@@ -45,7 +45,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50288 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50520 $", interfaceVersion = 3, names = {}, urls = {})
 public class OdyseeCom extends PluginForHost {
     public OdyseeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -172,7 +172,10 @@ public class OdyseeCom extends PluginForHost {
         final String sourceExt = getFileNameExtensionFromString((String) JavaScriptEngineFactory.walkJson(videoInfo, "source/name"));
         final String ext;
         final boolean directDownload;
-        if ("audio".equals(stream_type)) {
+        if ("binary".equals(stream_type)) {
+            directDownload = true;
+            ext = sourceExt != null ? sourceExt : "";
+        } else if ("audio".equals(stream_type)) {
             directDownload = true;
             ext = ".mp3";
         } else if ("document".equals(stream_type)) {
@@ -324,6 +327,11 @@ public class OdyseeCom extends PluginForHost {
         dl.startDownload();
     }
 
+    @Override
+    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    }
+
     private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty, final boolean resumable, final int maxchunks) throws Exception {
         final String url = link.getStringProperty(directlinkproperty);
         if (StringUtils.isEmpty(url)) {
@@ -338,6 +346,8 @@ public class OdyseeCom extends PluginForHost {
                 brc.followConnection(true);
                 throw new IOException();
             }
+        } catch (final InterruptedException e) {
+            throw e;
         } catch (final Throwable e) {
             link.removeProperty(directlinkproperty);
             logger.log(e);

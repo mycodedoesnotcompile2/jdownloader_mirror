@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 50421 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50521 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1570,7 +1570,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
         if (account == null) {
             /* Programmer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (br.getHttpConnection().getResponseCode() == 200 && !this.isLoggedin(br, account)) {
+        } else if (br.getHttpConnection().getResponseCode() == 200 && br.containsHTML("<html>") && !this.isLoggedin(br, account)) {
             throw new AccountUnavailableException("Session expired?", 5 * 60 * 1000l);
         } else {
             // TODO: Jiaz: other response codes?

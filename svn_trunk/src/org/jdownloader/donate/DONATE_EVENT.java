@@ -55,6 +55,12 @@ public enum DONATE_EVENT {
                 } else {
                     return false;
                 }
+            } else if (year == 2025) {
+                if ((month == Calendar.SEPTEMBER && day >= 20) || (month == Calendar.OCTOBER && day <= 5)) {
+                    return true;
+                } else {
+                    return false;
+                }
             }
             return false;
         }

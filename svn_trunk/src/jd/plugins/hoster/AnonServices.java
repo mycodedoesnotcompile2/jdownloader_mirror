@@ -24,7 +24,7 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
@@ -40,11 +40,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50518 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50519 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonServices extends PluginForHost {
     public AnonServices(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     public static String API_BASE                                  = "https://anon.services/api";
@@ -126,7 +125,12 @@ public class AnonServices extends PluginForHost {
         return 0;
     }
 
-    private String getFileURL(final DownloadLink link, final String passCode) throws MalformedURLException {
+    @Override
+    public String getPluginContentURL(final DownloadLink link) {
+        return getFileURL(link, this.getStoredDownloadPassword(link));
+    }
+
+    private String getFileURL(final DownloadLink link, final String passCode) {
         String url = "https://" + getHost() + "/file/" + this.getFID(link);
         if (passCode != null) {
             url += "?file_pw=" + Encoding.urlEncode(passCode);
@@ -134,23 +138,35 @@ public class AnonServices extends PluginForHost {
         return url;
     }
 
-    private String getContentURL(final DownloadLink link) throws MalformedURLException {
-        return getContentURL(link, link.getDownloadPassword());
+    private String getDownloadPasswordFromURL(final DownloadLink link) {
+        final boolean allowPassCodeFromURL = link.getBooleanProperty(PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL, true);
+        if (!allowPassCodeFromURL) {
+            return null;
+        }
+        try {
+            final String passCodeFromURL = UrlQuery.parse(link.getPluginPatternMatcher()).get("file_pw");
+            return passCodeFromURL;
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
-    private String getContentURL(final DownloadLink link, final String passCode) throws MalformedURLException {
-        String url;
-        if (passCode != null) {
-            url = URLHelper.getUrlWithoutParams(link.getPluginPatternMatcher());
-            url += "?file_pw=" + Encoding.urlEncode(passCode);
+    private String getStoredDownloadPassword(final DownloadLink link) {
+        final String passCodeFromURL = getDownloadPasswordFromURL(link);
+        if (passCodeFromURL != null) {
+            return passCodeFromURL;
         } else {
-            url = link.getPluginPatternMatcher();
+            return link.getDownloadPassword();
         }
-        return url;
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        return requestFileInformationAPI(this.br, link);
+    }
+
+    private AvailableStatus requestFileInformationAPI(final Browser br, final DownloadLink link) throws IOException, PluginException {
         final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
@@ -169,7 +185,7 @@ public class AnonServices extends PluginForHost {
             /* E.g. {"msg":"File not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* If we reach this, that file is definitely not password protected. */
+        /* If we reach this, that file is definitely not (anymore) password protected. */
         link.setPasswordProtected(false);
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         /* Check for other/unknown errors */
@@ -185,6 +201,46 @@ public class AnonServices extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    private AvailableStatus requestFileInformationWebsite(final Browser br, final DownloadLink link, final String downloadPassword) throws IOException, PluginException {
+        /* Ensure that this also works for password protected links. */
+        br.getPage(this.getFileURL(link, downloadPassword));
+        checkErrorsWebsite(br, link);
+        String filename = br.getRegex("Filename\\s*</th><td[^>]*>([^<]+)</td>").getMatch(0);
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
+        }
+        final String filesizeStr = br.getRegex("Size\\s*</th>\\s*<td>([^<]+)</td>").getMatch(0);
+        if (filesizeStr != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+        } else {
+            logger.warning("Failed to find filesize");
+        }
+        final String hash_sha256 = br.getRegex("SHA256:\\s*([a-f0-9]{64})").getMatch(0);
+        final String hash_sha1 = br.getRegex("SHA1:\\s*([a-f0-9]{40})").getMatch(0);
+        final String hash_md5 = br.getRegex("MD5:\\s*([a-f0-9]{32})").getMatch(0);
+        final String hash_crc32 = br.getRegex("CRC32:\\s*([a-f0-9]{8})").getMatch(0);
+        /* Set hashes for CRC check */
+        if (!StringUtils.isEmpty(hash_crc32)) {
+            link.addHashInfo(HashInfo.newInstanceSafe(hash_crc32, HashInfo.TYPE.CRC32));
+        }
+        if (!StringUtils.isEmpty(hash_md5)) {
+            link.addHashInfo(HashInfo.newInstanceSafe(hash_md5, HashInfo.TYPE.MD5));
+        }
+        if (!StringUtils.isEmpty(hash_sha1)) {
+            link.addHashInfo(HashInfo.newInstanceSafe(hash_sha1, HashInfo.TYPE.SHA1));
+        }
+        if (!StringUtils.isEmpty(hash_sha256)) {
+            link.addHashInfo(HashInfo.newInstanceSafe(hash_sha256, HashInfo.TYPE.SHA256));
+        }
+        if (link.getHashInfo() == null) {
+            logger.warning("Failed to find any file hashes");
+        }
+        return AvailableStatus.TRUE;
+    }
+
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         handleDownload(link);
@@ -193,48 +249,13 @@ public class AnonServices extends PluginForHost {
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
         String dllink = "https://" + getHost() + "/download/" + this.getFID(link);
-        String filePasswordQueryPart = "";
-        String passCode = null;
-        final boolean allowPassCodeFromURL = link.getBooleanProperty(PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL, true);
-        final String passCodeFromURL = allowPassCodeFromURL ? UrlQuery.parse(link.getPluginPatternMatcher()).get("file_pw") : null;
-        if (link.isPasswordProtected()) {
-            passCode = passCodeFromURL;
-            if (passCode == null) {
-                passCode = link.getDownloadPassword();
-                if (passCode == null) {
-                    passCode = getUserInput("Password?", link);
-                }
-            }
-            filePasswordQueryPart = "?file_pw=" + Encoding.urlEncode(passCode);
-            dllink += filePasswordQueryPart;
+        String passCode = getStoredDownloadPassword(link);
+        if (passCode == null && link.isPasswordProtected()) {
+            /* Ask user to enter password. */
+            passCode = getUserInput("Password?", link);
         }
-        if (link.getHashInfo() == null && org.jdownloader.settings.staticreferences.CFG_GENERAL.CFG.isHashCheckEnabled()) {
-            /* Crawl file hashes via website as API does not provide them. */
-            logger.info("Crawling file hashes");
-            final Browser brc = br.cloneBrowser();
-            /* Ensure that this also works for password protected links. */
-            brc.getPage(this.getFileURL(link, passCode));
-            checkErrorsWebsite(brc, link);
-            final String hash_sha256 = brc.getRegex("SHA256:\\s*([a-f0-9]{64})").getMatch(0);
-            final String hash_sha1 = brc.getRegex("SHA1:\\s*([a-f0-9]{40})").getMatch(0);
-            final String hash_md5 = brc.getRegex("MD5:\\s*([a-f0-9]{32})").getMatch(0);
-            final String hash_crc32 = brc.getRegex("CRC32:\\s*([a-f0-9]{8})").getMatch(0);
-            /* Set hashes for CRC check */
-            if (!StringUtils.isEmpty(hash_crc32)) {
-                link.addHashInfo(HashInfo.newInstanceSafe(hash_crc32, HashInfo.TYPE.CRC32));
-            }
-            if (!StringUtils.isEmpty(hash_md5)) {
-                link.addHashInfo(HashInfo.newInstanceSafe(hash_md5, HashInfo.TYPE.MD5));
-            }
-            if (!StringUtils.isEmpty(hash_sha1)) {
-                link.addHashInfo(HashInfo.newInstanceSafe(hash_sha1, HashInfo.TYPE.SHA1));
-            }
-            if (!StringUtils.isEmpty(hash_sha256)) {
-                link.addHashInfo(HashInfo.newInstanceSafe(hash_sha256, HashInfo.TYPE.SHA256));
-            }
-            if (link.getHashInfo() == null) {
-                logger.warning("Failed to find any file hashes");
-            }
+        if (passCode != null) {
+            dllink += "?file_pw=" + Encoding.urlEncode(passCode);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -249,6 +270,11 @@ public class AnonServices extends PluginForHost {
             logger.info("Found valid download password: " + passCode);
             link.setDownloadPassword(passCode);
         }
+        if (link.getHashInfo() == null && org.jdownloader.settings.staticreferences.CFG_GENERAL.CFG.isHashCheckEnabled()) {
+            /* Crawl file hashes via website as API does not provide them. */
+            logger.info("Performing linkcheck over website to find file hashes");
+            requestFileInformationWebsite(this.createNewBrowserInstance(), link, passCode);
+        }
         dl.startDownload();
     }
 
@@ -262,8 +288,21 @@ public class AnonServices extends PluginForHost {
                 logger.info("Got unespected 'file is password protected' message.");
                 link.setPasswordProtected(true);
             }
-            link.setDownloadPassword(null);
-            link.setProperty(PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL, false);
+            final String downloadPasswordFromURL = this.getDownloadPasswordFromURL(link);
+            if (downloadPasswordFromURL != null) {
+                /* Assume that password from URL was used -> Invalidate that */
+                link.setProperty(PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL, false);
+                if (downloadPasswordFromURL.equals(link.getDownloadPassword())) {
+                    /*
+                     * Same [wrong] password was also set on DownloadLink -> Invalidate it here too so we don't retry with the same wrong
+                     * password.
+                     */
+                    link.setDownloadPassword(null);
+                }
+            } else {
+                /* Assume that password from DownloadLink was used -> Invalidate that */
+                link.setDownloadPassword(null);
+            }
             throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
         }
     }

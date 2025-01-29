@@ -20,11 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -45,7 +40,12 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+
+@HostPlugin(revision = "$Revision: 50520 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastShareCz extends PluginForHost {
     public FastShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,8 +66,8 @@ public class FastShareCz extends PluginForHost {
     @Override
     public String rewriteHost(final String host) {
         /**
-         * 2023-04-11: Main domain has changed from fastshare.cz to fastshare.live. </br>
-         * 2024-03-21: Use fastshare.cloud as main domain because some users got problems reaching fastshare.live.
+         * 2023-04-11: Main domain has changed from fastshare.cz to fastshare.live. </br> 2024-03-21: Use fastshare.cloud as main domain
+         * because some users got problems reaching fastshare.live.
          */
         return this.rewriteHost(getPluginDomains(), host);
     }
@@ -170,9 +170,8 @@ public class FastShareCz extends PluginForHost {
         br.setCookie(this.getHost(), "lang", "cs");
         br.setCustomCharset("utf-8");
         /**
-         * 2023-08-20: The following information only applies for users of specific countries such as Germany: </br>
-         * When a user is not logged in, all files appear to be offline so effectively a linkcheck is only possible when an account is
-         * given.
+         * 2023-08-20: The following information only applies for users of specific countries such as Germany: </br> When a user is not
+         * logged in, all files appear to be offline so effectively a linkcheck is only possible when an account is given.
          */
         final boolean linkcheckOnlyPossibleWhenLoggedIn = false;
         if (linkcheckOnlyPossibleWhenLoggedIn && account == null) {
@@ -207,7 +206,7 @@ public class FastShareCz extends PluginForHost {
         } finally {
             con.disconnect();
         }
-        final String htmlRefresh = br.getRequest().getHTMLRefresh();
+        final String htmlRefresh = getRedirectLocation(br);
         if (htmlRefresh != null) {
             if (htmlRefresh.matches("^https?://[^/]+/?$")) {
                 /* Redirect to mainpage */
@@ -249,6 +248,19 @@ public class FastShareCz extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    private String getRedirectLocation(Browser br) {
+        String ret = br.getRedirectLocation();
+        if (ret != null) {
+            return ret;
+        }
+        ret = br.getRequest().getHTMLRefresh();
+        if (ret != null) {
+            return ret;
+        }
+        ret = br.getRegex("<script>\\s*top\\.location\\.href\\s*=\\s*'(.*?)'\\s*;").getMatch(0);
+        return ret;
+    }
+
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         handleDownload(link, null);
@@ -288,13 +300,13 @@ public class FastShareCz extends PluginForHost {
                     if (br.containsHTML("Špatně zadaný kód\\. Zkuste to znovu")) {
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                     }
-                    dllink = br.getRedirectLocation();
+                    dllink = getRedirectLocation(br);
                 }
                 if (dllink != null && canHandle(dllink)) {
                     // TODO: Check if this is still needed
                     // eg redirect http->https or cut-off ref parameter
                     br.getPage(dllink);
-                    dllink = br.getRedirectLocation();
+                    dllink = getRedirectLocation(br);
                 }
                 if (dllink == null) {
                     this.checkErrors(br, link, account);

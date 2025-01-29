@@ -15,14 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.ArtstationComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -40,7 +32,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://[a-z0-9\\-\\.]+\\.artstation\\.com/p/assets/.+" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.ArtstationComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50525 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://[a-z0-9\\-\\.]+\\.artstation\\.com/p/assets/.+" })
 public class ArtstationCom extends PluginForHost {
     public ArtstationCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,7 +98,7 @@ public class ArtstationCom extends PluginForHost {
         br2.setFollowRedirects(true);
         URLConnectionAdapter con = null;
         try {
-            br2.getHeaders().put("Accept-Encoding", "identity");
+            br2.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
             con = br2.openHeadConnection(dllink);
             if (looksLikeDownloadableContent(con)) {
                 if (con.getCompleteContentLength() > 0) {
@@ -131,7 +132,7 @@ public class ArtstationCom extends PluginForHost {
     }
 
     private void doDownload(final Account account, final DownloadLink link, final String url) throws Exception {
-        this.br.getHeaders().put("Accept-Encoding", "identity");
+        this.br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, url, this.isResumeable(link, account), free_maxchunks);
         if (!looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);

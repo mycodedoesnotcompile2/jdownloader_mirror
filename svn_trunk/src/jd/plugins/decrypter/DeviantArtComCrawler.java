@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -44,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 48324 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(?!core-membership|search|developers|join|users)[\\w\\-]+($|/favourites(/\\d+/[\\w\\-]+)?|/gallery/\\d+/[\\w\\-]+|/gallery/(all|scraps))" })
+@DecrypterPlugin(revision = "$Revision: 50522 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(?!core-membership|search|developers|join|users)[\\w\\-]+($|/favourites(/\\d+/[\\w\\-]+)?|/gallery/\\d+/[\\w\\-]+|/gallery/(all|scraps))" })
 public class DeviantArtComCrawler extends PluginForDecrypt {
     /**
      * @author raztoki, pspzockerscene
@@ -58,10 +59,10 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
 
-    private final String PATTERN_USER                   = "(?i)^https?://[^/]+/([\\w\\-]+)$";
-    private final String PATTERN_USER_FAVORITES         = "(?i)^https?://[^/]+/([\\w\\-]+)/favourites$";
-    private final String PATTERN_USER_FAVORITES_GALLERY = "(?i)^https?://[^/]+/([\\w\\-]+)/favourites/(\\d+)/([\\w\\-]+).*";
-    private final String PATTERN_GALLERY                = "(?i)^https?://[^/]+/([\\w\\-]+)/gallery/(\\d+)/([\\w\\-]+)$";
+    private final Pattern PATTERN_USER                   = Pattern.compile("/([\\w\\-]+)$", Pattern.CASE_INSENSITIVE);
+    private final Pattern PATTERN_USER_FAVORITES         = Pattern.compile("/([\\w\\-]+)/favourites$", Pattern.CASE_INSENSITIVE);
+    private final Pattern PATTERN_USER_FAVORITES_GALLERY = Pattern.compile("/([\\w\\-]+)/favourites/(\\d+)/([\\w\\-]+).*", Pattern.CASE_INSENSITIVE);
+    private final Pattern PATTERN_GALLERY                = Pattern.compile("/([\\w\\-]+)/gallery/(\\d+)/([\\w\\-]+)$", Pattern.CASE_INSENSITIVE);
 
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -76,11 +77,11 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
             plg.login(account, false);
         }
         final Regex favouritesGallery = new Regex(addedurl, PATTERN_USER_FAVORITES_GALLERY);
-        if (addedurl.matches(PATTERN_USER_FAVORITES_GALLERY)) {
+        if (favouritesGallery.patternFind()) {
             return crawlFavouritesGallery(account, favouritesGallery.getMatch(0), favouritesGallery.getMatch(1), favouritesGallery.getMatch(2));
-        } else if (addedurl.matches(PATTERN_USER_FAVORITES)) {
+        } else if (new Regex(addedurl, PATTERN_USER_FAVORITES).patternFind()) {
             return this.crawlProfileFavorites(account, param);
-        } else if (addedurl.matches(PATTERN_GALLERY)) {
+        } else if (new Regex(addedurl, PATTERN_GALLERY).patternFind()) {
             return this.crawlProfileOrGallery(account, param);
         } else {
             return this.crawlProfileOrGallery(account, param);

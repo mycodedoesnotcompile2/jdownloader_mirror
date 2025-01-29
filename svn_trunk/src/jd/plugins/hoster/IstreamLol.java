@@ -18,21 +18,18 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50523 $", interfaceVersion = 3, names = {}, urls = {})
-public class FilestoreMe extends XFileSharingProBasic {
-    public FilestoreMe(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 50522 $", interfaceVersion = 3, names = {}, urls = {})
+public class IstreamLol extends XFileSharingProBasic {
+    public IstreamLol(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -41,13 +38,13 @@ public class FilestoreMe extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2023-07-24: null <br />
+     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filestore.me" });
+        ret.add(new String[] { "istream.lol" });
         return ret;
     }
 
@@ -84,13 +81,13 @@ public class FilestoreMe extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 1;
+            return 0;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return 1;
+            return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 1;
+            return 0;
         }
     }
 
@@ -110,59 +107,21 @@ public class FilestoreMe extends XFileSharingProBasic {
     }
 
     @Override
-    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
-        String dllink = super.getDllink(link, account, br, src);
-        /**
-         * 2023-07-25: Small workaround: They can sometimes provide embedded PDF URLs. Those are direct-URLs and work just fine but using
-         * them will result in corrupt filenames. </br> Doing what we do here results in the upper handling using the
-         * "official download button" instead.
-         */
-        if (dllink != null && !StringUtils.containsIgnoreCase(dllink, "embedded=true")) {
-            return dllink;
+    protected boolean isVideohoster_enforce_video_filename() {
+        return true;
+    }
+
+    @Override
+    public String getLoginURL() {
+        return getMainPage() + "/auth/login";
+    }
+
+    @Override
+    public boolean isLoggedin(final Browser brc) {
+        if (brc.containsHTML("/auth/logout")) {
+            return true;
         } else {
-            return null;
+            return super.isLoggedin(brc);
         }
-    }
-
-    @Override
-    protected boolean supports_availablecheck_alt() {
-        /* 2024-04-17 */
-        return false;
-    }
-
-    @Override
-    protected boolean supports_availablecheck_filesize_html() {
-        /* 2023-10-04 */
-        return false;
-    }
-
-    @Override
-    public String[] scanInfo(final String html, final String[] fileInfo) {
-        super.scanInfo(html, fileInfo);
-        final String betterFilesize = br.getRegex("<span>Size ([^<]+)</span>").getMatch(0);
-        if (betterFilesize != null) {
-            fileInfo[1] = betterFilesize;
-        }
-        return fileInfo;
-    }
-
-    @Override
-    public ArrayList<String> getCleanupHTMLRegexes() {
-        /* 2024-04-17: Return empty array as commented out html of this website contains filesize which we otherwise cannot find. */
-        final ArrayList<String> cleanupRegExes = new ArrayList<String>();
-        return cleanupRegExes;
-    }
-
-    @Override
-    protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
-        if (super.looksLikeDownloadableContent(urlConnection)) {
-            return true;
-        }
-        final String contentType = urlConnection.getContentType();
-        if ((urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206) && CompiledFiletypeFilter.DocumentExtensions.TXT.isSameExtensionGroup(getDownloadLink().getLinkInfo().getExtension()) && StringUtils.equalsIgnoreCase(contentType, "text/plain")) {
-            /* Special check for .txt content without content-disposition header */
-            return true;
-        }
-        return false;
     }
 }

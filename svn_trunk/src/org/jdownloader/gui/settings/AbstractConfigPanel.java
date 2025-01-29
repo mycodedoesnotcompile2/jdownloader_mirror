@@ -8,6 +8,9 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -15,6 +18,12 @@ import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.SwingUtilities;
+import javax.swing.text.html.HTML;
+
+import jd.gui.swing.jdgui.interfaces.SwitchPanel;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.parser.Regex;
+import net.miginfocom.swing.MigLayout;
 
 import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.swing.components.ExtCheckBox;
@@ -30,10 +39,6 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.RestartController;
 import org.jdownloader.updatev2.SmartRlyExitRequest;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.gui.swing.jdgui.interfaces.SwitchPanel;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import net.miginfocom.swing.MigLayout;
 
 public abstract class AbstractConfigPanel extends SwitchPanel {
     public static class HighlightLabel extends JLabel {
@@ -173,6 +178,7 @@ public abstract class AbstractConfigPanel extends SwitchPanel {
     public JLabel addDescriptionPlain(String description) {
         if (!description.toLowerCase().startsWith("<html>")) {
             description = "<html>" + description.replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>") + "</html>";
+            description = escapeUnsupportedTags(description);
         }
         JLabel txt = new JLabel();
         SwingUtils.setOpaque(txt, false);
@@ -258,9 +264,26 @@ public abstract class AbstractConfigPanel extends SwitchPanel {
         save();
     }
 
+    public static String escapeUnsupportedTags(final String html) {
+        final StringBuffer sb = new StringBuffer();
+        final Matcher m = Pattern.compile("(?i)(</?[^>]*>)").matcher(html);
+        matcher: while (m.find()) {
+            final String match = html.substring(m.start(), m.end());
+            final String tag = new Regex(match, "</?([^>]*)").getMatch(0);
+            if (HTML.getTag(tag.toLowerCase(Locale.ENGLISH)) != null) {
+                m.appendReplacement(sb, Matcher.quoteReplacement(match));
+                continue matcher;
+            }
+            m.appendReplacement(sb, Matcher.quoteReplacement("&lt;" + match.substring(1)));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
     public HighlightLabel createLabel(String text) {
         if (text != null && !text.toLowerCase().startsWith("<html>")) {
             text = "<html>" + text.replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>") + "</html>";
+            text = escapeUnsupportedTags(text);
         }
         HighlightLabel lbl = new HighlightLabel(text);
         return lbl;

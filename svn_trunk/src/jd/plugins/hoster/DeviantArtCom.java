@@ -65,16 +65,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50446 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
+@HostPlugin(revision = "$Revision: 50522 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
 public class DeviantArtCom extends PluginForHost {
-    private final String               TYPE_DOWNLOADALLOWED_HTML             = "(?i)class=\"text\">HTML download</span>";
+    private final String               TYPE_DOWNLOADALLOWED_HTML             = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML           = "<div class=\"grf\\-indent\"";
     private boolean                    downloadHTML                          = false;
     private String                     betterHTML                            = null;
     private boolean                    accountRequiredWhenDownloadImpossible = false;
-    private final String               PATTERN_ART                           = "(?i)https?://[^/]+/([\\w\\-]+/)?art/([\\w\\-]+)-(\\d+)";
-    private final String               PATTERN_JOURNAL                       = "(?i)https?://[^/]+/([\\w\\-]+/)?journal/([\\w\\-]+)-(\\d+)";
-    public static final String         PATTERN_STATUS                        = "(?i)https?://[^/]+/([\\w\\-]+)/([\\w\\-]+/)?status(?:-update)?/(\\d+)";
+    public static final Pattern        PATTERN_ART                           = Pattern.compile("/([\\w\\-]+/)?art/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern        PATTERN_JOURNAL                       = Pattern.compile("/([\\w\\-]+/)?journal/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern        PATTERN_STATUS                        = Pattern.compile("/([\\w\\-]+)/([\\w\\-]+/)?status(?:-update)?/(\\d+)", Pattern.CASE_INSENSITIVE);
     public static final String         PROPERTY_USERNAME                     = "username";
     public static final String         PROPERTY_TITLE                        = "title";
     public static final String         PROPERTY_TYPE                         = "type";
@@ -240,10 +240,12 @@ public class DeviantArtCom extends PluginForHost {
     }
 
     private static String setTitleProperty(final DownloadLink link, String title) {
-        if (title != null) {
-            title = title.replaceAll("(?i) on deviantart$", "");
-            link.setProperty(PROPERTY_TITLE, title);
+        if (title == null) {
+            return null;
         }
+        /* Do some corrections */
+        title = title.replaceAll("(?i) on deviantart$", "");
+        link.setProperty(PROPERTY_TITLE, title);
         return title;
     }
 
@@ -267,6 +269,7 @@ public class DeviantArtCom extends PluginForHost {
         } else if (br.containsHTML("/error\\-title\\-oops\\.png\\)")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!this.canHandle(br.getURL()) && !br.getURL().contains(fid)) {
+            /* Redirect to unsupported URL. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         this.handleConnectionErrors(br, br.getHttpConnection(), false);
@@ -379,8 +382,8 @@ public class DeviantArtCom extends PluginForHost {
                 link.setProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL, displayedImageURL);
             }
         }
-        final String officialDownloadFilesizeStr = br.getRegex("(?i)>\\s*Image size\\s*</div><div [^>]*>\\d+x\\d+px\\s*(\\d+[^>]+)</div>").getMatch(0);
-        // final boolean accountNeededForOfficialDownload = br.containsHTML("(?i)Log in to download");
+        final String officialDownloadFilesizeStr = br.getRegex(">\\s*Image size\\s*</div><div [^>]*>\\d+x\\d+px\\s*(\\d+[^>]+)</div>").getMatch(0);
+        // final boolean accountNeededForOfficialDownload = br.containsHTML("Log in to download");
         if (StringUtils.isEmpty(officialDownloadurl)) {
             officialDownloadurl = br.getRegex("data-hook=\"download_button\"[^>]*href=\"(https?://[^\"]+)").getMatch(0);
             if (officialDownloadurl != null) {
@@ -409,9 +412,10 @@ public class DeviantArtCom extends PluginForHost {
              * We're ignoring this during linkcheck as by now we know the file is online.
              */
         }
+        final String contenturl = link.getPluginPatternMatcher();
         boolean allowGrabFilesizeFromHeader = false;
         /* Check if either user wants to download the html code or if we have a linktype which needs this. */
-        if (link.getPluginPatternMatcher().matches(PATTERN_JOURNAL) || link.getPluginPatternMatcher().matches(PATTERN_STATUS) || isLiterature || isStatus) {
+        if (new Regex(contenturl, PATTERN_JOURNAL).patternFind() || isLiterature || isStatus || isStatus(link)) {
             /* E.g. journal: https://www.deviantart.com/janny654/art/Nora-the-Goblin-s-Pony-chapter-1-824882173 */
             downloadHTML = true;
             forcedExt = ".html";
@@ -553,8 +557,8 @@ public class DeviantArtCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    public static boolean isStatus(DownloadLink link) {
-        if (StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "status") || link.getPluginPatternMatcher().matches(PATTERN_STATUS)) {
+    public static boolean isStatus(final DownloadLink link) {
+        if (StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "status") || new Regex(link.getPluginPatternMatcher(), PATTERN_STATUS).patternFind()) {
             return true;
         } else {
             return false;
@@ -613,7 +617,7 @@ public class DeviantArtCom extends PluginForHost {
     }
 
     private static boolean isAccountRequiredForOfficialDownload(final Browser br) {
-        if (br.containsHTML("(?i)aria-label=\"Log in to download\"")) {
+        if (br.containsHTML("aria-label=\"Log in to download\"")) {
             return true;
         } else {
             return false;
@@ -629,7 +633,7 @@ public class DeviantArtCom extends PluginForHost {
     }
 
     private boolean looksLikeAccountRequiredUploaderDecision(final Browser br) {
-        if (br.containsHTML("(?i)has limited the viewing of this artwork\\s*<")) {
+        if (br.containsHTML("has limited the viewing of this artwork\\s*<")) {
             return true;
         } else {
             return false;
@@ -637,7 +641,7 @@ public class DeviantArtCom extends PluginForHost {
     }
 
     private boolean looksLikeAccountRequiredMatureContent(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*This content is intended for mature audiences")) {
+        if (br.containsHTML(">\\s*This content is intended for mature audiences")) {
             return true;
         } else {
             return false;
