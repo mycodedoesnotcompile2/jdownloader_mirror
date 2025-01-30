@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50530 $", interfaceVersion = 3, names = {}, urls = {})
 public class MrdeepfakesCom extends KernelVideoSharingComV2 {
     public MrdeepfakesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -77,5 +77,14 @@ public class MrdeepfakesCom extends KernelVideoSharingComV2 {
     @Override
     protected boolean useEmbedWorkaround() {
         return true;
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        if (br.containsHTML(">\\s*Video deleted")) {
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
+        }
     }
 }

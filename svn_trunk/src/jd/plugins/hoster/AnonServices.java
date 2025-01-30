@@ -40,12 +40,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50519 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50526 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonServices extends PluginForHost {
     public AnonServices(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    /** Using API from: https://anon.services/static/anon_cli.py */
     public static String API_BASE                                  = "https://anon.services/api";
     private final String PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL = "allow_download_password_from_url";
 
@@ -62,7 +63,7 @@ public class AnonServices extends PluginForHost {
         return "https://" + getHost() + "/terms";
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "anon.services" });
@@ -96,7 +97,7 @@ public class AnonServices extends PluginForHost {
         }
     }
 
-    private boolean looksLikeValidFileID(final String str) {
+    public static boolean looksLikeValidContentID(final String str) {
         if (str == null) {
             return false;
         } else if (!str.replace("-", "").matches("[a-f0-9]{32}")) {
@@ -130,10 +131,22 @@ public class AnonServices extends PluginForHost {
         return getFileURL(link, this.getStoredDownloadPassword(link));
     }
 
-    private String getFileURL(final DownloadLink link, final String passCode) {
-        String url = "https://" + getHost() + "/file/" + this.getFID(link);
+    public String getFileURL(final DownloadLink link, final String passCode) {
+        return getFileURL(this.getFID(link), passCode);
+    }
+
+    public String getFileURL(final String fileID, final String passCode) {
+        String url = "https://" + getHost() + "/file/" + fileID;
         if (passCode != null) {
             url += "?file_pw=" + Encoding.urlEncode(passCode);
+        }
+        return url;
+    }
+
+    public String getFolderURL(final String folderID, final String passCode) {
+        String url = "https://" + getHost() + "/folder/" + folderID;
+        if (passCode != null) {
+            url += "?folder_pw=" + Encoding.urlEncode(passCode);
         }
         return url;
     }
@@ -171,10 +184,9 @@ public class AnonServices extends PluginForHost {
         if (!link.isNameSet()) {
             /* Fallback */
             link.setName(fid);
-        } else if (!this.looksLikeValidFileID(fid)) {
+        } else if (!looksLikeValidContentID(fid)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        this.setBrowserExclusive();
         br.getPage(API_BASE + "/files/" + fid);
         if (br.getHttpConnection().getResponseCode() == 403) {
             /* We know that the file is online but we cannot get more information. */
@@ -196,7 +208,9 @@ public class AnonServices extends PluginForHost {
         link.setFinalFileName(entries.get("filename").toString());
         link.setVerifiedFileSize(((Number) entries.get("size")).longValue());
         if (Boolean.TRUE.equals(entries.get("banned"))) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "File is banned");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "File has been banned");
+        } else if (Boolean.TRUE.equals(entries.get("deleted"))) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "File has been deleted");
         }
         return AvailableStatus.TRUE;
     }

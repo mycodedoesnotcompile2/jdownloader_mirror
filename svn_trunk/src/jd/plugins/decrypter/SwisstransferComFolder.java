@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.decrypter.SwisstransferComFolder.SwisstransferComConfig.CrawlMode;
 import jd.plugins.hoster.SwisstransferCom;
 
-@DecrypterPlugin(revision = "$Revision: 50503 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50526 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwisstransferComFolder extends PluginForDecrypt {
     public SwisstransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -292,13 +292,13 @@ public class SwisstransferComFolder extends PluginForDecrypt {
             FILES_FOLDERS {
                 @Override
                 public String getLabel() {
-                    return "Add loose files";
+                    return "Add individual files";
                 }
             },
             ALL {
                 @Override
                 public String getLabel() {
-                    return "Add loose files and .zip container";
+                    return "Add individual files and .zip container";
                 }
             },
             DEFAULT {

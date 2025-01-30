@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50522 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50526 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -1232,10 +1232,6 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         return ret;
     }
 
-    private String getPackagenameHashtag(final InstagramMetadata metadata) {
-        return "hashtag - " + metadata.getHashtag();
-    }
-
     @SuppressWarnings("unchecked")
     @Deprecated
     /**
@@ -2027,7 +2023,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlSearchWithLimitErrorhandling(final CryptedLink param, final Account account, final AtomicBoolean loggedIN, final String searchTerm) throws UnsupportedEncodingException, Exception {
-        final long searchMaxItemsLimit = 25; // TODO: use PluginJsonConfig.get(InstagramConfig.class).getSearchCrawlerMaxItemsLimit();
+        final long searchMaxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getSearchCrawlerMaxItemsLimit();
         if (searchMaxItemsLimit == 0) {
             logger.info("User has disabled search term crawler");
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -2056,13 +2052,13 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         final InstagramMetadata metadata = new InstagramMetadata();
         if (isHashtag) {
             metadata.setHashtag(searchTerm);
-            metadata.setPackageName(getPackagenameHashtag(metadata));
+            metadata.setPackageName("hashtag - " + metadata.getHashtag());
         } else {
             metadata.setPackageName("search - " + searchTerm);
         }
         int page = 1;
         final long hashtagMaxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getHashtagCrawlerMaxItemsLimit();
-        final long searchMaxItemsLimit = 25; // TODO: use PluginJsonConfig.get(InstagramConfig.class).getSearchCrawlerMaxItemsLimit();
+        final long searchMaxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getSearchCrawlerMaxItemsLimit();
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("enable_metadata", "true");
         query.appendEncoded("query", searchTerm);

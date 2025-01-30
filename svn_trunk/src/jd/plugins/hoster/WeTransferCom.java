@@ -64,7 +64,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49287 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 50526 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -468,13 +468,13 @@ public class WeTransferCom extends PluginForHost {
             FILES_FOLDERS {
                 @Override
                 public String getLabel() {
-                    return "Add loose files & folders";
+                    return "Add individual files & folders";
                 }
             },
             ALL {
                 @Override
                 public String getLabel() {
-                    return "Add loose files & folders AND .zip with all items";
+                    return "Add individual files & folders AND .zip with all items";
                 }
             },
             DEFAULT {

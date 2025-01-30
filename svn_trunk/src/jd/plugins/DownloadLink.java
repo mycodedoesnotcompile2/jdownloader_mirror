@@ -36,6 +36,7 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
@@ -1360,30 +1361,32 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         return old;
     }
 
-    public FinalLinkState setFinalLinkState(FinalLinkState finalLinkState) {
+    public FinalLinkState setFinalLinkState(final FinalLinkState finalLinkState) {
         final FinalLinkState old;
         synchronized (this) {
             old = this.finalLinkState;
             this.finalLinkState = finalLinkState;
         }
-        if (old != finalLinkState) {
-            if (FinalLinkState.CheckFinished(finalLinkState)) {
-                setResumeable(false);
-                setChunksProgress(null);
-            }
-            if (finalLinkState == null || !FinalLinkState.CheckFinished(finalLinkState)) {
-                setFinishedDate(-1);
-            }
-            if (finalLinkState == FinalLinkState.OFFLINE) {
-                setAvailable(false);
-            }
-            if (finalLinkState != null && JsonConfig.create(GeneralSettings.class).isHashRetryEnabled() && finalLinkState.isFailedHash()) {
-                final List<DownloadLink> link = Arrays.asList(this);
-                DownloadWatchDog.getInstance().reset(link);
-            }
-            if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.FINAL_STATE, finalLinkState));
-            }
+        if (old == finalLinkState) {
+            return old;
+        }
+        if (FinalLinkState.CheckFinished(finalLinkState)) {
+            setResumeable(false);
+            setChunksProgress(null);
+        }
+        if (finalLinkState == null || !FinalLinkState.CheckFinished(finalLinkState)) {
+            setFinishedDate(-1);
+        }
+        if (finalLinkState == FinalLinkState.OFFLINE) {
+            setAvailable(false);
+        }
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && finalLinkState != null && JsonConfig.create(GeneralSettings.class).isHashRetryEnabled() && finalLinkState.isFailedHash()) {
+            /* TODO: This is broken, fix it, see: https://svn.jdownloader.org/issues/90433 */
+            final List<DownloadLink> link = Arrays.asList(this);
+            DownloadWatchDog.getInstance().reset(link);
+        }
+        if (hasNotificationListener()) {
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.FINAL_STATE, finalLinkState));
         }
         return old;
     }

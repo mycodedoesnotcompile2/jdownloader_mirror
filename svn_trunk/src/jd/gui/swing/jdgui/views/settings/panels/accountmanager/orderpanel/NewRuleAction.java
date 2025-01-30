@@ -35,24 +35,33 @@ public class NewRuleAction extends AbstractAddAction {
         super();
     }
 
-    public void actionPerformed(ActionEvent e) {
+    public void actionPerformed(final ActionEvent e) {
         final ArrayList<DomainInfo> list = getAvailableDomainInfoList();
         /* Allow only one rule per hoster -> Remove items from list which a rule already exists for. */
+        final boolean allowNewRuleIfRuleForSameDomainAlreadyExists = true;
         final HosterRuleController hrc = HosterRuleController.getInstance();
-        for (final AccountUsageRule aur : hrc.list()) {
-            list.remove(DomainInfo.getInstance(aur.getHoster()));
+        if (!allowNewRuleIfRuleForSameDomainAlreadyExists) {
+            for (final AccountUsageRule aur : hrc.list()) {
+                list.remove(DomainInfo.getInstance(aur.getHoster()));
+            }
         }
         final ChooseHosterDialog d = new ChooseHosterDialog(_GUI.T.NewRuleAction_actionPerformed_choose_hoster_message(), list.toArray(new DomainInfo[] {}));
         try {
             Dialog.getInstance().showDialog(d);
             final DomainInfo di = d.getSelectedItem();
-            if (di != null) {
-                /* Add rule for selected item [unless user cancels edit dialog]. */
-                final AccountUsageRule rule = new AccountUsageRule(di.getTld());
-                rule.setEnabled(true);
-                if (HosterRuleController.getInstance().validateRule(rule) && HosterRuleController.getInstance().showEditPanel(rule)) {
-                    hrc.add(rule);
+            if (di == null) {
+                return;
+            }
+            /* Add rule for selected item [unless user cancels edit dialog]. */
+            final String domain = di.getTld();
+            final AccountUsageRule rule = new AccountUsageRule(domain);
+            rule.setEnabled(true);
+            if (HosterRuleController.getInstance().validateRule(rule) && HosterRuleController.getInstance().showEditPanel(rule)) {
+                if (allowNewRuleIfRuleForSameDomainAlreadyExists) {
+                    /* Remove already existing rule(s) for same domain as we only want one rule per domain */
+                    hrc.removeRulesByDomain(domain);
                 }
+                hrc.add(rule);
             }
         } catch (DialogClosedException e1) {
             e1.printStackTrace();

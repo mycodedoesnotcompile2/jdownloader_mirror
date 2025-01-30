@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50013 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50530 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -154,7 +154,6 @@ public class JumploadsCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(this.getFallbackFilename(link));
         }
-        this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -164,10 +163,16 @@ public class JumploadsCom extends PluginForHost {
         String filename = br.getRegex("filename[^\"]+\"[^>]*>([^<]+)</h2>").getMatch(0);
         String filesize = br.getRegex("filesize[^\"]*\"[^>]*>([^<]+)</h2>").getMatch(0);
         if (filename != null) {
-            link.setName(Encoding.htmlDecode(filename).trim());
+            filename = Encoding.htmlDecode(filename).trim();
+            /* 2025-01-29: Set final filename here because server sends useless crap via Content-Disposition header */
+            link.setFinalFileName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (!StringUtils.isEmpty(filesize)) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -181,7 +186,7 @@ public class JumploadsCom extends PluginForHost {
     }
 
     private boolean isPasswordProtectedContent(final Browser br) {
-        if (br.containsHTML("(?i)class=\"passwordLockedFile\"")) {
+        if (br.containsHTML("class=\"passwordLockedFile\"")) {
             return true;
         } else {
             return false;
@@ -211,6 +216,10 @@ public class JumploadsCom extends PluginForHost {
             br.followConnection(true);
             /* 2020-04-07: E.g. premium account with disabled direct download */
             dllink = br.getRegex("(/download\\.php[^<>\"\\']+)").getMatch(0);
+            if (dllink == null) {
+                /* 2025-01-29 */
+                dllink = br.getRegex("href=\"(https?://[^/]+/dll/[^\"]+)\"").getMatch(0);
+            }
             if (dllink == null) {
                 br.getHeaders().put("x-requested-with", "XMLHttpRequest");
                 if (isPasswordProtectedContent(br)) {
@@ -300,7 +309,7 @@ public class JumploadsCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -318,36 +327,36 @@ public class JumploadsCom extends PluginForHost {
         if (waitSkippable) {
             /* Very rare case! */
             logger.info("Skipping pre-download waittime: " + waitStr);
+            return;
+        }
+        final int extraWaitSeconds = 1;
+        int wait;
+        if (waitStr != null && waitStr.matches("\\d+")) {
+            int passedTime = (int) ((System.currentTimeMillis() - timeBefore) / 1000) - extraWaitSeconds;
+            logger.info("Found waittime, parsing waittime: " + waitStr);
+            wait = Integer.parseInt(waitStr);
+            /*
+             * Check how much time has passed during eventual captcha event before this function has been called and see how much time is
+             * left to wait.
+             */
+            wait -= passedTime;
+            if (passedTime > 0) {
+                /* This usually means that the user had to solve a captcha which cuts down the remaining time we have to wait. */
+                logger.info("Total passed time during captcha: " + passedTime);
+            }
         } else {
-            final int extraWaitSeconds = 1;
-            int wait;
-            if (waitStr != null && waitStr.matches("\\d+")) {
-                int passedTime = (int) ((System.currentTimeMillis() - timeBefore) / 1000) - extraWaitSeconds;
-                logger.info("Found waittime, parsing waittime: " + waitStr);
-                wait = Integer.parseInt(waitStr);
-                /*
-                 * Check how much time has passed during eventual captcha event before this function has been called and see how much time
-                 * is left to wait.
-                 */
-                wait -= passedTime;
-                if (passedTime > 0) {
-                    /* This usually means that the user had to solve a captcha which cuts down the remaining time we have to wait. */
-                    logger.info("Total passed time during captcha: " + passedTime);
-                }
-            } else {
-                /* No waittime at all */
-                wait = 0;
-            }
-            if (wait > 0) {
-                logger.info("Waiting final waittime: " + wait);
-                sleep(wait * 1000l, link);
-            } else if (wait < -extraWaitSeconds) {
-                /* User needed more time to solve the captcha so there is no waittime left :) */
-                logger.info("Congratulations: Time to solve captcha was higher than waittime --> No waittime left");
-            } else {
-                /* No waittime at all */
-                logger.info("Found no waittime");
-            }
+            /* No waittime at all */
+            wait = 0;
+        }
+        if (wait > 0) {
+            logger.info("Waiting final waittime: " + wait);
+            sleep(wait * 1000l, link);
+        } else if (wait < -extraWaitSeconds) {
+            /* User needed more time to solve the captcha so there is no waittime left :) */
+            logger.info("Congratulations: Time to solve captcha was higher than waittime --> No waittime left");
+        } else {
+            /* No waittime at all */
+            logger.info("Found no waittime");
         }
     }
 

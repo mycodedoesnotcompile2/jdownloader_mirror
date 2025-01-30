@@ -554,6 +554,23 @@ public class HosterRuleController implements AccountControllerListener {
         }
     }
 
+    /** Removes all existing rules for given domain. */
+    public void removeRulesByDomain(final String domain) {
+        final List<AccountUsageRule> rulesToRemove = new ArrayList<AccountUsageRule>();
+        for (final AccountUsageRule rule : loadedRules) {
+            if (rule.getHoster().endsWith(domain)) {
+                rulesToRemove.add(rule);
+            }
+        }
+        if (rulesToRemove.isEmpty()) {
+            /* Nothing to remove */
+            return;
+        }
+        for (final AccountUsageRule rule : rulesToRemove) {
+            this.remove(rule);
+        }
+    }
+
     public void remove(final AccountUsageRule rule) {
         if (rule == null) {
             return;

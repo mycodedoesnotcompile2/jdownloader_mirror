@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50517 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50526 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -203,8 +203,9 @@ public class LeechallIo extends PluginForHost {
             resp = this.getUserInfoMap(br);
         }
         final Map<String, Object> data = (Map<String, Object>) resp.get("data");
-        if (!"active".equalsIgnoreCase(data.get("status").toString())) {
-            throw new AccountInvalidException("Account is not active");
+        final String status = data.get("status").toString();
+        if (!status.equalsIgnoreCase("active")) {
+            throw new AccountInvalidException("Account is not active | status: " + status);
         }
         final long total_downloadedBytes = ((Number) data.get("total_downloaded")).longValue();
         final Number total_files = (Number) data.get("total_files");
@@ -253,11 +254,12 @@ public class LeechallIo extends PluginForHost {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             if (limitinfo != null) {
-                /* Find individual host limits */
+                /* Users' individual host limits */
                 final Map<String, Object> limitsbandwidth = (Map<String, Object>) limitinfo.get("bandwidth");
                 if (limitsbandwidth != null) {
-                    mhost.setTrafficMax(Long.parseLong(limitsbandwidth.get("total").toString()));
-                    mhost.setTrafficLeft(mhost.getTrafficMax() - Long.parseLong(limitsbandwidth.get("used").toString()));
+                    final long trafficMaxBytes = Long.parseLong(limitsbandwidth.get("total").toString());
+                    mhost.setTrafficMax(trafficMaxBytes);
+                    mhost.setTrafficLeft(trafficMaxBytes - Long.parseLong(limitsbandwidth.get("used").toString()));
                 }
                 final Map<String, Object> limitsfilenum = (Map<String, Object>) limitinfo.get("files");
                 if (limitsfilenum != null) {
@@ -288,7 +290,7 @@ public class LeechallIo extends PluginForHost {
             final Cookies cookies = account.loadCookies("");
             String access_token = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
             if (cookies != null && access_token != null) {
-                this.br.setCookies(this.getHost(), cookies);
+                br.setCookies(cookies);
                 br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + access_token);
                 if (!force) {
                     /* Do not check cookies */
@@ -434,6 +436,7 @@ public class LeechallIo extends PluginForHost {
                 }
             }
         }
+        /* No error -> Return map */
         return entries;
     }
 }
