@@ -19,6 +19,9 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
+import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -33,18 +36,26 @@ import org.appwork.resources.AWUTheme;
 import org.appwork.resources.IconRef;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.action.BasicAction;
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.JavaVersion;
+import org.appwork.utils.images.IconIO;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
 
 public abstract class AbstractTray implements TrayMouseListener {
-    private static final int POPUP_INSETS = 5;
-    protected TrayIcon       trayIcon;
-    private TrayMouseAdapter ma;
-    private TrayIconPopup    jpopup;
-    protected BasicAction[]  actions;
-    private DelayedRunnable  doubleclickDelayer;
-    private Runnable         executeSingleClick;
+    /**
+     *
+     */
+    @AWTestValidateClassReference
+    private static final String JAVA_AWT_IMAGE_BASE_MULTI_RESOLUTION_IMAGE = "java.awt.image.BaseMultiResolutionImage";
+    private static final int    POPUP_INSETS                               = 5;
+    protected TrayIcon          trayIcon;
+    private TrayMouseAdapter    ma;
+    private TrayIconPopup       jpopup;
+    protected BasicAction[]     actions;
+    private DelayedRunnable     doubleclickDelayer;
+    private Runnable            executeSingleClick;
 
     public AbstractTray(BasicAction... basicActions) {
         this.actions = basicActions;
@@ -97,6 +108,19 @@ public abstract class AbstractTray implements TrayMouseListener {
     }
 
     protected TrayIcon initTray() {
+        IconRef icon = getIconRef();
+        final Image img = this.createTrayImage(icon, null);
+        final TrayIcon trayIcon = new TrayIcon(img, null, null);
+        // workaround. we should use MultiResImage here amd set auto to false to get a nice image in case of HIghDPI Screens.
+        // however, using true scales img down pretty good.
+        trayIcon.setImageAutoSize(true);
+        return trayIcon;
+    }
+
+    /**
+     * @return
+     */
+    protected IconRef getIconRef() {
         IconRef icon = TrayIconRef.trayicon;
         if (!TrayIconRef.trayicon.exists()) {
             icon = new IconRef() {
@@ -116,12 +140,7 @@ public abstract class AbstractTray implements TrayMouseListener {
                 }
             };
         }
-        final Image img = this.createTrayImage(icon);
-        final TrayIcon trayIcon = new TrayIcon(img, null, null);
-        // workaround. we should use MultiResImage here amd set auto to false to get a nice image in case of HIghDPI Screens.
-        // however, using true scales img down pretty good.
-        trayIcon.setImageAutoSize(true);
-        return trayIcon;
+        return icon;
     }
 
     /**
@@ -140,21 +159,43 @@ public abstract class AbstractTray implements TrayMouseListener {
      * @param systemTray
      * @return
      */
-    protected Image createTrayImage(final IconRef id) {
+    protected Image createTrayImage(final IconRef id, TrayIconExtender extend) {
         final SystemTray systemTray = SystemTray.getSystemTray();
         Dimension traySize = systemTray.getTrayIconSize();
         if (CrossSystem.isWindows()) {
+            if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
+                Class<?> clasBaseMultiResImage;
+                try {
+                    clasBaseMultiResImage = Class.forName(JAVA_AWT_IMAGE_BASE_MULTI_RESOLUTION_IMAGE);
+                    Constructor<?> constructor = clasBaseMultiResImage.getDeclaredConstructor(Image[].class);
+                    ArrayList<Image> imgs = new ArrayList<Image>();
+                    HashSet<String> dupe = new HashSet<String>();
+                    for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+                        AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
+                        int size = Math.max((int) (traySize.width * tx.getScaleX()), (int) (traySize.height * tx.getScaleY()));
+                        if (dupe.add("" + size)) {
+                            Image img = IconIO.centerImage(id.image(size), size, size, null);
+                            imgs.add(extend == null ? img : extend.modify(img));
+                        }
+                    }
+                    Image multiImage = (Image) constructor.newInstance(new Object[] { imgs.toArray(new Image[] {}) });
+                    return multiImage;
+                } catch (Exception e) {
+                    LogV3.log(e);
+                }
+            }
             try {
                 //
                 AffineTransform tx = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration().getDefaultTransform();
-                Image img = id.image(Math.max((int) (traySize.width * tx.getScaleX()), (int) (traySize.height * tx.getScaleY())));
-                return img;
+                Image img = IconIO.centerImage(id.image(Math.max((int) (traySize.width * tx.getScaleX()), (int) (traySize.height * tx.getScaleY()))), (int) (traySize.width * tx.getScaleX()), (int) (traySize.height * tx.getScaleY()), null);
+                return extend == null ? img : extend.modify(img);
             } catch (Exception e) {
                 LogV3.log(e);
                 DebugMode.debugger();
             }
         }
-        return id.image(Math.max(traySize.width, traySize.height));
+        Image img = IconIO.centerImage(id.image(Math.max(traySize.width, traySize.height)), traySize.width, traySize.height, null);
+        return extend == null ? img : extend.modify(img);
     }
 
     public void showAbout(MouseEvent mouseevent) {

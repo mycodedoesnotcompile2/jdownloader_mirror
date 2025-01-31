@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50531 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
 public class MegaDebridEu extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("mega-debrid.eu");
 
@@ -115,7 +115,7 @@ public class MegaDebridEu extends PluginForHost {
             final MultiHostHost mhost = new MultiHostHost();
             mhost.setName(hostinfo.get("name").toString());
             mhost.setDomains(domains);
-            if (!"up".equals(hostinfo.get("status"))) {
+            if (!"up".equalsIgnoreCase(hostinfo.get("status").toString())) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             supportedhosts.add(mhost);
@@ -144,10 +144,12 @@ public class MegaDebridEu extends PluginForHost {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
             /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long waitMillis = 60 * 1000l;
             if (link != null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
             } else {
-                throw new AccountUnavailableException("Invalid API response", 60 * 1000);
+                throw new AccountUnavailableException(msg, waitMillis);
             }
         }
         final String response_code = entries.get("response_code").toString();

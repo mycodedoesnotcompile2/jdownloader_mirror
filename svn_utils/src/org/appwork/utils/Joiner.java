@@ -59,7 +59,28 @@ public class Joiner {
         this.separator = separator;
     }
 
-    private boolean ignoreNull = false;
+    private boolean ignoreNull  = false;
+    private boolean ignoreEmpty = false;
+
+    /**
+     * @return the ignoreEmpty
+     */
+    public boolean isIgnoreEmpty() {
+        return ignoreEmpty;
+    }
+
+    /**
+     * @param ignoreEmpty
+     *            the ignoreEmpty to set
+     */
+    public void setIgnoreEmpty(boolean ignoreEmpty) {
+        this.ignoreEmpty = ignoreEmpty;
+    }
+
+    public Joiner ignoreEmpty(boolean ignoreEmpty) {
+        this.ignoreEmpty = ignoreEmpty;
+        return this;
+    }
 
     /**
      * @return the ignoreNull
@@ -187,6 +208,11 @@ public class Joiner {
     protected boolean skip(Object s) {
         if (isIgnoreNull() && s == null) {
             return true;
+        }
+        if (s instanceof String) {
+            if (isIgnoreEmpty() && StringUtils.isEmpty((String) s)) {
+                return true;
+            }
         }
         return false;
     }

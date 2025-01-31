@@ -47,6 +47,7 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.testframework.TestDependency;
+import org.appwork.utils.Application;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.StringUtils;
 
@@ -69,6 +70,14 @@ public class ScanClassStrings extends AWTest {
             return;
         }
         new ClassPathScanner<Exception>() {
+            protected void handle(java.lang.Class<?> cls, File root) throws Exception {
+                if (!Application.isJared(null) && root.isFile()) {
+                    // jar in ide. this is probabl now our own class
+                    return;
+                }
+                super.handle(cls, root);
+            };
+
             @Override
             public void handle(Class<?> type) throws Exception {
                 BuildDecisionRequired buildDec = type.getAnnotation(BuildDecisionRequired.class);
@@ -80,10 +89,10 @@ public class ScanClassStrings extends AWTest {
                             }
                             try {
                                 Class.forName(s);
-                            } catch (Exception e) {
+                            } catch (Throwable e) {
                                 LogV3.warning("Invalid Class Definition in  " + buildDec + " - " + type);
                                 LogV3.log(e);
-                                throw e;
+                                throw new WTFException(e);
                             }
                         }
                     }
@@ -93,10 +102,10 @@ public class ScanClassStrings extends AWTest {
                     for (String str : testDep.value()) {
                         try {
                             Class.forName(str);
-                        } catch (Exception e) {
-                            LogV3.warning("Invalid Class Definition in  " + buildDec + " - " + type);
+                        } catch (Throwable e) {
+                            LogV3.warning("Invalid Class Definition in  " + testDep + " - " + type);
                             LogV3.log(e);
-                            throw e;
+                            throw new WTFException(e);
                         }
                     }
                 }
@@ -128,8 +137,8 @@ public class ScanClassStrings extends AWTest {
                             }
                         }
                     }
-                } catch (Exception e) {
-                    throw e;
+                } catch (Throwable e) {
+                    throw new WTFException(e);
                 }
             }
 

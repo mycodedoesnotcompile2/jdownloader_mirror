@@ -331,9 +331,11 @@ public class PostBuildRunner {
         String[] paras = new String[args.length - 2];
         System.arraycopy(args, 2, paras, 0, paras.length);
         final File testConfigFile = new File(new File(base, "application"), "test_resources/config.json");
-        CONFIG = new HashMap<String, Object>();
-        if (testConfigFile.isFile()) {
-            CONFIG = JSonStorage.restoreFromString(IO.readFileToString(testConfigFile), TypeRef.HASHMAP);
+        if (CONFIG == null) {
+            CONFIG = new HashMap<String, Object>();
+            if (testConfigFile.isFile()) {
+                CONFIG = JSonStorage.restoreFromString(IO.readFileToString(testConfigFile), TypeRef.HASHMAP);
+            }
         }
         instance.runPostBuildTest(paras, new File(base, "application"));
     }

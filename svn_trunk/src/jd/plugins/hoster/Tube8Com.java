@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50456 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50532 $", interfaceVersion = 3, names = {}, urls = {})
 public class Tube8Com extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -166,7 +166,10 @@ public class Tube8Com extends PluginForHost {
             link.setFinalFileName((title + ".mp4"));
         }
         if (isDownload) {
-            br.getPage("/embed/" + fid + "/");
+            final boolean useEmbedWorkaround = false;
+            if (useEmbedWorkaround) {
+                br.getPage("/embed/" + fid + "/");
+            }
             final String jssource = br.getRegex("\"?mediaDefinition\"?\\s*:\\s*(\\[[^\\]]+\\])").getMatch(0);
             final List<Map<String, Object>> qualities = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
             if (qualities.isEmpty()) {
@@ -191,7 +194,11 @@ public class Tube8Com extends PluginForHost {
         int heightMax = 0;
         Map<String, Object> result = null;
         for (final Map<String, Object> quality : qualities) {
-            final Number heightO = (Number) quality.get("height");
+            Number heightO = (Number) quality.get("height");
+            final Object qualityO = quality.get("quality");
+            if (heightO == null && qualityO != null && qualityO instanceof String && qualityO.toString().matches("\\d+")) {
+                heightO = Integer.parseInt(qualityO.toString());
+            }
             if (result == null) {
                 result = quality;
             } else if (heightO != null && heightO.intValue() > heightMax) {

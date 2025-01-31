@@ -948,4 +948,45 @@ public class IconIO {
         }
         return ICO_SUPPORTED == Boolean.TRUE;
     }
+
+    public static Image centerImage(Image input) {
+        return centerImage(input, Math.max(input.getWidth(null), input.getHeight(null)), Math.max(input.getWidth(null), input.getHeight(null)), null);
+    }
+
+    /**
+     * crops or enlarges the image. does not scale, but crop or fill the background
+     *
+     * @param image
+     * @param size
+     * @param size2
+     * @param object
+     * @return
+     */
+    public static Image centerImage(Image input, int width, int height, Color background) {
+        int imageType = BufferedImage.TRANSLUCENT;
+        int transparency = Transparency.TRANSLUCENT;
+        if (input instanceof BufferedImage) {
+            imageType = ((BufferedImage) input).getType() == 0 ? BufferedImage.TYPE_INT_ARGB : ((BufferedImage) input).getType();
+            transparency = ((BufferedImage) input).getTransparency();
+        }
+        BufferedImage newImage;
+        if (org.appwork.utils.Application.isHeadless()) {
+            newImage = new BufferedImage(width, height, imageType);
+        } else {
+            final GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            final GraphicsDevice gd = ge.getDefaultScreenDevice();
+            final GraphicsConfiguration gc = gd.getDefaultConfiguration();
+            newImage = gc.createCompatibleImage(width, height, transparency);
+        }
+        Graphics2D g2d = newImage.createGraphics();
+        if (background != null) {
+            g2d.setColor(background);
+            g2d.fillRect(0, 0, width, height);
+        }
+        int x = (width - input.getWidth(null)) / 2;
+        int y = (height - input.getHeight(null)) / 2;
+        g2d.drawImage(input, x, y, null);
+        g2d.dispose();
+        return newImage;
+    }
 }

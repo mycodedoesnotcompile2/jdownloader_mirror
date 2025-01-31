@@ -158,6 +158,7 @@ import jd.http.NoGateWayException;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CandidateResultProvider;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -1447,6 +1448,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 boolean ok = false;
                 CachedAccount waitForAccount = null;
                 ConditionalSkipReason conditionalSkipReason = null;
+                AccountRequiredException accountRequiredException = null;
                 for (final CachedAccount cachedAccount : accountCache) {
                     final CachedAccountPermission permission = selector.getCachedAccountPermission(cachedAccount);
                     try {
@@ -1484,6 +1486,9 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         } else {
                             logger.log(e);
                         }
+                    } catch (final AccountRequiredException e) {
+                        accountRequiredException = e;
+                        logger.log(e);
                     } catch (final Exception e) {
                         logger.log(e);
                     }
@@ -1493,6 +1498,10 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         selector.addExcluded(candidate, new DownloadLinkCandidateResult(conditionalSkipReason, null, null));
                     } else if (waitForAccount != null) {
                         selector.addExcluded(candidate, new DownloadLinkCandidateResult(new WaitForAccountSkipReason(waitForAccount.getAccount()), null, null));
+                    } else if (accountRequiredException != null) {
+                        final DownloadLinkCandidateResult dcr = new DownloadLinkCandidateResult(RESULT.ACCOUNT_REQUIRED, accountRequiredException, null);
+                        dcr.setMessage(accountRequiredException.getMessage());
+                        selector.addExcluded(candidate, dcr);
                     } else {
                         selector.addExcluded(candidate, new DownloadLinkCandidateResult(RESULT.ACCOUNT_REQUIRED, null, null));
                     }

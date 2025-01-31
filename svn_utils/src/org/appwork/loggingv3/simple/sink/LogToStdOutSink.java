@@ -106,14 +106,14 @@ public class LogToStdOutSink extends AbstractSink {
         switch (record.getLevel()) {
         case EXCEPTION:
             if (switchIt(lastErr, record)) {
-                errOut.println("Err> Date: " + dateOnly.get().format(record.timestamp) + "  Thread " + record.threadID + "/" + record.threadName + " - " + record.getThrownAt().getClassName());
+                errOut.println("Err> " + dateOnly.get().format(record.timestamp) + "  Thread " + record.threadID + "/" + record.threadName + " - " + record.getThrownAt().getClassName());
             }
-            errOut.println(format(record));
+            errOut.println(StringUtils.multiLineIntend(format(record), "Err> "));
             lastErr = record;
             break;
         default:
             if (switchIt(lastOut, record)) {
-                stdOut.println("Std> Date: " + dateOnly.get().format(record.timestamp) + "  Thread " + record.threadID + "/" + record.threadName + " - " + record.getThrownAt().getClassName());
+                stdOut.println("Std> " + dateOnly.get().format(record.timestamp) + "  Thread " + record.threadID + "/" + record.threadName + " - " + record.getThrownAt().getClassName());
             }
             stdOut.println(format(record));
             lastOut = record;

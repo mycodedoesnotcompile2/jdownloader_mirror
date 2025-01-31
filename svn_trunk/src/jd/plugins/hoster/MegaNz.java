@@ -110,7 +110,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50503 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50532 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -1058,17 +1058,19 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
 
     @Override
     public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
-        if (downloadLink != null) {
-            final boolean isPremium = account != null && AccountType.PREMIUM.equals(account.getType());
-            if (!StringUtils.equals((String) downloadLink.getProperty(USED_PLUGIN, getHost()), getHost())) {
-                return false;
-            } else if (!isPremium && downloadLink.getVerifiedFileSize() > 5368709120l && getMegaNzConfig().is5GBFreeLimitEnabled()) {
-                /**
-                 * 2024-07-02: Skip files over 5GB as we cannot download them in free mode, see: </br>
-                 * https://board.jdownloader.org/showthread.php?t=75268
-                 */
-                throw new AccountRequiredException("Free download of files >5GB is disabled in settings");
-            }
+        if (downloadLink == null) {
+            return super.canHandle(downloadLink, account);
+        }
+        final boolean isPremium = account != null && AccountType.PREMIUM.equals(account.getType());
+        if (!StringUtils.equals((String) downloadLink.getProperty(USED_PLUGIN, getHost()), getHost())) {
+            return false;
+        } else if (!isPremium && downloadLink.getView().getBytesTotal() > 5368709120l && getMegaNzConfig().is5GBFreeLimitEnabled()) {
+            /**
+             * 2024-07-02: Skip files over 5GB as we cannot download them in free mode and user has configured plugin to skip them
+             * immediately, see: </br>
+             * https://board.jdownloader.org/showthread.php?t=75268
+             */
+            throw new AccountRequiredException("Free download of files >5GB is disabled in settings");
         }
         return super.canHandle(downloadLink, account);
     }
