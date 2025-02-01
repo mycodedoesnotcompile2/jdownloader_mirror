@@ -18,7 +18,6 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,7 +32,6 @@ import java.util.regex.Pattern;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.downloader.text.TextDownloader;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.DeviantArtComConfig;
@@ -49,7 +47,6 @@ import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.Form;
 import jd.parser.html.HTMLSearch;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -65,35 +62,37 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50522 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
+@HostPlugin(revision = "$Revision: 50542 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
 public class DeviantArtCom extends PluginForHost {
-    private final String               TYPE_DOWNLOADALLOWED_HTML             = "class=\"text\">\\s*HTML download\\s*</span>";
-    private final String               TYPE_DOWNLOADFORBIDDEN_HTML           = "<div class=\"grf\\-indent\"";
-    private boolean                    downloadHTML                          = false;
-    private String                     betterHTML                            = null;
-    private boolean                    accountRequiredWhenDownloadImpossible = false;
-    public static final Pattern        PATTERN_ART                           = Pattern.compile("/([\\w\\-]+/)?art/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern        PATTERN_JOURNAL                       = Pattern.compile("/([\\w\\-]+/)?journal/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern        PATTERN_STATUS                        = Pattern.compile("/([\\w\\-]+)/([\\w\\-]+/)?status(?:-update)?/(\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final String         PROPERTY_USERNAME                     = "username";
-    public static final String         PROPERTY_TITLE                        = "title";
-    public static final String         PROPERTY_TYPE                         = "type";
-    private static final String        PROPERTY_OFFICIAL_DOWNLOADURL         = "official_downloadurl";
-    private static final String        PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL = "image_display_or_preview_url";
-    private static final String        PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL = "video_display_or_preview_url";
+    private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
+    private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
+    private boolean                    downloadHTML                                = false;
+    private String                     betterHTML                                  = null;
+    private boolean                    accountRequiredWhenDownloadImpossible       = false;
+    public static final Pattern        PATTERN_ART                                 = Pattern.compile("/([\\w\\-]+/)?art/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern        PATTERN_JOURNAL                             = Pattern.compile("/([\\w\\-]+/)?journal/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern        PATTERN_STATUS                              = Pattern.compile("/([\\w\\-]+)/([\\w\\-]+/)?status(?:-update)?/(\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final String         PROPERTY_USERNAME                           = "username";
+    public static final String         PROPERTY_TITLE                              = "title";
+    public static final String         PROPERTY_TYPE                               = "type";
+    private static final String        PROPERTY_OFFICIAL_DOWNLOADURL               = "official_downloadurl";
+    private static final String        PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL       = "image_display_or_preview_url";
+    private static final String        PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL       = "video_display_or_preview_url";
+    private static final boolean       LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD = true;
     /* Don't touch the following! */
-    private static final AtomicInteger freeDownloadsRunning                  = new AtomicInteger(0);
-    private static final AtomicInteger accountDownloadsRunning               = new AtomicInteger(0);
-    /* 2022-10-31: Normal login process won't work due to their anti DDoS protection -> Only cookie login is possible */
-    private final boolean              allowCookieLoginOnly                  = true;
+    private static final AtomicInteger freeDownloadsRunning                        = new AtomicInteger(0);
+    private static final AtomicInteger accountDownloadsRunning                     = new AtomicInteger(0);
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        if (allowCookieLoginOnly) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
-        } else {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
-        }
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     /**
@@ -258,7 +257,6 @@ public class DeviantArtCom extends PluginForHost {
         }
         this.setBrowserExclusive();
         prepBR(this.br);
-        br.setFollowRedirects(true);
         if (account != null) {
             login(account, false);
         }
@@ -419,34 +417,58 @@ public class DeviantArtCom extends PluginForHost {
             /* E.g. journal: https://www.deviantart.com/janny654/art/Nora-the-Goblin-s-Pony-chapter-1-824882173 */
             downloadHTML = true;
             forcedExt = ".html";
-        } else if (isImage) {
+        } else if (isImage && mode == ImageDownloadMode.HTML) {
+            /* HTML download */
+            downloadHTML = true;
+            forcedExt = ".html";
             if (mode == ImageDownloadMode.HTML) {
+                /* HTML download */
                 downloadHTML = true;
                 forcedExt = ".html";
+            } else {
+                /* Image download */
+                if (officialDownloadsizeBytes != null) {
+                    link.setDownloadSize(officialDownloadsizeBytes.longValue());
+                } else if (officialDownloadFilesizeStr != null) {
+                    link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesizeStr.replace(",", "")));
+                } else {
+                    allowGrabFilesizeFromHeader = true;
+                }
             }
         } else if (br.containsHTML(TYPE_DOWNLOADALLOWED_HTML) || br.containsHTML(TYPE_DOWNLOADFORBIDDEN_HTML)) {
             downloadHTML = true;
             forcedExt = ".html";
-        } else if (StringUtils.equalsIgnoreCase(dllink, officialDownloadurl) && (officialDownloadFilesizeStr != null || officialDownloadsizeBytes != null)) {
-            /*
-             * Set filesize of official download if: User wants official download and it is available and/or if user wants official
-             * downloads only (set filesize even if official downloadurl was not found).
-             */
-            if (officialDownloadsizeBytes != null) {
-                link.setVerifiedFileSize(officialDownloadsizeBytes.longValue());
-            } else {
-                link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesizeStr.replace(",", "")));
-            }
-        } else if (mode == ImageDownloadMode.OFFICIAL_DOWNLOAD_ELSE_PREVIEW) {
-            if (isVideo && displayedVideoSize != null) {
+        } else if (isVideo) {
+            /* Video download */
+            if (displayedVideoSize != null) {
                 link.setVerifiedFileSize(displayedVideoSize.longValue());
-            } else if (isImage && unlimitedImageSize != null && dllink != null && !dllink.matches("(?i).*/v1/.+")) {
-                link.setVerifiedFileSize(unlimitedImageSize.longValue());
-            } else {
-                allowGrabFilesizeFromHeader = true;
             }
+        } else if (isImage) {
+            /* Image download */
+            if (StringUtils.equalsIgnoreCase(dllink, officialDownloadurl)) {
+                /* Official download */
+                if (officialDownloadsizeBytes != null) {
+                    link.setVerifiedFileSize(officialDownloadsizeBytes.longValue());
+                } else if (officialDownloadFilesizeStr != null) {
+                    link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesizeStr.replace(",", "")));
+                }
+            } else {
+                /* Preview image download */
+                if (unlimitedImageSize != null && dllink != null && !dllink.matches("(?i).*/v1/.+")) {
+                    link.setVerifiedFileSize(unlimitedImageSize.longValue());
+                } else if (officialDownloadsizeBytes != null) {
+                    link.setDownloadSize(officialDownloadsizeBytes.longValue());
+                } else if (officialDownloadFilesizeStr != null) {
+                    link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesizeStr.replace(",", "")));
+                } else {
+                    allowGrabFilesizeFromHeader = true;
+                }
+            }
+        } else {
+            logger.warning("Got unknown media type");
         }
         final String extByURL = dllink != null ? Plugin.getFileNameExtensionFromURL(dllink) : null;
+        final boolean isBlurredImageDownloadlink = dllink != null && !isBlurredImageLink(dllink);
         final String ext;
         if (forcedExt != null) {
             /* Forced ext has highest priority */
@@ -505,7 +527,7 @@ public class DeviantArtCom extends PluginForHost {
                 final List<String> remainingReasons = new ArrayList<String>(blockReasons);
                 remainingReasons.remove("mature_filter");
                 remainingReasons.remove("mature_loggedout");
-                if (remainingReasons.isEmpty() && !isBlurredImageLink(dllink)) {
+                if (remainingReasons.isEmpty() && !isBlurredImageDownloadlink) {
                     return AvailableStatus.TRUE;
                 } else {
                     throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
@@ -518,6 +540,7 @@ public class DeviantArtCom extends PluginForHost {
                 return AvailableStatus.TRUE;
             }
         }
+        /* Set file size if possible. */
         if (downloadHTML) {
             link.setVerifiedFileSize(-1);
             try {
@@ -530,10 +553,9 @@ public class DeviantArtCom extends PluginForHost {
             } catch (final UnsupportedEncodingException ignore) {
                 ignore.printStackTrace();
             }
-        } else if (allowGrabFilesizeFromHeader && !cfg.isFastLinkcheckForSingleItems() && !isDownload && !StringUtils.isEmpty(dllink)) {
+        } else if (allowGrabFilesizeFromHeader && !link.isSizeSet() && !cfg.isFastLinkcheckForSingleItems() && !isDownload && !StringUtils.isEmpty(dllink) && !isBlurredImageDownloadlink) {
             /* No filesize value given -> Obtain from header */
             final Browser br2 = br.cloneBrowser();
-            br2.setFollowRedirects(true);
             /* Workaround for old downloadcore bug that can lead to incomplete files */
             br2.getHeaders().put("Accept-Encoding", "identity");
             URLConnectionAdapter con = null;
@@ -668,19 +690,14 @@ public class DeviantArtCom extends PluginForHost {
             final ImageDownloadMode mode = cfg.getImageDownloadMode();
             if (mode == ImageDownloadMode.OFFICIAL_DOWNLOAD_ONLY) {
                 /* User only wants to download items with official download option available but it is not available in this case. */
-                if (account == null) {
+                if (LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD && account == null) {
                     /* Account is required to be able to use official download option. */
-                    throw new AccountRequiredException();
+                    throw new AccountRequiredException("Account required for official download. Add account or change plugin settings to allow preview image download.");
                 } else if (isAccountRequiredForOfficialDownload(br)) {
                     /* Looks like official download is not available at all for this item */
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available");
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available. Add account or change plugin settings to allow preview image download.");
                 } else if (officialDownloadurl == null) {
-                    if (!link.hasProperty(PROPERTY_OFFICIAL_DOWNLOADURL)) {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available");
-                    } else {
-                        /* This should never happen! */
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "Official download broken or login issue");
-                    }
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available. Change plugin settings to allow preview image download.");
                 } else {
                     dllink = officialDownloadurl;
                 }
@@ -844,84 +861,26 @@ public class DeviantArtCom extends PluginForHost {
     public void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            br.setFollowRedirects(true);
-            final Cookies cookies = account.loadCookies("");
             final Cookies userCookies = account.loadUserCookies();
-            if (userCookies == null && allowCookieLoginOnly) {
+            if (userCookies == null) {
                 showCookieLoginInfo();
                 throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
             }
-            if (userCookies != null) {
-                br.setCookies(this.getHost(), userCookies);
-                if (!force) {
-                    /* Do not validate cookies */
-                    return;
-                }
-                br.getPage("https://www." + this.getHost());
-                if (this.isLoggedIN(br)) {
-                    logger.info("User cookie login successful");
-                    return;
+            br.setCookies(this.getHost(), userCookies);
+            if (!force) {
+                /* Do not validate cookies */
+                return;
+            }
+            br.getPage("https://www." + this.getHost());
+            if (!this.isLoggedIN(br)) {
+                logger.info("User cookie login failed");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
-                    logger.info("User cookie login failed");
-                    if (account.hasEverBeenValid()) {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                    } else {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                    }
-                }
-            } else if (cookies != null) {
-                br.setCookies(this.getHost(), cookies);
-                if (!force) {
-                    /* Do not validate cookies */
-                    return;
-                }
-                br.getPage("https://www. " + this.getHost());
-                if (this.isLoggedIN(br)) {
-                    logger.info("Cookie login successful");
-                    account.saveCookies(br.getCookies(br.getHost()), "");
-                    return;
-                } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(br.getHost());
-                    account.clearCookies("");
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
             }
-            logger.info("Performing full login");
-            br.getHeaders().put("Referer", "https://www." + this.getHost());
-            br.getPage("https://www." + this.getHost() + "/users/login"); // Not allowed to go directly to /users/login/
-            if (br.containsHTML("Please confirm you are human")) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
-            }
-            final boolean allowCaptcha = false;
-            if (allowCaptcha && (br.containsHTML("Please confirm you are human") || (br.containsHTML("px-blocked") && br.containsHTML("g-recaptcha")))) {
-                // disabled because perimeterx code is incomplete
-                final DownloadLink dummyLink = new DownloadLink(this, "Account Login", getHost(), getHost(), true);
-                final DownloadLink odl = this.getDownloadLink();
-                this.setDownloadLink(dummyLink);
-                final CaptchaHelperHostPluginRecaptchaV2 captcha = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Lcj-R8TAAAAABs3FrRPuQhLMbp5QrHsHufzLf7b");
-                if (odl != null) {
-                    this.setDownloadLink(odl);
-                }
-                final String uuid = new Regex(br.getURL(), "uuid=(.*?)($|&)").getMatch(0);
-                String vid = new Regex(br.getURL(), "vid=(.*?)($|&)").getMatch(0);
-                if (StringUtils.isEmpty(vid)) {
-                    vid = "null";
-                }
-                br.setCookie(getHost(), "_pxCaptcha", URLEncoder.encode(captcha.getToken(), "UTF-8") + ":" + uuid + ":" + vid);
-                br.getPage("https://www.deviantart.com/users/login");
-            }
-            final Form loginform = br.getFormbyActionRegex("(?i).*do/signin");
-            if (loginform == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            loginform.put("username", Encoding.urlEncode(account.getUser()));
-            loginform.put("password", Encoding.urlEncode(account.getPass()));
-            loginform.put("remember", "on");
-            br.submitForm(loginform);
-            if (!isLoggedIN(br)) {
-                throw new AccountInvalidException();
-            }
-            account.saveCookies(br.getCookies(br.getHost()), "");
+            logger.info("User cookie login successful");
         }
     }
 

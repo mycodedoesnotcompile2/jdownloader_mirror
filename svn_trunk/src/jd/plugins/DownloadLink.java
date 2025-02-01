@@ -2606,19 +2606,20 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             return;
         }
         final int maxEntries = CFG_GENERAL.CFG.getMaxDownloadLinkHistoryEntries();
-        if (maxEntries > 0) {
-            synchronized (this) {
-                if (history == null) {
-                    history = new ArrayList<HistoryEntry>();
-                }
-                while (history.size() > maxEntries) {
-                    history.remove(0);
-                }
-                history.add(entry);
+        if (maxEntries <= 0) {
+            return;
+        }
+        synchronized (this) {
+            if (history == null) {
+                history = new ArrayList<HistoryEntry>();
             }
-            if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HISTORY, entry));
+            while (history.size() > maxEntries) {
+                history.remove(0);
             }
+            history.add(entry);
+        }
+        if (hasNotificationListener()) {
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HISTORY, entry));
         }
     }
 

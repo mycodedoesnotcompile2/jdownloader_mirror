@@ -1485,7 +1485,7 @@ public class YoutubeHelper {
                     function = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
                     if (function != null) {
                         final String varName = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(1);
-                        function = function.replaceAll("if\\s*\\(typeof\\s*\\w+\\s*===\\s*\\\"undefined\\\"\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
+                        function = function.replaceAll("if\\s*\\(typeof\\s*[^=]*+\\s*===\\s*\\\"undefined\\\"\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
                     }
                     if (function == null) {
                         // since 2024-08-06
@@ -2364,7 +2364,13 @@ public class YoutubeHelper {
         br.addAllowedResponseCodes(429);
         // &disable_polymer=true is causing missing file information, check/update handling
         getPage(br, base + "/watch?bpctr=9999999999&has_verified=1&hl=en&v=" + vid.videoID + "&gl=US");
-        parse();
+        parse(br);
+        if (false) {
+            final Browser brc = br.cloneBrowser();
+            brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version");
+            getPage(brc, base + "/tv");
+            parsePlayerConfig(brc);
+        }
         vid.approxThreedLayout = br.getRegex("\"approx_threed_layout\"\\s*\\:\\s*\"([^\"]*)").getMatch(0);
         String[][] keyWordsGrid = br.getRegex("<meta\\s+property=\"([^\"]*)\"\\s+content=\"yt3d\\:([^\"]+)=([^\"]+)\">").getMatches();
         vid.keywords3D = new HashMap<String, String>();
@@ -2678,7 +2684,8 @@ public class YoutubeHelper {
             clientNameID = 85;
         } else {
             client.put("clientName", "TVHTML5");
-            client.put("clientVersion", "7.20241201.18.00");
+            client.put("clientVersion", "7.20250120.19.00");
+            client.put("userAgent", "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version");
             clientNameID = 7;
         }
         client.put("hl", "en");
@@ -2701,6 +2708,9 @@ public class YoutubeHelper {
         post.put("contentCheckOk", true);
         post.put("racyCheckOk", true);
         final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
+        if (client.containsKey("userAgent")) {
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
+        }
         request.getHeaders().put("X-Youtube-Client-Name", Integer.toString(clientNameID));
         request.getHeaders().put("X-Youtube-Client-Version", (String) client.get("clientVersion"));
         final String domain = "https://www.youtube.com";
@@ -4188,8 +4198,45 @@ public class YoutubeHelper {
         }
     }
 
+    public void parsePlayerConfig(final Browser br) throws Exception {
+        {
+            String ytplayerConfig = br.getRegex("ytplayer\\.(?:web_player_context_)?config\\s*=\\s*\\s*(\\{.*?\\});\\s*ytplayer\\.load").getMatch(0);
+            if (ytplayerConfig == null) {
+                ytplayerConfig = br.getRegex("ytplayer\\.(?:web_player_context_)?config\\s*=\\s*\\s*(\\{.*?\\});\\s*\\(\\s*function\\s*playerBootstrap").getMatch(0);
+                if (ytplayerConfig == null) {
+                    ytplayerConfig = br.getRegex("ytplayer\\.(?:web_player_context_)?config\\s*=\\s*\\s*(\\{.*?\\});").getMatch(0);
+                }
+            }
+            if (ytplayerConfig != null) {
+                this.ytPlayerConfig = jsonToJavaMap(ytplayerConfig, false);
+                if (this.ytPlayerConfig != null) {
+                    Object playerResponse = JavaScriptEngineFactory.walkJson(this.ytPlayerConfig, "args/player_response");
+                    if (playerResponse == null) {
+                        playerResponse = JavaScriptEngineFactory.walkJson(this.ytPlayerConfig, "args/raw_player_response");
+                    }
+                    if (playerResponse instanceof String) {
+                        final Map<String, Object> ytInitialPlayerResponse = jsonToJavaMap(playerResponse.toString(), true);
+                        if (this.ytInitialPlayerResponse == null) {
+                            this.ytInitialPlayerResponse = ytInitialPlayerResponse;
+                        } else {
+                            logger.info("Merge ytInitialPlayerResponse");
+                            // merge
+                            this.ytInitialPlayerResponse.putAll(ytInitialPlayerResponse);
+                        }
+                    }
+                }
+            } else {
+                /**
+                 * Do not remove this! <br>
+                 * It's important to clean fields because YoutubeHelper might be shared instance!
+                 */
+                this.ytPlayerConfig = null;
+            }
+        }
+    }
+
     /* It's important to clean fields because YoutubeHelper might be shared instance */
-    public void parse() throws Exception {
+    public void parse(final Browser br) throws Exception {
         {
             String ytInitialData = br.getRegex(">\\s*var\\s*ytInitialData\\s*=\\s*(\\{.*?\\})\\s*;?\\s*</script").getMatch(0);
             if (ytInitialData == null) {
@@ -4231,40 +4278,7 @@ public class YoutubeHelper {
                 this.ytInitialPlayerResponse = null;
             }
         }
-        {
-            String ytplayerConfig = br.getRegex("ytplayer\\.(?:web_player_context_)?config\\s*=\\s*\\s*(\\{.*?\\});\\s*ytplayer\\.load").getMatch(0);
-            if (ytplayerConfig == null) {
-                ytplayerConfig = br.getRegex("ytplayer\\.(?:web_player_context_)?config\\s*=\\s*\\s*(\\{.*?\\});\\s*\\(\\s*function\\s*playerBootstrap").getMatch(0);
-                if (ytplayerConfig == null) {
-                    ytplayerConfig = br.getRegex("ytplayer\\.(?:web_player_context_)?config\\s*=\\s*\\s*(\\{.*?\\});").getMatch(0);
-                }
-            }
-            if (ytplayerConfig != null) {
-                this.ytPlayerConfig = jsonToJavaMap(ytplayerConfig, false);
-                if (this.ytPlayerConfig != null) {
-                    Object playerResponse = JavaScriptEngineFactory.walkJson(this.ytPlayerConfig, "args/player_response");
-                    if (playerResponse == null) {
-                        playerResponse = JavaScriptEngineFactory.walkJson(this.ytPlayerConfig, "args/raw_player_response");
-                    }
-                    if (playerResponse instanceof String) {
-                        final Map<String, Object> ytInitialPlayerResponse = jsonToJavaMap(playerResponse.toString(), true);
-                        if (this.ytInitialPlayerResponse == null) {
-                            this.ytInitialPlayerResponse = ytInitialPlayerResponse;
-                        } else {
-                            logger.info("Merge ytInitialPlayerResponse");
-                            // merge
-                            this.ytInitialPlayerResponse.putAll(ytInitialPlayerResponse);
-                        }
-                    }
-                }
-            } else {
-                /**
-                 * Do not remove this! <br>
-                 * It's important to clean fields because YoutubeHelper might be shared instance!
-                 */
-                this.ytPlayerConfig = null;
-            }
-        }
+        parsePlayerConfig(br);
         {
             // there are many of these on the page
             final String ytcfgSet[] = br.getRegex("ytcfg\\.set\\((\\{.*?\\})\\);").getColumn(0);

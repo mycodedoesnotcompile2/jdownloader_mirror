@@ -106,36 +106,39 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
     }
 
     protected Map<String, Object> getV3Action(final String source) {
-        if (source != null) {
-            final String actionJson = new Regex(source, "grecaptcha(?:\\.enterprise)?\\.execute\\s*\\([^{]*,\\s*(\\{.*?\\}\\s*)").getMatch(0);
-            String action = null;
-            if (actionJson != null) {
-                action = new Regex(actionJson, "action(?:\"|')?\\s*:\\s*(?:\"|')(.*?)(\"|')").getMatch(0);
-            } else {
-                action = getAlternativeV3Action(source);
-            }
-            if (action != null) {
-                final Map<String, Object> ret = new HashMap<String, Object>();
-                ret.put("action", action);
-                return ret;
-            }
+        if (source == null) {
+            return null;
+        }
+        final String actionJson = new Regex(source, "grecaptcha(?:\\.enterprise)?\\.execute\\s*\\([^{]*,\\s*(\\{.*?\\}\\s*)").getMatch(0);
+        String action = null;
+        if (actionJson != null) {
+            action = new Regex(actionJson, "action(?:\"|')?\\s*:\\s*(?:\"|')(.*?)(\"|')").getMatch(0);
+        } else {
+            action = getAlternativeV3Action(source);
+        }
+        if (action != null) {
+            final Map<String, Object> ret = new HashMap<String, Object>();
+            ret.put("action", action);
+            return ret;
         }
         return null;
     }
 
     protected String getAlternativeV3Action(final String source) {
-        if (source != null) {
-            final String[] divs = getDIVs(source);
-            if (divs != null) {
-                for (final String div : divs) {
-                    if (new Regex(div, "class\\s*=\\s*('|\")(?:.*?\\s+)?g-recaptcha(-response)?(\\1|\\s+)").matches()) {
-                        final String siteKey = new Regex(div, "data-sitekey\\s*=\\s*('|\")\\s*(" + apiKeyRegex + ")\\s*\\1").getMatch(1);
-                        if (siteKey != null && StringUtils.equals(siteKey, getSiteKey())) {
-                            final String action = new Regex(div, "data-action\\s*=\\s*('|\")\\s*(.*?)\\s*\\1").getMatch(1);
-                            if (action != null) {
-                                return action;
-                            }
-                        }
+        if (source == null) {
+            return null;
+        }
+        final String[] divs = getDIVs(source);
+        if (divs == null || divs.length == 0) {
+            return null;
+        }
+        for (final String div : divs) {
+            if (new Regex(div, "class\\s*=\\s*('|\")(?:.*?\\s+)?g-recaptcha(-response)?(\\1|\\s+)").matches()) {
+                final String siteKey = new Regex(div, "data-sitekey\\s*=\\s*('|\")\\s*(" + apiKeyRegex + ")\\s*\\1").getMatch(1);
+                if (siteKey != null && StringUtils.equals(siteKey, getSiteKey())) {
+                    final String action = new Regex(div, "data-action\\s*=\\s*('|\")\\s*(.*?)\\s*\\1").getMatch(1);
+                    if (action != null) {
+                        return action;
                     }
                 }
             }
@@ -167,21 +170,23 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
     }
 
     protected TYPE getType(String source) {
-        if (source != null) {
-            if (getV3Action(source) != null) {
-                return TYPE.INVISIBLE;
-            }
-            final String[] divs = getDIVs(source);
-            if (divs != null) {
-                for (final String div : divs) {
-                    if (new Regex(div, "class\\s*=\\s*('|\")(?:.*?\\s+)?g-recaptcha(-response)?(\\1|\\s+)").matches()) {
-                        final String siteKey = new Regex(div, "data-sitekey\\s*=\\s*('|\")\\s*(" + apiKeyRegex + ")\\s*\\1").getMatch(1);
-                        if (siteKey != null && StringUtils.equals(siteKey, getSiteKey())) {
-                            final boolean isInvisible = new Regex(div, "data-size\\s*=\\s*('|\")\\s*(invisible)\\s*\\1").matches();
-                            if (isInvisible) {
-                                return TYPE.INVISIBLE;
-                            }
-                        }
+        if (source == null) {
+            return null;
+        }
+        if (getV3Action(source) != null) {
+            return TYPE.INVISIBLE;
+        }
+        final String[] divs = getDIVs(source);
+        if (divs == null || divs.length == 0) {
+            return null;
+        }
+        for (final String div : divs) {
+            if (new Regex(div, "class\\s*=\\s*('|\")(?:.*?\\s+)?g-recaptcha(-response)?(\\1|\\s+)").matches()) {
+                final String siteKey = new Regex(div, "data-sitekey\\s*=\\s*('|\")\\s*(" + apiKeyRegex + ")\\s*\\1").getMatch(1);
+                if (siteKey != null && StringUtils.equals(siteKey, getSiteKey())) {
+                    final boolean isInvisible = new Regex(div, "data-size\\s*=\\s*('|\")\\s*(invisible)\\s*\\1").matches();
+                    if (isInvisible) {
+                        return TYPE.INVISIBLE;
                     }
                 }
             }

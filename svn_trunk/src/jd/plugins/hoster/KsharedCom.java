@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50532 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50542 $", interfaceVersion = 3, names = {}, urls = {})
 public class KsharedCom extends PluginForHost {
     public KsharedCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -166,18 +166,7 @@ public class KsharedCom extends PluginForHost {
         }
         data.put("fileid", this.getFID(link));
         br.postPageRaw("https://www." + this.getHost() + "/v1/drive/get_download", JSonStorage.serializeToJson(data));
-        if (this.br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getHttpConnection().getResponseCode() == 500) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("\"reason\"\\s*:\\s*\"notfound\"")) {
-            /*
-             * 2025-01-30: Small workaround as their API sometimes returns broken json (parser down below would fail without this check
-             * here).
-             */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = this.handleErrors(br, link, account);
         if (entries == null) {
             /* 2021-02-18: Returns broken json for offline items */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -210,7 +199,7 @@ public class KsharedCom extends PluginForHost {
     }
 
     private boolean isPremiumonly(final DownloadLink link) {
-        return link.getBooleanProperty(PROPERTY_PREMIUMONLY, false);
+        return link.hasProperty(PROPERTY_PREMIUMONLY);
     }
 
     /** Obtains API bearer token from html code and sets it as Authorization header. */
@@ -274,119 +263,110 @@ public class KsharedCom extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private boolean login(final Account account, final boolean force) throws Exception {
+    private Map<String, Object> login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setFollowRedirects(true);
-                br.setCookiesExclusive(true);
-                prepBR(this.br);
-                String accessToken = this.accountGetAccessToken(account);
-                String ud = this.accountGetUD(account);
-                String ut = this.accountGetUT(account);
-                final Map<String, Object> data2 = new HashMap<String, Object>();
-                final Cookies userCookies = account.loadUserCookies();
-                final Cookies cookies = account.loadCookies("");
-                if (userCookies != null) {
-                    logger.info("Attempting user cookie login");
-                    br.setCookies(this.getHost(), userCookies);
-                    ud = br.getCookie(this.getHost(), "__ud");
-                    ut = br.getCookie(this.getHost(), "__ut");
-                    if (ud == null || ut == null) {
-                        /* Invalid cookies */
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                    }
-                    account.setProperty(PROPERTY_ACCOUNT_UD, ud);
-                    account.setProperty(PROPERTY_ACCOUNT_UT, ut);
-                    if (accessToken == null || force) {
-                        /* Fetch this on first attempt and when routine account check is happening. */
-                        /* 2022-06-24: This will most likely fail here due to Cloudflare! */
-                        br.getPage("https://www." + this.getHost() + "/account/signin");
-                        accessToken = findAndSetBearerToken(br);
-                        account.setProperty(PROPERTY_ACCOUNT_TOKEN, accessToken);
-                    }
-                    if (!force) {
-                        /* Do not verify cookies */
-                        return false;
-                    }
-                    if (checkLogin(br, account)) {
-                        logger.info("User cookie login successful");
-                        return true;
-                    } else {
-                        if (account.hasEverBeenValid()) {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                        } else {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                        }
-                    }
-                } else if (cookies != null && accessToken != null && ut != null && ud != null) {
-                    logger.info("Attempting token login");
-                    this.br.setCookies(this.getHost(), cookies);
-                    this.br.getHeaders().put("Authorization", "Bearer " + accessToken);
-                    br.getHeaders().put("Origin", "https://www." + this.getHost());
-                    br.getHeaders().put("Referer", "https://www." + this.getHost() + "/drive");
-                    if (!force) {
-                        /* Do not verify cookies */
-                        return false;
-                    }
-                    if (checkLogin(br, account)) {
-                        logger.info("Token login successful");
-                        /* Refresh cookie timestamp */
-                        account.saveCookies(this.br.getCookies(this.getHost()), "");
-                        return true;
-                    } else {
-                        logger.info("Token login failed");
-                        br.clearCookies(br.getHost());
-                    }
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            prepBR(this.br);
+            String accessToken = this.accountGetAccessToken(account);
+            String ud = this.accountGetUD(account);
+            String ut = this.accountGetUT(account);
+            final Map<String, Object> data2 = new HashMap<String, Object>();
+            final Cookies userCookies = account.loadUserCookies();
+            final Cookies cookies = account.loadCookies("");
+            if (userCookies != null) {
+                logger.info("Attempting user cookie login");
+                br.setCookies(this.getHost(), userCookies);
+                ud = br.getCookie(this.getHost(), "__ud");
+                ut = br.getCookie(this.getHost(), "__ut");
+                if (ud == null || ut == null) {
+                    /* Invalid cookies */
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
-                logger.info("Performing full login");
-                br.getPage("https://" + this.getHost() + "/account/signin");
-                accessToken = findAndSetBearerToken(br);
-                final Map<String, Object> data = new HashMap<String, Object>();
-                data.put("email", account.getUser());
-                data.put("passw", account.getPass());
-                br.postPageRaw("/v1/account/signin", JSonStorage.serializeToJson(data));
-                this.handleErrors(br, null, account);
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                // accessToken = (String) entries.get("accesstoken");
-                ut = (String) entries.get("ut");
-                ud = (String) entries.get("accesstoken");
-                if (StringUtils.isEmpty(ut) || StringUtils.isEmpty(ud)) {
-                    /* This should never happen */
-                    throw new AccountUnavailableException("Unknown failure", 10 * 60 * 1000l);
-                }
-                data2.clear();
-                data2.put("ud", ud);
-                data2.put("ut", ut);
-                br.getHeaders().put("Authorization", "Bearer " + accessToken);
-                br.postPageRaw("/v1/account/is_user", JSonStorage.serializeToJson(data2));
-                account.setProperty(PROPERTY_ACCOUNT_TOKEN, accessToken);
                 account.setProperty(PROPERTY_ACCOUNT_UD, ud);
                 account.setProperty(PROPERTY_ACCOUNT_UT, ut);
-                /* No error? Login was successful! */
-                account.saveCookies(this.br.getCookies(this.getHost()), "");
-                return true;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
+                if (accessToken == null || force) {
+                    /* Fetch this on first attempt and when routine account check is happening. */
+                    /* 2022-06-24: This will most likely fail here due to Cloudflare! */
+                    br.getPage("https://www." + this.getHost() + "/account/signin");
+                    accessToken = findAndSetBearerToken(br);
+                    account.setProperty(PROPERTY_ACCOUNT_TOKEN, accessToken);
                 }
-                throw e;
+                if (!force) {
+                    /* Do not verify cookies */
+                    return null;
+                }
+                try {
+                    final Map<String, Object> entries = checkLogin(br, account);
+                    logger.info("User cookie login successful");
+                    return entries;
+                } catch (final PluginException e) {
+                    logger.log(e);
+                    /* Dead end */
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                    }
+                }
+            } else if (cookies != null && accessToken != null && ut != null && ud != null) {
+                logger.info("Attempting token login");
+                this.br.setCookies(this.getHost(), cookies);
+                this.br.getHeaders().put("Authorization", "Bearer " + accessToken);
+                br.getHeaders().put("Origin", "https://www." + this.getHost());
+                br.getHeaders().put("Referer", "https://www." + this.getHost() + "/drive");
+                if (!force) {
+                    /* Do not verify cookies */
+                    return null;
+                }
+                try {
+                    final Map<String, Object> entries = checkLogin(br, account);
+                    logger.info("Token login successful");
+                    /* Refresh cookie timestamp */
+                    account.saveCookies(this.br.getCookies(this.getHost()), "");
+                    return entries;
+                } catch (final PluginException e) {
+                    logger.log(e);
+                    logger.info("Token login failed");
+                    br.clearCookies(br.getHost());
+                }
             }
+            logger.info("Performing full login");
+            br.getPage("https://" + this.getHost() + "/account/signin");
+            accessToken = findAndSetBearerToken(br);
+            final Map<String, Object> data = new HashMap<String, Object>();
+            data.put("email", account.getUser());
+            data.put("passw", account.getPass());
+            br.postPageRaw("/v1/account/signin", JSonStorage.serializeToJson(data));
+            Map<String, Object> entries = this.handleErrors(br, null, account);
+            // accessToken = (String) entries.get("accesstoken");
+            ut = (String) entries.get("ut");
+            ud = (String) entries.get("accesstoken");
+            if (StringUtils.isEmpty(ut) || StringUtils.isEmpty(ud)) {
+                /* This should never happen */
+                throw new AccountUnavailableException("Unknown failure", 10 * 60 * 1000l);
+            }
+            data2.clear();
+            data2.put("ud", ud);
+            data2.put("ut", ut);
+            br.getHeaders().put("Authorization", "Bearer " + accessToken);
+            br.postPageRaw("/v1/account/is_user", JSonStorage.serializeToJson(data2));
+            entries = this.handleErrors(br, null, account);
+            account.setProperty(PROPERTY_ACCOUNT_TOKEN, accessToken);
+            account.setProperty(PROPERTY_ACCOUNT_UD, ud);
+            account.setProperty(PROPERTY_ACCOUNT_UT, ut);
+            /* No error? Login was successful! */
+            account.saveCookies(this.br.getCookies(this.getHost()), "");
+            return entries;
         }
     }
 
-    private boolean checkLogin(final Browser br, final Account account) throws StorageException, IOException {
+    private Map<String, Object> checkLogin(final Browser br, final Account account) throws StorageException, IOException, PluginException {
         Map<String, Object> data2 = new HashMap<String, Object>();
         data2.put("ud", this.accountGetUD(account));
         data2.put("ut", this.accountGetUT(account));
         br.postPageRaw("https://www." + this.getHost() + "/v1/account/is_user", JSonStorage.serializeToJson(data2));
-        try {
-            this.handleErrors(br, null, account);
-            logger.info("User cookie login successful");
-            return true;
-        } catch (final Throwable e) {
-            e.printStackTrace();
-            return false;
-        }
+        return this.handleErrors(br, null, account);
     }
 
     private String accountGetAccessToken(final Account account) {
@@ -401,24 +381,30 @@ public class KsharedCom extends PluginForHost {
         return account.getStringProperty(PROPERTY_ACCOUNT_UD);
     }
 
-    private void handleErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+    private Map<String, Object> handleErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        String json = br.getRequest().getHtmlCode();
+        /* 2025-01-31: They sometimes return invalid json (wtf how does that happen??) -> Fix it */
+        json = json.replace("}{", ",");
+        final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
         /** 2021-02-18: In some rare cases "error" can be true WITHOUT "reason" and without "message"! */
         final boolean isError = entries.containsKey("error") ? ((Boolean) entries.get("error")).booleanValue() : false;
         if (!isError) {
             /* No error */
-            return;
+            return entries;
         }
         final String reason = (String) entries.get("reason");
         // final String message = (String) entries.get("message");
         if (reason == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (reason.equalsIgnoreCase("AccountNotFound") || reason.equalsIgnoreCase("InvalidPassword")) {
-            throw new AccountInvalidException();
         } else if (reason.equalsIgnoreCase("notfound")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (reason.equalsIgnoreCase("AccountNotFound") || reason.equalsIgnoreCase("InvalidPassword")) {
+            throw new AccountInvalidException();
         } else if (reason.equalsIgnoreCase("bandwidth")) {
             throw new AccountUnavailableException("Bandwidth limit reached", 5 * 60 * 1000l);
+        } else if (reason.equalsIgnoreCase("dlreached")) {
+            /* Free download limit reached */
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You have reached your download limit");
         } else {
             if (link == null) {
                 throw new AccountUnavailableException("Unknown error: " + reason, 5 * 60 * 1000l);
@@ -431,8 +417,7 @@ public class KsharedCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        login(account, true);
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = login(account, true);
         final Map<String, Object> userinfo = (Map<String, Object>) entries.get("me");
         final Map<String, Object> spaceInfo = (Map<String, Object>) userinfo.get("disk");
         final Map<String, Object> trafficInfo = (Map<String, Object>) userinfo.get("bandwidth");
@@ -445,11 +430,7 @@ public class KsharedCom extends PluginForHost {
         ai.setTrafficMax(trafficMax);
         ai.setTrafficLeft(trafficMax - trafficUsed);
         ai.setUsedSpace(((Number) spaceInfo.get("used")).longValue());
-        if (!(Boolean) userinfo.get("hasPremium")) {
-            account.setType(AccountType.FREE);
-            /* Free accounts can still have captcha */
-            account.setConcurrentUsePossible(false);
-        } else {
+        if (Boolean.TRUE.equals(userinfo.get("hasPremium"))) {
             /* E.g. "1 Month" */
             final String proPlan = (String) userinfo.get("proPlan");
             final long expireTimestamp = JavaScriptEngineFactory.toLong(userinfo.get("premiumExpires"), 0);
@@ -458,6 +439,10 @@ public class KsharedCom extends PluginForHost {
             account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
             ai.setStatus("Premium account | " + proPlan);
+        } else {
+            account.setType(AccountType.FREE);
+            /* Free accounts can still have captcha */
+            account.setConcurrentUsePossible(false);
         }
         return ai;
     }
@@ -471,7 +456,8 @@ public class KsharedCom extends PluginForHost {
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (!this.attemptStoredDownloadurlDownload(link, account)) {
             requestFileInformation(link, account);
-            if (isPremiumonly(link)) {
+            final boolean isPremium = account != null && AccountType.PREMIUM.equals(account.getType());
+            if (isPremiumonly(link) && !isPremium) {
                 throw new AccountRequiredException();
             }
             final Map<String, Object> data = new HashMap<String, Object>();
@@ -493,8 +479,7 @@ public class KsharedCom extends PluginForHost {
                 data.put("captcha", recaptchaV2Response);
             }
             br.postPageRaw("/v1/drive/get_download_link", JSonStorage.serializeToJson(data));
-            this.handleErrors(br, link, account);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> entries = this.handleErrors(br, link, account);
             final String dllink = (String) entries.get("link");
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadurl", 5 * 60 * 1000l);

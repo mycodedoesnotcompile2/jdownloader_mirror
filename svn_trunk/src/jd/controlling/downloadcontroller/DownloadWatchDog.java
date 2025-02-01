@@ -158,7 +158,6 @@ import jd.http.NoGateWayException;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
-import jd.plugins.AccountRequiredException;
 import jd.plugins.CandidateResultProvider;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -1448,7 +1447,6 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 boolean ok = false;
                 CachedAccount waitForAccount = null;
                 ConditionalSkipReason conditionalSkipReason = null;
-                AccountRequiredException accountRequiredException = null;
                 for (final CachedAccount cachedAccount : accountCache) {
                     final CachedAccountPermission permission = selector.getCachedAccountPermission(cachedAccount);
                     try {
@@ -1486,9 +1484,6 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         } else {
                             logger.log(e);
                         }
-                    } catch (final AccountRequiredException e) {
-                        accountRequiredException = e;
-                        logger.log(e);
                     } catch (final Exception e) {
                         logger.log(e);
                     }
@@ -1498,10 +1493,6 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         selector.addExcluded(candidate, new DownloadLinkCandidateResult(conditionalSkipReason, null, null));
                     } else if (waitForAccount != null) {
                         selector.addExcluded(candidate, new DownloadLinkCandidateResult(new WaitForAccountSkipReason(waitForAccount.getAccount()), null, null));
-                    } else if (accountRequiredException != null) {
-                        final DownloadLinkCandidateResult dcr = new DownloadLinkCandidateResult(RESULT.ACCOUNT_REQUIRED, accountRequiredException, null);
-                        dcr.setMessage(accountRequiredException.getMessage());
-                        selector.addExcluded(candidate, dcr);
                     } else {
                         selector.addExcluded(candidate, new DownloadLinkCandidateResult(RESULT.ACCOUNT_REQUIRED, null, null));
                     }
@@ -4616,36 +4607,37 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
     }
 
     public void handleMovedDownloadLinks(final FilePackage dest, final FilePackage source, final List<DownloadLink> links) {
-        if (source != dest) {
-            enqueueJob(new DownloadWatchDogJob() {
-                //
-                @Override
-                public void execute(DownloadSession currentSession) {
-                    for (DownloadLink downloadLink : links) {
-                        if (downloadLink.getDownloadLinkController() != null) {
-                            // running
-                            // TODO
-                            // if (DISKSPACERESERVATIONRESULT.FAILED.equals(validateDiskFree(nextSelectedCandidates))) {
-                            // for (final DownloadLinkCandidate candidate : nextSelectedCandidates) {
-                            // selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.DISK_FULL, null, null));
-                            // }
-                            // }
-                        } else if (downloadLink.getDefaultPlugin() != null) {
-                            move(downloadLink, source.getDownloadDirectory(), downloadLink.getName(), dest.getDownloadDirectory(), null);
-                        }
+        if (source == dest) {
+            return;
+        }
+        enqueueJob(new DownloadWatchDogJob() {
+            //
+            @Override
+            public void execute(DownloadSession currentSession) {
+                for (DownloadLink downloadLink : links) {
+                    if (downloadLink.getDownloadLinkController() != null) {
+                        // running
+                        // TODO
+                        // if (DISKSPACERESERVATIONRESULT.FAILED.equals(validateDiskFree(nextSelectedCandidates))) {
+                        // for (final DownloadLinkCandidate candidate : nextSelectedCandidates) {
+                        // selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.DISK_FULL, null, null));
+                        // }
+                        // }
+                    } else if (downloadLink.getDefaultPlugin() != null) {
+                        move(downloadLink, source.getDownloadDirectory(), downloadLink.getName(), dest.getDownloadDirectory(), null);
                     }
                 }
+            }
 
-                @Override
-                public void interrupt() {
-                }
+            @Override
+            public void interrupt() {
+            }
 
-                @Override
-                public boolean isHighPriority() {
-                    return false;
-                }
-            });
-        }
+            @Override
+            public boolean isHighPriority() {
+                return false;
+            }
+        });
     }
 
     public void setDownloadDirectory(final FilePackage pkg, final String path) {

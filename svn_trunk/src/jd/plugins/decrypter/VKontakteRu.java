@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50452 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50545 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -517,14 +517,9 @@ public class VKontakteRu extends PluginForDecrypt {
             allowJsonRequest = true;
         }
         /* Search for external embedded content. */
-        String embeddedVideoURL = new Regex(PluginJSonUtils.unescape(br.toString()), "<iframe [^>]*src=('|\")(.*?)\\1").getMatch(1);
-        if (embeddedVideoURL != null) {
-            logger.info("Found embedded video: " + embeddedVideoURL);
-            if (embeddedVideoURL.startsWith("//")) {
-                embeddedVideoURL = "https:" + embeddedVideoURL;
-            }
-            ret.add(createDownloadlink(embeddedVideoURL));
-            return ret;
+        ArrayList<DownloadLink> embedResults = findEmbeddedExternalVideos(br);
+        if (embedResults.size() > 0) {
+            return embedResults;
         }
         if (allowJsonRequest) {
             final UrlQuery query = new UrlQuery();
@@ -544,6 +539,10 @@ public class VKontakteRu extends PluginForDecrypt {
             // br.getHeaders().put("Referer", param.getCryptedUrl());
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             this.getPage(br, br.createPostRequest("/al_video.php?act=show", query));
+        }
+        embedResults = findEmbeddedExternalVideos(br);
+        if (embedResults.size() > 0) {
+            return embedResults;
         }
         final Map<String, Object> video = findVideoMap(this.br, id);
         if (video == null) {
@@ -714,6 +713,20 @@ public class VKontakteRu extends PluginForDecrypt {
         }
         if (ret.isEmpty()) {
             logger.warning("Single video crawler is returning empty array");
+        }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> findEmbeddedExternalVideos(final Browser br) {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String unescapedHTML_and_json = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+        String embeddedVideoURL = new Regex(unescapedHTML_and_json, "<iframe[^>]*src=('|\")(.*?)\\1").getMatch(1);
+        if (embeddedVideoURL != null) {
+            logger.info("Found embedded video: " + embeddedVideoURL);
+            if (embeddedVideoURL.startsWith("//")) {
+                embeddedVideoURL = "https:" + embeddedVideoURL;
+            }
+            ret.add(createDownloadlink(embeddedVideoURL));
         }
         return ret;
     }

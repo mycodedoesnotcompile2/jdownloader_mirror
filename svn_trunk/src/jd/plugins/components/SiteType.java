@@ -250,11 +250,6 @@ public class SiteType {
          */
         AdfLy_AdfLy,
         /**
-         * URL shortening service provider. <br />
-         * <a href="http://click.tf/services.html">A list of all supported domains</a>
-         */
-        URLShortnerLLP_URLShortner,
-        /**
          * URL shortening or monetizing platform by <a href="https://www.mightyscripts.com/">mightyscripts.com</a><br />
          * <a href="https://www.mightyscripts.com/downloads/adlinkfly-monetized-url-shortener/">AdLinkFly – Monetized URL
          * Shortener</a><br />

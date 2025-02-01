@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50527 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50536 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2869,7 +2869,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
                 if (StringUtils.isEmpty(captchaurl)) {
                     /* Fallback e.g. for relative URLs (e.g. subyshare.com [bad example, needs special handling anways!]) */
-                    captchaurl = new Regex(getCorrectBR(br), "(?i)(/captchas/[a-z0-9]+\\.jpe?g)").getMatch(0);
+                    captchaurl = new Regex(getCorrectBR(br), "(/captchas/[a-z0-9]+\\.jpe?g)", Pattern.CASE_INSENSITIVE).getMatch(0);
                 }
                 if (captchaurl == null) {
                     logger.warning("Standard captcha captchahandling broken2!");

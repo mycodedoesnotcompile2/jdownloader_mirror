@@ -52,6 +52,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.InputDialogInterface;
 import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.JDK8BufferHelper;
 import org.appwork.utils.JVMVersion;
@@ -110,7 +111,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50532 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50540 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -292,6 +293,18 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
             return "INVALID_OR_MISSING_DECRYPTION_KEY_" + fallbackFilename;
         } else {
             return null;
+        }
+    }
+
+    private void checkForCachedUnDownloadableConditions(final DownloadLink link, final Account account) throws PluginException {
+        final boolean isPremium = account != null && AccountType.PREMIUM.equals(account.getType());
+        if (getMegaNzConfig().is5GBFreeLimitEnabled() && !isPremium && link.getView().getBytesTotal() > 5368709120l) {
+            /**
+             * 2024-07-02: Skip files over 5GB as we cannot download them in free mode and user has configured plugin to skip them
+             * immediately, see: </br>
+             * https://board.jdownloader.org/showthread.php?t=75268
+             */
+            throw new AccountRequiredException("Free download of files >5GB is disabled in settings");
         }
     }
 
@@ -1061,16 +1074,16 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         if (downloadLink == null) {
             return super.canHandle(downloadLink, account);
         }
-        final boolean isPremium = account != null && AccountType.PREMIUM.equals(account.getType());
         if (!StringUtils.equals((String) downloadLink.getProperty(USED_PLUGIN, getHost()), getHost())) {
             return false;
-        } else if (!isPremium && downloadLink.getView().getBytesTotal() > 5368709120l && getMegaNzConfig().is5GBFreeLimitEnabled()) {
-            /**
-             * 2024-07-02: Skip files over 5GB as we cannot download them in free mode and user has configured plugin to skip them
-             * immediately, see: </br>
-             * https://board.jdownloader.org/showthread.php?t=75268
+        }
+        final boolean devTestAllowThrowExceptionInCanHandle = false;
+        if (devTestAllowThrowExceptionInCanHandle && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /*
+             * This would display misleading error message "Skipped - Account is required" instead of the message in
+             * AccountRequiredException.
              */
-            throw new AccountRequiredException("Free download of files >5GB is disabled in settings");
+            this.checkForCachedUnDownloadableConditions(downloadLink, account);
         }
         return super.canHandle(downloadLink, account);
     }
@@ -1127,16 +1140,16 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     }
 
     private void apiDownload(final DownloadLink link, final Account account) throws Exception {
+        this.checkForCachedUnDownloadableConditions(link, account);
         boolean resume = true;
         if (link.getDownloadCurrent() > 0 && !StringUtils.equalsIgnoreCase(getHost(), link.getStringProperty(USED_PLUGIN, getHost()))) {
             logger.info("Resume impossible due to previous multihoster download:" + link.getDownloadCurrent() + "/" + link.getKnownDownloadSize() + "|" + link.getStringProperty(USED_PLUGIN));
-            if (getMegaNzConfig().isAllowStartFromZeroIfDownloadWasStartedViaMultihosterBefore()) {
-                logger.info("Auto-download from scratch = true");
-                resume = false;
-            } else {
+            if (!getMegaNzConfig().isAllowStartFromZeroIfDownloadWasStartedViaMultihosterBefore()) {
                 logger.info("Auto-download from scratch = false --> Throwing Exception");
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Resume impossible! Either resume via previously used multihost or reset and start from scratch! See MEGA plugin settings if you want to auto-start from scratch!");
             }
+            logger.info("Auto-download from scratch = true");
+            resume = false;
         }
         final AvailableStatus available = requestFileInformation(link);
         if (AvailableStatus.FALSE == available) {
@@ -1145,7 +1158,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server is Busy", 1 * 60 * 1000l);
         }
         final String sid = getSID(account);
-        final String pluginPatternMatcherDecoded = this.getDecodedPluginPatternMatcher(link.getPluginPatternMatcher());
+        final String pluginPatternMatcherDecoded = getDecodedPluginPatternMatcher(link.getPluginPatternMatcher());
         final String fileID = getFileID(pluginPatternMatcherDecoded);
         final String keyString = getFileKey(link);
         // check finished encrypted file. if the decryption interrupted - for whatever reason

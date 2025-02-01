@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KsharedCom;
 
-@DecrypterPlugin(revision = "$Revision: 50532 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50542 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KsharedCom.class })
 public class KsharedComFolder extends PluginForDecrypt {
     public KsharedComFolder(PluginWrapper wrapper) {
@@ -104,6 +104,7 @@ public class KsharedComFolder extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (final String url : urls) {
             if (!hosterplugin.canHandle(url)) {
+                /* Skip URLs we can't deal with. */
                 continue;
             }
             final DownloadLink link = this.createDownloadlink(url);

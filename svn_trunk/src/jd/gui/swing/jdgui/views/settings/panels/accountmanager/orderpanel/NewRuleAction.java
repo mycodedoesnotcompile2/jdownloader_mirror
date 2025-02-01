@@ -8,6 +8,11 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 
+import jd.controlling.AccountController;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.MultiHostHost;
+
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
@@ -19,11 +24,6 @@ import org.jdownloader.gui.views.components.AbstractAddAction;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-
-import jd.controlling.AccountController;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.MultiHostHost;
 
 public class NewRuleAction extends AbstractAddAction {
     /**
@@ -42,7 +42,7 @@ public class NewRuleAction extends AbstractAddAction {
         final HosterRuleController hrc = HosterRuleController.getInstance();
         if (!allowNewRuleIfRuleForSameDomainAlreadyExists) {
             for (final AccountUsageRule aur : hrc.list()) {
-                list.remove(DomainInfo.getInstance(aur.getHoster()));
+                list.remove(aur.getDomainInfo());
             }
         }
         final ChooseHosterDialog d = new ChooseHosterDialog(_GUI.T.NewRuleAction_actionPerformed_choose_hoster_message(), list.toArray(new DomainInfo[] {}));

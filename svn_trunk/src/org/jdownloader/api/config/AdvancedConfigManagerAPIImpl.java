@@ -9,9 +9,6 @@ import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.exceptions.BadParameterException;
@@ -60,6 +57,9 @@ import org.jdownloader.updatev2.SmartRlyRestartRequest;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdaterListener;
 
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+
 public class AdvancedConfigManagerAPIImpl implements AdvancedConfigManagerAPI {
     private static final String EXTENSION = "Extension";
 
@@ -92,7 +92,12 @@ public class AdvancedConfigManagerAPIImpl implements AdvancedConfigManagerAPI {
             }
         }
         if (query.isIncludeExtensions()) {
-            ret.addAll(createExtensionConfigList(query));
+            for (AdvancedConfigAPIEntry entry : createExtensionConfigList(query)) {
+                if (cPat != null && !cPat.matcher(entry.getInterfaceName() + "." + entry.getKey()).matches()) {
+                    continue;
+                }
+                ret.add(entry);
+            }
         }
         return ret;
     }

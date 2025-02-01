@@ -9,6 +9,18 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.controlling.downloadcontroller.AccountCache;
+import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.dialog.EditHosterRuleDialog;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.PluginForHost;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
@@ -33,18 +45,6 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.controlling.downloadcontroller.AccountCache;
-import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.dialog.EditHosterRuleDialog;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.PluginForHost;
 
 public class HosterRuleController implements AccountControllerListener {
     private static final HosterRuleController INSTANCE = new HosterRuleController();
@@ -527,8 +527,7 @@ public class HosterRuleController implements AccountControllerListener {
     }
 
     /**
-     * Returns true if user confirmed edited rule. </br>
-     * Returns false if used closed or cancelled dialog.
+     * Returns true if user confirmed edited rule. </br> Returns false if used closed or cancelled dialog.
      */
     public boolean showEditPanel(final AccountUsageRule editing) {
         if (editing == null) {
@@ -556,19 +555,21 @@ public class HosterRuleController implements AccountControllerListener {
 
     /** Removes all existing rules for given domain. */
     public void removeRulesByDomain(final String domain) {
-        final List<AccountUsageRule> rulesToRemove = new ArrayList<AccountUsageRule>();
-        for (final AccountUsageRule rule : loadedRules) {
-            if (rule.getHoster().endsWith(domain)) {
-                rulesToRemove.add(rule);
+        queue.add(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                final List<AccountUsageRule> rulesToRemove = new ArrayList<AccountUsageRule>();
+                for (final AccountUsageRule rule : loadedRules) {
+                    if (rule.getHoster().endsWith(domain)) {
+                        rulesToRemove.add(rule);
+                    }
+                }
+                for (final AccountUsageRule rule : rulesToRemove) {
+                    remove(rule);
+                }
+                return null;
             }
-        }
-        if (rulesToRemove.isEmpty()) {
-            /* Nothing to remove */
-            return;
-        }
-        for (final AccountUsageRule rule : rulesToRemove) {
-            this.remove(rule);
-        }
+        });
     }
 
     public void remove(final AccountUsageRule rule) {
