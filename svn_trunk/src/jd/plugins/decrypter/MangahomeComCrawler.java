@@ -32,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49678 $", interfaceVersion = 3, names = { "mangahome.com" }, urls = { "https?://(?:www\\.)?(mangakoi|mangahome)\\.com/manga/[A-Za-z0-9\\-_]+(?:/v\\d+)?/c\\d+(?:\\.\\d+)?" })
+@DecrypterPlugin(revision = "$Revision: 50550 $", interfaceVersion = 3, names = { "mangahome.com" }, urls = { "https?://(?:www\\.)?(mangakoi|mangahome)\\.com/manga/[A-Za-z0-9\\-_]+(?:/v\\d+)?/c\\d+(?:\\.\\d+)?" })
 public class MangahomeComCrawler extends PluginForDecrypt {
     public MangahomeComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,6 +50,9 @@ public class MangahomeComCrawler extends PluginForDecrypt {
         final String contenturl = param.toString().replaceFirst("mangakoi\\.com", "mangahome.com");
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*The series [^<]* has been licensed")) {
+            /* Content abused */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Regex urlinfo = new Regex(contenturl, "https?://[^/]+/manga/([A-Za-z0-9\\-_]+)(?:/v\\d+)?/c(\\d+(?:\\.\\d+)?)");

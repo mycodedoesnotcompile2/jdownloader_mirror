@@ -118,6 +118,9 @@ import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.utils.JDFileUtils;
 
+import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.WinReg;
+
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
@@ -3937,10 +3940,18 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         return str.length() > 255;
     }
 
+    /**
+     * Ensures that the file we are about to download can be written to the desired destination. </br>
+     * Also takes care about these cases: <br>
+     * - File already exists </br>
+     * - Mirror of file is currently already being downloaded <br>
+     * - [Windows] File name is too long <br>
+     * - [Windows] File path is too long
+     */
     public void localFileCheck(final SingleDownloadController controller, final ExceptionRunnable runOkay, final ExceptionRunnable runFailed) throws Exception {
         final NullsafeAtomicReference<Object> asyncResult = new NullsafeAtomicReference<Object>(null);
         enqueueJob(new DownloadWatchDogJob() {
-            private void check(DownloadSession session, final SingleDownloadController controller) throws Exception {
+            private void check(final DownloadSession session, final SingleDownloadController controller) throws Exception {
                 if (controller.isAborting()) {
                     throw new InterruptedException("Controller is aborted");
                 }
@@ -3952,7 +3963,6 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 final File fileOutput = controller.getFileOutput(false, true);
                 if (fileOutput.isDirectory()) {
                     controller.getLogger().severe("fileOutput is a directory " + fileOutput);
-                    /* TODO: Make sure that this errormessage gets displayed in GUI or even add separate SkipReason for this case. */
                     throw new SkipReasonException(SkipReason.INVALID_DESTINATION, "Invalid download destination: Folder with name of this file already exists!");
                 }
                 boolean fileExists = fileOutput.exists();
@@ -3989,7 +3999,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             }
                         }
                     }
-                    fileWriteCheck: if (!accessChecks.contains(fileOutput.getParentFile().getAbsolutePath())) {
+                    if (!accessChecks.contains(fileOutput.getParentFile().getAbsolutePath())) {
                         /* Check if we can write in download-directory. */
                         final File writeTest = new File(fileOutput.getParentFile(), "jd_accessCheck_" + new UniqueAlltimeID().getID());
                         try {
@@ -4043,287 +4053,153 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                      */
                     return;
                 }
-                DownloadLink fileInProgress = null;
-                deepCheckDownloadPathHandling: if (!fileExists) {
-                    /* Check if a mirror of this item is currently being downloaded. */
-                    final String filename;
-                    if (MirrorDetectionDecision.SAFE.equals(mirrorDetectionDecision)) {
-                        /**
-                         * this returns a safe checkFile or null (if not available yet, eg no final/forcedFileName set)
-                         */
-                        if (safeFinalFileDestination != null) {
-                            /**
-                             * we use fileName from checkFile
-                             */
-                            filename = safeFinalFileDestination.getName();
-                        } else {
-                            /**
-                             * we use final/forcedFileName from downloadLink
-                             */
-                            filename = downloadLink.getName(true, false);
-                        }
-                    } else {
-                        /**
-                         * we use fileName from fileOutput (may be unsafe)
-                         */
-                        filename = fileOutput.getName();
-                    }
-                    /* Check if a mirror is currently being downloaded or if a file with the same name is currently being downloaded. */
-                    for (final SingleDownloadController downloadController : session.getControllers()) {
-                        if (downloadController == controller) {
-                            continue;
-                        }
-                        final DownloadLink block = downloadController.getDownloadLink();
-                        if (block == downloadLink) {
-                            continue;
-                        }
-                        if (session.getFileAccessManager().isLockedBy(fileOutput, downloadController)) {
-                            /* fileOutput is already locked */
-                            if (block.getFilePackage() == downloadLink.getFilePackage() && isMirrorCandidate(downloadLink, filename, block, mirrorDetectionDecision)) {
-                                /* only throw ConditionalSkipReasonException when file is from same package */
-                                throw new ConditionalSkipReasonException(new MirrorLoading(block));
-                            } else {
-                                fileInProgress = block;
-                                break deepCheckDownloadPathHandling;
-                            }
-                        }
-                    }
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        /**
-                         * Check if we can write our desired filename in the desired download directory. </br>
-                         * We know that we can write in the directory but can we write the specific file we want to write? </br>
-                         * The filename could still be too long!
-                         */
-                        File writeTest1 = fileOutput;
-                        final List<File> processFiles = downloadLink.getDefaultPlugin().listProcessFiles(downloadLink);
-                        if (processFiles != null) {
-                            /*
-                             * Get list of all possible files the related plugin could write and pick the longest one to perform our
-                             * write-test. Typically this will be our temporary .part file.
-                             */
-                            int maxlen = fileOutput.getName().length();
-                            for (final File file : processFiles) {
-                                if (file.getName().length() > maxlen && !file.exists()) {
-                                    maxlen = file.getName().length();
-                                    writeTest1 = file;
-                                }
-                            }
-                        }
-                        final int maxPathLengthWindows = 259; // 260 but only 259 usable
-                        try {
-                            FilePathChecker.createFilePath(writeTest1);
-                            /* Test-boolean to test this on OS which do not have any path limitations. */
-                            final boolean devtestForceLongfilenameException = false;
-                            if (devtestForceLongfilenameException && fileOutput.getAbsolutePath().length() > maxPathLengthWindows) {
-                                throw new BadFilePathException(writeTest1, PathFailureReason.PATH_SEGMENT_TOO_LONG);
-                            }
-                        } catch (final BadFilePathException e) {
-                            /* Looks like filename might be too long -> Check if writing a shortened filename would be possible. */
-                            int maxFilenameLength = maxPathLengthWindows - fileOutput.getParentFile().getAbsolutePath().length();
-                            if (fileOutput.getName().length() > filename.length()) {
-                                /*
-                                 * Name of write-test file was longer than name of filename -> Filename needs to be smaller to compensate
-                                 * for that.
-                                 */
-                                maxFilenameLength = maxFilenameLength - (fileOutput.getName().length() - filename.length());
-                            }
-                            final ParsedFilename pfname;
-                            if (e.getReason() != PathFailureReason.PATH_SEGMENT_TOO_LONG) {
-                                throw e;
-                            } else if ((pfname = new jd.plugins.ParsedFilename(filename)).isMultipartArchive()) {
-                                /* Do not offer auto filename shortening for multipart archive files. User needs to do this manually. */
-                                throw e;
-                            } else if (maxFilenameLength <= 0) {
-                                /*
-                                 * Does not look like too long filename -> Write-fail must have happened for a different reason, possibly
-                                 * permission problem -> Give up.
-                                 */
-                                logger.info("Filename is too long according to Exception but it's not");
-                                // throw e;
-                                throw new SkipReasonException(SkipReason.INVALID_DESTINATION, e);
-                            }
-                            /* Shorten filename and try again */
-                            final String shortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
-                            if (shortenedFilename == null) {
-                                /* Shortening this filename was not possible -> Throw exception */
-                                throw e;
-                            }
-                            final DownloadSession currentSession = getSession();
-                            IfFilenameTooLongAction action = currentSession.getOnFilenameTooLongAction(downloadLink.getFilePackage());
-                            if (action == null || action == IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
-                                final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, shortenedFilename).show();
-                                if (io.getCloseReason() == CloseReason.OK) {
-                                    action = io.getAction();
-                                } else {
-                                    /* Timeout or dialog closed/ignored -> Do not auto rename */
-                                    action = IfFilenameTooLongAction.SKIP_FILE;
-                                }
-                                if (io.isDontShowAgainSelected()) {
-                                    currentSession.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), action);
-                                } else {
-                                    currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
-                                }
-                            }
-                            if (IfFilenameTooLongAction.RENAME_FILE != action) {
-                                logger.info("Skipping filename auto short");
-                                throw e;
-                            }
-                            controller.setSessionDownloadFilename(shortenedFilename);
-                            downloadLink.setForcedFileName(shortenedFilename);
-                            downloadLink.setChunksProgress(null);
-                            logger.info("Looks like too long filename | Checking if shortened filename already exists: " + shortenedFilename);
-                            final File writeTest2 = new File(writeTest1.getParent(), shortenedFilename);
-                            if (writeTest2.exists()) {
-                                logger.info("File with shortened filename already exists!");
-                                throw new SkipReasonException(SkipReason.FILE_EXISTS);
-                            }
-                        }
-                    }
-                }
-                if (!fileExists && fileInProgress == null) {
-                    /* Success -> Early return */
+                if (fileExists) {
+                    /* File already exists -> Early return */
+                    fileAlreadyExistsHandling(session, controller, null);
                     return;
                 }
-                /* File already exists or file is currently being downloaded. */
-                IfFileExistsAction doAction = config.getIfFileExistsAction();
-                if (doAction == null || IfFileExistsAction.ASK_FOR_EACH_FILE == doAction) {
-                    final DownloadSession currentSession = getSession();
-                    doAction = currentSession.getOnFileExistsAction(downloadLink.getFilePackage());
-                    if (doAction == null || doAction == IfFileExistsAction.ASK_FOR_EACH_FILE) {
-                        final IfFileExistsDialogInterface io = new IfFileExistsDialog(downloadLink, fileInProgress).show();
-                        if (io.getCloseReason() == CloseReason.TIMEOUT) {
-                            /* User did not react -> All we can do is display an error. */
-                            throw new SkipReasonException(SkipReason.FILE_EXISTS);
-                        } else if (io.getCloseReason() == CloseReason.INTERRUPT) {
-                            throw new InterruptedException("IFFileExistsDialog Interrupted");
-                        }
-                        if (io.getCloseReason() == CloseReason.OK) {
-                            doAction = io.getAction();
+                /* Check if a mirror of this item is currently being downloaded. */
+                final String filename;
+                if (MirrorDetectionDecision.SAFE.equals(mirrorDetectionDecision)) {
+                    /**
+                     * this returns a safe checkFile or null (if not available yet, eg no final/forcedFileName set)
+                     */
+                    if (safeFinalFileDestination != null) {
+                        /**
+                         * we use fileName from checkFile
+                         */
+                        filename = safeFinalFileDestination.getName();
+                    } else {
+                        /**
+                         * we use final/forcedFileName from downloadLink
+                         */
+                        filename = downloadLink.getName(true, false);
+                    }
+                } else {
+                    /**
+                     * we use fileName from fileOutput (may be unsafe)
+                     */
+                    filename = fileOutput.getName();
+                }
+                /* Check if a mirror is currently being downloaded or if a file with the same name is currently being downloaded. */
+                for (final SingleDownloadController downloadController : session.getControllers()) {
+                    if (downloadController == controller) {
+                        continue;
+                    }
+                    final DownloadLink block = downloadController.getDownloadLink();
+                    if (block == downloadLink) {
+                        continue;
+                    }
+                    if (session.getFileAccessManager().isLockedBy(fileOutput, downloadController)) {
+                        /* fileOutput is already locked */
+                        if (block.getFilePackage() == downloadLink.getFilePackage() && isMirrorCandidate(downloadLink, filename, block, mirrorDetectionDecision)) {
+                            /* File is from same package */
+                            throw new ConditionalSkipReasonException(new MirrorLoading(block));
                         } else {
-                            doAction = IfFileExistsAction.SKIP_FILE;
-                        }
-                        if (doAction == null) {
-                            /* Fallback */
-                            doAction = IfFileExistsAction.SKIP_FILE;
-                        }
-                        if (io.isDontShowAgainSelected() && io.getCloseReason() == CloseReason.OK) {
-                            currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), doAction);
-                        } else {
-                            currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
+                            final DownloadLink fileInProgress = block;
+                            fileAlreadyExistsHandling(session, controller, fileInProgress);
+                            return;
                         }
                     }
                 }
-                switch (doAction) {
-                case SKIP_FILE:
-                    switch (CFG_GENERAL.CFG.getOnSkipDueToAlreadyExistsAction()) {
-                    case SET_FILE_TO_SUCCESSFUL_MIRROR:
-                        if (fileInProgress != null) {
-                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                        }
-                        throw new DeferredRunnableException(new ExceptionRunnable() {
-                            @Override
-                            public void run() throws Exception {
-                                final PluginForHost plugin = controller.getProcessingPlugin();
-                                if (plugin != null) {
-                                    final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
-                                    if (downloadable != null) {
-                                        switch (mirrorDetectionDecision) {
-                                        case AUTO:
-                                            final HashInfo hashInfo = downloadable.getHashInfo();
-                                            if (hashInfo != null) {
-                                                final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
-                                                if (hashResult != null && hashResult.match()) {
-                                                    downloadable.setHashResult(hashResult);
-                                                    downloadLink.setDownloadCurrent(fileOutput.length());
-                                                    throw new PluginException(LinkStatus.FINISHED);
-                                                }
-                                            }
-                                        case FILENAME_FILESIZE:
-                                            final long fileSize = downloadable.getVerifiedFileSize();
-                                            if (fileSize >= 0 && fileSize == fileOutput.length()) {
-                                                downloadLink.setDownloadCurrent(fileOutput.length());
-                                                throw new PluginException(LinkStatus.FINISHED);
-                                            }
-                                            break;
-                                        case FILENAME:
-                                        case DISABLED:
-                                        default:
-                                            // nothing
-                                        }
-                                    }
-                                }
-                                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                final boolean checkForPathLengthLimit = true;
+                if (checkForPathLengthLimit && DebugMode.TRUE_IN_IDE_ELSE_FALSE && isWindowsPathLimitActive()) {
+                    /**
+                     * We are close to the finish line! </br>
+                     * We know that we can write in the directory but can we write the specific file we want to write? </br>
+                     * The filename could still be too long!
+                     */
+                    File writeTest1 = fileOutput;
+                    final List<File> processFiles = downloadLink.getDefaultPlugin().listProcessFiles(downloadLink);
+                    if (processFiles != null) {
+                        /*
+                         * Get list of all possible files the related plugin could write and pick the longest one to perform our write-test.
+                         * Typically this will be our temporary .part file.
+                         */
+                        int maxlen = fileOutput.getName().length();
+                        for (final File file : processFiles) {
+                            if (file.getName().length() > maxlen && !file.exists()) {
+                                maxlen = file.getName().length();
+                                writeTest1 = file;
                             }
-                        });
-                    case SET_FILE_TO_SUCCESSFUL:
-                        throw new PluginException(LinkStatus.FINISHED);
-                    default:
-                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                        }
                     }
-                case OVERWRITE_FILE:
-                    if (fileInProgress != null) {
-                        /* We cannot overwrite a file that is currently in progress */
-                        controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Blocked by:" + fileInProgress);
-                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                    } else if (!fileOutput.delete()) {
-                        controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Can't delete initial file");
-                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                    } else {
-                        break;
-                    }
-                case AUTO_RENAME:
-                    final String splitName[] = CrossSystem.splitFileName(fileOutput.getName());
-                    final String downloadPath = fileOutput.getParent();
-                    String extension = splitName[1];
-                    if (extension == null) {
-                        extension = "";
-                    } else {
-                        extension = "." + extension;
-                    }
-                    String name = splitName[0];
-                    int duplicateFilenameCounter = 2;
-                    final String alreadyDuplicated = new Regex(name, ".*_(\\d{1,5})$").getMatch(0);
-                    if (alreadyDuplicated != null) {
-                        /* it seems the file already got auto renamed! */
-                        duplicateFilenameCounter = Integer.parseInt(alreadyDuplicated) + 1;
-                        name = new Regex(name, "(.*)_\\d+$").getMatch(0);
-                    }
+                    final int maxPathLengthWindows = 259; // 260 but only 259 usable
                     try {
-                        File check = null;
-                        String newName = null;
-                        while (true) {
-                            newName = name + "_" + (duplicateFilenameCounter++) + extension;
-                            check = new File(downloadPath, newName);
-                            if (check.exists()) {
-                                check = null;
-                            } else {
-                                for (SingleDownloadController downloadController : session.getControllers()) {
-                                    if (downloadController == controller) {
-                                        continue;
-                                    }
-                                    if (session.getFileAccessManager().isLockedBy(check, downloadController)) {
-                                        check = null;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (check != null) {
-                                break;
-                            }
+                        FilePathChecker.createFilePath(writeTest1);
+                        /* Test-boolean to test this on OS which do not have any path limitations. */
+                        final boolean devtestForceLongfilenameException = false;
+                        if (devtestForceLongfilenameException && fileOutput.getAbsolutePath().length() > maxPathLengthWindows) {
+                            throw new BadFilePathException(writeTest1, PathFailureReason.PATH_SEGMENT_TOO_LONG);
                         }
-                        // we can do this, because the localFilecheck always runs BEFORE the download
-                        // except for org.jdownloader.controlling.linkcrawler.GenericVariants.DEMUX_GENERIC_AUDIO
-                        controller.setSessionDownloadFilename(newName);
-                        downloadLink.setForcedFileName(newName);
+                    } catch (final BadFilePathException e) {
+                        /* Looks like filename might be too long -> Check if writing a shortened filename would be possible. */
+                        int maxFilenameLength = maxPathLengthWindows - fileOutput.getParentFile().getAbsolutePath().length();
+                        if (fileOutput.getName().length() > filename.length()) {
+                            /*
+                             * Name of write-test file was longer than name of filename -> Filename needs to be smaller to compensate for
+                             * that.
+                             */
+                            maxFilenameLength = maxFilenameLength - (fileOutput.getName().length() - filename.length());
+                        }
+                        final ParsedFilename pfname;
+                        if (e.getReason() != PathFailureReason.PATH_SEGMENT_TOO_LONG) {
+                            throw e;
+                        } else if ((pfname = new jd.plugins.ParsedFilename(filename)).isMultipartArchive()) {
+                            /* Do not offer auto filename shortening for multipart archive files. User needs to do this manually. */
+                            throw e;
+                        } else if (maxFilenameLength <= 0) {
+                            /*
+                             * Does not look like too long filename -> Write-fail must have happened for a different reason, possibly
+                             * permission problem -> Give up.
+                             */
+                            logger.info("Filename is too long according to Exception but it's not");
+                            // throw e;
+                            throw new SkipReasonException(SkipReason.INVALID_DESTINATION, e);
+                        }
+                        /* Shorten filename and try again */
+                        final DownloadSession currentSession = getSession();
+                        IfFilenameTooLongAction action = currentSession.getOnFilenameTooLongAction(downloadLink.getFilePackage());
+                        if (action == IfFilenameTooLongAction.SKIP_FILE) {
+                            /* User wants us to skip too long filenames. */
+                            throw e;
+                        }
+                        final String shortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
+                        if (shortenedFilename == null) {
+                            /* Shortening this filename is not possible */
+                            throw e;
+                        }
+                        if (action == null || action == IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
+                            /* TODO: Get- and set filename shortened by the user. Do not forget to remove non-allowed chars from it then! */
+                            final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, shortenedFilename).show();
+                            if (io.getCloseReason() == CloseReason.OK) {
+                                action = io.getAction();
+                            } else {
+                                /* Timeout or dialog closed/ignored -> Do not auto rename */
+                                action = IfFilenameTooLongAction.SKIP_FILE;
+                            }
+                            if (io.isDontShowAgainSelected()) {
+                                currentSession.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), action);
+                            } else {
+                                currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
+                            }
+                            /* TODO: Check length of file name if it was manually "shortened" by the user. */
+                        }
+                        if (IfFilenameTooLongAction.RENAME_FILE != action) {
+                            /* No rename wished -> Dead end */
+                            throw e;
+                        }
+                        // TODO: Maybe remove this check as we should be sure that the changed filename is writeable.
+                        controller.setSessionDownloadFilename(shortenedFilename);
+                        downloadLink.setForcedFileName(shortenedFilename);
                         downloadLink.setChunksProgress(null);
-                    } catch (Throwable e) {
-                        LogSource.exception(controller.getLogger(), e);
-                        downloadLink.setForcedFileName(null);
-                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                        logger.info("Looks like too long filename | Checking if shortened filename already exists: " + shortenedFilename);
+                        final File writeTest2 = new File(writeTest1.getParent(), shortenedFilename);
+                        if (writeTest2.exists()) {
+                            logger.info("File with shortened filename already exists!");
+                            throw new SkipReasonException(SkipReason.FILE_EXISTS);
+                        }
                     }
-                    break;
-                default:
-                    throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
                 }
             }
 
@@ -4387,6 +4263,169 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             throw (Exception) ret;
         }
         throw new WTFException("WTF? Result: " + ret);
+    }
+
+    /** TODO: Move this somewhere else. Maybe only do this once on application-start and cache the result. */
+    public static boolean isWindowsPathLimitActive() {
+        if (!CrossSystem.isWindows()) {
+            return false;
+        }
+        try {
+            int value = Advapi32Util.registryGetIntValue(WinReg.HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\FileSystem", "LongPathsEnabled");
+            if (value == 1) {
+                /* Long paths enabled -> No path length limit active. */
+                return false;
+            }
+        } catch (Exception e) {
+        }
+        return true;
+    }
+
+    public void fileAlreadyExistsHandling(final DownloadSession session, final SingleDownloadController controller, final DownloadLink fileInProgress) throws DeferredRunnableException, PluginException, SkipReasonException, InterruptedException {
+        /* File already exists or file is currently being downloaded. */
+        final DownloadLink downloadLink = controller.getDownloadLink();
+        final File fileOutput = controller.getFileOutput(false, true);
+        IfFileExistsAction doAction = config.getIfFileExistsAction();
+        if (doAction == null || IfFileExistsAction.ASK_FOR_EACH_FILE == doAction) {
+            final DownloadSession currentSession = getSession();
+            doAction = currentSession.getOnFileExistsAction(downloadLink.getFilePackage());
+            if (doAction == null || doAction == IfFileExistsAction.ASK_FOR_EACH_FILE) {
+                final IfFileExistsDialogInterface io = new IfFileExistsDialog(downloadLink, fileInProgress).show();
+                if (io.getCloseReason() == CloseReason.TIMEOUT) {
+                    /* User did not react -> All we can do is display an error. */
+                    throw new SkipReasonException(SkipReason.FILE_EXISTS);
+                } else if (io.getCloseReason() == CloseReason.INTERRUPT) {
+                    throw new InterruptedException("IFFileExistsDialog Interrupted");
+                }
+                if (io.getCloseReason() == CloseReason.OK) {
+                    doAction = io.getAction();
+                } else {
+                    doAction = IfFileExistsAction.SKIP_FILE;
+                }
+                if (doAction == null) {
+                    /* Fallback */
+                    doAction = IfFileExistsAction.SKIP_FILE;
+                }
+                if (io.isDontShowAgainSelected() && io.getCloseReason() == CloseReason.OK) {
+                    currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), doAction);
+                } else {
+                    currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
+                }
+            }
+        }
+        switch (doAction) {
+        case SKIP_FILE:
+            switch (CFG_GENERAL.CFG.getOnSkipDueToAlreadyExistsAction()) {
+            case SET_FILE_TO_SUCCESSFUL_MIRROR:
+                if (fileInProgress != null) {
+                    throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                }
+                throw new DeferredRunnableException(new ExceptionRunnable() {
+                    @Override
+                    public void run() throws Exception {
+                        final PluginForHost plugin = controller.getProcessingPlugin();
+                        if (plugin != null) {
+                            final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
+                            if (downloadable != null) {
+                                final MirrorDetectionDecision mirrorDetectionDecision = config.getMirrorDetectionDecision();
+                                switch (mirrorDetectionDecision) {
+                                case AUTO:
+                                    final HashInfo hashInfo = downloadable.getHashInfo();
+                                    if (hashInfo != null) {
+                                        final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
+                                        if (hashResult != null && hashResult.match()) {
+                                            downloadable.setHashResult(hashResult);
+                                            downloadLink.setDownloadCurrent(fileOutput.length());
+                                            throw new PluginException(LinkStatus.FINISHED);
+                                        }
+                                    }
+                                case FILENAME_FILESIZE:
+                                    final long fileSize = downloadable.getVerifiedFileSize();
+                                    if (fileSize >= 0 && fileSize == fileOutput.length()) {
+                                        downloadLink.setDownloadCurrent(fileOutput.length());
+                                        throw new PluginException(LinkStatus.FINISHED);
+                                    }
+                                    break;
+                                case FILENAME:
+                                case DISABLED:
+                                default:
+                                    // nothing
+                                }
+                            }
+                        }
+                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                    }
+                });
+            case SET_FILE_TO_SUCCESSFUL:
+                throw new PluginException(LinkStatus.FINISHED);
+            default:
+                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+            }
+        case OVERWRITE_FILE:
+            if (fileInProgress != null) {
+                /* We cannot overwrite a file that is currently in progress */
+                controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Blocked by:" + fileInProgress);
+                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+            } else if (!fileOutput.delete()) {
+                controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Can't delete initial file");
+                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+            } else {
+                break;
+            }
+        case AUTO_RENAME:
+            final String splitName[] = CrossSystem.splitFileName(fileOutput.getName());
+            final String downloadPath = fileOutput.getParent();
+            String extension = splitName[1];
+            if (extension == null) {
+                extension = "";
+            } else {
+                extension = "." + extension;
+            }
+            String name = splitName[0];
+            int duplicateFilenameCounter = 2;
+            final String alreadyDuplicated = new Regex(name, ".*_(\\d{1,5})$").getMatch(0);
+            if (alreadyDuplicated != null) {
+                /* it seems the file already got auto renamed! */
+                duplicateFilenameCounter = Integer.parseInt(alreadyDuplicated) + 1;
+                name = new Regex(name, "(.*)_\\d+$").getMatch(0);
+            }
+            try {
+                File check = null;
+                String newName = null;
+                while (true) {
+                    newName = name + "_" + (duplicateFilenameCounter++) + extension;
+                    check = new File(downloadPath, newName);
+                    if (check.exists()) {
+                        check = null;
+                    } else {
+                        for (SingleDownloadController downloadController : session.getControllers()) {
+                            if (downloadController == controller) {
+                                continue;
+                            }
+                            if (session.getFileAccessManager().isLockedBy(check, downloadController)) {
+                                check = null;
+                                break;
+                            }
+                        }
+                    }
+                    if (check != null) {
+                        break;
+                    }
+                }
+                // we can do this, because the localFilecheck always runs BEFORE the download
+                // except for org.jdownloader.controlling.linkcrawler.GenericVariants.DEMUX_GENERIC_AUDIO
+                controller.setSessionDownloadFilename(newName);
+                downloadLink.setForcedFileName(newName);
+                downloadLink.setChunksProgress(null);
+            } catch (Throwable e) {
+                LogSource.exception(controller.getLogger(), e);
+                downloadLink.setForcedFileName(null);
+                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+            }
+            break;
+        default:
+            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+        }
     }
 
     @Override

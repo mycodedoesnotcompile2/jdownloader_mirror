@@ -87,7 +87,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50505 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50546 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -307,8 +307,8 @@ public class AllDebridCom extends PluginForHost {
         synchronized (account) {
             String apikey = getApiKey(account);
             if (apikey != null) {
+                setAuthHeader(br, apikey);
                 if (!validateApikey) {
-                    setAuthHeader(br, apikey);
                     return null;
                 }
                 logger.info("Attempting login with existing apikey");
@@ -316,62 +316,67 @@ public class AllDebridCom extends PluginForHost {
                 logger.info("Apikey login successful");
                 return userinfo;
             }
-            /* Full login */
-            logger.info("Performing full login");
-            final Map<String, Object> data = this.callAPI("/pin/get", account, null);
-            final String user_url = data.get("user_url").toString();
-            final UrlQuery query = new UrlQuery();
-            query.appendEncoded("check", data.get("check").toString());
-            query.appendEncoded("pin", data.get("pin").toString());
-            final int maxSecondsServerside = ((Number) data.get("expires_in")).intValue();
-            final int maxWaitSecondsClientside = 1200;
-            final int waitSecondsForDialog = Math.min(maxSecondsServerside, maxWaitSecondsClientside);
-            final Thread dialog = showPINLoginInformation(user_url, waitSecondsForDialog);
-            int secondsWaited = 0;
-            final int waitSecondsPerLoop = 3;
-            try {
-                while (true) {
-                    logger.info("Waiting for user to authorize application. Seconds waited: " + secondsWaited + "/" + maxSecondsServerside);
-                    Thread.sleep(waitSecondsPerLoop * 1000);
-                    secondsWaited += waitSecondsPerLoop;
-                    /** Example response: { "status": "success", "data": { "activated": false, "expires_in": 590 }}} */
-                    final Map<String, Object> resp = this.callAPI("/pin/check", query, account, null);
-                    apikey = (String) resp.get("apikey");
-                    final int secondsLeftServerside = ((Number) data.get("expires_in")).intValue();
-                    if (!StringUtils.isEmpty(apikey)) {
-                        logger.info("Stopping because: Found apikey!");
-                        break;
-                    } else if (secondsWaited >= maxSecondsServerside) {
-                        logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsServerside + " seconds");
-                        break;
-                    } else if (secondsLeftServerside <= waitSecondsPerLoop) {
-                        logger.info("Stopping because: Timeout #2");
-                        break;
-                    } else if (secondsWaited >= maxWaitSecondsClientside) {
-                        logger.info("Stopping because: Timeout #3");
-                        break;
-                    } else if (!dialog.isAlive()) {
-                        logger.info("Stopping because: Dialog closed!");
-                        break;
-                    } else if (this.isAbort()) {
-                        logger.info("Stopping because: Aborted by user");
-                        throw new InterruptedException();
-                    } else if (secondsWaited + waitSecondsPerLoop >= maxSecondsServerside) {
-                        logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsServerside + " seconds");
-                        break;
-                    }
-                }
-            } finally {
-                dialog.interrupt();
-            }
-            if (StringUtils.isEmpty(apikey)) {
-                throw new AccountInvalidException("Authorization failed!\r\nLogin in your browser and confirm the code you see to allow JDownloader to login into your account.\r\nDo not close this pairing dialog until you have confirmed the code via browser!");
-            }
+            /* PIN login */
+            apikey = performPINLogin(account);
             account.setProperty(PROPERTY_apikey, apikey);
             setAuthHeader(br, apikey);
-            final Map<String, Object> userinfo = getAccountInfo(account, ai, apikey);
-            return userinfo;
+            return getAccountInfo(account, ai, apikey);
         }
+    }
+
+    private String performPINLogin(final Account account) throws Exception {
+        logger.info("Performing PIN login");
+        final Map<String, Object> data = this.callAPI("/pin/get", account, null);
+        final String user_url = data.get("user_url").toString();
+        final UrlQuery query = new UrlQuery();
+        query.appendEncoded("check", data.get("check").toString());
+        query.appendEncoded("pin", data.get("pin").toString());
+        final int maxSecondsServerside = ((Number) data.get("expires_in")).intValue();
+        final int maxWaitSecondsClientside = 1200;
+        final int waitSecondsForDialog = Math.min(maxSecondsServerside, maxWaitSecondsClientside);
+        final Thread dialog = showPINLoginInformation(user_url, waitSecondsForDialog);
+        int secondsWaited = 0;
+        final int waitSecondsPerLoop = 3;
+        String apikey = null;
+        try {
+            while (true) {
+                logger.info("Waiting for user to authorize application. Seconds waited: " + secondsWaited + "/" + maxSecondsServerside);
+                Thread.sleep(waitSecondsPerLoop * 1000);
+                secondsWaited += waitSecondsPerLoop;
+                /** Example response: { "status": "success", "data": { "activated": false, "expires_in": 590 }}} */
+                final Map<String, Object> resp = this.callAPI("/pin/check", query, account, null);
+                apikey = (String) resp.get("apikey");
+                final int secondsLeftServerside = ((Number) data.get("expires_in")).intValue();
+                if (!StringUtils.isEmpty(apikey)) {
+                    logger.info("Stopping because: Found apikey!");
+                    break;
+                } else if (secondsWaited >= maxSecondsServerside) {
+                    logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsServerside + " seconds");
+                    break;
+                } else if (secondsLeftServerside <= waitSecondsPerLoop) {
+                    logger.info("Stopping because: Timeout #2");
+                    break;
+                } else if (secondsWaited >= maxWaitSecondsClientside) {
+                    logger.info("Stopping because: Timeout #3");
+                    break;
+                } else if (!dialog.isAlive()) {
+                    logger.info("Stopping because: Dialog closed!");
+                    break;
+                } else if (this.isAbort()) {
+                    logger.info("Stopping because: Aborted by user");
+                    throw new InterruptedException();
+                } else if (secondsWaited + waitSecondsPerLoop >= maxSecondsServerside) {
+                    logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsServerside + " seconds");
+                    break;
+                }
+            }
+        } finally {
+            dialog.interrupt();
+        }
+        if (StringUtils.isEmpty(apikey)) {
+            throw new AccountInvalidException("Authorization failed!\r\nLogin in your browser and confirm the code you see to allow JDownloader to login into your account.\r\nDo not close this pairing dialog until you have confirmed the code via browser!");
+        }
+        return apikey;
     }
 
     private Map<String, Object> getAccountInfo(final Account account, final AccountInfo ai, final String apikey) throws Exception {

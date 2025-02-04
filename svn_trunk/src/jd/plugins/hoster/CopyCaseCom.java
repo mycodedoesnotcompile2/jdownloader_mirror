@@ -33,11 +33,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50283 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50551 $", interfaceVersion = 2, names = {}, urls = {})
 public class CopyCaseCom extends PluginForHost {
     public CopyCaseCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://copycase.com/pricing");
+        this.enablePremium("https://" + getHost() + "/pricing");
     }
 
     @Override
@@ -47,7 +47,7 @@ public class CopyCaseCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://copycase.com/page/en-US/terms";
+        return "https://" + getHost() + "/page/en-US/terms";
     }
 
     private final String PROPERTY_ACCOUNT_TOKEN = "token";
@@ -393,6 +393,7 @@ public class CopyCaseCom extends PluginForHost {
         ai.setUnlimitedTraffic();
         if (accounType.equalsIgnoreCase("free")) {
             account.setType(AccountType.FREE);
+            ai.setTrafficRefill(false);
         } else {
             /* Not all premium accounts have an expire date. */
             if (premium_expire_at != null) {
@@ -403,6 +404,7 @@ public class CopyCaseCom extends PluginForHost {
             if (!StringUtils.isEmpty(premium_package)) {
                 ai.setStatus(account.getType().getLabel() + " | " + premium_package);
             }
+            ai.setTrafficRefill(true);
         }
         if (download_available_transfer != null) {
             ai.setTrafficLeft(download_available_transfer.longValue());

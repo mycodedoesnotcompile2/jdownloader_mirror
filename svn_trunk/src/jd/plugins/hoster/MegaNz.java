@@ -111,7 +111,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50540 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50546 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -304,7 +304,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
              * immediately, see: </br>
              * https://board.jdownloader.org/showthread.php?t=75268
              */
-            throw new AccountRequiredException("Free download of files >5GB is disabled in settings");
+            throw new AccountRequiredException("Free download of files >5GB is disabled in plugin settings");
         }
     }
 

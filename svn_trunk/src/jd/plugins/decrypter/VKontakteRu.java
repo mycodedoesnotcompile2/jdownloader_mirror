@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50545 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50546 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -539,10 +539,10 @@ public class VKontakteRu extends PluginForDecrypt {
             // br.getHeaders().put("Referer", param.getCryptedUrl());
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             this.getPage(br, br.createPostRequest("/al_video.php?act=show", query));
-        }
-        embedResults = findEmbeddedExternalVideos(br);
-        if (embedResults.size() > 0) {
-            return embedResults;
+            embedResults = findEmbeddedExternalVideos(br);
+            if (embedResults.size() > 0) {
+                return embedResults;
+            }
         }
         final Map<String, Object> video = findVideoMap(this.br, id);
         if (video == null) {

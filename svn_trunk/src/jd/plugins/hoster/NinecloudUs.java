@@ -27,6 +27,8 @@ import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -34,10 +36,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50554 $", interfaceVersion = 3, names = {}, urls = {})
 public class NinecloudUs extends PluginForHost {
     public NinecloudUs(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -69,16 +78,15 @@ public class NinecloudUs extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    /* Connection stuff */
-    private static final boolean FREE_RESUME    = true;
-    private static final int     FREE_MAXCHUNKS = 0;
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
 
-    // private static final boolean ACCOUNT_FREE_RESUME = true;
-    // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_FREE_MAXDOWNLOADS = 20;
-    // private static final boolean ACCOUNT_PREMIUM_RESUME = true;
-    // private static final int ACCOUNT_PREMIUM_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
+    }
+
     @Override
     public String getLinkID(final DownloadLink link) {
         final String fid = getFID(link);
@@ -96,7 +104,10 @@ public class NinecloudUs extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
+        if (!link.isNameSet()) {
+            /* Fallback */
+            link.setName(this.getFID(link) + ".zip");
+        }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -109,10 +120,6 @@ public class NinecloudUs extends PluginForHost {
             link.setName(filename);
         } else {
             logger.warning("Failed to find filename");
-            if (!link.isNameSet()) {
-                /* Fallback */
-                link.setName(this.getFID(link));
-            }
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
@@ -125,15 +132,21 @@ public class NinecloudUs extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        doFree(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
+        doFree(link, "free_directlink");
     }
 
-    private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
+    private void doFree(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
         String dllink = checkDirectLink(link, directlinkproperty);
         if (dllink == null) {
             final String waitMinutesStr = br.getRegex("You cannot download until (\\d+) minutes? from now").getMatch(0);
             if (waitMinutesStr != null) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(waitMinutesStr) * 60 * 1001l);
+            }
+            String premiumOnlyMessage = br.getRegex("<div class=\"box_notice\"[^>]*>(.*?)</div>").getMatch(0);
+            if (premiumOnlyMessage != null) {
+                /* E.g. This file contains XX pictures, and would make a zip of XXX.XMB. You cannot download it without a subscription. */
+                premiumOnlyMessage = premiumOnlyMessage.replaceAll("<[^>]*>", "");
+                throw new AccountRequiredException(premiumOnlyMessage);
             }
             dllink = br.getRegex("\"(https?://(downloads|slow).[^/]+/[^\"]+)\"").getMatch(0);
             if (dllink == null) {
@@ -143,7 +156,7 @@ public class NinecloudUs extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {
@@ -164,7 +177,6 @@ public class NinecloudUs extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     return dllink;
@@ -189,6 +201,7 @@ public class NinecloudUs extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
+        /* 2025-02-03: Max 1 file per hour */
         return 1;
     }
 

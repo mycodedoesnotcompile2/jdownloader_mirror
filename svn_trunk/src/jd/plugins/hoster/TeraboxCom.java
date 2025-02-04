@@ -54,12 +54,19 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50515 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50546 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost());
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -192,22 +199,27 @@ public class TeraboxCom extends PluginForHost {
 
     public static AvailableStatus parseFileInformation(final DownloadLink link, final Map<String, Object> entries) throws IOException, PluginException {
         final String filename = (String) entries.get("server_filename");
-        final long filesize = JavaScriptEngineFactory.toLong(entries.get("size"), -1);
+        /* They sometimes put numbers as strings in their json. */
+        final Object filesizeO = entries.get("size");
+        final Object lastModifiedTimestampSecondsO = entries.get("local_mtime");
         final String md5 = (String) entries.get("md5");
         /* Typically only available when user is logged in. */
         final String directurl = (String) entries.get("dlink");
-        // final String fsidStr = Long.toString(JavaScriptEngineFactory.toLong(entries.get("fs_id"), -1));
+        // final String fsidStr = entries.get("fs_id").toString();
         if (!StringUtils.isEmpty(filename)) {
             link.setFinalFileName(filename);
         }
-        if (filesize > 0) {
-            link.setVerifiedFileSize(filesize);
+        if (filesizeO != null && filesizeO.toString().matches("\\d+")) {
+            link.setVerifiedFileSize(Long.parseLong(filesizeO.toString()));
         }
         if (!StringUtils.isEmpty(md5)) {
             link.setMD5Hash(md5);
         }
         if (!StringUtils.isEmpty(directurl)) {
             link.setProperty(PROPERTY_DIRECTURL, directurl);
+        }
+        if (lastModifiedTimestampSecondsO != null && lastModifiedTimestampSecondsO.toString().matches("\\d+")) {
+            link.setLastModifiedTimestamp(Long.parseLong(lastModifiedTimestampSecondsO.toString()) * 1000);
         }
         link.setAvailable(true);
         return AvailableStatus.TRUE;
@@ -225,7 +237,6 @@ public class TeraboxCom extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     return dllink;
@@ -249,7 +260,6 @@ public class TeraboxCom extends PluginForHost {
 
     public AccountInfo login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
             final Cookies userCookies = account.loadUserCookies();
             if (userCookies == null || userCookies.isEmpty()) {

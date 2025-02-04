@@ -26,7 +26,7 @@ import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50551 $", interfaceVersion = 3, names = {}, urls = {})
 public class WhoreshubCom extends KernelVideoSharingComV2 {
     public WhoreshubCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -70,6 +70,7 @@ public class WhoreshubCom extends KernelVideoSharingComV2 {
         if (!super.isLoggedIN(br)) {
             return false;
         }
+        /* Looks like we are logged in -> Perform deeper check */
         try {
             // normal main website does not indicate login being expired but accessing profile or videos result in "please login"
             final Browser ibr = br.cloneBrowser();
