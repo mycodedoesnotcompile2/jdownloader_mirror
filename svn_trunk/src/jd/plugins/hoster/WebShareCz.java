@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50555 $", interfaceVersion = 2, names = {}, urls = {})
 public class WebShareCz extends PluginForHost {
     public WebShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -382,8 +382,8 @@ public class WebShareCz extends PluginForHost {
             if (StringUtils.isEmpty(token)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            account.setProperty("token", token);
             br.setCookie(br.getHost(), "wst", token);
+            account.setProperty("token", token);
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }

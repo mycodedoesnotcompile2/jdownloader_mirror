@@ -146,7 +146,7 @@ public class WeisjJSVG {
                  * @see org.appwork.utils.images.svg.SVGIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
                  */
                 @Override
-                public void paintIcon(Component c, Graphics g1D, int x, int y, int width, int height) {              
+                public void paintIcon(Component c, Graphics g1D, int x, int y, int width, int height) {
                     final com.github.weisj.jsvg.geometry.size.FloatSize size = svgDocument.size();
                     if (width <= 0) {
                         width = (int) size.getWidth();
@@ -160,19 +160,19 @@ public class WeisjJSVG {
                     scaleHeight = scaleWidth;
                     int orgWidth = width;
                     int orgHeight = height;
-                    width = Math.max((int) (size.getWidth() * scaleWidth), 1);
-                    height = Math.max((int) (size.getHeight() * scaleHeight), 1);
+                    width = Math.max((int) Math.round(size.getWidth() * scaleWidth), 1);
+                    height = Math.max((int) Math.round(size.getHeight() * scaleHeight), 1);
                     // this centers the image in the new viewport.
                     x += (orgWidth - width) / 2;
                     y += (orgHeight - height) / 2;
                     final Graphics2D g = (Graphics2D) ((Graphics2D) g1D).create();
                     RenderingHints restoreHints = g.getRenderingHints();
                     AffineTransform restoreTransform = g.getTransform();
+                    // HIGHDPI: g already has set the correct scaling (tested with flatLAF), and thus there is nothing more to do here.
                     try {
                         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
                         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                        // AffineTransform transform = g.getTransform();
                         g.translate(x, y);
                         if (scaleWidth != 1.0d || scaleHeight != 1.0d) {
                             g.scale(scaleWidth, scaleHeight);

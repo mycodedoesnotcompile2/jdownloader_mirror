@@ -59,7 +59,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
-import javax.swing.GrayFilter;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -73,6 +72,7 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.URLStream;
+import org.appwork.utils.images.IconIO;
 
 /**
  * This class grants easy access to images stored in APPROOT/images/**.png
@@ -305,12 +305,6 @@ public class ImageProvider {
         }
     }
 
-    /**
-     * Uses the uimanager to get a grayscaled disabled Icon
-     *
-     * @param icon
-     * @return
-     */
     public static Icon getDisabledIcon(final JComponent component, Icon icon) {
         if (icon != null) {
             synchronized (ImageProvider.LOCK) {
@@ -320,11 +314,8 @@ public class ImageProvider {
                     //
                     return cachedDisabledIcon;
                 }
-                if (!(icon instanceof ImageIcon)) {
-                    // getDisabledIcon only works for imageicons
-                    icon = ImageProvider.toImageIcon(component, icon);
-                }
-                final Icon disabledIcon = new ImageIcon(GrayFilter.createDisabledImage(((ImageIcon) icon).getImage()));
+                DebugMode.debugger();
+                final Icon disabledIcon = new ImageIcon(IconIO.toGrayScale(IconIO.toImage(icon)));
                 ImageProvider.DISABLED_ICON_CACHE.put(icon, new MinTimeWeakReference<Icon>(disabledIcon, ImageProvider.MIN_LIFETIME, "disabled icon"));
                 return disabledIcon;
             }

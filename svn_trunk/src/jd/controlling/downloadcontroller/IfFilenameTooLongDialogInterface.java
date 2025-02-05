@@ -20,4 +20,7 @@ public interface IfFilenameTooLongDialogInterface extends OKCancelCloseUserIODef
 
     @Out
     public String getHost();
+
+    @Out
+    public String getNewFilename();
 }

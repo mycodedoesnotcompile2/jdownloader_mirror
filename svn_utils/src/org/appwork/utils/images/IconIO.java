@@ -68,26 +68,32 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.ImageIO;
+import javax.swing.GrayFilter;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
+import org.appwork.JNAHelper;
 import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
 import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.URLStream;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.svg.NoSVGSupportFactory;
 import org.appwork.utils.images.svg.SVGFactory;
 import org.appwork.utils.net.Base64OutputStream;
+import org.appwork.utils.os.CrossSystem;
 
 @BuildDecisionRequired(tags = { IconIO.SVG_JSVG, IconIO.SVG_SALAMANDER, IconIO.SVG_NONE }, imports = { IconIO.CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_WEISJ_JSVG_FACTORY, IconIO.CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_KIT_FOX_FACTORY, "" })
 public class IconIO {
@@ -102,15 +108,6 @@ public class IconIO {
     private static final AtomicReference<SVGFactory> SVG_FACTORY                                           = new AtomicReference<SVGFactory>();
     private static Boolean                           ICO_SUPPORTED;
     private volatile static Method                   ICO_DECODER;
-    private volatile static List<IconExeHandler>     CUSTOM_HANDLER                                        = new ArrayList<IconExeHandler>();
-
-    public static void addHandler(IconExeHandler handler) {
-        ArrayList<IconExeHandler> newList = new ArrayList<IconExeHandler>();
-        // add new handler with top priority
-        newList.add(handler);
-        newList.addAll(CUSTOM_HANDLER);
-        CUSTOM_HANDLER = newList;
-    }
 
     public static SVGFactory getSvgFactory() {
         SVGFactory factory = SVG_FACTORY.get();
@@ -349,7 +346,46 @@ public class IconIO {
      * @param resource
      * @return
      */
-    public static BufferedImage getImage(final URL resource) {
+    public static Image getImage(final URL resource) {
+        if (JNAHelper.isJNAAvailable() && CrossSystem.isWindows()) {
+            if (resource.getPath().toLowerCase(Locale.ROOT).endsWith(".exe")) {
+                Image ret;
+                try {
+                    ret = JNAImageHelper.getImageFromExe(resource);
+                    if (ret != null) {
+                        return ret;
+                    }
+                } catch (IOException e) {
+                    LogV3.log(e);
+                }
+            }
+        }
+        if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".ico") && isIcoSupported()) {
+            try {
+                InputStream is = resource.openStream();
+                try {
+                    List<BufferedImage> bufferedImages = (List<BufferedImage>) ICO_DECODER.invoke(null, is);
+                    if (bufferedImages != null && bufferedImages.size() > 0) {
+                        ArrayList<Image> images = new ArrayList<Image>(bufferedImages);
+                        if (images.size() > 1 && JavaVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
+                            MultiResolutionImageHelper.sortImagesBySize(images);
+                            // biggest one as base image
+                            return org.appwork.resources.MultiResolutionImageHelper.create(images.size() - 1, images.toArray(new Image[0]));
+                        } else {
+                            return images.get(0);
+                        }
+                    }
+                } finally {
+                    is.close();
+                }
+            } catch (InvocationTargetException e) {
+                LogV3.log(e);
+            } catch (IllegalAccessException e) {
+                LogV3.log(e);
+            } catch (IOException e) {
+                LogV3.log(e);
+            }
+        }
         return IconIO.getImage(resource, true);
     }
 
@@ -405,15 +441,15 @@ public class IconIO {
         return getIcon(resource, size, size);
     }
 
-    public static Icon getIcon(final URL resource, final int w, int h) {
-        if (resource != null) {
-            for (IconExeHandler ch : CUSTOM_HANDLER) {
-                Icon icon = ch.getIcon(resource, w, h);
-                if (icon != null) {
-                    return icon;
-                }
-            }
-        }
+    /**
+     * Returns an icon for the given resource, but only if the resource is a non-bitmap icon like a svg. Anything we cannot read as an image
+     *
+     * @param resource
+     * @param w
+     * @param h
+     * @return
+     */
+    public static Icon getNonImageIcon(final URL resource, final int w, int h) {
         if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
             if (getSvgFactory() != null) {
                 try {
@@ -432,28 +468,25 @@ public class IconIO {
                 return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
             }
         }
-        if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".ico") && isIcoSupported()) {
-            try {
-                InputStream is = resource.openStream();
-                try {
-                    List<BufferedImage> images = (List<BufferedImage>) ICO_DECODER.invoke(null, is);
-                    if (images != null && images.size() > 0) {
-                        MultiResIconImpl ret = new MultiResIconImpl(images, w, h);
-                        return ret;
-                    }
-                } finally {
-                    is.close();
-                }
-            } catch (IllegalAccessException e) {
-                LogV3.log(e);
-            } catch (InvocationTargetException e) {
-                LogV3.log(e);
-            } catch (IOException e) {
-                LogV3.log(e);
-            }
-            return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
+        return null;
+    }
+
+    @Deprecated
+    /**
+     * @deprecated use Theme methods to read icons to avoid bypassing caches etc.
+     * @param resource
+     * @param w
+     * @param h
+     * @return
+     */
+    public static Icon getIcon(final URL resource, final int w, int h) {
+        Icon ret = getNonImageIcon(resource, w, h);
+        if (ret != null) {
+            return ret;
         }
-        BufferedImage image = IconIO.getImage(resource);
+        // we should not get here. because this bypasses the image cache from the Theme.
+        DebugMode.debugger();
+        BufferedImage image = getImage(resource, true);
         if (image.getWidth() == w && image.getHeight() == h) {
             return new ImageIcon(image);
         } else if (w <= 0 && h <= 0) {
@@ -462,6 +495,45 @@ public class IconIO {
             return new ImageIcon(IconIO.getScaledInstance(image, w, h, Interpolation.BICUBIC, true));
         }
     }
+    // /**
+    // * this method tries to create a BadMultiResosultionImage that does not only contain the requested size, but also a bigger version for
+    // * highDPI systems.
+    // *
+    // * @param image
+    // * @param w
+    // * @param h
+    // * @return
+    // */
+    // private static Image wrapMultiRes(Image image, int targetWidth, int targetHeight) {
+    // Image scaledToTarget = IconIO.getScaledInstance(image, targetWidth, targetHeight, Interpolation.BICUBIC, true);
+    // try {
+    // double maxPossibleScale = Math.min((double) image.getWidth(null) / targetWidth, (double) image.getHeight(null) / targetHeight);
+    // if (maxPossibleScale <= 1) {
+    // // there is no bigger version
+    // return scaledToTarget;
+    // }
+    // double highestRequiredScale = 1d;
+    // // find the monitor with the highest scaling
+    // for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+    // AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
+    // highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleX());
+    // highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleY());
+    // }
+    // if (highestRequiredScale == 1) {
+    // // we no not need it bigger
+    // return scaledToTarget;
+    // }
+    // highestRequiredScale = Math.min(maxPossibleScale, highestRequiredScale);
+    // // large image.
+    // Image large = getScaledInstance(image, (int) Math.ceil(highestRequiredScale * targetWidth), (int) Math.ceil(highestRequiredScale *
+    // targetHeight));
+    // Image multiImage = new BaseMultiResolutionImageWrapper(1, large, scaledToTarget);
+    // return multiImage;
+    // } catch (Exception e) {
+    // LogV3.log(e);
+    // return scaledToTarget;
+    // }
+    // }
 
     public static Icon getScaledInstance(final Icon icon, final int width, final int height) {
         return IconIO.getScaledInstance(icon, width, height, Interpolation.BICUBIC);
@@ -502,26 +574,43 @@ public class IconIO {
      * @param j
      * @return
      */
-    public static BufferedImage getScaledInstance(final Image img, final int width, final int height) {
+    public static Image getScaledInstance(final Image img, final int width, final int height) {
         return IconIO.getScaledInstance(img, width, height, Interpolation.BICUBIC, true);
     }
 
-    public static BufferedImage getScaledInstance(final Image img, int width, int height, final Interpolation interpolation, final boolean higherQuality, boolean keepratio) {
+    public static Image getScaledInstance(Image img, int width, int height, final Interpolation interpolation, final boolean higherQuality, boolean keepratio) {
+        DebugMode.breakIf(img == null);
         final double faktor = Math.max((double) img.getWidth(null) / width, (double) img.getHeight(null) / height);
         if (keepratio) {
             width = Math.max((int) (img.getWidth(null) / faktor), 1);
             height = Math.max((int) (img.getHeight(null) / faktor), 1);
-            if (faktor == 1.0 && img instanceof BufferedImage) {
-                return (BufferedImage) img;
+            if (faktor == 1.0) {
+                return img;
             }
         } else {
-            if (img instanceof BufferedImage) {
-                if (height == img.getHeight(null) && width == img.getWidth(null)) {
-                    return (BufferedImage) img;
-                }
+            if (height == img.getHeight(null) && width == img.getWidth(null)) {
+                return img;
             }
         }
         Image ret = img;
+        DebugMode.breakIf(org.appwork.resources.MultiResolutionImageHelper.isInstanceOf(img));
+        // if (img instanceof MultiResolutionImageWrapper) {
+        // // maybe the multiimage has already a matching variant
+        // Image bestMatch = ((MultiResolutionImageWrapper) img).getResolutionVariant(width, height);
+        // if (keepratio) {
+        // if (bestMatch.getWidth(null) == width || bestMatch.getHeight(null) == height) {
+        // if (bestMatch.getWidth(null) <= width && bestMatch.getHeight(null) <= height) {
+        // // keep ratio may have one edge smaller
+        // return createNewBaseMulti(img, bestMatch);
+        // }
+        // }
+        // } else {
+        // if (img.getWidth(null) == width && img.getHeight(null) == height) {
+        // return createNewBaseMulti(img, bestMatch);
+        // }
+        // }
+        // ret = bestMatch;
+        // }
         int w, h;
         if (higherQuality) {
             // Use multi-step technique: start with original size, then
@@ -557,9 +646,6 @@ public class IconIO {
                     type = 6;
                 }
             }
-            if (w == 0) {
-                final int o = 2;
-            }
             final BufferedImage tmp = new BufferedImage(w, h, type);
             final Graphics2D g2 = tmp.createGraphics();
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, interpolation.getHint());
@@ -567,8 +653,25 @@ public class IconIO {
             g2.dispose();
             ret = tmp;
         } while (w != width || h != height);
-        return (BufferedImage) ret;
+        return ret;
     }
+    // /**
+    // * @param img
+    // * @param bestMatch
+    // * @return
+    // */
+    // private static Image createNewBaseMulti(Image img, Image bestMatch) {
+    // List<Image> variants = ((MultiResolutionImageWrapper) img).getResolutionVariants();
+    // int index = variants.indexOf(bestMatch);
+    // if (index < 0) {
+    // // not part of the image? maybe is not a baseMulti and the image was created on the fly
+    // variants = new ArrayList<Image>(variants);
+    // variants.add(bestMatch);
+    // sortImagesBySize(variants);
+    // index = variants.indexOf(bestMatch);
+    // }
+    // return new BaseMultiResolutionImageWrapper(index, variants.toArray(new Image[0]));
+    // }
 
     /**
      * Taken from http://today.java.net/pub/a/today/2007/04/03/perils-of-image- getscaledinstance.html License: unknown Convenience method
@@ -587,7 +690,7 @@ public class IconIO {
      *            original dimensions, and generally only when the {@code BILINEAR} hint is specified)
      * @return a scaled version of the original {@code BufferedImage}
      */
-    public static BufferedImage getScaledInstance(final Image img, int width, int height, final Interpolation interpolation, final boolean higherQuality) {
+    public static Image getScaledInstance(final Image img, int width, int height, final Interpolation interpolation, final boolean higherQuality) {
         return getScaledInstance(img, width, height, interpolation, higherQuality, true);
     }
 
@@ -730,6 +833,8 @@ public class IconIO {
             final BufferedImage image = new BufferedImage(w, h, Transparency.TRANSLUCENT);
             final Graphics2D g = image.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             // g.setColor(Color.RED);
             // g.fillRect(0, 0, w, h);
             icon.paintIcon(null, g, 0, 0);
@@ -744,6 +849,8 @@ public class IconIO {
             final BufferedImage image = gc.createCompatibleImage(w, h, Transparency.TRANSLUCENT);
             final Graphics2D g = image.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             // g.setColor(Color.RED);
             // g.fillRect(0, 0, w, h);
             icon.paintIcon(null, g, 0, 0);
@@ -963,6 +1070,27 @@ public class IconIO {
      * @return
      */
     public static Image centerImage(Image input, int width, int height, Color background) {
+        if (input.getWidth(null) == width && input.getHeight(null) == height) {
+            return input;
+        }
+        if (MultiResolutionImageHelper.isSupported() && MultiResolutionImageHelper.isInstanceOf(input)) {
+            // create a new MultiRes Image with all internal images cropped;
+            int baseWidth = input.getWidth(null);
+            int baseHeight = input.getHeight(null);
+            List<Image> variants = MultiResolutionImageHelper.getResolutionVariants(input);
+            Image[] newList = new Image[variants.size()];
+            int baseIndex = 0;
+            for (int i = 0; i < newList.length; i++) {
+                Image v = variants.get(i);
+                double wFactor = (double) v.getWidth(null) / baseWidth;
+                double hFactor = (double) v.getHeight(null) / baseHeight;
+                if (wFactor == 1d && hFactor == 1d) {
+                    baseIndex = i;
+                }
+                newList[i] = centerImage(v, (int) (width * wFactor), (int) (height * hFactor), background);
+            }
+            return MultiResolutionImageHelper.create(baseIndex, newList);
+        }
         int imageType = BufferedImage.TRANSLUCENT;
         int transparency = Transparency.TRANSLUCENT;
         if (input instanceof BufferedImage) {
@@ -979,6 +1107,11 @@ public class IconIO {
             newImage = gc.createCompatibleImage(width, height, transparency);
         }
         Graphics2D g2d = newImage.createGraphics();
+        double scale = g2d.getTransform().getScaleX();
+        DebugMode.breakIf(scale > 1);
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, Interpolation.BILINEAR.getHint());
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         if (background != null) {
             g2d.setColor(background);
             g2d.fillRect(0, 0, width, height);
@@ -988,5 +1121,49 @@ public class IconIO {
         g2d.drawImage(input, x, y, null);
         g2d.dispose();
         return newImage;
+    }
+
+    /**
+     *
+     */
+    @AWTestValidateClassReference
+    public static final String JAVA_AWT_IMAGE_BASE_MULTI_RESOLUTION_IMAGE = "java.awt.image.BaseMultiResolutionImage";
+
+    /**
+     * @param image
+     * @return
+     */
+    public static Image toGrayScale(Image input) {
+        if (MultiResolutionImageHelper.isSupported() && MultiResolutionImageHelper.isInstanceOf(input)) {
+            List<Image> variants = MultiResolutionImageHelper.getResolutionVariants(input);
+            Image[] newList = new Image[variants.size()];
+            int baseIndex = 0;
+            for (int i = 0; i < newList.length; i++) {
+                Image v = variants.get(i);
+                newList[i] = GrayFilter.createDisabledImage(v);
+            }
+            return MultiResolutionImageHelper.create(baseIndex, newList);
+        }
+        return GrayFilter.createDisabledImage(input);
+    }
+
+    /**
+     * Multiply the scale factor {@code sv} and the value {@code v} with appropriate clipping to the bounds of Integer resolution. If the
+     * answer would be greater than {@code Integer.MAX_VALUE} then {@code
+     * Integer.MAX_VALUE} is returned. If the answer would be less than {@code
+     * Integer.MIN_VALUE} then {@code Integer.MIN_VALUE} is returned. Otherwise the multiplication is returned.
+     */
+    public static int clipScale(final int v, final double sv) {
+        if (sv == 1.0) {
+            return v;
+        }
+        final double newv = v * sv;
+        if (newv < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        if (newv > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) Math.round(newv);
     }
 }

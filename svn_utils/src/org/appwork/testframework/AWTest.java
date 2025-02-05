@@ -681,7 +681,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             }
             final File tmp = Application.getResource("tmp/image" + UniqueAlltimeID.next() + "." + Files.getExtension(path, true));
             IO.secureWrite(tmp, IO.readStream(-1, zipFile.getInputStream(entry)));
-            final Icon icon = org.appwork.resources.Theme.getFACTORY().urlToIcon(tmp.toURL(), -1, -1);
+            final Icon icon = org.appwork.resources.Theme.getFACTORY().urlToNonImageIcon(tmp.toURL(), -1, -1);
             tmp.delete();
             tmp.deleteOnExit();
             if (icon.getIconWidth() < w || icon.getIconHeight() < h) {

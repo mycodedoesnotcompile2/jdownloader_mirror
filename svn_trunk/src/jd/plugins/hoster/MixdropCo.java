@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49591 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50560 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,6 +82,8 @@ public class MixdropCo extends antiDDoSForHost {
         deadDomains.add("mixdrop.vc");
         deadDomains.add("mixdrp.co");
         deadDomains.add("mixdrp.to");
+        deadDomains.add("mixdrop.is");
+        deadDomains.add("mixdrop.ms");
         return deadDomains;
     }
 
@@ -255,21 +257,21 @@ public class MixdropCo extends antiDDoSForHost {
             dllink = (String) json.get("url");
             if (StringUtils.isEmpty(dllink)) {
                 final String errormsg = (String) json.get("msg");
-                if (errormsg != null) {
-                    if (errormsg.matches("(?i).*Failed captcha verification.*")) {
-                        /*
-                         * 2020-04-20: Should never happen but happens:
-                         * {"type":"error","msg":"Failed captcha verification. Please try again. #errcode: 2"}
-                         */
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    } else if (errormsg.matches("(?i).*File not found.*")) {
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    } else {
-                        /* Unknown error */
-                        throw new PluginException(LinkStatus.ERROR_FATAL, errormsg);
-                    }
+                if (errormsg == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (errormsg.matches("(?i).*Failed captcha verification.*")) {
+                    /*
+                     * 2020-04-20: Should never happen but happens:
+                     * {"type":"error","msg":"Failed captcha verification. Please try again. #errcode: 2"}
+                     */
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                } else if (errormsg.matches("(?i).*File not found.*")) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    /* Unknown error */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, errormsg);
+                }
             }
             /* 2019-09-30: Skip short pre-download waittime */
         }

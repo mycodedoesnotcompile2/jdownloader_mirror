@@ -20,6 +20,7 @@ import java.awt.Frame;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.Image;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -219,7 +220,7 @@ public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTransla
                             final SystemTray systemTray = SystemTray.getSystemTray();
                             int trayIconWidth = (int) systemTray.getTrayIconSize().getWidth();
                             int trayIconHeight = (int) systemTray.getTrayIconSize().getHeight();
-                            final BufferedImage img;
+                            Image img;
                             if (CrossSystem.isWindows()) {
                                 try {
                                     // Improve HighDPI Tray Icon image quality
@@ -231,11 +232,11 @@ public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTransla
                                 }
                             }
                             if (getSettings().isGreyIconEnabled()) {
-                                img = ImageProvider.convertToGrayScale(IconIO.getScaledInstance(NewTheme.I().getImage("logo/jd_logo_128_128", -1), trayIconWidth, trayIconHeight));
+                                img = ImageProvider.convertToGrayScale(NewTheme.I().getImage("logo/jd_logo_128_128", trayIconWidth, trayIconHeight, true, true));
                             } else {
-                                img = IconIO.getScaledInstance(NewTheme.I().getImage("logo/jd_logo_128_128", -1), trayIconWidth, trayIconHeight);
+                                img = NewTheme.I().getImage("logo/jd_logo_128_128", trayIconWidth, trayIconHeight, true, true);
                             }
-                            LogController.CL(TrayExtension.class).info("TrayIconSize:" + trayIconWidth + "x" + trayIconHeight + "->IconSize:" + img.getWidth() + "x" + img.getHeight());
+                            LogController.CL(TrayExtension.class).info("TrayIconSize:" + trayIconWidth + "x" + trayIconHeight + "->IconSize:" + img.getWidth(null) + "x" + img.getHeight(null));
                             // workaround for gnome 3 transparency bug
                             if (getSettings().isGnomeTrayIconTransparentEnabled() && (CrossSystem.isUnix())) {
                                 // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6453521
@@ -257,7 +258,7 @@ public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTransla
                                                 taskBarDevice = screen;
                                                 final Rectangle bounds = screenConfiguration.getBounds();
                                                 if (insets.top > 0) {
-                                                    taskBarRectangle = new Rectangle(bounds.x, bounds.y, 2, img.getHeight());
+                                                    taskBarRectangle = new Rectangle(bounds.x, bounds.y, 2, img.getHeight(null));
                                                 } else {
                                                     // TODO: add support for taskbar at other locations
                                                 }
@@ -266,19 +267,21 @@ public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTransla
                                         }
                                         if (taskBarDevice != null && taskBarRectangle != null) {
                                             final Robot robo = new java.awt.Robot(taskBarDevice);
+                                            BufferedImage buffered = IconIO.toBufferedImage(img);
                                             final BufferedImage screenCapture = robo.createScreenCapture(taskBarRectangle);
-                                            for (int y = 0; y < img.getHeight(); y++) {
+                                            for (int y = 0; y < buffered.getHeight(null); y++) {
                                                 final Color pixel = new Color(screenCapture.getRGB(1, y));
-                                                for (int x = 0; x < img.getWidth(); x++) {
-                                                    final int rgb = img.getRGB(x, y);
+                                                for (int x = 0; x < buffered.getWidth(null); x++) {
+                                                    final int rgb = buffered.getRGB(x, y);
                                                     final Color tmp = new Color(rgb);
                                                     final float alpha = ((rgb >> 24) & 0xFF) / 255F;
                                                     final int cr = (int) (alpha * tmp.getRed() + (1 - alpha) * pixel.getRed());
                                                     final int cg = (int) (alpha * tmp.getGreen() + (1 - alpha) * pixel.getGreen());
                                                     final int cb = (int) (alpha * tmp.getBlue() + (1 - alpha) * pixel.getBlue());
-                                                    img.setRGB(x, y, new Color(cr, cg, cb).getRGB());
+                                                    buffered.setRGB(x, y, new Color(cr, cg, cb).getRGB());
                                                 }
                                             }
+                                            img = buffered;
                                         }
                                     }
                                 } catch (final Throwable e) {

@@ -55,17 +55,17 @@ import org.appwork.utils.CompareUtils;
  *
  */
 public class MultiResIconImpl implements MultiResIcon {
-    private CopyOnWriteArrayList<BufferedImage> images;
+    private CopyOnWriteArrayList<Image> images;
 
-    public List<BufferedImage> getImages() {
+    public List<Image> getImages() {
         return Collections.unmodifiableList(images);
     }
 
-    private int           iconWidth;
-    private int           iconHeight;
-    private BufferedImage largest;
+    private int   iconWidth;
+    private int   iconHeight;
+    private Image largest;
 
-    public BufferedImage getLargest() {
+    public Image getLargest() {
         return largest;
     }
 
@@ -98,13 +98,13 @@ public class MultiResIconImpl implements MultiResIcon {
                 return CompareUtils.compareInt(o1.getWidth() * o1.getHeight(), o2.getWidth() * o2.getHeight());
             }
         });
-        this.images = new CopyOnWriteArrayList<BufferedImage>(tmp);
+        this.images = new CopyOnWriteArrayList<Image>(tmp);
         this.largest = this.images.get(images.size() - 1);
         if (iconWidth <= 0) {
-            iconWidth = largest.getWidth();
+            iconWidth = largest.getWidth(null);
         }
         if (iconHeight <= 0) {
-            iconHeight = largest.getHeight();
+            iconHeight = largest.getHeight(null);
         }
         this.iconWidth = iconWidth;
         this.iconHeight = iconHeight;
@@ -127,18 +127,18 @@ public class MultiResIconImpl implements MultiResIcon {
         double scaleX = currentTransform.getScaleX();
         double scaleY = currentTransform.getScaleY();
         Graphics2D g2d = ((Graphics2D) g);
-        BufferedImage base = largest;
+        Image base = largest;
         int index = 0;
         if (width <= 0) {
-            width = largest.getWidth();
+            width = largest.getWidth(null);
         }
         if (height <= 0) {
-            height = largest.getHeight();
+            height = largest.getHeight(null);
         }
         if (width > 0 && height > 0) {
             int scaledWidth = (int) (width * scaleX);
             int scaledHeight = (int) (height * scaleY);
-            for (BufferedImage image : images) {
+            for (Image image : images) {
                 base = image;
                 if (image.getWidth(null) >= scaledWidth && image.getHeight(null) >= scaledHeight) {
                     break;
@@ -171,7 +171,7 @@ public class MultiResIconImpl implements MultiResIcon {
      * @return the image that represesents exactly the icons size or null
      */
     public Image getImage() {
-        for (BufferedImage image : images) {
+        for (Image image : images) {
             if (image.getWidth(null) == getIconWidth() && image.getHeight(null) == getIconHeight()) {
                 return image;
             }

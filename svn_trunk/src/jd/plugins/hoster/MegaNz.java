@@ -97,6 +97,7 @@ import jd.http.requests.PostRequest;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
@@ -111,7 +112,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50546 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50557 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -819,7 +820,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         }
     }
 
-    private Map<String, Object> apiRequest(Account account, final String sid, final UrlQuery additionalUrlQuery, final String action, final Object[]... postParams) throws Exception {
+    private Map<String, Object> apiRequest(final Account account, final String sid, final UrlQuery additionalUrlQuery, final String action, final Object[]... postParams) throws Exception {
         if (postParams == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -855,7 +856,27 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
             final List<Map<String, Object>> postData = new ArrayList<Map<String, Object>>();
             postData.add(sendParams);
             request.setPostDataString(JSonStorage.toString(postData));
-            requestResponseString = br.getPage(request);
+            URLConnectionAdapter con = null;
+            try {
+                con = br.openRequestConnection(request);
+                if (con.getResponseCode() == 402) {
+                    /**
+                     * Buggy API, see: <br>
+                     * https://board.jdownloader.org/showthread.php?t=96983 <br>
+                     * and: https://www.reddit.com/r/MEGA/comments/1hmefp9/unable_to_login_using_megacmd_hangs/
+                     */
+                    /* We will typically get an empty page here. */
+                    br.followConnection(true);
+                    /* Could be invalid user and/or PW or access denied by API. */
+                    throw new AccountInvalidException("Error 402 API denied login! Logout & login once via browser, then retry here.");
+                }
+                requestResponseString = br.followConnection();
+            } finally {
+                try {
+                    con.disconnect();
+                } catch (final Throwable e) {
+                }
+            }
             if (requestResponseString.matches("^\\s*-?\\d+\\s*$")) {
                 errorCode = Integer.parseInt(requestResponseString);
             } else if (requestResponseString.matches("^\\s*\\[.*")) {

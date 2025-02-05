@@ -3874,8 +3874,10 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
     }
 
     public void onNewFile(Object obj, final File[] list) {
-        if (!JsonConfig.create(GeneralSettings.class).isAutoOpenContainerAfterDownload() || list == null || list.length <= 0) {
+        if (!JsonConfig.create(GeneralSettings.class).isAutoOpenContainerAfterDownload()) {
             /* Do nothing */
+            return;
+        } else if (list == null || list.length <= 0) {
             return;
         }
         /* check if extracted files are container files */
@@ -4102,8 +4104,8 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         }
                     }
                 }
-                final boolean checkForPathLengthLimit = true;
-                if (checkForPathLengthLimit && DebugMode.TRUE_IN_IDE_ELSE_FALSE && isWindowsPathLimitActive()) {
+                final boolean allowCheckForPathLengthLimit = true;
+                if (allowCheckForPathLengthLimit && DebugMode.TRUE_IN_IDE_ELSE_FALSE && isWindowsPathLimitActive()) {
                     /**
                      * We are close to the finish line! </br>
                      * We know that we can write in the directory but can we write the specific file we want to write? </br>
@@ -4164,14 +4166,13 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             /* User wants us to skip too long filenames. */
                             throw e;
                         }
-                        final String shortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
+                        String shortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
                         if (shortenedFilename == null) {
-                            /* Shortening this filename is not possible */
+                            logger.info("Shortening this filename is not possible");
                             throw e;
                         }
                         if (action == null || action == IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
-                            /* TODO: Get- and set filename shortened by the user. Do not forget to remove non-allowed chars from it then! */
-                            final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, shortenedFilename).show();
+                            final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, pfname, shortenedFilename).show();
                             if (io.getCloseReason() == CloseReason.OK) {
                                 action = io.getAction();
                             } else {
@@ -4183,10 +4184,15 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             } else {
                                 currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
                             }
-                            /* TODO: Check length of file name if it was manually "shortened" by the user. */
+                            /* TODO: Remove non-allowed chars from this string. */
+                            shortenedFilename = io.getNewFilename();
                         }
                         if (IfFilenameTooLongAction.RENAME_FILE != action) {
                             /* No rename wished -> Dead end */
+                            throw e;
+                        } else if (shortenedFilename.length() > maxFilenameLength) {
+                            /* E.g. user has entered too long file name in dialog */
+                            logger.info("Shortened filename is still too long");
                             throw e;
                         }
                         // TODO: Maybe remove this check as we should be sure that the changed filename is writeable.
@@ -4267,6 +4273,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
 
     /** TODO: Move this somewhere else. Maybe only do this once on application-start and cache the result. */
     public static boolean isWindowsPathLimitActive() {
+        // TODO: Review this
         if (!CrossSystem.isWindows()) {
             return false;
         }
@@ -4274,7 +4281,8 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             int value = Advapi32Util.registryGetIntValue(WinReg.HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\FileSystem", "LongPathsEnabled");
             if (value == 1) {
                 /* Long paths enabled -> No path length limit active. */
-                return false;
+                // return false;
+                return true;
             }
         } catch (Exception e) {
         }

@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,62 +32,15 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.resources;
-
-import java.awt.Image;
-import java.net.URL;
-
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
-import javax.swing.JComponent;
-
-import org.appwork.utils.ImageProvider.ImageProvider;
-import org.appwork.utils.images.IconIO;
-import org.appwork.utils.images.Interpolation;
+package org.appwork.utils.images;
 
 /**
  * @author thomas
- * @date 23.10.2023
+ * @date Jan 31, 2025
  *
  */
-public class DefaultIconFactory implements IconFactory {
-    /**
-     * @see org.appwork.resources.IconFactory#urlToNonImageIcon(java.net.URL, int, int)
-     */
-    @Override
-    public Icon urlToNonImageIcon(URL url, int w, int h) {
-        return IconIO.getNonImageIcon(url, w, h);
-    }
-
-    /**
-     * @see org.appwork.resources.IconFactory#scale(javax.swing.Icon, int, int)
-     */
-    @Override
-    public Icon scale(Icon ret, int w, int h) {
-        return IconIO.getScaledInstance(ret, w, h, Interpolation.BILINEAR);
-    }
-
-    /**
-     * @see org.appwork.resources.IconFactory#getDisabled(javax.swing.JComponent, javax.swing.Icon)
-     */
-    @Override
-    public Icon getDisabled(JComponent component, Icon icon) {
-        return ImageProvider.getDisabledIcon(component, icon);
-    }
-
-    /**
-     * @see org.appwork.resources.IconFactory#urlToImage(java.net.URL, int, int)
-     */
-    @Override
-    public Image urlToImage(URL url) {
-        return IconIO.getImage(url, false);
-    }
-
-    /**
-     * @see org.appwork.resources.IconFactory#imageToIcon(java.awt.Image, int, int)
-     */
-    @Override
-    public Icon imageToIcon(Image image, int w, int h) {
-        return new ImageIcon(image);
-    }
+public enum AlignHorizontal {
+    LEFT,
+    CENTER,
+    RIGHT
 }

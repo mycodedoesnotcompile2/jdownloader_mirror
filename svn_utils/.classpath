@@ -11,6 +11,6 @@
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="libs/jsvg.jar" sourcepath="C:/Users/thomas/AppData/Local/Temp/.org.sf.feeling.decompiler1712753437479/source/jsvg-1.4.0-sources.jar"/>
-	<classpathentry kind="output" path="bin"/>
+	<classpathentry kind="lib" path="libs/jsvg.jar" />
+	<classpathentry kind="output" path="bin"/> 
 </classpath>

@@ -51,7 +51,7 @@ public interface IconFactory {
      * @param size2
      * @return
      */
-    Icon urlToIcon(URL url, int w, int h);
+    Icon urlToNonImageIcon(URL url, int w, int h);
 
     /**
      * @param ret
@@ -69,8 +69,21 @@ public interface IconFactory {
     Icon getDisabled(JComponent component, Icon icon);
 
     /**
-     * @param icon
+     * @param url
+     * @param i
+     * @param j
      * @return
      */
-    Image toImage(Icon icon);
+    Image urlToImage(URL url);
+
+    /**
+     *
+     * create an icon instance from an image
+     *
+     * @param image
+     * @param size
+     * @param size2
+     * @return
+     */
+    Icon imageToIcon(Image image, int w, int h);
 }
