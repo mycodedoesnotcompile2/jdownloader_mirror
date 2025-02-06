@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 50550 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50563 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -161,7 +161,7 @@ public class Bunkr extends PluginForHost {
     }
 
     public static String getNameFromURL(Plugin plugin, final String url) {
-        String filenameFromURL = new Regex(url, BunkrAlbum.PATTERN_SINGLE_FILE).getMatch(2);
+        String filenameFromURL = new Regex(url, BunkrAlbum.PATTERN_SINGLE_FILE).getMatch(1);
         if (filenameFromURL == null) {
             // name via n parameter from download URLs
             filenameFromURL = new Regex(url, "(?:\\?|&)n=([^&#]+)").getMatch(0);
@@ -190,8 +190,8 @@ public class Bunkr extends PluginForHost {
         final String hostFromAddedURLWithoutSubdomain = Browser.getHost(url, false);
         if (singleFileRegex.patternFind()) {
             final List<String> deadDomains = BunkrAlbum.getDeadDomains();
-            final String type = singleFileRegex.getMatch(1);
-            final String filename = singleFileRegex.getMatch(2);
+            final String type = singleFileRegex.getMatch(0);
+            final String filename = singleFileRegex.getMatch(1);
             final String host;
             if (deadDomains != null && deadDomains.contains(hostFromAddedURLWithoutSubdomain)) {
                 /* We know given host is dead -> Use current main domain */
@@ -326,8 +326,12 @@ public class Bunkr extends PluginForHost {
             directurls.add(officialDownloadurl);
         }
         final String lastGrabbedVideoStreamDirecturl = link.getStringProperty(PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL);
-        if (lastGrabbedVideoStreamDirecturl != null && !directurls.contains(lastGrabbedVideoStreamDirecturl)) {
-            directurls.add(lastGrabbedVideoStreamDirecturl);
+        if (lastGrabbedVideoStreamDirecturl != null) {
+            if (directurls.contains(lastGrabbedVideoStreamDirecturl)) {
+                logger.info("Video streaming URL is the same as official downloadurl");
+            } else {
+                directurls.add(lastGrabbedVideoStreamDirecturl);
+            }
         }
         if (directurls.isEmpty()) {
             handleHTMLErrors(link, br);
@@ -644,6 +648,8 @@ public class Bunkr extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 416", 30 * 1000l);
         } else if (con.getResponseCode() == 429) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 too many requests", 30 * 1000l);
+        } else if (con.getResponseCode() == 502) {
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 502 Bad Gateway", 60 * 1000l);
         } else if (con.getResponseCode() == 503) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 503 too many connections", 60 * 1000l);
         }

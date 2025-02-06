@@ -47,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.JulesjordanCom;
 import jd.plugins.hoster.JulesjordanCom.JulesjordanComConfigInterface;
 
-@DecrypterPlugin(revision = "$Revision: 50229 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50564 $", interfaceVersion = 3, names = {}, urls = {})
 public class JulesjordanComDecrypter extends PluginForDecrypt {
     public JulesjordanComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,6 +59,8 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
         ret.add(new String[] { "julesjordan.com" });
         ret.add(new String[] { "manuelferrara.com" });
         ret.add(new String[] { "theassfactory.com" });
+        ret.add(new String[] { "spermswallowers.com" });
+        ret.add(new String[] { "girlgirl.com" });
         return ret;
     }
 

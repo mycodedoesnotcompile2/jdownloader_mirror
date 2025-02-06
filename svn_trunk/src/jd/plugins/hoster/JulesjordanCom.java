@@ -53,7 +53,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50563 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
@@ -247,12 +247,13 @@ public class JulesjordanCom extends PluginForHost {
                  * Try to avoid login captcha at all cost! Important: ALWAYS check this as their cookies can easily become invalid e.g. when
                  * the user logs in via browser.
                  */
-                br.setCookies(this.getHost(), cookies);
+                br.setCookies(cookies);
                 if (!force) {
                     logger.info("Trust cookies without checking");
                     return;
                 }
                 br.getPage("https://www." + this.getHost() + "/members/index.php");
+                checkErrorsAfterPossibleLoginSuccess(br);
                 if (isLoggedin(br)) {
                     logger.info("Cookie login successful");
                     account.saveCookies(br.getCookies(br.getHost()), "");
@@ -283,16 +284,22 @@ public class JulesjordanCom extends PluginForHost {
                 if (br.containsHTML("captcha_x=1")) {
                     /* User entered invalid login-captcha */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                } else if (br.getURL().matches("(?i).*/expired/?$")) {
-                    /* Login is valid but account is not premium anymore. */
-                    throw new AccountInvalidException("Account is expired");
-                } else if (br.getURL().matches("(?i).*/trial_pg/?$")) {
-                    throw new AccountUnavailableException("Age verification required", 2 * 60 * 60 * 1000);
-                } else {
-                    throw new AccountInvalidException();
                 }
+                checkErrorsAfterPossibleLoginSuccess(br);
+                /* No other error happened until now -> All we know is that login has failed. */
+                throw new AccountInvalidException();
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
+        }
+    }
+
+    /** Check for "in between" errors: Errors which happen when the logins are valid but the account still cannot be used. */
+    void checkErrorsAfterPossibleLoginSuccess(final Browser br) throws AccountInvalidException, AccountUnavailableException {
+        if (br.getURL().matches("(?i).*/expired/?$")) {
+            /* Login is valid but account is not premium anymore. */
+            throw new AccountInvalidException("Account is expired");
+        } else if (br.getURL().matches("(?i).*/trial_pg/?$")) {
+            throw new AccountUnavailableException("Age verification required", 2 * 60 * 60 * 1000);
         }
     }
 

@@ -4058,7 +4058,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 if (fileExists) {
                     /* File already exists -> Early return */
                     fileAlreadyExistsHandling(session, controller, null);
-                    return;
+                    /* If no exception is thrown above, this means that the user has selected "overwrite already existing file". */
                 }
                 /* Check if a mirror of this item is currently being downloaded. */
                 final String filename;
@@ -4100,6 +4100,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         } else {
                             final DownloadLink fileInProgress = block;
                             fileAlreadyExistsHandling(session, controller, fileInProgress);
+                            /* Calling the above function should already thow an exception. */
                             return;
                         }
                     }

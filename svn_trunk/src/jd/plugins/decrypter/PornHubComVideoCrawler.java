@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50564 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -901,6 +901,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
                 categoriesCommaSeparated = getCommaSeparatedString(categories);
             }
         }
+        final String uploaderType = br.getRegex("'video_uploader'\\s*:\\s*'([^<>\"']+)'").getMatch(0);
         final String[] tags = br.getRegex("(?i)data-label=\"Tag\"[^>]*>([^<]+)</a>").getColumn(0);
         tagsCommaSeparated = getCommaSeparatedString(tags);
         final String pornstarsSrc = br.getRegex("<div class=\"pornstarsWrapper[^\"]*\">(.*?)</div>\\s+</div>").getMatch(0);
@@ -1080,6 +1081,9 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             }
             if (!StringUtils.isEmpty(modelAttributesCommaSeparated)) {
                 result.setProperty(PornHubCom.PROPERTY_MODEL_ATTRIBUTES_COMMA_SEPARATES, modelAttributesCommaSeparated);
+            }
+            if (!StringUtils.isEmpty(uploaderType)) {
+                result.setProperty(PornHubCom.PROPERTY_UPLOADER_TYPE, uploaderType);
             }
         }
         final FilePackage fp = FilePackage.getInstance();

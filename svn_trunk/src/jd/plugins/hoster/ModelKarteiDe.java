@@ -49,7 +49,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50175 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50564 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModelKarteiDe extends PluginForHost {
     public ModelKarteiDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,12 +106,12 @@ public class ModelKarteiDe extends PluginForHost {
     }
 
     private static Pattern TYPE_PHOTO = Pattern.compile("/(?:fotos|photos)/(?:foto|photo)/(\\d+)/?", Pattern.CASE_INSENSITIVE);
-    private static Pattern TYPE_VIDEO = Pattern.compile("/video/video/(\\d+)/?", Pattern.CASE_INSENSITIVE);
+    private static Pattern TYPE_VIDEO = Pattern.compile("/videos?/video/(\\d+)/?", Pattern.CASE_INSENSITIVE);
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_PHOTO.pattern() + "| " + TYPE_VIDEO.pattern() + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_PHOTO.pattern() + "|" + TYPE_VIDEO.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -140,7 +140,7 @@ public class ModelKarteiDe extends PluginForHost {
     }
 
     private boolean isVideo(final DownloadLink link) {
-        if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "/video/")) {
+        if (new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO).patternFind()) {
             return true;
         } else {
             return false;
@@ -232,11 +232,15 @@ public class ModelKarteiDe extends PluginForHost {
                 /* Find file size */
                 final URLConnectionAdapter con = basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, null, null);
                 final String lastModifiedHeader = con.getHeaderField(HTTPConstants.HEADER_RESPONSE_LAST_MODFIED);
-                if (lastModifiedHeader == null) {
+                if (StringUtils.isEmpty(lastModifiedHeader)) {
                     logger.warning("Last modified header is missing");
                     break findDateViaHeader;
                 }
                 final Date lastModifiedDate = TimeFormatter.parseDateString(lastModifiedHeader);
+                if (lastModifiedDate == null) {
+                    logger.warning("Unable to parse date (wtf): " + lastModifiedHeader);
+                    break findDateViaHeader;
+                }
                 dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(lastModifiedDate);
                 /* Now that the connection has been opened, we can also obtain the */
                 final String extensionFromMimeType = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());

@@ -85,7 +85,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 50326 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50564 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -143,6 +143,7 @@ public class PornHubCom extends PluginForHost {
     public static final String                    PROPERTY_MODEL_ATTRIBUTES_COMMA_SEPARATES = "model_attributes_comma_separated";
     public static final String                    PROPERTY_USERNAME                         = "username";
     public static final String                    PROPERTY_VIEWKEY                          = "viewkey";
+    public static final String                    PROPERTY_UPLOADER_TYPE                    = "uploader_type";
 
     public static List<String[]> getPluginDomains() {
         return PornHubComVideoCrawler.getPluginDomains();

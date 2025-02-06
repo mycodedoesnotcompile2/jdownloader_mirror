@@ -36,10 +36,6 @@ import jd.plugins.DownloadLink;
 import jd.plugins.ParsedFilename;
 
 public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAction> implements IfFilenameTooLongDialogInterface, FocusListener {
-    private final String            path;
-    private IfFilenameTooLongAction result;
-    private final String            packagename;
-
     @Override
     public boolean isRemoteAPIEnabled() {
         return true;
@@ -53,16 +49,18 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
         return packageID;
     }
 
-    private JRadioButton         skip;
-    private JRadioButton         rename;
-    final JTextField             textfieldFilenameNew;
-    private final String         packageID;
-    private final DownloadLink   downloadLink;
-    private final String         autoShortenedFilenameSuggestion;
-    private final ParsedFilename parsedOriginalFilename;
-    final AtomicBoolean          userChangedSelection               = new AtomicBoolean(false);
-    private final JLabel         warningLabel1_is_empty_filename    = new JLabel("Filename can't be empty!");
-    private final JLabel         warningLabel2_is_filename_too_long = new JLabel("Filename is too long!");
+    private final String            path;
+    private IfFilenameTooLongAction result;
+    private final String            packagename;
+    private JRadioButton            skip;
+    private JRadioButton            rename;
+    final JTextField                textfieldFilenameNew;
+    private final String            packageID;
+    private final DownloadLink      downloadLink;
+    private final String            autoShortenedFilenameSuggestion;
+    private final ParsedFilename    parsedOriginalFilename;
+    final AtomicBoolean             userChangedSelection = new AtomicBoolean(false);
+    private final JLabel            warningLabel         = new JLabel("");
 
     public IfFilenameTooLongDialog(final DownloadLink link, final ParsedFilename parsedOriginalFilename, final String autoShortenedFilenameSuggestion) {
         super(Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN | UIOManager.LOGIC_COUNTDOWN, "Filename is too long", null, null, null);
@@ -120,40 +118,44 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
 
     @Override
     public JComponent layoutDialogContent() {
+        final String textfieldConstraints = "wmin 50, wmax 300, growx";
         final MigPanel p = new MigPanel("ins 0,wrap 1", "", "");
         final ExtTextArea txt = new ExtTextArea();
         txt.setLabelMode(true);
-        txt.setToolTipText(path);
-        // TODO: Maybe only display the 'subfolder by package name' hint if we know that that setting is enabled.
-        // TODO: Add hyperlink to "subfolder by package name" support article.
-        txt.setText("The name of this file is too long to write it to your filesystem.\r\nWhat should we do about it?\r\nHint: If you are running into this problem frequently, turn off 'subfolder by package name'.\nFor Windows users: You can remove the path length limitation via Registry though be aware that this can have unwanted side effects!");
-        p.add(txt);
+        txt.setLineWrap(true);
+        txt.setWrapStyleWord(true);
+        txt.setText("The name of this file is too long to write it to your filesystem.\r\nWhat should we do about it?\r\nFor Windows users: You can remove the path length limitation via Registry though be aware that this can have unwanted side effects!");
+        p.add(txt, "growx, growy, pushx, pushy");
+        p.add(SwingUtils.toBold(new JLabel("Current filename:")), "split 2,sg 1");
         final JTextField textfieldFilenameOld = new JTextField(this.downloadLink.getName());
         textfieldFilenameOld.setEditable(false);
-        p.add(textfieldFilenameOld);
-        p.add(SwingUtils.toBold(new JLabel("Current filename:")), "split 2,sg 1");
-        // p.add(new JLabel(this.downloadLink.getName()));
+        p.add(textfieldFilenameOld, textfieldConstraints);
         p.add(SwingUtils.toBold(new JLabel("File extension:")), "split 2,sg 1");
-        p.add(new JTextField(this.parsedOriginalFilename.getExtensionAdvanced()));
+        final JTextField ext = new JTextField(this.parsedOriginalFilename.getExtensionAdvanced() != null ? this.parsedOriginalFilename.getExtensionAdvanced() : "NONE");
+        ext.setEditable(false);
+        // p.add(ext, "w 50::");
+        p.add(ext, textfieldConstraints);
         p.add(SwingUtils.toBold(new JLabel("Auto shortened filename:")), "split 2,sg 1");
-        p.add(new JLabel(this.autoShortenedFilenameSuggestion));
-        p.add(textfieldFilenameNew);
-        warningLabel1_is_empty_filename.setForeground(Color.RED);
-        warningLabel1_is_empty_filename.setVisible(false); // Hide for now
-        p.add(warningLabel1_is_empty_filename);
-        warningLabel2_is_filename_too_long.setForeground(Color.RED);
-        warningLabel2_is_filename_too_long.setVisible(false); // Hide for now
-        p.add(warningLabel2_is_filename_too_long);
+        // p.add(new JLabel(this.autoShortenedFilenameSuggestion));
+        final JTextField textfieldFilenameAutoShortened = new JTextField(this.autoShortenedFilenameSuggestion);
+        textfieldFilenameAutoShortened.setEditable(false);
+        p.add(textfieldFilenameAutoShortened, textfieldConstraints);
+        p.add(SwingUtils.toBold(new JLabel("Custom shortened filename:")), "split 2,sg 1");
+        p.add(textfieldFilenameNew, textfieldConstraints);
+        warningLabel.setForeground(Color.RED);
+        warningLabel.setVisible(false); // Hide for now
+        p.add(warningLabel);
         p.add(SwingUtils.toBold(new JLabel("Filesize:")), "split 2,sg 1");
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
-        p.add(new JLabel(SIZEUNIT.formatValue(maxSizeUnit, this.downloadLink.getDownloadSize())));
+        p.add(new JLabel(SIZEUNIT.formatValue(maxSizeUnit, this.downloadLink.getView().getBytesTotal())));
         p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFileExistsDialog_layoutDialogContent_package())), "split 2,sg 1");
-        p.add(new JLabel(packagename));
         final JTextField textfieldPackagename = new JTextField(packagename);
         textfieldPackagename.setEditable(false);
-        p.add(textfieldPackagename);
+        p.add(textfieldPackagename, textfieldConstraints);
         p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFileExistsDialog_layoutDialogContent_hoster())), "split 2,sg 1");
         p.add(new JLabel(downloadLink.getDomainInfo().getTld()));
+        // Group the radio buttons.
+        final ButtonGroup group = new ButtonGroup();
         skip = new JRadioButton(_GUI.T.IfFileExistsDialog_layoutDialogContent_skip_());
         skip.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -168,8 +170,6 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
                 validateInput();
             }
         });
-        // Group the radio buttons.
-        final ButtonGroup group = new ButtonGroup();
         group.add(skip);
         group.add(rename);
         p.add(new JSeparator(), "pushx,growx");
@@ -177,7 +177,7 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
         p.add(rename, "gapleft 10");
         // TODO: Update this so last selection is correctly used as current default
         // IfFileExistsAction def = org.jdownloader.settings.staticreferences.CFG_GUI.CFG.getLastIfFileExists();
-        IfFilenameTooLongAction def = null;
+        IfFilenameTooLongAction def = IfFilenameTooLongAction.SKIP_FILE;
         switch (def) {
         case RENAME_FILE:
             rename.setSelected(true);
@@ -193,27 +193,27 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
         this.textfieldFilenameNew.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                autoSelectRenameIfAllowed();
-                validateInput();
-                stopTimer();
+                onFilenameChanged();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
-                autoSelectRenameIfAllowed();
-                validateInput();
-                stopTimer();
+                onFilenameChanged();
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
-                autoSelectRenameIfAllowed();
-                validateInput();
-                stopTimer();
+                onFilenameChanged();
             }
         });
         result = def;
         return p;
+    }
+
+    private void onFilenameChanged() {
+        autoSelectRenameIfAllowed();
+        validateInput();
+        stopTimer();
     }
 
     private void autoSelectRenameIfAllowed() {
@@ -239,14 +239,17 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
             final boolean isFilenameEmpty = StringUtils.isEmpty(textfieldFilenameNew.getText());
             final boolean isFilenameTooLong = textfieldFilenameNew.getText().length() > this.autoShortenedFilenameSuggestion.length();
             if (isFilenameEmpty || isFilenameTooLong) {
-                warningLabel1_is_empty_filename.setVisible(isFilenameEmpty);
-                warningLabel2_is_filename_too_long.setVisible(isFilenameTooLong);
+                warningLabel.setVisible(true);
+                if (isFilenameEmpty) {
+                    warningLabel.setText("Filename can't be empty!");
+                } else {
+                    warningLabel.setText("Filename is too long!");
+                }
                 okButton.setEnabled(false);
                 return false;
             }
         }
-        warningLabel1_is_empty_filename.setVisible(false);
-        warningLabel2_is_filename_too_long.setVisible(false);
+        warningLabel.setVisible(false);
         okButton.setEnabled(true);
         return true;
     }
