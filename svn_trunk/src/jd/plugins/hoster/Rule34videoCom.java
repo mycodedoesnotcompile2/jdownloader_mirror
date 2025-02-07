@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50310 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50568 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -40,6 +40,7 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "rule34video.com", "rule34video.party" });
+        ret.add(new String[] { "rule34gen.com" });
         return ret;
     }
 

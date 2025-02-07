@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -54,7 +55,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50546 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50582 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -102,11 +103,12 @@ public class TeraboxCom extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    public static final String PROPERTY_DIRECTURL        = "directurl";
-    public static final String PROPERTY_PASSWORD_COOKIE  = "password_cookie";
-    public static final String PROPERTY_PAGINATION_PAGE  = "pagination_page";
-    public static final String PROPERTY_ACCOUNT_JS_TOKEN = "js_token";
-    public static final String PROPERTY_ACCOUNT_TOKEN    = "token";
+    public static final String PROPERTY_DIRECTURL                          = "directurl";
+    public static final String PROPERTY_PASSWORD_COOKIE                    = "password_cookie";
+    public static final String PROPERTY_PAGINATION_PAGE                    = "pagination_page";
+    public static final String PROPERTY_ACCOUNT_JS_TOKEN                   = "js_token";
+    public static final String PROPERTY_ACCOUNT_JS_TOKEN_REFRESH_TIMESTAMP = "js_token_refresh_timestamp";
+    public static final String PROPERTY_ACCOUNT_TOKEN                      = "token";
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -164,7 +166,7 @@ public class TeraboxCom extends PluginForHost {
              * Crawl the folder again to get a fresh directurl. There is no other way to do this. If the folder is big and the crawler has
              * to go through pagination, this can take a while!
              */
-            final PluginForDecrypt decrypter = getNewPluginForDecryptInstance(getHost());
+            final PluginForDecrypt crawler = getNewPluginForDecryptInstance(getHost());
             final CryptedLink param = new CryptedLink(link.getContainerUrl(), link);
             if (link.getDownloadPassword() != null) {
                 /* Crawler should not ask user again for that password! */
@@ -172,7 +174,7 @@ public class TeraboxCom extends PluginForHost {
             }
             try {
                 /* 2021-04-24: Handling has been changed so array should only contain the one element we need! */
-                final ArrayList<DownloadLink> items = ((jd.plugins.decrypter.TeraboxComFolder) decrypter).crawlFolder(this, param, account, this.getFID(link));
+                final ArrayList<DownloadLink> items = ((jd.plugins.decrypter.TeraboxComFolder) crawler).crawlFolder(this, param, account, this.getFID(link));
                 DownloadLink target = null;
                 for (final DownloadLink tmp : items) {
                     if (StringUtils.equals(this.getFID(tmp), this.getFID(link))) {
@@ -258,7 +260,7 @@ public class TeraboxCom extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    public AccountInfo login(final Account account, final boolean force) throws Exception {
+    public AccountInfo login(final Account account, boolean verifyCookies) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies userCookies = account.loadUserCookies();
@@ -267,7 +269,11 @@ public class TeraboxCom extends PluginForHost {
                 throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
             }
             setCookies(userCookies);
-            if (!force) {
+            if (!verifyCookies && Time.systemIndependentCurrentJVMTimeMillis() - account.getLongProperty(PROPERTY_ACCOUNT_JS_TOKEN_REFRESH_TIMESTAMP, 0) > 30 * 60 * 1000l) {
+                logger.info("Enforcing extended account check to ensure we got an up2date jstoken");
+                verifyCookies = true;
+            }
+            if (!verifyCookies) {
                 return null;
             }
             // boolean userHasAddedCookiesFromInternalMainDomain = false;
@@ -318,12 +324,11 @@ public class TeraboxCom extends PluginForHost {
                 account.setType(AccountType.FREE);
             }
             final String jstoken = getJsToken(br, br.getHost());
-            if (jstoken != null) {
-                account.setProperty(PROPERTY_ACCOUNT_JS_TOKEN, jstoken);
-            } else {
-                logger.warning("Failed to find jstoken");
-                account.removeProperty(PROPERTY_ACCOUNT_JS_TOKEN);
+            if (jstoken == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find jstoken");
             }
+            account.setProperty(PROPERTY_ACCOUNT_JS_TOKEN, jstoken);
+            account.setProperty(PROPERTY_ACCOUNT_JS_TOKEN_REFRESH_TIMESTAMP, Time.systemIndependentCurrentJVMTimeMillis());
             final boolean getExtendedInfo = true;
             if (getExtendedInfo) {
                 brc.getPage("/api/check/login?app_id=" + app_id + "&web=1&channel=dubox&clienttype=0&jsToken=&dp-logid=");

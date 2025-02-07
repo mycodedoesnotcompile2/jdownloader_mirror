@@ -49,7 +49,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50564 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50582 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModelKarteiDe extends PluginForHost {
     public ModelKarteiDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -210,7 +210,7 @@ public class ModelKarteiDe extends PluginForHost {
         if (dateStr != null) {
             dateFormatted = dateStr.substring(0, 4) + "_" + dateStr.substring(4, 6) + "_" + dateStr.substring(6, 8);
         } else {
-            logger.warning("Failed to find date");
+            logger.warning("Failed to find date in html code");
         }
         dllink = br.getRegex("id=\"gofullscreen\"[^<]*src=\"([^\"]+)").getMatch(0); // photo
         if (dllink == null) {
@@ -237,10 +237,6 @@ public class ModelKarteiDe extends PluginForHost {
                     break findDateViaHeader;
                 }
                 final Date lastModifiedDate = TimeFormatter.parseDateString(lastModifiedHeader);
-                if (lastModifiedDate == null) {
-                    logger.warning("Unable to parse date (wtf): " + lastModifiedHeader);
-                    break findDateViaHeader;
-                }
                 dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(lastModifiedDate);
                 /* Now that the connection has been opened, we can also obtain the */
                 final String extensionFromMimeType = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());

@@ -33,7 +33,7 @@ public class CTRLSender {
             System.out.println("I'm a helper process");
             final SimpleLoggerFactory fac = new SimpleLoggerFactory();
             fac.addSink(new LogToStdOutSink());
-            fac.set();
+            LogV3.setFactory(fac);
             final int pid = Integer.parseInt(args[0]);
             // free console, because we cannot attach to multiple consoles
             // https://blog.codetitans.pl/post/sending-ctrl-c-signal-to-another-application-on-windows/

@@ -18,6 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -39,14 +42,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50568 $", interfaceVersion = 3, names = {}, urls = {})
 public class MvpdjCom extends PluginForHost {
     public MvpdjCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.mvpdj.com/user/register");
+        this.enablePremium("https://www." + getHost() + "/user/register");
     }
 
     @Override
@@ -59,6 +59,12 @@ public class MvpdjCom extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "mvpdj.com", "mvpdj.cn" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("mvpdj.cn");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -127,11 +133,11 @@ public class MvpdjCom extends PluginForHost {
             this.login(aa, false);
             loggedIN = true;
         }
-        String title_html = null;
+        String title = null;
         if (loggedIN) {
             /* Download via download button --> Higher quality */
             br.postPage("https://www." + getHost() + "/song/download", "id=" + fid);
-            title_html = this.br.getRegex("class=\"dt_tc_big\"[^<>]*?>([^<>]+)<").getMatch(0);
+            title = this.br.getRegex("class=\"dt_tc_big\"[^<>]*?>([^<>]+)<").getMatch(0);
             if (this.br.containsHTML(">账户余额不足，请先充值")) {
                 /*
                  * Hmm something like "No traffic left" --> But let's not temp-disable the account - let's simply download the stream then!
@@ -142,8 +148,8 @@ public class MvpdjCom extends PluginForHost {
                 logger.info("Track should be downloadable fine via account");
                 dllink = "https://www.mvpdj.com/song/purchase/" + fid + "/2";
             }
-            if (title_html != null) {
-                title_html = Encoding.htmlDecode(title_html).trim();
+            if (title != null) {
+                title = Encoding.htmlDecode(title).trim();
             }
         }
         if (dllink == null) {
@@ -159,42 +165,48 @@ public class MvpdjCom extends PluginForHost {
                 /* E.g. https://www.mvpdj.com/song/player/111222333 */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            title_html = br.getRegex("<h1 class=\"audio-title[^>]*>([^<]+)</h1>").getMatch(0);
+            title = br.getRegex("<h1 class=\"audio-title[^>]*>([^<]+)</h1>").getMatch(0);
+            if (title == null) {
+                title = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
+            }
             dllink = PluginJSonUtils.getJsonValue(br, "url");
             if (StringUtils.isEmpty(dllink)) {
                 /* 2023-01-23 */
                 dllink = br.getRegex("<audio[^<]*src=\"([^\"]+)").getMatch(0);
             }
-            if (title_html != null) {
-                title_html = Encoding.htmlDecode(title_html).trim();
+            if (title != null) {
+                title = Encoding.htmlDecode(title).trim();
                 final String ext = Plugin.getFileNameExtensionFromURL(dllink, extDefault);
-                link.setFinalFileName(this.applyFilenameExtension(title_html, ext));
+                link.setFinalFileName(this.applyFilenameExtension(title, ext));
             }
         }
-        if (dllink != null && !isDownload) {
-            /* 2024-04-26: Use new browser instance here as this may return response 404 if a referer value is set. */
-            final Browser br2 = new Browser();
-            // In case the link redirects to the finallink
-            URLConnectionAdapter con = null;
-            try {
-                con = br2.openHeadConnection(dllink);
-                handleConnectionErrors(br2, con);
-                /* Especially for official account-downloads, server-filenames might be crippled! */
-                final String filename_connection = getFileNameFromConnection(con);
-                if (filename_connection != null) {
-                    link.setFinalFileName(filename_connection);
-                }
-                if (con.getCompleteContentLength() > 0) {
-                    if (con.isContentDecoded()) {
-                        link.setDownloadSize(con.getCompleteContentLength());
-                    } else {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                }
-            } finally {
+        if (dllink != null) {
+            dllink = br.getURL(dllink).toExternalForm();
+            if (!isDownload) {
+                /* 2024-04-26: Use new browser instance here as this may return response 404 if a referer value is set. */
+                final Browser br2 = new Browser();
+                // In case the link redirects to the finallink
+                URLConnectionAdapter con = null;
                 try {
-                    con.disconnect();
-                } catch (Throwable e) {
+                    con = br2.openHeadConnection(dllink);
+                    handleConnectionErrors(br2, con);
+                    /* Especially for official account-downloads, server-filenames might be crippled! */
+                    final String filename_connection = getFileNameFromConnection(con);
+                    if (filename_connection != null) {
+                        link.setFinalFileName(filename_connection);
+                    }
+                    if (con.getCompleteContentLength() > 0) {
+                        if (con.isContentDecoded()) {
+                            link.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
+                    }
+                } finally {
+                    try {
+                        con.disconnect();
+                    } catch (Throwable e) {
+                    }
                 }
             }
         }

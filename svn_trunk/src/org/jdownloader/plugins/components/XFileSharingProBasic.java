@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50536 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3269,24 +3269,20 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * This will also find video directurls of embedded videos if the player is 'currently visible'.
      */
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
-        String dllink = br.getRedirectLocation();
-        if (dllink == null || new Regex(dllink, this.getSupportedLinks()).patternFind()) {
-            if (StringUtils.isEmpty(dllink)) {
-                for (final Pattern pattern : getDownloadurlRegexes()) {
-                    dllink = new Regex(src, pattern).getMatch(0);
+        String dllink = null;
+        for (final Pattern pattern : getDownloadurlRegexes()) {
+            dllink = new Regex(src, pattern).getMatch(0);
+            if (dllink != null) {
+                break;
+            }
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
+            if (cryptedScripts != null && cryptedScripts.length != 0) {
+                for (String crypted : cryptedScripts) {
+                    dllink = decodeDownloadLink(link, account, br, crypted);
                     if (dllink != null) {
                         break;
-                    }
-                }
-            }
-            if (StringUtils.isEmpty(dllink)) {
-                final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
-                if (cryptedScripts != null && cryptedScripts.length != 0) {
-                    for (String crypted : cryptedScripts) {
-                        dllink = decodeDownloadLink(link, account, br, crypted);
-                        if (dllink != null) {
-                            break;
-                        }
                     }
                 }
             }

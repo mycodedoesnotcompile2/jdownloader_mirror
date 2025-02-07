@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50546 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50582 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -933,24 +933,6 @@ public class VKontakteRu extends PluginForDecrypt {
         return ret;
     }
 
-    private DownloadLink getSinglePhotoDownloadLink(final String photoID, final String picture_preview_json) throws IOException {
-        final DownloadLink dl = createDownloadlink("http://vkontaktedecrypted.ru/picturelink/" + photoID);
-        if (fastcheck_photo) {
-            dl.setAvailable(true);
-        }
-        final String dllink_temp = VKontakteRuHoster.getHighestQualityPicFromSavedJson(picture_preview_json);
-        final String tempFilename = VKontakteRuHoster.photoGetFinalFilename(photoID, null, dllink_temp);
-        if (tempFilename != null) {
-            dl.setName(tempFilename);
-        }
-        dl.setContentUrl(getProtocol() + "vk.com/photo" + photoID);
-        return dl;
-    }
-
-    private DownloadLink getSinglePhotoDownloadLink(final String photoID) throws IOException {
-        return getSinglePhotoDownloadLink(photoID, null);
-    }
-
     private ArrayList<DownloadLink> crawlPhotoAlbums_Website(final CryptedLink param) throws NumberFormatException, Exception {
         /*
          * Another possibility to get these (but still no API): https://vk.com/al_photos.php act=show_albums&al=1&owner=<owner_id> AblumsXXX
@@ -1227,7 +1209,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     content_id = typeObject.get("pid").toString();
                     final String album_id = typeObject.get("aid").toString();
                     final String wall_single_photo_content_url = getProtocol() + "vk.com/wall" + ownerID + "?own=1&z=photo" + owner_id + "_" + content_id + "/" + wall_list_id;
-                    dl = getSinglePhotoDownloadLink(owner_id + "_" + content_id, null);
+                    dl = getPhotoDownloadLink(owner_id, content_id);
                     /*
                      * Override previously set content URL as this really is the direct link to the picture which works fine via browser.
                      */
@@ -1264,7 +1246,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     title = Encoding.htmlDecode((String) typeObject.get("title"));
                     filename = artist + " - " + title + ".mp3";
                     final String url = (String) typeObject.get("url");
-                    dl = createDownloadlink("http://vkontaktedecrypted.ru/audiolink/" + owner_id + "_" + content_id);
+                    dl = this.getAudioDownloadLink(owner_id, content_id);
                     // dl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_mainlink, param.getCryptedUrl());
                     /*
                      * Audiolinks have their directlinks and IDs but no "nice" links so let's simply use the link to the source wall post
@@ -1879,7 +1861,7 @@ public class VKontakteRu extends PluginForDecrypt {
                             logger.info("Skipping dupe: " + photoContentStr);
                             continue;
                         }
-                        final DownloadLink photodl = getSinglePhotoDownloadLink(owner_id + "_" + content_id, null);
+                        final DownloadLink photodl = getPhotoDownloadLink(owner_id, content_id);
                         /*
                          * Override previously set content URL as this really is the direct link to the picture which works fine via
                          * browser.
@@ -2123,7 +2105,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     logger.info("Skipping wall comment item because user has deselected such items: " + photoContentStr);
                     continue;
                 }
-                final DownloadLink dl = getSinglePhotoDownloadLink(ownerIDTemp + "_" + contentIDTemp, picture_preview_json);
+                final DownloadLink dl = getPhotoDownloadLink(ownerIDTemp, contentIDTemp, picture_preview_json);
                 /*
                  * Override previously set content URL as this really is the direct link to the picture which works fine via browser.
                  */
@@ -2171,7 +2153,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     logger.info("Skipping dupe: ");
                     continue;
                 }
-                final DownloadLink dl = this.createDownloadlink("http://vkontaktedecrypted.ru/audiolink/" + audioContentStr);
+                final DownloadLink dl = getAudioDownloadLink(audioOwnerID, audioContentID);
                 final String artist = audioInfoArray[4];
                 final String title = audioInfoArray[3];
                 dl.setFinalFileName(Encoding.htmlDecode(artist + " - " + title) + ".mp3");
@@ -2398,32 +2380,83 @@ public class VKontakteRu extends PluginForDecrypt {
     /** Function to test new crawl stuff */
     private ArrayList<DownloadLink> crawlDevPlayground(final Browser br) throws IOException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            logger.info("This does nothing in stable");
-            return ret;
-        }
-        final String[] dataexecs = br.getRegex("data-exec=\"([^\"]+)").getColumn(0);
-        if (dataexecs == null || dataexecs.length == 0) {
-            logger.info("Failed to find any json source");
-            return ret;
-        }
-        String groupID = null;
-        for (String dataexec : dataexecs) {
-            dataexec = Encoding.htmlOnlyDecode(dataexec);
-            final Map<String, Object> entries = restoreFromString(dataexec, TypeRef.MAP);
-            final Map<String, Object> videoShowcaseCommunityCatalogInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityCatalog/init");
-            if (videoShowcaseCommunityCatalogInit != null) {
-                groupID = videoShowcaseCommunityCatalogInit.get("groupId").toString();
+        try {
+            final String[] dataexecs = br.getRegex("data-exec=\"([^\"]+)").getColumn(0);
+            if (dataexecs == null || dataexecs.length == 0) {
+                logger.info("Failed to find any json source");
+                return ret;
             }
-            final Map<String, Object> videoShowcaseCommunityHeaderInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityHeader/init");
-            if (videoShowcaseCommunityHeaderInit != null) {
-                // TODO
+            String groupID = null;
+            for (String dataexec : dataexecs) {
+                dataexec = Encoding.htmlOnlyDecode(dataexec);
+                final Map<String, Object> entries = restoreFromString(dataexec, TypeRef.MAP);
+                final Map<String, Object> videoShowcaseCommunityCatalogInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityCatalog/init");
+                if (videoShowcaseCommunityCatalogInit != null) {
+                    groupID = videoShowcaseCommunityCatalogInit.get("groupId").toString();
+                }
+                final Map<String, Object> videoShowcaseCommunityHeaderInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityHeader/init");
+                if (videoShowcaseCommunityHeaderInit != null) {
+                    // TODO
+                }
+                final Map<String, Object> postContentContainerInit = (Map<String, Object>) entries.get("PostContentContainer/init");
+                if (postContentContainerInit != null) {
+                    // TODO
+                    final Map<String, Object> item = (Map<String, Object>) postContentContainerInit.get("item");
+                    final List<Map<String, Object>> attachments = (List<Map<String, Object>>) item.get("attachments");
+                    for (final Map<String, Object> attachment : attachments) {
+                        /* Possible types: photo, audio, TODO find all possible types */
+                        final String type = attachment.get("type").toString();
+                        if (type.equalsIgnoreCase("photo")) {
+                            final Map<String, Object> photo = (Map<String, Object>) attachment.get("photo");
+                            final Map<String, Object> orig_photo = (Map<String, Object>) photo.get("orig_photo");
+                            String directurl = orig_photo.get("url").toString();
+                            directurl = Encoding.htmlOnlyDecode(directurl);
+                            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(directurl));
+                            final String owner_id = photo.get("owner_id").toString();
+                            final String content_id = photo.get("id").toString();
+                            final DownloadLink link = this.getPhotoDownloadLink(owner_id, content_id);
+                            link.setName(filenameFromURL);
+                            link.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_directlink, directurl);
+                            link.setAvailable(true);
+                            ret.add(link);
+                        } else if (type.equalsIgnoreCase("audio")) {
+                            final Map<String, Object> audio = (Map<String, Object>) attachment.get("audio");
+                            final String artist = Encoding.htmlDecode(audio.get("artist").toString()).trim();
+                            final String title = Encoding.htmlDecode(audio.get("title").toString()).trim();
+                            final String owner_id = audio.get("owner_id").toString();
+                            final String content_id = audio.get("id").toString();
+                            final String url = (String) audio.get("url");
+                            final DownloadLink link = this.getAudioDownloadLink(owner_id, content_id);
+                            link.setName(artist + " - " + title + ".mp3");
+                            if (!StringUtils.isEmpty(url)) {
+                                link.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_directlink, url);
+                            }
+                            final Number lengthSeconds = (Number) audio.get("duration");
+                            if (lengthSeconds != null) {
+                                /* Set estimated filesize based on a bitrate of 320KB/s */
+                                final long trackEstimatedFilesize = (lengthSeconds.intValue() * 320 * 1024) / 8;
+                                link.setDownloadSize(trackEstimatedFilesize);
+                            }
+                            ret.add(link);
+                        } else {
+                            logger.info("Skipping unsupported attachment type: " + type);
+                        }
+                    }
+                }
             }
-        }
-        if (groupID == null) {
-            logger.info("Found groupID:" + groupID);
-        } else {
-            logger.warning("Failed to find groupID");
+            if (groupID == null) {
+                logger.info("Found groupID:" + groupID);
+            } else {
+                logger.info("Failed to find groupID");
+            }
+        } catch (final Exception e) {
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                throw e;
+            } else {
+                /* Stable -> Do not throw exception inside experimental handling */
+                logger.log(e);
+                logger.warning("Experimental handling failed");
+            }
         }
         return ret;
     }
@@ -2488,7 +2521,7 @@ public class VKontakteRu extends PluginForDecrypt {
                         logger.info("Skipping dupe: " + photoContentStr);
                         continue;
                     }
-                    final DownloadLink photodl = getSinglePhotoDownloadLink(owner_id + "_" + content_id, null);
+                    final DownloadLink photodl = getPhotoDownloadLink(owner_id, content_id);
                     /*
                      * Override previously set content URL as this really is the direct link to the picture which works fine via browser.
                      */
@@ -2634,7 +2667,7 @@ public class VKontakteRu extends PluginForDecrypt {
         if (ownerID == null || contentID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final DownloadLink dl = getSinglePhotoDownloadLink(ownerID + "_" + contentID, null);
+        final DownloadLink dl = getPhotoDownloadLink(ownerID, contentID);
         dl.setContentUrl(param.getCryptedUrl());
         dl.setMimeHint(CompiledFiletypeFilter.ImageExtensions.JPG);
         if (module != null) {
@@ -2677,7 +2710,7 @@ public class VKontakteRu extends PluginForDecrypt {
             }
             final String filename = stringdata[1];
             final String content_ID = new Regex(docinfo, "^(?:\\[)?(\\d+)").getMatch(0);
-            final DownloadLink dl = getSinglePhotoDownloadLink("https://vk.com/doc" + owner_ID + "_" + content_ID, null);
+            final DownloadLink dl = this.createDownloadlink("https://vk.com/doc" + owner_ID + "_" + content_ID);
             dl.setContentUrl(param.getCryptedUrl());
             dl.setName(Encoding.htmlDecode(filename));
             dl.setDownloadSize(SizeFormatter.getSize(filesize));
@@ -3241,6 +3274,42 @@ public class VKontakteRu extends PluginForDecrypt {
 
     public static String generateContentURLVideo(final String oid, final String id) {
         return "https://vk.com/video" + oid + "_" + id;
+    }
+
+    private static String generateContentURLPhoto(final String ownerID, final String contentID) {
+        return getProtocol() + "vk.com/photo" + ownerID + "_" + contentID;
+    }
+
+    private DownloadLink getAudioDownloadLink(final String ownerID, final String contentID) throws IOException {
+        final String ownerIDAndContentID = ownerID + "_" + contentID;
+        final DownloadLink dl = createDownloadlink("http://vkontaktedecrypted.ru/audiolink/" + ownerIDAndContentID);
+        dl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_owner_id, ownerID);
+        dl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_content_id, contentID);
+        if (fastcheck_audio) {
+            dl.setAvailable(true);
+        }
+        return dl;
+    }
+
+    private DownloadLink getPhotoDownloadLink(final String ownerID, final String contentID, final String picture_preview_json) throws IOException {
+        final String ownerIDAndContentID = ownerID + "_" + contentID;
+        final DownloadLink dl = createDownloadlink("http://vkontaktedecrypted.ru/picturelink/" + ownerIDAndContentID);
+        dl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_owner_id, ownerID);
+        dl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_content_id, contentID);
+        if (fastcheck_photo) {
+            dl.setAvailable(true);
+        }
+        final String dllink_temp = VKontakteRuHoster.getHighestQualityPicFromSavedJson(picture_preview_json);
+        final String tempFilename = VKontakteRuHoster.photoGetFinalFilename(ownerIDAndContentID, null, dllink_temp);
+        if (tempFilename != null) {
+            dl.setName(tempFilename);
+        }
+        dl.setContentUrl(generateContentURLPhoto(ownerID, contentID));
+        return dl;
+    }
+
+    private DownloadLink getPhotoDownloadLink(final String ownerID, final String contentID) throws IOException {
+        return getPhotoDownloadLink(ownerID, contentID, null);
     }
 
     @Override

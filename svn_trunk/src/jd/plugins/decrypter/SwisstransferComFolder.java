@@ -26,8 +26,8 @@ import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.decrypter.SwisstransferComFolder.SwisstransferComConfig.CrawlMode;
 import jd.plugins.hoster.SwisstransferCom;
 
-@DecrypterPlugin(revision = "$Revision: 50526 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50580 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwisstransferComFolder extends PluginForDecrypt {
     public SwisstransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -161,15 +161,11 @@ public class SwisstransferComFolder extends PluginForDecrypt {
         final String containerUUID = (String) data.get("containerUUID");
         boolean isExpired = false;
         if (expiredDate != null) {
-            long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+            long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd'T'HH:mm:ssX", Locale.ENGLISH);
             if (timeStamp == -1) {
-                if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_8)) {
-                    timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd'T'HH:mm:ssX", Locale.ENGLISH);
-                } else {
-                    timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
-                }
+                timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
             }
-            if (timeStamp != -1 && timeStamp < System.currentTimeMillis()) {
+            if (timeStamp != -1 && timeStamp < Time.timestamp()) {
                 isExpired = true;
             }
         }
@@ -320,8 +316,8 @@ public class SwisstransferComFolder extends PluginForDecrypt {
 
         @AboutConfig
         @DefaultEnumValue("DEFAULT")
-        @Order(10)
         @DefaultOnNull
+        @Order(10)
         CrawlMode getCrawlMode();
 
         void setCrawlMode(final CrawlMode mode);

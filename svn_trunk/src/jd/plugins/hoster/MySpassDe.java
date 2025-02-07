@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49937 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
+@HostPlugin(revision = "$Revision: 50582 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,9 +100,9 @@ public class MySpassDe extends PluginForHost {
                 brc.getPage(link.getPluginPatternMatcher());
                 String jsurl = brc.getRegex("(/_next/static/chunks/pages/_app-[a-f0-9]+\\.js)").getMatch(0);
                 if (jsurl == null) {
-                    /* Fallback 2024-10-08 */
+                    /* Fallback 2025-02-06 */
                     logger.warning("Failed to find jsurl #1 -> Fallback");
-                    jsurl = "/_next/static/chunks/pages/_app-2573dd750bcd852c.js";
+                    jsurl = "/_next/static/chunks/pages/_app-8acb33d78ad917d1.js";
                 }
                 brc.getPage(jsurl);
                 final String freshToken = brc.getRegex("Bearer ([a-f0-9]{256})").getMatch(0);
@@ -134,23 +134,25 @@ public class MySpassDe extends PluginForHost {
         // final String broadcast_date = attr.get("broadcast_date").toString();
         String title = attr.get("title").toString();
         title = title.replaceFirst("\\(Folge \\d+\\)", "");
-        final String unique_name = attr.get("unique_name").toString();
+        final String unique_name = (String) attr.get("unique_name"); // can be null
         final String description = (String) attr.get("teaser_text");
         this.dllink = (String) attr.get("video_url");
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }
         final String format = (String) JavaScriptEngineFactory.walkJson(attr, "format/data/attributes/name");
-        final String seasonStr = new Regex(unique_name, "(?i)Staffel (\\d+)").getMatch(0);
-        final String episodeStr = new Regex(unique_name, "(?i)Folge (\\d+)").getMatch(0);
-        final DecimalFormat df = new DecimalFormat("00");
         String filename = format;
-        if (seasonStr != null && episodeStr != null) { // Sometimes episode = 9/Best Of, need regex to get only the integer
-            filename += " - S" + df.format(Integer.parseInt(seasonStr)) + "E" + df.format(Integer.parseInt(episodeStr));
-        }
-        /* Avoid adding information twice */
-        if (!format.contains(title)) {
-            filename += " - " + title;
+        if (unique_name != null) {
+            final String seasonStr = new Regex(unique_name, "(?i)Staffel (\\d+)").getMatch(0);
+            final String episodeStr = new Regex(unique_name, "(?i)Folge (\\d+)").getMatch(0);
+            final DecimalFormat df = new DecimalFormat("00");
+            if (seasonStr != null && episodeStr != null) { // Sometimes episode = 9/Best Of, need regex to get only the integer
+                filename += " - S" + df.format(Integer.parseInt(seasonStr)) + "E" + df.format(Integer.parseInt(episodeStr));
+            }
+            /* Avoid adding information twice */
+            if (!format.contains(title)) {
+                filename += " - " + title;
+            }
         }
         filename = filename.trim();
         filename = Encoding.htmlDecode(filename);
@@ -166,24 +168,29 @@ public class MySpassDe extends PluginForHost {
         }
         if (this.dllink.startsWith("/")) {
             synchronized (cdn) {
-                if (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000) {
+                findCdnServer: if (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000) {
                     logger.info("Obtaining fresh cdn value");
                     final Browser brc = br.cloneBrowser();
                     brc.getPage(link.getPluginPatternMatcher());
-                    String jsurl = brc.getRegex("(/_next/static/chunks/329-[0-f0-9]+\\.js)").getMatch(0);
-                    if (jsurl == null) {
-                        /* Fallback 2024-10-08 */
-                        logger.warning("Failed to find jsurl #2 -> Fallback");
-                        jsurl = "/_next/static/chunks/329-696a1b2fb2c4bf5e.js";
+                    String[] jsurls = brc.getRegex("(/_next/static/chunks/\\d+-[0-f0-9]+\\.js)").getColumn(0);
+                    if (jsurls == null || jsurls.length == 0) {
+                        jsurls = brc.getRegex("(/_next/static/chunks/pages/player-[a-f0-9]+\\.js)").getColumn(0);
                     }
-                    brc.getPage(jsurl);
-                    String freshCDN = brc.getRegex("uri:`(https?://[^/,]*?)\\$").getMatch(0);
-                    if (freshCDN == null) {
-                        logger.warning("Failed to find CDN -> Using static fallback");
-                        freshCDN = "https://cms-myspass.vanilla-ott.com/api/videos/"; // 2024-10-07
+                    if (jsurls == null || jsurls.length == 0) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    cdn.set(freshCDN);
-                    timestampCDNRefreshed.set(System.currentTimeMillis());
+                    int i = 0;
+                    for (final String jsurl : jsurls) {
+                        brc.getPage(jsurl);
+                        final String freshCDN = brc.getRegex("uri:`(https?://[^/,]*?)\\$").getMatch(0);
+                        if (freshCDN != null) {
+                            cdn.set(freshCDN);
+                            timestampCDNRefreshed.set(System.currentTimeMillis());
+                            break findCdnServer;
+                        }
+                        logger.info("Failed to find cdn in js[" + i + "] -> " + jsurl);
+                        i++;
+                    }
                 }
             }
             this.dllink = cdn.get() + this.dllink;

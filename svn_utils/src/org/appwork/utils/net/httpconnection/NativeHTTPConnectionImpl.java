@@ -68,8 +68,10 @@ import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.net.CountingInputStream;
+import org.appwork.utils.net.CountingInputStreamInterface;
 import org.appwork.utils.net.EmptyInputStream;
 import org.appwork.utils.net.NullOutputStream;
+import org.appwork.utils.net.StreamValidEOF;
 
 /**
  * @author daniel
@@ -611,12 +613,32 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                             this.contentDecoded = false;
                         } else if ("gzip".equalsIgnoreCase(encoding) || "x-gzip".equalsIgnoreCase(encoding)) {
                             /* gzip encoding */
-                            this.convertedInputStream = new CountingGZIPInputStream(rawInputStream);
-                            this.contentDecoded = true;
+                            final CountingInputStream countingInputStream = new CountingInputStream(rawInputStream);
+                            try {
+                                this.convertedInputStream = new CountingGZIPInputStream((CountingInputStreamInterface) countingInputStream);
+                                this.contentDecoded = true;
+                            } catch (IOException e) {
+                                if (rawInputStream instanceof StreamValidEOF && ((StreamValidEOF) rawInputStream).isValidEOF()) {
+                                    this.convertedInputStream = countingInputStream;
+                                    this.contentDecoded = true;
+                                } else {
+                                    throw e;
+                                }
+                            }
                         } else if ("deflate".equalsIgnoreCase(encoding) || "x-deflate".equalsIgnoreCase(encoding)) {
                             /* deflate encoding */
-                            this.convertedInputStream = new CountingInflaterInputStream(new CountingInputStream(rawInputStream));
-                            this.contentDecoded = true;
+                            final CountingInputStream countingInputStream = new CountingInputStream(rawInputStream);
+                            try {
+                                this.convertedInputStream = new CountingInflaterInputStream(countingInputStream);
+                                this.contentDecoded = true;
+                            } catch (IOException e) {
+                                if (rawInputStream instanceof StreamValidEOF && ((StreamValidEOF) rawInputStream).isValidEOF()) {
+                                    this.convertedInputStream = countingInputStream;
+                                    this.contentDecoded = true;
+                                } else {
+                                    throw e;
+                                }
+                            }
                         } else {
                             /* unsupported */
                             this.convertedInputStream = new CountingInputStream(rawInputStream);

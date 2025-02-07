@@ -3,11 +3,25 @@ package org.jdownloader.crosssystem.macos;
 import java.awt.Desktop;
 import java.io.File;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.List;
 
 import javax.swing.JFrame;
+
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.Application;
+import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
+import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.logging2.extmanager.LoggerFactory;
+import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.windowmanager.WindowManager;
+import org.appwork.utils.swing.windowmanager.WindowManager.FrameState;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.updatev2.RestartController;
+import org.jdownloader.updatev2.SmartRlyExitRequest;
 
 import jd.SecondLevelLaunch;
 import jd.controlling.TaskQueue;
@@ -18,32 +32,22 @@ import jd.gui.swing.dialog.AboutDialog;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.settings.ConfigurationView;
 
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.event.queue.QueueAction;
-import org.appwork.utils.logging2.extmanager.LoggerFactory;
-import org.appwork.utils.swing.EDTRunner;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogNoAnswerException;
-import org.appwork.utils.swing.windowmanager.WindowManager;
-import org.appwork.utils.swing.windowmanager.WindowManager.FrameState;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.updatev2.RestartController;
-import org.jdownloader.updatev2.SmartRlyExitRequest;
-
 public class AWTMacOSApplicationAdapter {
     public static void main(String[] args) {
+        Application.setApplication(".test");
         enableMacSpecial();
     }
 
     public static void enableMacSpecial() {
         final Desktop desktop = Desktop.getDesktop();
-        if (desktop != null) {
+        if (desktop != null && JVMVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
             final AWTMacOSApplicationAdapter adapter = new AWTMacOSApplicationAdapter();
             adapter.setAboutHandler​(desktop);
             adapter.setPreferencesHandler​(desktop);
             adapter.setQuitHandler(desktop);
             adapter.setOpenFileHandler(desktop);
             adapter.setOpenURIHandler​(desktop);
+            adapter.addAppReopenedListener(desktop);
             MacOSDockAdapter.init();
         }
     }
@@ -103,7 +107,11 @@ public class AWTMacOSApplicationAdapter {
                         return null;
                     }
                 });
-                setQuitHandler​.invoke(desktop, quitHandler);
+                try {
+                    setQuitHandler​.invoke(desktop, quitHandler);
+                } catch (InvocationTargetException e) {
+                    throw e.getTargetException();
+                }
             } catch (final UnsupportedOperationException ignore) {
                 LoggerFactory.getDefaultLogger().log(ignore);
             } catch (final Throwable e) {
@@ -144,7 +152,11 @@ public class AWTMacOSApplicationAdapter {
                         return null;
                     }
                 });
-                setOpenURIHandler​.invoke(desktop, openURIHandler);
+                try {
+                    setOpenURIHandler​.invoke(desktop, openURIHandler);
+                } catch (InvocationTargetException e) {
+                    throw e.getTargetException();
+                }
             } catch (final UnsupportedOperationException ignore) {
                 LoggerFactory.getDefaultLogger().log(ignore);
             } catch (final Throwable e) {
@@ -204,7 +216,11 @@ public class AWTMacOSApplicationAdapter {
                         return null;
                     }
                 });
-                setOpenFileHandler​.invoke(desktop, openFileHandler);
+                try {
+                    setOpenFileHandler​.invoke(desktop, openFileHandler);
+                } catch (InvocationTargetException e) {
+                    throw e.getTargetException();
+                }
             } catch (final UnsupportedOperationException ignore) {
                 LoggerFactory.getDefaultLogger().log(ignore);
             } catch (final Throwable e) {
@@ -247,7 +263,11 @@ public class AWTMacOSApplicationAdapter {
                         return null;
                     }
                 });
-                setPreferencesHandler.invoke(desktop, preferencesHandler);
+                try {
+                    setPreferencesHandler.invoke(desktop, preferencesHandler);
+                } catch (InvocationTargetException e) {
+                    throw e.getTargetException();
+                }
             } catch (final UnsupportedOperationException ignore) {
                 LoggerFactory.getDefaultLogger().log(ignore);
             } catch (final Throwable e) {
@@ -272,6 +292,32 @@ public class AWTMacOSApplicationAdapter {
         };
     }
 
+    private void addAppReopenedListener(Desktop desktop) {
+        if (desktop != null) {
+            try {
+                final Method addAppEventListener = getMethod(desktop.getClass(), "addAppEventListener");
+                final Object appEventListener = java.lang.reflect.Proxy.newProxyInstance(desktop.getClass().getClassLoader(), new Class[] { Class.forName("java.awt.desktop.AppReopenedListener") }, new InvocationHandler() {
+                    @Override
+                    public Object invoke(Object proxy, final Method method, final Object[] args) throws Throwable {
+                        if ("appReopened".equals(method.getName())) {
+                            appReOpened();
+                        }
+                        return null;
+                    }
+                });
+                try {
+                    addAppEventListener.invoke(desktop, appEventListener);
+                } catch (InvocationTargetException e) {
+                    throw e.getTargetException();
+                }
+            } catch (final UnsupportedOperationException ignore) {
+                LoggerFactory.getDefaultLogger().log(ignore);
+            } catch (final Throwable e) {
+                LoggerFactory.getDefaultLogger().log(e);
+            }
+        }
+    }
+
     private void setAboutHandler​(Desktop desktop) {
         if (desktop != null) {
             try {
@@ -283,7 +329,11 @@ public class AWTMacOSApplicationAdapter {
                         return null;
                     }
                 });
-                setAboutHandler​.invoke(desktop, aboutHandler);
+                try {
+                    setAboutHandler​.invoke(desktop, aboutHandler);
+                } catch (InvocationTargetException e) {
+                    throw e.getTargetException();
+                }
             } catch (final UnsupportedOperationException ignore) {
                 LoggerFactory.getDefaultLogger().log(ignore);
             } catch (final Throwable e) {

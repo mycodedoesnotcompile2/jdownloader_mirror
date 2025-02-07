@@ -46,7 +46,6 @@ import java.util.List;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
-import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.reflection.Clazz;
@@ -57,10 +56,6 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public class MultiResolutionImageHelper {
-    @AWTestValidateClassReference
-    public static String                CLAZZ     = "java.awt.image.BaseMultiResolutionImage";
-    @AWTestValidateClassReference
-    public static String                INTERFACE = "java.awt.image.MultiResolutionImage";
     private final static Constructor<?> CONSTRUCTOR;
     private final static Class<?>       CLS;
     private final static Class<?>       INTFS;
@@ -76,8 +71,8 @@ public class MultiResolutionImageHelper {
         Method variant = null;
         if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
             try {
-                cls = Class.forName(CLAZZ);
-                intfs = Class.forName(INTERFACE);
+                cls = Class.forName("java.awt.image.BaseMultiResolutionImage");
+                intfs = Class.forName("java.awt.image.MultiResolutionImage");
                 cons = cls.getConstructor(int.class, Image[].class);
                 variants = cls.getMethod("getResolutionVariants");
                 variant = cls.getMethod("getResolutionVariant", double.class, double.class);
@@ -112,6 +107,12 @@ public class MultiResolutionImageHelper {
         });
     }
 
+    private static void checkSupported() throws UnsupportedOperationException {
+        if (!SUPPORTED) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
     /**
      * @param i
      * @param baseImageHighDPIFinal
@@ -119,9 +120,10 @@ public class MultiResolutionImageHelper {
      * @return
      */
     public static Image create(int i, Image... images) {
-        Image base = images[i];
-        List<Image> list = Arrays.asList(images);
+        checkSupported();
         try {
+            final Image base = images[i];
+            final List<Image> list = Arrays.asList(images);
             sortImagesBySize(list);
             return (Image) CONSTRUCTOR.newInstance(list.indexOf(base), list.toArray(new Image[0]));
         } catch (SecurityException e) {
@@ -147,7 +149,7 @@ public class MultiResolutionImageHelper {
      * @return
      */
     public static boolean isInstanceOf(Image img) {
-        return Clazz.isInstanceof(img.getClass(), INTFS);
+        return img != null && INTFS != null && Clazz.isInstanceof(img.getClass(), INTFS);
     }
 
     /**
@@ -155,6 +157,7 @@ public class MultiResolutionImageHelper {
      * @return
      */
     public static List<Image> getResolutionVariants(Image input) {
+        checkSupported();
         try {
             return (List<Image>) METHOD_GETRESOLUTION_VARIANTS.invoke(input, new Object[0]);
         } catch (IllegalAccessException e) {
@@ -181,6 +184,7 @@ public class MultiResolutionImageHelper {
      * @return
      */
     public static Image create(List<Image> images) {
+        checkSupported();
         // smallest one as base image
         sortImagesBySize(images);
         return create(0, images.toArray(new Image[0]));
@@ -192,8 +196,9 @@ public class MultiResolutionImageHelper {
      * @return
      */
     public static Image create(Image base, List<Image> images) {
+        checkSupported();
         try {
-            List<Image> list = new ArrayList<Image>(images);
+            final List<Image> list = new ArrayList<Image>(images);
             if (!list.contains(base)) {
                 list.add(base);
             }
@@ -214,6 +219,28 @@ public class MultiResolutionImageHelper {
         } catch (InvocationTargetException e) {
             LogV3.log(e);
             throw new WTFException(e);
+        }
+    }
+
+    /**
+     * @param frontImage
+     * @param d
+     * @param e
+     * @return
+     */
+    public static Image getResolutionVariant(Image input, double width, double height) {
+        checkSupported();
+        try {
+            return (Image) METHOD_GETRESOLUTION_VARIANT.invoke(input, new Object[] { width, height });
+        } catch (IllegalAccessException e) {
+            LogV3.log(e);
+            throw new WTFException();
+        } catch (IllegalArgumentException e) {
+            LogV3.log(e);
+            throw new WTFException();
+        } catch (InvocationTargetException e) {
+            LogV3.log(e);
+            throw new WTFException();
         }
     }
 }

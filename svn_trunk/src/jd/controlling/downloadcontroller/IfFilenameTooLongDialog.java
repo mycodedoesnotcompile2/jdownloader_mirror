@@ -2,6 +2,7 @@ package jd.controlling.downloadcontroller;
 
 import java.awt.Color;
 import java.awt.Dialog.ModalityType;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
@@ -18,6 +19,10 @@ import javax.swing.JSeparator;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextArea;
@@ -41,10 +46,12 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
         return true;
     }
 
+    @Override
     public String getPackagename() {
         return packagename;
     }
 
+    @Override
     public String getPackageID() {
         return packageID;
     }
@@ -77,9 +84,10 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
     ItemListener userSelectionListener = new ItemListener() {
         @Override
         public void itemStateChanged(ItemEvent e) {
-            if (e.getStateChange() == ItemEvent.SELECTED) {
-                userChangedSelection.set(true);
+            if (e.getStateChange() != ItemEvent.SELECTED) {
+                return;
             }
+            userChangedSelection.set(true);
             validateInput();
             stopTimer();
         }
@@ -118,25 +126,24 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
 
     @Override
     public JComponent layoutDialogContent() {
-        final String textfieldConstraints = "wmin 50, wmax 300, growx";
-        final MigPanel p = new MigPanel("ins 0,wrap 1", "", "");
+        final String textfieldConstraints = "growx, pushx, wmin 100";
+        final MigPanel p = new MigPanel("ins 0,wrap 1, wmax 500", "", "");
         final ExtTextArea txt = new ExtTextArea();
         txt.setLabelMode(true);
         txt.setLineWrap(true);
         txt.setWrapStyleWord(true);
         txt.setText("The name of this file is too long to write it to your filesystem.\r\nWhat should we do about it?\r\nFor Windows users: You can remove the path length limitation via Registry though be aware that this can have unwanted side effects!");
-        p.add(txt, "growx, growy, pushx, pushy");
+        p.add(txt, textfieldConstraints);
         p.add(SwingUtils.toBold(new JLabel("Current filename:")), "split 2,sg 1");
         final JTextField textfieldFilenameOld = new JTextField(this.downloadLink.getName());
         textfieldFilenameOld.setEditable(false);
         p.add(textfieldFilenameOld, textfieldConstraints);
+        final String ext = this.parsedOriginalFilename.getExtensionAdvanced();
         p.add(SwingUtils.toBold(new JLabel("File extension:")), "split 2,sg 1");
-        final JTextField ext = new JTextField(this.parsedOriginalFilename.getExtensionAdvanced() != null ? this.parsedOriginalFilename.getExtensionAdvanced() : "NONE");
-        ext.setEditable(false);
-        // p.add(ext, "w 50::");
-        p.add(ext, textfieldConstraints);
+        final JTextField extField = new JTextField(ext != null ? ext : "");
+        extField.setEditable(false);
+        p.add(extField, textfieldConstraints);
         p.add(SwingUtils.toBold(new JLabel("Auto shortened filename:")), "split 2,sg 1");
-        // p.add(new JLabel(this.autoShortenedFilenameSuggestion));
         final JTextField textfieldFilenameAutoShortened = new JTextField(this.autoShortenedFilenameSuggestion);
         textfieldFilenameAutoShortened.setEditable(false);
         p.add(textfieldFilenameAutoShortened, textfieldConstraints);
@@ -206,8 +213,62 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
                 onFilenameChanged();
             }
         });
+        setTextFieldLimit(this.textfieldFilenameNew);
         result = def;
         return p;
+    }
+
+    private int getEffectiveMaxNewFilenameLength() {
+        final String ext = this.parsedOriginalFilename.getExtensionAdvanced();
+        if (ext != null) {
+            if (StringUtils.endsWithCaseInsensitive(this.textfieldFilenameNew.getText(), ext)) {
+                return this.autoShortenedFilenameSuggestion.length();
+            } else {
+                /* Extension is currently not in text but will be added later -> Max len is filename without length of file extension. */
+                return this.autoShortenedFilenameSuggestion.length() - ext.length();
+            }
+        } else {
+            return this.autoShortenedFilenameSuggestion.length();
+        }
+    }
+
+    private void setTextFieldLimit(final JTextField textField) {
+        ((AbstractDocument) textField.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                if (!isValidLength(fb, string, 0)) {
+                    triggerWarning(textField);
+                    return;
+                }
+                super.insertString(fb, offset, string, attr);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String string, AttributeSet attr) throws BadLocationException {
+                if (!isValidLength(fb, string, length)) {
+                    triggerWarning(textField);
+                    return;
+                }
+                super.replace(fb, offset, length, string, attr);
+            }
+
+            private boolean isValidLength(FilterBypass fb, String string, int lengthToRemove) {
+                final int maxlen = getEffectiveMaxNewFilenameLength();
+                return string != null && (fb.getDocument().getLength() - lengthToRemove + string.length()) <= maxlen;
+            }
+        });
+    }
+
+    private void triggerWarning(JTextField textField) {
+        Toolkit.getDefaultToolkit().beep();
+        textField.setForeground(Color.RED);
+        new Thread(() -> {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ignored) {
+            }
+            textField.setForeground(Color.BLACK);
+        }).start();
     }
 
     private void onFilenameChanged() {
@@ -217,12 +278,15 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
     }
 
     private void autoSelectRenameIfAllowed() {
-        if (userChangedSelection.get() == false && filenameHasChanged()) {
-            rename.setSelected(true);
-            /* Will be set to true by now -> Set to false because we've changed the field, not the user. */
-            userChangedSelection.set(false);
-            result = IfFilenameTooLongAction.RENAME_FILE;
+        if (userChangedSelection.get() == true) {
+            return;
+        } else if (!filenameHasChanged()) {
+            return;
         }
+        rename.setSelected(true);
+        /* Will be set to true by now -> Set to false because we've changed the field, not the user. */
+        userChangedSelection.set(false);
+        result = IfFilenameTooLongAction.RENAME_FILE;
     }
 
     /** Returns true if user defined filename differs from the initially suggested auto shortened filename. */

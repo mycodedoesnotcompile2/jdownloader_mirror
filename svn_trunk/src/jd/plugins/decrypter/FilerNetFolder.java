@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.FilerNet;
 
-@DecrypterPlugin(revision = "$Revision: 48674 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50582 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilerNet.class })
 public class FilerNetFolder extends PluginForDecrypt {
     public FilerNetFolder(PluginWrapper wrapper) {
@@ -137,15 +137,7 @@ public class FilerNetFolder extends PluginForDecrypt {
         return ret;
     }
 
-    private String getJson(final String parameter, final String source) {
-        String result = new Regex(source, "\"" + parameter + "\":(\\d+)").getMatch(0);
-        if (result == null) {
-            result = new Regex(source, "\"" + parameter + "\":\"([^<>\"]*?)\"").getMatch(0);
-        }
-        return result;
-    }
-
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

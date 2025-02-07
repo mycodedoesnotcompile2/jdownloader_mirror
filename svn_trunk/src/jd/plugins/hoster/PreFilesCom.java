@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 3, names = {}, urls = {})
 public class PreFilesCom extends XFileSharingProBasic {
     public PreFilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -216,35 +216,34 @@ public class PreFilesCom extends XFileSharingProBasic {
         String dllink = super.getDllink(link, account, br, src);
         if (dllink != null) {
             return dllink;
-        } else {
-            /* 2020-12-11: They're using simple redirectors here e.g. "pro.sh" */
-            dllink = new Regex(src, "href=\"(https?://[^\"]+)\"[^>]*>\\s*Click here to Download").getMatch(0);
-            if (dllink == null) {
-                return null;
-            }
-            if (dllink.matches("https?://[^/]+/[A-Za-z0-9]+")) {
-                /* pro.sh/ouo.io --> Use dedicated crawler plugin. */
-                logger.info("Processing special redirect URL");
-                try {
-                    final Browser brc = br.cloneBrowser();
-                    final PluginForDecrypt plg = this.getNewPluginForDecryptInstance("pro.sh");
-                    plg.setBrowser(brc);
-                    /* We expect exactly one result. */
-                    final ArrayList<DownloadLink> results = plg.decryptIt(new CryptedLink(dllink), null);
-                    dllink = results.get(0).getPluginPatternMatcher();
-                    return dllink;
-                } catch (final Throwable e) {
-                    if (e instanceof BlockedByException) {
-                        /* 2024-06-20: Dirty hack to make this fail later in order to let upper handling run into BlockedByException. */
-                        return dllink;
-                    } else {
-                        e.printStackTrace();
-                        return null;
-                    }
-                }
-            } else {
+        }
+        /* 2020-12-11: They're using simple redirectors here e.g. "pro.sh" */
+        dllink = new Regex(src, "href=\"(https?://[^\"]+)\"[^>]*>\\s*Click here to Download").getMatch(0);
+        if (dllink == null) {
+            return null;
+        }
+        if (dllink.matches("https?://[^/]+/[A-Za-z0-9]+")) {
+            /* pro.sh/ouo.io --> Use dedicated crawler plugin. */
+            logger.info("Processing special redirect URL");
+            try {
+                final Browser brc = br.cloneBrowser();
+                final PluginForDecrypt plg = this.getNewPluginForDecryptInstance("pro.sh");
+                plg.setBrowser(brc);
+                /* We expect exactly one result. */
+                final ArrayList<DownloadLink> results = plg.decryptIt(new CryptedLink(dllink), null);
+                dllink = results.get(0).getPluginPatternMatcher();
                 return dllink;
+            } catch (final Throwable e) {
+                if (e instanceof BlockedByException) {
+                    /* 2024-06-20: Dirty hack to make this fail later in order to let upper handling run into BlockedByException. */
+                    return dllink;
+                } else {
+                    e.printStackTrace();
+                    return null;
+                }
             }
+        } else {
+            return dllink;
         }
     }
 }

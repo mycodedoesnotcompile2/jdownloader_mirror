@@ -19,14 +19,6 @@ import java.io.File;
 
 import javax.swing.JFrame;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.gui.swing.dialog.AboutDialog;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -51,6 +43,14 @@ import com.apple.eawt.OpenURIHandler;
 import com.apple.eawt.PreferencesHandler;
 import com.apple.eawt.QuitHandler;
 import com.apple.eawt.QuitResponse;
+
+import jd.SecondLevelLaunch;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.gui.swing.dialog.AboutDialog;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
 
 public class EAWTMacOSApplicationAdapter implements QuitHandler, AboutHandler, PreferencesHandler, AppReOpenedListener, OpenFilesHandler, OpenURIHandler {
     public static void enableMacSpecial() throws Exception {

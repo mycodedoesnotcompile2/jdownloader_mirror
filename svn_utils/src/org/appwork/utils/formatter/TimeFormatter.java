@@ -49,11 +49,12 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.Regex;
 import org.appwork.utils.locale._AWU;
 
 public class TimeFormatter {
-    private static final java.util.List<SimpleDateFormat> dateformats  = new ArrayList<SimpleDateFormat>();
+    private static final java.util.List<SimpleDateFormat> dateformats = new ArrayList<SimpleDateFormat>();
     static {
         try {
             SimpleDateFormat sdf;
@@ -79,7 +80,7 @@ public class TimeFormatter {
             sdf.setLenient(false);
             TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss z", Locale.UK));
             sdf.setLenient(false);
-            if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
+            if (JVMVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
                 // Java 1.6 does not support X ISO 8601 time zone
                 TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'SSSX", Locale.UK));
                 sdf.setLenient(false);
@@ -93,9 +94,9 @@ public class TimeFormatter {
             e.printStackTrace();
         }
     }
-    public static final int                               HIDE_SECONDS = 1 << 1;
-    public static final int                               HIDE_MARKER  = 1 << 2;
-    public static final int                               CLOCK        = 1 << 3;
+    public static final int HIDE_SECONDS = 1 << 1;
+    public static final int HIDE_MARKER  = 1 << 2;
+    public static final int CLOCK        = 1 << 3;
 
     public static String formatMilliSeconds(final long totalSeconds, final int flags) {
         return TimeFormatter.formatSeconds(totalSeconds / 1000, flags);
@@ -176,6 +177,9 @@ public class TimeFormatter {
         return hours * 60 * 60 * 1000 + minutes * 60 * 1000;
     }
 
+    private static final Pattern GETMILLISECONDS_HOUR   = Pattern.compile("(h|st)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern GETMILLISECONDS_MINUTE = Pattern.compile("(m)", Pattern.CASE_INSENSITIVE);
+
     public static long getMilliSeconds(final String wait) {
         String[][] matches = new Regex(wait, "([\\d]+) ?[\\.|\\,|\\:] ?([\\d]+)").getMatches();
         if (matches == null || matches.length == 0) {
@@ -191,9 +195,9 @@ public class TimeFormatter {
         if (matches[0].length == 2) {
             res = Double.parseDouble(matches[0][0] + "." + matches[0][1]);
         }
-        if (org.appwork.utils.Regex.matches(wait, Pattern.compile("(h|st)", Pattern.CASE_INSENSITIVE))) {
+        if (GETMILLISECONDS_HOUR.matcher(wait).find()) {
             res *= 60 * 60 * 1000l;
-        } else if (org.appwork.utils.Regex.matches(wait, Pattern.compile("(m)", Pattern.CASE_INSENSITIVE))) {
+        } else if (GETMILLISECONDS_MINUTE.matcher(wait).find()) {
             res *= 60 * 1000l;
         } else {
             res *= 1000l;
@@ -201,69 +205,81 @@ public class TimeFormatter {
         return Math.round(res);
     }
 
-    public static long getMilliSeconds(final String dateString, final String dateFormatString, final Locale l) {
-        if (dateString != null) {
-            final Set<String> dateFormatVariants = new LinkedHashSet<String>();
-            dateFormatVariants.add(dateFormatString);
-            dateFormatVariants.add(dateFormatString.replaceAll("H+", "kk"));// Hour in day (0-23) to Hour in day (1-24)
-            dateFormatVariants.add(dateFormatString.replaceAll("k+", "HH"));// Hour in day (1-24) to Hour in day (0-23)
-            dateFormatVariants.add(dateFormatString.replaceAll("h+", "KK")); // Hour in am/pm (1-12) to Hour in am/pm (0-11)
-            dateFormatVariants.add(dateFormatString.replaceAll("h+", "kk")); // Hour in am/pm (1-12) to Hour in day (1-24)
-            dateFormatVariants.add(dateFormatString.replaceAll("h+", "HH")); // Hour in am/pm (1-12) to Hour in day (0-23)
-            for (final String dateFormatVariant : dateFormatVariants) {
-                final SimpleDateFormat dateFormat = l != null ? new SimpleDateFormat(dateFormatVariant, l) : new SimpleDateFormat(dateFormatVariant, Locale.ENGLISH);
-                try {
-                    dateFormat.setLenient(false);
-                    if (dateFormatVariant.contains("'Z'")) {
-                        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-                    }
-                    return dateFormat.parse(dateString).getTime();
-                } catch (final Exception e) {
-                    e.printStackTrace();
+    public static long getMilliSeconds(final String dateString, String dateFormatString, final Locale locale) {
+        if (dateString == null) {
+            return -1;
+        }
+        if (!JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7) || true) {
+            final String newDateFormatString = dateFormatString.replaceAll("X+$", "");
+            if (newDateFormatString != dateFormatString) {
+                final long ret = getMilliSeconds(dateString, newDateFormatString + "Z", locale);
+                if (ret != -1) {
+                    return ret;
                 }
+                dateFormatString = newDateFormatString;
+            }
+        }
+        final Set<String> dateFormatVariants = new LinkedHashSet<String>();
+        dateFormatVariants.add(dateFormatString);
+        dateFormatVariants.add(dateFormatString.replaceAll("H+", "kk"));// Hour in day (0-23) to Hour in day (1-24)
+        dateFormatVariants.add(dateFormatString.replaceAll("k+", "HH"));// Hour in day (1-24) to Hour in day (0-23)
+        dateFormatVariants.add(dateFormatString.replaceAll("h+", "KK")); // Hour in am/pm (1-12) to Hour in am/pm (0-11)
+        dateFormatVariants.add(dateFormatString.replaceAll("h+", "kk")); // Hour in am/pm (1-12) to Hour in day (1-24)
+        dateFormatVariants.add(dateFormatString.replaceAll("h+", "HH")); // Hour in am/pm (1-12) to Hour in day (0-23)
+        for (final String dateFormatVariant : dateFormatVariants) {
+            final SimpleDateFormat dateFormat = new SimpleDateFormat(dateFormatVariant, locale != null ? locale : Locale.ENGLISH);
+            try {
+                dateFormat.setLenient(false);
+                if (dateFormatVariant.contains("'Z'")) {
+                    dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+                }
+                return dateFormat.parse(dateString).getTime();
+            } catch (final Exception e) {
+                e.printStackTrace();
             }
         }
         return -1;
     }
 
     public static Date parseDateString(final String date) {
-        if (date != null) {
-            final Date ret = parseDateString(date, false);
-            if (ret != null) {
-                return ret;
-            }
-            return parseDateString(date, true);
+        if (date == null) {
+            return null;
         }
-        return null;
+        final Date ret = parseDateString(date, false);
+        if (ret == null) {
+            return null;
+        }
+        return parseDateString(date, true);
     }
 
     public static Date parseDateString(final String date, final boolean fix) {
-        if (date != null) {
-            for (final SimpleDateFormat format : TimeFormatter.dateformats) {
-                String parseDate = date.trim();
-                if (fix) {
-                    final DateFormatSymbols symbols = format.getDateFormatSymbols();
-                    for (final String shortWeekDay : symbols.getShortWeekdays()) {
-                        if (shortWeekDay != null && shortWeekDay.length() > 0 && parseDate.contains(shortWeekDay)) {
-                            /* fix broken weekDayName */
-                            parseDate = parseDate.replaceAll("(" + Pattern.quote(shortWeekDay) + "[a-zA-Z]+)", shortWeekDay);
-                            break;
-                        }
-                    }
-                    for (final String shortMonth : symbols.getShortMonths()) {
-                        if (shortMonth != null && shortMonth.length() > 0 && parseDate.contains(shortMonth)) {
-                            /* fix broken shortMonthName */
-                            parseDate = parseDate.replaceAll("(" + Pattern.quote(shortMonth) + "[a-zA-Z]+)", shortMonth);
-                            break;
-                        }
+        if (date == null) {
+            return null;
+        }
+        for (final SimpleDateFormat format : TimeFormatter.dateformats) {
+            String parseDate = date.trim();
+            if (fix) {
+                final DateFormatSymbols symbols = format.getDateFormatSymbols();
+                for (final String shortWeekDay : symbols.getShortWeekdays()) {
+                    if (shortWeekDay != null && shortWeekDay.length() > 0 && parseDate.contains(shortWeekDay)) {
+                        /* fix broken weekDayName */
+                        parseDate = parseDate.replaceAll("(" + Pattern.quote(shortWeekDay) + "[a-zA-Z]+)", shortWeekDay);
+                        break;
                     }
                 }
-                try {
-                    synchronized (format) {
-                        return format.parse(parseDate);
+                for (final String shortMonth : symbols.getShortMonths()) {
+                    if (shortMonth != null && shortMonth.length() > 0 && parseDate.contains(shortMonth)) {
+                        /* fix broken shortMonthName */
+                        parseDate = parseDate.replaceAll("(" + Pattern.quote(shortMonth) + "[a-zA-Z]+)", shortMonth);
+                        break;
                     }
-                } catch (final Throwable e2) {
                 }
+            }
+            try {
+                synchronized (format) {
+                    return format.parse(parseDate);
+                }
+            } catch (final Throwable e2) {
             }
         }
         return null;
@@ -275,8 +291,8 @@ public class TimeFormatter {
      * @throws DatatypeConfigurationException
      */
     public static long getTimestampByGregorianTime(String date) throws DatatypeConfigurationException {
-        DatatypeFactory f = DatatypeFactory.newInstance();
-        XMLGregorianCalendar xgc = f.newXMLGregorianCalendar(date);
+        final DatatypeFactory f = DatatypeFactory.newInstance();
+        final XMLGregorianCalendar xgc = f.newXMLGregorianCalendar(date);
         return xgc.toGregorianCalendar().getTime().getTime();
     }
 }

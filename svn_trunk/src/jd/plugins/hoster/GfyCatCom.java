@@ -53,7 +53,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48625 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50568 $", interfaceVersion = 2, names = {}, urls = {})
 public class GfyCatCom extends PluginForHost {
     public GfyCatCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -578,11 +578,15 @@ public class GfyCatCom extends PluginForHost {
         int counter = 0;
         for (final String directurl : directurls) {
             counter++;
+            br.getHeaders().put("Referer", "https://" + getHost() + "/");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, true, 1);
             final boolean success = this.looksLikeDownloadableContent(dl.getConnection());
             logger.info("Directurl " + counter + "/" + directurls.size() + ": success = " + success + " | URL: " + directurl);
             if (success) {
                 break;
+            } else {
+                logger.info("Skipping unusable directurl: " + directurl);
+                continue;
             }
         }
         if (!looksLikeDownloadableContent(dl.getConnection())) {

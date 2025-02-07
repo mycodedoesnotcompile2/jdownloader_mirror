@@ -1,9 +1,9 @@
 package org.jdownloader.gui.views.downloads.columns;
 
 import java.awt.Component;
+import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
 
 import javax.swing.AbstractButton;
 import javax.swing.DefaultComboBoxModel;
@@ -14,13 +14,6 @@ import javax.swing.JPopupMenu;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.JTableHeader;
-
-import jd.controlling.TaskQueue;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
 
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.components.CheckBoxIcon;
@@ -37,6 +30,13 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.BadgeIcon;
 import org.jdownloader.images.NewTheme;
+
+import jd.controlling.TaskQueue;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 public class PriorityColumn extends ExtComboColumn<AbstractNode, Priority> {
     /**
@@ -146,7 +146,7 @@ public class PriorityColumn extends ExtComboColumn<AbstractNode, Priority> {
                 Icon ico = getIconByPriority(o);
                 if (selected) {
                     CheckBoxIcon checkBox = CheckBoxIcon.TRUE;
-                    BufferedImage back = ImageProvider.merge(ico, checkBox, 5, 0, 0, ico.getIconHeight() - checkBox.getIconHeight() + 5);
+                    Image back = ImageProvider.merge(ico, checkBox, 5, 0, 0, ico.getIconHeight() - checkBox.getIconHeight() + 5);
                     setSmallIcon(new ImageIcon(back));
                 } else {
                     setSmallIcon(ico);

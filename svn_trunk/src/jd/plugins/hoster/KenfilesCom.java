@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -30,10 +33,7 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 48924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 3, names = {}, urls = {})
 public class KenfilesCom extends XFileSharingProBasic {
     public KenfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -120,17 +120,14 @@ public class KenfilesCom extends XFileSharingProBasic {
     /** Function to find the final downloadlink. */
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, final String src) {
-        String dllink = br.getRedirectLocation();
+        String dllink = new Regex(src, "(\"|\\')(https?://(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|([\\w\\-]+\\.)?kfs\\.space)(:\\d{1,4})?/(files|d|p|f|cgi\\-bin/dl\\.cgi)/(\\d+/)?[a-z0-9]+/[^<>\"/]*?)(\"|\\')").getMatch(1);
         if (dllink == null) {
-            dllink = new Regex(src, "(\"|\\')(https?://(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|([\\w\\-]+\\.)?kfs\\.space)(:\\d{1,4})?/(files|d|p|f|cgi\\-bin/dl\\.cgi)/(\\d+/)?[a-z0-9]+/[^<>\"/]*?)(\"|\\')").getMatch(1);
-            if (dllink == null) {
-                final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
-                if (cryptedScripts != null && cryptedScripts.length != 0) {
-                    for (String crypted : cryptedScripts) {
-                        dllink = decodeDownloadLink(link, account, br, crypted);
-                        if (dllink != null) {
-                            break;
-                        }
+            final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
+            if (cryptedScripts != null && cryptedScripts.length != 0) {
+                for (String crypted : cryptedScripts) {
+                    dllink = decodeDownloadLink(link, account, br, crypted);
+                    if (dllink != null) {
+                        break;
                     }
                 }
             }

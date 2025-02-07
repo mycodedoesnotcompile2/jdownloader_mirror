@@ -39,10 +39,12 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.Transparency;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.io.File;
@@ -52,7 +54,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,6 +69,7 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 
+import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.storage.config.MinTimeWeakReference;
 import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
 import org.appwork.utils.Application;
@@ -112,7 +117,8 @@ public class ImageProvider {
     }
 
     /* Thx to flubshi */
-    public static BufferedImage convertToGrayScale(final BufferedImage bufferedImage) {
+    public static BufferedImage convertToGrayScale(final Image img) {
+        BufferedImage bufferedImage = IconIO.toBufferedImage(img);
         final BufferedImage dest = new BufferedImage(bufferedImage.getWidth(), bufferedImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
         Color tmp;
         int val, alpha;
@@ -314,7 +320,6 @@ public class ImageProvider {
                     //
                     return cachedDisabledIcon;
                 }
-                DebugMode.debugger();
                 final Icon disabledIcon = new ImageIcon(IconIO.toGrayScale(IconIO.toImage(icon)));
                 ImageProvider.DISABLED_ICON_CACHE.put(icon, new MinTimeWeakReference<Icon>(disabledIcon, ImageProvider.MIN_LIFETIME, "disabled icon"));
                 return disabledIcon;
@@ -480,7 +485,7 @@ public class ImageProvider {
      * @param i
      * @param j
      */
-    public static BufferedImage merge(final Image back, final Image front, final int xoffset, final int yoffset) {
+    public static Image merge(final Image back, final Image front, final int xoffset, final int yoffset) {
         int xoffsetTop, yoffsetTop, xoffsetBottom, yoffsetBottom;
         if (xoffset >= 0) {
             xoffsetTop = 0;
@@ -499,36 +504,63 @@ public class ImageProvider {
         return ImageProvider.merge(back, front, xoffsetTop, yoffsetTop, xoffsetBottom, yoffsetBottom);
     }
 
-    public static BufferedImage merge(final Icon back, final Icon front, final int xoffsetBack, final int yoffsetBack, final int xoffsetFront, final int yoffsetFront, final Composite backComposite, final Composite frontComposite) {
+    public static Image merge(final Icon back, final Icon front, final int xoffsetBack, final int yoffsetBack, final int xoffsetFront, final int yoffsetFront, final Composite backComposite, final Composite frontComposite) {
+        Image backImage = IconIO.toImage(back);
+        Image frontImage = IconIO.toImage(front);
         final int width = Math.max(xoffsetBack + back.getIconWidth(), xoffsetFront + front.getIconWidth());
         final int height = Math.max(yoffsetBack + back.getIconHeight(), yoffsetFront + front.getIconHeight());
-        final BufferedImage dest = new BufferedImage(width, height, Transparency.TRANSLUCENT);
-        final Graphics2D g2 = dest.createGraphics();
+        if (false && MultiResolutionImageHelper.isSupported() && MultiResolutionImageHelper.isInstanceOf(backImage) && MultiResolutionImageHelper.isInstanceOf(frontImage)) {
+            ArrayList<Image> images = new ArrayList<Image>();
+            HashSet<String> dupe = new HashSet<String>();
+            for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+                AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
+                if (dupe.add(tx.getScaleX() + ":" + tx.getScaleY())) {
+                    Image backVariant = MultiResolutionImageHelper.getResolutionVariant(backImage, tx.getScaleX() * backImage.getWidth(null), tx.getScaleY() * backImage.getHeight(null));
+                    Image frontVariant = MultiResolutionImageHelper.getResolutionVariant(frontImage, tx.getScaleX() * frontImage.getWidth(null), tx.getScaleY() * frontImage.getHeight(null));
+                    images.add(merge(backVariant, frontVariant, IconIO.clipScale(xoffsetBack, tx.getScaleX()), IconIO.clipScale(yoffsetBack, tx.getScaleY()), IconIO.clipScale(xoffsetFront, tx.getScaleX()), IconIO.clipScale(yoffsetFront, tx.getScaleY()), backComposite, frontComposite, IconIO.clipScale(width, tx.getScaleX()), IconIO.clipScale(height, tx.getScaleY())));
+                }
+            }
+            if (images.size() == 1) {
+                return images.get(0);
+            } else if (images.size() > 0) {
+                return MultiResolutionImageHelper.create(images);
+            } else {
+                // fallback
+            }
+        }
+        return merge(backImage, frontImage, xoffsetBack, yoffsetBack, xoffsetFront, yoffsetFront, backComposite, frontComposite, width, height);
+    }
+
+    protected static Image merge(Image backVariant, Image frontVariant, final int xoffsetBack, final int yoffsetBack, final int xoffsetFront, final int yoffsetFront, final Composite backComposite, final Composite frontComposite, final int width, final int height) {
+        BufferedImage target = IconIO.createEmptyImage(width, height);
+        final Graphics2D g2 = target.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         if (backComposite != null) {
             final Composite old = g2.getComposite();
             g2.setComposite(backComposite);
-            back.paintIcon(null, g2, xoffsetBack, yoffsetBack);
+            g2.drawImage(backVariant, xoffsetBack, yoffsetBack, null);
             g2.setComposite(old);
         } else {
-            back.paintIcon(null, g2, xoffsetBack, yoffsetBack);
+            g2.drawImage(backVariant, xoffsetBack, yoffsetBack, null);
         }
         if (frontComposite != null) {
             final Composite old = g2.getComposite();
             g2.setComposite(frontComposite);
-            front.paintIcon(null, g2, xoffsetFront, yoffsetFront);
+            g2.drawImage(frontVariant, xoffsetFront, yoffsetFront, null);
             g2.setComposite(old);
         } else {
-            front.paintIcon(null, g2, xoffsetFront, yoffsetFront);
+            g2.drawImage(frontVariant, xoffsetFront, yoffsetFront, null);
         }
         g2.dispose();
-        return dest;
+        return target;
     }
 
-    public static BufferedImage merge(final Icon back, final Icon front, final int xoffsetBack, final int yoffsetBack, final int xoffsetFront, final int yoffsetFront) {
+    public static Image merge(final Icon back, final Icon front, final int xoffsetBack, final int yoffsetBack, final int xoffsetFront, final int yoffsetFront) {
         return ImageProvider.merge(back, front, xoffsetBack, yoffsetBack, xoffsetFront, yoffsetFront, null, null);
     }
 
-    public static BufferedImage merge(final Image back, final Image front, final int xoffsetBack, final int yoffsetBack, final int xoffsetFront, final int yoffsetFront) {
+    public static Image merge(final Image back, final Image front, final int xoffsetBack, final int yoffsetBack, final int xoffsetFront, final int yoffsetFront) {
         return ImageProvider.merge(new ImageIcon(back), new ImageIcon(front), xoffsetBack, yoffsetBack, xoffsetFront, yoffsetFront);
     }
 

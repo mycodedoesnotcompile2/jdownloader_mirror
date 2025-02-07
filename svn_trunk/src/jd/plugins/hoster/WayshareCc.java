@@ -29,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48651 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 3, names = {}, urls = {})
 public class WayshareCc extends XFileSharingProBasic {
     public WayshareCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -109,7 +109,7 @@ public class WayshareCc extends XFileSharingProBasic {
                 final Form download1 = this.findFormDownload1Free(br);
                 final Form download2 = this.findFormDownload2Free(br);
                 if (download1 != null || download2 != null || br.containsHTML("<h3>\\s*Preview video\\s*</h3>")) {
-                    logger.info("Avoid download of trailer: " + directurl);
+                    logger.info("Avoid download of trailer via URL: " + directurl);
                     return null;
                 }
             } catch (Exception e) {

@@ -3967,6 +3967,11 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                     controller.getLogger().severe("fileOutput is a directory " + fileOutput);
                     throw new SkipReasonException(SkipReason.INVALID_DESTINATION, "Invalid download destination: Folder with name of this file already exists!");
                 }
+                final boolean filenameTooLongDialogTest = false;
+                if (filenameTooLongDialogTest && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    final ParsedFilename pfname = new jd.plugins.ParsedFilename(downloadLink.getName());
+                    new IfFilenameTooLongDialog(downloadLink, pfname, downloadLink.getName()).show();
+                }
                 boolean fileExists = fileOutput.exists();
                 if (!fileExists) {
                     /* File does not exist: Check- and prepare path. */
@@ -4167,7 +4172,8 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             /* User wants us to skip too long filenames. */
                             throw e;
                         }
-                        String shortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
+                        final String autoShortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
+                        String shortenedFilename = autoShortenedFilename;
                         if (shortenedFilename == null) {
                             logger.info("Shortening this filename is not possible");
                             throw e;
@@ -4195,17 +4201,14 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             /* E.g. user has entered too long file name in dialog */
                             logger.info("Shortened filename is still too long");
                             throw e;
-                        }
-                        // TODO: Maybe remove this check as we should be sure that the changed filename is writeable.
-                        controller.setSessionDownloadFilename(shortenedFilename);
-                        downloadLink.setForcedFileName(shortenedFilename);
-                        downloadLink.setChunksProgress(null);
-                        logger.info("Looks like too long filename | Checking if shortened filename already exists: " + shortenedFilename);
-                        final File writeTest2 = new File(writeTest1.getParent(), shortenedFilename);
-                        if (writeTest2.exists()) {
+                        } else if (new File(writeTest1.getParent(), shortenedFilename).exists()) {
                             logger.info("File with shortened filename already exists!");
                             throw new SkipReasonException(SkipReason.FILE_EXISTS);
                         }
+                        /* Continue with shortened filename */
+                        controller.setSessionDownloadFilename(shortenedFilename);
+                        downloadLink.setForcedFileName(shortenedFilename);
+                        downloadLink.setChunksProgress(null);
                     }
                 }
             }
@@ -4333,34 +4336,36 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                     @Override
                     public void run() throws Exception {
                         final PluginForHost plugin = controller.getProcessingPlugin();
-                        if (plugin != null) {
-                            final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
-                            if (downloadable != null) {
-                                final MirrorDetectionDecision mirrorDetectionDecision = config.getMirrorDetectionDecision();
-                                switch (mirrorDetectionDecision) {
-                                case AUTO:
-                                    final HashInfo hashInfo = downloadable.getHashInfo();
-                                    if (hashInfo != null) {
-                                        final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
-                                        if (hashResult != null && hashResult.match()) {
-                                            downloadable.setHashResult(hashResult);
-                                            downloadLink.setDownloadCurrent(fileOutput.length());
-                                            throw new PluginException(LinkStatus.FINISHED);
-                                        }
-                                    }
-                                case FILENAME_FILESIZE:
-                                    final long fileSize = downloadable.getVerifiedFileSize();
-                                    if (fileSize >= 0 && fileSize == fileOutput.length()) {
-                                        downloadLink.setDownloadCurrent(fileOutput.length());
-                                        throw new PluginException(LinkStatus.FINISHED);
-                                    }
-                                    break;
-                                case FILENAME:
-                                case DISABLED:
-                                default:
-                                    // nothing
+                        if (plugin == null) {
+                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                        }
+                        final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
+                        if (downloadable == null) {
+                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                        }
+                        final MirrorDetectionDecision mirrorDetectionDecision = config.getMirrorDetectionDecision();
+                        switch (mirrorDetectionDecision) {
+                        case AUTO:
+                            final HashInfo hashInfo = downloadable.getHashInfo();
+                            if (hashInfo != null) {
+                                final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
+                                if (hashResult != null && hashResult.match()) {
+                                    downloadable.setHashResult(hashResult);
+                                    downloadLink.setDownloadCurrent(fileOutput.length());
+                                    throw new PluginException(LinkStatus.FINISHED);
                                 }
                             }
+                        case FILENAME_FILESIZE:
+                            final long fileSize = downloadable.getVerifiedFileSize();
+                            if (fileSize >= 0 && fileSize == fileOutput.length()) {
+                                downloadLink.setDownloadCurrent(fileOutput.length());
+                                throw new PluginException(LinkStatus.FINISHED);
+                            }
+                            break;
+                        case FILENAME:
+                        case DISABLED:
+                        default:
+                            // nothing
                         }
                         throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
                     }

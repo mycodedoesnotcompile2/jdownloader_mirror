@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.decrypter.FilemoonSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50461 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSx extends XFileSharingProBasic {
     public FilemoonSx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -244,7 +244,7 @@ public class FilemoonSx extends XFileSharingProBasic {
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
         /* 2023-04-20: New */
-        final String dllink = br.getRegex("(?i)>\\s*Your download link</div>\\s*<a href=\"(https?://[^\"]+)").getMatch(0);
+        final String dllink = br.getRegex(">\\s*Your download link</div>\\s*<a href=\"(https?://[^\"]+)").getMatch(0);
         if (dllink != null) {
             return dllink;
         } else {

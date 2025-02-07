@@ -77,7 +77,7 @@ import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
 @PluginDependencies(dependencies = { VKontakteRu.class })
-@HostPlugin(revision = "$Revision: 50230 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50582 $", interfaceVersion = 2, names = {}, urls = {})
 /* Most of all links are coming from a crawler plugin. */
 public class VKontakteRuHoster extends PluginForHost {
     /* Current main domain */
@@ -267,6 +267,9 @@ public class VKontakteRuHoster extends PluginForHost {
 
     @SuppressWarnings("deprecation")
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+        if (this.isDRMProtected(link)) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "DRM protected");
+        }
         String finalurl = null;
         if (link.getPluginPatternMatcher().matches(TYPE_DIRECT)) {
             /* Direct link -> No account needed to download it. */
@@ -858,7 +861,7 @@ public class VKontakteRuHoster extends PluginForHost {
 
     /* 2016-01-05: Check for invalid audioURL (e.g. decryption fails)! */
     public static boolean audioIsValidDirecturl(final String url) {
-        if (url == null) {
+        if (StringUtils.isEmpty(url)) {
             return false;
         } else if (url.matches("(?i).+audio_api_unavailable\\.mp3.*?")) {
             return false;
@@ -886,34 +889,41 @@ public class VKontakteRuHoster extends PluginForHost {
             if (!isFollowRedirect && StringUtils.containsIgnoreCase(br.getRedirectLocation(), "/429.html")) {
                 br.followRedirect();
             }
-            URL url = br._getURL();
-            if (url != null && StringUtils.equals(url.getPath(), "/429.html")) {
-                final UrlQuery query = UrlQuery.parse(url.getQuery());
-                final String hash429 = query.get("hash429");
-                if (hash429 != null) {
-                    Thread.sleep(1000);
-                    String newLocation = url.toString();
-                    if (StringUtils.containsIgnoreCase(newLocation, "&key=")) {
-                        // remove existing key from query
-                        newLocation = newLocation.replaceFirst("(?i)(&key=[^&#]+)", "");
-                    }
-                    newLocation = newLocation + "&key=" + Hash.getMD5(hash429);
-                    br.getPage(newLocation);
-                    if (!isFollowRedirect) {
-                        br.followRedirect();
-                    }
-                    if (!StringUtils.equals(br._getURL().getPath(), "/429.html") && !StringUtils.containsIgnoreCase(br.getRedirectLocation(), "/429.html")) {
-                        final String solution429 = br.getHostCookie("solution429");
-                        if (solution429 != null) {
-                            LOCK_429.put("hash", hash429);
-                            LOCK_429.put("solution", solution429);
-                        }
-                        return;
-                    }
-                }
+            final URL url = br._getURL();
+            if (!is429RateLimited(br)) {
+                /* Not rate limited -> Do nothing */
+                return;
+            }
+            final UrlQuery query = UrlQuery.parse(url.getQuery());
+            final String hash429 = query.get("hash429");
+            if (hash429 == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            Thread.sleep(1000);
+            String newLocation = url.toString();
+            if (StringUtils.containsIgnoreCase(newLocation, "&key=")) {
+                // remove existing key from query
+                newLocation = newLocation.replaceFirst("(?i)(&key=[^&#]+)", "");
+            }
+            newLocation = newLocation + "&key=" + Hash.getMD5(hash429);
+            br.getPage(newLocation);
+            if (!isFollowRedirect) {
+                br.followRedirect();
+            }
+            if (is429RateLimited(br)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String solution429 = br.getHostCookie("solution429");
+            if (solution429 == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            LOCK_429.put("hash", hash429);
+            LOCK_429.put("solution", solution429);
         }
+    }
+
+    private static boolean is429RateLimited(final Browser br) {
+        return StringUtils.equals(br._getURL().getPath(), "/429.html");
     }
 
     @Override

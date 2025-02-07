@@ -80,6 +80,7 @@ import org.appwork.utils.Time;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.net.ChunkedInputStream;
 import org.appwork.utils.net.CountingInputStream;
+import org.appwork.utils.net.CountingInputStreamInterface;
 import org.appwork.utils.net.EmptyInputStream;
 import org.appwork.utils.net.LimitedInputStream;
 import org.appwork.utils.net.PublicSuffixList;
@@ -1494,13 +1495,33 @@ public class HTTPConnectionImpl implements HTTPConnection {
                         } else if ("gzip".equalsIgnoreCase(encoding) || "x-gzip".equalsIgnoreCase(encoding)) {
                             /* gzip encoding */
                             // TODO: Handle auto-decoding marker. e.g. remove the header if the stream is decoded
-                            this.convertedInputStream = new CountingGZIPInputStream(rawInputStream);
-                            this.contentDecoded = true;
+                            final CountingInputStream countingInputStream = new CountingInputStream(rawInputStream);
+                            try {
+                                this.convertedInputStream = new CountingGZIPInputStream((CountingInputStreamInterface) countingInputStream);
+                                this.contentDecoded = true;
+                            } catch (IOException e) {
+                                if (rawInputStream instanceof StreamValidEOF && ((StreamValidEOF) rawInputStream).isValidEOF()) {
+                                    this.convertedInputStream = countingInputStream;
+                                    this.contentDecoded = true;
+                                } else {
+                                    throw e;
+                                }
+                            }
                         } else if ("deflate".equalsIgnoreCase(encoding) || "x-deflate".equalsIgnoreCase(encoding)) {
                             /* deflate encoding */
                             // TODO: Handle auto-decoding marker. e.g. remove the header if the stream is decoded
-                            this.convertedInputStream = new CountingInflaterInputStream(new CountingInputStream(rawInputStream));
-                            this.contentDecoded = true;
+                            final CountingInputStream countingInputStream = new CountingInputStream(rawInputStream);
+                            try {
+                                this.convertedInputStream = new CountingInflaterInputStream(countingInputStream);
+                                this.contentDecoded = true;
+                            } catch (IOException e) {
+                                if (rawInputStream instanceof StreamValidEOF && ((StreamValidEOF) rawInputStream).isValidEOF()) {
+                                    this.convertedInputStream = countingInputStream;
+                                    this.contentDecoded = true;
+                                } else {
+                                    throw e;
+                                }
+                            }
                         } else {
                             /* unsupported */
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
