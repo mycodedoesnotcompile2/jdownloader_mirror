@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50590 $", interfaceVersion = 2, names = {}, urls = {})
 public class RapiduVip extends YetiShareCore {
     public RapiduVip(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +49,13 @@ public class RapiduVip extends YetiShareCore {
         /* 2023-10-27: Main domain has changed from rapidu.vip to pobieraj.net. */
         ret.add(new String[] { "pobieraj.net", "rapidu.vip" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("rapidu.vip");
+        return deadDomains;
     }
 
     @Override

@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50590 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -5924,25 +5924,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return true;
         } else {
             return false;
-        }
-    }
-
-    /**
-     * pseudo redirect control!
-     */
-    @Override
-    protected void runPostRequestTask(final Browser ibr) throws Exception {
-        final String redirect;
-        if (!ibr.isFollowingRedirects() && (redirect = ibr.getRedirectLocation()) != null) {
-            if (!this.isImagehoster()) {
-                if (!isDllinkFile(redirect)) {
-                    super.getPage(ibr, redirect);
-                    return;
-                }
-            } else {
-                super.getPage(ibr, redirect);
-                return;
-            }
         }
     }
 

@@ -56,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 50568 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50592 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -403,7 +403,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                                 // alread part of attachments
                                 continue;
                             }
-                        } catch (MalformedURLException e) {
+                        } catch (final MalformedURLException e) {
                             logger.log(e);
                         }
                         ret.add(this.createDownloadlink(postTextContentLink.getURL()));
@@ -435,6 +435,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         for (final DownloadLink kemonoResult : kemonoResults) {
             if (!StringUtils.isEmpty(postTitle)) {
                 kemonoResult.setProperty(KemonoParty.PROPERTY_TITLE, postTitle);
+            }
+            if (!StringUtils.isEmpty(postTextContent)) {
+                kemonoResult.setProperty(KemonoParty.PROPERTY_POST_TEXT, postTextContent);
             }
             if (publishedDateStr != null) {
                 kemonoResult.setProperty(KemonoParty.PROPERTY_DATE, publishedDateStr);

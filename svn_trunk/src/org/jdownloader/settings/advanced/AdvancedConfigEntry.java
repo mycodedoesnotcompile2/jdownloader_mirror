@@ -14,6 +14,7 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.ConfigEntryKeywords;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.HexColorString;
+import org.appwork.storage.config.annotations.MultiLineString;
 import org.appwork.storage.config.annotations.RequiresRestart;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -154,6 +155,15 @@ public class AdvancedConfigEntry {
             hasDescription = getKeyHandler().getAnnotation(DescriptionForConfigEntry.class) != null;
         }
         return hasDescription;
+    }
+
+    private Boolean isMultiLineString = null;
+
+    public boolean isMultiLineString() {
+        if (isMultiLineString == null) {
+            isMultiLineString = getKeyHandler().getAnnotation(MultiLineString.class) != null;
+        }
+        return isMultiLineString;
     }
 
     private Boolean hasHexColorString = null;

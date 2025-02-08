@@ -29,28 +29,10 @@ import javax.swing.JList;
 import javax.swing.JPopupMenu;
 import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
+import javax.swing.JTextField;
 import javax.swing.ListCellRenderer;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.ClipboardMonitoring.ClipboardContent;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.controlling.linkcrawler.CrawledLinkModifiers;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.modifier.CommentModifier;
-import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
-import jd.controlling.linkcrawler.modifier.PackageNameModifier;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
-import jd.gui.swing.laf.LookAndFeelController;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.HTMLParser.HtmlParserCharSequence;
-import jd.parser.html.HTMLParser.HtmlParserResultSet;
-import jd.plugins.DownloadLink;
 
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
@@ -95,6 +77,25 @@ import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.ClipboardMonitoring.ClipboardContent;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.controlling.linkcrawler.CrawledLinkModifiers;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.modifier.CommentModifier;
+import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
+import jd.controlling.linkcrawler.modifier.PackageNameModifier;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
+import jd.gui.swing.laf.LookAndFeelController;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.HTMLParser.HtmlParserCharSequence;
+import jd.parser.html.HTMLParser.HtmlParserResultSet;
+import jd.plugins.DownloadLink;
 
 public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private ExtTextArea                         input;
@@ -376,6 +377,10 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     @Override
     public JComponent layoutDialogContent() {
         destination = new PathChooser("ADDLinks", true) {
+            {
+                txt.setDragEnabled(true);
+            }
+
             protected void onChanged(ExtTextField txt2) {
                 delayedValidate.run();
             }
@@ -426,6 +431,13 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             }
 
             @Override
+            public JTextField createTextField() {
+                final JTextField ret = super.createTextField();
+                ret.setDragEnabled(true);
+                return ret;
+            }
+
+            @Override
             protected String getTextForValue(PackageHistoryEntry value) {
                 return value == null ? null : value.getName();
             }
@@ -436,6 +448,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         packagename.setHelpText(_GUI.T.AddLinksDialog_layoutDialogContent_packagename_help());
         packagename.setSelectedItem(null);
         comment = new ExtTextField();
+        comment.setDragEnabled(true);
         comment.setHelpText(_GUI.T.AddLinksDialog_layoutDialogContent_comment_help());
         comment.setBorder(BorderFactory.createCompoundBorder(comment.getBorder(), BorderFactory.createEmptyBorder(2, 6, 1, 6)));
         final String defaultFolder = org.appwork.storage.config.JsonConfig.create(GeneralSettings.class).getDefaultDownloadFolder();
@@ -480,9 +493,11 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         // input.setLineWrap(true);
         input.setWrapStyleWord(true);
         input.setHelpText(_GUI.T.AddLinksDialog_layoutDialogContent_input_help());
+        input.setDragEnabled(true);
         sp = new JScrollPane(input);
         sp.setViewportBorder(BorderFactory.createEmptyBorder(2, 6, 1, 6));
         password = new ExtTextField();
+        password.setDragEnabled(true);
         password.setHelpText(_GUI.T.AddLinksDialog_createExtracOptionsPanel_password());
         password.setBorder(BorderFactory.createCompoundBorder(password.getBorder(), BorderFactory.createEmptyBorder(2, 6, 1, 6)));
         priority = new JComboBox(Priority.values());
@@ -496,6 +511,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         });
         priority.setSelectedItem(Priority.DEFAULT);
         downloadPassword = new ExtTextField();
+        downloadPassword.setDragEnabled(true);
         downloadPassword.setHelpText(_GUI.T.AddLinksDialog_createExtracOptionsPanel_downloadpassword());
         downloadPassword.setBorder(BorderFactory.createCompoundBorder(downloadPassword.getBorder(), BorderFactory.createEmptyBorder(2, 6, 1, 6)));
         extractToggle = new ExtCheckBox();
@@ -537,6 +553,16 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                     public void run() {
                         inform();
                         String textAuto = config.getPresetDebugLinks();
+                        if (textAuto != null && textAuto.startsWith("\"") && textAuto.endsWith("\"")) {
+                            try {
+                                final String result = JSonStorage.restoreFromString(textAuto, TypeRef.STRING);
+                                if (result != null) {
+                                    textAuto = result;
+                                }
+                            } catch (Exception e) {
+                                LogController.CL().log(e);
+                            }
+                        }
                         ClipboardContent clipboardContent = null;
                         if (StringUtils.isEmpty(textAuto) && config.isAutoFillAddLinksDialogWithClipboardContentEnabled()) {
                             final ClipboardMonitoring clp = ClipboardMonitoring.getINSTANCE();

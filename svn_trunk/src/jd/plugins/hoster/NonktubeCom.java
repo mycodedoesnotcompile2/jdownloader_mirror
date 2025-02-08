@@ -16,8 +16,14 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.requests.HeadRequest;
@@ -30,11 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "nonktube.com" }, urls = { "https?://(?:www\\.)?nonktube\\.com/(?:porn/)?video/(\\d+)/([a-z0-9\\-]+)" })
+@HostPlugin(revision = "$Revision: 50592 $", interfaceVersion = 2, names = {}, urls = {})
 public class NonktubeCom extends PluginForHost {
     public NonktubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,6 +62,32 @@ public class NonktubeCom extends PluginForHost {
         return "https://www." + getHost() + "/static/terms";
     }
 
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "nonktube.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_VIDEO.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private static final Pattern PATTERN_VIDEO = Pattern.compile("/video/([a-z0-9\\-]+)", Pattern.CASE_INSENSITIVE);
+
     @Override
     public String getLinkID(final DownloadLink link) {
         final String fid = getFID(link);
@@ -70,8 +98,13 @@ public class NonktubeCom extends PluginForHost {
         }
     }
 
+    @Override
+    public String getMirrorID(final DownloadLink link) {
+        return getLinkID(link);
+    }
+
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO).getMatch(0);
     }
 
     @Override
@@ -80,16 +113,18 @@ public class NonktubeCom extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
-        final String fid = this.getFID(link);
-        final String urlSlug = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
-        link.setFinalFileName(urlSlug.replace("-", " ").trim() + ".mp4");
+        final String urlSlug = this.getFID(link);
+        final String extDefault = ".mp4";
+        link.setFinalFileName(urlSlug.replace("-", " ").trim() + extDefault);
         dllink = null;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher().replaceFirst("^(?i)http://", "https://"));
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.getURL().contains(fid)) {
+        } else if (br.containsHTML("class=\"error-404 not-found")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!this.canHandle(br.getURL())) {
             /* E.g. redirect to mainpage */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -219,9 +254,9 @@ public class NonktubeCom extends PluginForHost {
         if (dllink != null) {
             dllink = Encoding.htmlOnlyDecode(dllink);
             if (!isDownload) {
-                HeadRequest headRequest = new HeadRequest(dllink);
+                final HeadRequest headRequest = new HeadRequest(dllink);
                 headRequest.getHeaders().put(OPEN_RANGE_REQUEST);
-                basicLinkCheck(br.cloneBrowser(), headRequest, link, link.getName(), ".mp4");
+                basicLinkCheck(br.cloneBrowser(), headRequest, link, link.getName(), extDefault);
             }
         }
         return AvailableStatus.TRUE;

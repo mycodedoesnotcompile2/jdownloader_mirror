@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50349 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50590 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -448,14 +448,15 @@ public class VoeSx extends XFileSharingProBasic {
     protected void runPostRequestTask(final Browser ibr) throws Exception {
         super.runPostRequestTask(ibr);
         final String redirect = ibr.getRegex("else \\{\\s*window\\.location\\.href = '(https?://[^\"\\']+)';").getMatch(0);
-        if (redirect != null) {
-            final String fuid = this.getFUIDFromURL(this.getDownloadLink());
-            if (canHandle(redirect) || (fuid != null && redirect.endsWith("/" + fuid))) {
-                logger.info("Handle special js redirect: " + redirect);
-                getPage(ibr, redirect);
-            } else {
-                logger.info("Unuspported domain for special js redirect: " + redirect);
-            }
+        if (redirect == null) {
+            return;
+        }
+        final String fuid = this.getFUIDFromURL(this.getDownloadLink());
+        if (canHandle(redirect) || (fuid != null && redirect.endsWith("/" + fuid))) {
+            logger.info("Handle special js redirect: " + redirect);
+            getPage(ibr, redirect);
+        } else {
+            logger.info("Unuspported domain for special js redirect: " + redirect);
         }
     }
 

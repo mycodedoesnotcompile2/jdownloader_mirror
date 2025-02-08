@@ -17,8 +17,6 @@ import javax.swing.JMenuItem;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.EnumLabel;
@@ -40,6 +38,8 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.advanced.AdvancedConfigEntry;
 import org.jdownloader.settings.advanced.RangeValidator;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import net.miginfocom.swing.MigLayout;
 
 public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> {
     private static final long                              serialVersionUID = 1L;
@@ -454,6 +454,9 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
         } else if (object.getType() == String.class) {
             if (object.hasHexColorString()) {
                 return colorColumn;
+            }
+            if (object.isMultiLineString()) {
+                return defaultColumn;
             }
             return stringColumn;
         } else if (Clazz.isDouble(object.getType()) || Clazz.isFloat(object.getType()) || Clazz.isLong(object.getType()) || Clazz.isInteger(object.getType()) || Clazz.isByte(object.getType())) {

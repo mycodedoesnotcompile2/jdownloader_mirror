@@ -61,6 +61,7 @@ import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.DevConfig;
 import org.appwork.storage.config.annotations.HexColorString;
 import org.appwork.storage.config.annotations.LookUpKeys;
+import org.appwork.storage.config.annotations.MultiLineString;
 import org.appwork.storage.config.annotations.NoHeadless;
 import org.appwork.storage.config.annotations.PlainStorage;
 import org.appwork.storage.config.annotations.RequiresRestart;
@@ -80,7 +81,7 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public abstract class KeyHandler<RawClass> {
-    private final static Class<?>[]               OK_FOR_ALL              = new Class<?>[] { DefaultOnNull.class, HexColorString.class, DefaultStorageSyncMode.class, CustomValueGetter.class, ValidatorFactory.class, DefaultJsonObject.class, DefaultFactory.class, AboutConfig.class, NoHeadless.class, DevConfig.class, RequiresRestart.class, AllowNonStorableObjects.class, DescriptionForConfigEntry.class, ConfigEntryKeywords.class, CryptedStorage.class, PlainStorage.class };
+    private final static Class<?>[]               OK_FOR_ALL              = new Class<?>[] { DefaultOnNull.class, HexColorString.class, MultiLineString.class, DefaultStorageSyncMode.class, CustomValueGetter.class, ValidatorFactory.class, DefaultJsonObject.class, DefaultFactory.class, AboutConfig.class, NoHeadless.class, DevConfig.class, RequiresRestart.class, AllowNonStorableObjects.class, DescriptionForConfigEntry.class, ConfigEntryKeywords.class, CryptedStorage.class, PlainStorage.class };
     private static final String                   ANNOTATION_PACKAGE_NAME = CryptedStorage.class.getPackage().getName();
     private static final String                   PACKAGE_NAME            = PlainStorage.class.getPackage().getName();
     private final String                          key;

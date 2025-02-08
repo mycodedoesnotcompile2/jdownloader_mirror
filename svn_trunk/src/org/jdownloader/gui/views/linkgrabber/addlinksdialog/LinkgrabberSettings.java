@@ -11,6 +11,7 @@ import org.appwork.storage.config.annotations.DefaultJsonObject;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DefaultStringValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.storage.config.annotations.MultiLineString;
 import org.appwork.storage.config.annotations.RequiresRestart;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.controlling.Priority;
@@ -106,6 +107,7 @@ public interface LinkgrabberSettings extends ConfigInterface {
 
     @DescriptionForConfigEntry("If set, the addlinks dialog has this text. Use it for debug reasons.")
     @AboutConfig
+    @MultiLineString
     String getPresetDebugLinks();
 
     void setPresetDebugLinks(String text);

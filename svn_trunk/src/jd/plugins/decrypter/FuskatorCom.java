@@ -22,7 +22,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 45838 $", interfaceVersion = 2, names = { "fuskator.com" }, urls = { "https?://(?:www\\.)?fuskator\\.com/(thumbs|expanded)/[^/]+/[^/]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 50600 $", interfaceVersion = 2, names = { "fuskator.com" }, urls = { "https?://(?:www\\.)?fuskator\\.com/(thumbs|expanded)/[^/]+/[^/]+\\.html" })
 public class FuskatorCom extends PluginForDecrypt {
     private enum RequestType {
         AUTH,
@@ -39,16 +39,20 @@ public class FuskatorCom extends PluginForDecrypt {
     }
 
     @Override
-    public ArrayList<DownloadLink> decryptIt(CryptedLink cryptedLink, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String url = cryptedLink.toString();
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
-        br.getPage(url);
+        return br;
+    }
+
+    @Override
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink cryptedLink, ProgressController progress) throws Exception {
+        final String contenturl = cryptedLink.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
-            decryptedLinks.add(this.createOfflinelink(url));
-            return decryptedLinks;
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String hash = new Regex(url, "(thumbs|expanded)/([^/]+)/[^/]+").getMatch(1);
+        String hash = new Regex(contenturl, "(thumbs|expanded)/([^/]+)/[^/]+").getMatch(1);
         String filePackageName = getFilePackageName(hash);
         /*
          * fuskator performs these XHR and then updates the page HTML with the info from the JSON:
@@ -69,11 +73,12 @@ public class FuskatorCom extends PluginForDecrypt {
         if (StringUtils.isEmpty(imagesJson)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        populateDecryptedLinks(decryptedLinks, url, imagesJson);
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        populateDecryptedLinks(ret, contenturl, imagesJson);
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(Encoding.htmlDecode(filePackageName));
-        fp.addLinks(decryptedLinks);
-        return decryptedLinks;
+        fp.addLinks(ret);
+        return ret;
     }
 
     private String performAjaxRequest(RequestType type, String auth, String hash) throws PluginException {

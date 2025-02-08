@@ -43,14 +43,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
 
-@HostPlugin(revision = "$Revision: 50491 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50592 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    /* Post title (often a shorter version of post content) */
     public static String                      PROPERTY_TITLE              = "title";
+    /* Post content */
+    public static String                      PROPERTY_POST_TEXT       = "post_text";
     public static String                      PROPERTY_BETTER_FILENAME    = "better_filename";
     public static String                      PROPERTY_TEXT               = "text";
     public static String                      PROPERTY_PORTAL             = "portal";

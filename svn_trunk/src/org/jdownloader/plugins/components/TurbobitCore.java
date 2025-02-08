@@ -51,7 +51,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50061 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50590 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurbobitCore extends antiDDoSForHost {
     /**
      * TODO: Check if we already got errorhandling for this kind of error http://turbobit.net/error/download/dcount/xxxtesst --> "
@@ -595,6 +595,7 @@ public class TurbobitCore extends antiDDoSForHost {
 
     @Override
     protected void runPostRequestTask(Browser ibr) throws Exception {
+        super.runPostRequestTask(ibr);
         final Request request = ibr != null ? ibr.getRequest() : null;
         if (request.isRequested()) {
             // remove (on purpose?) invalid html comment like <!--empty--!>

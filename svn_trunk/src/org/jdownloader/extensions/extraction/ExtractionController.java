@@ -26,14 +26,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.linkcollector.LinknameCleaner;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.raf.FileBytesCache;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.ValidationException;
@@ -53,6 +45,14 @@ import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.IfFileExistsAction;
+
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.linkcollector.LinknameCleaner;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.raf.FileBytesCache;
 
 /**
  * Responsible for the correct procedure of the extraction process. Contains one IExtraction instance.
@@ -590,9 +590,6 @@ public class ExtractionController extends QueueAction<Void, RuntimeException> im
             /* Deletion disabled by user */
             return;
         }
-        for (final ArchiveFile link : archive.getArchiveFiles()) {
-            link.deleteFile(remove);
-        }
         if (ArchiveType.RAR_MULTI.equals(archive.getArchiveType())) {
             // Deleting rar recovery volumes
             final HashSet<String> done = new HashSet<String>();
@@ -608,6 +605,9 @@ public class ExtractionController extends QueueAction<Void, RuntimeException> im
                     }
                 }
             }
+        }
+        for (final ArchiveFile link : archive.getArchiveFiles()) {
+            link.deleteFile(remove);
         }
     }
 

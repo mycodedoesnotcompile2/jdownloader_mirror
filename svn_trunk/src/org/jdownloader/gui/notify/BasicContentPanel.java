@@ -7,19 +7,17 @@ import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import javax.swing.text.JTextComponent;
 
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.swing.components.ExtTextArea;
 import org.appwork.swing.components.ExtTextPane;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.SwingUtils;
 
-public class BasicContentPanel extends AbstractBubbleContentPanel {
+import net.miginfocom.swing.MigLayout;
 
+public class BasicContentPanel extends AbstractBubbleContentPanel {
     public BasicContentPanel(String text, Icon icon) {
         super(icon);
         setLayout(new MigLayout("ins 0,wrap 2", "[][grow,fill]", "[]"));
-
         add(getMessage(text), "aligny center");
         SwingUtils.setOpaque(this, false);
     }
@@ -38,10 +36,14 @@ public class BasicContentPanel extends AbstractBubbleContentPanel {
             });
             textPane.setEditable(false);
             textPane.setFocusable(false);
+            /* Allow line wrap */
+            textPane.setEditorKit(new javax.swing.text.StyledEditorKit());
             ret = textPane;
         } else {
             final ExtTextArea textArea = new ExtTextArea();
             textArea.setLabelMode(true);
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
             ret = textArea;
         }
         SwingUtils.setOpaque(ret, false);
@@ -52,5 +54,4 @@ public class BasicContentPanel extends AbstractBubbleContentPanel {
     @Override
     public void updateLayout() {
     }
-
 }

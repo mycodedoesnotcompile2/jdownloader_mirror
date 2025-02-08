@@ -37,33 +37,6 @@ import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkCheckerThread;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.BrowserSettingsThread;
-import jd.http.ProxySelectorInterface;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP.ENCODING;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.PluginForHost.FILENAME_SOURCE;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.utils.JDUtilities;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -113,6 +86,33 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.translate._JDT;
+
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkCheckerThread;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.BrowserSettingsThread;
+import jd.http.ProxySelectorInterface;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP.ENCODING;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.PluginForHost.FILENAME_SOURCE;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.utils.JDUtilities;
 
 /**
  * Diese abstrakte Klasse steuert den Zugriff auf weitere Plugins. Alle Plugins müssen von dieser Klasse abgeleitet werden.
@@ -1329,19 +1329,18 @@ public abstract class Plugin implements ActionListener {
     public synchronized void cleanupLastChallengeResponse() {
         final List<Challenge<?>> ch = challenges;
         challenges = null;
-        if (ch != null) {
-            for (final Challenge<?> c : ch) {
-                if (c != null) {
-                    try {
-                        c.cleanup();
-                    } catch (Throwable e) {
-                        final LogInterface logger = getLogger();
-                        if (logger != null) {
-                            logger.log(e);
-                        } else {
-                            LoggerFactory.getDefaultLogger().log(e);
-                        }
-                    }
+        if (ch == null || ch.size() == 0) {
+            return;
+        }
+        for (final Challenge<?> c : ch) {
+            try {
+                c.cleanup();
+            } catch (Throwable e) {
+                final LogInterface logger = getLogger();
+                if (logger != null) {
+                    logger.log(e);
+                } else {
+                    LoggerFactory.getDefaultLogger().log(e);
                 }
             }
         }
@@ -1349,12 +1348,13 @@ public abstract class Plugin implements ActionListener {
 
     public void validateLastChallengeResponse() {
         final List<Challenge<?>> ch = challenges;
-        if (ch != null && ch.size() > 0) {
-            final Challenge<?> latest = ch.get(ch.size() - 1);
-            final SolverJob<?> job = latest.getJob();
-            if (job != null) {
-                job.validate();
-            }
+        if (ch == null || ch.size() == 0) {
+            return;
+        }
+        final Challenge<?> latest = ch.get(ch.size() - 1);
+        final SolverJob<?> job = latest.getJob();
+        if (job != null) {
+            job.validate();
         }
     }
 

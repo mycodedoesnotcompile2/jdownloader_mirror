@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49086 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50600 $", interfaceVersion = 3, names = {}, urls = {})
 public class DzenRu extends PluginForHost {
     public DzenRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,10 +115,9 @@ public class DzenRu extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String[] jsons = br.getRegex("(\\{\"data\".*?)\\)\\)\\}\\(\\);</script>").getColumn(0);
+        String[] jsons = br.getRegex("_params=\\((\\{.*?\\})\\);").getColumn(0);
         if (jsons == null || jsons.length == 0) {
-            /* Old regex */
-            jsons = br.getRegex("(\\{\"data\".*?)\\)\\}\\(\\);</script>").getColumn(0);
+            logger.warning("Failed to find any json items");
         }
         Map<String, Object> videomap = null;
         Map<String, Object> videoinfomap = null;
@@ -133,11 +132,19 @@ public class DzenRu extends PluginForHost {
                 logger.info("Skipping invalid json | index: " + jsonindex + " | json: " + json);
                 continue;
             }
-            videomap = (Map<String, Object>) findVideoMapRecursive(entries, videoid);
-            videoinfomap = (Map<String, Object>) findVideoInformationMapRecursive(entries, videoid);
+            if (videomap == null) {
+                videomap = (Map<String, Object>) findVideoMapRecursive(entries, videoid);
+            }
+            if (videoinfomap == null) {
+                videoinfomap = (Map<String, Object>) findVideoInformationMapRecursive(entries, videoid);
+            }
             if (videomap != null && videoinfomap != null) {
                 break;
             }
+        }
+        if (videomap == null) {
+            /* This will cause NPE down below */
+            logger.warning("Failed to find videomap");
         }
         String dateFormatted = null;
         String title = (String) JavaScriptEngineFactory.walkJson(videomap, "rawStreams/SingleStream/{0}/Title");
@@ -194,13 +201,21 @@ public class DzenRu extends PluginForHost {
         } else if (!StringUtils.isEmpty(title)) {
             link.setFinalFileName(title + extDefault);
         }
-        /**
-         * Very cheap way of calculating rough filesize using bandwidth of 1080p version and duration of the video. </br>
-         * (And yes, not all videos are available in 1080p and real bandwidth may vary.)
-         */
-        final Number durationSeconds = (Number) videomap.get("duration");
-        if (durationSeconds != null) {
-            link.setDownloadSize(durationSeconds.longValue() * 1405854 / 8);
+        final Map<String, Object> bestQualityInfo = (Map<String, Object>) videomap.get("bestQualityInfo");
+        if (bestQualityInfo != null) {
+            /* Accurate filesize source */
+            final Object sizeInBytesO = bestQualityInfo.get("sizeInBytes");
+            link.setDownloadSize(Long.parseLong(sizeInBytesO.toString()));
+        } else {
+            /* Inaccurate file size */
+            /**
+             * Very cheap way of calculating rough filesize using bandwidth of 1080p version and duration of the video. </br>
+             * (And yes, not all videos are available in 1080p and real bandwidth may vary.)
+             */
+            final Number durationSeconds = (Number) videomap.get("duration");
+            if (durationSeconds != null) {
+                link.setDownloadSize(durationSeconds.longValue() * 1405854 / 8);
+            }
         }
         return AvailableStatus.TRUE;
     }

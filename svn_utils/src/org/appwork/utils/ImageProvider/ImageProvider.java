@@ -222,7 +222,7 @@ public class ImageProvider {
      * @return
      * @throws IOException
      */
-    public static BufferedImage dereferenceImage(final Image image) throws IOException {
+    public static Image dereferenceImage(final Image image) throws IOException {
         final BufferedImage bu = new BufferedImage(image.getWidth(null), image.getHeight(null), BufferedImage.TYPE_INT_ARGB);
         final Graphics g = bu.getGraphics();
         g.drawImage(image, 0, 0, null);
@@ -382,7 +382,7 @@ public class ImageProvider {
              * WARNING: getScaledInstance will return a scaled image, BUT keeps a reference to original unscaled image
              */
             final Image scaledWithFuckingReference = image.getScaledInstance(width, height, Image.SCALE_SMOOTH);
-            final BufferedImage referencelessVersion = ImageProvider.dereferenceImage(scaledWithFuckingReference);
+            final Image referencelessVersion = ImageProvider.dereferenceImage(scaledWithFuckingReference);
             final ImageIcon imageicon = new ImageIcon(referencelessVersion);
             if (putIntoCache) {
                 ImageProvider.IMAGEICON_CACHE.put(key, new MinTimeWeakReference<ImageIcon>(imageicon, ImageProvider.MIN_LIFETIME, key, ImageProvider.IMAGEICON_CACHE_CLEANUP));
@@ -611,7 +611,7 @@ public class ImageProvider {
      * @param height
      * @return
      */
-    public static BufferedImage resizeWorkSpace(final Image scaleBufferedImage, final int width, final int height) {
+    public static Image resizeWorkSpace(final Image scaleBufferedImage, final int width, final int height) {
         // final GraphicsEnvironment ge =
         // GraphicsEnvironment.getLocalGraphicsEnvironment();
         // final GraphicsDevice gd = ge.getDefaultScreenDevice();
@@ -633,13 +633,28 @@ public class ImageProvider {
      * @param height
      * @return
      */
+    @Deprecated
     public static Image scaleBufferedImage(final BufferedImage img, int width, int height) {
+        return scaleImage(img, width, height);
+    }
+
+    /**
+     * Scales a Image to the given size. This method is NOT cached. so take care to cache it externally if you use it frequently
+     *
+     * @param img
+     * @param width
+     * @param height
+     * @return
+     */
+    public static Image scaleImage(final Image img, int width, int height) {
         if (img == null) {
             return null;
         }
-        final double faktor = Math.max((double) img.getWidth() / width, (double) img.getHeight() / height);
-        width = (int) (img.getWidth() / faktor);
-        height = (int) (img.getHeight() / faktor);
+        final int imgWidth = img.getWidth(null);
+        final int imgHeight = img.getHeight(null);
+        final double faktor = Math.max((double) imgWidth / width, (double) imgHeight / height);
+        width = (int) (imgWidth / faktor);
+        height = (int) (imgHeight / faktor);
         if (faktor == 1.0) {
             return img;
         }
@@ -667,16 +682,16 @@ public class ImageProvider {
         if (img.getIconHeight() == h && img.getIconWidth() == w) {
             return img;
         } else {
-            final BufferedImage dest;
+            final Image dest;
             if (ReflectionUtils.isInstanceOf("sun.awt.image.ToolkitImage", img.getImage())) {
                 dest = new BufferedImage(w, h, Transparency.TRANSLUCENT);
-                final Graphics2D g2 = dest.createGraphics();
+                final Graphics2D g2 = ((BufferedImage) dest).createGraphics();
                 g2.drawImage(img.getImage(), 0, 0, null);
                 g2.dispose();
             } else {
-                dest = (BufferedImage) img.getImage();
+                dest = img.getImage();
             }
-            return new ImageIcon(ImageProvider.scaleBufferedImage(dest, w, h));
+            return new ImageIcon(ImageProvider.scaleImage(dest, w, h));
         }
     }
 
