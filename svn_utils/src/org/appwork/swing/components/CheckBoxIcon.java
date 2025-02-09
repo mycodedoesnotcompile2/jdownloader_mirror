@@ -37,98 +37,176 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.HashSet;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JCheckBox;
+import javax.swing.LookAndFeel;
+import javax.swing.UIManager;
 
-import org.appwork.resources.MultiResolutionImageHelper;
+import org.appwork.loggingv3.LogV3;
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.images.BorderedIcon;
 import org.appwork.utils.images.IconIO;
-import org.appwork.utils.images.ImageCropper;
-import org.appwork.utils.images.Interpolation;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 
-public final class CheckBoxIcon extends ImageIcon implements Icon {
-    public static final CheckBoxIcon FALSE     = new CheckBoxIcon(false);
-    public static final CheckBoxIcon TRUE      = new CheckBoxIcon(true);
-    public static final CheckBoxIcon UNDEFINED = new CheckBoxIcon(true, false);
+public final class CheckBoxIcon implements Icon, IDIcon {
+    /**
+     *
+     */
+    @AWTestValidateClassReference
+    private static final String      COM_FORMDEV_FLATLAF_FLAT_LIGHT_LAF = "com.formdev.flatlaf.FlatLightLaf";
+    public static final CheckBoxIcon FALSE                              = new CheckBoxIcon(false);
+    public static final CheckBoxIcon TRUE                               = new CheckBoxIcon(true);
+    public static final CheckBoxIcon UNDEFINED                          = new CheckBoxIcon(true, false);
+    private int                      size;
+    private JCheckBox                checkBox;
+    private Rectangle2D              unscaledDimensionAndPosition;
+    private Image                    image;
+    private boolean                  selected;
+    private boolean                  enabled;
 
     public CheckBoxIcon(final boolean selected, final boolean enabled) {
+        this(-1, selected, enabled);
+    }
+
+    public CheckBoxIcon(int size, boolean selected, boolean enabled) {
         // we need this workaround.
         // if we would use cb.paint(g); for every paintIcon call, this might
         // habe sideeffects on the LAF painter.
-        Image image = null;
-        if (Application.isHeadless()) {
+        this.selected = selected;
+        this.enabled = enabled;
+        this.size = size;
+        if (Application.isHeadless() || false) {
             final Icon icon;
             if (selected) {
-                image = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(14);
+                image = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(size);
             } else {
-                image = HeadlessCheckboxIconRef.HEADLESS_checkbox_false.image(14);
+                image = HeadlessCheckboxIconRef.HEADLESS_checkbox_false.image(size);
             }
             if (!enabled) {
                 image = IconIO.toGrayScale(image);
             }
         } else {
-            ArrayList<Image> images = new ArrayList<Image>();
-            HashSet<String> dupe = new HashSet<String>();
-            dupe.add("1.0:1.0");
-            Image base;
-            Image img = getImage(1, 1, enabled, selected);
-            // +2 to hava slightly border buffer - this avoids cliping borders during scaling
-            images.add(base = IconIO.centerImage(img, img.getWidth(null) + 2, img.getHeight(null) + 2, null));
-            if (MultiResolutionImageHelper.isSupported()) {
-                for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
-                    AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
-                    if (dupe.add(tx.getScaleX() + ":" + tx.getScaleY())) {
-                        img = getImage(tx.getScaleX(), tx.getScaleY(), enabled, selected);
-                        // use center to ensure proper scaling factors. due to the cropper in getImage, the upscaled versions might be
-                        // actually slightly bigger or smaller than desired
-                        img = IconIO.centerImage(img, IconIO.clipScale(base.getWidth(null), tx.getScaleX()), IconIO.clipScale(base.getHeight(null), tx.getScaleY()), null);
-                        images.add(img);
-                    }
+            try {
+                checkBox = new JCheckBox();
+                checkBox.setEnabled(enabled);
+                checkBox.setSelected(selected);
+                // checkBox.setDebugGraphicsOptions(DebugGraphics.LOG_OPTION);
+                checkBox.setSize(checkBox.getPreferredSize());
+                checkBox.setOpaque(false);
+                checkBox.setContentAreaFilled(false);
+                BufferedImage dummy = IconIO.createEmptyImage(32, 32);
+                Graphics2D g2d = (Graphics2D) dummy.getGraphics();
+                g2d.setTransform(new AffineTransform());
+                RecordingGraphics2D record = new RecordingGraphics2D(g2d);
+                checkBox.paint(record);
+                // checkBox.paint(g2d);
+                g2d.dispose();
+                // Application.getResource("dummy.png").delete();
+                // System.out.println(Application.getResource("dummy.png"));
+                // try {
+                // ImageIO.write(dummy, "png", Application.getResource("dummy.png"));
+                // } catch (IOException e) {
+                // LogV3.log(e);
+                // }
+                unscaledDimensionAndPosition = record.getCompleteDrawnArea();
+            } catch (Exception e) {
+                LogV3.log(e);
+                final Icon icon;
+                if (selected) {
+                    image = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(size);
+                } else {
+                    image = HeadlessCheckboxIconRef.HEADLESS_checkbox_false.image(size);
                 }
-                image = MultiResolutionImageHelper.create(base, images);
-            } else {
-                // since we paint our own image below, we could implement an own MultiResLogic here - or Use MultiResIconImpl.
-                image = base;
+                if (!enabled) {
+                    image = IconIO.toGrayScale(image);
+                }
             }
         }
-        setImage(image);
     }
 
     /**
      * @see javax.swing.ImageIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
      */
     @Override
-    public synchronized void paintIcon(Component c, Graphics g, int x, int y) {
-        if (true) {
-            //
-            super.paintIcon(c, g, x, y);
+    public synchronized void paintIcon(Component c, Graphics gOrg, int x, int y) {
+        if (image != null) {
+            // headless
+            new ImageIcon(image).paintIcon(c, gOrg, x, y);
             return;
-        } else {
-            // might become not sharp
-            Object restore = ((Graphics2D) g).getRenderingHint(RenderingHints.KEY_INTERPOLATION);
-            try {
-                ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, Interpolation.BICUBIC.getHint());
-                super.paintIcon(c, g, x, y);
-            } finally {
-                if (restore == null) {
-                    restore = RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR;
-                }
-                ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, restore);
-            }
         }
+        Graphics g = gOrg.create();
+        // checkBox.setBackground(new Color(0, 0, 0, 0f));
+        Graphics2D g2d = ((Graphics2D) g);
+        // AffineTransform orgTf2 = g2d.getTransform();
+        // g2d.setColor(Color.green);
+        g2d.translate(x, y);
+        AffineTransform orgTf = g2d.getTransform();
+        // g2d.fillRect(x + 1, y + 1, getIconWidth() - 2, getIconHeight() - 2);
+        // g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        // g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        // g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        // dummy paint just to get the painted area
+        // g2d.setTransform(new AffineTransform());
+        double componentScaleX = getIconWidth() / unscaledDimensionAndPosition.getWidth();
+        double componentScaleY = getIconHeight() / unscaledDimensionAndPosition.getHeight();
+        // g2d.scale(orgTf.getScaleX(), orgTf.getScaleY());
+        // g2d.translate(x + area.getX() - 1, y + area.getY() + 1);
+        // g2d.translate(x, y);
+        // g2d.translate((orgTf.getTranslateX()), (orgTf.getTranslateY()));
+        g2d.scale(componentScaleX, componentScaleY);
+        // RecordingGraphics2D record2 = new RecordingGraphics2D(g2d);
+        // checkBox.paint(record2);
+        // Rectangle2D area2 = record2.getCompleteDrawnArea();
+        g2d.translate(-unscaledDimensionAndPosition.getX(), -unscaledDimensionAndPosition.getY());
+        // g2d.translate(-area2.getX() / record2.getTransform().getScaleX() * orgTf.getScaleX(), -area2.getY() /
+        // record2.getTransform().getScaleY() * orgTf.getScaleY());
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && false) {
+            System.out.println(g2d.getTransform());
+            // validation check, if the component actually paints in the desired size
+            RecordingGraphics2D record3 = new RecordingGraphics2D(g2d);
+            checkBox.paint(record3);
+            Rectangle2D area3 = record3.getCompleteDrawnArea();
+            double sizeX = (int) Math.round(area3.getWidth() / orgTf.getScaleX());
+            double sizeY = (int) Math.round(area3.getHeight() / orgTf.getScaleY());
+            DebugMode.breakIf((int) sizeX != getIconWidth());
+            DebugMode.breakIf((int) sizeY != getIconHeight());
+        }
+        // System.out.println(g2d.getTransform());
+        // System.out.println(g2d.getTransform());
+        // g2d.setClip(area3);
+        checkBox.paint(g2d);
+        g2d.dispose();
+        // BufferedImage crop1 = image.getSubimage((int) (area.getX()), (int) (area.getY()), (int) (area.getWidth() + 1), (int)
+        // (area.getHeight() + 1));
+        // if (true) {
+        // //
+        // super.paintIcon(c, g, x, y);
+        // return;
+        // } else {
+        // // might become not sharp
+        // Object restore = ((Graphics2D) g).getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+        // try {
+        // ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, Interpolation.BICUBIC.getHint());
+        // super.paintIcon(c, g, x, y);
+        // } finally {
+        // if (restore == null) {
+        // restore = RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR;
+        // }
+        // ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, restore);
+        // }
+        // }
     }
 
     public CheckBoxIcon(boolean selected) {
@@ -136,11 +214,11 @@ public final class CheckBoxIcon extends ImageIcon implements Icon {
     }
 
     public static void main(String[] args) {
-        Image image = getImage(1.25d, 1.25d, true, true);
-        Image small = getImage(1, 1, false, false);
+        Image image = getImage(1.25d, 1.25d, true, true, 1);
+        Image small = getImage(1, 1, false, false, 1);
         ;
         try {
-            Dialog.getInstance().showConfirmDialog(0, "b", "", TRUE, null, null);
+            Dialog.getInstance().showConfirmDialog(0, "b", "", new BorderedIcon(new CheckBoxIcon(48, true, true), Color.RED, 3), null, null);
         } catch (DialogClosedException e) {
             // LogV3.log(e);
         } catch (DialogCanceledException e) {
@@ -153,15 +231,28 @@ public final class CheckBoxIcon extends ImageIcon implements Icon {
      * @param scaleY
      * @param selected
      * @param enabled
+     * @param baseScale
      * @return
      */
-    private static Image getImage(double scaleX, double scaleY, boolean enabled, boolean selected) {
+    private static Image getImage(double scaleX, double scaleY, boolean enabled, boolean selected, double baseScale) {
+        boolean isLighFlatLAF = false;
+        Class<? extends LookAndFeel> lafClass = UIManager.getLookAndFeel().getClass();
+        while (lafClass != null && lafClass != LookAndFeel.class) {
+            if (COM_FORMDEV_FLATLAF_FLAT_LIGHT_LAF.equals(lafClass.getName())) {
+                isLighFlatLAF = true;
+                break;
+            }
+            lafClass = (Class<? extends LookAndFeel>) lafClass.getSuperclass();
+        }
         JCheckBox checkBox = new JCheckBox();
         checkBox.setEnabled(enabled);
         checkBox.setSelected(selected);
         checkBox.setSize(checkBox.getPreferredSize());
         checkBox.setOpaque(false);
-        checkBox.setBackground(new Color(1, 0, 0, 0f));
+        checkBox.setContentAreaFilled(false);
+        checkBox.setBackground(new Color(0, 0, 0, 0f));
+        scaleX *= baseScale;
+        scaleY *= baseScale;
         // +10 due to unknown insets for shadows etc
         BufferedImage image = new BufferedImage((int) ((checkBox.getWidth() + 10) * scaleX), (int) ((checkBox.getHeight() + 10) * scaleY), BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = image.createGraphics();
@@ -170,10 +261,54 @@ public final class CheckBoxIcon extends ImageIcon implements Icon {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2d.scale(scaleX, scaleY);
+        // dummy paint just to get the painted area
+        RecordingGraphics2D record = new RecordingGraphics2D(g2d);
+        checkBox.paint(record);
+        Rectangle2D area = record.getCompleteDrawnArea();
         checkBox.paint(g2d);
         g2d.dispose();
-        // crop - each laf has different insets. this cropping automates the process somehow.
-        Image croppedImage = new ImageCropper().crop(image);
-        return croppedImage;
+        BufferedImage crop1 = image.getSubimage((int) (area.getX()), (int) (area.getY()), (int) (area.getWidth() + 1), (int) (area.getHeight() + 1));
+        // // crop - each laf has different insets. this cropping automates the process somehow.
+        // Image croppedImage = new ImageCropper().cropTransparentBorder(image);
+        // System.out.println(scaleX);
+        // System.out.println(crop1);
+        // System.out.println(croppedImage);
+        return crop1;
+    }
+
+    /**
+     * @see javax.swing.Icon#getIconWidth()
+     */
+    @Override
+    public int getIconWidth() {
+        if (image != null) {
+            return image.getWidth(null);
+        }
+        if (size <= 0) {
+            return (int) unscaledDimensionAndPosition.getWidth();
+        }
+        return size;
+    }
+
+    /**
+     * @see javax.swing.Icon#getIconHeight()
+     */
+    @Override
+    public int getIconHeight() {
+        if (image != null) {
+            return image.getHeight(null);
+        }
+        if (size <= 0) {
+            return (int) unscaledDimensionAndPosition.getHeight();
+        }
+        return size;
+    }
+
+    /**
+     * @see org.appwork.swing.components.IDIcon#getIdentifier()
+     */
+    @Override
+    public IconIdentifier getIdentifier() {
+        return new IconIdentifier("CheckBoxIcon_" + (selected ? "true" : "false") + (enabled ? "_enabled" : "_disabled"));
     }
 }

@@ -50,7 +50,7 @@ import org.appwork.utils.swing.Graphics2DProxy;
  * @date 13.12.2023
  *
  */
-public class ColoredIcon implements Icon {
+public class ColoredIcon implements Icon, IconPipe {
     private Icon                  delegateIcon;
     private HashMap<Color, Color> colorMap;
 
@@ -180,5 +180,13 @@ public class ColoredIcon implements Icon {
     @Override
     public int getIconHeight() {
         return delegateIcon.getIconHeight();
+    }
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getDelegate()
+     */
+    @Override
+    public Icon getDelegate() {
+        return delegateIcon;
     }
 }

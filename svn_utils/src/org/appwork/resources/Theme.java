@@ -37,13 +37,16 @@ import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.JComponent;
 
@@ -65,6 +68,15 @@ import org.appwork.utils.images.Interpolation;
  *
  */
 public class Theme implements MinTimeWeakReferenceCleanup {
+    /**
+     *
+     */
+    public static final String  FINAL                   = "final_";
+    /**
+     *
+     */
+    private static final String ENHANCE_DOUBLE_SIZE_TAG = "_x2";
+
     /**
      * @author thomas
      * @date Feb 3, 2025
@@ -106,7 +118,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     private String                                              nameSpace;
     private final boolean                                       doNotLogMissingIcons = "false".equals(System.getProperty("DO_NOT_LOG_MISSING_ICONS_EXCEPTION", "false"));
     private boolean                                             useHighDPI;
-    private static final String                                 MAX_SIZE_KEY         = getSizeKey(-1, -1);
+    private static final String                                 MAX_SIZE_KEY         = "ORIGINAL";
 
     public Theme(final String namespace) {
         this.setNameSpace(namespace);
@@ -403,6 +415,9 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         return scaled;
     }
 
+    private HashMap<String, AtomicInteger> debugLoadingMap = new HashMap<String, AtomicInteger>();
+    private static final Image             NO_IMAGE        = IconIO.createEmptyImage(1, 1);
+
     /**
      * @param key
      * @param width
@@ -412,8 +427,197 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @return
      */
     private Image getRawImage(String key, int width, int height, boolean useCache, boolean highDPISupport) {
-        Image baseImageHighDPI = null;
         HashMap<String, MinTimeWeakReference<Image>> cached = null;
+        double highestRequiredScale = getHighestMonitorScaling();
+        int highDPIWidth = width;
+        int highDPIHeight = height;
+        if (highDPISupport && isUseHighDPI() && highestRequiredScale > 1) {
+            // the internal highDPI logic searches for images that are bigger than the required size. the required size is calculated as
+            // double, so java searches for an image with at least 23 pixel if 25.5 are required.
+            // bei using ceil here, we ensure that we always have an image big enough and will not have to scale up anything.
+            // this reduces issues with highDPI icons painted "between" physical pixels
+            highDPIWidth = (int) Math.ceil(width * highestRequiredScale);
+            highDPIHeight = (int) Math.ceil(height * highestRequiredScale);
+        }
+        boolean returnMultiResImage = width != highDPIWidth || height != highDPIHeight;
+        String finalKey = FINAL + width + "_" + height + "_" + highDPISupport;
+        if (useCache) {
+            synchronized (this.imageCache) {
+                cached = imageCache.get(key);
+                if (cached == null) {
+                    cached = new HashMap<String, MinTimeWeakReference<Image>>();
+                    imageCache.put(key, cached);
+                } else {
+                    MinTimeWeakReference<Image> finalCache = cached.get(finalKey);
+                    if (finalCache != null) {
+                        Image img = finalCache.get();
+                        if (img != null) {
+                            return img;
+                        }
+                    }
+                }
+            }
+        }
+        Image x2Image = NO_IMAGE;
+        Image baseImage = findBestMatch(cached, height, width);
+        if (width < 0 && height < 0) {// shortcut. -1, -1 should simply return the biggest image available
+            Image betterImage = x2Image != NO_IMAGE ? x2Image : loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height);
+            if (betterImage != null) {
+                putFinalCache(cached, finalKey, betterImage);
+                return betterImage;
+            }
+            if (baseImage == null) {
+                baseImage = loadImageFromDisc(key, "", cached, width, height);
+            }
+            if (baseImage != null) {
+                putFinalCache(cached, finalKey, baseImage);
+                return baseImage;
+            }
+        } else {
+            if (baseImage == null) {
+                baseImage = loadImageFromDisc(key, "", cached, width, height);
+            }
+        }
+        if (baseImage == null) {
+            baseImage = loadImageFromDisc(key, "", cached, width, height);
+        }
+        if (baseImage == null) {
+            DebugMode.debugger();
+            BufferedImage ret = IconIO.createEmptyImage(width, height);
+            putFinalCache(cached, finalKey, ret);
+        }
+        // Image src = baseImageTarget == null ? baseImage : baseImageTarget;
+        // if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+        // cached = imageCache.get(key);
+        // if (cached != null) {
+        // MinTimeWeakReference<Image> org = cached.get(MAX_SIZE_KEY);
+        // if (org != null) {
+        // Image orgImage = org.get();
+        // if (orgImage != null) {
+        // if (orgImage.getWidth(null) < width * 2 || orgImage.getHeight(null) < height * 2) {
+        // synchronized (debugLoadingMap) {
+        // String debugKey;
+        // AtomicInteger ex = debugLoadingMap.get(debugKey = "LOWRES:" + key);
+        // if (ex == null) {
+        // LogV3.warning("Low-Res Icon: " + key + ". Ensure that this icon (" + orgImage.getWidth(null) + ":" + orgImage.getHeight(null) +
+        // ") is at least " + (width * 2) + "x" + (height * 2) + " Source: " + lookupImageUrl(key, -1, -1));
+        // debugLoadingMap.put(debugKey, new AtomicInteger(1));
+        // }
+        // }
+        // }
+        // }
+        // }
+        // }
+        // }
+        // DebugMode.breakIf(key.contains("gopro."));
+        if (!isImageDimensionLargeEnoughForRequestedDimensions(width, height, baseImage)) {
+            // upscale required check x2 option
+            Image betterImage = x2Image != NO_IMAGE ? x2Image : loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height);
+            if (betterImage != null) {
+                baseImage = betterImage;
+            }
+        }
+        Image baseImageHighDPIFinal = null;
+        Image highDPIbase = null;
+        double targetBaseFactor = Math.max((double) baseImage.getWidth(null) / width, (double) baseImage.getHeight(null) / height);
+        double baseWidthFinal = Math.ceil(baseImage.getWidth(null) / targetBaseFactor);
+        double baseHeightFinal = Math.ceil(baseImage.getHeight(null) / targetBaseFactor);
+        if (returnMultiResImage) {
+            double targetHighDPIWidth = Math.ceil(baseWidthFinal * highestRequiredScale);
+            double targetHighDPIHeight = Math.ceil(baseHeightFinal * highestRequiredScale);
+            highDPIbase = findBestMatch(cached, highDPIWidth, highDPIHeight);
+            if (highDPIbase == null) {
+                // May happen if the original image got removed from cache
+                highDPIbase = loadImageFromDisc(key, "", cached, width, height);
+            }
+            if (highDPIbase == null || !isImageDimensionLargeEnoughForRequestedDimensions(highDPIWidth, highDPIHeight, highDPIbase)) {
+                // upscale required check x2 option
+                Image betterImage = x2Image != NO_IMAGE ? x2Image : loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height);
+                if (betterImage != null) {
+                    highDPIbase = betterImage;
+                }
+            }
+            if (highDPIbase != null) {
+                if (isImageDimensionExactRequestedDimensions(highDPIWidth, highDPIHeight, highDPIbase)) {
+                    baseImageHighDPIFinal = highDPIbase;
+                } else {
+                    // DO NOT UPSCALE!
+                    // if (isImageDimensionLargeEnoughForRequestedDimensions(highDPIWidth, highDPIHeight, highDPIbase)) {
+                    baseImageHighDPIFinal = scaleAndCache(key, cached, (int) Math.ceil(targetHighDPIWidth), (int) Math.ceil(targetHighDPIHeight), highDPIbase);
+                    // }
+                }
+            }
+        }
+        if (highDPIbase == baseImage && baseImageHighDPIFinal != null) {
+            // use already downscaled as basis instead of the large original
+            baseImage = baseImageHighDPIFinal;
+        }
+        Image baseImageTargetFinal = scaleAndCache(key, cached, (int) Math.ceil(baseWidthFinal), (int) Math.ceil(baseHeightFinal), baseImage);
+        if (returnMultiResImage && baseImageHighDPIFinal != null && baseImageTargetFinal != null && baseImageHighDPIFinal != baseImageTargetFinal) {
+            if (baseImageHighDPIFinal.getWidth(null) != baseImageTargetFinal.getWidth(null) && baseImageHighDPIFinal.getHeight(null) != baseImageTargetFinal.getHeight(null)) {
+                baseImageTargetFinal = MultiResolutionImageHelper.create(0, baseImageTargetFinal, baseImageHighDPIFinal);
+            }
+        }
+        putFinalCache(cached, finalKey, baseImageTargetFinal);
+        return baseImageTargetFinal;
+    }
+
+    protected void putFinalCache(HashMap<String, MinTimeWeakReference<Image>> cached, String finalKey, Image image) {
+        if (cached != null) {
+            MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(image, this.getCacheLifetime(), finalKey + getSizeKey(image.getWidth(null), image.getHeight(null)), this);
+            cached.put(finalKey, ref);
+        }
+    }
+
+    /**
+     * this method scales down the image, that it fits into the viewport targetWidth x targetHeight. This may result in images with
+     * different aspect ratios
+     *
+     * @param key
+     * @param cached
+     * @param targetWidth
+     * @param targetHeight
+     * @param input
+     * @param voidUpscaling
+     * @return
+     */
+    protected Image scaleAndCache(String key, HashMap<String, MinTimeWeakReference<Image>> cached, int targetWidth, int targetHeight, Image input) {
+        Image baseImageHighDPIFinal;
+        double faktor = Math.max((double) input.getWidth(null) / targetWidth, (double) input.getHeight(null) / targetHeight);
+        // do not keep aspect ratio. we need the icons exactly as calculated here
+        baseImageHighDPIFinal = IconIO.getScaledInstance(input, targetWidth, targetHeight, faktor > 1 ? Interpolation.BICUBIC : Interpolation.BILINEAR, true, false);
+        // if (baseImageHighDPIFinal.getWidth(null) * baseImageHighDPIFinal.getHeight(null) >
+        // baseImageTargetFinal.getWidth(null) *
+        // baseImageTargetFinal.getHeight(null)) {
+        DebugMode.breakIf(!(baseImageHighDPIFinal.getWidth(null) == targetWidth || baseImageHighDPIFinal.getHeight(null) == targetHeight));
+        DebugMode.breakIf(!((targetWidth <= 0 || baseImageHighDPIFinal.getWidth(null) <= targetWidth) && (targetHeight <= 0 || baseImageHighDPIFinal.getHeight(null) <= targetHeight)));
+        if (baseImageHighDPIFinal != input) {
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                File file = Application.getResource("tmp/scaledimage/" + key + "_" + getSizeKey(targetWidth, targetHeight) + ".png");
+                file.delete();
+                file.getParentFile().mkdirs();
+                try {
+                    ImageIO.write(IconIO.toBufferedImage(baseImageHighDPIFinal), "png", file);
+                } catch (IOException e) {
+                    LogV3.log(e);
+                }
+            }
+            LogV3.info("Downscaled Image: " + key + "/" + input.getWidth(null) + ":" + input.getHeight(null) + " --> View:" + targetWidth + ":" + targetHeight + " --> Actual: " + baseImageHighDPIFinal.getWidth(null) + ":" + baseImageHighDPIFinal.getHeight(null));
+        }
+        if (cached != null) {
+            synchronized (cached) {
+                String actualSizeKey = getSizeKey(baseImageHighDPIFinal.getWidth(null), baseImageHighDPIFinal.getHeight(null));
+                MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImageHighDPIFinal, this.getCacheLifetime(), key + actualSizeKey, this);
+                // we keep ratio. width or height might be different than the actual size;
+                cached.put(getSizeKey(targetWidth, targetHeight), ref);
+                // cached.put(getSizeKey(keepRatioWidth, keepRatioHeight), ref);
+                cached.put(actualSizeKey, ref);
+            }
+        }
+        return baseImageHighDPIFinal;
+    }
+
+    protected double getHighestMonitorScaling() {
         double highestRequiredScale = 1d;
         // find the monitor with the highest scaling
         for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
@@ -421,182 +625,186 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleX());
             highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleY());
         }
-        int highDPIWidth = width;
-        int highDPIHeight = height;
-        if (highDPISupport && isUseHighDPI() && highestRequiredScale > 1 && width > 0 && height > 0) {
-            highDPIWidth = (int) Math.ceil(highestRequiredScale * width);
-            highDPIHeight = (int) Math.ceil(highestRequiredScale * height);
+        return highestRequiredScale;
+    }
+
+    protected boolean isImageDimensionLargeEnoughForRequestedDimensions(int width, int height, Image baseImage) {
+        DebugMode.breakIf(baseImage == null);
+        return (width <= 0 || baseImage.getWidth(null) >= width) && (height <= 0 || baseImage.getHeight(null) >= height);
+    }
+
+    protected boolean isImageDimensionExactRequestedDimensions(int width, int height, Image baseImage) {
+        return (width <= 0 || baseImage.getWidth(null) == width) && (height <= 0 || baseImage.getHeight(null) == height);
+    }
+
+    /**
+     * search the best match from cache to derive an image in the desired dimensions
+     *
+     * @param cached
+     * @param height
+     * @param width
+     * @return
+     */
+    private Image findBestMatch(HashMap<String, MinTimeWeakReference<Image>> cached, int height, int width) {
+        if (cached == null || cached.size() == 0) {
+            return null;
         }
-        boolean useHighDPI = width != highDPIWidth || height != highDPIHeight;
+        String sizeKey = getSizeKey(width, height);
+        MinTimeWeakReference<Image> ret = null;
+        if (sizeKey == MAX_SIZE_KEY) {
+            // check x2 first
+            ret = cached.get(sizeKey + ENHANCE_DOUBLE_SIZE_TAG);
+            if (ret != null) {
+                Image img = ret.get();
+                if (img != null) {
+                    return img;
+                }
+            }
+        }
+        ret = cached.get(sizeKey);
+        if (ret != null) {
+            Image img = ret.get();
+            if (img != null) {
+                return img;
+            }
+        }
+        if (height < 0 && width < 0) {
+            // original is not in cache any more - we won't find it.
+            return null;
+        }
+        String bestKeyTarget = null;
         Image baseImageTarget = null;
-        if (useCache) {
-            synchronized (this.imageCache) {
-                cached = imageCache.get(key);
-                CACHE_LOOKUP: if (cached != null) {
-                    MinTimeWeakReference<Image> ret = cached.get(getSizeKey(width, height));
-                    if (ret != null) {
-                        baseImageTarget = ret.get();
-                        // no further lookup for original version
-                        if (width < 0 || height < 0) {
-                            break CACHE_LOOKUP;
-                        }
-                    }
-                    if (useHighDPI) {
-                        ret = cached.get(getSizeKey(highDPIWidth, highDPIHeight));
-                        if (ret != null) {
-                            baseImageHighDPI = ret.get();
-                        }
-                    }
-                    boolean hasExactHighDPI = baseImageHighDPI != null && baseImageHighDPI.getWidth(null) == highDPIWidth && baseImageHighDPI.getHeight(null) == highDPIHeight;
-                    boolean hasExactTarget = baseImageTarget != null && baseImageTarget.getWidth(null) == width && baseImageTarget.getHeight(null) == height;
-                    if ((!useHighDPI || hasExactHighDPI) && hasExactTarget) {
-                        break CACHE_LOOKUP;
-                    }
-                    String bestKeyHighDPI = null;
-                    String bestKeyTarget = null;
-                    for (Entry<String, MinTimeWeakReference<Image>> es : cached.entrySet()) {
-                        MinTimeWeakReference<Image> ref = es.getValue();
-                        if (ref != null) {
-                            // do not update the timer
-                            Image img = ref.superget();
-                            if (img != null) {
-                                if (useHighDPI) {
-                                    if (img.getWidth(null) >= highDPIWidth && img.getHeight(null) >= highDPIHeight) {
-                                        if (baseImageHighDPI == null || (img.getWidth(null) * img.getHeight(null)) < (baseImageHighDPI.getWidth(null) * baseImageHighDPI.getHeight(null))) {
-                                            // best match to downscale
-                                            baseImageHighDPI = img;
-                                            bestKeyHighDPI = es.getKey();
-                                        }
-                                    }
-                                }
-                                if (img.getWidth(null) >= width && img.getHeight(null) >= height) {
-                                    if (baseImageTarget == null || (img.getWidth(null) * img.getHeight(null)) < (baseImageTarget.getWidth(null) * baseImageTarget.getHeight(null))) {
-                                        // best match to downscale
-                                        baseImageTarget = img;
-                                        bestKeyTarget = es.getKey();
-                                    }
-                                }
-                                hasExactHighDPI = baseImageHighDPI != null && baseImageHighDPI.getWidth(null) == highDPIWidth && baseImageHighDPI.getHeight(null) == highDPIHeight;
-                                hasExactTarget = baseImageTarget != null && baseImageTarget.getWidth(null) == width && baseImageTarget.getHeight(null) == height;
-                                if ((!useHighDPI || hasExactHighDPI) && hasExactTarget) {
-                                    break;
+        try {
+            for (Entry<String, MinTimeWeakReference<Image>> es : cached.entrySet()) {
+                // ORIGINAL_x2=null if there is no x2 image, and we already tried to read it from disk.
+                if (es.getKey().startsWith(FINAL) || es.getValue() == null) {
+                    continue;
+                }
+                MinTimeWeakReference<Image> ref = es.getValue();
+                if (ref != null) {
+                    // do not update the timer
+                    Image img = ref.superget();
+                    if (img != null) {
+                        if (isImageDimensionLargeEnoughForRequestedDimensions(width, height, img)) {
+                            if (baseImageTarget == null || (img.getWidth(null) * img.getHeight(null)) < (baseImageTarget.getWidth(null) * baseImageTarget.getHeight(null))) {
+                                // best match to downscale
+                                baseImageTarget = img;
+                                bestKeyTarget = es.getKey();
+                                if ((width <= 0 || img.getWidth(null) == width) && (height <= 0 || img.getHeight(null) == height)) {
+                                    // the image has exact the requested dimensions.
+                                    return img;
                                 }
                             }
                         }
                     }
-                    if (baseImageTarget == null) {
-                        // we did not find an image big enough. check if we have the original version - the biggest available
-                        MinTimeWeakReference<Image> max = cached.get(MAX_SIZE_KEY);
-                        if (max != null) {
-                            bestKeyTarget = MAX_SIZE_KEY;
-                            baseImageTarget = max.get();
-                        }
-                    }
-                    if (useHighDPI && baseImageHighDPI == null) {
-                        // we did not find an image big enough. check if we have the original version - the biggest available
-                        MinTimeWeakReference<Image> max = cached.get(MAX_SIZE_KEY);
-                        if (max != null) {
-                            bestKeyHighDPI = MAX_SIZE_KEY;
-                            baseImageHighDPI = max.get();
-                        }
-                    }
-                    if (bestKeyTarget != null) {
-                        // update the mintimeweek timer
-                        cached.get(bestKeyTarget);
-                    }
-                    if (useHighDPI && bestKeyHighDPI != null && bestKeyTarget != bestKeyHighDPI) {
-                        // update the mintimeweek timer
-                        cached.get(bestKeyHighDPI);
+                }
+            }
+            if (baseImageTarget != null) {
+                return baseImageTarget;
+            }
+            // we did not find an image big enough. check if we have the original version - the biggest available
+            {
+                MinTimeWeakReference<Image> max = cached.get(MAX_SIZE_KEY + ENHANCE_DOUBLE_SIZE_TAG);
+                if (max != null) {
+                    baseImageTarget = max.get();
+                    if (baseImageTarget != null) {
+                        bestKeyTarget = MAX_SIZE_KEY + ENHANCE_DOUBLE_SIZE_TAG;
+                        return baseImageTarget;
                     }
                 }
             }
+            {
+                MinTimeWeakReference<Image> max = cached.get(MAX_SIZE_KEY);
+                if (max != null) {
+                    baseImageTarget = max.get();
+                    if (baseImageTarget != null) {
+                        bestKeyTarget = MAX_SIZE_KEY;
+                        return baseImageTarget;
+                    }
+                }
+            }
+        } finally {
+            if (bestKeyTarget != null) {
+                // update the mintimeweek timer
+                cached.get(bestKeyTarget);
+            }
         }
-        Image baseImage = baseImageHighDPI;
-        if (!useHighDPI) {
-            baseImage = baseImageTarget;
-        }
+        return null;
+    }
+
+    /**
+     * maxWidth and
+     *
+     * @param key
+     * @param cached
+     * @param widthForVectorGraphics
+     * @param heightForVectorGraphics
+     * @return
+     */
+    protected Image loadImageFromDisc(String key, String enhanceTag, HashMap<String, MinTimeWeakReference<Image>> cached, int widthForVectorGraphics, int heightForVectorGraphics) {
         boolean cacheMaxSize = true;
-        if (baseImage == null) {
-            // no base image. read from disk...
-            final URL url = lookupImageUrl(key, -1, -1);
-            if (url != null) {
-                baseImage = FACTORY.urlToImage(url);
-                if (baseImage == null) {
-                    // maybe a svg?
-                    Icon icon = FACTORY.urlToNonImageIcon(url, highDPIWidth, highDPIWidth);
-                    if (icon != null) {
-                        // there is no Max size for SVG...
-                        cacheMaxSize = false;
-                        baseImage = IconIO.toImage(icon);
+        if (cached != null) {
+            synchronized (cached) {
+                if (cached.containsKey(MAX_SIZE_KEY + enhanceTag)) {
+                    MinTimeWeakReference<Image> cachedEntry = cached.get(MAX_SIZE_KEY + enhanceTag);
+                    if (cachedEntry == null) {
+                        // image not available
+                        return null;
                     }
                 }
-                if (useCache && baseImage != null) {
-                    synchronized (this.imageCache) {
-                        if (cached == null) {
-                            cached = new HashMap<String, MinTimeWeakReference<Image>>();
-                            imageCache.put(key, cached);
-                        }
-                        MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImage, this.getCacheLifetime(), key, this);
-                        if (cacheMaxSize) {
-                            cached.put(MAX_SIZE_KEY, ref);
-                        }
-                        cached.put(getSizeKey(baseImage.getWidth(null), baseImage.getHeight(null)), ref);
-                    }
-                }
-                // if (baseImageHighDPI.getWidth(null) <= width && baseImageHighDPI.getHeight(null) <= height) {
-                // if (baseImageHighDPI.getWidth(null) == width || baseImageHighDPI.getHeight(null) == height) {
-                // // already desired size,
-                // return baseImageHighDPI;
-                // }
-                // }
             }
         }
+        // no base image. read from disk...
+        final URL url = lookupImageUrl(key + enhanceTag, -1, -1);
+        if (url == null) {
+            if (cached != null) {
+                synchronized (cached) {
+                    // tell the cache that this image is not available
+                    cached.put(MAX_SIZE_KEY + enhanceTag, null);
+                }
+            }
+            return null;
+        }
+        debugLogImageLoading(key + enhanceTag, url);
+        Image baseImage = FACTORY.urlToImage(url);
         if (baseImage == null) {
+            // maybe a svg?
             DebugMode.debugger();
-            return IconIO.createEmptyImage(width, height);
-        }
-        if (width < 0 || height < 0) {
-            return baseImage;
-        }
-        Image src = baseImageTarget == null ? baseImage : baseImageTarget;
-        Image baseImageTargetFinal = IconIO.getScaledInstance(baseImageTarget == null ? baseImage : baseImageTarget, width, height, Interpolation.BICUBIC, true);
-        if (baseImageTargetFinal != src) {
-            synchronized (this.imageCache) {
-                if (cached == null) {
-                    cached = new HashMap<String, MinTimeWeakReference<Image>>();
-                    imageCache.put(key, cached);
-                }
-                MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImageTargetFinal, this.getCacheLifetime(), key, this);
-                // we keep ratio. width or height might be different than the actual size;
-                cached.put(getSizeKey(width, height), ref);
-                cached.put(getSizeKey(baseImageTargetFinal.getWidth(null), baseImageTargetFinal.getHeight(null)), ref);
+            Icon icon = FACTORY.urlToNonImageIcon(url, widthForVectorGraphics, heightForVectorGraphics);
+            if (icon != null) {
+                // there is no Max size for SVG...
+                cacheMaxSize = false;
+                baseImage = IconIO.toImage(icon);
             }
         }
-        if (useHighDPI) {
-            Image highDPIbase = baseImageHighDPI == null ? baseImage : baseImageHighDPI;
-            // DO NOT UPSCALE!
-            highDPIWidth = Math.min(highDPIWidth, highDPIbase.getWidth(null));
-            highDPIHeight = Math.min(highDPIHeight, highDPIbase.getHeight(null));
-            if (highDPIWidth > width || highDPIHeight > height) {
-                Image baseImageHighDPIFinal = IconIO.getScaledInstance(highDPIbase, highDPIWidth, highDPIHeight, Interpolation.BICUBIC, true);
-                if (baseImageHighDPIFinal.getWidth(null) * baseImageHighDPIFinal.getHeight(null) > baseImageTargetFinal.getWidth(null) * baseImageTargetFinal.getHeight(null)) {
-                    if (baseImageHighDPIFinal != highDPIbase) {
-                        synchronized (this.imageCache) {
-                            if (cached == null) {
-                                cached = new HashMap<String, MinTimeWeakReference<Image>>();
-                                imageCache.put(key, cached);
-                            }
-                            MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImageHighDPIFinal, this.getCacheLifetime(), key, this);
-                            // we keep ratio. width or height might be different than the actual size;
-                            cached.put(getSizeKey(highDPIWidth, highDPIHeight), ref);
-                            cached.put(getSizeKey(baseImageHighDPIFinal.getWidth(null), baseImageHighDPIFinal.getHeight(null)), ref);
-                        }
-                    }
-                    return MultiResolutionImageHelper.create(1, baseImageHighDPIFinal, baseImageTargetFinal);
+        if (cached != null && baseImage != null) {
+            synchronized (cached) {
+                String actualSizeKey = getSizeKey(baseImage.getWidth(null), baseImage.getHeight(null));
+                MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImage, this.getCacheLifetime(), key + actualSizeKey, this);
+                if (cacheMaxSize) {
+                    cached.put(MAX_SIZE_KEY + enhanceTag, ref);
+                }
+                cached.put(actualSizeKey, ref);
+            }
+        }
+        return baseImage;
+    }
+
+    protected void debugLogImageLoading(String key, final URL url) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            LogV3.warning("Read Icon from Disk: " + url);
+            synchronized (debugLoadingMap) {
+                String debugKey;
+                AtomicInteger ex = debugLoadingMap.get(debugKey = "READ:" + key);
+                if (ex != null) {
+                    ex.incrementAndGet();
+                    // DebugMode.debugger();
+                    LogV3.warning("Read Icon from Disk AGAIN(" + ex + "): " + url);
+                } else {
+                    debugLoadingMap.put(debugKey, new AtomicInteger(1));
                 }
             }
         }
-        return baseImageTargetFinal;
     }
 
     /**
@@ -612,7 +820,16 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @return
      */
     private static String getSizeKey(int w, int h) {
-        return w + "/" + h;
+        if (w <= 0) {
+            w = -1;
+        }
+        if (h <= 0) {
+            h = -1;
+        }
+        if (h < 0 && w < 0) {
+            return MAX_SIZE_KEY;
+        }
+        return w + "x" + h;
     }
 
     protected final HashMap<String, HashMap<String, MinTimeWeakReference<Image>>> imageCache = new HashMap<String, HashMap<String, MinTimeWeakReference<Image>>>();

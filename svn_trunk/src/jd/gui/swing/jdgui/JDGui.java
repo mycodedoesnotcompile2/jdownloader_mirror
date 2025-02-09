@@ -232,6 +232,7 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         this.initComponents();
         this.setWindowIcon();
         this.layoutComponents();
+     
         // init tray
         tray = new TrayExtension();
         try {
@@ -1425,33 +1426,36 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         /*
          * we only load a single resolution icon here to show a jd icon instead of java icon and not having a great impact on startup time
          */
-        new EDTHelper<Object>() {
-            @Override
-            public Object edtRun() {
-                Image image = NewTheme.I().getImage("logo/jd_logo_64_64", -1);
-                if (Application.getJavaVersion() >= Application.JAVA16) {
-                    final java.util.List<Image> list = new ArrayList<Image>();
-                    list.add(image);
-                    mainFrame.setIconImages(list);
-                } else {
-                    mainFrame.setIconImage(image);
+        final Image preImage = NewTheme.I().getImage("logo/jd_logo_64_64", -1, -1, true, false);
+        if (true) {
+            new EDTHelper<Object>() {
+                @Override
+                public Object edtRun() {
+                    if (Application.getJavaVersion() >= Application.JAVA16) {
+                        final java.util.List<Image> list = new ArrayList<Image>();
+                        list.add(preImage);
+                        mainFrame.setIconImages(list);
+                    } else {
+                        mainFrame.setIconImage(preImage);
+                    }
+                    return null;
                 }
-                return null;
-            }
-        }.start();
+            }.start();
+        }
         SecondLevelLaunch.GUI_COMPLETE.executeWhenReached(new Runnable() {
             public void run() {
                 if (Application.getJavaVersion() >= Application.JAVA16) {
                     final java.util.List<Image> list = new ArrayList<Image>();
-                    list.add(NewTheme.I().getImage("logo/logo_14_14", -1));
-                    list.add(NewTheme.I().getImage("logo/logo_15_15", -1));
-                    list.add(NewTheme.I().getImage("logo/logo_16_16", -1));
-                    list.add(NewTheme.I().getImage("logo/logo_17_17", -1));
-                    list.add(NewTheme.I().getImage("logo/logo_18_18", -1));
-                    list.add(NewTheme.I().getImage("logo/logo_19_19", -1));
-                    list.add(NewTheme.I().getImage("logo/logo_20_20", -1));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", -1));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_128_128", -1));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 64));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 48));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 32));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 20));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 19));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 18));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 17));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_128_128", -1, -1, true, false));
+                    // list.add(NewTheme.I().getImage("logo/logo_20_20", -1, -1, true, false));
+                    list.add(preImage);
                     // list.add(NewTheme.I().getImage("logo/jd_logo_256_256", -1));
                     new EDTHelper<Object>() {
                         @Override
@@ -1464,7 +1468,8 @@ public class JDGui implements UpdaterListener, OwnerFinder {
                     new EDTHelper<Object>() {
                         @Override
                         public Object edtRun() {
-                            mainFrame.setIconImage(NewTheme.I().getImage("logo/logo_17_17", -1));
+                            // why a 17:17 icon?
+                            mainFrame.setIconImage(NewTheme.I().getImage("logo/logo_17_17", -1, -1, true, false));
                             return null;
                         }
                     }.start();

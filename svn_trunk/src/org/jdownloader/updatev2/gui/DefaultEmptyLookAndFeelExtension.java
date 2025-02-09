@@ -15,6 +15,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 
+import org.appwork.utils.DebugMode;
 import org.jdownloader.gui.translate._GUI;
 
 public class DefaultEmptyLookAndFeelExtension extends LookAndFeelExtension {
@@ -118,7 +119,12 @@ public class DefaultEmptyLookAndFeelExtension extends LookAndFeelExtension {
 
     @Override
     public String getColorForPanelBackground() {
-        return null;
+        Color color = new JPanel().getBackground();
+        if (color == null) {
+            DebugMode.debugger();
+            color = Color.LIGHT_GRAY;
+        }
+        return String.format("#%02X%02X%02X%02X", color.getAlpha(), color.getRed(), color.getGreen(), color.getBlue());
     }
 
     @Override

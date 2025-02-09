@@ -47,12 +47,20 @@ import org.appwork.utils.DebugMode;
  * @date Jan 30, 2025
  *
  */
-public class CroppedIcon implements Icon {
+public class CroppedIcon implements Icon, IconPipe {
     private Icon            icon;
     private int             width;
     private int             height;
     private AlignHorizontal alignHorizontal;
     private AlignVertical   alignVertical;
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getDelegate()
+     */
+    @Override
+    public Icon getDelegate() {
+        return icon;
+    }
 
     /**
      * @param iconEnd

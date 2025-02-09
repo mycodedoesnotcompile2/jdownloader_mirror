@@ -4,9 +4,9 @@ import java.awt.Cursor;
 import java.awt.Dialog.ModalityType;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,9 +14,35 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.imageio.ImageIO;
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
+
+import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.storage.config.ValidationException;
+import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.swing.components.ExtMergedIcon;
+import org.appwork.txtresource.TranslationFactory;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.event.queue.Queue;
+import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.images.Interpolation;
+import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
+import org.jdownloader.DomainInfo;
+import org.jdownloader.controlling.download.DownloadControllerListener;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.images.NewTheme;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
+import org.jdownloader.premium.OpenURLAction;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.SecondLevelLaunch;
 import jd.controlling.AccountController;
@@ -48,33 +74,6 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.DownloadLinkProperty;
 import jd.plugins.FilePackage;
 import jd.plugins.FilePackageProperty;
-
-import org.appwork.scheduler.DelayedRunnable;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.storage.config.ValidationException;
-import org.appwork.storage.config.events.GenericConfigEventListener;
-import org.appwork.storage.config.handler.KeyHandler;
-import org.appwork.swing.components.ExtMergedIcon;
-import org.appwork.txtresource.TranslationFactory;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.event.queue.Queue;
-import org.appwork.utils.event.queue.QueueAction;
-import org.appwork.utils.swing.EDTRunner;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogNoAnswerException;
-import org.jdownloader.DomainInfo;
-import org.jdownloader.controlling.download.DownloadControllerListener;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.images.NewTheme;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
-import org.jdownloader.premium.OpenURLAction;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 public class BannerRotation implements Sponsor, AccountControllerListener {
     private final List<AvailableBanner> allBanners = new CopyOnWriteArrayList<AvailableBanner>();
@@ -147,8 +146,7 @@ public class BannerRotation implements Sponsor, AccountControllerListener {
         protected Icon loadIcon(final String relPath) {
             if (NewTheme.getInstance().hasIcon(relPath)) {
                 try {
-                    final URL iconURL = NewTheme.getInstance().getIconURL(relPath);
-                    return new ImageIcon(ImageIO.read(iconURL));
+                    return NewTheme.getFACTORY().imageToIcon(NewTheme.getInstance().getImage(relPath, -1, 25, true, true), -1, 25);
                 } catch (final Throwable e) {
                     LogController.CL().log(e);
                 }
@@ -852,9 +850,21 @@ public class BannerRotation implements Sponsor, AccountControllerListener {
         final Banner banner = this.current;
         final Icon icon;
         if (isVisible() && isEnabled() && banner != null && (icon = banner.icon) != null) {
-            icon.paintIcon(pane, g, pane.getWidth() - icon.getIconWidth() - 2, 25 - icon.getIconHeight() + 2);
             final Rectangle bannerRectangle = new Rectangle(pane.getWidth() - icon.getIconWidth() - 2, 25 - icon.getIconHeight(), icon.getIconWidth(), icon.getIconHeight() + 2);
-            return bannerRectangle;
+            g = (Graphics2D) g.create(bannerRectangle.x, bannerRectangle.y, bannerRectangle.width, bannerRectangle.height);
+            try {
+                if (g.getTransform().getScaleX() != 1 || g.getTransform().getScaleY() != 1) {
+                    // at least use interpolation for HIGHDPI
+                    // TODO: Use banner images with higher resolution
+                    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, Interpolation.BILINEAR.getHint());
+                }
+                // g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                // g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                icon.paintIcon(pane, g, 0, 0);
+                return bannerRectangle;
+            } finally {
+                g.dispose();
+            }
         }
         return null;
     }

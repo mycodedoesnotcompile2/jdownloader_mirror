@@ -30,9 +30,7 @@ import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -41,6 +39,7 @@ import org.appwork.swing.ExtJWindow;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.ColorUtils;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Time;
@@ -65,6 +64,9 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
 
 public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel> extends ExtJWindow implements ActionListener, AWTEventListener, GenericConfigEventListener<Boolean> {
     private static final int BOTTOM_MARGIN = 5;
@@ -598,20 +600,26 @@ public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel>
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), round, round);
         g2.setComposite(AlphaComposite.SrcAtop);
         // rendering the actuall contents
-        Paint p = null;
-        if (highlightColor == null) {
-            p = new GradientPaint(0, 0, LAFOptions.getInstance().getColorForPanelHeaderBackground(), 0, TOP_MARGIN, LAFOptions.getInstance().getColorForScrollbarsMouseOverState());
+        try {
+            Paint p = null;
+            if (highlightColor == null) {
+                p = new GradientPaint(0, 0, LAFOptions.getInstance().getColorForPanelHeaderBackground(), 0, TOP_MARGIN, LAFOptions.getInstance().getColorForScrollbarsMouseOverState());
+                g2.setPaint(p);
+            } else {
+                p = new GradientPaint(0, 0, highlightColor, 0, TOP_MARGIN, highlightColor.brighter());
+                g2.setPaint(p);
+            }
+            g2.fillRoundRect(0, 0, width, height, round, round);
+            p = new GradientPaint(0, 0, LAFOptions.getInstance().getColorForPanelBackground(), 0, TOP_MARGIN, LAFOptions.getInstance().getColorForPanelBackground().brighter());
             g2.setPaint(p);
-        } else {
-            p = new GradientPaint(0, 0, highlightColor, 0, TOP_MARGIN, highlightColor.brighter());
-            g2.setPaint(p);
+            g2.fillRect(0, TOP_MARGIN, width, height - TOP_MARGIN - BOTTOM_MARGIN);
+            g2.setColor(LAFOptions.getInstance().getColorForPanelBorders());
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, round, round);
+        } catch (NullPointerException e) {
+            LogV3.log(e);
+            LogV3.warning("Colors Missing?");
+            DebugMode.debugger();
         }
-        g2.fillRoundRect(0, 0, width, height, round, round);
-        p = new GradientPaint(0, 0, LAFOptions.getInstance().getColorForPanelBackground(), 0, TOP_MARGIN, LAFOptions.getInstance().getColorForPanelBackground().brighter());
-        g2.setPaint(p);
-        g2.fillRect(0, TOP_MARGIN, width, height - TOP_MARGIN - BOTTOM_MARGIN);
-        g2.setColor(LAFOptions.getInstance().getColorForPanelBorders());
-        g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, round, round);
         g2.dispose();
         return img;
     }

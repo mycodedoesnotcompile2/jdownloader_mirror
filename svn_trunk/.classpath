@@ -75,7 +75,7 @@
 	<classpathentry kind="lib" path="ressourcen/libs/bcpkix-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bcprov-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bctls-jdk15on.jar"/>
-	<classpathentry kind="lib" path="ressourcen/libs/laf/flatlaf.jar"/>
+	<classpathentry kind="lib" path="ressourcen/libs/laf/flatlaf.jar" sourcepath="ressourcen/code-ressourcen/flatlaf-sources.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bcutil-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/proxyVole.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/AppWorkUtils"/>

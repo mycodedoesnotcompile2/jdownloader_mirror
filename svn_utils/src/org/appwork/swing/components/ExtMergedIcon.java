@@ -37,7 +37,10 @@ import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.Shape;
+import java.awt.geom.AffineTransform;
 import java.util.Comparator;
 import java.util.TreeSet;
 
@@ -47,10 +50,10 @@ import javax.swing.ImageIcon;
 import org.appwork.utils.Application;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ImageProvider.ImageProvider;
+import org.appwork.utils.images.IconPipe;
 
 public class ExtMergedIcon implements Icon, IDIcon {
     protected class Entry {
-
         public final Icon      icon;
         public final int       x;
         public final int       y;
@@ -66,29 +69,23 @@ public class ExtMergedIcon implements Icon, IDIcon {
             this.z = z;
             this.clip = clip;
         }
-
     }
 
     private int                    cropedWidth  = -1;
     private int                    cropedHeight = -1;
-
     protected final TreeSet<Entry> entries      = new TreeSet<Entry>(new Comparator<Entry>() {
-
                                                     @Override
                                                     public int compare(final Entry o1, final Entry o2) {
                                                         return CompareUtils.compareInt(o1.z, o2.z);
                                                     }
                                                 });
-
     private int                    width        = 0;
     private int                    height       = 0;
     private ImageIcon              internalIcon;
-
     private boolean                caching;
     protected IconIdentifier       internalID;
 
     public ExtMergedIcon() {
-
     }
 
     /**
@@ -107,8 +104,24 @@ public class ExtMergedIcon implements Icon, IDIcon {
         this.addEntry(new Entry(icon, x, y, 0, null, null));
     }
 
+    // TODO: Listener to detect changes
+    private final static boolean MONITOR_SCALING = hasMonitorScaling();
+
     public ExtMergedIcon(final Icon icon, final int x, final int y, final int z, final Composite c) {
         this.addEntry(new Entry(icon, x, y, z, c, null));
+    }
+
+    /**
+     * @return
+     */
+    private static boolean hasMonitorScaling() {
+        for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+            AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
+            if (tx.getScaleX() != 1d || tx.getScaleY() != 1d) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public ExtMergedIcon add(final Icon icon) {
@@ -127,7 +140,6 @@ public class ExtMergedIcon implements Icon, IDIcon {
         synchronized (this.entries) {
             return this.add(icon, x, y, this.entries.size(), null);
         }
-
     }
 
     public ExtMergedIcon add(final Icon icon, final int x, final int y, final int z, final Composite c, Shape clip) {
@@ -148,14 +160,21 @@ public class ExtMergedIcon implements Icon, IDIcon {
         this.height = Math.max(this.height, entry.y + entry.icon.getIconHeight());
         idIconCheck(entry);
         this.entries.add(entry);
-
     }
 
     protected void idIconCheck(final Entry entry) {
-        if (!(entry.icon instanceof IDIcon)) {
-            if (!Application.isJared(null)) {
-                new Exception(this.getClass() + ": Warning. Not an  IDIcon").printStackTrace();
+        Icon icon = entry.icon;
+        while (icon != null && icon instanceof IconPipe) {
+            if (icon instanceof IDIcon) {
+                return;
             }
+            icon = ((IconPipe) icon).getDelegate();
+        }
+        if (icon != null && icon instanceof IDIcon) {
+            return;
+        }
+        if (!Application.isJared(null)) {
+            new Exception(this.getClass() + ": Warning. Not an  IDIcon").printStackTrace();
         }
     }
 
@@ -170,11 +189,9 @@ public class ExtMergedIcon implements Icon, IDIcon {
         }
     }
 
-
     public ExtMergedIcon crop(final int width, final int height) {
         this.cropedWidth = width;
         this.cropedHeight = height;
-
         return this;
     }
 
@@ -196,14 +213,15 @@ public class ExtMergedIcon implements Icon, IDIcon {
 
     @Override
     public void paintIcon(final Component c, final Graphics g, final int x, final int y) {
-
         final Graphics2D g2 = (Graphics2D) g;
-
-        if (this.internalIcon == null && !this.caching) {
+        // TODO:
+        // fix cache to support proper highDPI caching.
+        // MONITOR_SCALING disables caching if a scaled monitor is available
+        if (this.internalIcon == null && !this.caching && !MONITOR_SCALING) {
             this.cache();
-
         }
-
+        // g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        // g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         if (this.internalIcon != null) {
             g2.drawImage(this.internalIcon.getImage(), x, y, null);
             // internalIcon.paintIcon(c, g2, x, y);
@@ -239,12 +257,11 @@ public class ExtMergedIcon implements Icon, IDIcon {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.swing.components.IdentifierInterface#toIdentifier()
      */
     @Override
     public IconIdentifier getIdentifier() {
-
         if (this.internalID != null) {
             return this.internalID;
         }
@@ -257,7 +274,6 @@ public class ExtMergedIcon implements Icon, IDIcon {
         }
         t.addProperty("height", this.getIconHeight());
         t.addProperty("width", this.getIconWidth());
-
         for (Entry e : this.entries) {
             if (e.icon instanceof IDIcon) {
                 IconIdentifier id = ((IDIcon) e.icon).getIdentifier();
@@ -271,14 +287,10 @@ public class ExtMergedIcon implements Icon, IDIcon {
                 id.addProperty("width", e.icon.getIconWidth());
                 t.add(id);
                 //
-
             } else {
                 t.add(new IconIdentifier("unknown", e.icon.toString()));
-
             }
         }
-
         return t;
     }
-
 }

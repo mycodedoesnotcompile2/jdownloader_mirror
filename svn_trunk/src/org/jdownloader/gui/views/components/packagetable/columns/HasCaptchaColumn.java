@@ -9,13 +9,6 @@ import javax.swing.JPopupMenu;
 import javax.swing.JTable;
 import javax.swing.table.JTableHeader;
 
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.PluginForHost;
-
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.columns.ExtIconColumn;
@@ -24,8 +17,14 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.columns.FileColumn;
 import org.jdownloader.images.NewTheme;
 
-public class HasCaptchaColumn extends ExtIconColumn<AbstractNode> {
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.PluginForHost;
 
+public class HasCaptchaColumn extends ExtIconColumn<AbstractNode> {
     /**
      *
      */
@@ -35,14 +34,12 @@ public class HasCaptchaColumn extends ExtIconColumn<AbstractNode> {
 
     public HasCaptchaColumn() {
         super(_GUI.T.HasCaptchaColumn_HasCaptchaColumn_());
-        iconYes = new CheckBoxIcon(true, true);
-        iconNo = new CheckBoxIcon(false, true);
+        iconYes = CheckBoxIcon.TRUE;
+        iconNo = CheckBoxIcon.FALSE;
     }
 
     public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-
         final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-
             private static final long serialVersionUID = 3938290423337000265L;
             final Icon                ocr              = NewTheme.I().getIcon(IconKey.ICON_OCR, 14);
 
@@ -122,7 +119,6 @@ public class HasCaptchaColumn extends ExtIconColumn<AbstractNode> {
                             break;
                         }
                     }
-
                 }
             }
             if (hasCaptcha) {
@@ -172,7 +168,6 @@ public class HasCaptchaColumn extends ExtIconColumn<AbstractNode> {
             } else {
                 return _GUI.T.HasCaptchaColumn_getTooltipText_no();
             }
-
         } else if (value instanceof CrawledLink) {
             final DownloadLink dlink = ((CrawledLink) value).getDownloadLink();
             if (hasCaptcha(dlink)) {

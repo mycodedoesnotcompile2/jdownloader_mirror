@@ -581,12 +581,14 @@ public class IconIO {
     public static Image getScaledInstance(Image img, int width, int height, final Interpolation interpolation, final boolean higherQuality, boolean keepratio) {
         DebugMode.breakIf(img == null);
         final double faktor = Math.max((double) img.getWidth(null) / width, (double) img.getHeight(null) / height);
-        if (keepratio) {
-            width = Math.max((int) (img.getWidth(null) / faktor), 1);
-            height = Math.max((int) (img.getHeight(null) / faktor), 1);
+        if (keepratio || width <= 0 || height <= 0) {
             if (faktor == 1.0) {
                 return img;
             }
+            double test = img.getHeight(null) / faktor;
+            // if height or width is 0 or less, this means to keep ratio and scale based on the remaining dimension
+            width = (int) Math.max(Math.ceil(img.getWidth(null) / faktor), 1);
+            height = (int) Math.max(Math.ceil(img.getHeight(null) / faktor), 1);
         } else {
             if (height == img.getHeight(null) && width == img.getWidth(null)) {
                 return img;

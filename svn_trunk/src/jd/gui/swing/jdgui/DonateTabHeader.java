@@ -9,14 +9,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.Icon;
 import javax.swing.Timer;
 
-import jd.gui.swing.jdgui.interfaces.JDMouseAdapter;
-import jd.gui.swing.jdgui.interfaces.View;
-import jd.gui.swing.jdgui.maintab.TabHeader;
-
-import org.appwork.utils.images.IconIO;
+import org.appwork.utils.images.TransparentIcon;
 import org.jdownloader.donate.DONATE_EVENT;
 import org.jdownloader.gui.mainmenu.DonateAction;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.gui.swing.jdgui.interfaces.JDMouseAdapter;
+import jd.gui.swing.jdgui.interfaces.View;
+import jd.gui.swing.jdgui.maintab.TabHeader;
 
 public class DonateTabHeader extends TabHeader implements PromotionTabHeader {
     /**
@@ -49,7 +49,7 @@ public class DonateTabHeader extends TabHeader implements PromotionTabHeader {
             if (isFlashing()) {
                 final Timer blinker = new Timer(1500, new ActionListener() {
                     private long       i               = 0;
-                    private final Icon iconTransparent = IconIO.getTransparentIcon(IconIO.toBufferedImage(icon), 0.5f);
+                    private final Icon iconTransparent = new TransparentIcon(icon, 0.5f);
 
                     @Override
                     public void actionPerformed(final ActionEvent e) {

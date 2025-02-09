@@ -154,6 +154,9 @@ public class LookAndFeelController implements LAFManagerInterface {
             ExtTooltip.setForgroundColor(LAFOptions.getInstance().getColorForTooltipForeground());
             UIManager.put(/* ExtTooltip.APPWORK_TOOLTIP_FOREGROUND */"Appwork.Tooltip.Foreground", LAFOptions.getInstance().getColorForTooltipForeground());
         } else if (ReflectionUtils.isInstanceOf("com.formdev.flatlaf.FlatLaf", laf)) {
+            // required to activate interpolation on icons
+            // AWUTheme.setFACTORY(new FlatLafIconFactory());
+            UIManager.put("ScrollBar.width", 14);
             // https://www.formdev.com/flatlaf/window-decorations
             // https://www.formdev.com/flatlaf/system-properties/#flatlaf.useWindowDecorations
             if (LAFOptions.getInstance().getCfg().isWindowDecorationEnabled()) {

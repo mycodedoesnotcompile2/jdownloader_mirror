@@ -48,13 +48,11 @@ import org.appwork.scheduler.DelayedRunnable;
  *
  */
 public class MinTimeWeakReference<T> extends WeakReference<T> {
-
     private static final ScheduledExecutorService EXECUTER     = DelayedRunnable.getNewScheduledExecutorService();
     private static final ScheduledExecutorService QUEUECLEANUP = DelayedRunnable.getNewScheduledExecutorService();
     private static final ReferenceQueue<Object>   QUEUE        = new ReferenceQueue<Object>();
     static {
         MinTimeWeakReference.QUEUECLEANUP.scheduleWithFixedDelay(new Runnable() {
-
             @Override
             public void run() {
                 try {
@@ -71,22 +69,17 @@ public class MinTimeWeakReference<T> extends WeakReference<T> {
 
     public static void main(final String[] args) throws InterruptedException {
         final AtomicBoolean onCallBack = new AtomicBoolean(false);
-
         MinTimeWeakReferenceCleanup callback = new MinTimeWeakReferenceCleanup() {
-
             @Override
             public void onMinTimeWeakReferenceCleanup(MinTimeWeakReference<?> minTimeWeakReference) {
                 onCallBack.set(true);
-
             }
         };
-
         final MinTimeWeakReference<double[]> ref = new MinTimeWeakReference<double[]>(new double[20000], 2000, "test", callback);
         for (int i = 0; i < 10; i++) {
             System.out.println(i * 1000 + " - " + ref.get().length);
             Thread.sleep(1000);
         }
-
         for (int i = 0; i < 10; i++) {
             Thread.sleep(1000);
             System.gc();
@@ -221,5 +214,4 @@ public class MinTimeWeakReference<T> extends WeakReference<T> {
     public String toString() {
         return "MinTimeWeakReference_" + MinTimeWeakReference.this.id + "|Gone:" + this.isGone();
     }
-
 }

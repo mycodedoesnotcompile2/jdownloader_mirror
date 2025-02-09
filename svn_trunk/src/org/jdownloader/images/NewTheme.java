@@ -1,21 +1,25 @@
 package org.jdownloader.images;
 
+import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.MultipleGradientPaint.CycleMethod;
-import java.awt.RadialGradientPaint;
-import java.awt.geom.Point2D;
-import java.awt.image.BufferedImage;
+import java.awt.RenderingHints;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.UIManager;
 
 import org.appwork.resources.AWUTheme;
+import org.appwork.resources.HighDPIIcon;
 import org.appwork.resources.Theme;
 import org.appwork.swing.components.CheckBoxIcon;
-import org.appwork.utils.ImageProvider.ImageProvider;
+import org.appwork.swing.components.ExtMergedIcon;
+import org.appwork.swing.components.IDIcon;
+import org.appwork.swing.components.IconIdentifier;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.images.IconIO;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.updatev2.gui.LAFOptions;
@@ -27,6 +31,42 @@ import org.jdownloader.updatev2.gui.LAFOptions;
  *
  */
 public class NewTheme extends Theme {
+    public static class RedDotIcon implements Icon, IDIcon {
+        private final Color red;
+        private final Icon  fChck;
+
+        public RedDotIcon(Color red, Icon fChck) {
+            this.red = red;
+            this.fChck = fChck;
+        }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(red);
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
+            int width = IconIO.clipScale(fChck.getIconWidth(), 0.6d);
+            g2.fillOval(x + (fChck.getIconWidth() - width) / 2, y + (fChck.getIconHeight() - width) / 2, width, width);
+        }
+
+        @Override
+        public int getIconWidth() {
+            return fChck.getIconWidth();
+        }
+
+        @Override
+        public int getIconHeight() {
+            return fChck.getIconHeight();
+        }
+
+        @Override
+        public IconIdentifier getIdentifier() {
+            return new IconIdentifier(getClass().getName());
+        }
+    }
+
     private static final NewTheme INSTANCE = new NewTheme();
 
     /**
@@ -44,9 +84,9 @@ public class NewTheme extends Theme {
 
     protected Icon modify(Icon ret, String relativePath) {
         if (ret instanceof ImageIcon) {
-            return new IdentifierImageIcon(((ImageIcon) ret).getImage(), relativePath);
+            return new HighDPIIcon(new IdentifierImageIcon(((ImageIcon) ret).getImage(), relativePath));
         }
-        return new IdentifierWrapperIcon(ret, relativePath);
+        return new HighDPIIcon(new IdentifierWrapperIcon(ret, relativePath));
     };
 
     /**
@@ -102,11 +142,9 @@ public class NewTheme extends Theme {
 
     @Override
     public Image getImage(String key, int size, boolean useCache) {
-        Icon ico = this.getIcon(key, size, useCache);
-        if (ico instanceof IdentifierWrapperIcon) {
-            return IconIO.toBufferedImage(((IdentifierWrapperIcon) ico).getIcon());
-        }
-        return IconIO.toBufferedImage(ico);
+        Image img = super.getImage(key, size, useCache);
+        DebugMode.breakIf(img == null);
+        return img;
     }
 
     public static void main(String[] args) {
@@ -140,11 +178,19 @@ public class NewTheme extends Theme {
         String key = this.getCacheKey(path + "/" + red, size, selected);
         ret = getCached(key);
         if (ret == null) {
-            Icon back = getIcon(path, size, false);
+            Icon back = getIcon(path, size, true);
             // y back = new IdentifierImageIcon(IconIO.getCroppedImage(IconIO.toBufferedImage(back)), path);
-            Icon checkBox = selected ? CheckBoxIcon.TRUE : CheckBoxIcon.FALSE;
-            checkBox = IconIO.getScaledInstance(checkBox, (int) (size * 0.5), (int) (size * 0.5));
-            if (red != null) {// works for synthetica default LAF only
+            Icon checkBox = selected ? new CheckBoxIcon((int) (1 * (0.5d * size)), selected, true) : new CheckBoxIcon((int) (1 * (0.5d * size)), selected, false);
+            // checkBox = IconIO.getScaledInstance(checkBox, (int) (size * 0.5), (int) (size * 0.5));
+            // checkBox = new BorderedIcon(checkBox, Color.RED, 1);
+            // try {
+            // Dialog.getInstance().showConfirmDialog(0, path + selected + size + red + "", "", checkBox, null, null);
+            // } catch (DialogClosedException e) {
+            // e.printStackTrace();
+            // } catch (DialogCanceledException e) {
+            // e.printStackTrace();
+            // }
+            if (red != null) {
                 if (UIManager.getLookAndFeel().getClass().getSimpleName().equals("PlainLookAndFeel")) {
                     checkBox = IconIO.replaceColor(checkBox, new Color(!selected ? 0xFFF0F0F0 : 0xFFEBEBEB), 50, red, true);
                 } else if (UIManager.getLookAndFeel().getClass().getSimpleName().equals("SyntheticaPlainLookAndFeel")) {
@@ -152,20 +198,20 @@ public class NewTheme extends Theme {
                 } else if (UIManager.getLookAndFeel().getClass().getSimpleName().equals("JDDefaultLookAndFeel")) {
                     checkBox = IconIO.replaceColor(checkBox, new Color(!selected ? 0xFFF0F0F0 : 0xFFEBEBEB), 50, red, true);
                 } else {
-                    BufferedImage img = IconIO.toBufferedImage(checkBox);
-                    Graphics2D g2 = (Graphics2D) img.getGraphics();
-                    Point2D center = new Point2D.Float(img.getWidth() / 2 - 1, img.getHeight() / 2 - 1);
-                    float radius = img.getWidth() / (float) 2;
-                    float[] dist = { 0.4f, 1.0f };
-                    Color[] colors = { new Color(red.getRed(), red.getGreen(), red.getBlue(), red.getAlpha()), new Color(red.getRed(), red.getGreen(), red.getBlue(), 0) };
-                    RadialGradientPaint p = new RadialGradientPaint(center, radius, dist, colors, CycleMethod.NO_CYCLE);
-                    g2.setPaint(p);
-                    g2.fillOval(0, 0, img.getWidth() + 2, img.getHeight() + 2);
-                    g2.dispose();
-                    checkBox = new ImageIcon(img);
+                    final Icon fChck = checkBox;
+                    checkBox = new ExtMergedIcon(checkBox).add(new RedDotIcon(red, fChck));
                 }
             }
-            ret = new ImageIcon(ImageProvider.merge(back, checkBox, 3, 0, 0, back.getIconHeight() - checkBox.getIconHeight() + 2));
+            ret = new ExtMergedIcon(back, 0, 0).add(checkBox, 0, back.getIconHeight() - checkBox.getIconHeight() + 2);
+            // ret = new ExtMergedIcon(back, 0, 0);
+            // try {
+            // Dialog.getInstance().showConfirmDialog(0, key, key, ret, null, null);
+            // } catch (DialogClosedException e) {
+            // e.printStackTrace();
+            // } catch (DialogCanceledException e) {
+            // e.printStackTrace();
+            // }
+            // ret = new ImageIcon(ImageProvider.merge(back, checkBox, 3, 0, 0, back.getIconHeight() - checkBox.getIconHeight() + 2));
             cache(ret, key);
         }
         return ret;

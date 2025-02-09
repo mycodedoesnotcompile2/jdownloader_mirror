@@ -23,12 +23,6 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 
-import jd.SecondLevelLaunch;
-import jd.gui.swing.components.SetIconInterface;
-import jd.gui.swing.components.SetLabelInterface;
-import jd.gui.swing.jdgui.JDGui;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.StringUtils;
@@ -46,6 +40,12 @@ import org.jdownloader.extensions.ExtensionNotLoadedException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.SecondLevelLaunch;
+import jd.gui.swing.components.SetIconInterface;
+import jd.gui.swing.components.SetLabelInterface;
+import jd.gui.swing.jdgui.JDGui;
+import net.miginfocom.swing.MigLayout;
 
 public class CustomizeableActionBar extends MigPanel {
     private final AbstractBottomBarMenuManager manager;
@@ -213,7 +213,7 @@ public class CustomizeableActionBar extends MigPanel {
     }
 
     protected ImageIcon createDropdownImage(boolean b, Image back) {
-        Image front = NewTheme.I().getImage(b ? IconKey.ICON_POPUPSMALL : IconKey.ICON_POPDOWNSMALL, -1, false);
+        Image front = NewTheme.I().getImage(b ? IconKey.ICON_POPUPSMALL : IconKey.ICON_POPDOWNSMALL, -1, true);
         int w = back.getWidth(null);
         int h = back.getHeight(null);
         int xoffsetBack = 0;
@@ -298,5 +298,4 @@ public class CustomizeableActionBar extends MigPanel {
             }
         };
     }
-
 }

@@ -49,7 +49,7 @@ public class ImageCropper {
      *            The source image to crop.
      * @return A new BufferedImage without transparent borders.
      */
-    public BufferedImage crop(BufferedImage img) {
+    public BufferedImage cropTransparentBorder(BufferedImage img) {
         int left = findLeftBoundary(img);
         int right = findRightBoundary(img);
         int top = findTopBoundary(img);

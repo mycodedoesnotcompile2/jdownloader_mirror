@@ -37,7 +37,6 @@ import java.awt.Image;
 import java.net.URL;
 
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 
 import org.appwork.utils.ImageProvider.ImageProvider;
@@ -87,6 +86,6 @@ public class DefaultIconFactory implements IconFactory {
      */
     @Override
     public Icon imageToIcon(Image image, int w, int h) {
-        return new ImageIcon(image);
+        return new HighDPIIcon(image);
     }
 }
