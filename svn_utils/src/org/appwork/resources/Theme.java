@@ -486,30 +486,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             BufferedImage ret = IconIO.createEmptyImage(width, height);
             putFinalCache(cached, finalKey, ret);
         }
-        // Image src = baseImageTarget == null ? baseImage : baseImageTarget;
-        // if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-        // cached = imageCache.get(key);
-        // if (cached != null) {
-        // MinTimeWeakReference<Image> org = cached.get(MAX_SIZE_KEY);
-        // if (org != null) {
-        // Image orgImage = org.get();
-        // if (orgImage != null) {
-        // if (orgImage.getWidth(null) < width * 2 || orgImage.getHeight(null) < height * 2) {
-        // synchronized (debugLoadingMap) {
-        // String debugKey;
-        // AtomicInteger ex = debugLoadingMap.get(debugKey = "LOWRES:" + key);
-        // if (ex == null) {
-        // LogV3.warning("Low-Res Icon: " + key + ". Ensure that this icon (" + orgImage.getWidth(null) + ":" + orgImage.getHeight(null) +
-        // ") is at least " + (width * 2) + "x" + (height * 2) + " Source: " + lookupImageUrl(key, -1, -1));
-        // debugLoadingMap.put(debugKey, new AtomicInteger(1));
-        // }
-        // }
-        // }
-        // }
-        // }
-        // }
-        // }
-        // DebugMode.breakIf(key.contains("gopro."));
         if (!isImageDimensionLargeEnoughForRequestedDimensions(width, height, baseImage)) {
             // upscale required check x2 option
             Image betterImage = x2Image != NO_IMAGE ? x2Image : loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height);
@@ -523,8 +499,8 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         double baseWidthFinal = Math.ceil(baseImage.getWidth(null) / targetBaseFactor);
         double baseHeightFinal = Math.ceil(baseImage.getHeight(null) / targetBaseFactor);
         if (returnMultiResImage) {
-            double targetHighDPIWidth = Math.ceil(baseWidthFinal * highestRequiredScale);
-            double targetHighDPIHeight = Math.ceil(baseHeightFinal * highestRequiredScale);
+            double targetHighDPIWidth = (int) Math.round(baseWidthFinal * highestRequiredScale);
+            double targetHighDPIHeight = (int) Math.round(baseHeightFinal * highestRequiredScale);
             highDPIbase = findBestMatch(cached, highDPIWidth, highDPIHeight);
             if (highDPIbase == null) {
                 // May happen if the original image got removed from cache
@@ -543,7 +519,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 } else {
                     // DO NOT UPSCALE!
                     // if (isImageDimensionLargeEnoughForRequestedDimensions(highDPIWidth, highDPIHeight, highDPIbase)) {
-                    baseImageHighDPIFinal = scaleAndCache(key, cached, (int) Math.ceil(targetHighDPIWidth), (int) Math.ceil(targetHighDPIHeight), highDPIbase);
+                    baseImageHighDPIFinal = scaleAndCache(key, cached, (int) Math.round(targetHighDPIWidth), (int) Math.round(targetHighDPIHeight), highDPIbase);
                     // }
                 }
             }
@@ -552,7 +528,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             // use already downscaled as basis instead of the large original
             baseImage = baseImageHighDPIFinal;
         }
-        Image baseImageTargetFinal = scaleAndCache(key, cached, (int) Math.ceil(baseWidthFinal), (int) Math.ceil(baseHeightFinal), baseImage);
+        Image baseImageTargetFinal = scaleAndCache(key, cached, (int) Math.round(baseWidthFinal), (int) Math.round(baseHeightFinal), baseImage);
+        if ((baseImageTargetFinal.getWidth(null) % 4 != 0) || (baseImageTargetFinal.getHeight(null) % 4 != 0)) {
+            LogV3.warning("Image warning: width and height shoul be dividable by 4 for proper highDPI display!: " + key + ": " + baseImageTargetFinal.getWidth(null) + "x" + baseImageTargetFinal.getHeight(null));
+        }
         if (returnMultiResImage && baseImageHighDPIFinal != null && baseImageTargetFinal != null && baseImageHighDPIFinal != baseImageTargetFinal) {
             if (baseImageHighDPIFinal.getWidth(null) != baseImageTargetFinal.getWidth(null) && baseImageHighDPIFinal.getHeight(null) != baseImageTargetFinal.getHeight(null)) {
                 baseImageTargetFinal = MultiResolutionImageHelper.create(0, baseImageTargetFinal, baseImageHighDPIFinal);
@@ -769,7 +748,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         Image baseImage = FACTORY.urlToImage(url);
         if (baseImage == null) {
             // maybe a svg?
-            DebugMode.debugger();
+            // DebugMode.debugger();
             Icon icon = FACTORY.urlToNonImageIcon(url, widthForVectorGraphics, heightForVectorGraphics);
             if (icon != null) {
                 // there is no Max size for SVG...

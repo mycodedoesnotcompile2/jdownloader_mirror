@@ -96,12 +96,15 @@ public class HighDPIIcon implements Icon, IconPipe {
                     boolean perfectFit = best.getWidth(null) == scaledW && best.getHeight(null) == scaledH;
                     g2.scale(1 / scaleX, 1 / scaleY);
                     // correct x/y position and avoid that hava tries to draw between physical pixals.
-                    g2.translate(-g2.getTransform().getTranslateX() % 1d, -g2.getTransform().getTranslateY() % 1d);
+                    double fixtX = g2.getTransform().getTranslateX() % 1d;
+                    double fixtY = g2.getTransform().getTranslateY() % 1d;
+                    g2.translate(-fixtX, -fixtY);
                     if (perfectFit) {
-                        g2.drawImage(best, x, y, c);
+                        g2.drawImage(best, (int) Math.round(x * scaleX), (int) Math.round(y * scaleY), c);
                     } else {
-                        new CroppedIcon(new ImageIcon(best), (int) Math.ceil(scaledW), (int) Math.ceil(scaledH), AlignHorizontal.CENTER, AlignVertical.CENTER).paintIcon(c, g2, (int) (x * scaleX), (int) (y * scaleY));
+                        new CroppedIcon(new ImageIcon(best), (int) Math.ceil(scaledW), (int) Math.ceil(scaledH), AlignHorizontal.CENTER, AlignVertical.CENTER).paintIcon(c, g2, (int) Math.round(x * scaleX), (int) Math.round(y * scaleY));
                     }
+                    g2.translate(fixtX, fixtY);
                     g2.scale(scaleX, scaleY);
                     return;
                 }
