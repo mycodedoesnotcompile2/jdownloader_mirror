@@ -17,7 +17,9 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
@@ -33,7 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50501 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50604 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -204,5 +206,20 @@ public class DatanodesTo extends XFileSharingProBasic {
         } else {
             return super.isPremiumOnly(br);
         }
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
+        if (src != null && src.startsWith("{")) {
+            try {
+                /* Parse json response */
+                final Map<String, Object> entries = restoreFromString(src, TypeRef.MAP);
+                final String url = entries.get("url").toString();
+                return url;
+            } catch (final Throwable ignore) {
+                logger.log(ignore);
+            }
+        }
+        return super.getDllink(link, account, br, src);
     }
 }

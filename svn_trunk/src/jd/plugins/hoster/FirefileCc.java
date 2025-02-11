@@ -73,7 +73,7 @@ import jd.plugins.PluginProgress;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50165 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
+@HostPlugin(revision = "$Revision: 50604 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
 public class FirefileCc extends PluginForHost {
     private static Object        DECRYPTLOCK                = new Object();
     /** Settings stuff */
@@ -446,7 +446,7 @@ public class FirefileCc extends PluginForHost {
         final Browser api = br.cloneBrowser();
         api.getHeaders().put("Accept", "*/*");
         api.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        api.getPage("https://firefile.cc/secure/uploads/downloadChunk?hashes=" + entryInfo.get("hash") + "&shareable_link=" + linkInfo.get("id"));
+        api.getPage("https://" + getHost() + "/secure/uploads/downloadChunk?hashes=" + entryInfo.get("hash") + "&shareable_link=" + linkInfo.get("id"));
         try {
             final Map<String, Object> apiResponse = restoreFromString(api.getRequest().getHtmlCode(), TypeRef.MAP);
             return (String) apiResponse.get("url");
@@ -465,7 +465,7 @@ public class FirefileCc extends PluginForHost {
         api.setAllowedResponseCodes(200, 500);
         api.getHeaders().put("Accept", "*/*");
         api.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        api.getPage("https://firefile.cc/secure/drive/shareable-links/" + linkData.getHash() + "?&withEntries=true");
+        api.getPage("https://" + getHost() + "/secure/drive/shareable-links/" + linkData.getHash() + "?&withEntries=true");
         try {
             final Map<String, Object> apiResponse = restoreFromString(api.getRequest().getHtmlCode(), TypeRef.MAP);
             return apiResponse;

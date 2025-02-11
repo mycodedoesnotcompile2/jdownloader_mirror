@@ -30,7 +30,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50388 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50605 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     public CamwhoreshdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -106,8 +106,11 @@ public class CamwhoreshdCom extends KernelVideoSharingComV2 {
         final String errormsg = br.getRegex(">\\s*(This video is a private video .*?Only active members can watch private videos\\.?)<").getMatch(0);
         if (errormsg != null) {
             return errormsg;
-        } else {
-            return super.getPrivateVideoWebsiteMessage(br);
         }
+        final String errormsg2 = br.getRegex(">\\s*(You are not allowed to watch this video[^<]*)</div>").getMatch(0);
+        if (errormsg2 != null) {
+            return errormsg2;
+        }
+        return super.getPrivateVideoWebsiteMessage(br);
     }
 }

@@ -139,7 +139,7 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
         txt.setLabelMode(true);
         txt.setLineWrap(true);
         txt.setWrapStyleWord(true);
-        txt.setText("The filename is too long to be saved on your filesystem.\r\nHow would you like to proceed?\r\nFor Windows users: You can remove the path length limitation via the Registry, but this may have unintended side effects!");
+        txt.setText("The filename is too long to be saved on your filesystem.\r\nHow would you like to proceed?");
         p.add(txt, textfieldConstraints);
         p.add(SwingUtils.toBold(new JLabel("Current filename:")), "split 2,sg 1");
         final JTextField textfieldFilenameCurrent = new JTextField(this.downloadLink.getName());

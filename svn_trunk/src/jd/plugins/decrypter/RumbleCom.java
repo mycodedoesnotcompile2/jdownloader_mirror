@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.RumbleComConfig;
@@ -44,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50604 $", interfaceVersion = 3, names = {}, urls = {})
 public class RumbleCom extends PluginForDecrypt {
     public RumbleCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +106,7 @@ public class RumbleCom extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         String dateFormatted = null;
         final String dateStr = (String) root.get("pubDate");
         if (!StringUtils.isEmpty(dateStr)) {
@@ -159,17 +158,17 @@ public class RumbleCom extends PluginForDecrypt {
                 final Map<String, Object> qualityInfoMeta = (Map<String, Object>) qualityInfo.get("meta");
                 final String url = qualityInfo.get("url").toString();
                 final Number filesizeN = (Number) qualityInfoMeta.get("size");
-                final int thisQualityWidth = ((Number) qualityInfoMeta.get("w")).intValue();
-                final int thisQualityHeight = ((Number) qualityInfoMeta.get("h")).intValue();
+                final Number thisQualityWidth = (Number) qualityInfoMeta.get("w");
+                final Number thisQualityHeight = (Number) qualityInfoMeta.get("h");
                 final int height;
                 final int width;
-                if (thisQualityHeight == 0) {
+                if (thisQualityWidth != null && thisQualityHeight != null) {
+                    height = thisQualityHeight.intValue();
+                    width = thisQualityWidth.intValue();
+                } else {
                     /* Fallback: Rare case: For unplayable videos or videos with only one quality. */
                     height = generalHeight;
                     width = generalWidth;
-                } else {
-                    height = thisQualityHeight;
-                    width = thisQualityWidth;
                 }
                 final DownloadLink dl = this.createDownloadlink(url);
                 /* Set this so when user copies URL of any video quality he'll get the URL to the main video. */
@@ -183,7 +182,8 @@ public class RumbleCom extends PluginForDecrypt {
                         best = dl;
                     }
                 }
-                dl.setAvailable(true);
+                /* Do not set as available to allow generic HLS crawler to find all qualities */
+                // dl.setAvailable(true);
                 dl._setFilePackage(fp);
                 if (uploaderName != null) {
                     dl.setProperty(PROPERTY_USERNAME, uploaderName);
