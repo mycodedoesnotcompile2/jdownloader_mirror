@@ -224,17 +224,6 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
     }
 
     private int getEffectiveMaxNewFilenameLength() {
-        // final String ext = this.parsedOriginalFilename.getExtensionAdvanced();
-        // if (ext != null) {
-        // if (StringUtils.endsWithCaseInsensitive(this.textfieldFilenameNew.getText(), ext)) {
-        // return this.autoShortenedFilenameWithoutExt.length();
-        // } else {
-        // /* Extension is currently not in text but will be added later -> Max len is filename without length of file extension. */
-        // return this.autoShortenedFilenameWithoutExt.length() - ext.length();
-        // }
-        // } else {
-        // return this.autoShortenedFilenameWithoutExt.length();
-        // }
         return this.autoShortenedFilenameWithoutExt.length();
     }
 

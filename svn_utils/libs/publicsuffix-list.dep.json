@@ -668,11 +668,47 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "version":"2025.31.2 5421ee732b6ad9733220267cd8d3d6b45a63ce05"
+    },
+    {
+      "changes":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4\t: Add alibabacloudcs.com to Public Suffix List (#2373)",
+      "date":"2025-02-06T18:33:18.511+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e242ac2c198cbbf0c0463980db0c544e20ac9a3b9da058ec039daafd1e821b5f"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4"
+    },
+    {
+      "changes":"2025.41.0 123d8aa7aa4baa5c9fe74b5655244ae49f176577\t: Add laravel.cloud to Public Suffix List (#2381)",
+      "date":"2025-02-10T10:25:40.873+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"813086477e37e6d278a52c2e4d0b4f47ea5fa2e5f05bf944384f9c89a04554d4"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.41.0 123d8aa7aa4baa5c9fe74b5655244ae49f176577"
     }
   ],
   "installed":{
-    "changes":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4\t: Add alibabacloudcs.com to Public Suffix List (#2373)",
-    "date":"2025-02-06T18:33:18.511+01:00",
+    "changes":"2025.41.1 58ffb9210ce88ad70bf4ab5f7f16066a2b6932e8\t: Moved JPRS comment to appropreate position (#2383)",
+    "date":"2025-02-11T09:25:35.726+01:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -777,7 +813,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e242ac2c198cbbf0c0463980db0c544e20ac9a3b9da058ec039daafd1e821b5f"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"5be6a61da1b6cba4f284a2ca7bc8101e9a95edc39211757332c13dc8445b54ab"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -787,7 +823,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2025.37.0 9b2b111ecac3039f8a2877d72eb37e71cf505da4"
+    "version":"2025.41.1 58ffb9210ce88ad70bf4ab5f7f16066a2b6932e8"
   },
   "minJRE":null,
   "provider":"github-clone",

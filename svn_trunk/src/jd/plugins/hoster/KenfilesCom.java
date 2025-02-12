@@ -32,8 +32,10 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50615 $", interfaceVersion = 3, names = {}, urls = {})
 public class KenfilesCom extends XFileSharingProBasic {
     public KenfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -227,6 +229,20 @@ public class KenfilesCom extends XFileSharingProBasic {
             }
         }
         return super.looksLikeDownloadableContent(urlConnection);
+    }
+    // @Override
+    // public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
+    // if (true) {
+    // throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
+    // }
+    // }
+
+    @Override
+    public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
+        requestFileInformationWebsite(link, account);
+        if (true) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
+        }
     }
     // @Override
     // public void handlePremium(final DownloadLink link, final Account account) throws Exception {

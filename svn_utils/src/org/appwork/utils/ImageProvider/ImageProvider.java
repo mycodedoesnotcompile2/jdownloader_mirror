@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -43,7 +43,6 @@ import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.RenderingHints;
-import java.awt.Transparency;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
@@ -174,7 +173,7 @@ public class ImageProvider {
     public static BufferedImage createIcon(final String string, final int width, final int height) {
         final int w = Math.max(1, width);
         final int h = Math.max(1, height);
-        final BufferedImage image = new BufferedImage(w, h, Transparency.TRANSLUCENT);
+        final BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         final Graphics2D g = image.createGraphics();
         int size = 1 + width / string.length();
         try {
@@ -612,13 +611,7 @@ public class ImageProvider {
      * @return
      */
     public static Image resizeWorkSpace(final Image scaleBufferedImage, final int width, final int height) {
-        // final GraphicsEnvironment ge =
-        // GraphicsEnvironment.getLocalGraphicsEnvironment();
-        // final GraphicsDevice gd = ge.getDefaultScreenDevice();
-        // final GraphicsConfiguration gc = gd.getDefaultConfiguration();
-        // final BufferedImage image = gc.createCompatibleImage(width, height,
-        // Transparency.BITMASK);
-        final BufferedImage image = new BufferedImage(width, height, Transparency.TRANSLUCENT);
+        final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         final Graphics2D g = image.createGraphics();
         g.drawImage(scaleBufferedImage, (width - scaleBufferedImage.getWidth(null)) / 2, (height - scaleBufferedImage.getHeight(null)) / 2, null);
         g.dispose();
@@ -684,7 +677,7 @@ public class ImageProvider {
         } else {
             final Image dest;
             if (ReflectionUtils.isInstanceOf("sun.awt.image.ToolkitImage", img.getImage())) {
-                dest = new BufferedImage(w, h, Transparency.TRANSLUCENT);
+                dest = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
                 final Graphics2D g2 = ((BufferedImage) dest).createGraphics();
                 g2.drawImage(img.getImage(), 0, 0, null);
                 g2.dispose();
@@ -703,7 +696,7 @@ public class ImageProvider {
         } else {
             final int w = icon.getIconWidth();
             final int h = icon.getIconHeight();
-            final BufferedImage image = new BufferedImage(w, h, Transparency.TRANSLUCENT);
+            final BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
             final Graphics2D g = image.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             // g.setColor(Color.RED);

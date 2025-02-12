@@ -21,16 +21,14 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
 @HostPlugin(revision = "$Revision: 50608 $", interfaceVersion = 3, names = {}, urls = {})
-public class Mega4upCom extends XFileSharingProBasic {
-    public Mega4upCom(final PluginWrapper wrapper) {
+public class StreamhbNet extends XFileSharingProBasic {
+    public StreamhbNet(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -39,21 +37,14 @@ public class Mega4upCom extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2020-01-21: reCaptchaV2<br />
+     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mega4upload.net", "mega4upload.com", "mega4up.org", "mega4up.com" });
+        ret.add(new String[] { "streamhb.net" });
         return ret;
-    }
-
-    @Override
-    public String rewriteHost(final String host) {
-        /* 2022-07-25: Main domain has been changed from mega4up.org to mega4upload.com */
-        /* 2025-02-11: Main domain has been changed from mega4upload.com to mega4upload.net */
-        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -71,29 +62,31 @@ public class Mega4upCom extends XFileSharingProBasic {
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return false;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return true;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return false;
+            return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return false;
+            return true;
         }
     }
 
     @Override
     public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 1;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return 0;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return 1;
+            return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 1;
+            return 0;
         }
     }
 
@@ -110,19 +103,5 @@ public class Mega4upCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    public Form findFormDownload1Free(final Browser br) throws Exception {
-        /* 2020-04-14: Special: Possible start of a cat & mouse game */
-        final Form download1 = super.findFormDownload1Free(br);
-        if (download1 != null) {
-            download1.remove("method_premium");
-            download1.remove("mega_premium");
-            if (download1.hasInputFieldByName("method_free")) {
-                download1.remove("method_free");
-            }
-        }
-        return download1;
     }
 }

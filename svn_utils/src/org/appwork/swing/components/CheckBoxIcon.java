@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -33,31 +33,22 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components;
 
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JCheckBox;
-import javax.swing.LookAndFeel;
-import javax.swing.UIManager;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.images.BorderedIcon;
 import org.appwork.utils.images.IconIO;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogCanceledException;
-import org.appwork.utils.swing.dialog.DialogClosedException;
 
 public final class CheckBoxIcon implements Icon, IDIcon {
     /**
@@ -142,7 +133,7 @@ public final class CheckBoxIcon implements Icon, IDIcon {
     public synchronized void paintIcon(Component c, Graphics gOrg, int x, int y) {
         if (image != null) {
             // headless
-            new ImageIcon(image).paintIcon(c, gOrg, x, y);
+            gOrg.drawImage(image, x, y, c);
             return;
         }
         Graphics g = gOrg.create();
@@ -211,69 +202,6 @@ public final class CheckBoxIcon implements Icon, IDIcon {
 
     public CheckBoxIcon(boolean selected) {
         this(selected, true);
-    }
-
-    public static void main(String[] args) {
-        Image image = getImage(1.25d, 1.25d, true, true, 1);
-        Image small = getImage(1, 1, false, false, 1);
-        ;
-        try {
-            Dialog.getInstance().showConfirmDialog(0, "b", "", new BorderedIcon(new CheckBoxIcon(48, true, true), Color.RED, 3), null, null);
-        } catch (DialogClosedException e) {
-            // LogV3.log(e);
-        } catch (DialogCanceledException e) {
-            // LogV3.log(e);
-        }
-    }
-
-    /**
-     * @param scaleX
-     * @param scaleY
-     * @param selected
-     * @param enabled
-     * @param baseScale
-     * @return
-     */
-    private static Image getImage(double scaleX, double scaleY, boolean enabled, boolean selected, double baseScale) {
-        boolean isLighFlatLAF = false;
-        Class<? extends LookAndFeel> lafClass = UIManager.getLookAndFeel().getClass();
-        while (lafClass != null && lafClass != LookAndFeel.class) {
-            if (COM_FORMDEV_FLATLAF_FLAT_LIGHT_LAF.equals(lafClass.getName())) {
-                isLighFlatLAF = true;
-                break;
-            }
-            lafClass = (Class<? extends LookAndFeel>) lafClass.getSuperclass();
-        }
-        JCheckBox checkBox = new JCheckBox();
-        checkBox.setEnabled(enabled);
-        checkBox.setSelected(selected);
-        checkBox.setSize(checkBox.getPreferredSize());
-        checkBox.setOpaque(false);
-        checkBox.setContentAreaFilled(false);
-        checkBox.setBackground(new Color(0, 0, 0, 0f));
-        scaleX *= baseScale;
-        scaleY *= baseScale;
-        // +10 due to unknown insets for shadows etc
-        BufferedImage image = new BufferedImage((int) ((checkBox.getWidth() + 10) * scaleX), (int) ((checkBox.getHeight() + 10) * scaleY), BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = image.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g2d.scale(scaleX, scaleY);
-        // dummy paint just to get the painted area
-        RecordingGraphics2D record = new RecordingGraphics2D(g2d);
-        checkBox.paint(record);
-        Rectangle2D area = record.getCompleteDrawnArea();
-        checkBox.paint(g2d);
-        g2d.dispose();
-        BufferedImage crop1 = image.getSubimage((int) (area.getX()), (int) (area.getY()), (int) (area.getWidth() + 1), (int) (area.getHeight() + 1));
-        // // crop - each laf has different insets. this cropping automates the process somehow.
-        // Image croppedImage = new ImageCropper().cropTransparentBorder(image);
-        // System.out.println(scaleX);
-        // System.out.println(crop1);
-        // System.out.println(croppedImage);
-        return crop1;
     }
 
     /**

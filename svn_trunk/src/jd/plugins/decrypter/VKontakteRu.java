@@ -29,17 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.simplejson.JSonUtils;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.config.SubConfiguration;
@@ -72,7 +61,18 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50582 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.simplejson.JSonUtils;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 50614 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -2449,7 +2449,7 @@ public class VKontakteRu extends PluginForDecrypt {
             } else {
                 logger.info("Failed to find groupID");
             }
-        } catch (final Exception e) {
+        } catch (final IOException e) {
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 throw e;
             } else {
@@ -3264,8 +3264,8 @@ public class VKontakteRu extends PluginForDecrypt {
         final String htmlrefresh = br.getRequest().getHTMLRefresh();
         if (StringUtils.containsIgnoreCase(htmlrefresh, "badbrowser.php")) {
             /**
-             * If this happens user needs to change User-Agent of this plugin to continue using it. </br>
-             * vk.com does not necessarily simply block a User-Agent value. They may as well just block it for specific users/IPs.
+             * If this happens user needs to change User-Agent of this plugin to continue using it. </br> vk.com does not necessarily simply
+             * block a User-Agent value. They may as well just block it for specific users/IPs.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Blocked User-Agent");
         }

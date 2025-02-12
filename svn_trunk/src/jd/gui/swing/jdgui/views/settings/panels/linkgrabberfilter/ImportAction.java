@@ -45,6 +45,7 @@ public class ImportAction extends AppAction {
             final String ext = table.getTable() instanceof ExceptionsTable ? ImportAction.VIEW : ImportAction.EXT;
             final ExtFileChooserDialog d = new ExtFileChooserDialog(0, _GUI.T.LinkgrabberFilter_import_dialog_title(), null, null);
             d.setFileSelectionMode(FileChooserSelectionMode.FILES_ONLY);
+            d.setStorageID("filter" + ext);
             d.setFileFilter(new FileFilter() {
                 @Override
                 public String getDescription() {
@@ -64,7 +65,10 @@ public class ImportAction extends AppAction {
                 return;
             }
             final List<LinkgrabberFilterRule> all = new ArrayList<LinkgrabberFilterRule>();
-            for (File file : files) {
+            for (final File file : files) {
+                if (!file.isFile()) {
+                    continue;
+                }
                 final List<LinkgrabberFilterRule> contents;
                 try {
                     contents = JSonStorage.restoreFromString(IO.readFileToString(file), new TypeRef<ArrayList<LinkgrabberFilterRule>>() {

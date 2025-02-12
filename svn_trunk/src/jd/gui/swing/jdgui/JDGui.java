@@ -232,7 +232,6 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         this.initComponents();
         this.setWindowIcon();
         this.layoutComponents();
-     
         // init tray
         tray = new TrayExtension();
         try {
@@ -1426,7 +1425,7 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         /*
          * we only load a single resolution icon here to show a jd icon instead of java icon and not having a great impact on startup time
          */
-        final Image preImage = NewTheme.I().getImage("logo/jd_logo_64_64", -1, -1, true, false);
+        final Image preImage = NewTheme.I().getImage("logo/jd_logo_64_64", -1, -1, true, false, false);
         if (true) {
             new EDTHelper<Object>() {
                 @Override
@@ -1453,7 +1452,7 @@ public class JDGui implements UpdaterListener, OwnerFinder {
                     list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 19));
                     list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 18));
                     list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 17));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_128_128", -1, -1, true, false));
+                    list.add(NewTheme.I().getImage("logo/jd_logo_128_128", -1, -1, true, false, false));
                     // list.add(NewTheme.I().getImage("logo/logo_20_20", -1, -1, true, false));
                     list.add(preImage);
                     // list.add(NewTheme.I().getImage("logo/jd_logo_256_256", -1));
@@ -1469,7 +1468,7 @@ public class JDGui implements UpdaterListener, OwnerFinder {
                         @Override
                         public Object edtRun() {
                             // why a 17:17 icon?
-                            mainFrame.setIconImage(NewTheme.I().getImage("logo/logo_17_17", -1, -1, true, false));
+                            mainFrame.setIconImage(NewTheme.I().getImage("logo/logo_17_17", -1, -1, true, false, false));
                             return null;
                         }
                     }.start();

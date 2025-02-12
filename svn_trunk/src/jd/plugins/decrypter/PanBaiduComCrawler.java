@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.PanBaiduCom;
 
-@DecrypterPlugin(revision = "$Revision: 50512 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50608 $", interfaceVersion = 3, names = {}, urls = {})
 public class PanBaiduComCrawler extends PluginForDecrypt {
     public PanBaiduComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -284,9 +284,43 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
             final int maxitemsperpage = 100;
             Map<String, Object> entries = null;
             List<Map<String, Object>> ressourcelist = null;
+            /* Find and parse json from html if possible */
+            String json = this.br.getRegex("setData\\((\\{.*\\})\\);\\n").getMatch(0);
+            if (json == null) {
+                /* 2021-03-22 */
+                json = this.br.getRegex("locals\\.mset\\((\\{.*?\\})\\);\\n").getMatch(0);
+            }
+            final String json2 = br.getRegex("window\\.yunData = (\\{.+\\});").getMatch(0);
+            if (json != null) {
+                entries = restoreFromString(json, TypeRef.MAP);
+                final Object ukBetter = entries.get("share_uk");
+                if (ukBetter != null) {
+                    uk = ukBetter.toString();
+                }
+                ressourcelist = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "file_list/list");
+                if (ressourcelist == null) {
+                    /* 2021-03-22 */
+                    ressourcelist = (List<Map<String, Object>>) entries.get("file_list");
+                }
+            } else if (json2 != null) {
+                /* 2025-01-24: For special items with path "/e/..." */
+                entries = restoreFromString(json2, TypeRef.MAP);
+                entries = (Map<String, Object>) entries.get("saasShareInfo");
+                final Object ukBetter = entries.get("uk");
+                if (ukBetter != null) {
+                    uk = ukBetter.toString();
+                }
+                ressourcelist = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "file_list/list");
+            }
+            final Object shareidO = entries.get("shareid");
+            if (shareidO != null) {
+                shareid = shareidO.toString();
+            }
             pagination: do {
                 int newLinksThisPage = 0;
-                if (page > 1 || is_subfolder) {
+                if (entries != null || !is_subfolder) {
+                    /* First page and json was parsed from html */
+                } else {
                     if (uk == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     } else if (shareid == null) {
@@ -317,42 +351,6 @@ public class PanBaiduComCrawler extends PluginForDecrypt {
                     br.getPage(url);
                     entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     ressourcelist = (List) entries.get("list");
-                } else {
-                    /* Regex json from html code */
-                    String json = this.br.getRegex("setData\\((\\{.*\\})\\);\\n").getMatch(0);
-                    if (json == null) {
-                        /* 2021-03-22 */
-                        json = this.br.getRegex("locals\\.mset\\((\\{.*?\\})\\);\\n").getMatch(0);
-                    }
-                    final String json2 = br.getRegex("window\\.yunData = (\\{.+\\});").getMatch(0);
-                    if (json == null && json2 == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "json is null");
-                    }
-                    if (json != null) {
-                        entries = restoreFromString(json, TypeRef.MAP);
-                        final Object ukBetter = entries.get("share_uk");
-                        if (ukBetter != null) {
-                            uk = ukBetter.toString();
-                        }
-                        ressourcelist = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "file_list/list");
-                        if (ressourcelist == null) {
-                            /* 2021-03-22 */
-                            ressourcelist = (List<Map<String, Object>>) entries.get("file_list");
-                        }
-                    } else {
-                        /* 2025-01-24: For special items with path "/e/..." */
-                        entries = restoreFromString(json2, TypeRef.MAP);
-                        entries = (Map<String, Object>) entries.get("saasShareInfo");
-                        final Object ukBetter = entries.get("uk");
-                        if (ukBetter != null) {
-                            uk = ukBetter.toString();
-                        }
-                        ressourcelist = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "file_list/list");
-                    }
-                    final Object shareidO = entries.get("shareid");
-                    if (shareidO != null) {
-                        shareid = shareidO.toString();
-                    }
                 }
                 errno = JavaScriptEngineFactory.toLong(entries.get("errno"), 0);
                 final String bothFolderIDs = shareid + "_" + uk;

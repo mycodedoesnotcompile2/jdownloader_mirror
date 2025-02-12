@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49674 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50608 $", interfaceVersion = 3, names = {}, urls = {})
 public class TurbovidCo extends XFileSharingProBasic {
     public TurbovidCo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -46,8 +46,14 @@ public class TurbovidCo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "turbovid.co", "turbovid.org" });
+        ret.add(new String[] { "turbovid.org", "turbovid.co" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2025-02-11: Main domain has been changed from turbovid.co to turbovid.org */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {

@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -56,7 +56,7 @@ import org.appwork.utils.images.IconPipe;
 public class HighDPIIcon implements Icon, IconPipe {
     private Icon delegate;
 
-    public HighDPIIcon(Icon icon) {
+    private HighDPIIcon(Icon icon) {
         this.delegate = icon;
     }
 
@@ -88,11 +88,11 @@ public class HighDPIIcon implements Icon, IconPipe {
         double scaleY = transform.getScaleY();
         // DebugMode.breakIf(getIconWidth() < 32);
         if (scaleX != 1d || scaleY != 1d) {
-            if (MultiResolutionImageHelper.isInstanceOf(image)) {
+            {
                 if (isHDPIFixRequired(scaleX, scaleY, transform.getTranslateX(), transform.getTranslateY())) {
                     double scaledW = getIconWidth() * scaleX;
                     double scaledH = getIconHeight() * scaleY;
-                    Image best = MultiResolutionImageHelper.getResolutionVariant(image, scaledW, scaledH);
+                    Image best = MultiResolutionImageHelper.isInstanceOf(image) ? MultiResolutionImageHelper.getResolutionVariant(image, scaledW, scaledH) : image;
                     boolean perfectFit = best.getWidth(null) == scaledW && best.getHeight(null) == scaledH;
                     g2.scale(1 / scaleX, 1 / scaleY);
                     // correct x/y position and avoid that hava tries to draw between physical pixals.
@@ -102,7 +102,7 @@ public class HighDPIIcon implements Icon, IconPipe {
                     if (perfectFit) {
                         g2.drawImage(best, (int) Math.round(x * scaleX), (int) Math.round(y * scaleY), c);
                     } else {
-                        new CroppedIcon(new ImageIcon(best), (int) Math.ceil(scaledW), (int) Math.ceil(scaledH), AlignHorizontal.CENTER, AlignVertical.CENTER).paintIcon(c, g2, (int) Math.round(x * scaleX), (int) Math.round(y * scaleY));
+                        new CroppedIcon(new ImageIcon(best), (int) Math.round(scaledW), (int) Math.round(scaledH), AlignHorizontal.CENTER, AlignVertical.CENTER).paintIcon(c, g2, (int) (x * scaleX), (int) (y * scaleY));
                     }
                     g2.translate(fixtX, fixtY);
                     g2.scale(scaleX, scaleY);
@@ -111,7 +111,6 @@ public class HighDPIIcon implements Icon, IconPipe {
             }
         }
         delegate.paintIcon(c, g, x, y);
-        // g.dispose();
     }
 
     /**

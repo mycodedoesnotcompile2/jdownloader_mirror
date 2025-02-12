@@ -99,11 +99,18 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50590 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50615 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
         // this.enablePremium(super.getPurchasePremiumURL());
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     // public static List<String[]> getPluginDomains() {
@@ -1073,9 +1080,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
         }
         URLConnectionAdapter con = null;
-        final boolean followRedirectsOld = br.isFollowingRedirects();
         try {
-            br.setFollowRedirects(true);
             con = openAntiDDoSRequestConnection(br, request);
             if (this.looksLikeDownloadableContent(con)) {
                 final long completeContentLength = con.getCompleteContentLength();
@@ -1102,7 +1107,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (con != null) {
                 con.disconnect();
             }
-            br.setFollowRedirects(followRedirectsOld);
         }
     }
 
@@ -1608,7 +1612,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             final String contentURL = this.getContentURL(link);
             /* Short URLs -> We need to find the long FUID! */
-            br.setFollowRedirects(true);
             /* Check if the URL we want has already been accessed with given browser instance */
             if (br.getURL() == null || !br.getURL().equals(contentURL)) {
                 if (probeDirectDownload(link, account, br, br.createGetRequest(contentURL), true)) {
@@ -3024,7 +3027,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         boolean throwException = false;
         try {
             final Browser br2 = br.cloneBrowser();
-            br2.setFollowRedirects(true);
             final Request request;
             if (supportsHEADRequestForDirecturlCheck()) {
                 request = br2.createHeadRequest(directurl);
@@ -4504,7 +4506,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             generateApikeyUrl = Encoding.htmlOnlyDecode(generateApikeyUrl);
             logger.info("Failed to find apikey but host has api-mod enabled --> Trying to generate first apikey for this account via: " + generateApikeyUrl);
             try {
-                brc.setFollowRedirects(true);
                 getPage(brc, generateApikeyUrl);
                 apikey = regexAPIKey(brc);
                 if (apikey == null) {
@@ -4871,11 +4872,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     public boolean loginWebsite(final DownloadLink link, final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
-            final boolean followRedirects = br.isFollowingRedirects();
             try {
                 /* Load cookies */
                 br.setCookiesExclusive(true);
-                br.setFollowRedirects(true);
                 final Cookies cookies = account.loadCookies("");
                 final Cookies userCookies = account.loadUserCookies();
                 if (userCookies == null && this.requiresCookieLogin()) {
@@ -5027,8 +5026,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     account.clearCookies("");
                 }
                 throw e;
-            } finally {
-                br.setFollowRedirects(followRedirects);
             }
         }
     }
@@ -5186,7 +5183,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (this.attemptStoredDownloadurlDownload(link, account)) {
             return;
         }
-        resolveShortURL(this.br.cloneBrowser(), link, account);
+        resolveShortURL(br.cloneBrowser(), link, account);
         if (this.enableAccountApiOnlyMode()) {
             /* API-only mode */
             handleDownload(link, account, null, this.getDllinkAPI(link, account));

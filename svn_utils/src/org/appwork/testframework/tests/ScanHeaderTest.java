@@ -36,6 +36,7 @@ package org.appwork.testframework.tests;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Date;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
@@ -79,7 +80,8 @@ public class ScanHeaderTest extends AWTest {
                     }
                     if (f.lastModified() > 1729246424444l) {
                         String java = IO.readFileToString(f);
-                        String newJava = java.replace("Copyright (c) 2009-2015,", "Copyright (c) 2009-2024,");
+                        int year = new Date().getYear() + 1900;
+                        String newJava = java.replaceAll("Copyright \\(c\\) 2009-20\\d\\d,", "Copyright (c) 2009-" + year + ",");
                         newJava = newJava.replace("Schwabacher Straße 117", "Spalter Strasse 58");
                         newJava = newJava.replace("90763 Fürth", "91183 Abenberg");
                         if (!newJava.contains("e-mail@appwork.org")) {

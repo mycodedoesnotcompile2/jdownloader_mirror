@@ -696,6 +696,10 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         return false;
     }
 
+    protected String getLastSelection() {
+        return getIDConfig().getLastSelection();
+    }
+
     /*
      * (non-Javadoc)
      *
@@ -777,18 +781,18 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
             fc.setMultiSelectionEnabled(false);
         }
         /* preSelection */
-        File presel = preSelection;
+        File presel = getPreSelection();
         if (presel != null && StringUtils.isEmpty(presel.getName())) {
             // find and eliminate file.filePath=null file objects.
             presel = null;
         }
         getLogger().info("Given presel: " + presel);
         if (presel == null) {
-            final String path = getIDConfig().getLastSelection();
+            final String path = getLastSelection();
             presel = StringUtils.isEmpty(path) ? null : new File(path);
         } else if (presel.getParentFile() == null) {
             // mix stoerage with new filename
-            final String path = getIDConfig().getLastSelection();
+            final String path = getLastSelection();
             File preselFromStorage = StringUtils.isEmpty(path) ? null : new File(path);
             if (preselFromStorage != null) {
                 presel = new File(preselFromStorage.getParentFile(), presel.getName());

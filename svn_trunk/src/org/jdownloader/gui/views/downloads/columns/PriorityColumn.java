@@ -1,14 +1,12 @@
 package org.jdownloader.gui.views.downloads.columns;
 
 import java.awt.Component;
-import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
 
 import javax.swing.AbstractButton;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JTable;
@@ -17,11 +15,11 @@ import javax.swing.table.JTableHeader;
 
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.components.CheckBoxIcon;
+import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.columns.ExtComboColumn;
-import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.images.IconIO;
 import org.jdownloader.controlling.Priority;
@@ -145,9 +143,7 @@ public class PriorityColumn extends ExtComboColumn<AbstractNode, Priority> {
                 setName(modelItemToString(o, value));
                 Icon ico = getIconByPriority(o);
                 if (selected) {
-                    CheckBoxIcon checkBox = CheckBoxIcon.TRUE;
-                    Image back = ImageProvider.merge(ico, checkBox, 5, 0, 0, ico.getIconHeight() - checkBox.getIconHeight() + 5);
-                    setSmallIcon(new ImageIcon(back));
+                    setSmallIcon(new ExtMergedIcon(ico).add(new CheckBoxIcon(8, true, true), 0, 8));
                 } else {
                     setSmallIcon(ico);
                 }

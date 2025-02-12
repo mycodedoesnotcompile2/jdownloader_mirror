@@ -3,17 +3,9 @@ package jd.controlling.captcha;
 import java.awt.Image;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
-import java.awt.image.BufferedImage;
 import java.net.MalformedURLException;
 
 import javax.swing.SwingUtilities;
-
-import jd.gui.swing.dialog.CaptchaDialog;
-import jd.gui.swing.dialog.DialogType;
-import jd.gui.swing.jdgui.JDGui;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 
 import org.appwork.exceptions.ThrowUncheckedException;
 import org.appwork.exceptions.WTFException;
@@ -44,6 +36,13 @@ import org.jdownloader.settings.SilentModeSettings.CaptchaDuringSilentModeAction
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
+import jd.gui.swing.dialog.CaptchaDialog;
+import jd.gui.swing.dialog.DialogType;
+import jd.gui.swing.jdgui.JDGui;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+
 public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<ResultType>, T extends Challenge<ResultType>, ResultType> {
     private DomainInfo            host;
     protected T                   captchaChallenge;
@@ -60,7 +59,6 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
         this.captchaChallenge = captchaChallenge2;
         config = JsonConfig.create(CaptchaSettings.class);
         logger = JDGui.getInstance().getLogger();
-
         dialogHandler = new DialogHandler() {
             @Override
             public <T> T showDialog(final AbstractDialog<T> dialog) throws DialogClosedException, DialogCanceledException {
@@ -148,7 +146,7 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
             try {
                 images = CaptchaDialog.getGifImages(((ImageCaptchaChallenge<?>) captchaChallenge).getImageFile().toURI().toURL());
                 if (images == null || images.length == 0) {
-                    BufferedImage img = IconIO.getImage(((ImageCaptchaChallenge<?>) captchaChallenge).getImageFile().toURI().toURL(), false);
+                    Image img = IconIO.getImage(((ImageCaptchaChallenge<?>) captchaChallenge).getImageFile().toURI().toURL(), false);
                     if (img != null) {
                         images = new Image[] { img };
                     }
@@ -210,7 +208,6 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
         }.waitForEDT();
         try {
             while (Boolean.TRUE.equals(new EDTHelper<Boolean>() {
-
                 @Override
                 public Boolean edtRun() {
                     return dialog.getDialog().isDisplayable();

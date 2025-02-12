@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -109,7 +109,7 @@ public class SimpleFormatter implements Formatter {
     public String format(LogRecord2 record) {
         String message = record.message == null ? "" : record.message;
         final StackTraceElement source = record.getThrownAt();
-        final String sourceString = Exceptions.stacktraceElementToThrownAtString(source);
+        final String sourceString = Exceptions.stacktraceElementToThrownAtString(source, false);
         String pre = createPre(record, sourceString);
         return StringUtils.multiLineIntend(message, pre, fillPre("", " ", pre.length()));
     }

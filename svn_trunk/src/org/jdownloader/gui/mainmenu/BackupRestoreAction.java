@@ -168,6 +168,7 @@ public class BackupRestoreAction extends CustomizableAppAction implements Action
                 });
                 d.setFileSelectionMode(FileChooserSelectionMode.FILES_ONLY);
                 d.setMultiSelection(false);
+                d.setStorageID("jd2backup");
                 d.setType(FileChooserType.OPEN_DIALOG);
                 try {
                     int i = 1;

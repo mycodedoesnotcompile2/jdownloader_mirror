@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,28 +32,60 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.loggingv3;
+package org.appwork.resources;
 
-import org.appwork.utils.logging2.LogInterface;
+import java.awt.Image;
 
 /**
- * @author Thomas
- * @date 18.09.2018
+ * @author thomas
+ * @date Feb 11, 2025
  *
  */
-public interface LogV3Factory {
-    public void setPredecessor(LogV3Factory previousFactory);
-
-    public void setSuccessor(LogV3Factory newFactory);
+public class SourceImageTooSmallException extends RuntimeException {
+    public final String key;
 
     /**
-     * @param simpleName
-     * @return
+     * @return the key
      */
-    public LogInterface getLogger(Object context);
+    public String getKey() {
+        return key;
+    }
 
-    public LogInterface getDefaultLogger();
     /**
-     * @param simpleLoggerFactory
+     * @return the baseImage
      */
+    public Image getBaseImage() {
+        return baseImage;
+    }
+
+    /**
+     * @return the targetViewportWidth
+     */
+    public int getTargetViewportWidth() {
+        return targetViewportWidth;
+    }
+
+    /**
+     * @return the targetViewportHeight
+     */
+    public int getTargetViewportHeight() {
+        return targetViewportHeight;
+    }
+
+    public final Image baseImage;
+    public final int   targetViewportWidth;
+    public final int   targetViewportHeight;
+
+    /**
+     * @param key
+     * @param highDPIbase
+     * @param highDPIWidth
+     * @param highDPIHeight
+     */
+    public SourceImageTooSmallException(String key, Image highDPIbase, int highDPIWidth, int highDPIHeight) {
+        this.key = key;
+        this.baseImage = highDPIbase;
+        this.targetViewportWidth = highDPIWidth;
+        this.targetViewportHeight = highDPIHeight;
+    }
 }

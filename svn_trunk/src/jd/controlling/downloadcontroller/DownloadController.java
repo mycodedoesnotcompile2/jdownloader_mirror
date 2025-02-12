@@ -364,8 +364,8 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
             protected Void run() throws RuntimeException {
                 int counter = index;
                 final boolean createFolder = CFG_GENERAL.CREATE_FOLDER_TRIGGER.getValue() == CreateFolderTrigger.ON_LINKS_ADDED;
-                HashSet<String> created = new HashSet<String>();
-                for (FilePackage fp : fps) {
+                final HashSet<String> created = new HashSet<String>();
+                for (final FilePackage fp : fps) {
                     if (createFolder) {
                         String folder = fp.getDownloadDirectory();
                         if (created.add(folder)) {

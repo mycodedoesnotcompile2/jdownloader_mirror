@@ -13,7 +13,6 @@ import javax.swing.ImageIcon;
 import javax.swing.UIManager;
 
 import org.appwork.resources.AWUTheme;
-import org.appwork.resources.HighDPIIcon;
 import org.appwork.resources.Theme;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtMergedIcon;
@@ -84,9 +83,9 @@ public class NewTheme extends Theme {
 
     protected Icon modify(Icon ret, String relativePath) {
         if (ret instanceof ImageIcon) {
-            return new HighDPIIcon(new IdentifierImageIcon(((ImageIcon) ret).getImage(), relativePath));
+            return new IdentifierImageIcon(((ImageIcon) ret).getImage(), relativePath);
         }
-        return new HighDPIIcon(new IdentifierWrapperIcon(ret, relativePath));
+        return new IdentifierWrapperIcon(ret, relativePath);
     };
 
     /**

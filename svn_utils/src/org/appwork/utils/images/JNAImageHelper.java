@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -117,7 +117,7 @@ public class JNAImageHelper {
                 return null;
             } else if (images.size() > 1 && MultiResolutionImageHelper.isSupported()) {
                 // use biggest image as base
-                return MultiResolutionImageHelper.create(images.get(images.size() - 1), images);
+                return MultiResolutionImageHelper.create(images);
             } else {
                 return images.get(0);
             }
@@ -159,7 +159,7 @@ public class JNAImageHelper {
                     throw new IllegalArgumentException("GetDIBits should not return 0");
                 }
                 final int[] colorArray = pixels.getIntArray(0, width * height);
-                final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+                final BufferedImage image = IconIO.createEmptyImage(width, height);
                 image.setRGB(0, 0, width, height, colorArray, 0, width);
                 return image;
             }

@@ -61,6 +61,9 @@ public class ImportAction extends AppAction {
             }
             final List<PackagizerRule> all = new ArrayList<PackagizerRule>();
             for (final File file : files) {
+                if (!file.isFile()) {
+                    continue;
+                }
                 final List<PackagizerRule> contents;
                 try {
                     contents = JSonStorage.restoreFromString(IO.readFileToString(file), new TypeRef<ArrayList<PackagizerRule>>() {

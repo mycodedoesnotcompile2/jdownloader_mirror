@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -50,7 +50,7 @@ public class LogV3 {
     static {
         Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
             @Override
-            public void uncaughtException(final Thread t, final Throwable e) {
+            public void uncaughtException(final Thread t, final Throwable e) {            
                 LogV3.logger(t).exception("Uncaught Exception in: " + t.getId() + "=" + t.getName(), e);
                 DebugMode.debugger();
             }

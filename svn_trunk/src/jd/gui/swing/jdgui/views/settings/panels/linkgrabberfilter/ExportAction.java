@@ -54,6 +54,7 @@ public class ExportAction extends AppAction {
             final String ext = export.get(0).isAccept() ? ImportAction.VIEW : ImportAction.EXT;
             final ExtFileChooserDialog d = new ExtFileChooserDialog(0, _GUI.T.LinkgrabberFilter_export_dialog_title(), null, null);
             d.setFileSelectionMode(FileChooserSelectionMode.FILES_ONLY);
+            d.setStorageID("filter" + ext);
             d.setFileFilter(new FileFilter() {
                 @Override
                 public String getDescription() {

@@ -37,7 +37,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 3, names = { "fex.net" }, urls = { "https?://(?:www\\.)?fex\\.net/folder/([a-z0-9]+)/file/(\\d+)" })
+@HostPlugin(revision = "$Revision: 50615 $", interfaceVersion = 3, names = { "fex.net" }, urls = { "https?://(?:www\\.)?fex\\.net/folder/([a-z0-9]+)/file/(\\d+)" })
 public class FexNet extends PluginForHost {
     public FexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,6 @@ public class FexNet extends PluginForHost {
     /* Connection stuff */
     private final boolean                  free_resume          = false;
     private final int                      free_maxchunks       = 1;
-    private final int                      free_maxdownloads    = -1;
     private String                         dllink               = null;
     public static final String             PROPERTY_directurl   = "directurl";
     public static final String             PROPERTY_token       = "authtoken";
@@ -60,7 +59,7 @@ public class FexNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://fex.net/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -106,7 +105,7 @@ public class FexNet extends PluginForHost {
         // final String token = (String) JavaScriptEngineFactory.walkJson(entries, "anonymous/anonym_token");
         final Browser brc = br.cloneBrowser();
         brc.getPage(API_BASE + "/v1/anonymous/upload-token");
-        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.toString(), TypeRef.MAP);
+        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final String token = (String) entries.get("token");
         if (StringUtils.isEmpty(token)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -137,26 +136,30 @@ public class FexNet extends PluginForHost {
         try {
             final Browser brc = br.cloneBrowser();
             con = brc.openGetConnection(this.dllink);
-            if (this.looksLikeDownloadableContent(con)) {
-                /* Filename is usually set in crawler */
-                if (link.getFinalFileName() == null) {
-                    link.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(con)));
-                }
-                if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
-                }
-            } else if (con.getResponseCode() == 403) {
-                /* Auth token refresh needed */
-                if (link.hasProperty(PROPERTY_token)) {
-                    link.removeProperty(PROPERTY_token);
+            if (!this.looksLikeDownloadableContent(con)) {
+                if (con.getResponseCode() == 401 || con.getResponseCode() == 403) {
+                    /* Auth token refresh needed */
+                    if (link.hasProperty(PROPERTY_token)) {
+                        link.removeProperty(PROPERTY_token);
+                    } else {
+                        setAuthToken(null);
+                    }
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid auth token", 1 * 60 * 1000l);
+                } else if (con.getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
-                    setAuthToken(null);
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
                 }
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid auth token", 3 * 60 * 1000l);
-            } else if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
+            }
+            /* Filename is usually set in crawler */
+            if (link.getFinalFileName() == null) {
+                final String filenameFromConnection = getFileNameFromConnection(con);
+                if (filenameFromConnection != null) {
+                    link.setFinalFileName(Encoding.htmlDecode(filenameFromConnection));
+                }
+            }
+            if (con.getCompleteContentLength() > 0) {
+                link.setVerifiedFileSize(con.getCompleteContentLength());
             }
         } finally {
             try {
@@ -186,7 +189,7 @@ public class FexNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -11,7 +11,6 @@ import javax.swing.filechooser.FileFilter;
 import jd.nutils.io.JDFileFilter;
 import jd.plugins.PluginsC;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.jdownloader.logging.LogController;
 
@@ -75,12 +74,10 @@ public class ContainerPluginController {
         } catch (final Throwable e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
         }
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            try {
-                plugins.add(new org.jdownloader.container.SFDL());
-            } catch (final Throwable e) {
-                org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
-            }
+        try {
+            plugins.add(new org.jdownloader.container.SFDL());
+        } catch (final Throwable e) {
+            org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
         }
         try {
             plugins.add(new org.jdownloader.container.JD2AccountsImport());
