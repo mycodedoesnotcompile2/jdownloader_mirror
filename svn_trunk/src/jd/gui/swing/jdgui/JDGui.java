@@ -1414,67 +1414,17 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         this.internalSetWaiting(b);
     }
 
-    /**
-     * Sets the Windows Icons. lot's of lafs have problems resizing the icon. so we set different sizes. for 1.5 it is only possible to use
-     * {@link JFrame#setIconImage(Image)}
-     */
     private void setWindowIcon() {
-        /*
-         * NOTE: on linux setIconImage only works when the frame is set invisible and visible again
-         */
-        /*
-         * we only load a single resolution icon here to show a jd icon instead of java icon and not having a great impact on startup time
-         */
-        final Image preImage = NewTheme.I().getImage("logo/jd_logo_64_64", -1, -1, true, false, false);
-        if (true) {
-            new EDTHelper<Object>() {
-                @Override
-                public Object edtRun() {
-                    if (Application.getJavaVersion() >= Application.JAVA16) {
-                        final java.util.List<Image> list = new ArrayList<Image>();
-                        list.add(preImage);
-                        mainFrame.setIconImages(list);
-                    } else {
-                        mainFrame.setIconImage(preImage);
-                    }
-                    return null;
-                }
-            }.start();
-        }
-        SecondLevelLaunch.GUI_COMPLETE.executeWhenReached(new Runnable() {
-            public void run() {
-                if (Application.getJavaVersion() >= Application.JAVA16) {
-                    final java.util.List<Image> list = new ArrayList<Image>();
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 64));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 48));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 32));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 20));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 19));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 18));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 17));
-                    list.add(NewTheme.I().getImage("logo/jd_logo_128_128", -1, -1, true, false, false));
-                    // list.add(NewTheme.I().getImage("logo/logo_20_20", -1, -1, true, false));
-                    list.add(preImage);
-                    // list.add(NewTheme.I().getImage("logo/jd_logo_256_256", -1));
-                    new EDTHelper<Object>() {
-                        @Override
-                        public Object edtRun() {
-                            mainFrame.setIconImages(list);
-                            return null;
-                        }
-                    }.start();
-                } else {
-                    new EDTHelper<Object>() {
-                        @Override
-                        public Object edtRun() {
-                            // why a 17:17 icon?
-                            mainFrame.setIconImage(NewTheme.I().getImage("logo/logo_17_17", -1, -1, true, false, false));
-                            return null;
-                        }
-                    }.start();
-                }
-            }
-        });
+        final java.util.List<Image> list = new ArrayList<Image>();
+        list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 64));
+        list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 48));
+        list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 32));
+        list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 20));
+        list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 19));
+        list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 18));
+        list.add(NewTheme.I().getImage("logo/jd_logo_64_64", 17));
+        list.add(NewTheme.I().getImage("logo/jd_logo_128_128", -1, -1));
+        mainFrame.setIconImages(list);
     }
 
     /**

@@ -6,9 +6,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 import javax.swing.Icon;
 import javax.swing.JComboBox;
+import javax.swing.JTextField;
 import javax.swing.tree.TreePath;
 
 import org.appwork.swing.components.searchcombo.SearchComboBox;
@@ -85,6 +87,34 @@ public class AddSpecialAction extends AppAction {
             protected JComboBox getComboBox(Object[] options2) {
                 // return super.getComboBox(options2);
                 SearchComboBox<Object> ret = new SearchComboBox<Object>(options2) {
+                    @Override
+                    protected void setListSearchResults(List<Object> found, List<Object> all) {
+                        final List<Object> newList = new ArrayList<Object>();
+                        newList.addAll(all);
+                        newList.removeAll(found);
+                        newList.addAll(0, found);
+                        setList(newList);
+                    }
+
+                    @Override
+                    protected boolean matches(String element, String matches) {
+                        return element.toLowerCase(Locale.ROOT).contains(matches.toLowerCase(Locale.ROOT));
+                    }
+
+                    @Override
+                    public void setSelectionAfterAutoComplete(JTextField tf, String txt, int pos, List<Object> found) {
+                        if (!tf.getText().toLowerCase(Locale.ROOT).startsWith(txt.toLowerCase(Locale.ROOT))) {
+                            if (found.size() > 1) {
+                                safeSet(txt);
+                                return;
+                            }
+                            pos = tf.getText().toLowerCase(Locale.ROOT).indexOf(txt.toLowerCase(Locale.ROOT)) + txt.length();
+                        }
+                        System.out.println("Setr piot " + pos);
+                        tf.setCaretPosition(pos);
+                        tf.select(pos, tf.getText().length());
+                    }
+
                     @Override
                     protected Icon getIconForValue(Object value) {
                         try {

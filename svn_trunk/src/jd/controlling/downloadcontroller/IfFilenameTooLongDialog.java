@@ -293,8 +293,10 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
 
     private void autoSelectRenameIfAllowed() {
         if (userChangedSelection.get() == true) {
+            /* User has manually changed radio buttons -> Do not auto change selection anymore. */
             return;
         } else if (!filenameHasChanged()) {
+            /* File name hasn't changed -> Do nothing. */
             return;
         }
         rename.setSelected(true);

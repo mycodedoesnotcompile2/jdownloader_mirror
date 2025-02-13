@@ -44,10 +44,14 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.JavaVersion;
+import org.appwork.utils.images.IconPipe;
 import org.appwork.utils.reflection.Clazz;
 
 /**
@@ -242,5 +246,26 @@ public class MultiResolutionImageHelper {
             LogV3.log(e);
             throw new WTFException();
         }
+    }
+
+    /**
+     * @param icon
+     * @return
+     */
+    public static List<Image> getResolutionVariants(Icon icon) {
+        while (icon != null) {
+            if (icon instanceof ImageIcon) {
+                Image image = ((ImageIcon) icon).getImage();
+                if (isInstanceOf(image)) {
+                    return getResolutionVariants(image);
+                } else {
+                    return Arrays.asList(image);
+                }
+            }
+            if (icon instanceof IconPipe) {
+                icon = ((IconPipe) icon).getDelegate();
+            }
+        }
+        return null;
     }
 }

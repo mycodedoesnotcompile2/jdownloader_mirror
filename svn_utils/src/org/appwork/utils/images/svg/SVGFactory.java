@@ -39,7 +39,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 
-import org.appwork.utils.images.MultiResIcon;
+import org.appwork.utils.images.ScalableIcon;
 
 /**
  * @author thomas
@@ -61,5 +61,5 @@ public interface SVGFactory {
 
     boolean isSupported();
 
-    MultiResIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException;
+    ScalableIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException;
 }

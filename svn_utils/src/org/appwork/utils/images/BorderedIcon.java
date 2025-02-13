@@ -48,8 +48,7 @@ import javax.swing.Icon;
  * @date Feb 5, 2025
  *
  */
-public class BorderedIcon implements Icon, IconPipe {
-    private Icon  delegate;
+public class BorderedIcon extends AbstractIconPipe {
     private int   borderWidth;
     private Color borderColor;
 
@@ -59,16 +58,13 @@ public class BorderedIcon implements Icon, IconPipe {
      * @param i
      */
     public BorderedIcon(Icon delegate, Color color, int borderWidth) {
-        this.delegate = delegate;
+        super(delegate);
         this.borderWidth = borderWidth;
         this.borderColor = color;
     }
 
-    /**
-     * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
-     */
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y) {
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
         Graphics2D g2d = (Graphics2D) g.create();
         AffineTransform originalTransform = g2d.getTransform();
         double scaleX = originalTransform.getScaleX();
@@ -95,7 +91,7 @@ public class BorderedIcon implements Icon, IconPipe {
             g2d.setTransform(originalTransform);
         }
         g2d.setColor(Color.green);
-        delegate.paintIcon(c, g, x + borderWidth, y + borderWidth);
+        paintDelegate(c, g, x + borderWidth, y + borderWidth);
     }
 
     /**
@@ -103,8 +99,7 @@ public class BorderedIcon implements Icon, IconPipe {
      */
     @Override
     public int getIconWidth() {
-        int dw = delegate.getIconWidth();
-        return delegate.getIconWidth() + borderWidth * 2;
+        return super.getIconWidth() + borderWidth * 2;
     }
 
     /**
@@ -112,14 +107,6 @@ public class BorderedIcon implements Icon, IconPipe {
      */
     @Override
     public int getIconHeight() {
-        return delegate.getIconHeight() + borderWidth * 2;
-    }
-
-    /**
-     * @see org.appwork.utils.images.IconPipe#getDelegate()
-     */
-    @Override
-    public Icon getDelegate() {
-        return delegate;
+        return super.getIconHeight() + borderWidth * 2;
     }
 }

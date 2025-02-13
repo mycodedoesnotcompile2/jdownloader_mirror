@@ -146,7 +146,7 @@ public class BannerRotation implements Sponsor, AccountControllerListener {
         protected Icon loadIcon(final String relPath) {
             if (NewTheme.getInstance().hasIcon(relPath)) {
                 try {
-                    return NewTheme.getInstance().getIcon(relPath, -1, 25, true);
+                    return NewTheme.getInstance().getIcon(relPath, -1, 25);
                 } catch (final Throwable e) {
                     LogController.CL().log(e);
                 }

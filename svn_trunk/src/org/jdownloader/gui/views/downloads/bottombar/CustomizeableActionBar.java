@@ -213,7 +213,7 @@ public class CustomizeableActionBar extends MigPanel {
     }
 
     protected ImageIcon createDropdownImage(boolean b, Image back) {
-        Image front = NewTheme.I().getImage(b ? IconKey.ICON_POPUPSMALL : IconKey.ICON_POPDOWNSMALL, -1, true);
+        Image front = NewTheme.I().getImage(b ? IconKey.ICON_POPUPSMALL : IconKey.ICON_POPDOWNSMALL, -1);
         int w = back.getWidth(null);
         int h = back.getHeight(null);
         int xoffsetBack = 0;

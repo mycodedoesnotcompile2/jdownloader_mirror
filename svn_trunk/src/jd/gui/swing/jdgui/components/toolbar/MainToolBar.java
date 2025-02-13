@@ -47,21 +47,6 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.downloadcontroller.DownloadLinkCandidate;
-import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
-import jd.gui.swing.components.SetIconInterface;
-import jd.gui.swing.components.SetLabelInterface;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -88,6 +73,21 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadLinkCandidate;
+import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
+import jd.gui.swing.components.SetIconInterface;
+import jd.gui.swing.components.SetLabelInterface;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
+import net.miginfocom.swing.MigLayout;
 
 public class MainToolBar extends JToolBar implements MouseListener, DownloadWatchdogListener, GenericConfigEventListener<Boolean> {
     private static final long          serialVersionUID = 922971719957349497L;
@@ -638,12 +638,12 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
         if (MenuItemData.isEmptyValue(iconKey)) {
             iconKey = IconKey.ICON_QUESTION;
         }
-        Image back = NewTheme.I().getImage(iconKey, 20, false);
+        Image back = NewTheme.I().getImage(iconKey, 20);
         return createDropdownImage(back);
     }
 
     protected ImageIcon createDropdownImage(Image back) {
-        Image checkBox = NewTheme.I().getImage("popDownSmall", -1, false);
+        Image checkBox = NewTheme.I().getImage("popDownSmall", -1);
         back = ImageProvider.merge(back, checkBox, 0, 0, 24 - checkBox.getWidth(null), 24 - checkBox.getHeight(null));
         return new ImageIcon(back);
     }

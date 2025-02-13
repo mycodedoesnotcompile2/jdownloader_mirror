@@ -323,7 +323,7 @@ public class TaskColumn extends ExtTextColumn<AbstractNode> {
                 columnHelper.icon = null;
                 columnHelper.tooltip = null;
                 columnHelper.string = "";
-            } else if (!controller.isAlive()) {
+            } else if (!controller.isAlive() && controller.getState() != Thread.State.NEW) {
                 columnHelper.icon = finalizingIcon;
                 columnHelper.string = finalizingString;
                 columnHelper.tooltip = null;

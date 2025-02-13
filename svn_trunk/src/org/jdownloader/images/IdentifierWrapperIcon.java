@@ -7,33 +7,24 @@ import javax.swing.Icon;
 
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
+import org.appwork.utils.images.AbstractIconPipe;
 
-public class IdentifierWrapperIcon implements Icon, IDIcon {
-    private final Icon   _icon;
+public class IdentifierWrapperIcon extends AbstractIconPipe implements IDIcon {
     private final String key;
 
     public IdentifierWrapperIcon(Icon ret, String relativePath) {
-        _icon = ret;
+        super(ret);
         key = relativePath;
     }
 
-    public Icon getIcon() {
-        return _icon;
+    @Override
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+        paintDelegate(c, g, x, y);
     }
 
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y) {
-        _icon.paintIcon(c, g, x, y);
-    }
-
-    @Override
-    public int getIconWidth() {
-        return _icon.getIconWidth();
-    }
-
-    @Override
-    public int getIconHeight() {
-        return _icon.getIconHeight();
+    public String toString() {
+        return "IDIcon: " + key;
     }
 
     @Override

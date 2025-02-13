@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -45,7 +45,7 @@ import java.io.InputStream;
 
 import javax.swing.JComponent;
 
-import org.appwork.utils.images.MultiResIcon;
+import org.appwork.utils.images.ScalableIcon;
 
 /**
  * @author daniel
@@ -106,7 +106,7 @@ public class WeisjJSVG {
      * @param height
      * @return
      */
-    public static MultiResIcon getIconFromSVG(InputStream stream, int width, int height) {
+    public static ScalableIcon getIconFromSVG(InputStream stream, int width, int height) {
         try {
             com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
             final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(stream);

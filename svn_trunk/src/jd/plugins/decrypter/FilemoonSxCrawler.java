@@ -35,9 +35,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
+import jd.plugins.hoster.FilemoonSx;
 
-@DecrypterPlugin(revision = "$Revision: 50550 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50618 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilemoonSxCrawler.class })
 public class FilemoonSxCrawler extends PluginForDecrypt {
     public FilemoonSxCrawler(PluginWrapper wrapper) {
@@ -46,7 +46,7 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "filemoon.sx", "filemoon.to", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol" });
+        ret.add(new String[] { "filemoon.sx", "filemoon.to", "filemoon.eu", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol" });
         return ret;
     }
 
@@ -76,7 +76,7 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final PluginForHost hosterPlugin = this.getNewPluginForHostInstance(this.getHost());
+        final FilemoonSx hosterPlugin = (FilemoonSx) this.getNewPluginForHostInstance(this.getHost());
         final DownloadLink link = new DownloadLink(hosterPlugin, this.getHost(), param.getCryptedUrl(), true);
         final XFSConfigVideoFilemoonSx cfg = PluginJsonConfig.get(XFSConfigVideoFilemoonSx.class);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();

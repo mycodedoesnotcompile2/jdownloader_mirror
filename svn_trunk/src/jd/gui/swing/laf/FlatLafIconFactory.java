@@ -13,23 +13,23 @@ import javax.swing.JComponent;
 
 import org.appwork.resources.DefaultIconFactory;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.images.MultiResIconImpl;
+import org.appwork.utils.images.AbstractIconPipe;
+import org.appwork.utils.images.ScalableIcon;
 
 public class FlatLafIconFactory extends DefaultIconFactory {
-    public static class InterpolatingIcon implements Icon {
-        private final Icon delegate;
-
+    public static class InterpolatingIcon extends AbstractIconPipe {
         public InterpolatingIcon(final Icon urlToIcon) {
-            DebugMode.breakIf(urlToIcon == null);
-            this.delegate = urlToIcon;
+            super(urlToIcon);
         }
 
         @Override
-        public void paintIcon(final Component c, final Graphics g, final int x, final int y) {
-            if (this.delegate instanceof MultiResIconImpl) {
-                this.delegate.paintIcon(c, g, x, y);
+        public void paintIcon(final Component c, final Graphics g, final int x, final int y, Icon parent) {
+            if (this.delegate instanceof ScalableIcon) {
+                paintDelegate(c, g, x, y);
                 return;
             }
+            // brauchen wir das noch?
+            DebugMode.debugger();
             final AffineTransform currentTransform = ((Graphics2D) g).getTransform();
             final double scaleX = currentTransform.getScaleX();
             final double scaleY = currentTransform.getScaleY();
@@ -48,16 +48,6 @@ public class FlatLafIconFactory extends DefaultIconFactory {
                 }
                 ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, restore);
             }
-        }
-
-        @Override
-        public int getIconWidth() {
-            return this.delegate.getIconWidth();
-        }
-
-        @Override
-        public int getIconHeight() {
-            return this.delegate.getIconHeight();
         }
     }
 

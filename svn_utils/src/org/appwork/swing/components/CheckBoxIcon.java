@@ -48,9 +48,11 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.images.IconDebugger;
 import org.appwork.utils.images.IconIO;
+import org.appwork.utils.images.ScalableIcon;
 
-public final class CheckBoxIcon implements Icon, IDIcon {
+public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
     /**
      *
      */
@@ -70,10 +72,13 @@ public final class CheckBoxIcon implements Icon, IDIcon {
         this(-1, selected, enabled);
     }
 
+    public static void main(String[] args) {
+        IconDebugger.show(TRUE, "TRUE");
+        IconDebugger.show(FALSE, "FALSE");
+        IconDebugger.show(UNDEFINED, "UNDEFINED");
+    }
+
     public CheckBoxIcon(int size, boolean selected, boolean enabled) {
-        // we need this workaround.
-        // if we would use cb.paint(g); for every paintIcon call, this might
-        // habe sideeffects on the LAF painter.
         this.selected = selected;
         this.enabled = enabled;
         this.size = size;
@@ -95,21 +100,13 @@ public final class CheckBoxIcon implements Icon, IDIcon {
                 // checkBox.setDebugGraphicsOptions(DebugGraphics.LOG_OPTION);
                 checkBox.setSize(checkBox.getPreferredSize());
                 checkBox.setOpaque(false);
-                checkBox.setContentAreaFilled(false);
+                checkBox.setContentAreaFilled(true);
                 BufferedImage dummy = IconIO.createEmptyImage(32, 32);
                 Graphics2D g2d = (Graphics2D) dummy.getGraphics();
                 g2d.setTransform(new AffineTransform());
                 RecordingGraphics2D record = new RecordingGraphics2D(g2d);
                 checkBox.paint(record);
-                // checkBox.paint(g2d);
                 g2d.dispose();
-                // Application.getResource("dummy.png").delete();
-                // System.out.println(Application.getResource("dummy.png"));
-                // try {
-                // ImageIO.write(dummy, "png", Application.getResource("dummy.png"));
-                // } catch (IOException e) {
-                // LogV3.log(e);
-                // }
                 unscaledDimensionAndPosition = record.getCompleteDrawnArea();
             } catch (Exception e) {
                 LogV3.log(e);
@@ -131,9 +128,73 @@ public final class CheckBoxIcon implements Icon, IDIcon {
      */
     @Override
     public synchronized void paintIcon(Component c, Graphics gOrg, int x, int y) {
+        paintIcon(c, gOrg, x, y, getIconWidth(), getIconHeight());
+    }
+
+    public CheckBoxIcon(boolean selected) {
+        this(selected, true);
+    }
+
+    /**
+     * @see javax.swing.Icon#getIconWidth()
+     */
+    @Override
+    public int getIconWidth() {
+        if (image != null) {
+            return image.getWidth(null);
+        }
+        if (size <= 0) {
+            return (int) unscaledDimensionAndPosition.getWidth();
+        }
+        return size;
+    }
+
+    /**
+     * @see javax.swing.Icon#getIconHeight()
+     */
+    @Override
+    public int getIconHeight() {
+        if (image != null) {
+            return image.getHeight(null);
+        }
+        if (size <= 0) {
+            return (int) unscaledDimensionAndPosition.getHeight();
+        }
+        return size;
+    }
+
+    /**
+     * @see org.appwork.swing.components.IDIcon#getIdentifier()
+     */
+    @Override
+    public IconIdentifier getIdentifier() {
+        return new IconIdentifier("CheckBoxIcon_" + (selected ? "true" : "false") + (enabled ? "_enabled" : "_disabled"));
+    }
+
+    /**
+     * @see org.appwork.utils.images.ScalableIcon#setIconHeight(int)
+     */
+    @Override
+    public void setIconHeight(int iconHeight) {
+        size = iconHeight;
+    }
+
+    /**
+     * @see org.appwork.utils.images.ScalableIcon#setIconWidth(int)
+     */
+    @Override
+    public void setIconWidth(int iconWidth) {
+        size = iconWidth;
+    }
+
+    /**
+     * @see org.appwork.utils.images.ScalableIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int, int, int)
+     */
+    @Override
+    public void paintIcon(Component c, Graphics gOrg, int x, int y, int width, int height) {
         if (image != null) {
             // headless
-            gOrg.drawImage(image, x, y, c);
+            gOrg.drawImage(IconIO.getScaledInstance(image, width, height), x, y, c);
             return;
         }
         Graphics g = gOrg.create();
@@ -150,8 +211,8 @@ public final class CheckBoxIcon implements Icon, IDIcon {
         // g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         // dummy paint just to get the painted area
         // g2d.setTransform(new AffineTransform());
-        double componentScaleX = getIconWidth() / unscaledDimensionAndPosition.getWidth();
-        double componentScaleY = getIconHeight() / unscaledDimensionAndPosition.getHeight();
+        double componentScaleX = height / unscaledDimensionAndPosition.getWidth();
+        double componentScaleY = width / unscaledDimensionAndPosition.getHeight();
         // g2d.scale(orgTf.getScaleX(), orgTf.getScaleY());
         // g2d.translate(x + area.getX() - 1, y + area.getY() + 1);
         // g2d.translate(x, y);
@@ -198,45 +259,5 @@ public final class CheckBoxIcon implements Icon, IDIcon {
         // ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, restore);
         // }
         // }
-    }
-
-    public CheckBoxIcon(boolean selected) {
-        this(selected, true);
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconWidth()
-     */
-    @Override
-    public int getIconWidth() {
-        if (image != null) {
-            return image.getWidth(null);
-        }
-        if (size <= 0) {
-            return (int) unscaledDimensionAndPosition.getWidth();
-        }
-        return size;
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconHeight()
-     */
-    @Override
-    public int getIconHeight() {
-        if (image != null) {
-            return image.getHeight(null);
-        }
-        if (size <= 0) {
-            return (int) unscaledDimensionAndPosition.getHeight();
-        }
-        return size;
-    }
-
-    /**
-     * @see org.appwork.swing.components.IDIcon#getIdentifier()
-     */
-    @Override
-    public IconIdentifier getIdentifier() {
-        return new IconIdentifier("CheckBoxIcon_" + (selected ? "true" : "false") + (enabled ? "_enabled" : "_disabled"));
     }
 }

@@ -61,7 +61,7 @@ import org.appwork.utils.swing.EDT;
  * @date Jan 30, 2025
  *
  */
-public class DebugIcon implements Icon, IconPipe {
+public class DebugIcon extends AbstractIconPipe {
     private static boolean CTRL_PRESSED = false;
     static {
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !Application.isHeadless()) {
@@ -92,29 +92,20 @@ public class DebugIcon implements Icon, IconPipe {
             });
         }
     }
-    private Icon delegate;
-
-    /**
-     * @see org.appwork.utils.images.IconPipe#getDelegate()
-     */
-    @Override
-    public Icon getDelegate() {
-        return delegate;
-    }
 
     /**
      * @param iconEnd
      */
     public DebugIcon(Icon icon) {
-        this.delegate = icon;
+        super(icon);
     }
 
     /**
      * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
      */
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y) {
-        delegate.paintIcon(c, g, x, y);
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+        paintDelegate(c, g, x, y);
         if (!CTRL_PRESSED) {
             Graphics2D g2d = (Graphics2D) g.create();
             String text = "" + (getIconWidth() * g2d.getTransform().getScaleX());
@@ -147,21 +138,5 @@ public class DebugIcon implements Icon, IconPipe {
             g2d.fill(textShape);
             g2d.dispose();
         }
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconWidth()
-     */
-    @Override
-    public int getIconWidth() {
-        return delegate.getIconWidth();
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconHeight()
-     */
-    @Override
-    public int getIconHeight() {
-        return delegate.getIconHeight();
     }
 }

@@ -128,15 +128,14 @@ public class LogToStdOutSink extends AbstractSink {
     protected boolean switchIt(LogRecord2 last, LogRecord2 record) {
         if (last == null) {
             return true;
-        }
-        if (last.threadID != record.threadID) {
+        } else if (!record.getThrownAt().getClassName().equals(last.getThrownAt().getClassName())) {
+            return true;
+        } else if (last.threadID != record.threadID) {
             return true;
         }
-        SimpleDateFormat format = dateOnly.get();
+        final SimpleDateFormat format = dateOnly.get();
         if (!format.format(record.timestamp).equals(format.format(last.timestamp))) {
-            return true;
-        }
-        if (!record.getThrownAt().getClassName().equals(last.getThrownAt().getClassName())) {
+            // we compare result of StringFormatter as it may be less accurate than actual raw timestamp
             return true;
         }
         return false;

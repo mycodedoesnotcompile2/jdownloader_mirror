@@ -100,8 +100,7 @@ public class IconIO {
         PNG
     }
 
-    public static class ScaledIcon implements Icon, IDIcon {
-        private final Icon          source;
+    public static class ScaledIcon extends AbstractIconPipe implements Icon, IDIcon {
         private final int           width;
         private final int           height;
         private final Interpolation interpolation;
@@ -114,7 +113,7 @@ public class IconIO {
          * @param hint
          */
         public ScaledIcon(final Icon icon, final int width, final int height, final Interpolation interpolation) {
-            this.source = icon;
+            super(icon);
             this.faktor = 1d / Math.max((double) icon.getIconWidth() / width, (double) icon.getIconHeight() / height);
             this.width = Math.max((int) (icon.getIconWidth() * this.faktor), 1);
             this.height = Math.max((int) (icon.getIconHeight() * this.faktor), 1);
@@ -148,23 +147,19 @@ public class IconIO {
          */
         @Override
         public IconIdentifier getIdentifier() {
-            if (source instanceof IDIcon) {
-                return ((IDIcon) source).getIdentifier();
+            if (delegate instanceof IDIcon) {
+                return ((IDIcon) delegate).getIdentifier();
             } else {
-                return new IconIdentifier("unknown", source.toString());
+                return new IconIdentifier("unknown", delegate.toString());
             }
         }
 
         protected Icon getOrigin() {
-            if (source instanceof ScaledIcon) {
-                return ((ScaledIcon) source).getOrigin();
+            if (delegate instanceof ScaledIcon) {
+                return ((ScaledIcon) delegate).getOrigin();
             } else {
-                return source;
+                return delegate;
             }
-        }
-
-        protected Icon getSource() {
-            return source;
         }
 
         /*
@@ -173,9 +168,9 @@ public class IconIO {
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
-        public void paintIcon(final Component c, final Graphics g, final int x, final int y) {
-            if (source instanceof MultiResIcon) {
-                ((MultiResIcon) source).paintIcon(c, g, x, y, getIconWidth(), getIconHeight());
+        public void paintIcon(final Component c, final Graphics g, final int x, final int y, Icon parent) {
+            if (delegate instanceof ScalableIcon) {
+                ((ScalableIcon) delegate).paintIcon(c, g, x, y, getIconWidth(), getIconHeight());
                 return;
             }
             final Graphics2D g2 = (Graphics2D) g;
@@ -185,7 +180,7 @@ public class IconIO {
             final AffineTransform old = g2.getTransform();
             g2.translate(x, y);
             g2.scale(this.faktor, this.faktor);
-            this.source.paintIcon(c, g, 0, 0);
+            paintDelegate(c, g2, 0, 0);
             g2.setTransform(old);
         }
     }
@@ -650,8 +645,8 @@ public class IconIO {
      * @return
      */
     public static Icon getScaledInstance(final Icon icon, final int width, final int height, final Interpolation bicubic) {
-        if (icon instanceof MultiResIcon) {
-            return new ProxyIcon((MultiResIcon) icon, width, height);
+        if (icon instanceof ScalableIcon) {
+            return new ScaledIcon(icon, width, height, bicubic);
         }
         if (icon instanceof ImageIcon) {
             final ImageIcon iIcon = (ImageIcon) icon;
@@ -936,6 +931,7 @@ public class IconIO {
                 final int r = (rgb >> 16) & 0xff;
                 final int g = (rgb >> 8) & 0xff;
                 final int b = (rgb >> 0) & 0xff;
+                // System.out.println(Long.toHexString(new Color(r, g, b, a).getRGB()));
                 // System.out.println(a);
                 if (r == 0 && b == 0 && g == 0) {
                     //
@@ -1013,12 +1009,6 @@ public class IconIO {
             final Image img = ((ImageIcon) icon).getImage();
             if (img instanceof BufferedImage) {
                 return (BufferedImage) img;
-            }
-        }
-        if (icon instanceof MultiResIconImpl) {
-            Image ret = ((MultiResIconImpl) icon).getImage();
-            if (ret != null) {
-                return IconIO.toBufferedImage(ret);
             }
         }
         final int w = icon.getIconWidth();

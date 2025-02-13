@@ -35,8 +35,8 @@ package org.appwork.utils.test;
 
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.JVMVersion;
-import org.appwork.utils.JVMVersion.JavaVersionInterface;
 import org.appwork.utils.JavaVersion;
+import org.appwork.utils.JavaVersionInterface;
 
 /**
  * @author daniel

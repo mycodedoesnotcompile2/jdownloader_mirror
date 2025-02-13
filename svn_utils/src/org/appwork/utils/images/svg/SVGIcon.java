@@ -36,14 +36,14 @@ package org.appwork.utils.images.svg;
 import java.awt.Component;
 import java.awt.Graphics;
 
-import org.appwork.utils.images.MultiResIcon;
+import org.appwork.utils.images.ScalableIcon;
 
 /**
  * @author thomas
  * @date 22.11.2023
  *
  */
-public abstract class SVGIcon implements MultiResIcon {
+public abstract class SVGIcon implements ScalableIcon {
     protected int iconWidth;
 
     @Override

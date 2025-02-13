@@ -74,6 +74,7 @@ import javax.swing.plaf.basic.ComboPopup;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 
+import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.MigPanel;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTHelper;
@@ -161,6 +162,23 @@ public abstract class SearchComboBox<T> extends JComboBox {
             this.tf.addActionListener(l);
         }
 
+        private DelayedRunnable delayer = new DelayedRunnable(500) {
+            @Override
+            public void delayedrun() {
+                // scheduler executes at least 50 ms after this submit.
+                // this.sheduler.run();
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (Editor.this.valueSetter.get() > 0) {
+                            return;
+                        }
+                        Editor.this.autoComplete(true);
+                    }
+                });
+            }
+        };
+
         private void auto() {
             if (!SearchComboBox.this.isAutoCompletionEnabled()) {
                 return;
@@ -168,17 +186,7 @@ public abstract class SearchComboBox<T> extends JComboBox {
             if (this.valueSetter.get() > 0) {
                 return;
             }
-            // scheduler executes at least 50 ms after this submit.
-            // this.sheduler.run();
-            SwingUtilities.invokeLater(new Runnable() {
-                @Override
-                public void run() {
-                    if (Editor.this.valueSetter.get() > 0) {
-                        return;
-                    }
-                    Editor.this.autoComplete(true);
-                }
-            });
+            delayer.resetAndStart();
         }
 
         /**
@@ -475,6 +483,10 @@ public abstract class SearchComboBox<T> extends JComboBox {
      */
     public SearchComboBox() {
         this((List<T>) null);
+    }
+
+    protected void safeSet(String text) {
+        ((Editor) editor).safeSet(text);
     }
 
     public SearchComboBox(final T... elements) {
@@ -898,11 +910,10 @@ public abstract class SearchComboBox<T> extends JComboBox {
         if (txt == null) {
             return false;
         }
-        txt = txt.toLowerCase(Locale.ENGLISH);
         String text;
         for (int i = 0; i < SearchComboBox.this.getModel().getSize(); i++) {
             text = SearchComboBox.this.getTextForValue((T) SearchComboBox.this.getModel().getElementAt(i));
-            if (text != null && text.toLowerCase(Locale.ENGLISH).startsWith(txt)) {
+            if (matches(text, txt)) {
                 return true;
             }
         }

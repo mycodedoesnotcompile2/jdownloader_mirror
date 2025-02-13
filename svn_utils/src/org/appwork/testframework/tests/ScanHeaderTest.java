@@ -78,7 +78,7 @@ public class ScanHeaderTest extends AWTest {
                     if (f.getName().equals((ScanHeaderTest.class.getSimpleName() + ".java"))) {
                         return;
                     }
-                    if (f.lastModified() > 1729246424444l) {
+                    if (f.lastModified() > System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000l) {
                         String java = IO.readFileToString(f);
                         int year = new Date().getYear() + 1900;
                         String newJava = java.replaceAll("Copyright \\(c\\) 2009-20\\d\\d,", "Copyright (c) 2009-" + year + ",");

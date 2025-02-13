@@ -34,6 +34,9 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.images;
 
+import java.awt.Component;
+import java.awt.Graphics;
+
 import javax.swing.Icon;
 
 /**
@@ -43,4 +46,13 @@ import javax.swing.Icon;
  */
 public interface IconPipe {
     public Icon getDelegate();
+
+    /**
+     * @param c
+     * @param g
+     * @param x
+     * @param y
+     * @param identifierWrapperIcon
+     */
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent);
 }

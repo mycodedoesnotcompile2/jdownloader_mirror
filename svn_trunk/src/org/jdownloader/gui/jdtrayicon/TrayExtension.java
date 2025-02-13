@@ -232,9 +232,9 @@ public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTransla
                                 }
                             }
                             if (getSettings().isGreyIconEnabled()) {
-                                img = ImageProvider.convertToGrayScale(NewTheme.I().getImage("logo/jd_logo_128_128", trayIconWidth, trayIconHeight, true, true, false));
+                                img = ImageProvider.convertToGrayScale(NewTheme.I().getImage("logo/jd_logo_128_128", trayIconWidth, trayIconHeight));
                             } else {
-                                img = NewTheme.I().getImage("logo/jd_logo_128_128", trayIconWidth, trayIconHeight, true, true, false);
+                                img = NewTheme.I().getImage("logo/jd_logo_128_128", trayIconWidth, trayIconHeight);
                             }
                             LogController.CL(TrayExtension.class).info("TrayIconSize:" + trayIconWidth + "x" + trayIconHeight + "->IconSize:" + img.getWidth(null) + "x" + img.getHeight(null));
                             // workaround for gnome 3 transparency bug

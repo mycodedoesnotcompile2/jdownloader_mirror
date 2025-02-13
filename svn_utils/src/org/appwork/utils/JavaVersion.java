@@ -1,6 +1,12 @@
 package org.appwork.utils;
 
-import org.appwork.utils.JVMVersion.JavaVersionInterface;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 
 public enum JavaVersion implements JavaVersionInterface {
     // https://en.wikipedia.org/wiki/Java_version_history
@@ -36,7 +42,7 @@ public enum JavaVersion implements JavaVersionInterface {
     JVM_26_0(70, "26"/* not verified */) {
         private final long next;
         {
-            this.next = JVMVersion.parseJavaVersionString("27");
+            this.next = parseJavaVersionString("27");
         }
 
         @Override
@@ -54,7 +60,7 @@ public enum JavaVersion implements JavaVersionInterface {
      * @return
      */
     public boolean is(final String versionString) {
-        return this.is(JVMVersion.parseJavaVersionString(versionString));
+        return this.is(parseJavaVersionString(versionString));
     }
 
     public boolean is(final long id) {
@@ -85,10 +91,65 @@ public enum JavaVersion implements JavaVersionInterface {
     }
 
     private JavaVersion(final int classMajorVersion, final String stringID, final boolean lts) {
-        this.longID = JVMVersion.parseJavaVersionString(stringID);
+        this.longID = parseJavaVersionString(stringID);
         this.classID = classMajorVersion;
         this.string = stringID;
         this.lts = lts;
+    }
+
+    public static long parseJavaVersionString(String version) {
+        if (version != null) {
+            // remove trailing LTS
+            version = version.replaceFirst("\\s*-\\s*LTS$", "");
+        }
+        final String majorFeature = new Regex(version, "^(\\d+)").getMatch(0);
+        final String minorInterim = new Regex(version, "^\\d+\\.(\\d+)").getMatch(0);
+        final String securityUpdate = new Regex(version, "^\\d+\\.\\d+\\.(\\d+)").getMatch(0);
+        // final String patch = new Regex(version, "^\\d+\\.\\d+\\.\\d+\\.(\\d+)").getMatch(0);
+        long ret = 0;
+        final String u;
+        final String b;
+        if ("1".equals(majorFeature) && minorInterim != null) {
+            // java 1.5 - java 1.8
+            ret = Long.parseLong(minorInterim) * 1000 * 1000 + 10000000;
+            u = new Regex(version, "^.*?_(\\d+)").getMatch(0);
+            b = new Regex(version, "^.*?(_|-)b(\\d+)$").getMatch(1);
+            // ignore securityUpdate
+        } else if (majorFeature != null) {
+            // java 1.9, java 10, java 11...
+            final long major = Long.parseLong(majorFeature);
+            u = new Regex(version, "u(\\d+)").getMatch(0);
+            b = new Regex(version, "\\+(\\d+)$").getMatch(0);
+            // if (major < 5) {
+            // // fallback to Java 1.5
+            // return JAVA_1_5;
+            // } else
+            //
+            if (major < 9) {
+                // < java 9
+                ret = major * 1000 * 1000 + 10000000;
+            } else {
+                // >= java 9
+                ret = major * 1000 * 1000 * 1000 * 1000l;
+                if (minorInterim != null) {
+                    ret += Math.min(999, Long.parseLong(minorInterim)) * 1000 * 1000 * 1000l;
+                }
+                if (securityUpdate != null) {
+                    ret += Math.min(999, Long.parseLong(securityUpdate)) * 1000 * 1000;
+                }
+            }
+        } else {
+            return -1;
+        }
+        if (u != null) {
+            /* append update number */
+            ret += Math.min(999, Long.parseLong(u)) * 1000;
+        }
+        if (b != null) {
+            /* append build number */
+            ret += Math.min(999, Long.parseLong(b));
+        }
+        return ret;
     }
 
     public boolean isHigherThan(final JavaVersionInterface v) {
@@ -99,8 +160,142 @@ public enum JavaVersion implements JavaVersionInterface {
         }
     }
 
+    private static final JavaVersionInterface VERSION;
+    static {
+        JavaVersionInterface version = JavaVersion.UNKNOWN;
+        try {
+            final String versionString = getJVMVersion();
+            version = toJavaVersion(versionString);
+        } catch (final Exception e) {
+            DebugMode.debugger(e);
+        }
+        VERSION = version;
+    }
+
+    private static int getClassID(JavaVersion base) {
+        final String version = System.getProperty("java.class.version");
+        if (version != null) {
+            try {
+                final int ret = (int) Double.parseDouble(version);
+                if (base.getClassID() != -1 && ret != base.getClassID()) {
+                    DebugMode.debugger();
+                }
+                return ret;
+            } catch (NumberFormatException ignore) {
+                DebugMode.debugger(ignore);
+            }
+        }
+        return base.getClassID();
+    }
+
+    public static JavaVersion readClassJVMVersion(final InputStream is) throws IOException {
+        try {
+            final DataInputStream dis = new DataInputStream(is);
+            final byte[] magic = new byte[4];
+            dis.readFully(magic);
+            if (Arrays.equals(magic, new byte[] { (byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE })) {
+                final byte[] minor = new byte[2];
+                dis.readFully(minor);
+                final byte[] major = new byte[2];
+                final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(4);
+                byteBuffer.order(ByteOrder.BIG_ENDIAN);
+                byteBuffer.put(major);
+                dis.readFully(major);
+                byteBuffer.put(major);
+                JDK8BufferHelper.flip(byteBuffer);
+                final int majorVersion = byteBuffer.getInt();
+                for (final JavaVersion e : JavaVersion.values()) {
+                    if (e.classID == majorVersion) {
+                        return e;
+                    }
+                }
+            }
+            return JavaVersion.UNKNOWN;
+        } catch (final EOFException e) {
+            return JavaVersion.UNKNOWN;
+        } catch (final IOException e) {
+            return JavaVersion.UNKNOWN;
+        }
+    }
+
+    public static JavaVersionInterface toJavaVersion(final String versionString) {
+        final long longID = parseJavaVersionString(versionString);
+        final boolean isLTS = versionString != null && versionString.contains("LTS");
+        JavaVersion base = JavaVersion.UNKNOWN;
+        for (JavaVersion v : JavaVersion.values()) {
+            if (v.is(longID)) {
+                base = v;
+                break;
+            }
+        }
+        final JavaVersion finalBase = base;
+        return new JavaVersionInterface() {
+            private final int classID = VERSION == null ? JavaVersion.getClassID(finalBase) : finalBase.getClassID();
+
+            public boolean is(JavaVersionInterface version) {
+                return getBase().is(version);
+            }
+
+            public boolean isHigherThan(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() > v.getLongID();
+            }
+
+            public boolean isMinimum(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() >= v.getLongID();
+            }
+
+            public boolean isMaximum(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() <= v.getLongID();
+            }
+
+            public boolean isLowerThan(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() < v.getLongID();
+            }
+
+            @Override
+            public long getLongID() {
+                return longID;
+            }
+
+            @Override
+            public JavaVersion getBase() {
+                return finalBase;
+            }
+
+            @Override
+            public int getClassID() {
+                return classID;
+            }
+
+            @Override
+            public boolean isLTS() {
+                return isLTS || getBase().isLTS();
+            }
+
+            @Override
+            public String getVersionString() {
+                return versionString;
+            }
+
+            @Override
+            public String toString() {
+                return "Base:" + getBase().name() + (isLTS() ? "(LTS)" : "") + "|Version:" + getLongID() + "(" + getVersionString() + ")|ClassID:" + getClassID();
+            }
+        };
+    }
+
+    public static String getJVMVersion() {
+        /* this version info contains more information */
+        final String version = System.getProperty("java.runtime.version");
+        if (version == null || version.trim().length() == 0) {
+            return System.getProperty("java.version");
+        } else {
+            return version;
+        }
+    }
+
     public static JavaVersionInterface getVersion() {
-        return JVMVersion.getVersion();
+        return VERSION;
     }
 
     public boolean isMinimum(final JavaVersionInterface v) {

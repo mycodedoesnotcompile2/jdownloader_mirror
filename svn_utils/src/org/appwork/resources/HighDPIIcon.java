@@ -43,29 +43,21 @@ import java.awt.geom.AffineTransform;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
+import org.appwork.swing.components.IDIcon;
+import org.appwork.swing.components.IconIdentifier;
+import org.appwork.utils.images.AbstractIconPipe;
 import org.appwork.utils.images.AlignHorizontal;
 import org.appwork.utils.images.AlignVertical;
 import org.appwork.utils.images.CroppedIcon;
-import org.appwork.utils.images.IconPipe;
 
 /**
  * @author thomas
  * @date Feb 8, 2025
  *
  */
-public class HighDPIIcon implements Icon, IconPipe {
-    private Icon delegate;
-
+public class HighDPIIcon extends AbstractIconPipe {
     private HighDPIIcon(Icon icon) {
-        this.delegate = icon;
-    }
-
-    public int getIconHeight() {
-        return delegate.getIconHeight();
-    }
-
-    public int getIconWidth() {
-        return delegate.getIconWidth();
+        super(icon);
     }
 
     /**
@@ -76,41 +68,60 @@ public class HighDPIIcon implements Icon, IconPipe {
     }
 
     @Override
-    public synchronized void paintIcon(Component c, Graphics g, int x, int y) {
+    public synchronized void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
         if (!(delegate instanceof ImageIcon)) {
-            delegate.paintIcon(c, g, x, y);
+            paintDelegate(c, g, x, y);
             return;
+        }
+        if (parent instanceof IDIcon) {
+            IconIdentifier iden = ((IDIcon) parent).getIdentifier();
+            if (iden.getKey().contains("plus")) {
+                // System.out.println(12);
+            }
         }
         Image image = ((ImageIcon) delegate).getImage();
         Graphics2D g2 = (Graphics2D) g;
         AffineTransform transform = g2.getTransform();
         double scaleX = transform.getScaleX();
         double scaleY = transform.getScaleY();
-        // DebugMode.breakIf(getIconWidth() < 32);
+        // if (parent instanceof IDIcon) {
+        // IconIdentifier iden = ((IDIcon) parent).getIdentifier();
+        // System.out.println("Paint: " + parent);
+        // }
         if (scaleX != 1d || scaleY != 1d) {
-            {
-                if (isHDPIFixRequired(scaleX, scaleY, transform.getTranslateX(), transform.getTranslateY())) {
-                    double scaledW = getIconWidth() * scaleX;
-                    double scaledH = getIconHeight() * scaleY;
-                    Image best = MultiResolutionImageHelper.isInstanceOf(image) ? MultiResolutionImageHelper.getResolutionVariant(image, scaledW, scaledH) : image;
-                    boolean perfectFit = best.getWidth(null) == scaledW && best.getHeight(null) == scaledH;
+            if (isHDPIFixRequired(scaleX, scaleY, transform.getTranslateX(), transform.getTranslateY())) {
+                double scaledW = getIconWidth() * scaleX;
+                double scaledH = getIconHeight() * scaleY;
+                Image best = MultiResolutionImageHelper.isInstanceOf(image) ? MultiResolutionImageHelper.getResolutionVariant(image, scaledW, scaledH) : image;
+                boolean perfectFit = best.getWidth(null) == scaledW && best.getHeight(null) == scaledH;
+                AffineTransform currentTransform = g2.getTransform();
+                // correct x/y position and avoid that hava tries to draw between physical pixals.
+                double fixtX = currentTransform.getTranslateX() % 1d;
+                double fixtY = currentTransform.getTranslateY() % 1d;
+                g2.translate(-fixtX, -fixtY);
+                if (perfectFit) {
+                    // System.out.println("perfeftFit HighDPI");
                     g2.scale(1 / scaleX, 1 / scaleY);
-                    // correct x/y position and avoid that hava tries to draw between physical pixals.
-                    double fixtX = g2.getTransform().getTranslateX() % 1d;
-                    double fixtY = g2.getTransform().getTranslateY() % 1d;
-                    g2.translate(-fixtX, -fixtY);
-                    if (perfectFit) {
-                        g2.drawImage(best, (int) Math.round(x * scaleX), (int) Math.round(y * scaleY), c);
-                    } else {
-                        new CroppedIcon(new ImageIcon(best), (int) Math.round(scaledW), (int) Math.round(scaledH), AlignHorizontal.CENTER, AlignVertical.CENTER).paintIcon(c, g2, (int) (x * scaleX), (int) (y * scaleY));
-                    }
+                    g2.drawImage(best, (int) Math.round(x * scaleX), (int) Math.round(y * scaleY), c);
                     g2.translate(fixtX, fixtY);
                     g2.scale(scaleX, scaleY);
+                } else if (Math.abs(scaledW - best.getWidth(null)) > 1 || Math.abs(scaledH - best.getHeight(null)) > 1) {
+                    // we have no highRes image. draw normal
+                    // System.out.println("bypass HighDPI");
+                    paintDelegate(c, g, x, y);
+                    g2.translate(fixtX, fixtY);
                     return;
+                } else {
+                    // System.out.println("crop HighDPI");
+                    g2.scale(1 / scaleX, 1 / scaleY);
+                    new CroppedIcon(new ImageIcon(best), (int) Math.round(scaledW), (int) Math.round(scaledH), AlignHorizontal.CENTER, AlignVertical.CENTER).paintIcon(c, g2, (int) (x * scaleX), (int) (y * scaleY));
+                    g2.translate(fixtX, fixtY);
+                    g2.scale(scaleX, scaleY);
                 }
+                return;
             }
         }
-        delegate.paintIcon(c, g, x, y);
+        paintDelegate(c, g, x, y);
     }
 
     /**
@@ -128,11 +139,11 @@ public class HighDPIIcon implements Icon, IconPipe {
     public boolean isHDPIFixRequired(double scaleX, double scaleY, double translateX, double translateY) {
         // Check if the current offset is not on whole physical pixels, but somewhere in between. This would result in intermediate pixel
         // calculation and ugly display
-        translateX *= scaleX;
+        // translateX *= scaleX;
         if (translateX % 1d != 0) {
             return true;
         }
-        translateY *= scaleY;
+        // translateY *= scaleY;
         if (translateY % 1d != 0) {
             return true;
         }
@@ -151,13 +162,5 @@ public class HighDPIIcon implements Icon, IconPipe {
             return false;
         }
         return true;
-    }
-
-    /**
-     * @see org.appwork.utils.images.IconPipe#getDelegate()
-     */
-    @Override
-    public Icon getDelegate() {
-        return delegate;
     }
 }

@@ -71,6 +71,7 @@ import org.appwork.utils.IO;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.images.DebugIcon;
+import org.appwork.utils.images.IconDebugger;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.Interpolation;
 
@@ -83,15 +84,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     /**
      *
      */
-    public static final String  THEME_DEBUG_PRINT_SIZES = "THEME_DEBUG_PRINT_SIZES";
-    /**
-     *
-     */
     public static final String  FINAL                   = "final_";
     /**
      *
      */
-    private static final String ENHANCE_DOUBLE_SIZE_TAG = "_x2";
+    private static final String ENHANCE_DOUBLE_SIZE_TAG = "@2x";
 
     /**
      * @author thomas
@@ -240,28 +237,22 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public Icon getIcon(final String relativePath, final int size) {
-        return this.getIcon(relativePath, size, true);
+        return this.getIcon(relativePath, size, size, getDefaultContext());
     }
 
-    public Icon getIcon(final String relativePath, final int size, boolean useCache) {
-        return getIcon(relativePath, size, size, useCache);
+    public Icon getIcon(final String relativePath, final int width, final int height) {
+        return getIcon(relativePath, width, height, getDefaultContext());
     }
 
-    /**
-     * @param relativePath
-     * @param size
-     * @param b
-     * @return
-     */
-    public Icon getIcon(final String relativePath, final int width, final int height, boolean useCache) {
+    public Icon getIcon(final String relativePath, final int width, final int height, ThemeContext context) {
         Icon ret = null;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            ret = delegate.getIcon(relativePath, width, height, useCache);
+            ret = delegate.getIcon(relativePath, width, height, context);
         }
         if (ret == null) {
             String key = null;
-            if (useCache) {
+            if (context.isUsecache()) {
                 key = this.getCacheKey(relativePath, width, height);
                 ret = this.getCached(key);
             }
@@ -278,13 +269,13 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                     ret = FACTORY.urlToNonImageIcon(url, width, height);
                     if (ret == null) {
                         // DebugMode.debugger();
-                        Image image = getImage(relativePath, width, height, useCache, true, false);
+                        Image image = getImage(relativePath, width, height, context);
                         if (image != null) {
                             // we cache the icon as well, else we would get many lookupImageUrl calls - slow!
                             ret = FACTORY.imageToIcon(image, width, height);
                         }
                     } else {
-                        if (System.getProperty(THEME_DEBUG_PRINT_SIZES) != null) {
+                        if (context.isDebugDrawEnabled()) {
                             ret = new DebugIcon(ret);
                         }
                     }
@@ -293,7 +284,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                         org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.buildPath("images/", relativePath, ".png", false)));
                     }
                 }
-                if (useCache && ret != null) {
+                if (context.isUsecache() && ret != null) {
                     this.cache(ret, key);
                 }
             }
@@ -376,62 +367,33 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public Image getImage(final String relativePath, final int size) {
-        // test if using the cache causes issues in the ide. if not, we may set it to true as default some day
-        return this.getImage(relativePath, size, Application.isJared(null) ? false : true);
-    }
-
-    public Image getImage(final String key, final int size, final boolean useCache) {
-        Image image = null;
-        if (image == null) {
-            image = getImage(key, size, size, useCache, true, false);
-        }
-        return image;
+        return this.getImage(relativePath, size, size);
     }
 
     public Image getImage(String key, int width, int height) {
-        return getImage(key, width, height, true, true, false);
+        return getImage(key, width, height, getDefaultContext());
     }
 
     /**
-     * @param key
-     * @param useCache
-     * @param highDPISupport
-     *            TODO
-     * @param exceptionOnUpscale
-     *            TODO
-     * @param size
-     * @param size2
      * @return
      */
-    public Image getImage(String key, int width, int height, boolean useCache, boolean highDPISupport, boolean exceptionOnUpscale) {
+    protected ThemeContext getDefaultContext() {
+        return ThemeContext.DEFAULT;
+    }
+
+    public Image getImage(String key, int width, int height, ThemeContext context) {
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            Image image = delegate.getImage(key, width, height, useCache, highDPISupport, exceptionOnUpscale);
+            Image image = delegate.getImage(key, width, height, context);
             if (image != null) {
                 return image;
             }
         }
-        Image scaled = getRawImage(key, width, height, useCache, highDPISupport, exceptionOnUpscale);
-        return scaled;
-    }
-
-    private HashMap<String, AtomicInteger> debugLoadingMap = new HashMap<String, AtomicInteger>();
-
-    /**
-     * @param key
-     * @param width
-     * @param height
-     * @param useCache
-     * @param highDPISupport
-     * @param exceptionOnUpscale
-     * @return
-     */
-    private Image getRawImage(String key, int width, int height, boolean useCache, boolean highDPISupport, boolean exceptionOnUpscale) {
         HashMap<String, MinTimeWeakReference<Image>> cached = null;
         double highestRequiredScale = getHighestMonitorScaling();
         int highDPIWidth = width;
         int highDPIHeight = height;
-        if (highDPISupport && isUseHighDPI() && highestRequiredScale > 1) {
+        if (context.isCreateMultiResolutionImages() && isUseHighDPI() && highestRequiredScale > 1) {
             // the internal highDPI logic searches for images that are bigger than the required size. the required size is calculated as
             // double, so java searches for an image with at least 23 pixel if 25.5 are required.
             // bei using ceil here, we ensure that we always have an image big enough and will not have to scale up anything.
@@ -440,8 +402,8 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             highDPIHeight = (int) Math.round(height * highestRequiredScale);
         }
         boolean returnMultiResImage = width != highDPIWidth || height != highDPIHeight;
-        String finalKey = FINAL + width + "_" + height + "_" + highDPISupport;
-        if (useCache) {
+        String finalKey = FINAL + width + "_" + height + "_" + context.toKeyID();
+        if (context.isUsecache()) {
             synchronized (this.imageCache) {
                 cached = imageCache.get(key);
                 if (cached == null) {
@@ -465,34 +427,34 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             if (cachedEntry != null && cachedEntry.sizeKey.equals(MAX_SIZE_KEY + ENHANCE_DOUBLE_SIZE_TAG)) {
                 return baseImage;
             }
-            Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height);
+            Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height, context);
             if (betterImage != null) {
-                putFinalCache(key, cached, finalKey, betterImage);
+                putFinalCache(key, context, cached, finalKey, betterImage);
                 return betterImage;
             }
             if (baseImage == null) {
-                baseImage = loadImageFromDisc(key, "", cached, width, height);
+                baseImage = loadImageFromDisc(key, "", cached, width, height, context);
                 if (baseImage != null) {
-                    putFinalCache(key, cached, finalKey, baseImage);
+                    putFinalCache(key, context, cached, finalKey, baseImage);
                 }
             }
             if (baseImage != null) {
-                debugDrawSizeInImages(width, height, baseImage);
+                debugDrawSizeInImages(context, width, height, baseImage);
                 return baseImage;
             }
         } else {
             if (baseImage == null) {
-                baseImage = loadImageFromDisc(key, "", cached, width, height);
+                baseImage = loadImageFromDisc(key, "", cached, width, height, context);
             }
         }
         if (baseImage == null) {
             BufferedImage ret = onImageNotAvailable(key, width, height, cached, finalKey);
-            putFinalCache(key, cached, finalKey, ret);
+            putFinalCache(key, context, cached, finalKey, ret);
             return ret;
         }
         if (!IconIO.isImageCanGetDownscaled(width, height, baseImage)) {
             // upscale required check x2 option
-            Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height);
+            Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height, context);
             if (betterImage != null) {
                 baseImage = betterImage;
             }
@@ -509,12 +471,12 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             highDPIbase = cachedEntry == null ? null : cachedEntry.image;
             if (highDPIbase == null) {
                 // May happen if the original image got removed from cache
-                highDPIbase = loadImageFromDisc(key, "", cached, width, height);
+                highDPIbase = loadImageFromDisc(key, "", cached, width, height, context);
             }
             if (cachedEntry == null || !cachedEntry.sizeKey.endsWith(ENHANCE_DOUBLE_SIZE_TAG)) {
                 if (highDPIbase == null || !IconIO.isImageCanGetDownscaled(highDPIWidth, highDPIHeight, highDPIbase)) {
                     // upscale required check x2 option
-                    Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height);
+                    Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height, context);
                     if (betterImage != null) {
                         highDPIbase = betterImage;
                     }
@@ -526,10 +488,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 } else {
                     // DO NOT UPSCALE!
                     // if (isImageDimensionLargeEnoughForRequestedDimensions(highDPIWidth, highDPIHeight, highDPIbase)) {
-                    if (exceptionOnUpscale && !IconIO.isImageCanGetDownscaled(highDPIWidth, highDPIHeight, highDPIbase)) {
+                    if (context.isDoNotUpscaleButThrowException() && !IconIO.isImageCanGetDownscaled(highDPIWidth, highDPIHeight, highDPIbase)) {
                         throw new SourceImageTooSmallException(key, highDPIbase, highDPIWidth, highDPIHeight);
                     }
-                    baseImageHighDPIFinal = scaleAndCache(key, cached, (int) Math.round(targetHighDPIWidth), (int) Math.round(targetHighDPIHeight), highDPIbase);
+                    baseImageHighDPIFinal = scaleAndCache(key, context, cached, (int) Math.round(targetHighDPIWidth), (int) Math.round(targetHighDPIHeight), highDPIbase);
                     // }
                 }
             }
@@ -542,10 +504,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         if (IconIO.isImageDimensionExact(width, height, baseImage)) {
             baseImageTargetFinal = baseImage;
         } else {
-            if (exceptionOnUpscale && !IconIO.isImageCanGetDownscaled(width, height, baseImage)) {
+            if (context.isDoNotUpscaleButThrowException() && !IconIO.isImageCanGetDownscaled(width, height, baseImage)) {
                 throw new SourceImageTooSmallException(key, baseImage, width, height);
             }
-            baseImageTargetFinal = scaleAndCache(key, cached, (int) Math.round(baseWidthFinal), (int) Math.round(baseHeightFinal), baseImage);
+            baseImageTargetFinal = scaleAndCache(key, context, cached, (int) Math.round(baseWidthFinal), (int) Math.round(baseHeightFinal), baseImage);
         }
         if ((baseImageTargetFinal.getWidth(null) % 4 != 0) || (baseImageTargetFinal.getHeight(null) % 4 != 0)) {
             LogV3.warning("Image warning: width and height should be dividable by 4 for proper highDPI display!: " + key + ": " + baseImageTargetFinal.getWidth(null) + "x" + baseImageTargetFinal.getHeight(null));
@@ -555,9 +517,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 baseImageTargetFinal = MultiResolutionImageHelper.create(0, baseImageTargetFinal, baseImageHighDPIFinal);
             }
         }
-        putFinalCache(key, cached, finalKey, baseImageTargetFinal);
+        putFinalCache(key, context, cached, finalKey, baseImageTargetFinal);
         return baseImageTargetFinal;
     }
+
+    private HashMap<String, AtomicInteger> debugLoadingMap = new HashMap<String, AtomicInteger>();
 
     /**
      * @param key
@@ -580,7 +544,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         return ret;
     }
 
-    protected void putFinalCache(String key, HashMap<String, MinTimeWeakReference<Image>> cached, String finalKey, Image image) {
+    protected void putFinalCache(String key, ThemeContext context, HashMap<String, MinTimeWeakReference<Image>> cached, String finalKey, Image image) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            IconDebugger.show(image, key + " - " + finalKey);
+        }
         if (cached != null) {
             synchronized (cached) {
                 if (cached != null) {
@@ -637,12 +604,12 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @param voidUpscaling
      * @return
      */
-    protected Image scaleAndCache(String key, HashMap<String, MinTimeWeakReference<Image>> cached, int targetWidth, int targetHeight, Image input) {
+    protected Image scaleAndCache(String key, ThemeContext context, HashMap<String, MinTimeWeakReference<Image>> cached, int targetWidth, int targetHeight, Image input) {
         Image baseImageHighDPIFinal;
         double faktor = Math.max((double) input.getWidth(null) / targetWidth, (double) input.getHeight(null) / targetHeight);
         // do not keep aspect ratio. we need the icons exactly as calculated here
         baseImageHighDPIFinal = IconIO.getScaledInstance(input, targetWidth, targetHeight, faktor > 1 ? Interpolation.BICUBIC : Interpolation.BILINEAR, true, false);
-        baseImageHighDPIFinal = debugDrawSizeInImages(targetWidth, targetHeight, baseImageHighDPIFinal);
+        baseImageHighDPIFinal = debugDrawSizeInImages(context, targetWidth, targetHeight, baseImageHighDPIFinal);
         // if (baseImageHighDPIFinal.getWidth(null) * baseImageHighDPIFinal.getHeight(null) >
         // baseImageTargetFinal.getWidth(null) *
         // baseImageTargetFinal.getHeight(null)) {
@@ -686,25 +653,26 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     /**
+     * @param context
      * @param targetWidth
      * @param targetHeight
      * @param baseImageHighDPIFinal
      * @return
      */
-    protected Image debugDrawSizeInImages(int targetWidth, int targetHeight, Image src) {
-        if (System.getProperty(THEME_DEBUG_PRINT_SIZES) != null) {
-            final int w = src.getWidth(null);
-            final int h = src.getHeight(null);
-            final BufferedImage image = IconIO.createEmptyImage(w, h, BufferedImage.TYPE_INT_ARGB, Transparency.TRANSLUCENT);
-            final Graphics2D g = image.createGraphics();
-            g.drawImage(src, 0, 0, null);
-            g.setColor(Color.BLUE);
-            // g.fillRect(0, 0, 5, 5);
-            drawTextInViewport(src.getWidth(null), src.getHeight(null), targetWidth + "", g);
-            g.dispose();
-            return image;
+    protected Image debugDrawSizeInImages(ThemeContext context, int targetWidth, int targetHeight, Image src) {
+        if (!context.isDebugDrawEnabled()) {
+            return src;
         }
-        return src;
+        final int w = src.getWidth(null);
+        final int h = src.getHeight(null);
+        final BufferedImage image = IconIO.createEmptyImage(w, h, BufferedImage.TYPE_INT_ARGB, Transparency.TRANSLUCENT);
+        final Graphics2D g = image.createGraphics();
+        g.drawImage(src, 0, 0, null);
+        g.setColor(Color.BLUE);
+        // g.fillRect(0, 0, 5, 5);
+        drawTextInViewport(src.getWidth(null), src.getHeight(null), targetWidth + "", g);
+        g.dispose();
+        return image;
     }
 
     protected double getHighestMonitorScaling() {
@@ -832,9 +800,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @param cached
      * @param widthForVectorGraphics
      * @param heightForVectorGraphics
+     * @param option
      * @return
      */
-    protected Image loadImageFromDisc(String key, String enhanceTag, HashMap<String, MinTimeWeakReference<Image>> cached, int widthForVectorGraphics, int heightForVectorGraphics) {
+    protected Image loadImageFromDisc(String key, String enhanceTag, HashMap<String, MinTimeWeakReference<Image>> cached, int widthForVectorGraphics, int heightForVectorGraphics, ThemeContext option) {
         boolean cacheMaxSize = true;
         if (cached != null) {
             synchronized (cached) {
@@ -862,7 +831,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         if (baseImage == null) {
             // maybe a svg?
             // DebugMode.debugger();
-            Icon icon = getIcon(key + enhanceTag, widthForVectorGraphics, heightForVectorGraphics, cached != null);
+            Icon icon = getIcon(key + enhanceTag, widthForVectorGraphics, heightForVectorGraphics, option);
             if (icon != null) {
                 LogV3.warning("Loaded an Vector graphic as Image. Use getIcon if possible! " + url);
                 // there is no Max size for SVG...

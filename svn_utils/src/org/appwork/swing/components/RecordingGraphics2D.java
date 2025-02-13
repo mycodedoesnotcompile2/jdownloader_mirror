@@ -138,7 +138,7 @@ public class RecordingGraphics2D extends Graphics2D {
         } else {
             drawnArea = drawnArea.createUnion(bounds);
         }
-        System.out.println(currentTransform + "+ " + s + "(" + transformedShape + ")  = " + drawnArea);
+        // System.out.println(currentTransform + "+ " + s + "(" + transformedShape + ") = " + drawnArea);
     }
 
     /**

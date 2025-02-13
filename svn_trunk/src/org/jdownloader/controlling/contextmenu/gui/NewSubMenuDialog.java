@@ -16,6 +16,7 @@ import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
+import org.appwork.resources.ThemeContext;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.components.ExtTextField;
@@ -26,7 +27,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 
 public class NewSubMenuDialog extends AbstractDialog<Object> {
-
     private ExtTextField txt;
     protected Icon       actionIcon;
     private ExtButton    iconField;
@@ -34,7 +34,6 @@ public class NewSubMenuDialog extends AbstractDialog<Object> {
 
     public NewSubMenuDialog() {
         super(Dialog.STYLE_HIDE_ICON, _GUI.T.NewSubMenuDialog_NewSubMenuDialog_title(), null, null, null);
-
     }
 
     @Override
@@ -54,19 +53,13 @@ public class NewSubMenuDialog extends AbstractDialog<Object> {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-
                 final JPopupMenu p = new JPopupMenu();
-
                 File imagesDir;
-
                 imagesDir = NewTheme.I().getImagesDirectory();
-
                 String[] names = imagesDir.list(new FilenameFilter() {
-
                     public boolean accept(File dir, String name) {
                         if (name.endsWith(".png") || name.endsWith(".svg")) {
-
-                            Image image = NewTheme.I().getImage(name.substring(0, name.length() - 4), -1, false);
+                            Image image = NewTheme.I().getImage(name.substring(0, name.length() - 4), -1, -1, new ThemeContext().withoutCache());
                             if (Math.max(image.getWidth(null), image.getHeight(null)) >= 32) {
                                 return true;
                             }
@@ -74,12 +67,10 @@ public class NewSubMenuDialog extends AbstractDialog<Object> {
                         return false;
                     }
                 });
-
                 final JList list = new JList(names);
                 list.setLayoutOrientation(JList.HORIZONTAL_WRAP);
                 final ListCellRenderer org = list.getCellRenderer();
                 list.setCellRenderer(new ListCellRenderer() {
-
                     public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                         String key = value.toString().substring(0, value.toString().length() - 4);
                         JLabel ret = (JLabel) org.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
@@ -91,7 +82,6 @@ public class NewSubMenuDialog extends AbstractDialog<Object> {
                 list.setFixedCellWidth(22);
                 list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
                 list.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
-
                     public void valueChanged(ListSelectionEvent e) {
                         String v = list.getSelectedValue().toString();
                         v = v.substring(0, v.length() - 4);
@@ -103,9 +93,7 @@ public class NewSubMenuDialog extends AbstractDialog<Object> {
                 });
                 p.add(list);
                 p.show(iconField, 0, iconField.getHeight());
-
             }
-
         });
         p.add(iconField, "width 24!,height 24!");
         p.add(txt);

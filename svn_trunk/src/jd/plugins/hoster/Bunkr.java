@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 50563 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50618 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -223,11 +223,12 @@ public class Bunkr extends PluginForHost {
         return "https://" + getHost() + "/v/" + filename;
     }
 
-    private static final String PROPERTY_LAST_GRABBED_DIRECTURL              = "last_grabbed_directurl";
-    private static final String PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL = "last_grabbed_video_stream_directurl";
-    private static final String PROPERTY_LAST_USED_SINGLE_FILE_URL           = "last_used_single_file_url";
-    public static final String  PROPERTY_FILENAME_FROM_ALBUM                 = "filename_from_album";
-    public static final String  PROPERTY_PARSED_FILESIZE                     = "parsed_filesize";
+    private static final String PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
+    private static final String PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
+    private static final String PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL = "last_grabbed_image_fullsize_view_directurl";
+    private static final String PROPERTY_LAST_USED_SINGLE_FILE_URL                  = "last_used_single_file_url";
+    public static final String  PROPERTY_FILENAME_FROM_ALBUM                        = "filename_from_album";
+    public static final String  PROPERTY_PARSED_FILESIZE                            = "parsed_filesize";
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -331,6 +332,14 @@ public class Bunkr extends PluginForHost {
                 logger.info("Video streaming URL is the same as official downloadurl");
             } else {
                 directurls.add(lastGrabbedVideoStreamDirecturl);
+            }
+        }
+        final String lastGrabbedImageFullsizeViewDirecturl = link.getStringProperty(PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL);
+        if (lastGrabbedImageFullsizeViewDirecturl != null) {
+            if (directurls.contains(lastGrabbedImageFullsizeViewDirecturl)) {
+                logger.info("Image fullsize URL is the same as official downloadurl");
+            } else {
+                directurls.add(lastGrabbedImageFullsizeViewDirecturl);
             }
         }
         if (directurls.isEmpty()) {
@@ -471,6 +480,10 @@ public class Bunkr extends PluginForHost {
         if (videoStreamDirecturl != null) {
             link.setProperty(PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL, videoStreamDirecturl);
         }
+        final String imageFullsizeViewDirecturl = br.getRegex("<a[^>]*href=\"(https?://[^\"]+)\"[^>]*>\\s*Enlarge image").getMatch(0);
+        if (imageFullsizeViewDirecturl != null) {
+            link.setProperty(PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL, imageFullsizeViewDirecturl);
+        }
         /* 2024-02-16: New: Additional step required to find official downloadurl */
         final String nextStepURL = br.getRegex("(https?://get\\.[^/]+/file/\\d+)").getMatch(0);
         if (nextStepURL != null) {
@@ -530,7 +543,7 @@ public class Bunkr extends PluginForHost {
         } else {
             logger.warning("Failed to find download directurl");
         }
-        if (directurl == null && videoStreamDirecturl == null) {
+        if (directurl == null && imageFullsizeViewDirecturl == null) {
             logger.warning("Failed to find any directurl");
         }
         link.setProperty(PROPERTY_LAST_USED_SINGLE_FILE_URL, singleFileURL);

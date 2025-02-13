@@ -38,8 +38,11 @@ import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.Paint;
+import java.awt.image.BufferedImage;
 import java.util.HashMap;
+import java.util.Map.Entry;
 
 import javax.swing.Icon;
 
@@ -50,9 +53,13 @@ import org.appwork.utils.swing.Graphics2DProxy;
  * @date 13.12.2023
  *
  */
-public class ColoredIcon implements Icon, IconPipe {
-    private Icon                  delegateIcon;
-    private HashMap<Color, Color> colorMap;
+public class ColoredIcon extends AbstractIconPipe {
+    private HashMap<ColorLookup, Color> colorMap;
+
+    public ColoredIcon(Icon icon) {
+        super(icon);
+        this.colorMap = new HashMap<ColorLookup, Color>();
+    }
 
     /**
      * @param icon
@@ -60,9 +67,41 @@ public class ColoredIcon implements Icon, IconPipe {
      * @param height
      */
     public ColoredIcon(Icon icon, Color color) {
-        this.delegateIcon = icon;
-        this.colorMap = new HashMap<Color, Color>();
-        colorMap.put(null, color);
+        super(icon);
+        this.colorMap = new HashMap<ColorLookup, Color>();
+        replace(new ColorLookup(null, 0, true), color);
+    }
+
+    public static class ColorLookup {
+        private boolean keepBrightness = true;
+
+        /**
+         * @param search
+         * @param tollerance2
+         */
+        public ColorLookup(Color search, int tollerance2, boolean keepBrightness) {
+            this.color = search;
+            this.tollerance = tollerance2;
+            this.keepBrightness = keepBrightness;
+        }
+
+        private Color color;
+        private int   tollerance = 0;
+    }
+
+    public ColoredIcon(Icon icon, ColorLookup from, Color to) {
+        super(icon);
+        this.colorMap = new HashMap<ColorLookup, Color>();
+        replace(from, to);
+    }
+
+    /**
+     * @param from
+     * @param to
+     */
+    public ColoredIcon replace(ColorLookup from, Color to) {
+        colorMap.put(from, to);
+        return this;
     }
 
     /**
@@ -71,9 +110,9 @@ public class ColoredIcon implements Icon, IconPipe {
      * @param textForeGroundForComponent
      */
     public ColoredIcon(Icon icon, Color from, Color to) {
-        this.delegateIcon = icon;
-        this.colorMap = new HashMap<Color, Color>();
-        colorMap.put(from, to);
+        super(icon);
+        this.colorMap = new HashMap<ColorLookup, Color>();
+        replace(new ColorLookup(from, 50, true), to);
     }
 
     private class Graphics2DProxyImpl extends Graphics2DProxy {
@@ -86,6 +125,30 @@ public class ColoredIcon implements Icon, IconPipe {
         public Graphics2DProxyImpl(Graphics2D g, ColoredIcon coloredIcon) {
             super(g);
             this.icon = coloredIcon;
+        }
+
+        /**
+         * @see org.appwork.utils.swing.Graphics2DProxy#beforeBufferedImageDraw(java.awt.image.BufferedImage)
+         */
+        @Override
+        protected BufferedImage beforeBufferedImageDraw(BufferedImage img) {
+            BufferedImage ret = img;
+            for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
+                ret = IconIO.toBufferedImage(IconIO.replaceColor(ret, es.getKey().color, es.getKey().tollerance, es.getValue(), es.getKey().keepBrightness));
+            }
+            return ret;
+        }
+
+        /**
+         * @see org.appwork.utils.swing.Graphics2DProxy#beforeImageDraw(java.awt.Image)
+         */
+        @Override
+        protected Image beforeImageDraw(Image img) {
+            Image ret = img;
+            for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
+                ret = IconIO.replaceColor(IconIO.toBufferedImage(ret), es.getKey().color, es.getKey().tollerance, es.getValue(), es.getKey().keepBrightness);
+            }
+            return ret;
         }
 
         /**
@@ -129,12 +192,13 @@ public class ColoredIcon implements Icon, IconPipe {
         }
     }
 
-    /**
-     * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
-     */
-    @Override
     public void paintIcon(Component c, Graphics g, int x, int y) {
-        delegateIcon.paintIcon(c, new Graphics2DProxyImpl((Graphics2D) g, this), x, y);
+        this.paintIcon(c, g, x, y, null);
+    }
+
+    @Override
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+        paintDelegate(c, new Graphics2DProxyImpl((Graphics2D) g, this), x, y);
     }
 
     /**
@@ -142,15 +206,31 @@ public class ColoredIcon implements Icon, IconPipe {
      * @return
      */
     public Color modifyColor(Color c) {
-        if (false) {
-            return Color.RED;
-        }
-        Color replacement = colorMap.get(c);
-        if (replacement == null) {
-            replacement = colorMap.get(null);
-        }
-        if (replacement != null) {
-            return replacement;
+        Color replacement = null;
+        final int a1 = c == null ? 0 : c.getAlpha();
+        final int r1 = c == null ? 0 : c.getRed();
+        final int g1 = c == null ? 0 : c.getGreen();
+        final int b1 = c == null ? 0 : c.getBlue();
+        for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
+            if (c == null) {
+                if (es.getKey().color == null) {
+                    return replacement = es.getValue();
+                }
+            }
+            int rgb = es.getKey().color.getRGB();
+            final int a = (rgb >> 24) & 0xff;
+            final int r = (rgb >> 16) & 0xff;
+            final int g = (rgb >> 8) & 0xff;
+            final int b = (rgb >> 0) & 0xff;
+            if (Math.abs(r - r1) <= es.getKey().tollerance && Math.abs(g - g1) <= es.getKey().tollerance && Math.abs(b - b1) <= es.getKey().tollerance && Math.abs(a - a1) <= es.getKey().tollerance) {
+                replacement = es.getValue();
+            }
+            if (replacement == null) {
+                replacement = colorMap.get(null);
+            }
+            if (replacement != null) {
+                return replacement;
+            }
         }
         return c;
     }
@@ -164,29 +244,5 @@ public class ColoredIcon implements Icon, IconPipe {
             return modifyColor((Color) paint);
         }
         return paint;
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconWidth()
-     */
-    @Override
-    public int getIconWidth() {
-        return delegateIcon.getIconWidth();
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconHeight()
-     */
-    @Override
-    public int getIconHeight() {
-        return delegateIcon.getIconHeight();
-    }
-
-    /**
-     * @see org.appwork.utils.images.IconPipe#getDelegate()
-     */
-    @Override
-    public Icon getDelegate() {
-        return delegateIcon;
     }
 }

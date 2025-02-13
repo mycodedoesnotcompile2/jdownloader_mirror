@@ -48,7 +48,7 @@ import java.net.URI;
 import java.net.URL;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.utils.images.MultiResIcon;
+import org.appwork.utils.images.ScalableIcon;
 
 import com.kitfox.svg.SVGDiagram;
 import com.kitfox.svg.SVGElementException;
@@ -140,7 +140,7 @@ public class SVGIO {
      * @return
      * @throws IOException
      */
-    public static MultiResIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
+    public static ScalableIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
         final SVGUniverse universe = new SVGUniverse();
         URI uri;
         try {

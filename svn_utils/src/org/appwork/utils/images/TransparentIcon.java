@@ -47,8 +47,7 @@ import javax.swing.Icon;
  * @date Jan 30, 2025
  *
  */
-public class TransparentIcon implements Icon, IconPipe {
-    private Icon           delegate;
+public class TransparentIcon extends AbstractIconPipe {
     private AlphaComposite composite;
 
     /**
@@ -57,7 +56,7 @@ public class TransparentIcon implements Icon, IconPipe {
      *            0-1d
      */
     public TransparentIcon(Icon icon, float f) {
-        this.delegate = icon;
+        super(icon);
         this.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, f);
     }
 
@@ -65,38 +64,14 @@ public class TransparentIcon implements Icon, IconPipe {
      * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
      */
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y) {
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
         Graphics2D g2 = (Graphics2D) g;
         Composite restore = g2.getComposite();
         try {
             g2.setComposite(composite);
-            delegate.paintIcon(c, g2, x, y);
+            paintDelegate(c, g2, x, y);
         } finally {
             g2.setComposite(restore);
         }
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconWidth()
-     */
-    @Override
-    public int getIconWidth() {
-        return delegate.getIconWidth();
-    }
-
-    /**
-     * @see javax.swing.Icon#getIconHeight()
-     */
-    @Override
-    public int getIconHeight() {
-        return delegate.getIconWidth();
-    }
-
-    /**
-     * @see org.appwork.utils.images.IconPipe#getDelegate()
-     */
-    @Override
-    public Icon getDelegate() {
-        return delegate;
     }
 }

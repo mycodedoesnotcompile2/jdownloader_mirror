@@ -47,20 +47,11 @@ import org.appwork.utils.DebugMode;
  * @date Jan 30, 2025
  *
  */
-public class CroppedIcon implements Icon, IconPipe {
-    private Icon            icon;
+public class CroppedIcon extends AbstractIconPipe {
     private int             width;
     private int             height;
     private AlignHorizontal alignHorizontal;
     private AlignVertical   alignVertical;
-
-    /**
-     * @see org.appwork.utils.images.IconPipe#getDelegate()
-     */
-    @Override
-    public Icon getDelegate() {
-        return icon;
-    }
 
     /**
      * @param iconEnd
@@ -85,7 +76,7 @@ public class CroppedIcon implements Icon, IconPipe {
      * @param background
      */
     public CroppedIcon(Icon icon, int width, int height, AlignHorizontal horizonal, AlignVertical vertical) {
-        this.icon = icon;
+        super(icon);
         crop(width, height);
         align(horizonal, vertical);
     }
@@ -104,19 +95,19 @@ public class CroppedIcon implements Icon, IconPipe {
      * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
      */
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y) {
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
         int xOffset = 0;
         int yOffset = 0;
         if (alignHorizontal != null) {
             switch (alignHorizontal) {
             case CENTER:
-                yOffset = (width - icon.getIconWidth()) / 2;
+                yOffset = (width - delegate.getIconWidth()) / 2;
                 break;
             case LEFT:
                 xOffset = 0;
                 break;
             case RIGHT:
-                xOffset = width - icon.getIconWidth();
+                xOffset = width - delegate.getIconWidth();
                 break;
             default:
                 DebugMode.debugger();
@@ -126,20 +117,20 @@ public class CroppedIcon implements Icon, IconPipe {
         if (alignVertical != null) {
             switch (alignVertical) {
             case CENTER:
-                yOffset = (height - icon.getIconHeight()) / 2;
+                yOffset = (height - delegate.getIconHeight()) / 2;
                 break;
             case TOP:
                 yOffset = 0;
                 break;
             case BOTTOM:
-                yOffset = height - icon.getIconHeight();
+                yOffset = height - delegate.getIconHeight();
                 break;
             default:
                 DebugMode.debugger();
                 throw new NotSupportedException();
             }
         }
-        icon.paintIcon(c, g, x + xOffset, y + yOffset);
+        paintDelegate(c, g, x + xOffset, y + yOffset);
     }
 
     /**

@@ -5,12 +5,13 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
-import javax.swing.UIManager;
 
 import org.appwork.resources.AWUTheme;
 import org.appwork.resources.Theme;
@@ -18,7 +19,8 @@ import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
-import org.appwork.utils.DebugMode;
+import org.appwork.utils.images.ColoredIcon;
+import org.appwork.utils.images.ColoredIcon.ColorLookup;
 import org.appwork.utils.images.IconIO;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.updatev2.gui.LAFOptions;
@@ -139,28 +141,26 @@ public class NewTheme extends Theme {
         return null;
     }
 
-    @Override
-    public Image getImage(String key, int size, boolean useCache) {
-        Image img = super.getImage(key, size, useCache);
-        DebugMode.breakIf(img == null);
-        return img;
-    }
-
-    public static void main(String[] args) {
-        long t = System.currentTimeMillis();
-        for (int i = 1000; i >= 0; i--) {
-            IconIO.getImageIcon(NewTheme.class.getResource("/themes/flat/org/jdownloader/images/add.svg"), 32);
-        }
-        System.out.println(System.currentTimeMillis() - t);
-        t = System.currentTimeMillis();
-        for (int i = 1000; i >= 0; i--) {
-            IconIO.getImageIcon(NewTheme.class.getResource("/themes/standard/org/jdownloader/images/add.png"), 32);
-        }
-        System.out.println(System.currentTimeMillis() - t);
-    }
-
     public Icon getCheckBoxImage(String path, boolean selected, int size) {
         return getCheckBoxImage(path, selected, size, null);
+    }
+
+    public static Set<Color> getInner25PercentColors(BufferedImage image) {
+        Set<Color> colors = new HashSet<Color>();
+        int width = image.getWidth();
+        int height = image.getHeight();
+        int startX = width / 4;
+        int startY = height / 4;
+        int innerWidth = width / 2;
+        int innerHeight = height / 2;
+        for (int y = startY; y < startY + innerHeight; y++) {
+            for (int x = startX; x < startX + innerWidth; x++) {
+                int rgb = image.getRGB(x, y);
+                Color color = new Color(rgb, true);
+                colors.add(color);
+            }
+        }
+        return colors;
     }
 
     /**
@@ -177,40 +177,17 @@ public class NewTheme extends Theme {
         String key = this.getCacheKey(path + "/" + red, size, selected);
         ret = getCached(key);
         if (ret == null) {
-            Icon back = getIcon(path, size, true);
-            // y back = new IdentifierImageIcon(IconIO.getCroppedImage(IconIO.toBufferedImage(back)), path);
-            Icon checkBox = selected ? new CheckBoxIcon((int) (1 * (0.5d * size)), selected, true) : new CheckBoxIcon((int) (1 * (0.5d * size)), selected, false);
-            // checkBox = IconIO.getScaledInstance(checkBox, (int) (size * 0.5), (int) (size * 0.5));
-            // checkBox = new BorderedIcon(checkBox, Color.RED, 1);
-            // try {
-            // Dialog.getInstance().showConfirmDialog(0, path + selected + size + red + "", "", checkBox, null, null);
-            // } catch (DialogClosedException e) {
-            // e.printStackTrace();
-            // } catch (DialogCanceledException e) {
-            // e.printStackTrace();
-            // }
+            Icon back = getIcon(path, size);
+            Icon checkBox = selected ? new CheckBoxIcon((int) (1 * (0.5d * size)), selected, true) : new CheckBoxIcon((int) (1 * (0.5d * size)), selected, true);
             if (red != null) {
-                if (UIManager.getLookAndFeel().getClass().getSimpleName().equals("PlainLookAndFeel")) {
-                    checkBox = IconIO.replaceColor(checkBox, new Color(!selected ? 0xFFF0F0F0 : 0xFFEBEBEB), 50, red, true);
-                } else if (UIManager.getLookAndFeel().getClass().getSimpleName().equals("SyntheticaPlainLookAndFeel")) {
-                    checkBox = IconIO.replaceColor(checkBox, new Color(!selected ? 0xFFF0F0F0 : 0xFFEBEBEB), 50, red, true);
-                } else if (UIManager.getLookAndFeel().getClass().getSimpleName().equals("JDDefaultLookAndFeel")) {
-                    checkBox = IconIO.replaceColor(checkBox, new Color(!selected ? 0xFFF0F0F0 : 0xFFEBEBEB), 50, red, true);
-                } else {
-                    final Icon fChck = checkBox;
-                    checkBox = new ExtMergedIcon(checkBox).add(new RedDotIcon(red, fChck));
+                ColoredIcon colored = new ColoredIcon(checkBox);
+                for (Color c : getInner25PercentColors(IconIO.toBufferedImage(CheckBoxIcon.FALSE))) {
+                    colored.replace(new ColorLookup(c, 10, true), red);
                 }
+                checkBox = colored;
+                // }
             }
             ret = new ExtMergedIcon(back, 0, 0).add(checkBox, 0, back.getIconHeight() - checkBox.getIconHeight() + 2);
-            // ret = new ExtMergedIcon(back, 0, 0);
-            // try {
-            // Dialog.getInstance().showConfirmDialog(0, key, key, ret, null, null);
-            // } catch (DialogClosedException e) {
-            // e.printStackTrace();
-            // } catch (DialogCanceledException e) {
-            // e.printStackTrace();
-            // }
-            // ret = new ImageIcon(ImageProvider.merge(back, checkBox, 3, 0, 0, back.getIconHeight() - checkBox.getIconHeight() + 2));
             cache(ret, key);
         }
         return ret;
