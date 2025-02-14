@@ -33,6 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.testframework;
 
+import java.awt.Image;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -55,6 +56,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 import javax.swing.Icon;
+import javax.swing.ImageIcon;
 
 import org.appwork.builddecision.BuildDecisions;
 import org.appwork.exceptions.WTFException;
@@ -681,7 +683,13 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             }
             final File tmp = Application.getResource("tmp/image" + UniqueAlltimeID.next() + "." + Files.getExtension(path, true));
             IO.secureWrite(tmp, IO.readStream(-1, zipFile.getInputStream(entry)));
-            final Icon icon = org.appwork.resources.Theme.getFACTORY().urlToNonImageIcon(tmp.toURL(), -1, -1);
+            Icon icon = org.appwork.resources.Theme.getFACTORY().urlToNonImageIcon(tmp.toURL(), -1, -1);
+            if (icon == null) {
+                Image image = org.appwork.resources.Theme.getFACTORY().urlToImage(tmp.toURL());
+                if (image != null) {
+                    icon = new ImageIcon(image);
+                }
+            }
             tmp.delete();
             tmp.deleteOnExit();
             if (icon.getIconWidth() < w || icon.getIconHeight() < h) {

@@ -49,6 +49,7 @@ import jd.plugins.components.gopro.GoProConfig;
 import jd.plugins.components.gopro.GoProType;
 import jd.plugins.components.gopro.GoProVariant;
 import jd.plugins.components.gopro.Media;
+import jd.plugins.components.gopro.SyncGoProLibraryToolbarAction;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.decrypter.GoProCloudDecrypter;
 
@@ -72,8 +73,8 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
-@HostPlugin(revision = "$Revision: 50198 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
-public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler */{
+@HostPlugin(revision = "$Revision: 50622 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
+public class GoProCloud extends PluginForHost {
     private static final String HTTPS_API_GOPRO_COM_V1_OAUTH2_TOKEN   = "https://api.gopro.com/v1/oauth2/token";
     private static final String CLIENT_SECRET                         = "3863c9b438c07b82f39ab3eeeef9c24fefa50c6856253e3f1d37e0e3b1ead68d";
     private static final String CLIENT_ID                             = "71611e67ea968cfacf45e2b6936c81156fcf5dbe553a2bf2d342da1562d05f46";
@@ -87,10 +88,7 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
     public GoProCloud(PluginWrapper wrapper) {
         super(wrapper);
         enablePremium("https://" + getHost() + "/login/signup");
-        // if (!org.appwork.utils.Application.isHeadless()) {
-        // MenuManagerMainmenu.getInstance().registerExtender(this);
-        // MenuManagerMainToolbar.getInstance().registerExtender(this);
-        // }
+        SyncGoProLibraryToolbarAction.registerExtender();
     }
 
     @Override
@@ -675,24 +673,6 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
         }
     }
 
-    // @Override
-    // public MenuItemData updateMenuModel(ContextMenuManager manager, MenuContainerRoot mr) {
-    // if (manager instanceof MenuManagerMainmenu) {
-    // return null;
-    // } else if (manager instanceof MenuManagerMainToolbar) {
-    // for (MenuItemData m : mr.getItems()) {
-    // ActionData ad = m.getActionData();
-    // if (ad != null) {
-    // String cl = ad.getClazzName();
-    // if (StringUtils.equals(cl, SyncGoProLibraryToolbarAction.class.getName())) {
-    // return null;
-    // }
-    // }
-    // }
-    // mr.add(SyncGoProLibraryToolbarAction.class);
-    // }
-    // return null;
-    // }
     public static String createVideoVariantID(Variation v, Media media) {
         final int digits = (int) (Math.log10(media.getItem_count()) + 1);
         return v.getLabel() + "_" + StringUtils.fillPre(v.getItem_number() + "", "0", digits);

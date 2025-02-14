@@ -15,20 +15,24 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50619 $", interfaceVersion = 3, names = {}, urls = {})
 /** Helper plugin to download image hotlinks from photobucket.com without serverside "watermark protection". */
 public class PhotobucketComDirectImages extends PluginForHost {
     public PhotobucketComDirectImages(PluginWrapper wrapper) {
@@ -101,6 +105,14 @@ public class PhotobucketComDirectImages extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(this.br, link, link.getPluginPatternMatcher(), this.isResumeable(link, null), 1);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    @Override
+    protected void throwConnectionExceptions(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (con.getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Server error 404");
+        }
+        super.throwConnectionExceptions(br, con);
     }
 
     private void prepareDownloadHeaders(final Browser br, final DownloadLink link) {

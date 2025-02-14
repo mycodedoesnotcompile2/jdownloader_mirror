@@ -61,69 +61,51 @@ public class MenuManagerLinkgrabberTabBottombar extends AbstractBottomBarMenuMan
 
     public MenuContainerRoot createDefaultStructure() {
         MenuContainerRoot mr = new MenuContainerRoot();
-
         MenuManagerDownloadTabBottomBar.fillAddLinks(mr);
         //
         //
-
         mr.add(ClearLinkgrabberAction.class);
-
         DeleteContainer delete = new DeleteContainer();
-
         delete.add(setIconKey(new ActionData(GenericDeleteFromLinkgrabberAction.class).putSetup(GenericDeleteFromLinkgrabberAction.DELETE_DISABLED, true).putSetup(IncludedSelectionSetup.INCLUDE_UNSELECTED_LINKS, true).putSetup(IncludedSelectionSetup.INCLUDE_SELECTED_LINKS, true), IconKey.ICON_REMOVE_DISABLED));
-
         delete.add(setIconKey(new ActionData(GenericDeleteFromLinkgrabberAction.class).putSetup(GenericDeleteFromLinkgrabberAction.DELETE_OFFLINE, true).putSetup(IncludedSelectionSetup.INCLUDE_UNSELECTED_LINKS, true).putSetup(IncludedSelectionSetup.INCLUDE_SELECTED_LINKS, true), IconKey.ICON_REMOVE_OFFLINE));
-
         delete.add(new SeparatorData());
         delete.add(new ActionData(RemoveIncompleteArchives.class).putSetup(TableContext.ITEM_VISIBLE_FOR_EMPTY_SELECTION, true));
-
         delete.add(new ActionData(ClearFilteredLinksAction.class));
-
         mr.add(delete);
         //
         mr.add(new LinkgrabberSearchMenuItem());
         mr.add(new HorizontalBoxItem());
         mr.add(AddFilteredStuffAction.class);
-
+        mr.add(CleanupDownloadFolderAction.class);
         mr.add(new LeftRightDividerItem());
-
         mr.add(new ConfirmButtonMenuItem());
-
         //
         MenuContainer all = new MenuContainer(_GUI.T.ConfirmOptionsAction_actionPerformed_all(), IconKey.ICON_CONFIRMALL);
         MenuContainer selected = new MenuContainer(_GUI.T.ConfirmOptionsAction_actionPerformed_selected(), IconKey.ICON_CONFIRMSELECTEDLINKS);
-
         all.add(new ActionData(ConfirmSelectionBarActionSub.class).putSetup(ConfirmSelectionBarAction.AUTO_START, AutoStartOptions.DISABLED.toString()).putSetup(ConfirmSelectionBarAction.SELECTION_ONLY, false));
         all.add(new ActionData(ConfirmSelectionBarActionSub.class).putSetup(ConfirmSelectionBarAction.AUTO_START, AutoStartOptions.ENABLED.toString()).putSetup(ConfirmSelectionBarAction.SELECTION_ONLY, false));
         all.add(new ActionData(ConfirmSelectionBarActionSub.class).putSetup(ConfirmSelectionBarAction.AUTO_START, AutoStartOptions.ENABLED.toString()).putSetup(ConfirmSelectionBarAction.FORCE_START, true).putSetup(ConfirmSelectionBarAction.SELECTION_ONLY, false));
-
         selected.add(new ActionData(ConfirmSelectionBarActionSub.class).putSetup(ConfirmSelectionBarAction.AUTO_START, AutoStartOptions.DISABLED.toString()));
         selected.add(new ActionData(ConfirmSelectionBarActionSub.class).putSetup(ConfirmSelectionBarAction.AUTO_START, AutoStartOptions.ENABLED.toString()));
         selected.add(new ActionData(ConfirmSelectionBarActionSub.class).putSetup(ConfirmSelectionBarAction.AUTO_START, AutoStartOptions.ENABLED.toString()).putSetup(ConfirmSelectionBarAction.FORCE_START, true));
-
         MenuContainer popup = new MenuContainer("", null);
         popup.add(all);
         popup.add(selected);
         mr.add(popup);
-
         QuickSettingsMenuContainer quicksettings = new QuickSettingsMenuContainer();
-
         quicksettings.add(AddAtTopToggleAction.class);
         quicksettings.add(AutoConfirmToggleAction.class);
         quicksettings.add(AutoStartToggleAction.class);
         quicksettings.add(setOptional(LinkFilterToggleAction.class));
-
         quicksettings.add(new SeparatorData());
         quicksettings.add((LinkgrabberPropertiesToggleAction.class));
         quicksettings.add((LinkgrabberOverviewPanelToggleAction.class));
-
         quicksettings.add((LinkgrabberSidebarToggleAction.class));
         quicksettings.add(new SeparatorData());
         quicksettings.add(BottomBarMenuManagerAction.class);
         mr.add(quicksettings);
         OptionalContainer opt;
         mr.add(opt = new OptionalContainer(false));
-
         opt.add(AutoConfirmStopAction.class);
         return mr;
     }

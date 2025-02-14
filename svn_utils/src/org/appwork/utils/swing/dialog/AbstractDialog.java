@@ -1277,6 +1277,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
     }
 
     protected JComponent lastFocusRequestedJComponent = null;
+    private Throwable    initException;
 
     /**
      * @param focus
@@ -1823,7 +1824,9 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      */
     public void throwCloseExceptions() throws DialogClosedException, DialogCanceledException {
         final int mask = this.getReturnmask();
-        if (BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED)) {
+        if (BinaryLogic.containsSome(mask, Dialog.RETURN_EXCEPTION)) {
+            throw new DialogClosedException(mask | Dialog.RETURN_EXCEPTION, getInitException());
+        } else if (BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED)) {
             throw new DialogClosedException(mask);
         } else if (BinaryLogic.containsSome(mask, Dialog.RETURN_CANCEL)) {
             throw new DialogCanceledException(mask);
@@ -1892,5 +1895,20 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      */
     public boolean isExpired(long currentTimeout) {
         return currentTimeout < 0;
+    }
+
+    /**
+     * @param throwable
+     */
+    protected void onInitException(Throwable throwable) {
+        this.initException = throwable;
+        this.returnBitMask |= Dialog.RETURN_EXCEPTION;
+    }
+
+    /**
+     * @return the initException
+     */
+    public Throwable getInitException() {
+        return initException;
     }
 }

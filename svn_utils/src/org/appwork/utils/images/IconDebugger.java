@@ -11,52 +11,16 @@
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
- *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
+ *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info file that contains a reference to this license.
  *
  * === 3rd Party Licences ===
  *     Some parts of the [The Product] use or reference 3rd party libraries and classes. These parts may have different licensing conditions. Please check the *.license and *.info files of included libraries
- *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header.
+ *     to ensure that they are compatible to your use-case. Furthermore, some *.java have their own license. In this case, they have their license terms in the java file header.
  *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
- * === Dual Licensing ===
- * === Commercial Usage ===
- *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
- *     Contact AppWork for further details: e-mail@appwork.org
- * === Non-Commercial Usage ===
- *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
- *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
- *
- *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
- * ====================================================================================================================================================
- * ==================================================================================================================================================== */
-package org.appwork.utils.images;
-
-/**
- *
- * ====================================================================================================================================================
- *         "AppWork Utilities" License
- *         The "AppWork Utilities" will be called [The Product] from now on.
- * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
- *         Spalter Strasse 58
- *         91183 Abenberg
- *         e-mail@appwork.org
- *         Germany
- * === Preamble ===
- *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
- *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
- *
- * === 3rd Party Licences ===
- *     Some parts of the [The Product] use or reference 3rd party libraries and classes. These parts may have different licensing conditions. Please check the *.license and *.info files of included libraries
- *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header.
- *
- * === Definition: Commercial Usage ===
- *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
  * === Dual Licensing ===
  * === Commercial Usage ===
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
@@ -69,6 +33,8 @@ package org.appwork.utils.images;
  * ====================================================================================================================================================
  * ====================================================================================================================================================
  */
+package org.appwork.utils.images;
+
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -95,7 +61,10 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 import org.appwork.resources.MultiResolutionImageHelper;
 
@@ -103,20 +72,59 @@ public class IconDebugger extends JFrame {
     private static IconDebugger   instance;
     private JPanel                container;
     private Map<String, DebugRow> entries;
+    // Suchfeld, das oben im Fenster angezeigt wird
+    private JTextField            searchField;
 
     private IconDebugger() {
         super("Icon Debugger");
+        setLayout(new BorderLayout());
+        // Suchfeld oben
+        JPanel searchPanel = new JPanel(new BorderLayout());
+        JLabel searchLabel = new JLabel("Search: ");
+        searchField = new JTextField();
+        searchPanel.add(searchLabel, BorderLayout.WEST);
+        searchPanel.add(searchField, BorderLayout.CENTER);
+        add(searchPanel, BorderLayout.NORTH);
+        // Container mit DebugRows
         container = new JPanel();
         container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
         entries = new HashMap<String, DebugRow>();
         JScrollPane scrollPane = new JScrollPane(container);
         scrollPane.getVerticalScrollBar().setUnitIncrement(20);
-        getContentPane().add(scrollPane, BorderLayout.CENTER);
+        add(scrollPane, BorderLayout.CENTER);
+        // DocumentListener, um bei jeder Änderung die DebugRows zu filtern
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) {
+                filterRows(searchField.getText());
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                filterRows(searchField.getText());
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                filterRows(searchField.getText());
+            }
+        });
         // Beim Schließen des Fensters soll die Anwendung NICHT beendet werden.
         setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
         setSize(600, 400);
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    private void filterRows(String searchTerm) {
+        String lowerTerm = searchTerm.toLowerCase();
+        for (Map.Entry<String, DebugRow> entry : entries.entrySet()) {
+            DebugRow row = entry.getValue();
+            if (row.iconText.toLowerCase().contains(lowerTerm)) {
+                row.panel.setVisible(true);
+            } else {
+                row.panel.setVisible(false);
+            }
+        }
+        container.revalidate();
+        container.repaint();
     }
 
     private void update(Icon icon, String text) {
@@ -143,14 +151,14 @@ public class IconDebugger extends JFrame {
         }
     }
 
+    // Falls ein Image übergeben wird, wird es in ein WrappedImageIcon gewrappt.
     public static void show(Image image, String text) {
-        show(new ImageIcon(image), text);
+        show(new WrappedImageIcon(image), text);
     }
 
     public static void show(Image... images) {
         for (int i = 0; i < images.length; i++) {
-            ImageIcon icon = new ImageIcon(images[i]);
-            show(icon, "Image " + (i + 1));
+            show(new WrappedImageIcon(images[i]), "Image " + (i + 1));
         }
     }
 
@@ -197,9 +205,9 @@ public class IconDebugger extends JFrame {
         void pixelInfoFixed(String infoLine);
     }
 
-    // DebugRow enthält das Icon, einen statischen Beschreibungstext und ein kopierbares Textfeld.
-    // Bei Mouseover werden temporär der aktuelle Pixelfarbwert (als Hex) angezeigt,
-    // ein Klick fügt den aktuell ermittelten Farbwert als festen Bestandteil hinzu.
+    // DebugRow enthält das Icon, einen statischen Beschreibungstext (inkl. MultiResolution-Infos)
+    // und ein kopierbares Textfeld. Mouseover zeigt temporär den aktuellen Pixelfarbwert (als Hex),
+    // ein Klick fügt den Wert als festen Bestandteil hinzu.
     private static class DebugRow {
         public ZoomableIconLabel iconLabel;
         public JTextArea         infoTextArea;
@@ -244,7 +252,8 @@ public class IconDebugger extends JFrame {
 
         private void updateInfoPanel() {
             StringBuilder sb = new StringBuilder();
-            sb.append("Icon: ").append(iconText).append("\n");
+            // Angepasst: Nur den iconText (ID) ohne das Präfix "Icon: "
+            sb.append(iconText).append("\n");
             sb.append(baseInfo);
             if (fixedPixelInfos.length() > 0) {
                 sb.append("\nFixed: ").append(fixedPixelInfos.toString());
@@ -260,11 +269,30 @@ public class IconDebugger extends JFrame {
             updateInfoPanel();
         }
 
-        // Hier wird zusätzlich geprüft, ob das zugrundeliegende Image ein MultiResolutionImage ist.
+        // In buildInfo() wird zusätzlich geprüft, ob das zugrundeliegende Image ein MultiResolutionImage ist.
         // Falls ja, werden die verfügbaren Auflösungen (Variants) ermittelt.
+        // Zudem wird, falls das Icon das Interface IconPipe implementiert, die delegate-Klasse(n) angezeigt.
         private String buildInfo(Icon icon) {
             StringBuilder sb = new StringBuilder();
-            sb.append("Icon Class: ").append(icon.getClass().getName());
+            // Falls das Icon ein WrappedImageIcon ist, zeige die Klasse des ursprünglichen Images.
+            if (icon instanceof WrappedImageIcon) {
+                Image orig = ((WrappedImageIcon) icon).getOriginalImage();
+                sb.append("Type: ").append(orig.getClass().getSimpleName());
+            } else {
+                sb.append("Type: : ").append(icon.getClass().getSimpleName());
+            }
+            // Falls das Icon das Interface IconPipe implementiert, zeige zusätzlich die Delegate-Klasse.
+            Icon entry = icon;
+            while (entry instanceof IconPipe) {
+                entry = ((IconPipe) entry).getDelegate();
+                if (entry != null) {
+                    if (entry.getClass().isAnonymousClass()) {
+                        sb.append(" > ").append(entry.getClass().getSuperclass().getSimpleName());
+                    } else {
+                        sb.append(" > ").append(entry.getClass().getSimpleName());
+                    }
+                }
+            }
             sb.append(" | Dimensions: ").append(icon.getIconWidth()).append("x").append(icon.getIconHeight());
             if (icon instanceof ImageIcon) {
                 Image image = ((ImageIcon) icon).getImage();
@@ -391,6 +419,20 @@ public class IconDebugger extends JFrame {
                 }
             }
             super.paintComponent(g);
+        }
+    }
+
+    // WrappedImageIcon speichert zusätzlich das ursprüngliche Image, falls eines übergeben wurde.
+    private static class WrappedImageIcon extends ImageIcon {
+        private final Image originalImage;
+
+        public WrappedImageIcon(Image image) {
+            super(image);
+            this.originalImage = image;
+        }
+
+        public Image getOriginalImage() {
+            return originalImage;
         }
     }
 }

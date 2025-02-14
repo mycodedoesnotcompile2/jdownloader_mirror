@@ -56,7 +56,7 @@ import org.appwork.utils.images.CroppedIcon;
  *
  */
 public class HighDPIIcon extends AbstractIconPipe {
-    private HighDPIIcon(Icon icon) {
+    public HighDPIIcon(Icon icon) {
         super(icon);
     }
 
@@ -68,7 +68,7 @@ public class HighDPIIcon extends AbstractIconPipe {
     }
 
     @Override
-    public synchronized void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
         if (!(delegate instanceof ImageIcon)) {
             paintDelegate(c, g, x, y);
             return;

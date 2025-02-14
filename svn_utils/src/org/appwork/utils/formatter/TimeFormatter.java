@@ -54,49 +54,52 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.locale._AWU;
 
 public class TimeFormatter {
-    private static final java.util.List<SimpleDateFormat> dateformats = new ArrayList<SimpleDateFormat>();
+    private static final java.util.List<SimpleDateFormat> dateformats  = new ArrayList<SimpleDateFormat>();
     static {
         try {
+            // use "en" over "en_GB" , see https://bugs.openjdk.org/browse/JDK-8329375 and
+            // https://unicode-org.atlassian.net/browse/CLDR-14412
+            final Locale locale = Locale.ENGLISH;
             SimpleDateFormat sdf;
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.UK));// RFC1123
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", locale));// RFC1123
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss zzz", Locale.UK)); // RFC1036
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss zzz", locale)); // RFC1036
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy z", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yy HH:mm:ss z", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss z", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("dd MMM yyyy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("dd MMM yyyy HH:mm:ss z", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z", locale));
             sdf.setLenient(false);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss z", locale));
             sdf.setLenient(false);
             if (JVMVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
                 // Java 1.6 does not support X ISO 8601 time zone
-                TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'SSSX", Locale.UK));
+                TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'SSSX", locale));
                 sdf.setLenient(false);
             }
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z", locale));
             sdf.setLenient(true);
-            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss 'GMT+0000'", Locale.UK));
+            TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss 'GMT+0000'", locale));
             sdf.setTimeZone(TimeZone.getTimeZone("GMT+0000"));
             sdf.setLenient(false);
         } catch (final Throwable e) {
             e.printStackTrace();
         }
     }
-    public static final int HIDE_SECONDS = 1 << 1;
-    public static final int HIDE_MARKER  = 1 << 2;
-    public static final int CLOCK        = 1 << 3;
+    public static final int                               HIDE_SECONDS = 1 << 1;
+    public static final int                               HIDE_MARKER  = 1 << 2;
+    public static final int                               CLOCK        = 1 << 3;
 
     public static String formatMilliSeconds(final long totalSeconds, final int flags) {
         return TimeFormatter.formatSeconds(totalSeconds / 1000, flags);
@@ -208,11 +211,12 @@ public class TimeFormatter {
     public static long getMilliSeconds(final String dateString, String dateFormatString, final Locale locale) {
         if (dateString == null) {
             return -1;
-        }
-        if (!JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7) || true) {
+        } // en_GB has "Sept" but en has "Sep"
+        final String correctedDateString = dateString.replaceAll("(?i)Sept($|\\s)", "Sep$1");
+        if (!JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
             final String newDateFormatString = dateFormatString.replaceAll("X+$", "");
             if (newDateFormatString != dateFormatString) {
-                final long ret = getMilliSeconds(dateString, newDateFormatString + "Z", locale);
+                final long ret = getMilliSeconds(correctedDateString, newDateFormatString + "Z", locale);
                 if (ret != -1) {
                     return ret;
                 }
@@ -233,7 +237,7 @@ public class TimeFormatter {
                 if (dateFormatVariant.contains("'Z'")) {
                     dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
                 }
-                return dateFormat.parse(dateString).getTime();
+                return dateFormat.parse(correctedDateString).getTime();
             } catch (final Exception e) {
                 e.printStackTrace();
             }
@@ -246,10 +250,11 @@ public class TimeFormatter {
             return null;
         }
         final Date ret = parseDateString(date, false);
-        if (ret == null) {
-            return null;
+        if (ret != null) {
+            return ret;
+        } else {
+            return parseDateString(date, true);
         }
-        return parseDateString(date, true);
     }
 
     public static Date parseDateString(final String date, final boolean fix) {
@@ -274,6 +279,8 @@ public class TimeFormatter {
                         break;
                     }
                 }
+                // en_GB has "Sept" but en has "Sep"
+                parseDate = parseDate.replaceAll("(?i)Sept($|\\s)", "Sep$1");
             }
             try {
                 synchronized (format) {

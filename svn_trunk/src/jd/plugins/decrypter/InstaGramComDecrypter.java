@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50531 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50619 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -164,7 +164,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     private static final Pattern       TYPE_LEGACY_HASHTAG        = Pattern.compile("/explore/tags/([^/]+)/?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern       TYPE_SEARCH_KEYWORD        = Pattern.compile("/explore/search/keyword/\\?q=([^&]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern       TYPE_PROFILE_SAVED_OBJECTS = Pattern.compile("/([^/]+)/saved.*", Pattern.CASE_INSENSITIVE);
-    private static final Pattern       TYPE_PROFILE_TAGGED        = Pattern.compile("[^/]+/([^/]+)/tagged/?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern       TYPE_PROFILE_TAGGED        = Pattern.compile("/([^/]+)/tagged/?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern       TYPE_PROFILE_REELS         = Pattern.compile("/([^/]+)/reels/?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern       TYPE_PROFILE               = Pattern.compile("/([^/]+)(?:/.*)?", Pattern.CASE_INSENSITIVE);
     /**

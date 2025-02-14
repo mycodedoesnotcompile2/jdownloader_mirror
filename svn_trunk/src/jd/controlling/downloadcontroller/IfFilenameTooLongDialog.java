@@ -24,10 +24,14 @@ import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DocumentFilter;
 
+import jd.plugins.DownloadLink;
+import jd.plugins.ParsedFilename;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextArea;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -36,9 +40,6 @@ import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.IfFilenameTooLongAction;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-import jd.plugins.DownloadLink;
-import jd.plugins.ParsedFilename;
 
 public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAction> implements IfFilenameTooLongDialogInterface, FocusListener {
     @Override
@@ -276,13 +277,21 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
     private void triggerWarning(final JTextField textField) {
         Toolkit.getDefaultToolkit().beep();
         textField.setForeground(Color.RED);
-        new Thread(() -> {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException ignored) {
-            }
-            textField.setForeground(Color.BLACK);
-        }).start();
+        new Thread() {
+            public void run() {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ignored) {
+                }
+                new EDTRunner() {
+
+                    @Override
+                    protected void runInEDT() {
+                        textField.setForeground(Color.BLACK);
+                    }
+                };
+            };
+        }.start();
     }
 
     private void onFilenameChanged() {

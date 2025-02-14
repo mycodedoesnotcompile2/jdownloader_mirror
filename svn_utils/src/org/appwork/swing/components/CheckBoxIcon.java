@@ -45,7 +45,6 @@ import javax.swing.Icon;
 import javax.swing.JCheckBox;
 
 import org.appwork.loggingv3.LogV3;
-import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.images.IconDebugger;
@@ -53,20 +52,15 @@ import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.ScalableIcon;
 
 public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
-    /**
-     *
-     */
-    @AWTestValidateClassReference
-    private static final String      COM_FORMDEV_FLATLAF_FLAT_LIGHT_LAF = "com.formdev.flatlaf.FlatLightLaf";
-    public static final CheckBoxIcon FALSE                              = new CheckBoxIcon(false);
-    public static final CheckBoxIcon TRUE                               = new CheckBoxIcon(true);
-    public static final CheckBoxIcon UNDEFINED                          = new CheckBoxIcon(true, false);
-    private int                      size;
-    private JCheckBox                checkBox;
-    private Rectangle2D              unscaledDimensionAndPosition;
-    private Image                    image;
-    private boolean                  selected;
-    private boolean                  enabled;
+    public static final Icon FALSE     = (new CheckBoxIcon(false));
+    public static final Icon TRUE      = (new CheckBoxIcon(true));
+    public static final Icon UNDEFINED = (new CheckBoxIcon(true, false));
+    private int              size;
+    private JCheckBox        checkBox;
+    private Rectangle2D      unscaledDimensionAndPosition;
+    private Image            image;
+    private boolean          selected;
+    private boolean          enabled;
 
     public CheckBoxIcon(final boolean selected, final boolean enabled) {
         this(-1, selected, enabled);

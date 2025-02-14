@@ -30,6 +30,9 @@ import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -43,7 +46,7 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Time;
-import org.appwork.utils.images.IconIO;
+import org.appwork.utils.images.TransparentIcon;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -64,9 +67,6 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
 
 public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel> extends ExtJWindow implements ActionListener, AWTEventListener, GenericConfigEventListener<Boolean> {
     private static final int BOTTOM_MARGIN = 5;
@@ -420,6 +420,7 @@ public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel>
         SwingUtils.setOpaque(ret, false);
         SwingUtils.setOpaque(headerLbl, false);
         ExtButton settings = new ExtButton() {
+            private final AbstractIcon icon             = new AbstractIcon(IconKey.ICON_WRENCH, 10);
             {
                 setToolTipText(_GUI.T.Notify_createHeader_settings_tt());
                 setRolloverEffectEnabled(true);
@@ -433,23 +434,24 @@ public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel>
             /**
              *
              */
-            private static final long serialVersionUID = 1L;
+            private static final long  serialVersionUID = 1L;
 
             protected void onRollOut() {
                 setContentAreaFilled(false);
-                setIcon(IconIO.getTransparentIcon(NewTheme.I().getImage(IconKey.ICON_WRENCH, 10), 0.5f));
-                // setIcon(new AbstractIcon(IconKey.ICON_brightmix/w2", 18));
+                setIcon(new TransparentIcon(icon, 0.5f));
             }
 
             /**
              *
              */
             protected void onRollOver() {
-                setIcon(new AbstractIcon(IconKey.ICON_WRENCH, 10));
+                setIcon(icon);
             }
         };
         ret.add(settings, "width 10!,height 10!");
         ExtButton closeButton = new ExtButton() {
+
+            private final AbstractIcon icon             = new AbstractIcon(IconKey.ICON_CLOSE, 10);
             {
                 setToolTipText(_GUI.T.Notify_createHeader_close_tt());
                 setRolloverEffectEnabled(true);
@@ -463,18 +465,18 @@ public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel>
             /**
              *
              */
-            private static final long serialVersionUID = 1L;
+            private static final long  serialVersionUID = 1L;
 
             protected void onRollOut() {
                 setContentAreaFilled(false);
-                setIcon(IconIO.getTransparentIcon(NewTheme.I().getImage("close", 10), 0.5f));
+                setIcon(new TransparentIcon(icon, 0.5f));
             }
 
             /**
              *
              */
             protected void onRollOver() {
-                setIcon(new AbstractIcon(IconKey.ICON_CLOSE, 10));
+                setIcon(icon);
             }
         };
         ret.add(closeButton, "width 10!,height 10!");

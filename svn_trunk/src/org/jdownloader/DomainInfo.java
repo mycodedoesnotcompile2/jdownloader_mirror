@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.Locale;
 
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 
 import jd.config.Property;
 import jd.controlling.faviconcontroller.FavIconRequestor;
@@ -71,6 +70,19 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
     protected boolean hosterIconUpdatePermission = false;
 
     protected void setHosterIcon(Icon icon, boolean updatePermission) {
+        if (icon != null && icon != hosterIcon) {
+            final int width;
+            final int height;
+            final Icon hosterIcon = this.hosterIcon;
+            if (hosterIcon != null) {
+                width = hosterIcon.getIconWidth();
+                height = hosterIcon.getIconHeight();
+            } else {
+                width = WIDTH;
+                height = HEIGHT;
+            }
+            icon = IconIO.getScaledInstance(icon, width, height);
+        }
         this.hosterIcon = icon;
         this.hosterIconUpdatePermission = icon != null && (hosterIconUpdatePermission || updatePermission);
     }
@@ -107,9 +119,6 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
                 if (ret == null && !updatePermission) {
                     ret = FavIcons.getDefaultIcon(domain, false);
                 }
-            }
-            if (ret != null) {
-                ret = new ImageIcon(FavIcons.getCroppedImage(IconIO.toBufferedImage(ret), false));
             }
         }
         if (ret != null) {

@@ -50,7 +50,7 @@ public class FavitIcon implements Icon, FavIconRequestor, IDIcon {
 
     @Override
     public void paintIcon(Component c, Graphics g, int x, int y) {
-        Icon back = icon;
+        final Icon back = icon;
         // badge = new ImageIcon(ImageProvider.getScaledInstance((BufferedImage) icon.getImage(), size, size,
         // RenderingHints.VALUE_INTERPOLATION_BILINEAR, true));
         // back = domainInfo.getIcon(icon.getIconHeight());
@@ -59,6 +59,7 @@ public class FavitIcon implements Icon, FavIconRequestor, IDIcon {
         g.setColor(Color.WHITE);
         Composite comp = g2d.getComposite();
         g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.75f));
+        final Icon badge = this.badge;
         int xx = x + width - badge.getIconWidth();
         int yy = y + height - badge.getIconHeight();
         g2d.fill(new Ellipse2D.Float(xx, yy, badge.getIconWidth(), badge.getIconHeight()));
@@ -84,6 +85,6 @@ public class FavitIcon implements Icon, FavIconRequestor, IDIcon {
         if (icon != null) {
             badge = IconIO.getScaledInstance(icon, size, size);
         }
-        return badge;
+        return this;
     }
 }

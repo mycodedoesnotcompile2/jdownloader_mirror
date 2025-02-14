@@ -212,10 +212,11 @@ public class ColoredIcon extends AbstractIconPipe {
         final int g1 = c == null ? 0 : c.getGreen();
         final int b1 = c == null ? 0 : c.getBlue();
         for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
-            if (c == null) {
-                if (es.getKey().color == null) {
-                    return replacement = es.getValue();
+            if (es.getKey().color == null) {
+                if (c == null || c.getAlpha() == 0) {
+                    return es.getValue();
                 }
+                continue;
             }
             int rgb = es.getKey().color.getRGB();
             final int a = (rgb >> 24) & 0xff;

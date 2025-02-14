@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50479 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50619 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -182,6 +182,10 @@ public class OneHundretSixteenPanCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
             dllink = br.getRegex("down_process2\\('\\d+',\\s*'(https?://[^\\']+)").getMatch(0);
+            if (dllink == null) {
+                /* 2025-03-13 */
+                dllink = br.getRegex("href=\"(http[^\"]+)\"[^>]*down_process2").getMatch(0);
+            }
             if (dllink == null) {
                 dllink = br.getRegex("true\\|(http[^<>\"]+)").getMatch(0);
             }

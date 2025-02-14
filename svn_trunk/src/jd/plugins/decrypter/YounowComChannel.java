@@ -22,8 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
@@ -34,7 +32,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48043 $", interfaceVersion = 3, names = { "younow.com" }, urls = { "https?://(?:www\\.)?younow\\.com/[^/]+(?:/\\d+)?" })
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 50622 $", interfaceVersion = 3, names = { "younow.com" }, urls = { "https?://(?:www\\.)?younow\\.com/[^/]+(?:/\\d+)?" })
 public class YounowComChannel extends PluginForDecrypt {
     public YounowComChannel(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,7 @@ public class YounowComChannel extends PluginForDecrypt {
                         dl.setProperty("decryptedbroadcasttitle", broadcasttitle);
                         temp_filename = username + "_" + broadcastID + "_" + broadcasttitle;
                     } else if (lastDateUploaded > 0) {
-                        final SimpleDateFormat df = new SimpleDateFormat("MMMM dd, yyyy", Locale.UK);
+                        final SimpleDateFormat df = new SimpleDateFormat("MMMM dd, yyyy", Locale.ENGLISH);
                         final String date = df.format(new Date(lastDateUploaded * 1000));
                         temp_filename = username + "_" + broadcastID + " - " + date;
                     } else {

@@ -4,14 +4,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.Icon;
 
-import jd.controlling.faviconcontroller.FavIconRequestor;
 import jd.controlling.linkcrawler.CrawledLink;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storage;
-import org.jdownloader.images.NewTheme;
+import org.appwork.utils.images.IconIO;
 
-public abstract class Filter implements FavIconRequestor {
+public abstract class Filter {
 
     protected Icon                 icon    = null;
     protected AtomicInteger        counter = new AtomicInteger(0);
@@ -43,7 +42,7 @@ public abstract class Filter implements FavIconRequestor {
 
     public void setIcon(Icon icon) {
         if (icon != null) {
-            this.icon = NewTheme.I().getScaledInstance(icon, 16);
+            this.icon = IconIO.getScaledInstance(icon, 16, 16);
         }
     }
 
@@ -54,7 +53,7 @@ public abstract class Filter implements FavIconRequestor {
     public Filter(String string, Icon icon) {
         this.name = string;
         if (icon != null) {
-            this.icon = NewTheme.I().getScaledInstance(icon, 16);
+            setIcon(icon);
         }
         enabled = Boolean.TRUE.equals(CONFIG.get(getID(), true));
     }
@@ -82,11 +81,6 @@ public abstract class Filter implements FavIconRequestor {
     }
 
     protected final String name;
-
-    public Icon setFavIcon(Icon icon) {
-        setIcon(icon);
-        return icon;
-    }
 
     abstract public boolean isFiltered(CrawledLink link);
 

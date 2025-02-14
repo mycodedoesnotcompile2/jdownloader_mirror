@@ -22,7 +22,6 @@ public class FlatLafIconFactory extends DefaultIconFactory {
             super(urlToIcon);
         }
 
-        @Override
         public void paintIcon(final Component c, final Graphics g, final int x, final int y, Icon parent) {
             if (this.delegate instanceof ScalableIcon) {
                 paintDelegate(c, g, x, y);

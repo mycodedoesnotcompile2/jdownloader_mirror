@@ -17,7 +17,6 @@ public class IdentifierWrapperIcon extends AbstractIconPipe implements IDIcon {
         key = relativePath;
     }
 
-    @Override
     public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
         paintDelegate(c, g, x, y);
     }

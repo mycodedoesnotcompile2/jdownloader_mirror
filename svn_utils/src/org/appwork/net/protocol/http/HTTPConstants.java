@@ -123,7 +123,6 @@ public class HTTPConstants {
         SERVERERROR_SERVICE_UNAVAILABLE(503, "Service Unavailable"),
         GATEWAY_TIMEOUT(504, "Gateway Time-out"),
         WEB_SERVER_DOWN(521, "Cloudflare, Web server is down");
-
         /**
          * @param responseCode
          * @return
@@ -301,12 +300,12 @@ public class HTTPConstants {
     /**
      * In case we have dynamic content-length or content-length is not known in advance
      */
-    public static final String           HEADER_RESPONSE_CONTENT_TRANSFER_ENCODING     = "Content-Transfer-Encoding";                                     // https://www.w3.org/Protocols/rfc1341/5_Content-Transfer-Encoding.html
-    public static final String           HEADER_RESPONSE_TRANSFER_ENCODING             = "Transfer-Encoding";                                             // https://tools.ietf.org/html/rfc2616#section-3.6
+    public static final String           HEADER_RESPONSE_CONTENT_TRANSFER_ENCODING     = "Content-Transfer-Encoding";                                          // https://www.w3.org/Protocols/rfc1341/5_Content-Transfer-Encoding.html
+    public static final String           HEADER_RESPONSE_TRANSFER_ENCODING             = "Transfer-Encoding";                                                  // https://tools.ietf.org/html/rfc2616#section-3.6
     public static final String           HEADER_RESPONSE_TRANSFER_ENCODING_CHUNKED     = "chunked";
     public static final String           HEADER_RESPONSE_ACCEPT_RANGES                 = "Accept-Ranges";
-    public static final String           HEADER_RESPONSE_CONTENT_ENCODING              = "Content-Encoding";                                              // https://tools.ietf.org/html/rfc2616#section-3.5
-    public static final String           HEADER_REQUEST_CONTENT_ENCODING               = "Content-Encoding";                                              // https://tools.ietf.org/html/rfc2616#section-3.5
+    public static final String           HEADER_RESPONSE_CONTENT_ENCODING              = "Content-Encoding";                                                   // https://tools.ietf.org/html/rfc2616#section-3.5
+    public static final String           HEADER_REQUEST_CONTENT_ENCODING               = "Content-Encoding";                                                   // https://tools.ietf.org/html/rfc2616#section-3.5
     public static final String           HEADER_RESPONSE_LOCATION                      = "Location";
     public static final String           HEADER_RESPONSE_SERVER                        = "Server";
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_ORIGIN   = "Access-Control-Allow-Origin";
@@ -341,7 +340,7 @@ public class HTTPConstants {
     public static final String           HEADER_REQUEST_CONTROL_HEADERS                = "Access-Control-Request-Headers";
     /*
      * https://www.rfc-editor.org/rfc/rfc2616#page-141
-     *
+     * 
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
      */
     public static final String           HEADER_RESPONSE_RETRY_AFTER                   = "Retry-After";
@@ -362,12 +361,12 @@ public class HTTPConstants {
     /**
      * ATTENTION: SimpleDateFormat is not thread safe. synchronize on the format instance itself
      */
-    public static final SimpleDateFormat DATE_FORMAT_HTTP_DATE_RFC1123                 = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.UK);
+    public static final SimpleDateFormat DATE_FORMAT_HTTP_DATE_RFC1123                 = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
     // RFC1036
     /**
      * ATTENTION: SimpleDateFormat is not thread safe. synchronize on the format instance itself
      */
-    public static final SimpleDateFormat DATE_FORMAT_HTTP_DATE_RFC1036                 = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss zzz", Locale.UK);
+    public static final SimpleDateFormat DATE_FORMAT_HTTP_DATE_RFC1036                 = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss zzz", Locale.ENGLISH);
     public static final String           HEADER_VALUE_ENCODING_DEFLATE                 = "deflate";
     public static final String           HEADER_RESPONSE_LAST_MODFIED                  = "Last-Modified";
     public static final String           HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS      = "Upgrade-Insecure-Requests";

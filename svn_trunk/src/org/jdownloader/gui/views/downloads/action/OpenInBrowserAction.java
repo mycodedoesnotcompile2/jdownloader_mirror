@@ -4,9 +4,6 @@ import java.awt.event.ActionEvent;
 import java.util.List;
 import java.util.Set;
 
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
@@ -21,6 +18,9 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.images.NewTheme;
+
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 public class OpenInBrowserAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext {
     private static final long   serialVersionUID = 7911375550836173693L;
@@ -88,71 +88,74 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (isEnabled()) {
-            super.actionPerformed(e);
+        if (!isEnabled()) {
+            return;
         }
+        super.actionPerformed(e);
     }
 
     @Override
     protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
-        if (SelectionInfo.isNotEmpty(selectionInfo) && isEnabled()) {
-            new Thread("OpenInBrowserAction") {
-                public void run() {
-                    final int delay = getOpenDelay();
-                    final Set<String> urls = LinkTreeUtils.getURLs(selectionInfo, true);
-                    if (urls.size() < 5 && delay < 1000) {
-                        for (String url : urls) {
-                            try {
-                                Thread.sleep(delay);
-                            } catch (InterruptedException e) {
-                                return;
-                            }
-                            CrossSystem.openURL(url);
-                        }
-                        return;
-                    }
-                    final ProgressDialog pg = new ProgressDialog(new ProgressGetter() {
-                        private int total = -1;
-                        private int current;
-
-                        @Override
-                        public void run() throws Exception {
-                            total = urls.size();
-                            current = 0;
-                            for (String url : urls) {
-                                CrossSystem.openURL(url);
-                                current++;
-                                Thread.sleep(delay);
-                            }
-                        }
-
-                        @Override
-                        public String getString() {
-                            return current + "/" + total;
-                        }
-
-                        @Override
-                        public int getProgress() {
-                            if (total == 0) {
-                                return -1;
-                            }
-                            final int ret = (current * 100) / total;
-                            return ret;
-                        }
-
-                        @Override
-                        public String getLabelString() {
-                            return null;
-                        }
-                    }, 0, _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi(), _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi_msg(urls.size()), NewTheme.I().getIcon(IconKey.ICON_BROWSE, 32), null, null);
-                    try {
-                        Dialog.getInstance().showDialog(pg);
-                    } catch (DialogNoAnswerException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }.start();
+        if (SelectionInfo.isEmpty(selectionInfo)) {
+            return;
+        } else if (!isEnabled()) {
+            return;
         }
-    }
+        new Thread("OpenInBrowserAction") {
+            public void run() {
+                final int delay = getOpenDelay();
+                final Set<String> urls = LinkTreeUtils.getURLs(selectionInfo, true);
+                if (urls.size() < 5 && delay < 1000) {
+                    for (String url : urls) {
+                        try {
+                            Thread.sleep(delay);
+                        } catch (InterruptedException e) {
+                            return;
+                        }
+                        CrossSystem.openURL(url);
+                    }
+                    return;
+                }
+                final ProgressDialog pg = new ProgressDialog(new ProgressGetter() {
+                    private int total = -1;
+                    private int current;
 
+                    @Override
+                    public void run() throws Exception {
+                        total = urls.size();
+                        current = 0;
+                        for (String url : urls) {
+                            CrossSystem.openURL(url);
+                            current++;
+                            Thread.sleep(delay);
+                        }
+                    }
+
+                    @Override
+                    public String getString() {
+                        return current + "/" + total;
+                    }
+
+                    @Override
+                    public int getProgress() {
+                        if (total == 0) {
+                            return -1;
+                        }
+                        final int ret = (current * 100) / total;
+                        return ret;
+                    }
+
+                    @Override
+                    public String getLabelString() {
+                        return null;
+                    }
+                }, 0, _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi(), _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi_msg(urls.size()), NewTheme.I().getIcon(IconKey.ICON_BROWSE, 32), null, null);
+                try {
+                    Dialog.getInstance().showDialog(pg);
+                } catch (DialogNoAnswerException e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+    }
 }

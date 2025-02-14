@@ -45,6 +45,7 @@ import javax.swing.ImageIcon;
 import javax.swing.ListCellRenderer;
 import javax.swing.SwingUtilities;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.resources.AWUTheme;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.BinaryLogic;
@@ -609,6 +610,9 @@ public class Dialog {
             final T ret = dialog.getReturnValue();
             final int mask = dialog.getReturnmask();
             if (exception.get() != null) {
+                dialog.onInitException(exception.get());
+                // without this logger, the exception is swallowed
+                LogV3.log(exception.get());
                 throw new DialogClosedException(mask | Dialog.RETURN_EXCEPTION, exception.get());
             } else {
                 if (BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED)) {

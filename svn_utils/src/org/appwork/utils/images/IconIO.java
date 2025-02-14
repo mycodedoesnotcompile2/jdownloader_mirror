@@ -269,9 +269,8 @@ public class IconIO {
 
     /**
      * Multiply the scale factor {@code sv} and the value {@code v} with appropriate clipping to the bounds of Integer resolution. If the
-     * answer would be greater than {@code Integer.MAX_VALUE} then {@code
-     * Integer.MAX_VALUE} is returned. If the answer would be less than {@code
-     * Integer.MIN_VALUE} then {@code Integer.MIN_VALUE} is returned. Otherwise the multiplication is returned.
+     * answer would be greater than {@code Integer.MAX_VALUE} then {@code Integer.MAX_VALUE} is returned. If the answer would be less than
+     * {@code Integer.MIN_VALUE} then {@code Integer.MIN_VALUE} is returned. Otherwise the multiplication is returned.
      */
     public static int clipScale(final int v, final double sv) {
         if (sv == 1.0) {
@@ -451,6 +450,7 @@ public class IconIO {
             return new ImageIcon(IconIO.getScaledInstance(image, w, h, Interpolation.BICUBIC, true));
         }
     }
+
     // /**
     // * this method tries to create a BadMultiResosultionImage that does not only contain the requested size, but also a bigger version for
     // * highDPI systems.
@@ -490,7 +490,6 @@ public class IconIO {
     // return scaledToTarget;
     // }
     // }
-
     public static Icon getIconFromDataUrl(String dataURL) throws IOException {
         return new ImageIcon(getImageFromDataUrl(dataURL));
     }
@@ -524,7 +523,7 @@ public class IconIO {
         }
         if (StringUtils.endsWithCaseInsensitive(resource.getPath(), ".ico") && isIcoSupported()) {
             try {
-                InputStream is = resource.openStream();
+                final InputStream is = resource.openStream();
                 try {
                     List<BufferedImage> bufferedImages = (List<BufferedImage>) ICO_DECODER.invoke(null, is);
                     if (bufferedImages != null && bufferedImages.size() > 0) {
@@ -645,21 +644,21 @@ public class IconIO {
      * @return
      */
     public static Icon getScaledInstance(final Icon icon, final int width, final int height, final Interpolation bicubic) {
-        if (icon instanceof ScalableIcon) {
+        if (icon.getIconHeight() == height && icon.getIconWidth() == width) {
+            return icon;
+        } else if (icon instanceof ScalableIcon) {
             return new ScaledIcon(icon, width, height, bicubic);
-        }
-        if (icon instanceof ImageIcon) {
-            final ImageIcon iIcon = (ImageIcon) icon;
-            if (iIcon.getIconHeight() == height && iIcon.getIconWidth() == width) {
-                return icon;
-            }
-        }
-        if (icon instanceof ScaledIcon) {
-            final ScaledIcon sIcon = (ScaledIcon) icon;
-            if (sIcon.getIconHeight() == height && sIcon.getIconWidth() == width) {
+        } else if (icon instanceof ScaledIcon) {
+            final ScaledIcon scaledIcon = (ScaledIcon) icon;
+            if (scaledIcon.getIconHeight() == height && scaledIcon.getIconWidth() == width) {
                 return icon;
             } else {
-                return new ScaledIcon(sIcon.getOrigin(), width, height, bicubic);
+                final ScaledIcon newScaledIcon = new ScaledIcon(scaledIcon.getOrigin(), width, height, bicubic);
+                if (newScaledIcon.getIconHeight() == scaledIcon.getIconHeight() && newScaledIcon.getIconWidth() == scaledIcon.getIconWidth()) {
+                    return scaledIcon;
+                } else {
+                    return newScaledIcon;
+                }
             }
         }
         return new ScaledIcon(icon, width, height, bicubic);
@@ -753,6 +752,7 @@ public class IconIO {
         } while (w != width || h != height);
         return ret;
     }
+
     // /**
     // * @param img
     // * @param bestMatch
@@ -770,7 +770,6 @@ public class IconIO {
     // }
     // return new BaseMultiResolutionImageWrapper(index, variants.toArray(new Image[0]));
     // }
-
     public static SVGFactory getSvgFactory() {
         SVGFactory factory = SVG_FACTORY.get();
         if (factory == null) {
@@ -806,15 +805,6 @@ public class IconIO {
         g.drawImage(src, 0, 0, null);
         g.dispose();
         return image;
-    }
-
-    /**
-     * @param image
-     * @param f
-     * @return
-     */
-    public static ImageIcon getTransparentIcon(final Image src, final float f) {
-        return new ImageIcon(IconIO.getTransparent(src, f));
     }
 
     /**

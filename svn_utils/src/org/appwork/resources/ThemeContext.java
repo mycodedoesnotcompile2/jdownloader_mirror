@@ -34,7 +34,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.resources;
 
-import org.appwork.exceptions.NotSupportedException;
+import java.net.URL;
+import java.util.HashMap;
 
 /**
  * @author thomas
@@ -42,35 +43,17 @@ import org.appwork.exceptions.NotSupportedException;
  *
  */
 public class ThemeContext {
-    public static final ThemeContext DEFAULT                       = new ThemeContext() {
-                                                                  /**
-                                                                   * @see org.appwork.resources.ThemeContext#setUsecache(boolean)
-                                                                   */
-                                                                  @Override
-                                                                  public ThemeContext setUsecache(boolean usecache) {
-                                                                      throw new NotSupportedException();
-                                                                  }
+    public static enum Target {
+        IMAGE,
+        ICON
+    }
 
-                                                                  /**
-                                                                   * @see org.appwork.resources.ThemeContext#setCreateMultiResolutionImages(boolean)
-                                                                   */
-                                                                  @Override
-                                                                  public ThemeContext setCreateMultiResolutionImages(boolean createMultiResolutionImages) {
-                                                                      throw new NotSupportedException();
-                                                                  }
-
-                                                                  /**
-                                                                   * @see org.appwork.resources.ThemeContext#setDoNotUpscaleButThrowException(boolean)
-                                                                   */
-                                                                  @Override
-                                                                  public ThemeContext setDoNotUpscaleButThrowException(boolean doNotUpscaleButThrowException) {
-                                                                      throw new NotSupportedException();
-                                                                  }
-                                                              };
-    private boolean             usecache                      = true;
-    private boolean             createMultiResolutionImages   = true;
-    private boolean             doNotUpscaleButThrowException = false;
-    private boolean             debugDrawEnabled              = false;
+    private boolean              usecache                      = true;
+    private boolean              createMultiResolutionImages   = true;
+    private boolean              doNotUpscaleButThrowException = false;
+    private boolean              debugDrawEnabled              = false;
+    private HashMap<String, URL> urls                          = new HashMap<String, URL>();
+    private Target               target                        = null;
 
     /**
      * @return the debugDrawEnabled
@@ -137,5 +120,33 @@ public class ThemeContext {
      */
     public String toKeyID() {
         return isCreateMultiResolutionImages() + "_" + isDoNotUpscaleButThrowException() + "_" + isDebugDrawEnabled();
+    }
+
+    /**
+     * @param url
+     */
+    public ThemeContext putURL(String relPath, URL url) {
+        this.urls.put(relPath, url);
+        return this;
+    }
+
+    public URL getURL(String relativePath) {
+        return urls.get(relativePath);
+    }
+
+    /**
+     * @param image
+     */
+    protected void ensureTarget(Target newTarget) {
+        if (target == null) {
+            target = newTarget;
+        }
+    }
+
+    /**
+     * @return the target
+     */
+    protected Target getTarget() {
+        return target;
     }
 }

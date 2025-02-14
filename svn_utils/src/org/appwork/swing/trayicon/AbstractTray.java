@@ -69,7 +69,9 @@ public abstract class AbstractTray implements TrayMouseListener {
         new EDTRunner() {
             @Override
             protected void runInEDT() {
-                trayIcon.setToolTip(tt);
+                if (trayIcon != null) {
+                    trayIcon.setToolTip(tt);
+                }
             }
         };
     }

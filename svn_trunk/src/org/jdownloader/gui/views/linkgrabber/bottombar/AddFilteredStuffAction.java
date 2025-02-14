@@ -8,13 +8,6 @@ import java.util.Map.Entry;
 
 import javax.swing.JComponent;
 
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollectorCrawler;
-import jd.controlling.linkcollector.LinkCollectorEvent;
-import jd.controlling.linkcollector.LinkCollectorListener;
-import jd.controlling.linkcrawler.CrawledLink;
-
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.swing.EDTRunner;
@@ -27,13 +20,18 @@ import org.jdownloader.gui.views.downloads.bottombar.SelfComponentFactoryInterfa
 import org.jdownloader.gui.views.downloads.bottombar.SelfLayoutInterface;
 import org.jdownloader.translate._JDT;
 
-public class AddFilteredStuffAction extends CustomizableAppAction implements ActionContext, SelfComponentFactoryInterface, SelfLayoutInterface {
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollectorCrawler;
+import jd.controlling.linkcollector.LinkCollectorEvent;
+import jd.controlling.linkcollector.LinkCollectorListener;
+import jd.controlling.linkcrawler.CrawledLink;
 
+public class AddFilteredStuffAction extends CustomizableAppAction implements ActionContext, SelfComponentFactoryInterface, SelfLayoutInterface {
     private boolean onlyVisibleIfThereIsFilteredStuff = true;
 
     public AddFilteredStuffAction() {
         setIconKey(IconKey.ICON_FILTER);
-
     }
 
     public static String getTranslationForOnlyVisibleIfThereIsFilteredStuff() {
@@ -47,13 +45,11 @@ public class AddFilteredStuffAction extends CustomizableAppAction implements Act
 
     public void setOnlyVisibleIfThereIsFilteredStuff(boolean onlyVisibleIfThereIsFilteredStuff) {
         this.onlyVisibleIfThereIsFilteredStuff = onlyVisibleIfThereIsFilteredStuff;
-
     }
 
     @Override
     public void actionPerformed(ActionEvent e) {
         LinkCollector.getInstance().getQueue().add(new QueueAction<Void, RuntimeException>() {
-
             @Override
             protected Void run() throws RuntimeException {
                 final List<CrawledLink> filteredStuff = LinkCollector.getInstance().getFilteredStuff(true);
@@ -83,7 +79,6 @@ public class AddFilteredStuffAction extends CustomizableAppAction implements Act
     }
 
     public class Button extends ExtButton implements LinkCollectorListener {
-
         public Button(AddFilteredStuffAction addFilteredStuffAction) {
             super(addFilteredStuffAction);
             LinkCollector.getInstance().getEventsender().addListener(this, true);
@@ -91,10 +86,8 @@ public class AddFilteredStuffAction extends CustomizableAppAction implements Act
         }
 
         private void setFilteredAvailable(final int size) {
-
             if (size > 0) {
                 new EDTRunner() {
-
                     @Override
                     protected void runInEDT() {
                         setText(_GUI.T.RestoreFilteredLinksAction_(size));
@@ -103,7 +96,6 @@ public class AddFilteredStuffAction extends CustomizableAppAction implements Act
                 };
             } else {
                 new EDTRunner() {
-
                     @Override
                     protected void runInEDT() {
                         setText(_GUI.T.RestoreFilteredLinksAction_(0));
@@ -170,15 +162,12 @@ public class AddFilteredStuffAction extends CustomizableAppAction implements Act
         @Override
         public void onLinkCrawlerFinished() {
         }
-
     }
 
     @Override
     public JComponent createComponent() {
-        Button ret = new Button(this);
+        final Button ret = new Button(this);
         ret.setEnabled(true);
-
         return ret;
     }
-
 }
