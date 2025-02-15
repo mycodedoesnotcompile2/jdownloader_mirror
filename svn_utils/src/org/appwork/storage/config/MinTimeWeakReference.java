@@ -38,7 +38,6 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.scheduler.DelayedRunnable;
@@ -48,9 +47,9 @@ import org.appwork.scheduler.DelayedRunnable;
  *
  */
 public class MinTimeWeakReference<T> extends WeakReference<T> {
-    private static final ScheduledExecutorService EXECUTER     = DelayedRunnable.getNewScheduledExecutorService();
-    private static final ScheduledExecutorService QUEUECLEANUP = DelayedRunnable.getNewScheduledExecutorService();
-    private static final ReferenceQueue<Object>   QUEUE        = new ReferenceQueue<Object>();
+    private static final ScheduledExecutorService              EXECUTER      = DelayedRunnable.getNewScheduledExecutorService();
+    private static final ScheduledExecutorService              QUEUECLEANUP  = DelayedRunnable.getNewScheduledExecutorService();
+    private static final ReferenceQueue<Object>                QUEUE         = new ReferenceQueue<Object>();
     static {
         MinTimeWeakReference.QUEUECLEANUP.scheduleWithFixedDelay(new Runnable() {
             @Override
@@ -66,31 +65,6 @@ public class MinTimeWeakReference<T> extends WeakReference<T> {
             }
         }, 10, 60, TimeUnit.SECONDS);
     }
-
-    public static void main(final String[] args) throws InterruptedException {
-        final AtomicBoolean onCallBack = new AtomicBoolean(false);
-        MinTimeWeakReferenceCleanup callback = new MinTimeWeakReferenceCleanup() {
-            @Override
-            public void onMinTimeWeakReferenceCleanup(MinTimeWeakReference<?> minTimeWeakReference) {
-                onCallBack.set(true);
-            }
-        };
-        final MinTimeWeakReference<double[]> ref = new MinTimeWeakReference<double[]>(new double[20000], 2000, "test", callback);
-        for (int i = 0; i < 10; i++) {
-            System.out.println(i * 1000 + " - " + ref.get().length);
-            Thread.sleep(1000);
-        }
-        for (int i = 0; i < 10; i++) {
-            Thread.sleep(1000);
-            System.gc();
-            System.out.println(i * 1000 + " - " + (ref.superget() != null));
-        }
-        while (onCallBack.get() == false) {
-            Thread.sleep(1000);
-        }
-        System.out.println("nice");
-    }
-
     private final AtomicReference<DelayedRunnable>             hardReference = new AtomicReference<DelayedRunnable>(null);
     private final AtomicReference<MinTimeWeakReferenceCleanup> cleanupMinTimeWeakReference;
     private final String                                       id;

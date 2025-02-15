@@ -7,6 +7,13 @@ import java.net.MalformedURLException;
 
 import javax.swing.SwingUtilities;
 
+import jd.gui.swing.dialog.CaptchaDialog;
+import jd.gui.swing.dialog.DialogType;
+import jd.gui.swing.jdgui.JDGui;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+
 import org.appwork.exceptions.ThrowUncheckedException;
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
@@ -35,13 +42,6 @@ import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.settings.SilentModeSettings.CaptchaDuringSilentModeAction;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
-
-import jd.gui.swing.dialog.CaptchaDialog;
-import jd.gui.swing.dialog.DialogType;
-import jd.gui.swing.jdgui.JDGui;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 
 public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<ResultType>, T extends Challenge<ResultType>, ResultType> {
     private DomainInfo            host;
@@ -146,6 +146,7 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
             try {
                 images = CaptchaDialog.getGifImages(((ImageCaptchaChallenge<?>) captchaChallenge).getImageFile().toURI().toURL());
                 if (images == null || images.length == 0) {
+                    // TODO: change to loadImage
                     Image img = IconIO.getImage(((ImageCaptchaChallenge<?>) captchaChallenge).getImageFile().toURI().toURL(), false);
                     if (img != null) {
                         images = new Image[] { img };

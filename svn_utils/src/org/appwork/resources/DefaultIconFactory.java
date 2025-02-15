@@ -50,11 +50,11 @@ import org.appwork.utils.images.Interpolation;
  */
 public class DefaultIconFactory implements IconFactory {
     /**
-     * @see org.appwork.resources.IconFactory#urlToNonImageIcon(java.net.URL, int, int)
+     * @see org.appwork.resources.IconFactory#urlToVectorIcon(java.net.URL, int, int)
      */
     @Override
-    public Icon urlToNonImageIcon(URL url, int w, int h) {
-        return IconIO.getNonImageIcon(url, w, h);
+    public Icon urlToVectorIcon(URL url, int w, int h) {
+        return IconIO.loadVectorIcon(url, w, h);
     }
 
     /**
@@ -62,7 +62,7 @@ public class DefaultIconFactory implements IconFactory {
      */
     @Override
     public Icon scale(Icon ret, int w, int h) {
-        return IconIO.getScaledInstance(ret, w, h, Interpolation.BILINEAR);
+        return IconIO.getScaledInstance(ret, w, h, Interpolation.BICUBIC);
     }
 
     /**
@@ -70,6 +70,7 @@ public class DefaultIconFactory implements IconFactory {
      */
     @Override
     public Icon getDisabled(JComponent component, Icon icon) {
+        // (DebugMode.debugger();
         return ImageProvider.getDisabledIcon(component, icon);
     }
 
@@ -78,7 +79,7 @@ public class DefaultIconFactory implements IconFactory {
      */
     @Override
     public Image urlToImage(URL url) {
-        return IconIO.getImage(url, false);
+        return IconIO.loadImage(url);
     }
 
     /**

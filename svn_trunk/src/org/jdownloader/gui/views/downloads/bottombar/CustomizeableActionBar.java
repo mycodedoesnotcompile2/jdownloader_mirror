@@ -9,7 +9,6 @@ import java.awt.Image;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.awt.Transparency;
 import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.InvocationTargetException;
@@ -23,9 +22,16 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 
+import jd.SecondLevelLaunch;
+import jd.gui.swing.components.SetIconInterface;
+import jd.gui.swing.components.SetLabelInterface;
+import jd.gui.swing.jdgui.JDGui;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.images.IconIO;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
@@ -40,12 +46,6 @@ import org.jdownloader.extensions.ExtensionNotLoadedException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.SecondLevelLaunch;
-import jd.gui.swing.components.SetIconInterface;
-import jd.gui.swing.components.SetLabelInterface;
-import jd.gui.swing.jdgui.JDGui;
-import net.miginfocom.swing.MigLayout;
 
 public class CustomizeableActionBar extends MigPanel {
     private final AbstractBottomBarMenuManager manager;
@@ -222,7 +222,7 @@ public class CustomizeableActionBar extends MigPanel {
         int yoffsetFront = (back.getHeight(null) - front.getHeight(null)) / 2;
         final int width = Math.max(xoffsetBack + back.getWidth(null), xoffsetFront + front.getWidth(null));
         final int height = Math.max(yoffsetBack + back.getHeight(null), yoffsetFront + front.getHeight(null));
-        final BufferedImage dest = new BufferedImage(width + 2, height, Transparency.TRANSLUCENT);
+        final BufferedImage dest = IconIO.createEmptyImage(width + 2, height);
         final Graphics2D g2 = dest.createGraphics();
         g2.drawImage(back, xoffsetBack, yoffsetBack, null);
         g2.drawImage(front, xoffsetFront, yoffsetFront, null);

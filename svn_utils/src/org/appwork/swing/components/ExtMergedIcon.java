@@ -115,6 +115,9 @@ public class ExtMergedIcon implements Icon, IDIcon {
      * @return
      */
     private static boolean hasMonitorScaling() {
+        if (Application.isHeadless()) {
+            return false;
+        }
         for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
             AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
             if (tx.getScaleX() != 1d || tx.getScaleY() != 1d) {

@@ -24,6 +24,26 @@ import java.util.Map.Entry;
 import java.util.WeakHashMap;
 import java.util.regex.Matcher;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.flexijson.FlexiJSONParser;
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.FlexiParserException;
+import org.appwork.storage.flexijson.JSPath;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
+import org.appwork.storage.flexijson.mapper.FlexiMapperException;
+import org.appwork.utils.Files;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.linkcrawler.LinkVariant;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.accountchecker.AccountCheckerThread;
@@ -53,27 +73,7 @@ import jd.plugins.components.gopro.SyncGoProLibraryToolbarAction;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.decrypter.GoProCloudDecrypter;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.flexijson.FlexiJSONParser;
-import org.appwork.storage.flexijson.FlexiJSonNode;
-import org.appwork.storage.flexijson.FlexiParserException;
-import org.appwork.storage.flexijson.JSPath;
-import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
-import org.appwork.storage.flexijson.mapper.FlexiMapperException;
-import org.appwork.utils.Files;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.linkcrawler.LinkVariant;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-
-@HostPlugin(revision = "$Revision: 50622 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
+@HostPlugin(revision = "$Revision: 50635 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
 public class GoProCloud extends PluginForHost {
     private static final String HTTPS_API_GOPRO_COM_V1_OAUTH2_TOKEN   = "https://api.gopro.com/v1/oauth2/token";
     private static final String CLIENT_SECRET                         = "3863c9b438c07b82f39ab3eeeef9c24fefa50c6856253e3f1d37e0e3b1ead68d";
@@ -88,7 +88,12 @@ public class GoProCloud extends PluginForHost {
     public GoProCloud(PluginWrapper wrapper) {
         super(wrapper);
         enablePremium("https://" + getHost() + "/login/signup");
+    }
+
+    @Override
+    public boolean assignPlugin(Account account) {
         SyncGoProLibraryToolbarAction.registerExtender();
+        return super.assignPlugin(account);
     }
 
     @Override
@@ -254,7 +259,6 @@ public class GoProCloud extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         }
-
     }
 
     protected Variation loadDownloadURL(final DownloadLink link, final Account account) throws Exception {

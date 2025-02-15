@@ -67,7 +67,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49397 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50632 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -528,7 +528,14 @@ public class OneFichierCom extends PluginForHost {
         } else if (responsecode == 403) {
             if (ibr.containsHTML("(?i)>\\s*Premium status must not be used on professional services")) {
                 if (account != null) {
-                    throw new AccountUnavailableException("Premium status must not be used on professional services (VPN, proxies, ...). Use CDN credits", 30 * 60 * 1000l);
+                    throw new AccountUnavailableException("Premium status must not be used on professional services (VPN, proxies, ...). Use CDN credits", 60 * 60 * 1000l);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
+            if (ibr.containsHTML("(?i)>\\s*Premium status is only allowed to be used on residential private and dedicated")) {
+                if (account != null) {
+                    throw new AccountUnavailableException("Premium status is only allowed to be used on residential private and dedicated - internet connexion. Use CDN credits", 60 * 60 * 1000l);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -1449,9 +1456,7 @@ public class OneFichierCom extends PluginForHost {
     }
 
     public static boolean looksLikeValidAPIKeySTATIC(final String str) {
-        if (str == null) {
-            return false;
-        } else if (str.matches("[A-Za-z0-9\\-_=]{32}")) {
+        if (str != null && str.matches("[A-Za-z0-9\\-_=]{32}")) {
             return true;
         } else {
             return false;

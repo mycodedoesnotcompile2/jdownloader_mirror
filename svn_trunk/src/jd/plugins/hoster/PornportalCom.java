@@ -64,7 +64,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 50413 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50637 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -403,7 +403,10 @@ public class PornportalCom extends PluginForHost {
              * evaluate the "valid to" parameter stored inside the URL.
              */
             final UrlQuery query = UrlQuery.parse(dllink);
-            final String expireTimestampStr = query.get("validto");
+            String expireTimestampStr = query.get("validto");
+            if (expireTimestampStr == null) {
+                expireTimestampStr = new Regex(dllink, "st=\\d+~exp=(\\d+)").getMatch(0);// expire on m3u8 playlists
+            }
             if (expireTimestampStr != null && expireTimestampStr.matches("\\d+") && Long.parseLong(expireTimestampStr) * 1000l < System.currentTimeMillis()) {
                 logger.info("Directurl is expired according to timestamp from URL-parameter");
                 refreshDirecturlNeeded = true;
@@ -413,8 +416,9 @@ public class PornportalCom extends PluginForHost {
                 con = br.openHeadConnection(dllink);
                 /**
                  * 403 = Generic expired </br>
-                 * 472 = Video-directurl expired 474 = Image directurl expired and/or any directurl is not expired but used with the wrong
-                 * IP -> New one needs to be obtained.
+                 * 472 = Video-directurl expired</br>
+                 * 474 = Image directurl expired and/or any directurl is not expired but used with the wrong IP -> New one needs to be
+                 * obtained.
                  */
                 if (con.getResponseCode() == 403 || con.getResponseCode() == 472 || con.getResponseCode() == 474) {
                     br.followConnection(true);

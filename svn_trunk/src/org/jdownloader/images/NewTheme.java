@@ -1,24 +1,18 @@
 package org.jdownloader.images;
 
-import java.awt.AlphaComposite;
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.Set;
 
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
+import javax.swing.JComponent;
 
 import org.appwork.resources.AWUTheme;
 import org.appwork.resources.Theme;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.components.IDIcon;
-import org.appwork.swing.components.IconIdentifier;
 import org.appwork.utils.images.ColoredIcon;
 import org.appwork.utils.images.ColoredIcon.ColorLookup;
 import org.appwork.utils.images.IconIO;
@@ -32,42 +26,6 @@ import org.jdownloader.updatev2.gui.LAFOptions;
  *
  */
 public class NewTheme extends Theme {
-    public static class RedDotIcon implements Icon, IDIcon {
-        private final Color red;
-        private final Icon  fChck;
-
-        public RedDotIcon(Color red, Icon fChck) {
-            this.red = red;
-            this.fChck = fChck;
-        }
-
-        @Override
-        public void paintIcon(Component c, Graphics g, int x, int y) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(red);
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
-            int width = IconIO.clipScale(fChck.getIconWidth(), 0.6d);
-            g2.fillOval(x + (fChck.getIconWidth() - width) / 2, y + (fChck.getIconHeight() - width) / 2, width, width);
-        }
-
-        @Override
-        public int getIconWidth() {
-            return fChck.getIconWidth();
-        }
-
-        @Override
-        public int getIconHeight() {
-            return fChck.getIconHeight();
-        }
-
-        @Override
-        public IconIdentifier getIdentifier() {
-            return new IconIdentifier(getClass().getName());
-        }
-    }
-
     private static final NewTheme INSTANCE = new NewTheme();
 
     /**
@@ -82,13 +40,6 @@ public class NewTheme extends Theme {
     public static NewTheme I() {
         return NewTheme.INSTANCE;
     }
-
-    protected Icon modify(Icon ret, String relativePath) {
-        if (ret instanceof ImageIcon) {
-            return new IdentifierImageIcon(((ImageIcon) ret).getImage(), relativePath);
-        }
-        return new IdentifierWrapperIcon(ret, relativePath);
-    };
 
     /**
      * Create a new instance of NewTheme.I(). This is a singleton class. Access the only existing instance by using {@link #getInstance()}.
@@ -114,12 +65,23 @@ public class NewTheme extends Theme {
     }
 
     @Override
+    public Icon getDisabledIcon(JComponent component, Icon input) {
+        if (input instanceof IDIcon) {
+            return new IdentifierWrapperIcon(super.getDisabledIcon(component, input), ((IDIcon) input).getIdentifier().getKey());
+        }
+        return super.getDisabledIcon(component, input);
+    }
+
+    @Override
     public Icon getIcon(String relativePath, int size) {
         if ("compress".equals(relativePath)) {
-            return super.getIcon(IconKey.ICON_EXTRACT, size);
-        } else {
-            return super.getIcon(relativePath, size);
+            relativePath = IconKey.ICON_EXTRACT;
         }
+        Icon ret = super.getIcon(relativePath, size);
+        if (ret != null) {
+            ret = new IdentifierWrapperIcon(ret, relativePath);
+        }
+        return ret;
     }
 
     protected String getCacheKey(final Object... objects) {
@@ -182,10 +144,9 @@ public class NewTheme extends Theme {
             if (red != null) {
                 ColoredIcon colored = new ColoredIcon(checkBox);
                 for (Color c : getInner25PercentColors(IconIO.toBufferedImage(CheckBoxIcon.FALSE))) {
-                    colored.replace(new ColorLookup(c, 10, true), red);
+                    colored.replace(new ColorLookup(c, 20, true), red);
                 }
                 checkBox = colored;
-                // }
             }
             ret = new ExtMergedIcon(back, 0, 0).add(checkBox, 0, back.getIconHeight() - checkBox.getIconHeight() + 2);
             cache(ret, key);

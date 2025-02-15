@@ -3,11 +3,19 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.HeadRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
@@ -22,17 +30,11 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
+@HostPlugin(revision = "$Revision: 50636 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
 public class SxyprnCom extends antiDDoSForHost {
     public SxyprnCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://sxyprn.com/community/0.html");
+        this.enablePremium("https://" + getHost() + "/community/0.html");
     }
 
     @Override
@@ -49,7 +51,7 @@ public class SxyprnCom extends antiDDoSForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://sxyprn.com/";
+        return "https://" + getHost() + "/";
     }
 
     @Override
@@ -149,7 +151,13 @@ public class SxyprnCom extends antiDDoSForHost {
         }
     }
 
-    private long ssut51(final String input) {
+    public static String boo(long ss, long es) {
+        String input = ss + "-" + "sxyprn.com" + "-" + es;
+        String encoded = Encoding.Base64Encode(input);
+        return encoded.replace("+", "-").replace("/", "_").replace("=", ".");
+    }
+
+    private static long ssut51(final String input) {
         final String num = input.replaceAll("[^0-9]", "");
         long ret = 0;
         for (int i = 0; i < num.length(); i++) {
@@ -158,13 +166,23 @@ public class SxyprnCom extends antiDDoSForHost {
         return ret;
     }
 
-    private String getDllink(final DownloadLink link, final String vnfo, final boolean isDownload) throws Exception {
-        final String tmp[] = vnfo.split("/");
-        if (StringUtils.containsIgnoreCase(br.getHost(), "sxyprn.net")) {
-            tmp[1] += "5";
-        } else {
-            tmp[1] += "8";
+    /**
+     * See https://sxyprn.com/js/main2.js?92 <br>
+     * -> Function getvsrc()
+     */
+    private String getDllink(final DownloadLink link, String vnfo, final boolean isDownload) throws Exception {
+        int num = 5;
+        String js = br.getRegex("src\\s*=\\s*\"(/js/main.*?)\"").getMatch(0);
+        if (js != null) {
+            Browser brc = br.cloneBrowser();
+            brc.getPage(js);
+            String numString = brc.getRegex("tmp\\[1\\]\\s*\\+\\s*=\\s*\"(\\d+)\"\\s*\\+\\s*\"/\"").getMatch(0);
+            if (numString != null) {
+                num = Integer.parseInt(numString);
+            }
         }
+        final String tmp[] = vnfo.split("/");
+        tmp[1] += num + "/" + boo(ssut51(tmp[6]), ssut51(tmp[7]));
         tmp[5] = String.valueOf((Long.parseLong(tmp[5]) - (ssut51(tmp[6]) + ssut51(tmp[7]))));
         final String url = "/" + StringUtils.join(tmp, "/");
         if (isDownload) {
@@ -172,7 +190,9 @@ public class SxyprnCom extends antiDDoSForHost {
             return url;
         } else {
             try {
-                final URLConnectionAdapter con = basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(url), link, link.getName(), null);
+                final HeadRequest request = br.createHeadRequest(url);
+                request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5");
+                final URLConnectionAdapter con = basicLinkCheck(br.cloneBrowser(), request, link, link.getName(), null);
                 return con.getURL().toExternalForm();
             } catch (Exception e) {
                 logger.log(e);

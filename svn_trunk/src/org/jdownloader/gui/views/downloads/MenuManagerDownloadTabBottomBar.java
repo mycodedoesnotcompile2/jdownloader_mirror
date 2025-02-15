@@ -17,6 +17,7 @@ import org.jdownloader.gui.mainmenu.ParallelDownloadsPerHostEditorLink;
 import org.jdownloader.gui.mainmenu.SpeedlimitEditorLink;
 import org.jdownloader.gui.mainmenu.container.OptionalContainer;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.downloads.action.CleanupDownloadFolderAction;
 import org.jdownloader.gui.views.downloads.action.GenericDeleteFromDownloadlistAction;
 import org.jdownloader.gui.views.downloads.action.ResetAction;
 import org.jdownloader.gui.views.downloads.action.ResumeAction;
@@ -65,6 +66,7 @@ public class MenuManagerDownloadTabBottomBar extends AbstractBottomBarMenuManage
         MenuContainerRoot mr = new MenuContainerRoot();
         fillAddLinks(mr);
         mr.add(setName(setIconKey(new ActionData(GenericDeleteFromDownloadlistAction.class).putSetup(GenericDeleteFromDownloadlistAction.DELETE_ALL, true), IconKey.ICON_DELETE), MenuItemData.EMPTY));
+        mr.add(CleanupDownloadFolderAction.class);
         DeleteContainer delete = new DeleteContainer();
         delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistAction.class).putSetup(GenericDeleteFromDownloadlistAction.DELETE_DISABLED, true), IconKey.ICON_REMOVE_DISABLED));
         delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistAction.class).putSetup(GenericDeleteFromDownloadlistAction.DELETE_FAILED, true), IconKey.ICON_REMOVE_FAILED));

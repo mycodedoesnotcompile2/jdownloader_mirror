@@ -132,11 +132,7 @@ public class ColoredIcon extends AbstractIconPipe {
          */
         @Override
         protected BufferedImage beforeBufferedImageDraw(BufferedImage img) {
-            BufferedImage ret = img;
-            for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
-                ret = IconIO.toBufferedImage(IconIO.replaceColor(ret, es.getKey().color, es.getKey().tollerance, es.getValue(), es.getKey().keepBrightness));
-            }
-            return ret;
+            return IconIO.toBufferedImage(beforeImageDraw(img));
         }
 
         /**

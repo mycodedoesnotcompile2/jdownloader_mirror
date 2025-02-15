@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50493 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50625 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornhexCom extends PluginForHost {
     public PornhexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -182,6 +182,7 @@ public class PornhexCom extends PluginForHost {
                     logger.info("Looking for user selected video stream quality: " + userSelectedQuality);
                 }
                 boolean foundUserSelectedQuality = false;
+                boolean foundStreamingUrlKey = false;
                 for (final Object videoo : ressourcelist) {
                     /* Check for single URL without any quality information e.g. uqload.com */
                     if (videoo instanceof String && onlyOneQualityAvailable) {
@@ -211,6 +212,12 @@ public class PornhexCom extends PluginForHost {
                         /* 2020-05-20: This plugin cannot yet handle DASH stream downloads */
                         logger.info("Skipping DASH stream: " + dllink_temp);
                         continue;
+                    }
+                    /* 2025-02-14: Add key to URL otherwise server may answer with http response 403. */
+                    final String key = (String) entries.get("key");
+                    if (key != null) {
+                        dllink_temp += "?h=" + key;
+                        foundStreamingUrlKey = true;
                     }
                     /* Find quality + downloadurl */
                     long quality_temp = 0;
@@ -255,6 +262,9 @@ public class PornhexCom extends PluginForHost {
                         }
                     }
                 }
+                if (!foundStreamingUrlKey) {
+                    logger.warning("Failed to find key in streamingURLs");
+                }
                 if (!StringUtils.isEmpty(dllink)) {
                     logger.info("Quality handling for multiple video stream sources succeeded - picked quality is: " + quality_picked);
                     if (foundUserSelectedQuality) {
@@ -271,7 +281,8 @@ public class PornhexCom extends PluginForHost {
             }
         }
         if (!StringUtils.isEmpty(dllink) && !isDownload) {
-            this.basicLinkCheck(br, br.createHeadRequest(this.dllink), link, filename, null);
+            /* 2025-02-14: HEAD-request is not allowed anymore. */
+            this.basicLinkCheck(br, br.createGetRequest(this.dllink), link, filename, null);
         } else {
             link.setFinalFileName(filename);
         }

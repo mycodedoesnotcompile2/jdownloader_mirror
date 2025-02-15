@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50619 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50624 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
         if (account != null && AccountType.PREMIUM.equals(account.getType())) {
             return 0;
         } else {
-            return -5;
+            return -2;
         }
     }
 
@@ -183,7 +183,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
             }
             dllink = br.getRegex("down_process2\\('\\d+',\\s*'(https?://[^\\']+)").getMatch(0);
             if (dllink == null) {
-                /* 2025-03-13 */
+                /* 2025-02-13 */
                 dllink = br.getRegex("href=\"(http[^\"]+)\"[^>]*down_process2").getMatch(0);
             }
             if (dllink == null) {

@@ -20,7 +20,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50542 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
+@HostPlugin(revision = "$Revision: 50633 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -76,12 +75,49 @@ public class DeviantArtCom extends PluginForHost {
     public static final String         PROPERTY_TITLE                              = "title";
     public static final String         PROPERTY_TYPE                               = "type";
     private static final String        PROPERTY_OFFICIAL_DOWNLOADURL               = "official_downloadurl";
-    private static final String        PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL       = "image_display_or_preview_url";
+    public static final String         PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL       = "image_display_or_preview_url";
+    public static final String         PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2     = "image_display_or_preview_url_2";
     private static final String        PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL       = "video_display_or_preview_url";
+    private static final String        PROPERTY_DEVIATION_HTML                     = "deviation_html";
+    private static final String        PROPERTY_TIER_ACCESS                        = "tier_access";
+    public static final String         PROPERTY_IMAGE_POSITION                     = "image_position";
+    public static final String         PROPERTY_IMAGE_POSITION_MAX                 = "image_position_max";
+    public static final String         PROPERTY_IMAGE_TOKEN                        = "image_token";
     private static final boolean       LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD = true;
     /* Don't touch the following! */
     private static final AtomicInteger freeDownloadsRunning                        = new AtomicInteger(0);
     private static final AtomicInteger accountDownloadsRunning                     = new AtomicInteger(0);
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "deviantart.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            String regex = "https?://[\\w\\.\\-]*?" + buildHostsPatternPart(domains) + "(";
+            regex += PATTERN_ART.pattern();
+            regex += "|";
+            regex += PATTERN_JOURNAL.pattern();
+            regex += "|";
+            regex += PATTERN_STATUS.pattern();
+            regex += ")";
+            ret.add(regex);
+        }
+        return ret.toArray(new String[0]);
+    }
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -91,6 +127,7 @@ public class DeviantArtCom extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        br.setCookie(getHost(), "agegate_state", "1");
         br.setFollowRedirects(true);
         return br;
     }
@@ -101,12 +138,12 @@ public class DeviantArtCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public DeviantArtCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www." + this.getHost() + "/join/");
+        this.enablePremium("https://www." + getHost() + "/join/");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www." + this.getHost() + "/about/policy/service/";
+        return "https://www." + getHost() + "/about/policy/service/";
     }
 
     @Override
@@ -124,7 +161,12 @@ public class DeviantArtCom extends PluginForHost {
     public String getLinkID(final DownloadLink link) {
         final String fid = getFID(link);
         if (fid != null) {
-            return this.getHost() + "://" + fid;
+            final int imageposition = getImagePosition(link);
+            if (imageposition == -1) {
+                return this.getHost() + "://" + fid;
+            } else {
+                return this.getHost() + "://" + fid + "/image_position/" + imageposition;
+            }
         } else {
             return super.getLinkID(link);
         }
@@ -145,97 +187,91 @@ public class DeviantArtCom extends PluginForHost {
         return requestFileInformation(link, account, false);
     }
 
-    public static Map<String, Object> parseDeviationJSON(final Plugin plugin, final DownloadLink link, Map<String, Object> deviation) {
+    public static void parseDeviationJSON(final Plugin plugin, final DownloadLink link, final Map<String, Object> art) {
         // author can also be id(number) of author in users map
-        final Map<String, Object> author = deviation.get("author") instanceof Map ? (Map<String, Object>) deviation.get("author") : null;
-        if (author != null) {
-            link.setProperty(PROPERTY_USERNAME, author.get("username"));
-        }
-        setTitleProperty(link, (String) deviation.get("title"));
-        link.setProperty(PROPERTY_TYPE, deviation.get("type"));
-        final Map<String, Object> ret = new HashMap<String, Object>();
-        final Map<String, Object> media = (Map<String, Object>) deviation.get("media");
-        if (media == null) {
-            plugin.getLogger().warning("Failed to find field 'media'");
-            return ret;
-        }
-        String displayedImageURL = null;
-        Number unlimitedImageSize = null;
-        String displayedVideoURL = null;
-        Number displayedVideoSize = null;
+        setTitleProperty(link, art.get("title").toString());
+        link.setProperty(PROPERTY_TYPE, art.get("type"));
+        link.setProperty(PROPERTY_TIER_ACCESS, art.get("tierAccess"));
+        link.setProperty(PROPERTY_DEVIATION_HTML, JavaScriptEngineFactory.walkJson(art, "textContent/html/markup"));
         final boolean isImage = isImage(link);
         final boolean isVideo = isVideo(link);
+        final Map<String, Object> media = (Map<String, Object>) art.get("media");
         try {
             final String baseUri = (String) media.get("baseUri");
             final String prettyName = (String) media.get("prettyName");
             final List<Map<String, Object>> types = (List<Map<String, Object>>) media.get("types");
-            if (types != null && StringUtils.isAllNotEmpty(baseUri, prettyName)) {
-                Map<String, Object> bestType = null;
-                final List<String> bestTypesList;
-                if (isImage) {
-                    bestTypesList = Arrays.asList(new String[] { "fullview" });
-                } else if (isVideo) {
-                    bestTypesList = Arrays.asList(new String[] { "video" });
-                } else {
-                    bestTypesList = new ArrayList<String>(0);
-                }
-                typeStringLoop: for (final String typeString : bestTypesList) {
-                    for (final Map<String, Object> type : types) {
-                        if (typeString.equals(type.get("t"))) {
-                            if (isImage) {
+            Map<String, Object> bestType = null;
+            final List<String> bestTypesList;
+            if (isImage) {
+                bestTypesList = Arrays.asList(new String[] { "fullview" });
+            } else if (isVideo) {
+                bestTypesList = Arrays.asList(new String[] { "video" });
+            } else {
+                bestTypesList = new ArrayList<String>(0);
+            }
+            typeStringLoop: for (final String typeString : bestTypesList) {
+                for (final Map<String, Object> type : types) {
+                    if (typeString.equals(type.get("t"))) {
+                        if (isImage) {
+                            bestType = type;
+                            break typeStringLoop;
+                        } else if (isVideo) {
+                            if (bestType == null || ((Number) type.get("h")).intValue() > ((Number) bestType.get("h")).intValue()) {
                                 bestType = type;
-                                break typeStringLoop;
-                            } else if (isVideo) {
-                                if (bestType == null || ((Number) type.get("h")).intValue() > ((Number) bestType.get("h")).intValue()) {
-                                    bestType = type;
-                                }
                             }
                         }
-                    }
-                }
-                if (bestType != null) {
-                    if (isImage) {
-                        String c = (String) bestType.get("c");
-                        if (c == null) {
-                            if ("fullview".equals(bestType.get("t"))) {
-                                // r=1? o=true??(maybe original)
-                                c = "";// raw image without any processing?
-                            } else {
-                                final Number h = (Number) bestType.get("h");
-                                final Number w = (Number) bestType.get("w");
-                                if (h != null && w != null) {
-                                    c = "/v1/fit/w_" + w + ",h_" + h + "/";
-                                }
-                            }
-                        }
-                        if (c != null) {
-                            c = c.replaceFirst(",q_\\d+(,strp)?", "");
-                            final List<String> tokens = (List<String>) media.get("token");
-                            displayedImageURL = baseUri + c.replaceFirst("<prettyName>", Matcher.quoteReplacement(prettyName));
-                            if (tokens != null) {
-                                displayedImageURL = displayedImageURL + "?token=" + tokens.get(0);
-                            }
-                        }
-                    } else if (isVideo) {
-                        displayedVideoURL = (String) bestType.get("b");
-                        displayedVideoSize = (Number) bestType.get("f");
                     }
                 }
             }
+            String displayedImageURL = null;
+            Number unlimitedImageSize = null;
+            String displayedVideoURL = null;
+            Number displayedVideoSize = null;
+            if (bestType != null) {
+                if (isImage) {
+                    String c = (String) bestType.get("c");
+                    if (c == null) {
+                        if ("fullview".equals(bestType.get("t"))) {
+                            // r=1? o=true??(maybe original)
+                            c = "";// raw image without any processing?
+                        } else {
+                            final Number h = (Number) bestType.get("h");
+                            final Number w = (Number) bestType.get("w");
+                            if (h != null && w != null) {
+                                c = "/v1/fit/w_" + w + ",h_" + h + "/";
+                            }
+                        }
+                    }
+                    if (c != null) {
+                        c = c.replaceFirst(",q_\\d+(,strp)?", "");
+                        final List<String> tokens = (List<String>) media.get("token");
+                        final String token = tokens.get(0);
+                        link.setProperty(PROPERTY_IMAGE_TOKEN, token);
+                        displayedImageURL = baseUri + c.replaceFirst("<prettyName>", Matcher.quoteReplacement(prettyName));
+                        displayedImageURL = displayedImageURL + "?token=" + token;
+                    }
+                } else if (isVideo) {
+                    displayedVideoURL = (String) bestType.get("b");
+                    displayedVideoSize = (Number) bestType.get("f");
+                }
+            }
+            if (isImage && displayedImageURL != null) {
+                link.setProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL, displayedImageURL);
+            } else if (isVideo && displayedVideoURL != null) {
+                link.setProperty(PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL, displayedVideoURL);
+            }
+            link.setProperty("displayedImageURL", displayedImageURL);
+            link.setProperty("unlimitedImageSize", unlimitedImageSize);
+            link.setProperty("displayedVideoURL", displayedVideoURL);
+            link.setProperty("displayedVideoSize", displayedVideoSize);
         } catch (Exception e) {
             plugin.getLogger().log(e);
         }
-        if (displayedImageURL != null && isImage) {
-            link.setProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL, displayedImageURL);
+        final Object authorO = art.get("author");
+        final Map<String, Object> author = authorO instanceof Map ? (Map<String, Object>) authorO : null;
+        if (author != null) {
+            link.setProperty(PROPERTY_USERNAME, author.get("username"));
         }
-        if (displayedVideoURL != null && isVideo) {
-            link.setProperty(PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL, displayedVideoURL);
-        }
-        ret.put("displayedImageURL", displayedImageURL);
-        ret.put("unlimitedImageSize", unlimitedImageSize);
-        ret.put("displayedVideoURL", displayedVideoURL);
-        ret.put("displayedVideoSize", displayedVideoSize);
-        return ret;
     }
 
     private static String setTitleProperty(final DownloadLink link, String title) {
@@ -253,41 +289,45 @@ public class DeviantArtCom extends PluginForHost {
         this.betterHTML = null;
         this.accountRequiredWhenDownloadImpossible = false;
         if (!link.isNameSet()) {
-            link.setName(new URL(link.getPluginPatternMatcher()).getPath() + getAssumedFileExtension(account, link));
+            link.setName(new URL(link.getPluginPatternMatcher()).getPath() + getAssumedFileExtension(link));
         }
         this.setBrowserExclusive();
-        prepBR(this.br);
         if (account != null) {
             login(account, false);
         }
-        final String fid = getFID(link);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("/error\\-title\\-oops\\.png\\)")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!this.canHandle(br.getURL()) && !br.getURL().contains(fid)) {
+        } else if (!this.canHandle(br.getURL()) && !br.getURL().contains(getFID(link))) {
             /* Redirect to unsupported URL. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         this.handleConnectionErrors(br, br.getHttpConnection(), false);
-        String title = null;
+        String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
+        if (json != null) {
+            json = PluginJSonUtils.unescape(json);
+            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            parseFileInformation(br, link, account, entries, isDownload);
+        } else {
+            logger.warning("Failed to find json with extended information");
+            parseFileInformation(br, link, account, null, isDownload);
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    public void parseFileInformation(final Browser br, final DownloadLink link, final Account account, final Map<String, Object> entries, final boolean isDownload) throws Exception {
+        final String fid = getFID(link);
         String displayedImageURL = null;
         Number unlimitedImageSize = null;
         Number displayedVideoSize = null;
         String officialDownloadurl = null;
         Boolean officialDownloadPossible = null;
-        String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
         Number officialDownloadsizeBytes = null;
-        Number originalFileSizeBytes = null;
-        String tierAccess = null;
         List<String> blockReasons = new ArrayList<String>();
         Map<String, Object> premiumFolderData = null;
-        String deviationHTML = null;
-        String originalFileExt = null;
-        if (json != null) {
-            json = PluginJSonUtils.unescape(json);
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+        jsonHandling: if (entries != null) {
             final Map<String, Object> entities = (Map<String, Object>) entries.get("@@entities");
             final Map<String, Object> user = (Map<String, Object>) entities.get("user");
             final Map<String, Object> deviation = (Map<String, Object>) entities.get("deviation");
@@ -306,86 +346,70 @@ public class DeviantArtCom extends PluginForHost {
                     }
                 }
             }
-            tierAccess = (String) thisArt.get("tierAccess");
+            officialDownloadPossible = (Boolean) thisArt.get("isDownloadable");
             blockReasons = (List<String>) thisArt.get("blockReasons");
-            deviationHTML = (String) JavaScriptEngineFactory.walkJson(thisArt, "textContent/html/markup");
-            final Map<String, Object> deviationResult = parseDeviationJSON(this, link, thisArt);
-            displayedImageURL = (String) deviationResult.get("displayedImageURL");
-            unlimitedImageSize = (Number) deviationResult.get("unlimitedImageSize");
-            displayedVideoSize = (Number) deviationResult.get("displayedVideoSize");
+            parseDeviationJSON(this, link, thisArt);
+            displayedImageURL = link.getStringProperty("displayedImageURL");
+            unlimitedImageSize = (Number) link.getProperty("unlimitedImageSize");
+            displayedVideoSize = (Number) link.getProperty("displayedVideoSize");
             final Map<String, Object> thisUser = (Map<String, Object>) user.get(thisArt.get("author").toString());
-            title = link.getStringProperty(PROPERTY_TITLE);
-            if (title == null) {
-                title = (String) thisArt.get("title");
-                setTitleProperty(link, title);
-            }
-            String username = link.getStringProperty(PROPERTY_USERNAME);
-            if (username == null) {
-                username = thisUser.get("username").toString();
-                link.setProperty(PROPERTY_USERNAME, username);
-            }
-            if (title != null) {
-                title += " by " + username + "_ " + fid;
-            } else if (isStatus(link)) {
-                /* A status typically doesn't have a title so we goota create our own. */
-                title = fid + " by " + username;
-            }
+            link.setProperty(PROPERTY_USERNAME, thisUser.get("username"));
             premiumFolderData = (Map<String, Object>) thisArt.get("premiumFolderData");
-            deviationExtendedHandling: if (StringUtils.isEmpty(officialDownloadurl)) {
-                final Map<String, Object> deviationExtended = (Map<String, Object>) entities.get("deviationExtended");
-                if (deviationExtended == null) {
-                    logger.warning("Failed to find 'deviationExtended'");
-                    break deviationExtendedHandling;
-                }
-                Map<String, Object> deviationExtendedThisArt = (Map<String, Object>) deviationExtended.get(fid);
-                if (deviationExtendedThisArt == null && alternativeDeviationID != null) {
-                    /*
-                     * PATTERN_STATUS might be listed with key <someNumbers>-<fid> also typically deviationExtended will only contain one
-                     * item.
-                     */
-                    deviationExtendedThisArt = (Map<String, Object>) deviationExtended.get(alternativeDeviationID);
-                }
-                if (deviationExtendedThisArt == null) {
-                    logger.warning("Failed to find 'deviationExtendedThisArt'");
-                    break deviationExtendedHandling;
-                }
-                final Map<String, Object> download = (Map<String, Object>) deviationExtendedThisArt.get("download");
-                final Map<String, Object> originalFile = (Map<String, Object>) deviationExtendedThisArt.get("originalFile");
-                if (download != null) {
-                    officialDownloadurl = download.get("url").toString();
-                    officialDownloadPossible = true;
-                    officialDownloadsizeBytes = (Number) download.get("filesize");
-                }
-                if (originalFile != null) {
-                    originalFileSizeBytes = (Number) originalFile.get("filesize");
-                    originalFileExt = originalFile.get("type").toString();
-                }
-                final Map<String, Object> descriptionText = (Map<String, Object>) deviationExtendedThisArt.get("descriptionText");
-                if (descriptionText != null) {
-                    final String rawText = (String) descriptionText.get("excerpt");
-                    if (!StringUtils.isEmpty(rawText) && StringUtils.isEmpty(link.getComment())) {
-                        link.setComment(rawText);
-                    }
+            final Map<String, Object> deviationExtended = (Map<String, Object>) entities.get("deviationExtended");
+            if (deviationExtended == null) {
+                logger.warning("Failed to find 'deviationExtended'");
+                break jsonHandling;
+            }
+            Map<String, Object> deviationExtendedThisArt = (Map<String, Object>) deviationExtended.get(fid);
+            if (deviationExtendedThisArt == null && alternativeDeviationID != null) {
+                /*
+                 * PATTERN_STATUS might be listed with key <someNumbers>-<fid> also typically deviationExtended will only contain one item.
+                 */
+                deviationExtendedThisArt = (Map<String, Object>) deviationExtended.get(alternativeDeviationID);
+            }
+            if (deviationExtendedThisArt == null) {
+                logger.info("Failed to find 'deviationExtendedThisArt'");
+                break jsonHandling;
+            }
+            final Map<String, Object> download = (Map<String, Object>) deviationExtendedThisArt.get("download");
+            final Map<String, Object> originalFile = (Map<String, Object>) deviationExtendedThisArt.get("originalFile");
+            if (download != null) {
+                officialDownloadurl = download.get("url").toString();
+                officialDownloadsizeBytes = (Number) download.get("filesize");
+                officialDownloadPossible = Boolean.TRUE;
+            } else if (originalFile != null) {
+                officialDownloadsizeBytes = (Number) originalFile.get("filesize");
+                // originalFileExt = originalFile.get("type").toString();
+            }
+            final Map<String, Object> descriptionText = (Map<String, Object>) deviationExtendedThisArt.get("descriptionText");
+            if (descriptionText != null) {
+                final String rawText = (String) descriptionText.get("excerpt");
+                if (!StringUtils.isEmpty(rawText) && StringUtils.isEmpty(link.getComment())) {
+                    link.setComment(rawText);
                 }
             }
         }
         /* Fallbacks via website-html */
-        if (title == null) {
-            title = HTMLSearch.searchMetaTag(br, "og:title");
-            setTitleProperty(link, title);
+        if (!link.hasProperty(PROPERTY_TITLE)) {
+            String titleFromHTML = HTMLSearch.searchMetaTag(br, "og:title");
+            if (titleFromHTML != null) {
+                titleFromHTML = Encoding.htmlDecode(titleFromHTML).trim();
+                setTitleProperty(link, titleFromHTML);
+            }
         }
         if (StringUtils.isEmpty(displayedImageURL) && isImage(link)) {
             displayedImageURL = HTMLSearch.searchMetaTag(br, "og:image");
             if (displayedImageURL != null) {
+                displayedImageURL = Encoding.htmlOnlyDecode(displayedImageURL);
                 link.setProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL, displayedImageURL);
             }
         }
-        final String officialDownloadFilesizeStr = br.getRegex(">\\s*Image size\\s*</div><div [^>]*>\\d+x\\d+px\\s*(\\d+[^>]+)</div>").getMatch(0);
+        final String officialDownloadFilesizeStr = br.getRegex(">\\s*Image size\\s*</div><div[^>]*>\\d+x\\d+px\\s*(\\d+[^>]+)</div>").getMatch(0);
         // final boolean accountNeededForOfficialDownload = br.containsHTML("Log in to download");
-        if (StringUtils.isEmpty(officialDownloadurl)) {
+        if (StringUtils.isEmpty(officialDownloadurl) && officialDownloadPossible == null) {
             officialDownloadurl = br.getRegex("data-hook=\"download_button\"[^>]*href=\"(https?://[^\"]+)").getMatch(0);
             if (officialDownloadurl != null) {
-                officialDownloadPossible = true;
+                officialDownloadPossible = Boolean.TRUE;
                 officialDownloadurl = Encoding.htmlOnlyDecode(officialDownloadurl);
             }
         }
@@ -394,6 +418,8 @@ public class DeviantArtCom extends PluginForHost {
         } else {
             link.removeProperty(PROPERTY_OFFICIAL_DOWNLOADURL);
         }
+        final int imagePosition = getImagePosition(link);
+        // final int imagePositionMax = getImagePositionMax(link);
         final boolean isImage = isImage(link);
         final boolean isVideo = isVideo(link);
         final boolean isLiterature = isLiterature(link);
@@ -409,11 +435,14 @@ public class DeviantArtCom extends PluginForHost {
              * This will happen if the item is not downloadable. </br>
              * We're ignoring this during linkcheck as by now we know the file is online.
              */
+            if (isDownload) {
+                throw e;
+            }
+            logger.log(e);
         }
-        final String contenturl = link.getPluginPatternMatcher();
         boolean allowGrabFilesizeFromHeader = false;
         /* Check if either user wants to download the html code or if we have a linktype which needs this. */
-        if (new Regex(contenturl, PATTERN_JOURNAL).patternFind() || isLiterature || isStatus || isStatus(link)) {
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_JOURNAL).patternFind() || isLiterature || isStatus || isStatus(link)) {
             /* E.g. journal: https://www.deviantart.com/janny654/art/Nora-the-Goblin-s-Pony-chapter-1-824882173 */
             downloadHTML = true;
             forcedExt = ".html";
@@ -421,20 +450,6 @@ public class DeviantArtCom extends PluginForHost {
             /* HTML download */
             downloadHTML = true;
             forcedExt = ".html";
-            if (mode == ImageDownloadMode.HTML) {
-                /* HTML download */
-                downloadHTML = true;
-                forcedExt = ".html";
-            } else {
-                /* Image download */
-                if (officialDownloadsizeBytes != null) {
-                    link.setDownloadSize(officialDownloadsizeBytes.longValue());
-                } else if (officialDownloadFilesizeStr != null) {
-                    link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesizeStr.replace(",", "")));
-                } else {
-                    allowGrabFilesizeFromHeader = true;
-                }
-            }
         } else if (br.containsHTML(TYPE_DOWNLOADALLOWED_HTML) || br.containsHTML(TYPE_DOWNLOADFORBIDDEN_HTML)) {
             downloadHTML = true;
             forcedExt = ".html";
@@ -445,8 +460,11 @@ public class DeviantArtCom extends PluginForHost {
             }
         } else if (isImage) {
             /* Image download */
-            if (StringUtils.equalsIgnoreCase(dllink, officialDownloadurl)) {
-                /* Official download */
+            if (imagePosition > 1) {
+                /* Image is part of multi image gallery -> File size is never available via website or API. */
+                allowGrabFilesizeFromHeader = true;
+            } else if (StringUtils.equalsIgnoreCase(dllink, officialDownloadurl)) {
+                /* Official download -> Set official download filesize if possible */
                 if (officialDownloadsizeBytes != null) {
                     link.setVerifiedFileSize(officialDownloadsizeBytes.longValue());
                 } else if (officialDownloadFilesizeStr != null) {
@@ -467,83 +485,55 @@ public class DeviantArtCom extends PluginForHost {
         } else {
             logger.warning("Got unknown media type");
         }
-        final String extByURL = dllink != null ? Plugin.getFileNameExtensionFromURL(dllink) : null;
-        final boolean isBlurredImageDownloadlink = dllink != null && !isBlurredImageLink(dllink);
-        final String ext;
-        if (forcedExt != null) {
-            /* Forced ext has highest priority */
-            ext = forcedExt;
-        } else if (extByURL != null) {
-            ext = extByURL;
-        } else if (originalFileExt != null) {
-            ext = originalFileExt;
-        } else {
-            ext = null;
-        }
-        if (title != null) {
-            title = Encoding.htmlDecode(title).trim();
-            if (ext != null) {
-                title = this.applyFilenameExtension(title, ext);
-                link.setFinalFileName(title);
-            } else {
-                title = this.applyFilenameExtension(title, getAssumedFileExtension(account, link));
-                link.setName(title);
-            }
-        } else if (!StringUtils.isEmpty(dllink)) {
-            /* Last resort fallback */
-            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(dllink));
-            if (filenameFromURL != null) {
-                link.setName(filenameFromURL);
-            }
-        }
-        try {
-            if ("locked".equalsIgnoreCase(tierAccess)) {
-                /* Paid content. All we could download would be a blurred image of the content. */
-                /* Example: https://www.deviantart.com/ohshinakai/art/Stretched-to-the-limit-Shanoli-996105058 */
-                if (originalFileSizeBytes != null) {
-                    link.setDownloadSize(originalFileSizeBytes.longValue());
-                }
-                throw new AccountRequiredException("Paid content");
-            } else if (premiumFolderData != null && Boolean.FALSE.equals(premiumFolderData.get("hasAccess"))) {
-                final String premiumType = (String) premiumFolderData.get("type");
-                if (StringUtils.equalsIgnoreCase(premiumType, "watchers")) {
-                    throw new AccountRequiredException("Item is only accessible for followers of this artist");
-                } else if (blockReasons != null && blockReasons.size() > 0) {
-                    throw new AccountRequiredException("Paid content and blocked for reasons: " + blockReasons);
-                } else {
+        this.setFilename(link, account, forcedExt);
+        if (dllink == null || isBlurredImageLink(dllink)) {
+            try {
+                if ("locked".equalsIgnoreCase(link.getStringProperty(PROPERTY_TIER_ACCESS))) {
+                    /* Paid content. All we could download would be a blurred image of the content. */
+                    /* Example: https://www.deviantart.com/ohshinakai/art/Stretched-to-the-limit-Shanoli-996105058 */
                     throw new AccountRequiredException("Paid content");
+                } else if (premiumFolderData != null && Boolean.FALSE.equals(premiumFolderData.get("hasAccess"))) {
+                    final String premiumType = (String) premiumFolderData.get("type");
+                    if (StringUtils.equalsIgnoreCase(premiumType, "watchers")) {
+                        throw new AccountRequiredException("Item is only accessible for followers of this artist");
+                    } else if (blockReasons != null && blockReasons.size() > 0) {
+                        throw new AccountRequiredException("Paid content and blocked for reasons: " + blockReasons);
+                    } else {
+                        throw new AccountRequiredException("Paid content");
+                    }
+                } else if (blockReasons != null && !blockReasons.isEmpty()) {
+                    /* Mature content (account required) or blocked for other reasons. */
+                    /* Examples for block reasons we can always circumvent: mature_filter */
+                    this.accountRequiredWhenDownloadImpossible = true;
+                    if (dllink == null && officialDownloadurl == null) {
+                        throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
+                    }
+                    /*
+                     * Item is blocked due to mature content (= the only blocked reason here) but that limitation can be skipped as image
+                     * does not seem to be blurred.
+                     */
+                    final List<String> remainingReasons = new ArrayList<String>(blockReasons);
+                    remainingReasons.remove("mature_filter");
+                    remainingReasons.remove("mature_loggedout");
+                    if (remainingReasons.isEmpty() && !isBlurredImageLink(dllink)) {
+                        return;
+                    } else {
+                        throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
+                    }
                 }
-            } else if (blockReasons != null && !blockReasons.isEmpty()) {
-                /* Mature content (account required) or blocked for other reasons. */
-                /* Examples for block reasons we can always circumvent: mature_filter */
-                this.accountRequiredWhenDownloadImpossible = true;
-                if (dllink == null && officialDownloadurl == null) {
-                    throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
-                }
-                /*
-                 * Item is blocked due to mature content (= the only blocked reason here) but that limitation can be skipped as image does
-                 * not seem to be blurred.
-                 */
-                final List<String> remainingReasons = new ArrayList<String>(blockReasons);
-                remainingReasons.remove("mature_filter");
-                remainingReasons.remove("mature_loggedout");
-                if (remainingReasons.isEmpty() && !isBlurredImageDownloadlink) {
-                    return AvailableStatus.TRUE;
+            } catch (final AccountRequiredException ar) {
+                if (isDownload) {
+                    throw ar;
                 } else {
-                    throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
+                    return;
                 }
-            }
-        } catch (final AccountRequiredException ar) {
-            if (isDownload) {
-                throw ar;
-            } else {
-                return AvailableStatus.TRUE;
             }
         }
         /* Set file size if possible. */
         if (downloadHTML) {
             link.setVerifiedFileSize(-1);
             try {
+                final String deviationHTML = link.getStringProperty(PROPERTY_DEVIATION_HTML);
                 if (deviationHTML != null) {
                     this.betterHTML = deviationHTML;
                     link.setDownloadSize(deviationHTML.getBytes("UTF-8").length);
@@ -553,7 +543,7 @@ public class DeviantArtCom extends PluginForHost {
             } catch (final UnsupportedEncodingException ignore) {
                 ignore.printStackTrace();
             }
-        } else if (allowGrabFilesizeFromHeader && !link.isSizeSet() && !cfg.isFastLinkcheckForSingleItems() && !isDownload && !StringUtils.isEmpty(dllink) && !isBlurredImageDownloadlink) {
+        } else if (allowGrabFilesizeFromHeader && !link.isSizeSet() && !cfg.isFastLinkcheckForSingleItems() && !isDownload && !StringUtils.isEmpty(dllink) && !isBlurredImageLink(dllink)) {
             /* No filesize value given -> Obtain from header */
             final Browser br2 = br.cloneBrowser();
             /* Workaround for old downloadcore bug that can lead to incomplete files */
@@ -576,97 +566,57 @@ public class DeviantArtCom extends PluginForHost {
                 }
             }
         }
-        return AvailableStatus.TRUE;
     }
 
-    public static boolean isStatus(final DownloadLink link) {
-        if (StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "status") || new Regex(link.getPluginPatternMatcher(), PATTERN_STATUS).patternFind()) {
-            return true;
-        } else {
-            return false;
+    public void setFilename(final DownloadLink link, final Account account, final String forcedExt) throws Exception {
+        final String fid = this.getFID(link);
+        String dllink = null;
+        try {
+            dllink = getDirecturl(br, link, account);
+        } catch (final PluginException e) {
+            /**
+             * This will happen if the item is not downloadable. </br>
+             * We're ignoring this here.
+             */
+            logger.log(e);
         }
-    }
-
-    public static boolean isImage(DownloadLink link) {
-        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "image");
-    }
-
-    public static boolean isVideo(DownloadLink link) {
-        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "film");
-    }
-
-    public static boolean isLiterature(DownloadLink link) {
-        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "literature");
-    }
-
-    private static boolean isBlurredImageLink(final String url) {
-        if (StringUtils.containsIgnoreCase(url, ",blur_")) {
-            return true;
+        final int imagePosition = getImagePosition(link);
+        final int imagePositionMax = getImagePositionMax(link);
+        final String extByURL = dllink != null ? Plugin.getFileNameExtensionFromURL(dllink) : null;
+        final String ext;
+        if (forcedExt != null) {
+            /* Forced ext has highest priority */
+            ext = forcedExt;
+        } else if (extByURL != null) {
+            ext = extByURL;
         } else {
-            return false;
+            ext = null;
         }
-    }
-
-    /**
-     * Returns assumed file extension based on all information we currently have. Use this only for weak filenames e.g. before linkcheck is
-     * done.
-     */
-    public static String getAssumedFileExtension(final Account account, final DownloadLink link) {
-        if (isVideo(link)) {
-            return ".mp4";
-        } else if (isImage(link)) {
-            // TODO: add isGif support
-            if (PluginJsonConfig.get(DeviantArtComConfig.class).getImageDownloadMode() == ImageDownloadMode.HTML) {
-                return ".html";
-            } else {
-                try {
-                    final String url = getDirecturl(null, link, account);
-                    final String ext = getFileNameExtensionFromURL(url);
-                    if (ext != null) {
-                        return ext;
-                    }
-                } catch (Exception e) {
-                }
-                return ".jpg";
+        final String title = link.getStringProperty(PROPERTY_TITLE);
+        String filename = null;
+        final String username = link.getStringProperty(PROPERTY_USERNAME);
+        if (title != null) {
+            filename = title + " by " + username + "_ " + fid;
+            if (imagePositionMax > 1) {
+                /* Image is part of multi image gallery -> Make sure each item gets a different filename. */
+                filename += "_" + imagePosition;
             }
-        } else if (isLiterature(link) || isStatus(link)) {
-            /* TODO: Add proper handling to only download relevant text of this type of link and write it into .txt file. */
-            return ".html";
-            // return ".txt";
-        } else {
-            return ".html";
+        } else if (isStatus(link)) {
+            /* A status typically doesn't have a title so we goota create our own. */
+            filename = fid + " by " + username;
         }
-    }
-
-    private static boolean isAccountRequiredForOfficialDownload(final Browser br) {
-        if (br.containsHTML("aria-label=\"Log in to download\"")) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean looksLikeAccountRequired(final Browser br) {
-        if (looksLikeAccountRequiredUploaderDecision(br) || looksLikeAccountRequiredMatureContent(br)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean looksLikeAccountRequiredUploaderDecision(final Browser br) {
-        if (br.containsHTML("has limited the viewing of this artwork\\s*<")) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean looksLikeAccountRequiredMatureContent(final Browser br) {
-        if (br.containsHTML(">\\s*This content is intended for mature audiences")) {
-            return true;
-        } else {
-            return false;
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
+            if (ext != null) {
+                filename = this.applyFilenameExtension(filename, ext);
+            }
+            link.setFinalFileName(filename);
+        } else if (!StringUtils.isEmpty(dllink)) {
+            /* Last resort fallback */
+            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(dllink));
+            if (filenameFromURL != null) {
+                link.setName(filenameFromURL);
+            }
         }
     }
 
@@ -675,49 +625,9 @@ public class DeviantArtCom extends PluginForHost {
         handleDownload(link, null);
     }
 
-    private static String getDirecturl(final Browser br, final DownloadLink link, final Account account) throws PluginException {
-        final long oldVerifiedFilesize = link.getVerifiedFileSize();
-        if (oldVerifiedFilesize != -1) {
-            link.setVerifiedFileSize(-1);
-            /* Don't loose this value. */
-            link.setDownloadSize(oldVerifiedFilesize);
-        }
-        String dllink = null;
-        final String officialDownloadurl = link.getStringProperty(PROPERTY_OFFICIAL_DOWNLOADURL);
-        if (isImage(link)) {
-            /* officialDownloadurl can be given while account is not given -> Will lead to error 404 then! */
-            final DeviantArtComConfig cfg = PluginJsonConfig.get(DeviantArtComConfig.class);
-            final ImageDownloadMode mode = cfg.getImageDownloadMode();
-            if (mode == ImageDownloadMode.OFFICIAL_DOWNLOAD_ONLY) {
-                /* User only wants to download items with official download option available but it is not available in this case. */
-                if (LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD && account == null) {
-                    /* Account is required to be able to use official download option. */
-                    throw new AccountRequiredException("Account required for official download. Add account or change plugin settings to allow preview image download.");
-                } else if (isAccountRequiredForOfficialDownload(br)) {
-                    /* Looks like official download is not available at all for this item */
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available. Add account or change plugin settings to allow preview image download.");
-                } else if (officialDownloadurl == null) {
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available. Change plugin settings to allow preview image download.");
-                } else {
-                    dllink = officialDownloadurl;
-                }
-            } else if (account != null && officialDownloadurl != null) {
-                dllink = officialDownloadurl;
-            } else {
-                dllink = link.getStringProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL);
-            }
-        } else if (isVideo(link)) {
-            /* officialDownloadurl can be given while account is not given -> Will lead to error 404 then! */
-            dllink = link.getStringProperty(PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL);
-        } else if (officialDownloadurl != null) {
-            /* E.g. official pdf download */
-            dllink = officialDownloadurl;
-        }
-        return dllink;
-    }
-
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link, account, true);
+        /* We never know what we get -> Remove verified filesize before download start is attempted. */
         link.setVerifiedFileSize(-1);
         if (this.downloadHTML) {
             /* Write text to file */
@@ -904,15 +814,157 @@ public class DeviantArtCom extends PluginForHost {
         return null;
     }
 
-    public static Browser prepBR(final Browser br) {
-        /* Needed to view mature content */
-        br.setCookie("deviantart.com", "agegate_state", "1");
-        return br;
+    public static boolean isStatus(final DownloadLink link) {
+        if (StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "status") || new Regex(link.getPluginPatternMatcher(), PATTERN_STATUS).patternFind()) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
-    @Override
-    public String getDescription() {
-        return "JDownloader's Deviantart Plugin helps downloading data from deviantart.com.";
+    public static int getImagePosition(final DownloadLink link) {
+        return link.getIntegerProperty(PROPERTY_IMAGE_POSITION, -1);
+    }
+
+    public static int getImagePositionMax(final DownloadLink link) {
+        return link.getIntegerProperty(PROPERTY_IMAGE_POSITION_MAX, -1);
+    }
+
+    public static boolean isImage(DownloadLink link) {
+        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "image");
+    }
+
+    public static boolean isVideo(DownloadLink link) {
+        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "film");
+    }
+
+    public static boolean isLiterature(DownloadLink link) {
+        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "literature");
+    }
+
+    private static boolean isBlurredImageLink(final String url) {
+        if (StringUtils.containsIgnoreCase(url, ",blur_")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Returns assumed file extension based on all information we currently have. Use this only for weak filenames e.g. before linkcheck is
+     * done.
+     */
+    public static String getAssumedFileExtension(final DownloadLink link) {
+        if (isVideo(link)) {
+            return ".mp4";
+        } else if (isImage(link)) {
+            // TODO: add isGif support
+            if (PluginJsonConfig.get(DeviantArtComConfig.class).getImageDownloadMode() == ImageDownloadMode.HTML) {
+                return ".html";
+            } else {
+                return ".jpg";
+            }
+        } else if (isLiterature(link) || isStatus(link)) {
+            /* TODO: Add proper handling to only download relevant text of this type of link and write it into .txt file. */
+            return ".html";
+            // return ".txt";
+        } else {
+            return ".html";
+        }
+    }
+
+    private static boolean isAccountRequiredForOfficialDownload(final Browser br) {
+        if (br.containsHTML("aria-label=\"Log in to download\"")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean looksLikeAccountRequired(final Browser br) {
+        if (looksLikeAccountRequiredUploaderDecision(br) || looksLikeAccountRequiredMatureContent(br)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean looksLikeAccountRequiredUploaderDecision(final Browser br) {
+        if (br.containsHTML("has limited the viewing of this artwork\\s*<")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean looksLikeAccountRequiredMatureContent(final Browser br) {
+        if (br.containsHTML(">\\s*This content is intended for mature audiences")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private static String getDirecturl(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        String dllink = null;
+        final String officialDownloadurl = link.getStringProperty(PROPERTY_OFFICIAL_DOWNLOADURL);
+        final String multiImageGalleryPreviewUrl = getMultiImageGalleryPreviewUrl(link);
+        final String imagePreviewUrl = link.getStringProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL);
+        if (isVideo(link)) {
+            /* officialDownloadurl can be given while account is not given -> Will lead to error 404 then! */
+            dllink = link.getStringProperty(PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL);
+        } else if (isImage(link)) {
+            /* officialDownloadurl can be given while account is not given -> Will lead to error 404 then! */
+            final int imagePosition = getImagePosition(link);
+            if (imagePosition > 1) {
+                /*
+                 * Multi image gallery download -> 2nd image and all after that are never 'officially' downloadable -> Always return
+                 * imagePreviewUrl.
+                 */
+                dllink = multiImageGalleryPreviewUrl;
+            } else {
+                if (PluginJsonConfig.get(DeviantArtComConfig.class).getImageDownloadMode() == ImageDownloadMode.OFFICIAL_DOWNLOAD_ONLY) {
+                    /**
+                     * User only wants to download only items with official download option available -> Check if that is possible for this
+                     * item. <br>
+                     * Important: Only check this for single items or for the first item of multi image items.
+                     */
+                    if (LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD && account == null) {
+                        /* Account is required to be able to use official download option. */
+                        throw new AccountRequiredException("Account required for official download. Add account or change plugin settings to allow preview image download.");
+                    } else if (isAccountRequiredForOfficialDownload(br)) {
+                        /* Looks like official download is not available at all for this item */
+                        throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available. Add account or change plugin settings to allow preview image download.");
+                    } else if (officialDownloadurl == null) {
+                        throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not available. Change plugin settings to allow preview image download.");
+                    }
+                }
+                if (officialDownloadurl != null && ((LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD && account != null) || !LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD)) {
+                    dllink = officialDownloadurl;
+                } else if (multiImageGalleryPreviewUrl != null) {
+                    dllink = multiImageGalleryPreviewUrl;
+                } else {
+                    dllink = imagePreviewUrl;
+                }
+            }
+        } else if (officialDownloadurl != null) {
+            /* Non image item e.g. official pdf download */
+            dllink = officialDownloadurl;
+        }
+        return dllink;
+    }
+
+    private static String getMultiImageGalleryPreviewUrl(final DownloadLink link) {
+        String url = link.getStringProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2);
+        if (url == null) {
+            return null;
+        }
+        final String token = link.getStringProperty(PROPERTY_IMAGE_TOKEN);
+        if (token != null) {
+            /* Put fresh token into existing URL to ensure that the URL will be valid. */
+            url = url.replaceAll("\\?token=.+", "?token=" + token);
+        }
+        return url;
     }
 
     @Override

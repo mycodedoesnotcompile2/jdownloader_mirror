@@ -32,8 +32,6 @@ import javax.swing.Scrollable;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.components.ExtTextField;
@@ -62,6 +60,8 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.config.Order;
+
+import net.miginfocom.swing.MigLayout;
 
 public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     public Dimension getPreferredScrollableViewportSize() {
@@ -172,7 +172,7 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                         // String key = value.toString().substring(0, value.toString().length() - 4);
                         JLabel ret = (JLabel) org.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
                         try {
-                            ret.setIcon(IconIO.getImageIcon(f.toURI().toURL(), 20));
+                            ret.setIcon(IconIO.getIcon(f.toURI().toURL(), 20, 20));
                         } catch (MalformedURLException e) {
                             e.printStackTrace();
                         }

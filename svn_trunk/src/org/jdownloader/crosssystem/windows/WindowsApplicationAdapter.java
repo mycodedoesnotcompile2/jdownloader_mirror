@@ -7,7 +7,6 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.Transparency;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -178,7 +177,7 @@ public class WindowsApplicationAdapter {
         int stringwidth = Math.max(fm.getAscent(), fm.stringWidth(speedString)) + 6;
         final int w = stringwidth;
         final int h = stringwidth;
-        final BufferedImage image = new BufferedImage(w, h, Transparency.TRANSLUCENT);
+        final BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         final Graphics2D g = image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setFont(font);

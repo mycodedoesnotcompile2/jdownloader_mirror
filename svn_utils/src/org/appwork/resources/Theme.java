@@ -39,15 +39,12 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.Transparency;
 import java.awt.font.FontRenderContext;
 import java.awt.font.GlyphVector;
-import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -225,28 +222,26 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         return this.cacheLifetime;
     }
 
-    public Icon getDisabledIcon(final Icon _getIcon) {
-        return getDisabledIcon(null, _getIcon);
+    public Icon getDisabledIcon(final Icon input) {
+        return getDisabledIcon(null, input);
     }
 
     protected Theme getDelegate() {
         return delegate;
     }
 
-    public Icon getDisabledIcon(final JComponent component, final Icon _getIcon) {
-        if (_getIcon != null) {
+    public Icon getDisabledIcon(final JComponent component, final Icon input) {
+        if (input != null) {
             Icon ret = null;
             final Theme delegate = getDelegate();
             if (delegate != null) {
-                ret = delegate.getDisabledIcon(_getIcon);
+                ret = delegate.getDisabledIcon(input);
             }
             if (ret == null) {
-                final String key = this.getCacheKey(_getIcon, "disabled");
+                final String key = this.getCacheKey(input, "disabled");
                 ret = this.getCached(key);
                 if (ret == null) {
-                    final Icon ico = FACTORY.getDisabled(component, _getIcon);
-                    ret = ico;
-                    ret = this.modify(ret, key, null, ret.getIconWidth(), ret.getIconHeight(), key);
+                    ret = FACTORY.getDisabled(component, input);
                     this.cache(ret, key);
                 }
             }
@@ -264,13 +259,17 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     protected Icon onIconNotAvailable(String relativePath, ThemeContext context, String cacheKey, int width, int height) {
+        if (context.getTarget() != Target.ICON) {
+            DebugMode.debugger();
+            return null;
+        }
         LogV3.info(NO_IMAGE_AVAILABLE + relativePath);
         DebugMode.debugger();
         if (doNotLogMissingIcons) {
             org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.buildPath("images/", relativePath, ".png|svg|ico|exe", false)));
         }
         BufferedImage ret = createNotAvailableImage(width, height);
-        Icon icon = this.modify(FACTORY.imageToIcon(ret, width, height), relativePath, context, width, height, cacheKey);
+        Icon icon = FACTORY.imageToIcon(ret, width, height);
         if (context.isUsecache()) {
             this.cache(icon, cacheKey);
         }
@@ -313,11 +312,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 ret = this.getCached(relativePath);
                 if (ret != null && ret instanceof ScalableIcon) {
                     // reuse a cached svg
-                    ret = IconIO.getScaledInstance(ret, width, height);
-                    ret = modify(ret, relativePath, context, width, height, cacheKey);
+                    ret = FACTORY.scale(ret, width, height);
                     cache(ret, cacheKey);
                     return ret;
-                } else {
+                } else if (ret != null) {
+                    DebugMode.debugger();
                     ret = null;
                 }
             }
@@ -343,7 +342,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             if (url == null) {
                 return onIconNotAvailable(relativePath, context, cacheKey, width, height);
             }
-            ret = FACTORY.urlToNonImageIcon(url, width, height);
+            ret = FACTORY.urlToVectorIcon(url, width, height);
             if (ret != null) {
                 Icon search = ret;
                 // find the scalable icon to cache it
@@ -371,21 +370,26 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                     // we cache the icon as well, else we would get many lookupImageUrl calls - slow!
                     ret = FACTORY.imageToIcon(image, width, height);
                 }
-                if (ret == null) {
-                    DebugMode.breakIf(ret == null && url != null);
-                    return onIconNotAvailable(relativePath, context, cacheKey, width, height);
-                }
-            } else {
-                if (context.isDebugDrawEnabled()) {
-                    ret = new DebugIcon(ret);
-                }
             }
         }
-        ret = this.modify(ret, relativePath, context, width, height, cacheKey);
-        if (context.isUsecache()) {
-            this.cache(ret, cacheKey);
+        if (ret == null) {
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                DebugMode.breakIf(ret == null && lookupImageUrl(relativePath, context) != null);
+            }
+            ret = onIconNotAvailable(relativePath, context, cacheKey, width, height);
+            if (ret != null && context.isDebugDrawEnabled() && context.getTarget() == Target.ICON) {
+                ret = new DebugIcon(ret);
+            }
+            return ret;
+        } else {
+            if (context.isDebugDrawEnabled() && context.getTarget() == Target.ICON) {
+                ret = new DebugIcon(ret);
+            }
+            if (context.isUsecache()) {
+                this.cache(ret, cacheKey);
+            }
+            return ret;
         }
-        return ret;
     }
 
     private static IconFactory FACTORY = createIconFactory();
@@ -451,25 +455,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         }
     }
 
-    /**
-     * @param ret
-     * @param relativePath
-     * @param context
-     *            TODO
-     * @param width
-     *            TODO
-     * @param height
-     *            TODO
-     * @param cacheKey
-     *            TODO
-     */
-    protected Icon modify(Icon ret, String relativePath, ThemeContext context, int width, int height, String cacheKey) {
-        if (ICONDEBUGGER) {
-            IconDebugger.show(ret, "Icon:" + relativePath + " - " + cacheKey + " - " + lookupImageUrl(relativePath, null));
-        }
-        return ret;
-    }
-
     public Image getImage(final String relativePath, final int size) {
         return this.getImage(relativePath, size, size);
     }
@@ -518,7 +503,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             context = createNewDefaultContext();
         }
         context.ensureTarget(ThemeContext.Target.IMAGE);
-        double highestRequiredScale = getHighestMonitorScaling();
+        double highestRequiredScale = MultiResolutionImageHelper.getHighestMonitorScaling();
         int highDPIWidth = width;
         int highDPIHeight = height;
         if (context.isCreateMultiResolutionImages() && isUseHighDPI() && highestRequiredScale > 1) {
@@ -558,9 +543,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             }
         }
         if (baseImage == null) {
-            BufferedImage ret = onImageNotAvailable(key, width, height, cached, finalKey);
-            putFinalCache(key, context, cached, finalKey, ret);
-            return ret;
+            return onImageNotAvailable(key, context, width, height, cached, finalKey);
         }
         if (!IconIO.isImageCanGetDownscaled(width, height, baseImage)) {
             // upscale required check x2 option
@@ -648,20 +631,28 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     private HashMap<String, AtomicInteger> debugLoadingMap = new HashMap<String, AtomicInteger>();
 
     /**
-     * @param key
+     * @param context
+     *            TODO
      * @param width
      * @param height
      * @param cached
      * @param finalKey
+     * @param key
      * @return
      */
-    protected BufferedImage onImageNotAvailable(String relativePath, int width, int height, HashMap<String, MinTimeWeakReference<Image>> cached, String finalKey) {
+    protected Image onImageNotAvailable(String relativePath, ThemeContext context, int width, int height, HashMap<String, MinTimeWeakReference<Image>> cached, String finalKey) {
+        if (context.getTarget() != Target.IMAGE) {
+            DebugMode.debugger();
+            return null;
+        }
         LogV3.info(NO_IMAGE_AVAILABLE + relativePath);
         if (doNotLogMissingIcons) {
             org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.buildPath("images/", relativePath, ".png|svg|ico", false)));
         }
         DebugMode.debugger();
-        return createNotAvailableImage(width, height);
+        BufferedImage ret = createNotAvailableImage(width, height);
+        putFinalCache(relativePath, context, cached, finalKey, ret);
+        return ret;
     }
 
     protected void putFinalCache(String key, ThemeContext context, HashMap<String, MinTimeWeakReference<Image>> cached, String finalKey, Image image) {
@@ -780,7 +771,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @return
      */
     protected Image debugDrawSizeInImages(ThemeContext context, int targetWidth, int targetHeight, Image src) {
-        if (!context.isDebugDrawEnabled()) {
+        if (!context.isDebugDrawEnabled() || context.getTarget() != Target.IMAGE) {
             return src;
         }
         final int w = src.getWidth(null);
@@ -793,17 +784,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         drawTextInViewport(src.getWidth(null), src.getHeight(null), targetWidth + "", g);
         g.dispose();
         return image;
-    }
-
-    protected double getHighestMonitorScaling() {
-        double highestRequiredScale = 1d;
-        // find the monitor with the highest scaling
-        for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
-            AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
-            highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleX());
-            highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleY());
-        }
-        return highestRequiredScale;
     }
 
     private class ImageMatch {

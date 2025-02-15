@@ -91,35 +91,49 @@ public class JNAImageHelper {
             if (totalIcons == 0) {
                 return null;
             }
-            totalIcons = 10;
             // Arrays to hold the icons (large and small)
             final HICON[] largeIcons = new HICON[totalIcons];
+            final HICON[] smallIcons = new HICON[totalIcons];
             // Extract icons using ExtractIconEx
-            final int numExtracted = Shell32.INSTANCE.ExtractIconEx(target.getAbsolutePath(), iconIndex, largeIcons, null, totalIcons);
+            final int numExtracted = Shell32.INSTANCE.ExtractIconEx(target.getAbsolutePath(), iconIndex, largeIcons, smallIcons, totalIcons);
             if (numExtracted == 0) {
                 return null;
             }
             final ArrayList<Image> images = new ArrayList<Image>();
-            for (int i = 0; i < totalIcons; i++) {
-                if (largeIcons[i] == null) {
+            for (HICON i : largeIcons) {
+                if (i == null) {
                     continue;
                 }
                 try {
-                    final Image largeImage = toImage(largeIcons[i]);
+                    final Image largeImage = toImage(i);
                     if (largeImage != null) {
                         images.add(largeImage);
                     }
                 } finally {
-                    User32.INSTANCE.DestroyIcon(largeIcons[i]);
+                    User32.INSTANCE.DestroyIcon(i);
                 }
             }
+            for (HICON i : smallIcons) {
+                if (i == null) {
+                    continue;
+                }
+                try {
+                    final Image largeImage = toImage(i);
+                    if (largeImage != null) {
+                        images.add(largeImage);
+                    }
+                } finally {
+                    User32.INSTANCE.DestroyIcon(i);
+                }
+            }
+            MultiResolutionImageHelper.sortImagesBySize(images);
             if (images.size() == 0) {
                 return null;
             } else if (images.size() > 1 && MultiResolutionImageHelper.isSupported()) {
                 // use biggest image as base
-                return MultiResolutionImageHelper.create(images);
+                return MultiResolutionImageHelper.create(images.get(images.size() - 1), images);
             } else {
-                return images.get(0);
+                return images.get(images.size() - 1);
             }
         } finally {
             if (deleteExe && target != null) {

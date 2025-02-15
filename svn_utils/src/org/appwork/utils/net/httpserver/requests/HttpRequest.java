@@ -34,7 +34,9 @@
 package org.appwork.utils.net.httpserver.requests;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.utils.net.HeaderCollection;
@@ -205,5 +207,23 @@ public abstract class HttpRequest implements HttpRequestInterface {
      */
     public HTTPBridge getBridge() {
         return bridge;
+    }
+
+    private Map<String, Object> properties = new HashMap<String, Object>();
+
+    /**
+     * @param string
+     * @param origin
+     */
+    public Object putProperty(String key, Object value) {
+        return properties.put(key, value);
+    }
+
+    /**
+     * @param authMethod
+     * @return
+     */
+    public Object getProperty(String key) {
+        return properties.get(key);
     }
 }

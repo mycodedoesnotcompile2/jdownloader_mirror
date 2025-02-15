@@ -34,7 +34,10 @@
  * ==================================================================================================================================================== */
 package org.appwork.resources;
 
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.Image;
+import java.awt.geom.AffineTransform;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -49,6 +52,7 @@ import javax.swing.ImageIcon;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.Application;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.images.IconPipe;
@@ -267,5 +271,19 @@ public class MultiResolutionImageHelper {
             }
         }
         return null;
+    }
+
+    public static double getHighestMonitorScaling() {
+        if (Application.isHeadless()) {
+            return 1d;
+        }
+        double highestRequiredScale = 1d;
+        // find the monitor with the highest scaling
+        for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+            AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
+            highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleX());
+            highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleY());
+        }
+        return highestRequiredScale;
     }
 }

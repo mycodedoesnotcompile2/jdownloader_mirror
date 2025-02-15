@@ -51,7 +51,7 @@ public interface IconFactory {
      * @param size2
      * @return
      */
-    Icon urlToNonImageIcon(URL url, int w, int h);
+    Icon urlToVectorIcon(URL url, int w, int h);
 
     /**
      * @param ret

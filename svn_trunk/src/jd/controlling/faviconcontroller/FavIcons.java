@@ -6,7 +6,6 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
-import java.awt.Transparency;
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
@@ -39,15 +38,8 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.PluginForHost;
-import net.sf.image4j.codec.ico.ICODecoder;
-
 import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
 import org.appwork.shutdown.ShutdownRequest;
@@ -72,7 +64,16 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.PluginForHost;
+import net.sf.image4j.codec.ico.ICODecoder;
+
 public class FavIcons {
+    private static final int                                                     BASE_SIZE       = 16;
     private static final ThreadPoolExecutor                                      THREAD_POOL;
     private static final AtomicInteger                                           THREADCOUNTER   = new AtomicInteger(0);
     private static final Object                                                  LOCK            = new Object();
@@ -84,7 +85,6 @@ public class FavIcons {
     private static final long                                                    REFRESH_TIMEOUT = 1000l * 60 * 60 * 24 * 7;
     private static final long                                                    RETRY_TIMEOUT   = 1000l * 60 * 60 * 24 * 7;
     static {
-
         int maxThreads = Math.max(CONFIG.getMaxThreads(), 1);
         int keepAlive = Math.max(CONFIG.getThreadKeepAlive(), 100);
         THREAD_POOL = new ThreadPoolExecutor(0, maxThreads, keepAlive, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
@@ -406,13 +406,24 @@ public class FavIcons {
         }
     }
 
+    private static Image createDefaultFavIcon(final LogSource logger, final String host) {
+        Image base = createDefaultFavIcon(logger, host, BASE_SIZE, BASE_SIZE);
+        if (!MultiResolutionImageHelper.isSupported()) {
+            return base;
+        }
+        double highest = MultiResolutionImageHelper.getHighestMonitorScaling();
+        if (highest <= 1d) {
+            return base;
+        }
+        Image bigger = createDefaultFavIcon(logger, host, (int) Math.round(BASE_SIZE * highest), (int) Math.round(BASE_SIZE * highest));
+        return MultiResolutionImageHelper.create(Arrays.asList(base, bigger));
+    }
+
     /**
      * Creates a dummyHosterIcon
      */
-    private static BufferedImage createDefaultFavIcon(final LogSource logger, final String host) {
-        final int w = 16;
-        final int h = 16;
-        int size = 9;
+    private static Image createDefaultFavIcon(final LogSource logger, final String host, int w, int h) {
+        int size = w - 7;
         final Color fg = Color.BLACK;
         Color bg = Color.WHITE;
         logger.info("createDefaultFavIcon: " + host);
@@ -426,7 +437,7 @@ public class FavIcons {
         } catch (final Throwable e) {
             logger.log(e);
         }
-        final BufferedImage image = new BufferedImage(w, h, Transparency.TRANSLUCENT);
+        final BufferedImage image = IconIO.createEmptyImage(w, h);
         final Graphics2D g = image.createGraphics();
         try {
             try {
@@ -465,7 +476,7 @@ public class FavIcons {
                 Rectangle2D bounds = fontmetrics.getStringBounds(dummy, g);
                 g.drawString(dummy, (int) (w - bounds.getWidth()) / 2, (int) (-bounds.getY() + (h - bounds.getHeight()) / 2) - (tld == null ? 0 : 1));
                 if (tld != null) {
-                    g.setFont(new Font(fontName, 0, 6));
+                    g.setFont(new Font(fontName, 0, w - 10));
                     bounds = fontmetrics.getStringBounds("." + tld, g);
                     g.drawString("." + tld, (int) (w - bounds.getWidth()) - 2, (h) - 2);
                 }
@@ -585,7 +596,6 @@ public class FavIcons {
             } catch (Throwable e) {
                 LogController.CL().log(e);
             }
-
         }
         return source;
     }

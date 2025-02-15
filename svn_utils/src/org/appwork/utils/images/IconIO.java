@@ -115,8 +115,8 @@ public class IconIO {
         public ScaledIcon(final Icon icon, final int width, final int height, final Interpolation interpolation) {
             super(icon);
             this.faktor = 1d / Math.max((double) icon.getIconWidth() / width, (double) icon.getIconHeight() / height);
-            this.width = Math.max((int) (icon.getIconWidth() * this.faktor), 1);
-            this.height = Math.max((int) (icon.getIconHeight() * this.faktor), 1);
+            this.width = Math.max((int) Math.round(icon.getIconWidth() * this.faktor), 1);
+            this.height = Math.max((int) Math.round(icon.getIconHeight() * this.faktor), 1);
             this.interpolation = interpolation;
         }
 
@@ -422,26 +422,18 @@ public class IconIO {
         return null;
     }
 
-    public static Icon getIcon(final URL resource, final int size) {
-        return getIcon(resource, size, size);
-    }
-
-    @Deprecated
     /**
-     * @deprecated use Theme methods to read icons to avoid bypassing caches etc.
      * @param resource
      * @param w
      * @param h
      * @return
      */
     public static Icon getIcon(final URL resource, final int w, int h) {
-        Icon ret = getNonImageIcon(resource, w, h);
+        Icon ret = loadVectorIcon(resource, w, h);
         if (ret != null) {
             return ret;
         }
-        // we should not get here. because this bypasses the image cache from the Theme.
-        DebugMode.debugger();
-        Image image = getImage(resource, true);
+        Image image = loadImage(resource);
         if (image.getWidth(null) == w && image.getHeight(null) == h) {
             return new ImageIcon(image);
         } else if (w <= 0 && h <= 0) {
@@ -451,64 +443,22 @@ public class IconIO {
         }
     }
 
-    // /**
-    // * this method tries to create a BadMultiResosultionImage that does not only contain the requested size, but also a bigger version for
-    // * highDPI systems.
-    // *
-    // * @param image
-    // * @param w
-    // * @param h
-    // * @return
-    // */
-    // private static Image wrapMultiRes(Image image, int targetWidth, int targetHeight) {
-    // Image scaledToTarget = IconIO.getScaledInstance(image, targetWidth, targetHeight, Interpolation.BICUBIC, true);
-    // try {
-    // double maxPossibleScale = Math.min((double) image.getWidth(null) / targetWidth, (double) image.getHeight(null) / targetHeight);
-    // if (maxPossibleScale <= 1) {
-    // // there is no bigger version
-    // return scaledToTarget;
-    // }
-    // double highestRequiredScale = 1d;
-    // // find the monitor with the highest scaling
-    // for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
-    // AffineTransform tx = sd.getDefaultConfiguration().getDefaultTransform();
-    // highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleX());
-    // highestRequiredScale = Math.max(highestRequiredScale, tx.getScaleY());
-    // }
-    // if (highestRequiredScale == 1) {
-    // // we no not need it bigger
-    // return scaledToTarget;
-    // }
-    // highestRequiredScale = Math.min(maxPossibleScale, highestRequiredScale);
-    // // large image.
-    // Image large = getScaledInstance(image, (int) Math.ceil(highestRequiredScale * targetWidth), (int) Math.ceil(highestRequiredScale *
-    // targetHeight));
-    // Image multiImage = new BaseMultiResolutionImageWrapper(1, large, scaledToTarget);
-    // return multiImage;
-    // } catch (Exception e) {
-    // LogV3.log(e);
-    // return scaledToTarget;
-    // }
-    // }
     public static Icon getIconFromDataUrl(String dataURL) throws IOException {
         return new ImageIcon(getImageFromDataUrl(dataURL));
     }
 
-    public static Image getImage(final URL resource) {
-        return getImage(resource, true);
+    @Deprecated
+    public static Image getImage(final URL resource, boolean Dummy) {
+        return loadImage(resource);
     }
 
     /**
      * @param resource
      * @return
      */
-    public static Image getImage(final URL resource, boolean useDummyImage) {
+    public static Image loadImage(final URL resource) {
         if (resource == null) {
-            if (useDummyImage) {
-                return ImageProvider.createIcon("DUMMY", 48, 48);
-            } else {
-                return null;
-            }
+            return null;
         }
         if (StringUtils.endsWithCaseInsensitive(resource.getPath(), ".exe") && isExeSupported()) {
             Image ret;
@@ -527,7 +477,7 @@ public class IconIO {
                 try {
                     List<BufferedImage> bufferedImages = (List<BufferedImage>) ICO_DECODER.invoke(null, is);
                     if (bufferedImages != null && bufferedImages.size() > 0) {
-                        ArrayList<Image> images = new ArrayList<Image>(bufferedImages);
+                        final ArrayList<Image> images = new ArrayList<Image>(bufferedImages);
                         MultiResolutionImageHelper.sortImagesBySize(images);
                         if (images.size() > 1 && MultiResolutionImageHelper.isSupported()) {
                             // biggest one as base image
@@ -568,11 +518,7 @@ public class IconIO {
             } catch (final Throwable e) {
             }
         }
-        if (useDummyImage) {
-            return ImageProvider.createIcon("DUMMY", 48, 48);
-        } else {
-            return null;
-        }
+        return null;
     }
 
     /**
@@ -585,23 +531,6 @@ public class IconIO {
     }
 
     /**
-     * @param resource
-     * @return
-     */
-    public static ImageIcon getImageIcon(final URL resource) {
-        return new ImageIcon(IconIO.getImage(resource));
-    }
-
-    /**
-     * @param resource
-     * @param i
-     * @return
-     */
-    public static ImageIcon getImageIcon(final URL resource, final int size) {
-        return toImageIcon(getIcon(resource, size));
-    }
-
-    /**
      * Returns an icon for the given resource, but only if the resource is a non-bitmap icon like a svg. Anything we cannot read as an image
      *
      * @param resource
@@ -609,7 +538,7 @@ public class IconIO {
      * @param h
      * @return
      */
-    public static Icon getNonImageIcon(final URL resource, final int w, int h) {
+    public static Icon loadVectorIcon(final URL resource, final int w, int h) {
         if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
             if (getSvgFactory() != null) {
                 try {
@@ -621,11 +550,9 @@ public class IconIO {
                     }
                 } catch (IOException e) {
                     LogV3.log(e);
-                    return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
                 }
             } else {
                 LogV3.warning("SVG Factory not found!");
-                return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
             }
         }
         return null;

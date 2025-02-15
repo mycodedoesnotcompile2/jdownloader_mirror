@@ -9,6 +9,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.mainmenu.container.OptionalContainer;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.MenuManagerDownloadTabBottomBar;
+import org.jdownloader.gui.views.downloads.action.CleanupDownloadFolderAction;
 import org.jdownloader.gui.views.downloads.bottombar.AbstractBottomBarMenuManager;
 import org.jdownloader.gui.views.downloads.bottombar.DeleteContainer;
 import org.jdownloader.gui.views.downloads.bottombar.HorizontalBoxItem;
@@ -62,8 +63,6 @@ public class MenuManagerLinkgrabberTabBottombar extends AbstractBottomBarMenuMan
     public MenuContainerRoot createDefaultStructure() {
         MenuContainerRoot mr = new MenuContainerRoot();
         MenuManagerDownloadTabBottomBar.fillAddLinks(mr);
-        //
-        //
         mr.add(ClearLinkgrabberAction.class);
         DeleteContainer delete = new DeleteContainer();
         delete.add(setIconKey(new ActionData(GenericDeleteFromLinkgrabberAction.class).putSetup(GenericDeleteFromLinkgrabberAction.DELETE_DISABLED, true).putSetup(IncludedSelectionSetup.INCLUDE_UNSELECTED_LINKS, true).putSetup(IncludedSelectionSetup.INCLUDE_SELECTED_LINKS, true), IconKey.ICON_REMOVE_DISABLED));

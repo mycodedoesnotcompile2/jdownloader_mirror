@@ -15,7 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -25,12 +25,15 @@ import java.util.regex.Pattern;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig.ArtCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
-import jd.nutils.encoding.Encoding;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
@@ -45,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50522 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(?!core-membership|search|developers|join|users)[\\w\\-]+($|/favourites(/\\d+/[\\w\\-]+)?|/gallery/\\d+/[\\w\\-]+|/gallery/(all|scraps))" })
+@DecrypterPlugin(revision = "$Revision: 50633 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
     /**
      * @author raztoki, pspzockerscene
@@ -55,41 +58,90 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
 
-    private final Pattern PATTERN_USER                   = Pattern.compile("/([\\w\\-]+)$", Pattern.CASE_INSENSITIVE);
-    private final Pattern PATTERN_USER_FAVORITES         = Pattern.compile("/([\\w\\-]+)/favourites$", Pattern.CASE_INSENSITIVE);
-    private final Pattern PATTERN_USER_FAVORITES_GALLERY = Pattern.compile("/([\\w\\-]+)/favourites/(\\d+)/([\\w\\-]+).*", Pattern.CASE_INSENSITIVE);
-    private final Pattern PATTERN_GALLERY                = Pattern.compile("/([\\w\\-]+)/gallery/(\\d+)/([\\w\\-]+)$", Pattern.CASE_INSENSITIVE);
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "deviantart.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            String regex = "https?://[\\w\\.\\-]*?" + buildHostsPatternPart(domains) + "(";
+            regex += PATTERN_GALLERY.pattern();
+            regex += "|";
+            regex += PATTERN_USER_FAVORITES.pattern();
+            regex += "|";
+            regex += PATTERN_USER_FAVORITES_GALLERY.pattern();
+            regex += "|";
+            regex += DeviantArtCom.PATTERN_ART.pattern();
+            regex += "|";
+            regex += PATTERN_USER.pattern();
+            regex += ")";
+            ret.add(regex);
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private static final Pattern PATTERN_USER                   = Pattern.compile("/(?!core-membership|search|developers|join|users)([\\w\\-]+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_USER_FAVORITES         = Pattern.compile("/([\\w\\-]+)/favourites$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_USER_FAVORITES_GALLERY = Pattern.compile("/([\\w\\-]+)/favourites/(\\d+)/([\\w\\-]+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_GALLERY                = Pattern.compile("/([\\w\\-]+)/gallery/(\\d+)/([\\w\\-]+)$", Pattern.CASE_INSENSITIVE);
+    DeviantArtCom                hosterplugin                   = null;
 
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        DeviantArtCom.prepBR(this.br);
-        final String addedurl = param.getCryptedUrl();
-        br.setFollowRedirects(true);
-        br.setCookiesExclusive(true);
+        final String contenturl = param.getCryptedUrl();
+        final String path = new URL(contenturl).getPath();
         /* Login if possible. Sometimes not all items of a gallery are visible without being logged in. */
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        hosterplugin = (DeviantArtCom) this.getNewPluginForHostInstance(this.getHost());
         if (account != null) {
-            final DeviantArtCom plg = (DeviantArtCom) this.getNewPluginForHostInstance(this.getHost());
-            plg.login(account, false);
+            hosterplugin.login(account, false);
         }
-        final Regex favouritesGallery = new Regex(addedurl, PATTERN_USER_FAVORITES_GALLERY);
+        final Regex favouritesGallery = new Regex(path, PATTERN_USER_FAVORITES_GALLERY);
         if (favouritesGallery.patternFind()) {
             return crawlFavouritesGallery(account, favouritesGallery.getMatch(0), favouritesGallery.getMatch(1), favouritesGallery.getMatch(2));
-        } else if (new Regex(addedurl, PATTERN_USER_FAVORITES).patternFind()) {
+        } else if (new Regex(path, PATTERN_USER_FAVORITES).patternFind()) {
             return this.crawlProfileFavorites(account, param);
-        } else if (new Regex(addedurl, PATTERN_GALLERY).patternFind()) {
+        } else if (new Regex(path, PATTERN_GALLERY).patternFind()) {
+            return this.crawlProfileOrGallery(account, param);
+        } else if (new Regex(path, DeviantArtCom.PATTERN_ART).patternFind()) {
+            return this.crawlArt(param, account);
+        } else if (new Regex(path, PATTERN_USER).patternFind()) {
             return this.crawlProfileOrGallery(account, param);
         } else {
-            return this.crawlProfileOrGallery(account, param);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
     }
 
-    /** Crawls a collection of favourites of a user. */
-    private ArrayList<DownloadLink> crawlFavouritesGallery(final Account account, final String username, final String galleryID, final String gallerySlug) throws IOException, PluginException, DecrypterRetryException {
+    /**
+     * Crawls a collection of favourites of a user.
+     *
+     * @throws Exception
+     */
+    private ArrayList<DownloadLink> crawlFavouritesGallery(final Account account, final String username, final String galleryID, final String gallerySlug) throws Exception {
         if (username == null || galleryID == null) {
             /* Developer mistake */
             throw new IllegalArgumentException();
@@ -101,15 +153,19 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username + " - Favourites - " + gallerySlug.replace("-", " ").trim());
         final UrlQuery query = new UrlQuery();
-        query.add("type", "collection");
-        query.add("folderid", "galleryID");
-        query.add("username", username);
-        query.add("folderid", galleryID);
+        query.appendEncoded("type", "collection");
+        query.appendEncoded("folderid", "galleryID");
+        query.appendEncoded("username", username);
+        query.appendEncoded("folderid", galleryID);
         return crawlPagination(account, fp, "/_puppy/dashared/gallection/contents", query);
     }
 
-    /** Crawls all favourites of a user. */
-    private ArrayList<DownloadLink> crawlProfileFavorites(final Account account, final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
+    /**
+     * Crawls all favourites of a user.
+     *
+     * @throws Exception
+     */
+    private ArrayList<DownloadLink> crawlProfileFavorites(final Account account, final CryptedLink param) throws Exception {
         final String username = new Regex(param.getCryptedUrl(), PATTERN_USER_FAVORITES).getMatch(0);
         if (username == null) {
             /* Developer mistake */
@@ -123,14 +179,14 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username + " - Favorites");
         final UrlQuery query = new UrlQuery();
-        query.add("type", "collection");
+        query.appendEncoded("type", "collection");
         // query.add("folderid", "");
-        query.add("username", username);
-        query.add("all_folder", "true");
+        query.appendEncoded("username", username);
+        query.appendEncoded("all_folder", "true");
         return this.crawlPagination(account, fp, "/_puppy/dashared/gallection/contents", query);
     }
 
-    private ArrayList<DownloadLink> crawlProfileOrGallery(final Account account, final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
+    private ArrayList<DownloadLink> crawlProfileOrGallery(final Account account, final CryptedLink param) throws Exception {
         br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
@@ -157,22 +213,21 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
             fp.setName(username);
         }
         final UrlQuery query = new UrlQuery();
-        query.add("type", "gallery");
-        query.add("username", username);
+        query.appendEncoded("type", "gallery");
+        query.appendEncoded("username", username);
         if (galleryID != null) {
-            query.add("folderid", galleryID);
+            query.appendEncoded("folderid", galleryID);
         } else {
             if ("scraps".equalsIgnoreCase(gallerySlug)) {
-                query.add("scraps_folder", "true");
+                query.appendEncoded("scraps_folder", "true");
             } else {
-                query.add("all_folder", "true");
+                query.appendEncoded("all_folder", "true");
             }
         }
         return crawlPagination(account, fp, "/_puppy/dashared/gallection/contents", query);
     }
 
-    private ArrayList<DownloadLink> crawlPagination(final Account account, final FilePackage fp, final String action, final UrlQuery query) throws IOException, PluginException, DecrypterRetryException {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+    private ArrayList<DownloadLink> crawlPagination(final Account account, final FilePackage fp, final String action, final UrlQuery query) throws Exception {
         String csrftoken = br.getRegex("window\\.__CSRF_TOKEN__\\s*=\\s*'([^<>\"\\']+)';").getMatch(0);
         if (csrftoken == null) {
             csrftoken = br.getRegex("csrfToken\\s*:\\s*\"([^\"]+)").getMatch(0);
@@ -180,12 +235,16 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         if (StringUtils.isEmpty(csrftoken)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final DeviantArtComConfig cfg = PluginJsonConfig.get(DeviantArtComConfig.class);
+        final ArtCrawlMode mode = cfg.getArtCrawlMode();
+        final boolean fastcrawl = mode == ArtCrawlMode.FAST_CRAWL_IGNORE_MULTI_IMAGE_GALLERIES;
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int page = 0;
         final int maxItemsPerPage = 24;
         int offset = 0;
         final HashSet<String> dupes = new HashSet<String>();
-        query.add("limit", Integer.toString(maxItemsPerPage));
-        query.add("csrf_token", Encoding.urlEncode(csrftoken));
+        query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
+        query.appendEncoded("csrf_token", csrftoken);
         do {
             query.addAndReplace("offset", Integer.toString(offset));
             page++;
@@ -213,32 +272,38 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
                     /* 2023-09-23 */
                     deviation = result;
                 }
-                // final Map<String, Object> author = (Map<String, Object>) deviation.get("author");
                 final String url = deviation.get("url").toString();
-                if (dupes.add(url)) {
-                    numberofNewItems++;
-                    final DownloadLink link = this.createDownloadlink(url);
-                    final Map<String, Object> deviationRet = DeviantArtCom.parseDeviationJSON(this, link, deviation);
-                    /**
-                     * This file extension may change later when file is downloaded. </br>
-                     * 2022-11-11: Items of type "literature" (or simply != "image") will not get any file extension at all at this moment.
-                     */
-                    final String assumedFileExtension = DeviantArtCom.getAssumedFileExtension(account, link);
-                    link.setName(link.getStringProperty(DeviantArtCom.PROPERTY_TITLE) + " by " + link.getStringProperty(DeviantArtCom.PROPERTY_USERNAME) + "_" + deviation.get("deviationId") + assumedFileExtension);
-                    link.setAvailable(true);
-                    if (fp != null) {
-                        link._setFilePackage(fp);
-                    }
-                    ret.add(link);
-                    distribute(link);
+                if (!dupes.add(url)) {
+                    /* Skip duplicates */
+                    continue;
                 }
+                numberofNewItems++;
+                final DownloadLink link = this.createDownloadlink(url);
+                // TODO: Correctly implement this
+                DeviantArtCom.parseDeviationJSON(this, link, deviation);
+                hosterplugin.setFilename(link, account, null);
+                /**
+                 * This file extension may change later when file is downloaded. </br>
+                 * 2022-11-11: Items of type "literature" (or simply != "image") will not get any file extension at all at this moment.
+                 */
+                if (fastcrawl) {
+                    link.setAvailable(true);
+                }
+                if (fp != null) {
+                    link._setFilePackage(fp);
+                }
+                ret.add(link);
+                distribute(link);
             }
             logger.info("Crawled page " + page + " | Offset: " + offset + " | nextOffset: " + nextOffset + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
-            } else if (!(Boolean) entries.get("hasMore") || nextOffset == null) {
+            } else if (!Boolean.TRUE.equals(entries.get("hasMore"))) {
                 logger.info("Stopping because: Reached end");
+                break;
+            } else if (nextOffset == null) {
+                logger.info("Stopping because: Reached end?");
                 break;
             } else if (numberofNewItems == 0) {
                 /* Extra fail-safe */
@@ -250,6 +315,77 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
                 continue;
             }
         } while (true);
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> crawlArt(final CryptedLink param, final Account account) throws Exception {
+        final DeviantArtComConfig cfg = PluginJsonConfig.get(DeviantArtComConfig.class);
+        final String contenturl = param.getCryptedUrl();
+        final DownloadLink mainlink = this.createDownloadlink(contenturl);
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        ret.add(mainlink);
+        if (cfg.getArtCrawlMode() == ArtCrawlMode.FAST_CRAWL_IGNORE_MULTI_IMAGE_GALLERIES) {
+            /* Pass item to hosterplugin straight away. */
+            return ret;
+        }
+        hosterplugin.requestFileInformation(mainlink, account, false);
+        mainlink.setAvailable(true);
+        if (!DeviantArtCom.isImage(mainlink)) {
+            /* Item is not an image item -> No need to look for more image items. */
+            return ret;
+        }
+        mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION, 1);
+        final HashSet<String> dupes = new HashSet<String>();
+        final List<String> allowedresults = new ArrayList<String>();
+        final String[] urls = br.getRegex("src=\"(https?://[^/]+/[^\"]+)\"[^>]*/></button>").getColumn(0);
+        if (urls != null && urls.length > 0) {
+            for (final String url : urls) {
+                if (!dupes.add(url)) {
+                    /* Skip duplicates */
+                    continue;
+                }
+                if (url.contains("fit/w_150,h_150") && url.contains(".jpg") && url.contains("token=")) {
+                    allowedresults.add(url);
+                }
+            }
+        }
+        if (allowedresults.isEmpty()) {
+            logger.info("Found single item");
+        }
+        int position = 1;
+        final String[] propertiesToCopy = new String[] { DeviantArtCom.PROPERTY_USERNAME, DeviantArtCom.PROPERTY_TITLE, DeviantArtCom.PROPERTY_TYPE };
+        for (String url : allowedresults) {
+            /**
+             * Change resolution from thumbnail to fullsize and remove other unneeded stuff. This will also unblur blurred images (lol).
+             * <br>
+             * Removes everything until "?token=..."
+             */
+            url = url.replaceAll("(/v1/fit/.*150\\.jpg)", "");
+            if (position == 1) {
+                mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
+            } else {
+                final DownloadLink image = this.createDownloadlink(contenturl);
+                /* Inherit some properties from main link. */
+                for (final String property : propertiesToCopy) {
+                    image.setProperty(property, mainlink.getProperty(property));
+                }
+                image.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION, position);
+                image.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
+                image.setAvailable(true);
+                ret.add(image);
+            }
+            position++;
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(mainlink.getStringProperty(DeviantArtCom.PROPERTY_TITLE));
+        for (final DownloadLink result : ret) {
+            result._setFilePackage(fp);
+            result.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION_MAX, ret.size());
+            this.hosterplugin.setFilename(result, account, null);
+        }
         return ret;
     }
 

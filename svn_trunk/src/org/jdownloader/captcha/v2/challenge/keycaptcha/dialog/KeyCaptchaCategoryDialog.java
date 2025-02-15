@@ -4,7 +4,6 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
-import java.awt.Transparency;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -125,7 +124,7 @@ public class KeyCaptchaCategoryDialog extends AbstractCaptchaDialog<String> impl
         SwingUtils.setOpaque(bgs, false);
         BufferedImage bg = data.getBackground();
         for (int i = 0; i < 3; i++) {
-            BufferedImage cats = new BufferedImage(bg.getWidth() / 3, bg.getHeight(), Transparency.TRANSLUCENT);
+            BufferedImage cats = new BufferedImage(bg.getWidth() / 3, bg.getHeight(), BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = (Graphics2D) cats.getGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g.drawImage(bg, 0, 0, bg.getWidth() / 3, bg.getHeight(), i * bg.getWidth() / 3, 0, (i + 1) * bg.getWidth() / 3, bg.getHeight(), null);

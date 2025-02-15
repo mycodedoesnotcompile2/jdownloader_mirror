@@ -14,28 +14,29 @@ import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "deviantart.com", type = Type.HOSTER)
 public interface DeviantArtComConfig extends PluginConfigInterface {
-    final String                    text_FastLinkcheckForSingleItems = "Fast linkcheck for single files (filesize might not be shown until dl is started)?";
     // final String text_PreferServerFilename = "Prefer server filename?";
-    final String                    text_ImageDownloadMode           = "Image download mode:";
-    public static final TRANSLATION TRANSLATION                      = new TRANSLATION();
+    public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
         public String getFastLinkcheckForSingleItems_label() {
-            return text_FastLinkcheckForSingleItems;
+            return "Fast linkcheck for single image files (filesize might not be shown until dl is started)?";
         }
         // public String getPreferServerFilename_label() {
         // return text_PreferServerFilename;
         // }
 
         public String getDownloadMode_label() {
-            return text_ImageDownloadMode;
+            return "Image download mode";
+        }
+
+        public String getArtCrawlMode_label() {
+            return "Crawl mode for '/art/' links";
         }
     }
 
     @AboutConfig
     @DefaultBooleanValue(false)
     @TakeValueFromSubconfig("SKIP_FILESIZECHECK") // backward compatibility
-    @DescriptionForConfigEntry(text_FastLinkcheckForSingleItems)
     @Order(10)
     boolean isFastLinkcheckForSingleItems();
 
@@ -48,6 +49,30 @@ public interface DeviantArtComConfig extends PluginConfigInterface {
     // boolean isPreferServerFilename();
     //
     // void setPreferServerFilename(boolean b);
+
+    public static enum ArtCrawlMode implements LabelInterface {
+        SLOW_LOOK_FOR_MULTI_IMAGE_GALLERIES {
+            @Override
+            public String getLabel() {
+                return "Slow: Check for multi image galleries";
+            }
+        },
+        FAST_CRAWL_IGNORE_MULTI_IMAGE_GALLERIES {
+            @Override
+            public String getLabel() {
+                return "Fast: Do not check for multi image galleries";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("SLOW_LOOK_FOR_MULTI_IMAGE_GALLERIES")
+    @Order(20)
+    @DescriptionForConfigEntry("Set this to fast if you already know that none of the items you add leads to a multi image gallery.")
+    @DefaultOnNull
+    ArtCrawlMode getArtCrawlMode();
+
+    void setArtCrawlMode(final ArtCrawlMode mode);
 
     public static enum ImageDownloadMode implements LabelInterface {
         OFFICIAL_DOWNLOAD_ELSE_PREVIEW {
@@ -73,7 +98,6 @@ public interface DeviantArtComConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("OFFICIAL_DOWNLOAD_ELSE_PREVIEW")
     @Order(30)
-    @DescriptionForConfigEntry(text_ImageDownloadMode)
     @DefaultOnNull
     ImageDownloadMode getImageDownloadMode();
 

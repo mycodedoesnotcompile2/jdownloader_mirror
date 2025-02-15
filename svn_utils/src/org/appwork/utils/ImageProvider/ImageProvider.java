@@ -146,12 +146,14 @@ public class ImageProvider {
                 return FONTNAME.get();
             }
             try {
-                final String[] availableFontFamilyNames = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
-                if (availableFontFamilyNames != null) {
-                    for (final String fontFamilyName : availableFontFamilyNames) {
-                        if ("Arial".equals(fontFamilyName)) {
-                            FONTNAME.set(fontFamilyName);
-                            return fontFamilyName;
+                if (!Application.isHeadless()) {
+                    final String[] availableFontFamilyNames = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+                    if (availableFontFamilyNames != null) {
+                        for (final String fontFamilyName : availableFontFamilyNames) {
+                            if ("Arial".equals(fontFamilyName)) {
+                                FONTNAME.set(fontFamilyName);
+                                return fontFamilyName;
+                            }
                         }
                     }
                 }
@@ -508,7 +510,7 @@ public class ImageProvider {
         Image frontImage = IconIO.toImage(front);
         final int width = Math.max(xoffsetBack + back.getIconWidth(), xoffsetFront + front.getIconWidth());
         final int height = Math.max(yoffsetBack + back.getIconHeight(), yoffsetFront + front.getIconHeight());
-        if (false && MultiResolutionImageHelper.isSupported() && MultiResolutionImageHelper.isInstanceOf(backImage) && MultiResolutionImageHelper.isInstanceOf(frontImage)) {
+        if (false && !Application.isHeadless() && MultiResolutionImageHelper.isInstanceOf(backImage) && MultiResolutionImageHelper.isInstanceOf(frontImage)) {
             ArrayList<Image> images = new ArrayList<Image>();
             HashSet<String> dupe = new HashSet<String>();
             for (GraphicsDevice sd : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {

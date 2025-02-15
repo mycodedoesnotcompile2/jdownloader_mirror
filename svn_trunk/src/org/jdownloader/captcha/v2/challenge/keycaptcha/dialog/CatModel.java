@@ -4,7 +4,6 @@ import java.awt.Component;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
-import java.awt.Transparency;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 
@@ -131,7 +130,7 @@ public class CatModel extends ExtTableModel<CatOption> {
         BufferedImage bg = data.getBackground();
         for (i = 0; i < 3; i++) {
 
-            BufferedImage cats = new BufferedImage(bg.getWidth() / 3, bg.getHeight(), Transparency.TRANSLUCENT);
+            BufferedImage cats = new BufferedImage(bg.getWidth() / 3, bg.getHeight(), BufferedImage.TYPE_INT_ARGB);
 
             Graphics2D g = (Graphics2D) cats.getGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
