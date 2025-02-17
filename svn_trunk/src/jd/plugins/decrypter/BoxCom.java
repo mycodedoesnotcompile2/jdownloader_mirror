@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
@@ -45,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "box.com" }, urls = { "https?://(?:\\w+\\.)*box\\.(?:net|com)/s(?:hared)?/([a-z0-9]{32}|[a-z0-9]{20})(?:/(?:folder|file)/(\\d+))?" })
+@DecrypterPlugin(revision = "$Revision: 50641 $", interfaceVersion = 3, names = { "box.com" }, urls = { "https?://(?:\\w+\\.)*box\\.(?:net|com)/s(?:hared)?/([a-z0-9]{32}|[a-z0-9]{20})(?:/(?:folder|file)/(\\d+))?" })
 public class BoxCom extends antiDDoSForDecrypt {
     private static final String            TYPE_APP      = "https?://(?:\\w+\\.)*box\\.(?:net|com)/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})(?:/folder/\\d+)?";
     private static final String            TYPE_APP_FILE = "https?://[^/]+/s(?:hared)?/([a-z0-9]{32}|[a-z0-9]{20})/file/(\\d+)";
@@ -110,7 +109,7 @@ public class BoxCom extends antiDDoSForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink parameter, final ProgressController progress) throws Exception {
-        br = new Browser();
+        br = createNewBrowserInstance();
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         cryptedlink = parameter.toString().replace("box.net/", "box.com/");
         logger.finer("Decrypting: " + cryptedlink);

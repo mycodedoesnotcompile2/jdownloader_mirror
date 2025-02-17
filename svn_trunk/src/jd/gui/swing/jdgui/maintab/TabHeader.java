@@ -13,7 +13,6 @@
 //
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package jd.gui.swing.jdgui.maintab;
 
 import java.awt.Dimension;
@@ -23,15 +22,14 @@ import java.awt.event.MouseEvent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
+import org.appwork.utils.swing.SwingUtils;
+
 import jd.gui.swing.jdgui.MainTabbedPane;
 import jd.gui.swing.jdgui.interfaces.JDMouseAdapter;
 import jd.gui.swing.jdgui.interfaces.View;
 import net.miginfocom.swing.MigLayout;
 
-import org.appwork.utils.swing.SwingUtils;
-
 public class TabHeader extends JPanel implements CustomTabHeader {
-
     private static final long serialVersionUID = 4463352125800695922L;
     private boolean           selected;
     private JLabel            label;
@@ -48,25 +46,20 @@ public class TabHeader extends JPanel implements CustomTabHeader {
         } else {
             super.setBounds(x - 2, y - 1, width + 2, height + 1);
         }
-
     }
 
     public TabHeader(final View view) {
-        setLayout(new MigLayout("ins 0 0 0 0", "[][grow]", "0[16!]0"));
+        setLayout(new MigLayout("ins 0 0 0 0", "[][grow]", "0[" + (view.getIcon().getIconHeight() + 2) + "!]0"));
         setOpaque(false);
         setToolTipText(view.getTooltip());
         initMouseForwarder();
-
         putClientProperty("paintActive", Boolean.TRUE);
         labelIcon = new JLabel();
         labelIcon.setIcon(view.getIcon());
         SwingUtils.setOpaque(labelIcon, false);
-
         label = new JLabel(view.getTitle());
-
         SwingUtils.setOpaque(label, false);
         fontUnselected = label.getFont();
-
         fontSelected = fontUnselected.deriveFont(fontUnselected.getStyle() ^ Font.BOLD);
         add(labelIcon);
         add(label, "alignx center");
@@ -75,7 +68,6 @@ public class TabHeader extends JPanel implements CustomTabHeader {
         maxWidth = pref.width;
         setPreferredSize(new Dimension(maxWidth, pref.height));
         label.setFont(fontUnselected);
-
     }
 
     protected void initMouseForwarder() {
@@ -118,7 +110,6 @@ public class TabHeader extends JPanel implements CustomTabHeader {
                 JDMouseAdapter.forwardEvent(e, MainTabbedPane.getInstance());
                 // }
             }
-
         });
     }
 
@@ -133,5 +124,4 @@ public class TabHeader extends JPanel implements CustomTabHeader {
         label.setFont(fontSelected);
         repaint();
     }
-
 }

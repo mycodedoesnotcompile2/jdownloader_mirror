@@ -152,7 +152,7 @@ public abstract class Plugin implements ActionListener {
     }
 
     public Browser createNewBrowserInstance() {
-        return new Browser();
+        return new PluginBrowser<Plugin>(this);
     }
 
     protected String getMappedHost(List<String[]> pluginDomains, String host) {

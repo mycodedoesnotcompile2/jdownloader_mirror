@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50274 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 3, names = {}, urls = {})
 public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
     public XFileSharingProBasicSpecialFilejoker(final PluginWrapper wrapper) {
         super(wrapper);
@@ -593,7 +593,7 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
                      * Use a new Browser instance as we do not want to continue via API afterwards thus we do not want to have API
                      * headers/cookies especially as in API mode, different user-agent could be used!
                      */
-                    final Browser apiBR = new Browser();
+                    final Browser apiBR = createNewBrowserInstance();
                     /* Do not only call login as we need the email/username cookie which we only get when obtaining AccountInfo! */
                     // loginAPIZeusCloudManager(apiBR, account, force);
                     AccountInfo ai = null;

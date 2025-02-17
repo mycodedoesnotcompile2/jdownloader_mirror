@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50226 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 50641 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,7 +108,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
          * Do not set API headers on main browser object because if we use website crawler for some reason and have API login headers set
          * we'll run into problems for sure!
          */
-        final Browser dummy_login_browser = new Browser();
+        final Browser dummy_login_browser = createNewBrowserInstance();
         final boolean canLoginViaAPI = DropboxCom.setAPILoginHeaders(dummy_login_browser, account);
         final boolean urlCanBeCrawledViaAPI = !param.toString().contains("disallow_crawl_via_api=true") && !param.toString().matches(DropboxCom.TYPE_SC_GALLERY);
         final boolean canUseAPI = canLoginViaAPI && urlCanBeCrawledViaAPI;

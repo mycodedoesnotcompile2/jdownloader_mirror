@@ -692,7 +692,7 @@ public class Browser {
     }
 
     public int getDefaultLoadLimit() {
-        return 8 * 1024 * 1024;
+        return 16 * 1024 * 1024;
     }
 
     /**

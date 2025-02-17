@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50615 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1057,7 +1057,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 final String probeContext = new String(probe, "UTF-8");
                 final Request clone = urlConnection.getRequest().cloneRequest();
                 clone.setHtmlCode(probeContext);
-                final Browser br = new Browser();
+                final Browser br = createNewBrowserInstance();
                 br.setRequest(clone);
                 try {
                     // TODO: extract the html checks into own method to avoid Browser instance
@@ -1902,7 +1902,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         String checkURL = null;
         int linkcheckTypeTryCount = 0;
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance();
             this.prepBrowser(br, getMainPage());
             br.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();
@@ -5629,7 +5629,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         boolean linkcheckerHasFailed = false;
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance();
             this.prepBrowser(br, getMainPage());
             br.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();

@@ -46,11 +46,12 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49206 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
 public class FilerNet extends PluginForHost {
     private int                 statusCode                                             = 0;
     private String              statusMessage                                          = null;
@@ -80,7 +81,7 @@ public class FilerNet extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser() {
+        final Browser br = new PluginBrowser<FilerNet>(this) {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**

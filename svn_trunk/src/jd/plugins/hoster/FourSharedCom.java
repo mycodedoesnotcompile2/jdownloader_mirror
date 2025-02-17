@@ -46,7 +46,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.UserAgents;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?4shared(?:-china)?\\.com/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
+@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?4shared(?:-china)?\\.com/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
 public class FourSharedCom extends PluginForHost {
     // DEV NOTES:
     // old versions of JDownloader can have troubles with Java7+ with HTTPS posts.
@@ -224,7 +224,7 @@ public class FourSharedCom extends PluginForHost {
             if (DLLINK == null && acc != null && TRY_FAST_FREE) {
                 try {
                     final String host = new Regex(link.getDownloadURL(), "https?://(www\\.)?(4shared(-china)?\\.com)").getMatch(1);
-                    final Browser cbr = new Browser();
+                    final Browser cbr = createNewBrowserInstance();
                     cbr.getHeaders().put("User-Agent", "UniversalUserAgent(winHTTP)");
                     cbr.getPage("http://www." + host + "/downloadhelper/flink?login=" + Encoding.urlEncode(acc.getUser()) + "&password=" + Encoding.urlEncode(acc.getPass()) + "&url=" + Encoding.urlEncode(link.getDownloadURL()) + "&forDownloadHelper%3Dtrue%26lgfp%3D" + new Random().nextInt(10000));
                     DLLINK = cbr.getRegex("<url>(http[^<>\"]*?)</url>").getMatch(0);

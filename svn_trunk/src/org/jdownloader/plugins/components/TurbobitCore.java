@@ -51,7 +51,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50590 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurbobitCore extends antiDDoSForHost {
     /**
      * TODO: Check if we already got errorhandling for this kind of error http://turbobit.net/error/download/dcount/xxxtesst --> "
@@ -117,7 +117,7 @@ public class TurbobitCore extends antiDDoSForHost {
         final boolean fastLinkcheck = isFastLinkcheckEnabled();
         final ArrayList<DownloadLink> deepChecks = new ArrayList<DownloadLink>();
         try {
-            final Browser br_linkcheck = new Browser();
+            final Browser br_linkcheck = createNewBrowserInstance();
             prepBrowserWebsite(br_linkcheck, null);
             br_linkcheck.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             br_linkcheck.setCookiesExclusive(true);

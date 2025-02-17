@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50590 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -566,7 +566,7 @@ public class VoeSx extends XFileSharingProBasic {
         boolean linkcheckerHasFailed = false;
         final String preferredQualityHeightStr = getPreferredDownloadQualityHeightStr();
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance();
             this.prepBrowser(br, getMainPage());
             br.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();
