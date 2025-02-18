@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50633 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50644 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
     /**
      * @author raztoki, pspzockerscene
@@ -357,13 +357,7 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         }
         int position = 1;
         final String[] propertiesToCopy = new String[] { DeviantArtCom.PROPERTY_USERNAME, DeviantArtCom.PROPERTY_TITLE, DeviantArtCom.PROPERTY_TYPE };
-        for (String url : allowedresults) {
-            /**
-             * Change resolution from thumbnail to fullsize and remove other unneeded stuff. This will also unblur blurred images (lol).
-             * <br>
-             * Removes everything until "?token=..."
-             */
-            url = url.replaceAll("(/v1/fit/.*150\\.jpg)", "");
+        for (final String url : allowedresults) {
             if (position == 1) {
                 mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
             } else {

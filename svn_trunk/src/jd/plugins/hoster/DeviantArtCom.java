@@ -61,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50633 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50644 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -941,10 +941,10 @@ public class DeviantArtCom extends PluginForHost {
                 }
                 if (officialDownloadurl != null && ((LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD && account != null) || !LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD)) {
                     dllink = officialDownloadurl;
+                } else if (imagePreviewUrl != null) {
+                    dllink = imagePreviewUrl;
                 } else if (multiImageGalleryPreviewUrl != null) {
                     dllink = multiImageGalleryPreviewUrl;
-                } else {
-                    dllink = imagePreviewUrl;
                 }
             }
         } else if (officialDownloadurl != null) {
@@ -958,6 +958,16 @@ public class DeviantArtCom extends PluginForHost {
         String url = link.getStringProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2);
         if (url == null) {
             return null;
+        }
+        final int imagePosition = getImagePosition(link);
+        if (imagePosition > 1) {
+            /**
+             * Change resolution from thumbnail to fullsize and remove other unneeded stuff. This will also unblur blurred images (lol).
+             * <br>
+             * Removes everything until "?token=..." <br>
+             * Important: This does not work for the first image, only for the images >= 2!
+             */
+            url = url.replaceAll("(/v1/fit/.*150\\.jpg)", "");
         }
         final String token = link.getStringProperty(PROPERTY_IMAGE_TOKEN);
         if (token != null) {

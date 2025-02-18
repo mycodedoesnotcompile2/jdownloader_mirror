@@ -15,6 +15,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
+import org.jdownloader.plugins.config.Order;
 
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
@@ -23,12 +24,14 @@ import jd.controlling.packagecontroller.PackageController.MergePackageSettings;
 
 public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
     private boolean caseInsensitive = true;
+    private boolean mergeAll        = false;
 
     public static String getTranslationForMatchPackageNamesCaseInsensitive() {
         return _GUI.T.MergeSameNamedPackagesAction_Case_Insensitive();
     }
 
     @Customizer(link = "#getTranslationForMatchPackageNamesCaseInsensitive")
+    @Order(100)
     public boolean isMatchPackageNamesCaseInsensitive() {
         return caseInsensitive;
     }
@@ -37,15 +40,23 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
         this.caseInsensitive = val;
     }
 
+    // @Customizer(link = "#getTranslationForMergeAll")
+    @Order(200)
+    public boolean isMergeAll() {
+        return mergeAll;
+    }
+
+    public void setMergeAll(boolean val) {
+        this.mergeAll = val;
+    }
+
     /**
      * @param selection
-     *            TODO
      *
      */
     public AbstractMergeSameNamedPackagesAction() {
         super(true, true);
         setName(_GUI.T.MergeSameNamedPackagesAction_());
-        // setAccelerator(KeyEvent.VK_M);
         setIconKey(IconKey.ICON_REMOVE_DUPES);
     }
 
@@ -61,11 +72,15 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
             @Override
             protected Void run() throws RuntimeException {
                 final boolean caseInsensitive = isMatchPackageNamesCaseInsensitive();
+                final boolean mergeAll = isMergeAll();
                 /* If user has selected package(s), only collect duplicates within selection. */
                 final List<PackageView<PackageType, ChildrenType>> selPackageViews = sel.getPackageViews();
                 final Map<String, List<PackageType>> dupes;
-                if (sel != null && selPackageViews.size() > 0) {
-                    /* Merge duplicates withing users' selection */
+                if (sel == null || selPackageViews.size() == 0 || mergeAll) {
+                    /* Merge duplicates in whole list */
+                    dupes = controller.getPackagesWithSameName(caseInsensitive);
+                } else {
+                    /* Merge duplicates within users' selection */
                     final List<PackageType> selectedPackages = new ArrayList<PackageType>();
                     for (final PackageView<PackageType, ChildrenType> pv : selPackageViews) {
                         final PackageType selectedpackage = pv.getPackage();
@@ -76,9 +91,6 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
                         return null;
                     }
                     dupes = controller.getPackagesWithSameName(selectedPackages, caseInsensitive);
-                } else {
-                    /* Merge duplicates in whole list */
-                    dupes = controller.getPackagesWithSameName(caseInsensitive);
                 }
                 if (dupes.isEmpty()) {
                     /* Zero results -> Do nothing */

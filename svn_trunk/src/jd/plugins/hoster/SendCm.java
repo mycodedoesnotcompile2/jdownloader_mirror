@@ -32,6 +32,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.plugins.components.config.XFSConfigSendCm;
 import org.jdownloader.plugins.components.config.XFSConfigSendCm.LoginMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -49,7 +50,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50644 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +67,7 @@ public class SendCm extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "send.cm", "sendit.cloud", "send.now", "usersfiles.com", "tusfiles.com", "tusfiles.net" });
+        ret.add(new String[] { "send.now", "send.cm", "sendit.cloud", "usersfiles.com", "tusfiles.com", "tusfiles.net" });
         return ret;
     }
 
@@ -495,6 +496,177 @@ public class SendCm extends XFileSharingProBasic {
     @Override
     protected boolean supportsAPISingleLinkcheck() {
         return looksLikeValidAPIKey(this.getAPIKey());
+    }
+
+    @Override
+    public boolean massLinkcheckerAPI(final DownloadLink[] urls, final String apikey) {
+        /**
+         * Copy & paste from superclass and modified to set file hash on DownloadLink items.
+         */
+        if (urls == null || urls.length == 0 || !this.looksLikeValidAPIKey(apikey)) {
+            return false;
+        }
+        boolean linkcheckerHasFailed = false;
+        try {
+            final Browser br = createNewBrowserInstance();
+            this.prepBrowser(br, getMainPage());
+            br.setCookiesExclusive(true);
+            final StringBuilder sb = new StringBuilder();
+            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            int index = 0;
+            while (true) {
+                links.clear();
+                while (true) {
+                    /*
+                     * We test max 50 links at once. 2020-05-29: XFS default API linkcheck limit is exactly 50 items. If you check more than
+                     * 50 items, it will only return results for the first 50 items.
+                     */
+                    if (index == urls.length || links.size() == 50) {
+                        break;
+                    } else {
+                        links.add(urls[index]);
+                        index++;
+                    }
+                }
+                final ArrayList<DownloadLink> apiLinkcheckLinks = new ArrayList<DownloadLink>();
+                sb.delete(0, sb.capacity());
+                for (final DownloadLink link : links) {
+                    try {
+                        resolveShortURL(br.cloneBrowser(), link, null);
+                    } catch (final PluginException e) {
+                        logger.log(e);
+                        if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
+                            link.setAvailableStatus(AvailableStatus.FALSE);
+                        } else if (e.getLinkStatus() == LinkStatus.ERROR_IP_BLOCKED) {
+                            link.setAvailableStatus(AvailableStatus.TRUE);
+                        } else {
+                            link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
+                        }
+                        if (!link.isNameSet()) {
+                            setWeakFilename(link, null);
+                        }
+                        /*
+                         * We cannot check shortLinks via API so if we're unable to convert them to TYPE_NORMAL we basically already checked
+                         * them here. Also we have to avoid sending wrong fileIDs to the API otherwise linkcheck WILL fail!
+                         */
+                        continue;
+                    }
+                    sb.append(this.getFUIDFromURL(link));
+                    sb.append("%2C");
+                    apiLinkcheckLinks.add(link);
+                }
+                if (apiLinkcheckLinks.isEmpty()) {
+                    /* Rare edge-case */
+                    logger.info("Seems like we got only shortURLs -> Nothing left to be checked via API");
+                    break;
+                }
+                getPage(br, getAPIBase() + "/file/info?key=" + apikey + "&file_code=" + sb.toString());
+                Map<String, Object> entries = null;
+                try {
+                    entries = this.checkErrorsAPI(br, links.get(0), null);
+                } catch (final Throwable e) {
+                    logger.log(e);
+                    /* E.g. invalid apikey, broken serverside API, developer mistake (e.g. sent fileIDs in invalid format) */
+                    logger.info("Fatal failure");
+                    return false;
+                }
+                final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("result");
+                for (final DownloadLink link : apiLinkcheckLinks) {
+                    Map<String, Object> fileinfo = null;
+                    final String thisFUID = this.getFUIDFromURL(link);
+                    for (final Map<String, Object> fileInfoTmp : ressourcelist) {
+                        String fuid_temp = (String) fileInfoTmp.get("filecode");
+                        if (StringUtils.isEmpty(fuid_temp)) {
+                            /* 2022-08-09 */
+                            fuid_temp = (String) fileInfoTmp.get("file_code");
+                        }
+                        if (StringUtils.equals(fuid_temp, thisFUID)) {
+                            fileinfo = fileInfoTmp;
+                            break;
+                        }
+                    }
+                    if (fileinfo == null) {
+                        /**
+                         * This should never happen. Possible reasons: <br>
+                         * - Wrong APIKey <br>
+                         * - We tried to check too many items at once <br>
+                         * - API only allows users to check self-uploaded content --> Disable API linkchecking in plugin! <br>
+                         * - API does not not allow linkchecking at all --> Disable API linkchecking in plugin! <br>
+                         */
+                        logger.warning("WTF failed to find information for fuid: " + this.getFUIDFromURL(link));
+                        linkcheckerHasFailed = true;
+                        continue;
+                    }
+                    /* E.g. check for "result":[{"status":404,"filecode":"xxxxxxyyyyyy"}] */
+                    final int status = ((Number) fileinfo.get("status")).intValue();
+                    if (!link.isNameSet()) {
+                        setWeakFilename(link, null);
+                    }
+                    final String hash_sha256 = (String) fileinfo.get("file_sha256");
+                    if (hash_sha256 != null) {
+                        link.setSha256Hash(hash_sha256);
+                    }
+                    String filename = null;
+                    boolean isVideohost = false;
+                    if (status != 200) {
+                        link.setAvailable(false);
+                    } else {
+                        link.setAvailable(true);
+                        filename = (String) fileinfo.get("name");
+                        if (StringUtils.isEmpty(filename)) {
+                            filename = (String) fileinfo.get("file_title");
+                        }
+                        final long filesize = JavaScriptEngineFactory.toLong(fileinfo.get("size"), 0);
+                        final Object canplay = fileinfo.get("canplay");
+                        final Object views_started = fileinfo.get("views_started");
+                        final Object views = fileinfo.get("views");
+                        final Object length = fileinfo.get("length");
+                        isVideohost = canplay != null || views_started != null || views != null || length != null;
+                        /* Filesize is not always given especially not for videohosts. */
+                        if (filesize > 0) {
+                            link.setDownloadSize(filesize);
+                        }
+                    }
+                    if (!isVideohost) {
+                        isVideohost = this.internal_isVideohoster_enforce_video_filename(link, null);
+                    }
+                    if (!StringUtils.isEmpty(filename)) {
+                        /*
+                         * At least for videohosts, filenames from json would often not contain a file extension!
+                         */
+                        if (Encoding.isHtmlEntityCoded(filename)) {
+                            filename = Encoding.htmlDecode(filename).trim();
+                        }
+                        if (isVideohost) {
+                            filename = this.applyFilenameExtension(filename, ".mp4");
+                        }
+                        /* Trust API filenames -> Set as final filename. */
+                        link.setFinalFileName(filename);
+                    } else {
+                        /* Use cached name */
+                        final String name = link.getName();
+                        if (name != null && isVideohost) {
+                            link.setName(this.applyFilenameExtension(filename, ".mp4"));
+                        }
+                    }
+                }
+                if (index == urls.length) {
+                    break;
+                }
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            return false;
+        } finally {
+            if (linkcheckerHasFailed) {
+                logger.info("Seems like massLinkcheckerAPI availablecheck is not supported by this host or currently broken");
+            }
+        }
+        if (linkcheckerHasFailed) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     @Override

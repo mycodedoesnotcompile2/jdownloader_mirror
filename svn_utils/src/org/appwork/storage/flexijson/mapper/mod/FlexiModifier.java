@@ -48,6 +48,8 @@ import org.appwork.moncompare.ConditionException;
 import org.appwork.moncompare.Scope;
 import org.appwork.moncompare.TypeHandler;
 import org.appwork.moncompare.typehandler.FlexiTypeHandler;
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
 import org.appwork.storage.flexijson.FlexiComment;
 import org.appwork.storage.flexijson.FlexiJSonArray;
 import org.appwork.storage.flexijson.FlexiJSonComments;
@@ -63,6 +65,7 @@ import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.simplejson.ValueType;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.logging2.LogInterface;
 
 /**
@@ -321,7 +324,7 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
                 this.set(jsPath, value, onlyIfUnset);
             } catch (final Exception e1) {
                 if (this.isBreakOnError(e1)) {
-                    throw MergeException.wrap(e1);
+                    throw Exceptions.addSuppressed(MergeException.wrap(e1), new Exception("Key: " + e.getKey() + "| Value: " + Deser.get().toString(e.getValue(), SC.SINGLE_LINE)));
                 }
             }
         }

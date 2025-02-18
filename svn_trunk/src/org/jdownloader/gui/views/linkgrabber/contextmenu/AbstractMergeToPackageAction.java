@@ -5,10 +5,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.controlling.packagecontroller.PackageController;
-
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
@@ -23,26 +19,51 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.gui.views.components.LocationInList;
+import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
+import org.jdownloader.gui.views.downloads.action.MergeSameNamedPackagesAction;
+import org.jdownloader.plugins.config.Order;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.controlling.packagecontroller.PackageController;
 
 public abstract class AbstractMergeToPackageAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
     /**
      *
      */
-    private static final long serialVersionUID = -4468197802870765463L;
+    private static final long serialVersionUID        = -4468197802870765463L;
+    private boolean           displayNewPackageDialog = true;
+    private boolean           expandNewPackage        = false;
+    private LocationInList    location                = LocationInList.END_OF_LIST;
+    private boolean           lastPathDefault         = false;
+    private boolean           mergeSameNamedPackages  = false;
 
     public AbstractMergeToPackageAction() {
         setName(_GUI.T.MergeToPackageAction_MergeToPackageAction_());
         setIconKey(IconKey.ICON_PACKAGE_NEW);
     }
 
-    private boolean expandNewPackage = false;
+    public static String getTranslationForDisplayNewPackageDialog() {
+        return "Display new package dialog";
+    }
+
+    @Customizer(link = "#getTranslationForDisplayNewPackageDialog")
+    @Order(100)
+    public boolean isDisplayNewPackageDialog() {
+        return displayNewPackageDialog;
+    }
+
+    public void setDisplayNewPackageDialog(boolean displayNewPackageDialog) {
+        this.displayNewPackageDialog = displayNewPackageDialog;
+    }
 
     public static String getTranslationForExpandNewPackage() {
         return _JDT.T.MergeToPackageAction_getTranslationForExpandNewPackage();
     }
 
     @Customizer(link = "#getTranslationForExpandNewPackage")
+    @Order(100)
     public boolean isExpandNewPackage() {
         return expandNewPackage;
     }
@@ -51,13 +72,12 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         this.expandNewPackage = expandNewPackage;
     }
 
-    private boolean lastPathDefault = false;
-
     public static String getTranslationForLastPathDefault() {
         return _JDT.T.MergeToPackageAction_getTranslationForLastPathDefault();
     }
 
     @Customizer(link = "#getTranslationForLastPathDefault")
+    @Order(200)
     public boolean isLastPathDefault() {
         return lastPathDefault;
     }
@@ -66,19 +86,32 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         this.lastPathDefault = lastPathDefault;
     }
 
-    private LocationInList location = LocationInList.END_OF_LIST;
-
     public static String getTranslationForLocation() {
         return _JDT.T.MergeToPackageAction_getTranslationForLocation();
     }
 
     @Customizer(link = "#getTranslationForLocation")
+    @Order(201)
     public LocationInList getLocation() {
         return location;
     }
 
     public void setLocation(LocationInList location) {
         this.location = location;
+    }
+
+    public static String getTranslationForMergeSameNamedPackages() {
+        return _GUI.T.MergeSameNamedPackagesAction_();
+    }
+
+    @Customizer(link = "#getTranslationForMergeSameNamedPackages")
+    @Order(300)
+    public boolean isMergeSameNamedPackages() {
+        return this.mergeSameNamedPackages;
+    }
+
+    public void setMergeSameNamedPackages(final boolean bool) {
+        this.mergeSameNamedPackages = bool;
     }
 
     @Override
@@ -90,35 +123,55 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         if (!isEnabled()) {
             return;
         }
-        NewPackageDialog d = null;
         final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
-        try {
-            d = new NewPackageDialog(sel) {
-                @Override
-                public String getDontShowAgainKey() {
-                    return "ABSTRACTDIALOG_DONT_SHOW_AGAIN_" + AbstractMergeToPackageAction.this.getClass().getSimpleName();
+        String downloadFolder = null;
+        final List<String> history_paths;
+        if (isLastPathDefault() && (history_paths = DownloadPathHistoryManager.getInstance().listPaths((String[]) null)) != null && history_paths.size() > 0) {
+            downloadFolder = history_paths.get(0);
+        } else {
+            downloadFolder = LinkTreeUtils.getRawDownloadDirectory(sel.getFirstPackage()).getAbsolutePath();
+        }
+        final boolean final_mergeSameNamedPackages;
+        final String final_newPackageName;
+        final String final_downloadFolder;
+        if (this.isDisplayNewPackageDialog()) {
+            /*
+             * TODO: Maybe collect list of selected package names in beforehand and hide "merge same named packages" checkbox if packages
+             * already have the same names.
+             */
+            NewPackageDialog d = null;
+            try {
+                d = new NewPackageDialog(sel) {
+                    @Override
+                    public String getDontShowAgainKey() {
+                        return "ABSTRACTDIALOG_DONT_SHOW_AGAIN_" + AbstractMergeToPackageAction.this.getClass().getSimpleName();
+                    }
+                };
+                if (downloadFolder != null) {
+                    d.setDownloadFolder(downloadFolder);
                 }
-            };
-            if (isLastPathDefault()) {
-                List<String> paths = DownloadPathHistoryManager.getInstance().listPaths((String[]) null);
-                if (paths != null && paths.size() > 0) {
-                    d.setDownloadFolder(paths.get(0));
-                }
+                d.setMergeWithSameNamedPackages(Boolean.TRUE.equals(this.isMergeSameNamedPackages()));
+                Dialog.getInstance().showDialog(d);
+            } catch (final DialogNoAnswerException e1) {
+                return;
             }
-            Dialog.getInstance().showDialog(d);
-        } catch (DialogNoAnswerException e1) {
+            final_mergeSameNamedPackages = d.isMergeWithSameNamedPackages();
+            final_newPackageName = d.getName();
+            final_downloadFolder = d.getDownloadFolder();
+        } else {
+            final_mergeSameNamedPackages = Boolean.TRUE.equals(this.isMergeSameNamedPackages());
+            final_newPackageName = sel.getFirstPackage().getName();
+            final_downloadFolder = downloadFolder;
+        }
+        if (StringUtils.isEmpty(final_newPackageName)) {
+            /* New package name cannot be used -> Do nothing */
             return;
         }
-        final String name = d.getName();
-        if (StringUtils.isEmpty(name)) {
-            return;
-        }
-        final String downloadFolder = d.getDownloadFolder();
         final PackageController<PackageType, ChildrenType> controller = sel.getController();
         controller.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                final PackageType newPackage = createNewPackage(name, downloadFolder);
+                final PackageType newPackage = createNewPackage(final_newPackageName, final_downloadFolder);
                 newPackage.setExpanded(isExpandNewPackage());
                 final String packageComment = mergePackageViewListComments(sel.getPackageViews());
                 if (!StringUtils.isEmpty(packageComment)) {
@@ -131,7 +184,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                         index = Math.max(index, controller.indexOf(pv.getPackage()) + 1);
                     }
                     controller.moveOrAddAt(newPackage, sel.getChildren(), 0, index);
-                    return null;
+                    break;
                 case BEFORE_SELECTION:
                     index = Integer.MAX_VALUE;
                     for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
@@ -141,13 +194,18 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                         index = 0;
                     }
                     controller.moveOrAddAt(newPackage, sel.getChildren(), 0, index);
-                    return null;
+                    break;
                 case END_OF_LIST:
                     controller.moveOrAddAt(newPackage, sel.getChildren(), 0, -1);
-                    return null;
+                    break;
                 case TOP_OF_LIST:
                     controller.moveOrAddAt(newPackage, sel.getChildren(), 0, 0);
-                    return null;
+                    break;
+                }
+                if (final_mergeSameNamedPackages) {
+                    final MergeSameNamedPackagesAction mp = new MergeSameNamedPackagesAction();
+                    mp.setMergeAll(true);
+                    mp.actionPerformed(e);
                 }
                 return null;
             }

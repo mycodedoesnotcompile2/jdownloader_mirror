@@ -258,14 +258,17 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         new NonInterruptibleRunnable<Void, IOException>() {
             @Override
             public Void run() throws IOException, InterruptedException {
+                LogV3.info("Execute CTRL Sender for PID " + pid);
                 final Command command = new Command(CrossSystem.getJavaBinary(), "-cp", java.lang.management.ManagementFactory.getRuntimeMXBean().getClassPath(), CTRLSender.class.getName(), pid + "");
                 ProcessOutputHandler po;
                 command.setOutputHandler(po = new ProcessOutputHandler());
                 command.start(true);
                 command.waitFor();
                 LogV3.info(po.getResult().toString());
-                if (po.getResult().getExitCode() != 0) {
-                    throw new IOException("Could not send CTRL");
+                if (po.getResult().getExitCode() == CTRLSender.PROCESS_NOT_FOUND) {
+                    LogV3.info("Process Not Found");
+                } else if (po.getResult().getExitCode() != 0) {
+                    throw new IOException("Could not send CTRL: " + po.getResult().getExitCode());
                 }
                 return null;
             }
@@ -276,15 +279,17 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         try {
             final int length = User32.INSTANCE.GetWindowTextLength(window);
             if (length > 0) {
-                final char[] chars = new char[length];
-                User32.INSTANCE.GetWindowText(window, chars, length);
-                LogV3.info("Close Window Title: " + Native.toString(chars));
+                // terminator
+                final char[] chars = new char[length + 1];
+                User32.INSTANCE.GetWindowText(window, chars, length + 1);
+                LogV3.info("Close Window with Title: " + Native.toString(chars));
             }
         } catch (final RuntimeException e) {
             LogV3.log(e);
         }
+        LogV3.info("Send WM_CLOSE to Window");
         User32.INSTANCE.PostMessage(window, WinUser.WM_CLOSE, new WinDef.WPARAM(0), new WinDef.LPARAM(0));
-        final int error = Kernel32.INSTANCE.GetLastError();
+        // final int error = Kernel32.INSTANCE.GetLastError();
         // System.out.println("PostMessage: " + error);
     }
 
@@ -318,12 +323,14 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
      */
     public boolean terminateRequest(ProcessInfo p) throws IOException {
         final HWND window = findMainWindow(p.getPid());
-        LogV3.info("Close " + p + "/" + window);
+        LogV3.info("Close " + p + " WindowHandle: " + window);
         if (isValid(window)) {
+            LogV3.info("Valid Window Found");
             try {
                 if (!StringUtils.isEmpty(p.getId())) {
                     // check the internal id
                     if (isRunning(p) == false) {
+                        LogV3.info("Process with ID " + p.getId() + " is not running. Exit");
                         return false;
                     }
                 } else {
@@ -334,10 +341,24 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
                 Kernel32.INSTANCE.CloseHandle(window);
             }
         } else {
-            if (isRunning(p) == false) {
-                return false;
+            if (!StringUtils.isEmpty(p.getId())) {
+                // check the internal id
+                if (isRunning(p) == false) {
+                    LogV3.info("Process with ID " + p.getId() + " is not running. Exit");
+                    return false;
+                }
             }
-            this.sendCTRLToPID(p.getPid());
+            LogV3.info("No Window Found");
+            try {
+                this.sendCTRLToPID(p.getPid());
+            } catch (IOException e) {
+                if (!StringUtils.isEmpty(p.getId())) {
+                    if (isRunning(p) == false) {
+                        return true;
+                    }
+                }
+                throw e;
+            }
         }
         return true;
     }
@@ -460,8 +481,13 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         boolean result = true;
         for (ProcessInfo p : proccesses) {
             fill(p);
-            if (terminateRequest(p)) {
-                result = true;
+            try {
+                if (terminateRequest(p)) {
+                    result = true;
+                }
+            } catch (IOException e) {
+                // swallow - we might be successfull with forced
+                LogV3.log(e);
             }
         }
         LogV3.info("Close requested. Wait Timeout " + timeout);

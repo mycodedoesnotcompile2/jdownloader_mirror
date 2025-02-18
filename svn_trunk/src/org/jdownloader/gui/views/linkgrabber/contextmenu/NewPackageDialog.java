@@ -4,10 +4,9 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
 
+import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-
-import jd.gui.swing.jdgui.views.settings.components.FolderChooser;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextField;
@@ -17,11 +16,16 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 
+import jd.gui.swing.jdgui.views.settings.components.FolderChooser;
+
 public class NewPackageDialog extends AbstractDialog<Object> {
     private SelectionInfo<?, ?> selection;
-    private ExtTextField        tf;
-    private FolderChooser       fc;
-    private String              preSet = null;
+    private ExtTextField        packageNameField;
+    private FolderChooser       downloadFolderFolderChooserField;
+    private JCheckBox           mergeCheckbox                             = null;
+    private String              preSetDownloadFolder                      = null;
+    private boolean             preSetMergeWithSameNamedPackages          = false;
+    private boolean             displayCheckboxMergeWithSameNamedPackages = true;
 
     public NewPackageDialog(SelectionInfo<?, ?> selection) {
         super(0, _GUI.T.NewPackageDialog_NewPackageDialog_(), null, null, null);
@@ -29,7 +33,7 @@ public class NewPackageDialog extends AbstractDialog<Object> {
     }
 
     protected int getPreferredWidth() {
-        return Math.min(Math.max(tf.getPreferredSize().width, fc.getPreferredSize().width) * 2, getDialog().getParent().getWidth());
+        return Math.min(Math.max(packageNameField.getPreferredSize().width, downloadFolderFolderChooserField.getPreferredSize().width) * 2, getDialog().getParent().getWidth());
     }
 
     private String getNewName() {
@@ -45,7 +49,7 @@ public class NewPackageDialog extends AbstractDialog<Object> {
 
     @Override
     protected void initFocus(JComponent focus) {
-        super.initFocus(tf);
+        super.initFocus(packageNameField);
     }
 
     @Override
@@ -57,49 +61,73 @@ public class NewPackageDialog extends AbstractDialog<Object> {
     public JComponent layoutDialogContent() {
         MigPanel p = new MigPanel("ins 0,wrap 2", "[][grow,fill]", "[]");
         p.add(new JLabel(_GUI.T.NewPackageDialog_layoutDialogContent_newname_()));
-        tf = new ExtTextField();
-        tf.setText(getNewName());
-        p.add(tf);
+        packageNameField = new ExtTextField();
+        packageNameField.setText(getNewName());
+        p.add(packageNameField);
         p.add(new JLabel(_GUI.T.NewPackageDialog_layoutDialogContent_saveto()));
-        fc = new FolderChooser();
+        downloadFolderFolderChooserField = new FolderChooser();
         File path = null;
-        if (StringUtils.isNotEmpty(preSet)) {
-            fc.setText(preSet);
+        if (StringUtils.isNotEmpty(preSetDownloadFolder)) {
+            downloadFolderFolderChooserField.setText(preSetDownloadFolder);
         } else {
             path = LinkTreeUtils.getRawDownloadDirectory(selection.getFirstPackage());
             if (path != null) {
-                fc.setText(path.getAbsolutePath());
+                downloadFolderFolderChooserField.setText(path.getAbsolutePath());
             }
         }
-        p.add(fc, "pushx,growx");
+        p.add(downloadFolderFolderChooserField, "pushx,growx");
+        if (displayCheckboxMergeWithSameNamedPackages) {
+            mergeCheckbox = new JCheckBox(_GUI.T.MergeSameNamedPackagesAction_());
+            mergeCheckbox.setSelected(preSetMergeWithSameNamedPackages);
+            p.add(mergeCheckbox, "span 2");
+        }
         return p;
     }
 
     @Override
     protected void packed() {
-        tf.addFocusListener(new FocusListener() {
+        packageNameField.addFocusListener(new FocusListener() {
             @Override
             public void focusLost(FocusEvent e) {
             }
 
             @Override
             public void focusGained(FocusEvent e) {
-                tf.selectAll();
+                packageNameField.selectAll();
             }
         });
-        this.tf.requestFocusInWindow();
-        this.tf.selectAll();
+        this.packageNameField.requestFocusInWindow();
+        this.packageNameField.selectAll();
     }
 
     public String getName() {
-        return tf.getText();
+        return packageNameField.getText();
     }
 
     public void setDownloadFolder(String path) {
-        preSet = path;
+        preSetDownloadFolder = path;
     }
 
     public String getDownloadFolder() {
-        return fc.getText();
+        return downloadFolderFolderChooserField.getText();
+    }
+
+    public boolean isMergeWithSameNamedPackages() {
+        if (mergeCheckbox != null) {
+            return mergeCheckbox.isSelected();
+        } else {
+            return this.preSetMergeWithSameNamedPackages;
+        }
+    }
+
+    public void setMergeWithSameNamedPackages(boolean merge) {
+        this.preSetMergeWithSameNamedPackages = merge;
+        if (mergeCheckbox != null) {
+            mergeCheckbox.setSelected(merge);
+        }
+    }
+
+    public void setDisplayCheckboxMergeWithSameNamedPackages(boolean display) {
+        this.displayCheckboxMergeWithSameNamedPackages = display;
     }
 }

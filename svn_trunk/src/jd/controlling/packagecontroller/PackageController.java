@@ -15,8 +15,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
-
 import org.appwork.utils.ModifyLock;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -31,6 +29,8 @@ import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerSelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.dragdrop.MergePosition;
 import org.jdownloader.logging.LogController;
+
+import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
 
 public abstract class PackageController<PackageType extends AbstractPackageNode<ChildType, PackageType>, ChildType extends AbstractPackageChildrenNode<PackageType>> implements AbstractNodeNotifier {
     protected final AtomicLong structureChanged = new AtomicLong(System.currentTimeMillis());
@@ -558,12 +558,15 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
     }
 
     /**
-     * This class describes, how a "merge packages" action shall behave. </br> Examples of what it can influence: </br> - position of merged
-     * items </br> - shall package comments be merged or not </br>
+     * This class describes, how a "merge packages" action shall behave. </br>
+     * Examples of what it can influence: </br>
+     * - position of merged items </br>
+     * - shall package comments be merged or not </br>
      */
     public final static class MergePackageSettings {
-        private MergePosition mergeposition        = null;
-        private Boolean       mergePackageComments = null;
+        private MergePosition mergeposition          = null;
+        private Boolean       mergePackageComments   = null;
+        private Boolean       mergeSameNamedPackages = Boolean.FALSE;
 
         public MergePackageSettings() {
             setMergePosition(null);
@@ -590,6 +593,18 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         public MergePackageSettings setMergePackageComments(Boolean mergePackageComments) {
             this.mergePackageComments = mergePackageComments;
             return this;
+        }
+
+        public Boolean getMergeSameNamedPackages() {
+            return mergeSameNamedPackages;
+        }
+
+        public void setMergeSameNamedPackages(Boolean mergeSameNamedPackages) {
+            if (mergeSameNamedPackages == null) {
+                mergeSameNamedPackages = Boolean.FALSE;
+            } else {
+                this.mergeSameNamedPackages = mergeSameNamedPackages;
+            }
         }
     }
 
@@ -812,7 +827,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     /* remove all */
                     /*
                      * TODO: speed optimization, we have to correct the index to match changes in children structure
-                     * 
+                     *
                      * TODO: optimize this loop. only process existing links in this package
                      */
                     for (final ChildType child : elementsToMove) {
@@ -1037,8 +1052,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
     }
 
     /**
-     * Returns packages with identical name and download path. </br> Those are packages you would typically want to merge in other
-     * functions.
+     * Returns packages with identical name and download path. </br>
+     * Those are packages you would typically want to merge in other functions.
      */
     public final Map<String, List<PackageType>> getPackagesWithSameName(final boolean case_insensitive) {
         final boolean readL = this.readLock();
@@ -1171,47 +1186,48 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
 
     public void sort(final PackageControllerComparator<AbstractNode> comparator, final boolean sortChildren) {
         this.sorter = comparator;
-        if (comparator != null) {
-            QUEUE.add(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected Void run() throws RuntimeException {
-                    final ArrayList<PackageType> lpackages = getPackagesCopy();
-                    try {
-                        Collections.sort(lpackages, comparator);
-                    } catch (final Throwable e) {
-                        LogController.CL(true).log(e);
-                    }
-                    boolean sortChildrenChanged = sortChildren;
-                    if (sortChildrenChanged) {
-                        sortChildrenChanged = false;
-                        try {
-                            for (final PackageType pkg : lpackages) {
-                                sortChildrenChanged |= _sortPackageChildren(pkg, comparator);
-                            }
-                        } finally {
-                            if (sortChildrenChanged) {
-                                structureChanged.set(backendChanged.incrementAndGet());
-                            }
-                        }
-                    }
-                    writeLock();
-                    try {
-                        getPackages().clear();
-                        getPackages().addAll(lpackages);
-                    } finally {
-                        writeUnlock();
-                    }
-                    structureChanged.set(backendChanged.incrementAndGet());
-                    if (sortChildrenChanged) {
-                        for (final PackageType pkg : lpackages) {
-                            _controllerPackageNodeStructureChanged(pkg, this.getQueuePrio());
-                        }
-                    }
-                    _controllerStructureChanged(this.getQueuePrio());
-                    return null;
-                }
-            });
+        if (comparator == null) {
+            return;
         }
+        QUEUE.add(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                final ArrayList<PackageType> lpackages = getPackagesCopy();
+                try {
+                    Collections.sort(lpackages, comparator);
+                } catch (final Throwable e) {
+                    LogController.CL(true).log(e);
+                }
+                boolean sortChildrenChanged = sortChildren;
+                if (sortChildrenChanged) {
+                    sortChildrenChanged = false;
+                    try {
+                        for (final PackageType pkg : lpackages) {
+                            sortChildrenChanged |= _sortPackageChildren(pkg, comparator);
+                        }
+                    } finally {
+                        if (sortChildrenChanged) {
+                            structureChanged.set(backendChanged.incrementAndGet());
+                        }
+                    }
+                }
+                writeLock();
+                try {
+                    getPackages().clear();
+                    getPackages().addAll(lpackages);
+                } finally {
+                    writeUnlock();
+                }
+                structureChanged.set(backendChanged.incrementAndGet());
+                if (sortChildrenChanged) {
+                    for (final PackageType pkg : lpackages) {
+                        _controllerPackageNodeStructureChanged(pkg, this.getQueuePrio());
+                    }
+                }
+                _controllerStructureChanged(this.getQueuePrio());
+                return null;
+            }
+        });
     }
 
     public PackageType getPackageByID(long longID) {

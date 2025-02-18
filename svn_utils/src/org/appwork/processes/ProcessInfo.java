@@ -149,7 +149,7 @@ public class ProcessInfo {
      */
     @Override
     public String toString() {
-        return "Process " + getPid() + " " + getCommandLine() + " Started: " + DateMapper.formatJsonDefault(getCreationTime());
+        return "Process PID:'" + getPid() + "' CMD:'" + getCommandLine() + "' Started: " + DateMapper.formatJsonDefault(getCreationTime());
     }
 
     /**

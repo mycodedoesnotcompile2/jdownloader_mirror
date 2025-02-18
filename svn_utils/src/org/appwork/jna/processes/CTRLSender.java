@@ -3,13 +3,13 @@
  */
 package org.appwork.jna.processes;
 
+import org.appwork.builddecision.BuildDecisions;
 import org.appwork.jna.windows.Kernel32Ext;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.simple.SimpleLoggerFactory;
 import org.appwork.loggingv3.simple.sink.LogToStdOutSink;
 import org.appwork.utils.Application;
 
-import com.sun.jna.LastErrorException;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.ptr.IntByReference;
@@ -21,20 +21,20 @@ public class CTRLSender {
     /**
      *
      */
-    private static final int EXCEPTIOn         = 2;
+    public static final int EXCEPTION         = 2;
     /**
      *
      */
-    private static final int PROCESS_NOT_FOUND = 1;
+    public static final int PROCESS_NOT_FOUND = 1;
 
     public static void main(final String[] args) {
+        BuildDecisions.setEnabled(false);
+        final int pid = Integer.parseInt(args[0]);
         try {
             Application.setApplication(".AppWorkUtils");
-            System.out.println("I'm a helper process");
             final SimpleLoggerFactory fac = new SimpleLoggerFactory();
             fac.addSink(new LogToStdOutSink());
             LogV3.setFactory(fac);
-            final int pid = Integer.parseInt(args[0]);
             // free console, because we cannot attach to multiple consoles
             // https://blog.codetitans.pl/post/sending-ctrl-c-signal-to-another-application-on-windows/
             // this
@@ -89,7 +89,8 @@ public class CTRLSender {
                     } else {
                         final int error = Kernel32.INSTANCE.GetLastError();
                         if (error != 0) {
-                            throw new LastErrorException(error);
+                            LogV3.info("Last Error: " + error);
+                            throw new com.sun.jna.platform.win32.Win32Exception(error);
                         }
                     }
                 } finally {
@@ -98,7 +99,7 @@ public class CTRLSender {
             }
         } catch (final Throwable e) {
             LogV3.log(e);
-            System.exit(EXCEPTIOn);
+            System.exit(EXCEPTION);
         }
     }
 }

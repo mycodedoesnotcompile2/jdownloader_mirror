@@ -21,16 +21,14 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
 @HostPlugin(revision = "$Revision: 50645 $", interfaceVersion = 3, names = {}, urls = {})
-public class BigwarpIo extends XFileSharingProBasic {
-    public BigwarpIo(final PluginWrapper wrapper) {
+public class DesiuploadCo extends XFileSharingProBasic {
+    public DesiuploadCo(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -45,7 +43,7 @@ public class BigwarpIo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bigwarp.io" });
+        ret.add(new String[] { "desiupload.co" });
         return ret;
     }
 
@@ -105,32 +103,5 @@ public class BigwarpIo extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected boolean isVideohoster_enforce_video_filename() {
-        return true;
-    }
-
-    @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br) {
-        if (br.containsHTML(">\\s*File is no longer available")) {
-            return true;
-        } else if (br.containsHTML("name=\"file_code\" value=\"\"")) {
-            /* Embed page with empty file_code in form -> Offline/broken link */
-            return true;
-        } else {
-            return super.isOffline(link, br);
-        }
-    }
-
-    @Override
-    public String[] scanInfo(final String html, final String[] fileInfo) {
-        super.scanInfo(html, fileInfo);
-        final String betterFilename = br.getRegex("<th colspan=2>Download ([^<]+)</th>").getMatch(0);
-        if (betterFilename != null) {
-            fileInfo[0] = Encoding.htmlDecode(betterFilename).trim();
-        }
-        return fileInfo;
     }
 }

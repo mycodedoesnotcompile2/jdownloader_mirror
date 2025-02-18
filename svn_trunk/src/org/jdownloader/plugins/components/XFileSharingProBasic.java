@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50644 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -5693,7 +5693,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
                 final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("result");
                 for (final DownloadLink link : apiLinkcheckLinks) {
-                    Map<String, Object> fileInfo = null;
+                    Map<String, Object> fileinfo = null;
                     final String thisFUID = this.getFUIDFromURL(link);
                     for (final Map<String, Object> fileInfoTmp : ressourcelist) {
                         String fuid_temp = (String) fileInfoTmp.get("filecode");
@@ -5702,11 +5702,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                             fuid_temp = (String) fileInfoTmp.get("file_code");
                         }
                         if (StringUtils.equals(fuid_temp, thisFUID)) {
-                            fileInfo = fileInfoTmp;
+                            fileinfo = fileInfoTmp;
                             break;
                         }
                     }
-                    if (fileInfo == null) {
+                    if (fileinfo == null) {
                         /**
                          * This should never happen. Possible reasons: <br>
                          * - Wrong APIKey <br>
@@ -5719,7 +5719,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         continue;
                     }
                     /* E.g. check for "result":[{"status":404,"filecode":"xxxxxxyyyyyy"}] */
-                    final int status = ((Number) fileInfo.get("status")).intValue();
+                    final int status = ((Number) fileinfo.get("status")).intValue();
                     if (!link.isNameSet()) {
                         setWeakFilename(link, null);
                     }
@@ -5729,15 +5729,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         link.setAvailable(false);
                     } else {
                         link.setAvailable(true);
-                        filename = (String) fileInfo.get("name");
+                        filename = (String) fileinfo.get("name");
                         if (StringUtils.isEmpty(filename)) {
-                            filename = (String) fileInfo.get("file_title");
+                            filename = (String) fileinfo.get("file_title");
                         }
-                        final long filesize = JavaScriptEngineFactory.toLong(fileInfo.get("size"), 0);
-                        final Object canplay = fileInfo.get("canplay");
-                        final Object views_started = fileInfo.get("views_started");
-                        final Object views = fileInfo.get("views");
-                        final Object length = fileInfo.get("length");
+                        final long filesize = JavaScriptEngineFactory.toLong(fileinfo.get("size"), 0);
+                        final Object canplay = fileinfo.get("canplay");
+                        final Object views_started = fileinfo.get("views_started");
+                        final Object views = fileinfo.get("views");
+                        final Object length = fileinfo.get("length");
                         isVideohost = canplay != null || views_started != null || views != null || length != null;
                         /* Filesize is not always given especially not for videohosts. */
                         if (filesize > 0) {

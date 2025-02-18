@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 50521 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50645 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -434,7 +434,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                  * This can only happen on special file information page! </br>
                  * Some websites enforce a specific language so there is no other way but to add traits for multiple languages.
                  */
-                if (br.containsHTML(">\\s*Status\\s*:?\\s*</[^>]*>\\s*<[^>]*>\\s*(Deleted|Usunięto|Silindi|Çöp)\\s*</")) {
+                if (br.containsHTML(">\\s*Status\\s*:?\\s*</[^>]*>\\s*<[^>]*>\\s*(Deleted|Usunięto|Usunięty|Silindi|Çöp)\\s*</")) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             } else {
@@ -552,7 +552,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
              */
             String betterFilename = br.getRegex("(?i)>\\s*File Page Link\\s*</span>\\s*<pre>https?://[^/]+/[A-Za-z0-9]+/([^<]+)</pre>").getMatch(0);
             if (betterFilename == null) {
-                betterFilename = br.getRegex("(?i)>\\s*(?:Information about|Informação sobre|Informacja o) \"([^\"]+)\"\\s*<").getMatch(0);
+                betterFilename = br.getRegex("(?i)>\\s*(?:Information about|Informação sobre|Informacja o|Nazwa pliku) \"([^\"]+)\"\\s*<").getMatch(0);
             }
             if (betterFilename != null) {
                 fileInfo[0] = betterFilename;

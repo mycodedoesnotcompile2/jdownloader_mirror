@@ -40,13 +40,13 @@ package org.appwork.utils;
  *
  */
 public class Timeout {
-    private int  ms;
+    private long ms;
     private long started;
 
     /**
      * @param i
      */
-    public Timeout(int ms) {
+    public Timeout(long ms) {
         this.ms = ms;
         reset();
     }
