@@ -32,7 +32,6 @@ import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 import org.jdownloader.plugins.components.config.DropBoxConfig;
-import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -60,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50641 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 50650 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,11 +70,6 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
-    }
-
-    @Override
-    public Class<? extends PluginConfigInterface> getConfigInterface() {
-        return DropBoxConfig.class;
     }
 
     private static final String TYPES_NORMAL              = "(?i)https?://[^/]+/(sh|s|sc|scl)/.+";
@@ -175,8 +169,10 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             return ret;
         }
         /* File/folder */
-        /* Correct aded URL. */
+        /* Correct added URL. */
         contentURL = contentURL.replaceFirst("(?i)dl\\.dropboxusercontent\\.com/", this.getHost() + "/");
+        /* Avoid immediate redirect to file content (we want to have the html page). */
+        contentURL = contentURL.replaceAll("(?i)dl=1", "dl=0");
         /*
          * 2019-09-24: isSingleFile may sometimes be wrong but if our URL contains 'crawl_subfolders=' we know it has been added via crawler
          * and it is definitely a folder and not a file!
@@ -210,24 +206,6 @@ public class DropBoxComCrawler extends PluginForDecrypt {
              * 2023: Unsure whether this case can still happen.
              */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final boolean tryPasswordProtectedWorkaround = false;
-        pwWorkaround: if (!DropboxCom.isPasswordProtectedWebsite(br) && tryPasswordProtectedWorkaround) {
-            /*
-             * 2024-11-25: Workaround to find out if a folder is password protected without the need to decrypt Dropbox' GRPC json, see:
-             * https://svn.jdownloader.org/issues/90376
-             */
-            final UrlQuery query = UrlQuery.parse(br.getURL());
-            /* Important: This parameter is required but the content of it doesn't matter. */
-            query.appendEncoded("content_id", "xxxyyy");
-            String pathWithParams = br._getURL().getPath();
-            if (br.getURL().contains("?")) {
-                final String paramsStr = br.getURL().substring(br.getURL().lastIndexOf("?") + 1);
-                pathWithParams += "?" + paramsStr;
-            }
-            String pwurl = "https://www.dropbox.com/sm/password?cont=" + Encoding.urlEncode(pathWithParams);
-            pwurl += "&content_id=xxxyyy";
-            br.getPage(pwurl);
         }
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -278,7 +256,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             this.sleep(waitSeconds * 1000, param);
             br.getPage(contentURL);
         }
-        final String edison_page_name = br.getRegex("edison_page_name=([\\w\\-]+)").getMatch(0);
+        final String edison_page_name = br.getRegex("edison_page_name(?:=|:)([\\w\\-]+)").getMatch(0);
         final String dws_page_name = br.getRegex("dws_page_name=([\\w\\-]+)").getMatch(0);
         if (StringUtils.equals(edison_page_name, "shared_link_deleted")) {
             /* Item was deleted */
@@ -897,56 +875,8 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         return new DownloadLink(hosterPlugin, null, this.getHost(), url, true);
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
-    }
-
-    private Thread recommendAPIUsage() {
-        final long display_dialog_every_x = 1 * 60 * 60 * 1000l;
-        final long timestamp_last_time_displayed = this.getPluginConfig().getLongProperty("timestamp_last_time_displayed", 0);
-        final long timestamp_display_dialog_next_time = timestamp_last_time_displayed + display_dialog_every_x;
-        final long waittime_until_next_dialog_display = timestamp_display_dialog_next_time - System.currentTimeMillis();
-        if (waittime_until_next_dialog_display > 0) {
-            /* Do not display dialog this time - we do not want to annoy our users. */
-            logger.info("Not displaying dialog now - waittime until next display: " + waittime_until_next_dialog_display);
-            return null;
-        }
-        this.getPluginConfig().setProperty("timestamp_last_time_displayed", System.currentTimeMillis());
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = "Dropbox - bitte die API verwenden";
-                        message += "Hallo liebe(r) Dropbox NutzerIn\r\n";
-                        message += "Unser Dropbox Plugin verwendet die Dropbox Webseite sofern du keinen Dropbox Account eingetragen hast.\r\n";
-                        message += "Leider ist dieser Weg manchmal unzuverlässig.\r\n";
-                        message += "Falls soeben nicht alle Dateien und (Unter-)Ordner gefunden wurden, trage einen kostenlosen Dropbox Account in JDownloader ein und füge die Links erneut hinzu.\r\n";
-                        message += "Dies ist keine Werbung! Leider können wir die zuverlässigere Dropbox Schnittstelle nur über registrierte Nutzeraccounts ansprechen.\r\n";
-                        message += "Dropbox Accounts sind kostenlos. Es werden weder ein Abonnement- noch Zahlungsdfaten benötigt!\r\n";
-                        message += "Falls du trotz eingetragenem Dropbox Account Probleme hast, kontaktiere bitte unseren Support!\r\n";
-                    } else {
-                        title = "Dropbox - recommendation to use API";
-                        message += "Hello dear Dropbox user\r\n";
-                        message += "Our Dropbox plugin is using the Dropbox website to find files- and (sub-)folders as long as no (Free) Account is added to JDownloader.\r\n";
-                        message += "The Website handling may be unreliable sometimes!\r\n";
-                        message += "If our plugin was unable to find all files- and (sub-)folders, add your free Dropbox account to JDownloader and re-add your URLs afterwards.\r\n";
-                        message += "This is NOT and advertisement! Sadly the more reliable Dropbox API can only be used by registered users!\r\n";
-                        message += "In case you are still experiencing issues even after adding a Dropbox account, please contact our support!\r\n";
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(3 * 60 * 1000);
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
     }
 }

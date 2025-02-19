@@ -41,12 +41,12 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.RomHustlerCrawler;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50648 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { RomHustlerCrawler.class })
 public class RomHustler extends PluginForHost {
     public RomHustler(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.romhustler.org/user/sign-up");
+        this.enablePremium("https://www." + getHost() + "/user/sign-up");
     }
 
     public static List<String[]> getPluginDomains() {
@@ -77,7 +77,7 @@ public class RomHustler extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://romhustler.org/disclaimer";
+        return "https://" + getHost() + "/disclaimer";
     }
 
     @Override
@@ -98,7 +98,7 @@ public class RomHustler extends PluginForHost {
     public String getLinkID(final DownloadLink link) {
         final String contentID = getInternalContentID(link);
         if (contentID != null) {
-            return this.getHost() + "://" + this.getPartPosition(link);
+            return this.getHost() + "://contentID/" + contentID + "/partPosition/" + this.getPartPosition(link);
         } else {
             return super.getLinkID(link);
         }
@@ -156,14 +156,6 @@ public class RomHustler extends PluginForHost {
 
     private String getPartsDownloadOverviewURL(final DownloadLink link) {
         return link.getStringProperty(PROPERTY_PARTS_OVERVIEW_URL);
-    }
-
-    private boolean isLoggedIn(final Browser br) {
-        if (br.containsHTML("/user/logout")) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     @Override
@@ -257,21 +249,6 @@ public class RomHustler extends PluginForHost {
 
     private int getPartPosition(final DownloadLink link) {
         return link.getIntegerProperty(PROPERTY_POSITION, 0);
-    }
-
-    @Deprecated
-    private boolean isSplitPartInPosHigherThanZero(final DownloadLink link) {
-        if (link.getBooleanProperty("splitlink", false)) {
-            /* Legacy compatibility */
-            return true;
-        } else {
-            final int position = link.getIntegerProperty(PROPERTY_POSITION, -1);
-            if (position > 0) {
-                return true;
-            } else {
-                return false;
-            }
-        }
     }
 
     @Override

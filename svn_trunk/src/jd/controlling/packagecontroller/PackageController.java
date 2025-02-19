@@ -564,14 +564,17 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
      * - shall package comments be merged or not </br>
      */
     public final static class MergePackageSettings {
-        private MergePosition mergeposition          = null;
-        private Boolean       mergePackageComments   = null;
-        private Boolean       mergeSameNamedPackages = Boolean.FALSE;
+        private MergePosition mergeposition                         = null;
+        private Boolean       mergePackageComments                  = Boolean.TRUE;
+        private Boolean       mergeSameNamedPackages                = Boolean.FALSE;
+        private Boolean       expandPackage                         = Boolean.FALSE;
+        private Boolean       mergeSameNamedPackagesCaseInsensitive = Boolean.FALSE;
 
         public MergePackageSettings() {
             setMergePosition(null);
         }
 
+        /** This can return null! */
         public MergePosition getMergePosition() {
             return mergeposition;
         }
@@ -591,7 +594,11 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         }
 
         public MergePackageSettings setMergePackageComments(Boolean mergePackageComments) {
-            this.mergePackageComments = mergePackageComments;
+            if (mergePackageComments == null) {
+                this.mergePackageComments = Boolean.TRUE;
+            } else {
+                this.mergePackageComments = mergePackageComments;
+            }
             return this;
         }
 
@@ -606,6 +613,58 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 this.mergeSameNamedPackages = mergeSameNamedPackages;
             }
         }
+
+        public Boolean getExpandPackage() {
+            return expandPackage;
+        }
+
+        public void setExpandPackage(Boolean expandPackage) {
+            if (expandPackage == null) {
+                expandPackage = Boolean.FALSE;
+            } else {
+                this.expandPackage = expandPackage;
+            }
+        }
+
+        public Boolean getMergeSameNamedPackagesCaseInsensitive() {
+            return mergeSameNamedPackagesCaseInsensitive;
+        }
+
+        public void setMergeSameNamedPackagesCaseInsensitive(Boolean mergeSameNamedPackagesCaseInsensitive) {
+            if (mergeSameNamedPackagesCaseInsensitive == null) {
+                mergeSameNamedPackagesCaseInsensitive = Boolean.FALSE;
+            } else {
+                this.mergeSameNamedPackagesCaseInsensitive = mergeSameNamedPackagesCaseInsensitive;
+            }
+        }
+    }
+
+    public void mergeSameNamedPackages(final List<PackageType> selectedPackages, final MergePackageSettings mergesettings) {
+        // final Map<String, List<PackageType>> dupes;
+        // if (selectedPackages == null) {
+        // /* Merge dupes within all packages */
+        // dupes = getPackagesWithSameName(selectedPackages, mergesettings);
+        // } else {
+        // /* Merge dupes within selection */
+        // dupes = getPackagesWithSameName(selectedPackages, mergesettings);
+        // }
+        // if (dupes.isEmpty()) {
+        // /* Zero results -> Do nothing */
+        // return;
+        // }
+        // final Iterator<Entry<String, List<PackageType>>> dupes_iterator = dupes.entrySet().iterator();
+        // while (dupes_iterator.hasNext()) {
+        // final Entry<String, List<PackageType>> entry = dupes_iterator.next();
+        // final List<PackageType> thisdupes = entry.getValue();
+        // if (thisdupes.size() == 1) {
+        // /* We need at least two packages to be able to merge them. */
+        // continue;
+        // }
+        // /* Pick package to merge the others into */
+        // final PackageType target = thisdupes.remove(0);
+        // merge(target, thisdupes, mergesettings);
+        // }
+        merge(null, null, selectedPackages, mergesettings);
     }
 
     public void merge(final PackageType dest, final List<PackageType> srcPkgs, final MergePackageSettings mergesettings) {
@@ -613,14 +672,47 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
     }
 
     public void merge(final PackageType dest, final List<ChildType> srcLinks, final List<PackageType> srcPkgs, final MergePackageSettings mergesettings) {
-        if (dest == null) {
-            return;
-        } else if (srcLinks == null && srcPkgs == null) {
-            return;
+        if (mergesettings == null) {
+            throw new IllegalArgumentException();
+        }
+        if (mergesettings.getMergeSameNamedPackages()) {
+            if (srcPkgs != null && srcPkgs.isEmpty()) {
+                return;
+            }
+        } else {
+            if (dest == null) {
+                return;
+            } else if (srcLinks == null && srcPkgs == null) {
+                return;
+            }
         }
         QUEUE.add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
+                if (mergesettings.getMergeSameNamedPackages()) {
+                    final Map<String, List<PackageType>> dupes = getPackagesWithSameName(srcPkgs, mergesettings);
+                    if (dupes.isEmpty()) {
+                        /* Zero results -> Do nothing */
+                        return null;
+                    }
+                    /* Avoid endless loop as we call this function again. */
+                    mergesettings.setMergeSameNamedPackages(false);
+                    final Iterator<Entry<String, List<PackageType>>> dupes_iterator = dupes.entrySet().iterator();
+                    while (dupes_iterator.hasNext()) {
+                        final Entry<String, List<PackageType>> entry = dupes_iterator.next();
+                        final List<PackageType> thisdupes = entry.getValue();
+                        if (thisdupes.size() == 1) {
+                            /* We need at least two packages to be able to merge them. */
+                            continue;
+                        }
+                        /* Merge all duplicates into first package */
+                        final PackageType target = thisdupes.remove(0);
+                        /* Call this function in a recursive way. */
+                        merge(target, thisdupes, mergesettings);
+                    }
+                    /* End */
+                    return null;
+                }
                 int positionMerge = 0;
                 switch (mergesettings.getMergePosition()) {
                 case BOTTOM:
@@ -643,7 +735,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 if (srcPkgs != null) {
                     for (final PackageType pkg : srcPkgs) {
                         /* move links from srcPkgs to dest */
-                        int size = pkg.getChildren().size();
+                        final int size = pkg.getChildren().size();
                         moveOrAddAt(dest, pkg.getChildren(), positionMerge);
                         if (positionMerge != -1) {
                             /* update positionMerge in case we want merge@top */
@@ -653,8 +745,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     if (Boolean.TRUE.equals(mergesettings.getMergePackageComments())) {
                         final HashSet<String> commentDups = new HashSet<String>();
                         /* Merge package comments */
-                        /* Place main package at beginning of list so that comment of it is placed first in our merged comment string. */
                         final StringBuilder sb = new StringBuilder();
+                        /* Place main package at beginning of list so that comment of it is placed first in our merged comment string. */
                         srcPkgs.add(0, dest);
                         for (final PackageType pkg : srcPkgs) {
                             final String comment = pkg.getComment();
@@ -1053,37 +1145,53 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
 
     /**
      * Returns packages with identical name and download path. </br>
-     * Those are packages you would typically want to merge in other functions.
+     * Those are packages you would typically want to merge in other functions. <br>
+     *
+     * @param packages:
+     *            List of packages that are allowed to be merged or null if duplicate merging should be done on whole
+     *            linkgrabberlist/downloadlist.
      */
-    public final Map<String, List<PackageType>> getPackagesWithSameName(final boolean case_insensitive) {
+    public final Map<String, List<PackageType>> getPackagesWithSameName(final List<PackageType> packages, final MergePackageSettings settings) {
         final boolean readL = this.readLock();
         try {
-            return getPackagesWithSameName(this.getPackages(), case_insensitive);
+            final boolean case_insensitive = settings.getMergeSameNamedPackagesCaseInsensitive();
+            HashSet<String> dupesSelection = null;
+            if (packages != null) {
+                /* Only return duplicates within a list of pre selected packages. */
+                dupesSelection = new HashSet<String>();
+                for (final PackageType packageNode : this.getPackages()) {
+                    String packagename = packageNode.getName();
+                    if (case_insensitive) {
+                        packagename = packagename.toLowerCase(Locale.ENGLISH);
+                    }
+                    dupesSelection.add(packagename);
+                }
+            }
+            final Map<String, List<PackageType>> dupes = new HashMap<String, List<PackageType>>();
+            for (final PackageType packageNode : this.getPackages()) {
+                String packagename = packageNode.getName();
+                if (case_insensitive) {
+                    packagename = packagename.toLowerCase(Locale.ENGLISH);
+                }
+                if (dupesSelection != null && !dupesSelection.contains(packagename)) {
+                    continue;
+                }
+                String downloaddestination = LinkTreeUtils.getDownloadDirectory(packageNode).getPath();
+                if (downloaddestination != null && CrossSystem.isWindows()) {
+                    downloaddestination = downloaddestination.toLowerCase(Locale.ENGLISH);
+                }
+                final String compareString = packagename + downloaddestination;
+                List<PackageType> thisdupeslist = dupes.get(compareString);
+                if (thisdupeslist == null) {
+                    thisdupeslist = new ArrayList<PackageType>();
+                    dupes.put(compareString, thisdupeslist);
+                }
+                thisdupeslist.add(packageNode);
+            }
+            return dupes;
         } finally {
             this.readUnlock(readL);
         }
-    }
-
-    public final Map<String, List<PackageType>> getPackagesWithSameName(final List<PackageType> packages, final boolean case_insensitive) {
-        final Map<String, List<PackageType>> dupes = new HashMap<String, List<PackageType>>();
-        for (final PackageType packageNode : this.getPackages()) {
-            String packagename = packageNode.getName();
-            if (case_insensitive) {
-                packagename = packagename.toLowerCase(Locale.ENGLISH);
-            }
-            String downloaddestination = LinkTreeUtils.getDownloadDirectory(packageNode).getPath();
-            if (downloaddestination != null && CrossSystem.isWindows()) {
-                downloaddestination = downloaddestination.toLowerCase(Locale.ENGLISH);
-            }
-            final String compareString = packagename + downloaddestination;
-            List<PackageType> thisdupeslist = dupes.get(compareString);
-            if (thisdupeslist == null) {
-                thisdupeslist = new ArrayList<PackageType>();
-                dupes.put(compareString, thisdupeslist);
-            }
-            thisdupeslist.add(packageNode);
-        }
-        return dupes;
     }
 
     @Deprecated

@@ -54,7 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 50504 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50650 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -295,8 +295,14 @@ public class SankakucomplexCom extends PluginForHost {
         if (account != null) {
             this.login(account, false);
         }
-        br.getPage(SankakucomplexComCrawler.API_BASE + "/posts?lang=en&page=1&limit=1&tags=id_range:" + fileID);
-        final Object obj = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        final Browser brc = this.createNewBrowserInstance();
+        brc.setAllowedResponseCodes(400);
+        brc.getPage(SankakucomplexComCrawler.API_BASE + "/posts?lang=en&page=1&limit=1&tags=id_range:" + fileID);
+        if (brc.getHttpConnection().getResponseCode() == 400) {
+            /* {"success":false,"code":"invalid id","error":"invalid id","errorId":"error_<someHash>"} */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Object obj = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.OBJECT);
         if (obj instanceof Map) {
             /* We only get a map if something went wrong. */
             final Map<String, Object> errormap = (Map<String, Object>) obj;
@@ -304,7 +310,7 @@ public class SankakucomplexCom extends PluginForHost {
             if (StringUtils.equalsIgnoreCase(errorcode, "snackbar__content-belongs-to-premium-client")) {
                 link.setProperty(PROPERTY_IS_PREMIUMONLY, true);
                 return AvailableStatus.TRUE;
-            } else if (br.getHttpConnection().getResponseCode() == 404) {
+            } else if (brc.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "API error: " + errorcode);

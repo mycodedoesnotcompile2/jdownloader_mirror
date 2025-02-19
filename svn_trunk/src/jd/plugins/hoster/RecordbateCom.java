@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50648 $", interfaceVersion = 3, names = {}, urls = {})
 public class RecordbateCom extends PluginForHost {
     public RecordbateCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,7 +123,7 @@ public class RecordbateCom extends PluginForHost {
              * Every accessing of this URL will count toward their download-limit. </br>
              * This is a measure to avoid this because we can expect those links to be online.
              */
-            return AvailableStatus.TRUE;
+            return AvailableStatus.UNCHECKABLE;
         }
         this.setBrowserExclusive();
         if (account != null) {
@@ -171,6 +171,11 @@ public class RecordbateCom extends PluginForHost {
             if (StringUtils.isEmpty(dllink)) {
                 if (br.getURL().matches("https?://[^/]+/upgrade")) {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Reached daily downloadlimit");
+                } else if (br.getHttpConnection().getResponseCode() == 400) {
+                    /*
+                     * Example: https://recordbate.com/videos/sexycreolyta4u1728321213
+                     */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }

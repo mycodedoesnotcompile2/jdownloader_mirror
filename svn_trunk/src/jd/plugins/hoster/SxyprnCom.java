@@ -30,7 +30,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50636 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
+@HostPlugin(revision = "$Revision: 50650 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
 public class SxyprnCom extends antiDDoSForHost {
     public SxyprnCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,14 +171,16 @@ public class SxyprnCom extends antiDDoSForHost {
      * -> Function getvsrc()
      */
     private String getDllink(final DownloadLink link, String vnfo, final boolean isDownload) throws Exception {
-        int num = 5;
+        int num = 8;
         String js = br.getRegex("src\\s*=\\s*\"(/js/main.*?)\"").getMatch(0);
         if (js != null) {
-            Browser brc = br.cloneBrowser();
+            final Browser brc = br.cloneBrowser();
             brc.getPage(js);
-            String numString = brc.getRegex("tmp\\[1\\]\\s*\\+\\s*=\\s*\"(\\d+)\"\\s*\\+\\s*\"/\"").getMatch(0);
+            final String numString = brc.getRegex("tmp\\[1\\]\\s*\\+\\s*=\\s*\"(\\d+)\"\\s*\\+\\s*\"/\"").getMatch(0);
             if (numString != null) {
                 num = Integer.parseInt(numString);
+            } else {
+                logger.warning("Failed to find numString");
             }
         }
         final String tmp[] = vnfo.split("/");

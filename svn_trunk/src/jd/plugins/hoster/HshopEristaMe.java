@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49069 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50648 $", interfaceVersion = 3, names = {}, urls = {})
 public class HshopEristaMe extends PluginForHost {
     public HshopEristaMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,7 @@ public class HshopEristaMe extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://hshop.erista.me/";
+        return "https://" + getHost();
     }
 
     private static List<String[]> getPluginDomains() {

@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -45,7 +46,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImgSrcRu;
 
-@DecrypterPlugin(revision = "$Revision: 49887 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50648 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImgSrcRuCrawler extends PluginForDecrypt {
     // dev notes
     // &pwd= is a md5 hash id once you've provided password for that album.
@@ -250,15 +251,24 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
              * 2024-03-18: Change image view to be able to find all items. </br>
              * And no, this not give us all images on one page, just lets us paginate over the gallery.
              */
-            final String allImagesOnOnePage = br.getRegex("'(/main/tape\\.php\\?aid=\\d+&id=\\d+&pwd=[^']*)'").getMatch(0);
-            if (allImagesOnOnePage != null && !br.getURL().endsWith(allImagesOnOnePage)) {
-                getPage(allImagesOnOnePage, param);
+            String allImagesOnOnePage = br.getRegex("'(/main/tape\\.php\\?aid=\\d+&id=\\d+&pwd=[^']*)'").getMatch(0);
+            if (allImagesOnOnePage == null) {
+                /* 2025-02-18 */
+                allImagesOnOnePage = br.getRegex("href='(/[^']+)'[^>]*>\\s*all images on one page").getMatch(0);
+            }
+            if (allImagesOnOnePage != null) {
+                if (!br.getURL().endsWith(allImagesOnOnePage)) {
+                    getPage(allImagesOnOnePage, param);
+                }
+            } else {
+                logger.warning("Failed to find link to 'all images on one page' view");
             }
             final String title = Encoding.htmlDecode(username.trim()) + " @ " + Encoding.htmlDecode(galleryTitle).trim();
             final FilePackage fp = FilePackage.getInstance();
             fp.setAllowMerge(true);
             fp.setName(Encoding.htmlDecode(title).trim());
-            final String quotedUsername = Pattern.quote(username);
+            // final String quotedUsername = Pattern.quote(username);
+            final Set<String> pagesDupes = new HashSet<String>();
             final Set<String> pagesDone = new HashSet<String>();
             final List<String> pagesTodo = new ArrayList<String>();
             int page = 1;
@@ -275,7 +285,7 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
                 }
                 ret.addAll(thisPageResults);
                 final int numberofNewItemsThisPage = ret.size() - numberofResultsOld;
-                logger.info("Crawled page " + page + " | New items this page: " + numberofNewItemsThisPage + " | Total: " + ret.size());
+                logger.info("Crawled page " + page + " | New items this page: " + numberofNewItemsThisPage + " | Total: " + ret.size() + " | URL: " + br.getURL());
                 if (numberofNewItemsThisPage == 0) {
                     if (ret.isEmpty()) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Found zero new results");
@@ -285,35 +295,32 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
                     }
                 }
                 /* Look for next page */
-                final String nextPage = br.getRegex("<a [^>]*href=\\s*(\"|'|)?(/" + quotedUsername + "/\\d+\\.html(?:\\?pwd=[a-z0-9]{32}[^>]*?|\\?)?)\\1\\s*>\\s*(▶|&#9654;?|&#9658;?|<i\\s*class\\s*=\\s*\"material-icons\"\\s*>\\s*&#xe5cc;?)").getMatch(1);
-                final String previousPage = br.getRegex("<a [^>]*href=\\s*(\"|'|)?(/" + quotedUsername + "/\\d+\\.html(?:\\?pwd=[a-z0-9]{32}[^>]*?|\\?)?)\\1\\s*>\\s*(◄|&#9664;?|&#9668;?|<i\\s*class\\s*=\\s*\"material-icons\"\\s*>\\s*&#xe5cb;?)").getMatch(1);
-                if (previousPage != null && !pagesTodo.contains(previousPage) && !pagesDone.contains(previousPage)) {
-                    pagesTodo.add(previousPage);
-                }
-                if (nextPage != null && !pagesTodo.contains(nextPage) && !pagesDone.contains(nextPage)) {
-                    pagesTodo.add(nextPage);
-                }
-                final String[] allPossibleNextPages = br.getRegex("'(\\?aid=\\d+&id=\\d+&skip=\\d+&pwd=[^']*)'").getColumn(0);
+                String[] allPossibleNextPages = br.getRegex("(/[^/]+/tape-\\d+-\\d+-\\d{2,}[^'\"]+)").getColumn(0);
                 if (allPossibleNextPages != null && allPossibleNextPages.length > 0) {
-                    for (final String possibleNextPage : allPossibleNextPages) {
-                        if (!pagesTodo.contains(previousPage) && !pagesDone.contains(possibleNextPage)) {
-                            pagesTodo.add(possibleNextPage);
+                    for (String url : allPossibleNextPages) {
+                        url = br.getURL(url).toExternalForm();
+                        /* Cheap trick to avoid adding the same URL multiple times with different "lang" parameters. */
+                        final String urlForAvoidingDupes = URLHelper.getUrlWithoutParams(url);
+                        if (!pagesDupes.add(urlForAvoidingDupes)) {
+                            continue;
+                        } else if (pagesDone.contains(url) || pagesTodo.contains(url)) {
+                            continue;
                         }
+                        pagesTodo.add(url);
                     }
                 }
                 nextpagefinder: while (true) {
-                    if (pagesTodo.size() > 0) {
-                        final String thisNextPage = pagesTodo.remove(0);
-                        if (pagesDone.add(thisNextPage)) {
-                            /* Continue to next page */
-                            getPage(thisNextPage, param);
-                            break nextpagefinder;
-                        } else {
-                            logger.info("Stopping because: Failed to find any new next page");
-                            break pagination;
-                        }
-                    } else {
+                    if (pagesTodo.isEmpty()) {
                         logger.info("Stopping because: Failed to find any next page");
+                        break pagination;
+                    }
+                    final String thisNextPage = pagesTodo.remove(0);
+                    if (pagesDone.add(thisNextPage)) {
+                        /* Continue to next page */
+                        getPage(thisNextPage, param);
+                        break nextpagefinder;
+                    } else {
+                        logger.info("Stopping because: Failed to find any new next page");
                         break pagination;
                     }
                 }

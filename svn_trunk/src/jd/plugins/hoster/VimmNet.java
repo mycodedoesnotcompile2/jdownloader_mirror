@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VimmNetCrawler;
 
-@HostPlugin(revision = "$Revision: 49326 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50648 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VimmNetCrawler.class })
 public class VimmNet extends PluginForHost {
     public VimmNet(PluginWrapper wrapper) {
@@ -178,7 +178,7 @@ public class VimmNet extends PluginForHost {
         /* 2024-06-13: This is always inside their html code (didn't bother adding more filters) */
         final boolean looksLikeDownloadUnavailable = br.containsHTML(">\\s*Download unavailable");
         try {
-            final String url = br.getRegex("\"([^\"]*download\\d+\\." + Pattern.quote(br.getHost(false)) + "/[^\"]*)\"").getMatch(0);
+            final String url = br.getRegex("\"([^\"]*(download|dl)\\d+\\." + Pattern.quote(br.getHost(false)) + "/[^\"]*)\"").getMatch(0);
             if (url == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

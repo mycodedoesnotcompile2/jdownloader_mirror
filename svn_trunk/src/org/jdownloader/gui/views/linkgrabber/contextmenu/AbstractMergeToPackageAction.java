@@ -20,13 +20,14 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.gui.views.components.LocationInList;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
-import org.jdownloader.gui.views.downloads.action.MergeSameNamedPackagesAction;
+import org.jdownloader.gui.views.components.packagetable.dragdrop.MergePosition;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.translate._JDT;
 
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.controlling.packagecontroller.PackageController;
+import jd.controlling.packagecontroller.PackageController.MergePackageSettings;
 
 public abstract class AbstractMergeToPackageAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
     /**
@@ -171,6 +172,14 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         controller.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
+                final MergePackageSettings mergesettings = new MergePackageSettings();
+                mergesettings.setExpandPackage(isExpandNewPackage());
+                // TODO: setMergePosition: somehow implement missing positions
+                if (getLocation() == LocationInList.TOP_OF_LIST) {
+                    mergesettings.setMergePosition(MergePosition.TOP);
+                } else if (getLocation() == LocationInList.END_OF_LIST) {
+                    mergesettings.setMergePosition(MergePosition.BOTTOM);
+                }
                 final PackageType newPackage = createNewPackage(final_newPackageName, final_downloadFolder);
                 newPackage.setExpanded(isExpandNewPackage());
                 final String packageComment = mergePackageViewListComments(sel.getPackageViews());
@@ -203,9 +212,13 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                     break;
                 }
                 if (final_mergeSameNamedPackages) {
-                    final MergeSameNamedPackagesAction mp = new MergeSameNamedPackagesAction();
-                    mp.setMergeAll(true);
-                    mp.actionPerformed(e);
+                    mergesettings.setMergeSameNamedPackages(true);
+                    final List<PackageType> mergePackages = new ArrayList<PackageType>();
+                    mergePackages.add(newPackage);
+                    controller.mergeSameNamedPackages(mergePackages, mergesettings);
+                    // final MergeSameNamedPackagesAction mp = new MergeSameNamedPackagesAction();
+                    // mp.setMergeAll(true);
+                    // mp.actionPerformed(e);
                 }
                 return null;
             }

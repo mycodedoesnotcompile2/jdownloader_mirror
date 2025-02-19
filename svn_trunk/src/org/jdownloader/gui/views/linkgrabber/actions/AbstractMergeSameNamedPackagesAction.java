@@ -71,14 +71,15 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
         controller.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                final boolean caseInsensitive = isMatchPackageNamesCaseInsensitive();
                 final boolean mergeAll = isMergeAll();
+                final MergePackageSettings settings = new MergePackageSettings();
+                settings.setMergeSameNamedPackagesCaseInsensitive(isMatchPackageNamesCaseInsensitive());
                 /* If user has selected package(s), only collect duplicates within selection. */
                 final List<PackageView<PackageType, ChildrenType>> selPackageViews = sel.getPackageViews();
                 final Map<String, List<PackageType>> dupes;
                 if (sel == null || selPackageViews.size() == 0 || mergeAll) {
                     /* Merge duplicates in whole list */
-                    dupes = controller.getPackagesWithSameName(caseInsensitive);
+                    dupes = controller.getPackagesWithSameName(null, settings);
                 } else {
                     /* Merge duplicates within users' selection */
                     final List<PackageType> selectedPackages = new ArrayList<PackageType>();
@@ -90,7 +91,7 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
                         /* User has only selected items we can't work with -> Do nothing */
                         return null;
                     }
-                    dupes = controller.getPackagesWithSameName(selectedPackages, caseInsensitive);
+                    dupes = controller.getPackagesWithSameName(selectedPackages, settings);
                 }
                 if (dupes.isEmpty()) {
                     /* Zero results -> Do nothing */
@@ -106,9 +107,7 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
                     }
                     /* Pick package to merge the others into */
                     final PackageType target = thisdupes.remove(0);
-                    final MergePackageSettings mergesettings = new MergePackageSettings();
-                    mergesettings.setMergePackageComments(true);
-                    controller.merge(target, thisdupes, mergesettings);
+                    controller.merge(target, thisdupes, settings);
                 }
                 return null;
             }

@@ -11,9 +11,7 @@ import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "dropbox.com", type = Type.HOSTER)
 public interface DropBoxConfig extends PluginConfigInterface {
-    public static final TRANSLATION TRANSLATION                            = new TRANSLATION();
-    final String                    text_AskIfSubfoldersShouldBeCrawled    = "Folder crawler: Ask if subfolders should be crawled?";
-    final String                    text_EnableFastLinkcheckForSingleFiles = "Enable fast linkcheck for single files [enabled = filesize won't be displayed until download is started]?";
+    public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
         // public String getUseAPI_label() {
@@ -22,11 +20,11 @@ public interface DropBoxConfig extends PluginConfigInterface {
         // // return "Use API (in account mode)? [Recommended]";
         // }
         public String getAskIfSubfoldersShouldBeCrawled_label() {
-            return text_AskIfSubfoldersShouldBeCrawled;
+            return "Folder crawler: Ask if subfolders should be crawled?";
         }
 
         public String getEnableFastLinkcheckForSingleFiles_label() {
-            return text_EnableFastLinkcheckForSingleFiles;
+            return "Enable fast linkcheck for single files [enabled = file information may not be be displayed until download is started]?";
         }
 
         public String getUserAgent_label() {
@@ -43,7 +41,7 @@ public interface DropBoxConfig extends PluginConfigInterface {
 
     @DefaultBooleanValue(false)
     @AboutConfig
-    @DescriptionForConfigEntry(text_AskIfSubfoldersShouldBeCrawled)
+    @DescriptionForConfigEntry("Disabled = Do not ask and always crawl subfolders")
     @Order(20)
     boolean isAskIfSubfoldersShouldBeCrawled();
 
@@ -51,7 +49,6 @@ public interface DropBoxConfig extends PluginConfigInterface {
 
     @DefaultBooleanValue(true)
     @AboutConfig
-    @DescriptionForConfigEntry(text_EnableFastLinkcheckForSingleFiles)
     @Order(30)
     boolean isEnableFastLinkcheckForSingleFiles();
 
