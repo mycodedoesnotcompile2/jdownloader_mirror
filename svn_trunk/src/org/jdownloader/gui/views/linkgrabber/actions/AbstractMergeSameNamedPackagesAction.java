@@ -2,10 +2,7 @@ package org.jdownloader.gui.views.linkgrabber.actions;
 
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 
 import org.appwork.utils.event.queue.QueueAction;
 import org.jdownloader.controlling.contextmenu.ActionContext;
@@ -40,7 +37,11 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
         this.caseInsensitive = val;
     }
 
-    // @Customizer(link = "#getTranslationForMergeAll")
+    public static String getTranslationForMergeAll() {
+        return "Merge all regardless of selection";
+    }
+
+    @Customizer(link = "#getTranslationForMergeAll")
     @Order(200)
     public boolean isMergeAll() {
         return mergeAll;
@@ -71,15 +72,13 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
         controller.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                final boolean mergeAll = isMergeAll();
                 final MergePackageSettings settings = new MergePackageSettings();
                 settings.setMergeSameNamedPackagesCaseInsensitive(isMatchPackageNamesCaseInsensitive());
                 /* If user has selected package(s), only collect duplicates within selection. */
                 final List<PackageView<PackageType, ChildrenType>> selPackageViews = sel.getPackageViews();
-                final Map<String, List<PackageType>> dupes;
-                if (sel == null || selPackageViews.size() == 0 || mergeAll) {
+                if (isMergeAll() || sel == null || selPackageViews.size() == 0) {
                     /* Merge duplicates in whole list */
-                    dupes = controller.getPackagesWithSameName(null, settings);
+                    controller.merge(null, null, null, settings);
                 } else {
                     /* Merge duplicates within users' selection */
                     final List<PackageType> selectedPackages = new ArrayList<PackageType>();
@@ -91,23 +90,7 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
                         /* User has only selected items we can't work with -> Do nothing */
                         return null;
                     }
-                    dupes = controller.getPackagesWithSameName(selectedPackages, settings);
-                }
-                if (dupes.isEmpty()) {
-                    /* Zero results -> Do nothing */
-                    return null;
-                }
-                final Iterator<Entry<String, List<PackageType>>> dupes_iterator = dupes.entrySet().iterator();
-                while (dupes_iterator.hasNext()) {
-                    final Entry<String, List<PackageType>> entry = dupes_iterator.next();
-                    final List<PackageType> thisdupes = entry.getValue();
-                    if (thisdupes.size() == 1) {
-                        /* We need at least two packages to be able to merge them. */
-                        continue;
-                    }
-                    /* Pick package to merge the others into */
-                    final PackageType target = thisdupes.remove(0);
-                    controller.merge(target, thisdupes, settings);
+                    controller.merge(null, null, selectedPackages, settings);
                 }
                 return null;
             }
@@ -117,16 +100,11 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
     @Override
     public boolean isEnabled() {
         final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
-        if (sel == null) {
-            /* This shall never happen. */
-            return false;
-        }
         final PackageController<PackageType, ChildrenType> controller = sel.getController();
-        if (controller == null || controller.getPackages() == null || controller.getPackages().size() == 0) {
+        if (controller == null || controller.getPackages() == null || controller.getPackages().isEmpty()) {
             /* Zero items in linkgrabberlist/downloadlist -> No duplicates that can be merged. */
             return false;
-        } else {
-            return super.isEnabled();
         }
+        return super.isEnabled();
     }
 }

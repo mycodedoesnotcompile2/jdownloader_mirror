@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50644 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50661 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1539,7 +1539,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String shorturlID = this.supportsShortURLs() ? new Regex(url, PATTERN_SHORTURL).getMatch(0) : null;
         if (isImagehoster() && url.matches("(?i)^https?://[^/]+/(?:th|i)/\\d+/([a-z0-9]{12}).*")) {
             return URL_TYPE.IMAGE;
-        } else if (shorturlID != null && shorturlID.length() != 12 && !shorturlID.toLowerCase(Locale.ENGLISH).equals(shorturlID)) {
+        } else if (shorturlID != null && (shorturlID.length() != 12 || !shorturlID.toLowerCase(Locale.ENGLISH).equals(shorturlID))) {
             return URL_TYPE.SHORT;
         } else if (url.matches("(?i)^https?://[^/]+/d/([a-z0-9]{12}).*")) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;

@@ -7,7 +7,6 @@ import org.appwork.txtresource.TranslateInterface;
 
 @Defaults(lngs = { "en" })
 public interface JdownloaderTranslation extends TranslateInterface {
-    //
     @Default(lngs = { "en", "de" }, values = { "Error occurred!", "Fehler aufgetreten!" })
     String dialog_title_exception();
 
@@ -898,7 +897,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Use latest selected path as default one" })
     String MergeToPackageAction_getTranslationForLastPathDefault();
 
-    @Default(lngs = { "en" }, values = { "Expand the new package after creation" })
+    @Default(lngs = { "en" }, values = { "Expand the package after creation." })
     String MergeToPackageAction_getTranslationForExpandNewPackage();
 
     @Default(lngs = { "en" }, values = { "Merge Packages before splitting?" })

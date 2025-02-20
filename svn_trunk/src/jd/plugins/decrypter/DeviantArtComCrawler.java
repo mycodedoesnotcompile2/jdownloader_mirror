@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50644 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50661 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
     /**
      * @author raztoki, pspzockerscene
@@ -91,6 +91,8 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
             String regex = "https?://[\\w\\.\\-]*?" + buildHostsPatternPart(domains) + "(";
             regex += PATTERN_GALLERY.pattern();
             regex += "|";
+            regex += PATTERN_GALLERY_2.pattern();
+            regex += "|";
             regex += PATTERN_USER_FAVORITES.pattern();
             regex += "|";
             regex += PATTERN_USER_FAVORITES_GALLERY.pattern();
@@ -108,6 +110,7 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
     private static final Pattern PATTERN_USER_FAVORITES         = Pattern.compile("/([\\w\\-]+)/favourites$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_USER_FAVORITES_GALLERY = Pattern.compile("/([\\w\\-]+)/favourites/(\\d+)/([\\w\\-]+).*", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_GALLERY                = Pattern.compile("/([\\w\\-]+)/gallery/(\\d+)/([\\w\\-]+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_GALLERY_2              = Pattern.compile("/([\\w\\-]+)/gallery/(all|scraps)$", Pattern.CASE_INSENSITIVE);
     DeviantArtCom                hosterplugin                   = null;
 
     @SuppressWarnings("deprecation")
@@ -126,6 +129,8 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         } else if (new Regex(path, PATTERN_USER_FAVORITES).patternFind()) {
             return this.crawlProfileFavorites(account, param);
         } else if (new Regex(path, PATTERN_GALLERY).patternFind()) {
+            return this.crawlProfileOrGallery(account, param);
+        } else if (new Regex(path, PATTERN_GALLERY_2).patternFind()) {
             return this.crawlProfileOrGallery(account, param);
         } else if (new Regex(path, DeviantArtCom.PATTERN_ART).patternFind()) {
             return this.crawlArt(param, account);
@@ -171,7 +176,6 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -187,9 +191,8 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlProfileOrGallery(final Account account, final CryptedLink param) throws Exception {
-        br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
-        if (this.br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String username = new Regex(br.getURL(), "https?://[^/]+/([^/\\?]+)").getMatch(0);
@@ -245,7 +248,7 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         final HashSet<String> dupes = new HashSet<String>();
         query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
         query.appendEncoded("csrf_token", csrftoken);
-        do {
+        pagination: do {
             query.addAndReplace("offset", Integer.toString(offset));
             page++;
             br.getPage(action + "?" + query.toString());
@@ -298,22 +301,21 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
             logger.info("Crawled page " + page + " | Offset: " + offset + " | nextOffset: " + nextOffset + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break;
+                break pagination;
             } else if (!Boolean.TRUE.equals(entries.get("hasMore"))) {
                 logger.info("Stopping because: Reached end");
-                break;
+                break pagination;
             } else if (nextOffset == null) {
                 logger.info("Stopping because: Reached end?");
-                break;
+                break pagination;
             } else if (numberofNewItems == 0) {
                 /* Extra fail-safe */
                 logger.info("Stopping because: Failed to find new items on page " + page);
-                break;
-            } else {
-                /* Continue to next page */
-                offset = nextOffset.intValue();
-                continue;
+                break pagination;
             }
+            /* Continue to next page */
+            offset = nextOffset.intValue();
+            continue;
         } while (true);
         if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -376,7 +378,9 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(mainlink.getStringProperty(DeviantArtCom.PROPERTY_TITLE));
         for (final DownloadLink result : ret) {
-            result._setFilePackage(fp);
+            if (ret.size() > 1) {
+                result._setFilePackage(fp);
+            }
             result.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION_MAX, ret.size());
             this.hosterplugin.setFilename(result, account, null);
         }

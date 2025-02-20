@@ -61,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50644 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50656 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -590,7 +590,7 @@ public class DeviantArtCom extends PluginForHost {
         } else if (extByURL != null) {
             ext = extByURL;
         } else {
-            ext = null;
+            ext = getAssumedFileExtension(link);
         }
         final String title = link.getStringProperty(PROPERTY_TITLE);
         String filename = null;

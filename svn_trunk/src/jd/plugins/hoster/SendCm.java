@@ -50,7 +50,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50644 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50661 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -277,6 +277,8 @@ public class SendCm extends XFileSharingProBasic {
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
         if (br.containsHTML(">\\s*The file you were looking for doesn")) {
+            return true;
+        } else if (br.containsHTML(">\\s*The file you were looking for doesn")) {
             return true;
         } else {
             return super.isOffline(link, br);

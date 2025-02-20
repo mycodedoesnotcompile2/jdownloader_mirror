@@ -15,6 +15,7 @@ import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
+import org.jdownloader.translate._JDT;
 
 import jd.gui.swing.jdgui.views.settings.components.FolderChooser;
 
@@ -23,9 +24,11 @@ public class NewPackageDialog extends AbstractDialog<Object> {
     private ExtTextField        packageNameField;
     private FolderChooser       downloadFolderFolderChooserField;
     private JCheckBox           mergeCheckbox                             = null;
+    private JCheckBox           expandCheckbox                            = null;
     private String              preSetDownloadFolder                      = null;
-    private boolean             preSetMergeWithSameNamedPackages          = false;
+    private boolean             mergeCheckboxDefaultValue                 = false;
     private boolean             displayCheckboxMergeWithSameNamedPackages = true;
+    private boolean             expandCheckboxDefaultValue                = false;
 
     public NewPackageDialog(SelectionInfo<?, ?> selection) {
         super(0, _GUI.T.NewPackageDialog_NewPackageDialog_(), null, null, null);
@@ -78,9 +81,12 @@ public class NewPackageDialog extends AbstractDialog<Object> {
         p.add(downloadFolderFolderChooserField, "pushx,growx");
         if (displayCheckboxMergeWithSameNamedPackages) {
             mergeCheckbox = new JCheckBox(_GUI.T.MergeSameNamedPackagesAction_());
-            mergeCheckbox.setSelected(preSetMergeWithSameNamedPackages);
+            mergeCheckbox.setSelected(mergeCheckboxDefaultValue);
             p.add(mergeCheckbox, "span 2");
         }
+        expandCheckbox = new JCheckBox(_JDT.T.MergeToPackageAction_getTranslationForExpandNewPackage());
+        expandCheckbox.setSelected(expandCheckboxDefaultValue);
+        p.add(expandCheckbox, "span 2");
         return p;
     }
 
@@ -116,14 +122,29 @@ public class NewPackageDialog extends AbstractDialog<Object> {
         if (mergeCheckbox != null) {
             return mergeCheckbox.isSelected();
         } else {
-            return this.preSetMergeWithSameNamedPackages;
+            return this.mergeCheckboxDefaultValue;
         }
     }
 
-    public void setMergeWithSameNamedPackages(boolean merge) {
-        this.preSetMergeWithSameNamedPackages = merge;
+    public void setMergeCheckboxDefaultValue(boolean b) {
+        this.mergeCheckboxDefaultValue = b;
         if (mergeCheckbox != null) {
-            mergeCheckbox.setSelected(merge);
+            mergeCheckbox.setSelected(b);
+        }
+    }
+
+    public boolean isExpandPackage() {
+        if (expandCheckbox != null) {
+            return expandCheckbox.isSelected();
+        } else {
+            return this.expandCheckboxDefaultValue;
+        }
+    }
+
+    public void setExpandPackage(boolean b) {
+        this.expandCheckboxDefaultValue = b;
+        if (expandCheckbox != null) {
+            expandCheckbox.setSelected(b);
         }
     }
 

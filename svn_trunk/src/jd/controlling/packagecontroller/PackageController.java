@@ -565,6 +565,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
      */
     public final static class MergePackageSettings {
         private MergePosition mergeposition                         = null;
+        private int           mergeposition_int                     = -1;
         private Boolean       mergePackageComments                  = Boolean.TRUE;
         private Boolean       mergeSameNamedPackages                = Boolean.FALSE;
         private Boolean       expandPackage                         = Boolean.FALSE;
@@ -579,12 +580,26 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             return mergeposition;
         }
 
-        public MergePackageSettings setMergePosition(MergePosition mergeposition) {
+        public void setMergePosition(final int mergeposition) {
+            this.mergeposition_int = mergeposition;
+        }
+
+        public MergePackageSettings setMergePosition(final MergePosition mergeposition) {
             if (mergeposition == null) {
                 /* Default */
                 this.mergeposition = MergePosition.BOTTOM;
             } else {
                 this.mergeposition = mergeposition;
+                switch (mergeposition) {
+                case BOTTOM:
+                    // positionMerge = dest.getChildren().size();
+                    break;
+                case TOP:
+                    mergeposition_int = 0;
+                    break;
+                default:
+                    mergeposition_int = -1;
+                }
             }
             return this;
         }
@@ -639,34 +654,6 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         }
     }
 
-    public void mergeSameNamedPackages(final List<PackageType> selectedPackages, final MergePackageSettings mergesettings) {
-        // final Map<String, List<PackageType>> dupes;
-        // if (selectedPackages == null) {
-        // /* Merge dupes within all packages */
-        // dupes = getPackagesWithSameName(selectedPackages, mergesettings);
-        // } else {
-        // /* Merge dupes within selection */
-        // dupes = getPackagesWithSameName(selectedPackages, mergesettings);
-        // }
-        // if (dupes.isEmpty()) {
-        // /* Zero results -> Do nothing */
-        // return;
-        // }
-        // final Iterator<Entry<String, List<PackageType>>> dupes_iterator = dupes.entrySet().iterator();
-        // while (dupes_iterator.hasNext()) {
-        // final Entry<String, List<PackageType>> entry = dupes_iterator.next();
-        // final List<PackageType> thisdupes = entry.getValue();
-        // if (thisdupes.size() == 1) {
-        // /* We need at least two packages to be able to merge them. */
-        // continue;
-        // }
-        // /* Pick package to merge the others into */
-        // final PackageType target = thisdupes.remove(0);
-        // merge(target, thisdupes, mergesettings);
-        // }
-        merge(null, null, selectedPackages, mergesettings);
-    }
-
     public void merge(final PackageType dest, final List<PackageType> srcPkgs, final MergePackageSettings mergesettings) {
         merge(dest, null, srcPkgs, mergesettings);
     }
@@ -690,7 +677,14 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             @Override
             protected Void run() throws RuntimeException {
                 if (mergesettings.getMergeSameNamedPackages()) {
-                    final Map<String, List<PackageType>> dupes = getPackagesWithSameName(srcPkgs, mergesettings);
+                    final Map<String, List<PackageType>> dupes;
+                    if (dest != null) {
+                        final List<PackageType> mergePackages = new ArrayList<PackageType>();
+                        mergePackages.add(dest);
+                        dupes = getPackagesWithSameName(mergePackages, mergesettings);
+                    } else {
+                        dupes = getPackagesWithSameName(srcPkgs, mergesettings);
+                    }
                     if (dupes.isEmpty()) {
                         /* Zero results -> Do nothing */
                         return null;
@@ -708,7 +702,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                         /* Merge all duplicates into first package */
                         final PackageType target = thisdupes.remove(0);
                         /* Call this function in a recursive way. */
-                        merge(target, thisdupes, mergesettings);
+                        merge(target, null, thisdupes, mergesettings);
                     }
                     /* End */
                     return null;
@@ -743,27 +737,10 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                         }
                     }
                     if (Boolean.TRUE.equals(mergesettings.getMergePackageComments())) {
-                        final HashSet<String> commentDups = new HashSet<String>();
                         /* Merge package comments */
-                        final StringBuilder sb = new StringBuilder();
                         /* Place main package at beginning of list so that comment of it is placed first in our merged comment string. */
                         srcPkgs.add(0, dest);
-                        for (final PackageType pkg : srcPkgs) {
-                            final String comment = pkg.getComment();
-                            if (StringUtils.isEmpty(comment)) {
-                                continue;
-                            }
-                            final String[] commentLines = Regex.getLines(comment);
-                            for (final String commentLine : commentLines) {
-                                if (!StringUtils.isEmpty(commentLine) && commentDups.add(commentLine)) {
-                                    if (sb.length() > 0) {
-                                        sb.append("\r\n");
-                                    }
-                                    sb.append(commentLine);
-                                }
-                            }
-                        }
-                        final String mergedComments = sb.toString();
+                        final String mergedComments = mergePackageComments(srcPkgs);
                         if (!StringUtils.isEmpty(mergedComments)) {
                             /* Set new comment */
                             dest.setComment(mergedComments);
@@ -773,6 +750,30 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 return null;
             }
         });
+    }
+
+    public String mergePackageComments(final List<PackageType> packages) {
+        final StringBuilder sb = new StringBuilder();
+        final HashSet<String> dupes = new HashSet<String>();
+        for (final PackageType cp : packages) {
+            final String comment = cp.getComment();
+            if (StringUtils.isEmpty(comment)) {
+                continue;
+            }
+            final String[] commentLines = Regex.getLines(comment);
+            for (final String commentLine : commentLines) {
+                if (StringUtils.isEmpty(commentLine)) {
+                    continue;
+                } else if (!dupes.add(commentLine)) {
+                    continue;
+                }
+                if (sb.length() > 0) {
+                    sb.append("\r\n");
+                }
+                sb.append(commentLine);
+            }
+        }
+        return sb.toString();
     }
 
     public void moveOrAddAt(final PackageType pkg, final List<ChildType> movechildren, final int moveChildrenindex) {
@@ -1154,12 +1155,13 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
     public final Map<String, List<PackageType>> getPackagesWithSameName(final List<PackageType> packages, final MergePackageSettings settings) {
         final boolean readL = this.readLock();
         try {
+            final List<PackageType> allpackages = this.getPackages();
             final boolean case_insensitive = settings.getMergeSameNamedPackagesCaseInsensitive();
             HashSet<String> dupesSelection = null;
             if (packages != null) {
                 /* Only return duplicates within a list of pre selected packages. */
                 dupesSelection = new HashSet<String>();
-                for (final PackageType packageNode : this.getPackages()) {
+                for (final PackageType packageNode : allpackages) {
                     String packagename = packageNode.getName();
                     if (case_insensitive) {
                         packagename = packagename.toLowerCase(Locale.ENGLISH);
@@ -1168,7 +1170,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 }
             }
             final Map<String, List<PackageType>> dupes = new HashMap<String, List<PackageType>>();
-            for (final PackageType packageNode : this.getPackages()) {
+            for (final PackageType packageNode : allpackages) {
                 String packagename = packageNode.getName();
                 if (case_insensitive) {
                     packagename = packagename.toLowerCase(Locale.ENGLISH);
