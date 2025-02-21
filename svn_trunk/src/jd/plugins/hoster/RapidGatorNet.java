@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50408 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50675 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -222,7 +222,11 @@ public class RapidGatorNet extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
-        return !isPremiumAccount(acc);
+        if (isPremiumAccount(acc)) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     @Override

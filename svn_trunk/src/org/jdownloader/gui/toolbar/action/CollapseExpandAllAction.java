@@ -56,8 +56,8 @@ public class CollapseExpandAllAction extends SelectionBasedToolbarAction {
     }
 
     @Override
-    protected void onSelectionUpdate() {
-        if (getTable() == null) {
+    protected void onSelectionUpdate(final PackageControllerTable<?, ?> table) {
+        if (table == null) {
             setEnabled(false);
             return;
         } else {

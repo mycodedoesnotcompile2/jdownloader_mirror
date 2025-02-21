@@ -10,4 +10,8 @@ public class _JDT {
 
     public static final JdownloaderTranslation T = TranslationFactory.create(JdownloaderTranslation.class);
 
+    public static final String FIX_ME(String text) {
+        return text;
+    }
+
 }

@@ -26,6 +26,7 @@ public class NewPackageDialog extends AbstractDialog<Object> {
     private JCheckBox           mergeCheckbox                             = null;
     private JCheckBox           expandCheckbox                            = null;
     private String              preSetDownloadFolder                      = null;
+    private String              preSetPackageName                         = null;
     private boolean             mergeCheckboxDefaultValue                 = false;
     private boolean             displayCheckboxMergeWithSameNamedPackages = true;
     private boolean             expandCheckboxDefaultValue                = false;
@@ -51,7 +52,7 @@ public class NewPackageDialog extends AbstractDialog<Object> {
     }
 
     @Override
-    protected void initFocus(JComponent focus) {
+    protected void initFocus(final JComponent focus) {
         super.initFocus(packageNameField);
     }
 
@@ -65,7 +66,11 @@ public class NewPackageDialog extends AbstractDialog<Object> {
         MigPanel p = new MigPanel("ins 0,wrap 2", "[][grow,fill]", "[]");
         p.add(new JLabel(_GUI.T.NewPackageDialog_layoutDialogContent_newname_()));
         packageNameField = new ExtTextField();
-        packageNameField.setText(getNewName());
+        if (preSetPackageName != null) {
+            packageNameField.setText(preSetPackageName);
+        } else {
+            packageNameField.setText(getNewName());
+        }
         p.add(packageNameField);
         p.add(new JLabel(_GUI.T.NewPackageDialog_layoutDialogContent_saveto()));
         downloadFolderFolderChooserField = new FolderChooser();
@@ -150,5 +155,16 @@ public class NewPackageDialog extends AbstractDialog<Object> {
 
     public void setDisplayCheckboxMergeWithSameNamedPackages(boolean display) {
         this.displayCheckboxMergeWithSameNamedPackages = display;
+    }
+
+    public String getPreSetPackageName() {
+        return preSetPackageName;
+    }
+
+    public void setPreSetPackageName(String preSetPackageName) {
+        this.preSetPackageName = preSetPackageName;
+        if (packageNameField != null) {
+            packageNameField.setText(preSetPackageName);
+        }
     }
 }

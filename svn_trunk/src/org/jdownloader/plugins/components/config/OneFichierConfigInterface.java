@@ -2,8 +2,10 @@ package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
@@ -26,23 +28,27 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
         }
 
         public String getSmallFilesWaitInterval_label() {
-            return "Wait x seconds for small files (smaller than 50 mbyte) to prevent IP block";
+            return "Wait x seconds for small files (smaller than 50 MB) to prevent IP block";
         }
 
         public String getUsePremiumAPIEnabled_label() {
-            return "Use premium API[recommended]? If you want to add 1fichier free-accounts, disable this.";
+            return "Use premium API[recommended]? If you want to use a 1fichier free account, disable this.";
+        }
+
+        public String getLinkcheckMode_label() {
+            return "Linkcheck mode";
         }
 
         public String getMaxPremiumChunks_label() {
-            return "Max number of chunks(premium account)? See 1fichier.com/hlp.html#dllent";
+            return "Max number of chunks for premium downloads (See 1fichier.com/hlp.html#dllent)";
         }
 
         public String getGlobalRequestIntervalLimit1fichierComMilliseconds_label() {
-            return "Define global request limit for 1fichier.com milliseconds";
+            return "Global request limit for 1fichier.com milliseconds";
         }
 
         public String getGlobalRequestIntervalLimitAPI1fichierComMilliseconds_label() {
-            return "Define global request limit for api.1fichier.com milliseconds";
+            return "Global request limit for api.1fichier.com milliseconds";
         }
     }
 
@@ -72,6 +78,41 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
     boolean isUsePremiumAPIEnabled();
 
     void setUsePremiumAPIEnabled(boolean b);
+
+    public static enum LinkcheckMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto";
+            }
+        },
+        PREFER_SINGLE_LINKCHECK_FOR_SINGLE_LINKS {
+            @Override
+            public String getLabel() {
+                return "Single linkcheck for single links via API if possible";
+            }
+        },
+        PREFER_SINGLE_LINKCHECK_FOR_ALL_LINKS {
+            @Override
+            public String getLabel() {
+                return "Single linkcheck for all links via API if possible";
+            }
+        },
+        MASS_LINKCHECK {
+            @Override
+            public String getLabel() {
+                return "Mass linkcheck";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("AUTO")
+    @Order(35)
+    @DescriptionForConfigEntry("Controls, how single links are checked. Multiple links are always checked via mass linkcheck.")
+    LinkcheckMode getLinkcheckMode();
+
+    void setLinkcheckMode(final LinkcheckMode mode);
 
     @AboutConfig
     @DefaultIntValue(10)

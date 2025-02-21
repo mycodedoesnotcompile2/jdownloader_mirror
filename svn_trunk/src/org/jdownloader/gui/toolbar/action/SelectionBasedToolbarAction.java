@@ -40,9 +40,9 @@ public abstract class SelectionBasedToolbarAction extends AbstractToolBarAction 
             if (table != null) {
                 table.getEventSender().addListener(this, true);
             }
-            onSelectionUpdate();
+            onSelectionUpdate(table);
         } catch (Exception e) {
-            onSelectionUpdate();
+            onSelectionUpdate(null);
             setEnabled(false);
         } finally {
             super.onGuiMainTabSwitch(oldView, newView);
@@ -53,7 +53,7 @@ public abstract class SelectionBasedToolbarAction extends AbstractToolBarAction 
     public void onExtTableEvent(ExtTableEvent<?> event) {
         switch (event.getType()) {
         case SELECTION_CHANGED:
-            onSelectionUpdate();
+            onSelectionUpdate(getTable());
         }
     }
 
@@ -61,6 +61,6 @@ public abstract class SelectionBasedToolbarAction extends AbstractToolBarAction 
         return table;
     }
 
-    protected abstract void onSelectionUpdate();
+    protected abstract void onSelectionUpdate(final PackageControllerTable<?, ?> table);
 
 }

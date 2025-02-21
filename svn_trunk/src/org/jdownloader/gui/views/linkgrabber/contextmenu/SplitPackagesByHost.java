@@ -84,13 +84,13 @@ public class SplitPackagesByHost extends CustomizableTableContextAppAction<Crawl
     }
 
     public void actionPerformed(ActionEvent e) {
-        final SelectionInfo<CrawledPackage, CrawledLink> finalSelecction = getSelection();
+        final SelectionInfo<CrawledPackage, CrawledLink> finalSelection = getSelection();
         final String newName;
         final String newDownloadFolder;
-        if (isMergePackages() && finalSelecction.getPackageViews().size() > 1) {
+        if (isMergePackages() && finalSelection.getPackageViews().size() > 1) {
             if (isAskForNewDownloadFolderAndPackageName()) {
                 try {
-                    final NewPackageDialog d = new NewPackageDialog(finalSelecction) {
+                    final NewPackageDialog d = new NewPackageDialog(finalSelection) {
                         @Override
                         public String getDontShowAgainKey() {
                             return "ABSTRACTDIALOG_DONT_SHOW_AGAIN_" + SplitPackagesByHost.this.getClass().getSimpleName();
@@ -109,7 +109,7 @@ public class SplitPackagesByHost extends CustomizableTableContextAppAction<Crawl
                 }
             } else {
                 newName = "";
-                newDownloadFolder = finalSelecction.getFirstPackage().getRawDownloadFolder();
+                newDownloadFolder = finalSelection.getFirstPackage().getRawDownloadFolder();
             }
         } else {
             newName = null;
@@ -125,7 +125,7 @@ public class SplitPackagesByHost extends CustomizableTableContextAppAction<Crawl
                 case BEFORE_SELECTION:
                     insertAt = Integer.MAX_VALUE;
                 }
-                for (AbstractNode child : finalSelecction.getChildren()) {
+                for (AbstractNode child : finalSelection.getChildren()) {
                     if (child instanceof CrawledLink) {
                         final CrawledLink cL = (CrawledLink) child;
                         final CrawledPackage parent = isMergePackages() ? null : cL.getParentNode();

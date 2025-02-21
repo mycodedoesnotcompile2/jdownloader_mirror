@@ -17,7 +17,7 @@ import org.jdownloader.plugins.config.Order;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageController.MergePackageSettings;
+import jd.controlling.packagecontroller.PackageController.PackageSettings;
 
 public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
     private boolean caseInsensitive = true;
@@ -72,7 +72,7 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
         controller.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                final MergePackageSettings settings = new MergePackageSettings();
+                final PackageSettings settings = new PackageSettings();
                 settings.setMergeSameNamedPackagesCaseInsensitive(isMatchPackageNamesCaseInsensitive());
                 /* If user has selected package(s), only collect duplicates within selection. */
                 final List<PackageView<PackageType, ChildrenType>> selPackageViews = sel.getPackageViews();

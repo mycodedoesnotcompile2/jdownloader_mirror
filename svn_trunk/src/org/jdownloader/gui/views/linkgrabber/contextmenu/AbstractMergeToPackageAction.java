@@ -20,15 +20,16 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.gui.views.components.LocationInList;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
 
-import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.linkcollector.LinknameCleaner;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageController.MergePackageSettings;
+import jd.controlling.packagecontroller.PackageController.PackageSettings;
 
 public abstract class AbstractMergeToPackageAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
     /**
@@ -36,10 +37,9 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
      */
     private static final long serialVersionUID        = -4468197802870765463L;
     private boolean           displayNewPackageDialog = true;
-    private boolean           expandNewPackage        = false;
+    private PackageExpandMode packageExpandMode       = PackageExpandMode.AUTO;
     private LocationInList    location                = LocationInList.END_OF_LIST;
     private DownloadPath      downloadpath            = DownloadPath.GLOBAL_DEFAULT;
-    private boolean           lastPathDefault         = false;
     private boolean           mergeSameNamedPackages  = false;
 
     public AbstractMergeToPackageAction() {
@@ -61,36 +61,43 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         this.displayNewPackageDialog = displayNewPackageDialog;
     }
 
-    public static String getTranslationForExpandNewPackage() {
-        return _JDT.T.MergeToPackageAction_getTranslationForExpandNewPackage();
+    public static String getTranslationPackageExpandMode() {
+        return "Package expand mode";
     }
 
-    @Customizer(link = "#getTranslationForExpandNewPackage")
-    @Order(150)
-    public boolean isExpandNewPackage() {
-        return expandNewPackage;
+    @Customizer(link = "#getTranslationPackageExpandMode")
+    @Order(201)
+    public PackageExpandMode getPackageExpandMode() {
+        return packageExpandMode;
     }
 
-    public void setExpandNewPackage(boolean expandNewPackage) {
-        this.expandNewPackage = expandNewPackage;
+    public void setPackageExpandMode(PackageExpandMode mode) {
+        this.packageExpandMode = mode;
     }
 
-    public static String getTranslationForLastPathDefault() {
-        return _JDT.T.MergeToPackageAction_getTranslationForLastPathDefault();
-    }
-
-    @Customizer(link = "#getTranslationForLastPathDefault")
-    @Order(200)
-    public boolean isLastPathDefault() {
-        return lastPathDefault;
-    }
-
-    public void setLastPathDefault(boolean lastPathDefault) {
-        this.lastPathDefault = lastPathDefault;
+    public static enum PackageExpandMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return _JDT.FIX_ME("Auto");
+            }
+        },
+        EXPANDED {
+            @Override
+            public String getLabel() {
+                return _JDT.T.PackageExpandBehavior_EXPANDED();
+            }
+        },
+        COLLAPSED {
+            @Override
+            public String getLabel() {
+                return _JDT.T.PackageExpandBehavior_COLLAPSED();
+            }
+        };
     }
 
     public static String getTranslationForDownloadPath() {
-        return "Download path";
+        return _JDT.FIX_ME("Download path");
     }
 
     @Customizer(link = "#getTranslationForDownloadPath")
@@ -107,21 +114,35 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         PATH_OF_FIRST_SELECTED_PACKAGE {
             @Override
             public String getLabel() {
-                return "Path of first selected package";
+                return _JDT.FIX_ME("Path of first selected package");
             }
         },
         LAST_DOWNLOAD_PATH {
             @Override
             public String getLabel() {
-                return "Last used download path";
+                return _JDT.FIX_ME("Last used download path");
             }
         },
         GLOBAL_DEFAULT {
             @Override
             public String getLabel() {
-                return "Global default download path";
+                return _JDT.FIX_ME("Global default download path");
             }
         };
+    }
+
+    private String getDownloadPathString() {
+        final List<String> history_paths;
+        if (downloadpath == DownloadPath.GLOBAL_DEFAULT) {
+            final String path = PackagizerController.replaceDynamicTags(org.appwork.storage.config.JsonConfig.create(GeneralSettings.class).getDefaultDownloadFolder(), null, null);
+            return path;
+        } else if (downloadpath == DownloadPath.LAST_DOWNLOAD_PATH && (history_paths = DownloadPathHistoryManager.getInstance().listPaths((String[]) null)) != null && history_paths.size() > 0) {
+            return history_paths.get(0);
+        } else {
+            /* Path of first selected package */
+            final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
+            return LinkTreeUtils.getRawDownloadDirectory(sel.getFirstPackage()).getAbsolutePath();
+        }
     }
 
     public static String getTranslationForLocation() {
@@ -152,35 +173,64 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         this.mergeSameNamedPackages = bool;
     }
 
-    public void actionPerformed(ActionEvent e) {
+    @Override
+    protected void onActionPerformed(ActionEvent e, final SelectionType selectionType, final SelectionInfo<PackageType, ChildrenType> sel) {
         if (!isEnabled()) {
             return;
         }
-        final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
-        boolean userHasSelectedPackage = false;
-        final List<AbstractNode> selecteditems = sel.getRawSelection();
-        for (final AbstractNode selecteditem : selecteditems) {
-            if (selecteditem instanceof AbstractPackageNode) {
-                userHasSelectedPackage = true;
-                break;
+        int numberofExpandedPackages = 0;
+        int numberofSelectedPackages = 0;
+        String singleFileName = null;
+        final List<PackageView<PackageType, ChildrenType>> pvlist = sel.getPackageViews();
+        for (final PackageView<PackageType, ChildrenType> pv : pvlist) {
+            if (pv.getPackage().isEnabled()) {
+                numberofExpandedPackages++;
+            }
+            if (pv.isPackageSelected()) {
+                numberofSelectedPackages++;
+            }
+            final List<ChildrenType> children = pv.getSelectedChildren();
+            if (children.size() == 1) {
+                singleFileName = children.get(0).getName();
             }
         }
-        if (!userHasSelectedPackage) {
-            /*
-             * TODO: Add more 'intelligent' package name suggestion if selection contains only a single item or only multipart archives that
-             * belong together RE ticket https://svn.jdownloader.org/issues/81815
-             */
+        AbstractPackageNode<?, ?> selectedpackage = null;
+        final Object rawContext = sel.getRawContext();
+        if (rawContext instanceof AbstractPackageNode) {
+            selectedpackage = (AbstractPackageNode<?, ?>) rawContext;
+        } else {
+            /* No package selected */
         }
-        final String downloadFolder = getDownloadPathNew();
+        final String suggestedNewPackageName;
+        if (numberofSelectedPackages == 0 && singleFileName != null) {
+            suggestedNewPackageName = LinknameCleaner.derivePackagenameFromFilename(singleFileName);
+        } else {
+            suggestedNewPackageName = sel.getFirstPackage().getName();
+        }
+        final String downloadFolder = getDownloadPathString();
         final boolean final_mergeSameNamedPackages;
         final String final_newPackageName;
         final String final_downloadFolder;
         final boolean final_expandPackage;
+        final boolean expandPackagePreSetState;
+        final PackageExpandMode packageExpandMode = this.getPackageExpandMode();
+        if (packageExpandMode == PackageExpandMode.AUTO) {
+            final boolean autoPackageExpandedResult;
+            if (selectedpackage != null) {
+                autoPackageExpandedResult = selectedpackage.isExpanded();
+            } else if (numberofSelectedPackages > 0 && numberofExpandedPackages >= numberofSelectedPackages / 2) {
+                /* Most selected packages are expanded -> Expand target package too */
+                autoPackageExpandedResult = true;
+            } else {
+                autoPackageExpandedResult = false;
+            }
+            expandPackagePreSetState = autoPackageExpandedResult;
+        } else if (packageExpandMode == PackageExpandMode.EXPANDED) {
+            expandPackagePreSetState = true;
+        } else {
+            expandPackagePreSetState = false;
+        }
         if (this.isDisplayNewPackageDialog()) {
-            /*
-             * TODO: Maybe collect list of selected package names in beforehand and hide "merge same named packages" checkbox if packages
-             * already have the same names.
-             */
             NewPackageDialog d = null;
             try {
                 d = new NewPackageDialog(sel) {
@@ -192,7 +242,8 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                 /* Set dialog default values */
                 d.setDownloadFolder(downloadFolder);
                 d.setMergeCheckboxDefaultValue(Boolean.TRUE.equals(this.isMergeSameNamedPackages()));
-                d.setExpandPackage(isExpandNewPackage());
+                d.setExpandPackage(expandPackagePreSetState);
+                d.setPreSetPackageName(suggestedNewPackageName);
                 Dialog.getInstance().showDialog(d);
             } catch (final DialogNoAnswerException e1) {
                 return;
@@ -203,9 +254,9 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
             final_expandPackage = d.isExpandPackage();
         } else {
             final_mergeSameNamedPackages = Boolean.TRUE.equals(this.isMergeSameNamedPackages());
-            final_newPackageName = sel.getFirstPackage().getName();
+            final_newPackageName = suggestedNewPackageName;
             final_downloadFolder = downloadFolder;
-            final_expandPackage = isExpandNewPackage();
+            final_expandPackage = expandPackagePreSetState;
         }
         if (StringUtils.isEmpty(final_newPackageName)) {
             /* New package name cannot be used -> Do nothing */
@@ -215,8 +266,6 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         controller.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                final MergePackageSettings mergesettings = new MergePackageSettings();
-                mergesettings.setExpandPackage(final_expandPackage);
                 final PackageType newPackage = createNewPackage(final_newPackageName, final_downloadFolder);
                 newPackage.setExpanded(final_expandPackage);
                 final List<PackageType> packages = new ArrayList<PackageType>();
@@ -233,7 +282,6 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                     for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
                         index = Math.max(index, controller.indexOf(pv.getPackage()) + 1);
                     }
-                    controller.moveOrAddAt(newPackage, sel.getChildren(), 0, index);
                     break;
                 case BEFORE_SELECTION:
                     index = Integer.MAX_VALUE;
@@ -243,49 +291,23 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                     if (index == Integer.MAX_VALUE) {
                         index = 0;
                     }
-                    controller.moveOrAddAt(newPackage, sel.getChildren(), 0, index);
                     break;
                 case END_OF_LIST:
-                    index = -1;
-                    controller.moveOrAddAt(newPackage, sel.getChildren(), 0, -1);
+                    index = Integer.MAX_VALUE;
                     break;
                 case TOP_OF_LIST:
                     index = 0;
-                    controller.moveOrAddAt(newPackage, sel.getChildren(), 0, 0);
                     break;
                 }
-                mergesettings.setMergePosition(index);
-                if (final_mergeSameNamedPackages) {
-                    mergesettings.setMergeSameNamedPackages(true);
-                    controller.merge(newPackage, null, null, mergesettings);
-                }
+                final PackageSettings mergesettings = new PackageSettings();
+                mergesettings.setExpandPackage(final_expandPackage);
+                mergesettings.setPackagePosition(index);
+                mergesettings.setMergeSameNamedPackages(final_mergeSameNamedPackages);
+                controller.merge(newPackage, sel.getChildren(), null, mergesettings);
                 return null;
             }
         });
     }
 
-    private String getDownloadPathNew() {
-        final List<String> history_paths;
-        if (downloadpath == DownloadPath.GLOBAL_DEFAULT) {
-            final String path = PackagizerController.replaceDynamicTags(org.appwork.storage.config.JsonConfig.create(GeneralSettings.class).getDefaultDownloadFolder(), null, null);
-            return path;
-        } else if (downloadpath == DownloadPath.LAST_DOWNLOAD_PATH && (history_paths = DownloadPathHistoryManager.getInstance().listPaths((String[]) null)) != null && history_paths.size() > 0) {
-            return history_paths.get(0);
-        } else {
-            /* Path of first selected package */
-            final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
-            return LinkTreeUtils.getRawDownloadDirectory(sel.getFirstPackage()).getAbsolutePath();
-        }
-    }
-
     protected abstract PackageType createNewPackage(final String name, final String downloadFolder);
-
-    @Override
-    public boolean isEnabled() {
-        final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
-        if (sel == null || sel.isEmpty()) {
-            return false;
-        }
-        return super.isEnabled();
-    }
 }

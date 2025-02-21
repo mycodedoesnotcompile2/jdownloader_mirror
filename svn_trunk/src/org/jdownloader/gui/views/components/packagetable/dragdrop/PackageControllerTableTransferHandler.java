@@ -26,7 +26,7 @@ import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
 import jd.controlling.packagecontroller.AbstractNode;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.controlling.packagecontroller.PackageController.MergePackageSettings;
+import jd.controlling.packagecontroller.PackageController.PackageSettings;
 
 public abstract class PackageControllerTableTransferHandler<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends TransferHandler {
     /**
@@ -366,16 +366,16 @@ public abstract class PackageControllerTableTransferHandler<PackageType extends 
                 table.getController().getQueue().add(new QueueAction<Void, RuntimeException>(prio) {
                     @Override
                     protected Void run() throws RuntimeException {
-                        final MergePackageSettings mergesettings = new MergePackageSettings();
+                        final PackageSettings mergesettings = new PackageSettings();
                         if (((PackageType) element).getCurrentSorter() == null) {
                             if (org.jdownloader.settings.staticreferences.CFG_LINKCOLLECTOR.DO_MERGE_TOP_BOTTOM.isEnabled()) {
-                                mergesettings.setMergePosition(MergePosition.BOTTOM);
+                                mergesettings.setPackagePosition(MergePosition.BOTTOM);
                             } else {
-                                mergesettings.setMergePosition(MergePosition.TOP);
+                                mergesettings.setPackagePosition(MergePosition.TOP);
                             }
                         } else {
                             // we have a sorter.neither top nor bottom but sorted insert
-                            mergesettings.setMergePosition(MergePosition.SORTED);
+                            mergesettings.setPackagePosition(MergePosition.SORTED);
                         }
                         table.getController().merge((PackageType) element, links, packages, mergesettings);
                         return null;

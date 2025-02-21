@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50619 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50679 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -1042,7 +1042,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
         /* Login is mandatory! */
         loginOrFail(account, loggedIN);
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (!crawlProfilePicture && !crawlPosts) {
             /* Developer mistake */
             throw new IllegalArgumentException("crawlProfilePicture and crawlPosts cannot both be false");
@@ -1050,12 +1050,39 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         final InstagramMetadata metadata = new InstagramMetadata(username);
         metadata.setPackageName(username);
         InstaGramCom.prepBRAltAPI(this.br);
+        Number total_media_items = null;
+        boolean hasCrawledProfilePicture = false;
+        if (crawlProfilePicture) {
+            /* Crawl HD profile image, thx to: https://github.com/Ademking/profile-picture-viewer/blob/master/instagram.js#L43 */
+            logger.info("Crawling profile image");
+            InstaGramCom.getPageAltAPI(account, this.br, InstaGramCom.ALT_API_BASE + "/users/" + userID + "/info/");
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> user = (Map<String, Object>) entries.get("user");
+            total_media_items = ((Number) user.get("media_count")).intValue();
+            final Map<String, Object> hd_profile_pic_url_info = (Map<String, Object>) user.get("hd_profile_pic_url_info");
+            final String profilePictureURL = hd_profile_pic_url_info.get("url").toString();
+            final DownloadLink profilePic = this.createDownloadlink(profilePictureURL);
+            final String ext = Plugin.getFileNameExtensionFromString(profilePictureURL);
+            profilePic.setFinalFileName(username + ext);
+            profilePic.setAvailable(true);
+            profilePic._setFilePackage(metadata.getFilePackage());
+            ret.add(profilePic);
+            distribute(profilePic);
+            hasCrawledProfilePicture = true;
+            if (total_media_items != null && total_media_items.intValue() == 0) {
+                /* User doesn't have anything else we can crawl */
+                logger.info("Stopping because: media_count==0");
+                return ret;
+            } else if (!crawlPosts) {
+                logger.info("Stopping because: do not crawl posts (profile image only)");
+                return ret;
+            }
+        }
         String nextid = null;
         int page = 1;
         int numberofCrawledPosts = 0;
         final int maxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getProfileCrawlerMaxItemsLimit();
         final String profilePostsFeedBaseURL = InstaGramCom.ALT_API_BASE + "/feed/user/" + userID + "/";
-        boolean hasCrawledProfilePicture = false;
         do {
             if (page == 1) {
                 InstaGramCom.getPageAltAPI(account, this.br, profilePostsFeedBaseURL);
@@ -1063,8 +1090,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 // br.getPage(hashtagBaseURL + "?after=" + nextid);
                 InstaGramCom.getPageAltAPI(account, this.br, profilePostsFeedBaseURL + "?max_id=" + nextid);
             }
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             if (crawlProfilePicture && !hasCrawledProfilePicture) {
+                /* Old way -> This will return a low resolution 150x150 profile image */
                 final Map<String, Object> user = (Map<String, Object>) entries.get("user");
                 final String profilePictureURL = user.get("profile_pic_url").toString();
                 final DownloadLink profilePic = this.createDownloadlink(profilePictureURL);
@@ -1072,25 +1100,23 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 profilePic.setFinalFileName(username + ext);
                 profilePic.setAvailable(true);
                 profilePic._setFilePackage(metadata.getFilePackage());
-                decryptedLinks.add(profilePic);
+                ret.add(profilePic);
                 distribute(profilePic);
-                hasCrawledProfilePicture = true;
-            }
-            if (!crawlPosts) {
-                /* Do not crawl posts */
-                logger.info("Stopping because: do not crawl posts");
-                break;
+                if (!crawlPosts) {
+                    logger.info("Stopping because: do not crawl posts (profile image only)");
+                    return ret;
+                }
             }
             final int numberofItemsOnCurrentPage = (int) JavaScriptEngineFactory.toLong(entries.get("num_results"), 0);
             if (numberofItemsOnCurrentPage == 0) {
                 /* Rare case */
                 if (page == 1) {
                     /* Looks like profile doesn't contain any posts. */
-                    decryptedLinks.add(this.getDummyDownloadlinkProfileEmpty(username));
+                    ret.add(this.getDummyDownloadlinkProfileEmpty(username));
                 } else {
                     logger.info("Stopping because: 0 items available on current page");
                 }
-                return decryptedLinks;
+                return ret;
             }
             nextid = (String) entries.get("next_max_id");
             final boolean more_available = ((Boolean) entries.get("more_available"));
@@ -1099,9 +1125,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 logger.info("Stopping because: Found no new links on page " + page);
                 break;
             }
-            decryptedLinks.addAll(this.crawlPostListAltAPI(param, mediaItems, metadata));
+            ret.addAll(this.crawlPostListAltAPI(param, mediaItems, metadata));
             numberofCrawledPosts += numberofItemsOnCurrentPage;
-            logger.info("Crawled page: " + page + " | Crawled posts so far: " + numberofCrawledPosts);
+            logger.info("Crawled page: " + page + " | Crawled posts so far: " + numberofCrawledPosts + " | Total number of media items: " + total_media_items);
             if (!more_available) {
                 logger.info("Stopping because: more_available == false");
                 break;
@@ -1115,7 +1141,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 page++;
             }
         } while (!this.isAbort());
-        return decryptedLinks;
+        return ret;
     }
 
     private void loginOrFail(final Account account, final AtomicBoolean loggedIN) throws Exception {

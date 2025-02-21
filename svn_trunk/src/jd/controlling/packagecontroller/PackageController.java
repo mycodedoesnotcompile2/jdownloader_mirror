@@ -563,42 +563,41 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
      * - position of merged items </br>
      * - shall package comments be merged or not </br>
      */
-    public final static class MergePackageSettings {
-        private MergePosition mergeposition                         = null;
-        private int           mergeposition_int                     = -1;
-        private Boolean       mergePackageComments                  = Boolean.TRUE;
-        private Boolean       mergeSameNamedPackages                = Boolean.FALSE;
-        private Boolean       expandPackage                         = Boolean.FALSE;
-        private Boolean       mergeSameNamedPackagesCaseInsensitive = Boolean.FALSE;
+    public final static class PackageSettings {
+        private int     packageposition                       = -1;
+        private Boolean mergePackageComments                  = Boolean.TRUE;
+        private Boolean mergeSameNamedPackages                = Boolean.FALSE;
+        private Boolean expandPackage                         = Boolean.FALSE;
+        private Boolean mergeSameNamedPackagesCaseInsensitive = Boolean.FALSE;
 
-        public MergePackageSettings() {
-            setMergePosition(null);
+        public PackageSettings() {
+            setPackagePosition(null);
         }
 
-        /** This can return null! */
-        public MergePosition getMergePosition() {
-            return mergeposition;
+        public int getPackagePositionInt() {
+            return packageposition;
         }
 
-        public void setMergePosition(final int mergeposition) {
-            this.mergeposition_int = mergeposition;
+        public PackageSettings setPackagePosition(final int position) {
+            this.packageposition = position;
+            return this;
         }
 
-        public MergePackageSettings setMergePosition(final MergePosition mergeposition) {
-            if (mergeposition == null) {
+        public PackageSettings setPackagePosition(final MergePosition position) {
+            if (position == null) {
                 /* Default */
-                this.mergeposition = MergePosition.BOTTOM;
+                this.packageposition = -1;
             } else {
-                this.mergeposition = mergeposition;
-                switch (mergeposition) {
+                switch (position) {
                 case BOTTOM:
                     // positionMerge = dest.getChildren().size();
+                    packageposition = Integer.MAX_VALUE;
                     break;
                 case TOP:
-                    mergeposition_int = 0;
+                    packageposition = 0;
                     break;
                 default:
-                    mergeposition_int = -1;
+                    packageposition = -1;
                 }
             }
             return this;
@@ -608,7 +607,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             return mergePackageComments;
         }
 
-        public MergePackageSettings setMergePackageComments(Boolean mergePackageComments) {
+        public PackageSettings setMergePackageComments(Boolean mergePackageComments) {
             if (mergePackageComments == null) {
                 this.mergePackageComments = Boolean.TRUE;
             } else {
@@ -654,11 +653,12 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         }
     }
 
-    public void merge(final PackageType dest, final List<PackageType> srcPkgs, final MergePackageSettings mergesettings) {
+    public void merge(final PackageType dest, final List<PackageType> srcPkgs, final PackageSettings mergesettings) {
+        // TODO: Remove this?
         merge(dest, null, srcPkgs, mergesettings);
     }
 
-    public void merge(final PackageType dest, final List<ChildType> srcLinks, final List<PackageType> srcPkgs, final MergePackageSettings mergesettings) {
+    public void merge(final PackageType dest, final List<ChildType> srcLinks, final List<PackageType> srcPkgs, final PackageSettings mergesettings) {
         if (mergesettings == null) {
             throw new IllegalArgumentException();
         }
@@ -707,20 +707,20 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     /* End */
                     return null;
                 }
-                int positionMerge = 0;
-                switch (mergesettings.getMergePosition()) {
-                case BOTTOM:
-                    positionMerge = dest.getChildren().size();
-                    break;
-                case TOP:
-                    positionMerge = 0;
-                    break;
-                default:
-                    positionMerge = -1;
-                }
+                int positionMerge = mergesettings.getPackagePositionInt();
+                // switch (mergesettings.getMergePosition()) {
+                // case BOTTOM:
+                // positionMerge = dest.getChildren().size();
+                // break;
+                // case TOP:
+                // positionMerge = 0;
+                // break;
+                // default:
+                // positionMerge = -1;
+                // }
                 if (srcLinks != null) {
                     /* move srcLinks to dest */
-                    moveOrAddAt(dest, srcLinks, positionMerge);
+                    moveOrAddAt(dest, srcLinks, 0, positionMerge);
                     if (positionMerge != -1) {
                         /* update positionMerge in case we want merge@top */
                         positionMerge += srcLinks.size();
@@ -730,7 +730,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     for (final PackageType pkg : srcPkgs) {
                         /* move links from srcPkgs to dest */
                         final int size = pkg.getChildren().size();
-                        moveOrAddAt(dest, pkg.getChildren(), positionMerge);
+                        moveOrAddAt(dest, pkg.getChildren(), 0, positionMerge);
                         if (positionMerge != -1) {
                             /* update positionMerge in case we want merge@top */
                             positionMerge += size;
@@ -1152,7 +1152,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
      *            List of packages that are allowed to be merged or null if duplicate merging should be done on whole
      *            linkgrabberlist/downloadlist.
      */
-    public final Map<String, List<PackageType>> getPackagesWithSameName(final List<PackageType> packages, final MergePackageSettings settings) {
+    public final Map<String, List<PackageType>> getPackagesWithSameName(final List<PackageType> packages, final PackageSettings settings) {
         final boolean readL = this.readLock();
         try {
             final List<PackageType> allpackages = this.getPackages();
