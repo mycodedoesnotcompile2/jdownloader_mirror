@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "" })
 public class SlideShareNet extends PluginForHost {
     public SlideShareNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,9 @@ public class SlideShareNet extends PluginForHost {
     }
 
     public static boolean isOffline(final Browser br) {
-        if (br.getHttpConnection().getResponseCode() == 410) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.getHttpConnection().getResponseCode() == 410) {
             return true;
         } else if (br.containsHTML(">\\s*Sorry\\! We could not find what you were looking for|>Don\\'t worry, we will help you get to the right place|<title>404 error\\. Page Not Found\\.</title>") || br.containsHTML("(?i)>\\s*Uploaded Content Removed\\s*<")) {
             return true;

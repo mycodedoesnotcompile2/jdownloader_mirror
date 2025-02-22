@@ -53,6 +53,7 @@ import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -99,7 +100,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50661 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50685 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2734,11 +2735,28 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    protected boolean handleCloudflareTurnstileCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
+        final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br);
+        /**
+         * This contains a workaround for a widespread design-flaw when using hcaptcha and a long wait-time in browser: <br>
+         * We need to split up the total waittime in such a case otherwise our solution token will expire before we get the chance to send
+         * it!
+         */
+        logger.info("Detected captcha method \"CloudflareTurnstileCaptcha\" for this host");
+        this.waitBeforeInteractiveCaptcha(link, ts.getSolutionTimeout());
+        final String cfTurnstileResponse = ts.getToken();
+        captchaForm.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+        /* For cheap copy & paste implementations which some websites are doing. */
+        captchaForm.put("g-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
+        return true;
+    }
+
     protected boolean handleHCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
         final CaptchaHelperHostPluginHCaptcha hCaptcha = getCaptchaHelperHostPluginHCaptcha(this, br);
-        /*
-         * This contains a workaround for a widespread design-flaw when using hcaptcha and a long wait-time in browser: We need to split up
-         * the total waittime in such a case otherwise our solution token will expire before we get the chance to send it!
+        /**
+         * This contains a workaround for a widespread design-flaw when using hcaptcha and a long wait-time in browser: <br>
+         * We need to split up the total waittime in such a case otherwise our solution token will expire before we get the chance to send
+         * it!
          */
         logger.info("Detected captcha method \"hcaptcha\" type '" + hCaptcha.getType() + "' for this host");
         this.waitBeforeInteractiveCaptcha(link, hCaptcha.getSolutionTimeout());
@@ -2771,9 +2789,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Handles all kinds of captchas, also login-captcha - fills captcha answer into given captchaForm. */
     public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
         /* Captcha START */
-        if (new Regex(getCorrectBR(br), Pattern.compile("(geetest_challenge|geetest_validate|geetest_seccode)", Pattern.CASE_INSENSITIVE)).patternFind()) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unsupported captcha type geetest", 3 * 60 * 60 * 1000l);
-        } else if (new Regex(getCorrectBR(br), Pattern.compile("\\$\\.post\\(\\s*\"/ddl\"", Pattern.CASE_INSENSITIVE)).patternFind()) {
+        if (new Regex(getCorrectBR(br), Pattern.compile("\\$\\.post\\(\\s*\"/ddl\"", Pattern.CASE_INSENSITIVE)).patternFind()) {
             /* 2019-06-06: Rare case */
             final String captchaResponse;
             final CaptchaHosterHelperInterface captchaHelper;
@@ -2824,6 +2840,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 this.logger.warning("Fatal " + captchaHelper + " ajax handling failure");
                 checkErrorsLastResort(brc, link, null);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        } else if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
+            if (handleCloudflareTurnstileCaptcha(link, br, captchaForm)) {
             }
         } else if (containsHCaptcha(getCorrectBR(br))) {
             if (handleHCaptcha(link, br, captchaForm)) {

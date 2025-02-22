@@ -34,14 +34,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:(?:\\w+)\\.)?slideshare\\.net/(slideshow/[a-z0-9\\-]+/\\d+|[a-z0-9\\-_]+/[a-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:(?:\\w+)\\.)?slideshare\\.net/(slideshow/[a-z0-9\\-]+/\\d+|[a-z0-9\\-_]+/[a-z0-9\\-_]+)" })
 public class SlideShareNetDecrypter extends PluginForDecrypt {
     public SlideShareNetDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         jd.plugins.hoster.SlideShareNet.prepBR(br);
         final String contenturl = param.getCryptedUrl().replaceAll("https?://(?:[a-z0-9]+\\.)?slideshare\\.net/", "https://www.slideshare.net/");
         final PluginForHost hostplugin = this.getNewPluginForHostInstance(this.getHost());
@@ -55,6 +54,7 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
         if (jd.plugins.hoster.SlideShareNet.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (br.containsHTML("class=\"profileHeader\"")) {
             // TODO: Check if this is still needed
             /* All documents/presentations/videos/info graphics of a user */
@@ -74,7 +74,7 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
                     return null;
                 }
                 for (String url : entries) {
-                    url = "https://www.slideshare.net" + url;
+                    url = url = br.getURL(url).toExternalForm();
                     ret.add(this.createDownloadlink(url));
                 }
                 next = this.br.getRegex("href=\"(/[^<>\"]*?\\d+)\" rel=\"next\"").getMatch(0);
@@ -112,11 +112,6 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
         return ret;
     }
 
-    @Override
-    public boolean isProxyRotationEnabledForLinkCrawler() {
-        return false;
-    }
-
     private boolean getUserLogin(final boolean force) throws Exception {
         final PluginForHost hostPlugin = JDUtilities.getPluginForHost(this.getHost());
         final Account aa = AccountController.getInstance().getValidAccount(hostPlugin);
@@ -133,5 +128,15 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
         // Account is valid, let's just add it
         AccountController.getInstance().addAccount(hostPlugin, aa);
         return true;
+    }
+
+    @Override
+    public boolean isProxyRotationEnabledForLinkCrawler() {
+        return false;
+    }
+
+    @Override
+    public boolean hasCaptcha(CryptedLink link, Account acc) {
+        return false;
     }
 }

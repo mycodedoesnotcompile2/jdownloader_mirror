@@ -47,6 +47,8 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -83,7 +85,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 50645 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50684 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -805,6 +807,11 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                             /* Check if link to next download-page redirects directly to final downloadurl. */
                             waitTime(this.br, link, timeBeforeCaptchaInput);
                             this.dl = jd.plugins.BrowserAdapter.openDownload(br, link, continueLink, this.isResumeable(link, account), this.getMaxChunks(account));
+                        } else if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
+                            final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
+                            continueform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                            /* For cheap copy & paste implementations which some websites are doing. */
+                            continueform.put("cf-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
                         } else if (containsRecaptchaV2Class(continueform) || br.containsHTML("data\\-sitekey\\s*=\\s*|g\\-recaptcha\\'")) {
                             loopLog += " --> reCaptchaV2";
                             hasRequestedCaptcha = true;

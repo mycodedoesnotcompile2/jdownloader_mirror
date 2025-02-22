@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
 
-@HostPlugin(revision = "$Revision: 50592 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50683 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -53,11 +53,12 @@ public class KemonoParty extends PluginForHost {
     /* Post title (often a shorter version of post content) */
     public static String                      PROPERTY_TITLE              = "title";
     /* Post content */
-    public static String                      PROPERTY_POST_TEXT       = "post_text";
+    public static String                      PROPERTY_POST_TEXT          = "post_text";
     public static String                      PROPERTY_BETTER_FILENAME    = "better_filename";
     public static String                      PROPERTY_TEXT               = "text";
     public static String                      PROPERTY_PORTAL             = "portal";
     public static String                      PROPERTY_USERID             = "userid";
+    public static String                      PROPERTY_USERNAME           = "username";
     public static String                      PROPERTY_POSTID             = "postid";
     public static String                      PROPERTY_DATE               = "date";
     public static String                      PROPERTY_POST_CONTENT_INDEX = "postContentIndex";

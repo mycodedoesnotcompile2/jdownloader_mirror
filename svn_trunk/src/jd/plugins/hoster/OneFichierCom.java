@@ -29,16 +29,18 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -67,7 +69,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50675 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50690 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -89,7 +91,6 @@ public class OneFichierCom extends PluginForHost {
      */
     private static final boolean resume_free_hotlink               = true;
     private static final int     maxchunks_free_hotlink            = -3;
-    private static final boolean PREFER_API_FOR_SINGLE_LINKCHECK   = true;
 
     @Override
     public String[] siteSupportedNames() {
@@ -196,14 +197,36 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
+    private boolean preferSingleLinkcheckViaAPI() {
+        final OneFichierConfigInterface cfg = PluginJsonConfig.get(OneFichierConfigInterface.class);
+        final LinkcheckMode mode = cfg.getLinkcheckMode();
+        if (mode == LinkcheckMode.AUTO) {
+            return true;
+        } else if (mode == LinkcheckMode.PREFER_SINGLE_LINKCHECK) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean allowSingleFileAPILinkcheck(final DownloadLink link, final Account account) {
+        if (isaccessControlLimited(link) && !link.isSizeSet() && link.getDownloadPassword() != null && canUseAPI(account)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     @Override
     public boolean checkLinks(final DownloadLink[] urls) {
         if (urls == null || urls.length == 0) {
             return false;
         }
         final Account account;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && urls.length == 1 && PREFER_API_FOR_SINGLE_LINKCHECK && (account = AccountController.getInstance().getValidAccount(this.getHost())) != null && canUseAPI(account)) {
+        if (preferSingleLinkcheckViaAPI() && urls.length == 1 && (account = AccountController.getInstance().getValidAccount(this.getHost())) != null && allowSingleFileAPILinkcheck(urls[0], account)) {
             /* Trigger fallback to single linkcheck */
+            // requestFileInformationAPI(br, urls[0], account);
+            /* Trigger single linkcheck */
             return false;
         }
         try {
@@ -243,27 +266,22 @@ public class OneFichierCom extends PluginForHost {
                 br.postPageRaw(correctProtocol("http://" + this.getHost() + "/check_links.pl"), sb.toString());
                 for (final DownloadLink link : links) {
                     // final String addedLink = dllink.getDownloadURL();
-                    final String addedlink_id = this.getFID(link);
-                    if (addedlink_id == null) {
-                        // invalid uid
+                    final String file_id = this.getFID(link);
+                    /* Set fallback-filename */
+                    if (!link.isNameSet()) {
+                        link.setName(file_id);
+                    }
+                    if (br.containsHTML(file_id + "[^;]*;;;(NOT FOUND|BAD LINK)")) {
                         link.setAvailable(false);
-                    } else if (br.containsHTML(addedlink_id + "[^;]*;;;(NOT FOUND|BAD LINK)")) {
-                        link.setAvailable(false);
-                        if (!link.isNameSet()) {
-                            link.setName(addedlink_id);
-                        }
-                    } else if (br.containsHTML(addedlink_id + "[^;]*;;;PRIVATE")) {
+                    } else if (br.containsHTML(file_id + "[^;]*;;;PRIVATE")) {
                         /**
                          * Private or password protected file. </br>
                          * Admin was asked to change this to return a more precise status instead but declined that suggestion.
                          */
                         link.setProperty(PROPERTY_ACL_ACCESS_CONTROL_LIMIT, true);
                         link.setAvailable(true);
-                        if (!link.isNameSet()) {
-                            link.setName(addedlink_id);
-                        }
                     } else {
-                        final String[] linkInfo = br.getRegex(addedlink_id + "[^;]*;([^;]+);(\\d+)").getRow(0);
+                        final String[] linkInfo = br.getRegex(file_id + "[^;]*;([^;]+);(\\d+)").getRow(0);
                         if (linkInfo.length != 2) {
                             logger.warning("Linkchecker for 1fichier.com is broken!");
                             return false;
@@ -289,7 +307,10 @@ public class OneFichierCom extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
         final Account account;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && PREFER_API_FOR_SINGLE_LINKCHECK && (account = AccountController.getInstance().getValidAccount(this.getHost())) != null && canUseAPI(account)) {
+        if (!link.isNameSet()) {
+            link.setName(this.getFID(link));
+        }
+        if (preferSingleLinkcheckViaAPI() && (account = AccountController.getInstance().getValidAccount(this.getHost())) != null && allowSingleFileAPILinkcheck(link, account)) {
             /*
              * Advantage when doing this: We can get the file information even for password protected files (if we got the correct
              * password).
@@ -356,6 +377,7 @@ public class OneFichierCom extends PluginForHost {
         if (checksum != null) {
             link.setHashInfo(HashInfo.parse(checksum, TYPE.WHIRLPOOL));
         }
+        link.setAvailable(true);
         return AvailableStatus.TRUE;
     }
 
@@ -762,7 +784,15 @@ public class OneFichierCom extends PluginForHost {
             ai.setStatus(type.getLabel() + " | Can't display more detailed info at this moment due to 'API flood'");
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
-            ai.setUnlimitedTraffic();
+            if (type == AccountType.PREMIUM) {
+                ai.setUnlimitedTraffic();
+            } else {
+                /*
+                 * Free accounts cannot be used for downloading in API mode [unless they got CDN credits and they are in use, see down
+                 * below].
+                 */
+                ai.setTrafficLeft(0);
+            }
             return ai;
         }
         this.handleErrorsAPI(entries, account);
@@ -787,7 +817,6 @@ public class OneFichierCom extends PluginForHost {
         if (!StringUtils.isEmpty(subscription_end)) {
             validuntil = TimeFormatter.getMilliSeconds(subscription_end, "yyyy-MM-dd HH:mm:ss", Locale.FRANCE);
         }
-        ai.setUnlimitedTraffic();
         String accountStatus;
         if (validuntil > System.currentTimeMillis()) {
             /* Premium */
@@ -795,30 +824,35 @@ public class OneFichierCom extends PluginForHost {
             accountStatus = "Premium Account";
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
-            this.setValidUntil(ai, validuntil);
+            setValidUntil(ai, validuntil);
+            ai.setUnlimitedTraffic();
         } else {
             /* Free --> 2019-07-18: API Keys are only available for premium users so this should never happen! */
             account.setType(AccountType.FREE);
-            accountStatus = "Free Account";
+            accountStatus = "Free Account [DL not possible in API mode]";
             account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
             account.setConcurrentUsePossible(false);
+            /*
+             * Free accounts cannot be used for downloading in API mode [unless they got CDN credits and they are in use, see down below].
+             */
+            ai.setTrafficLeft(0);
         }
         /* 2019-04-04: Credits are only relevant for free accounts according to website: https://1fichier.com/console/params.pl */
         String creditsStatus = "";
         if (available_credits_in_gigabyte > 0) {
-            if (account.getType() == AccountType.FREE) {
-                ai.setTrafficLeft((long) available_credits_in_gigabyte);
-                /* Display traffic but do not care about how much is actually left. */
-                ai.setSpecialTraffic(true);
-            }
+            final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+            final long available_credits_in_bytes = (long) available_credits_in_gigabyte;
+            final String available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, available_credits_in_bytes);
+            creditsStatus = available_credits_human_readable + " CDN credits available | Used: ";
             if (useOwnCredits == 1) {
-                creditsStatus += " [Using credits]";
+                creditsStatus += "No";
                 if (account.getType() == AccountType.FREE) {
                     /* Treat Free accounts like a premium account if credits are used. */
                     account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
                 }
+                ai.setTrafficLeft(available_credits_in_bytes);
             } else {
-                creditsStatus += " [NOT using credits]";
+                creditsStatus += "Yes";
             }
             accountStatus += creditsStatus;
         }

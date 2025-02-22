@@ -39,7 +39,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50408 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50688 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -188,6 +188,9 @@ public class VeevTo extends XFileSharingProBasic {
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
         if (br.containsHTML("<title>Watch video - Veev\\.to</title>")) {
+            /* 2024-07-08: Offline embed item without further error message. */
+            return true;
+        } else if (br.containsHTML(">\\s*File not found")) {
             /* 2024-07-08: Offline embed item without further error message. */
             return true;
         } else {

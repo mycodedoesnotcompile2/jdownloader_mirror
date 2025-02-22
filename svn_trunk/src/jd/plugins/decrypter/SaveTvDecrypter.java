@@ -52,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.SaveTv;
 
-@DecrypterPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm" })
+@DecrypterPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -674,5 +674,10 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         message += "Dauer des Crawlvorganges: " + TimeFormatter.formatMilliSeconds(crawl_duration, 0);
         message += "\r\n\r\nGenervt von diesen Info-Dialogen? In den Plugin Einstellungen kannst du sie deaktivieren ;)";
         return message;
+    }
+
+    @Override
+    public boolean hasCaptcha(CryptedLink link, Account acc) {
+        return false;
     }
 }

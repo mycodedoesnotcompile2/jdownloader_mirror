@@ -18,7 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -27,9 +26,9 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50684 $", interfaceVersion = 3, names = {}, urls = {})
-public class FilespayoutCom extends XFileSharingProBasic {
-    public FilespayoutCom(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = {}, urls = {})
+public class UploadscloudCom extends XFileSharingProBasic {
+    public UploadscloudCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -38,13 +37,13 @@ public class FilespayoutCom extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2024-10-07: null <br />
+     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filespayout.com", "filespayouts.com" });
+        ret.add(new String[] { "uploadscloud.com" });
         return ret;
     }
 
@@ -81,13 +80,13 @@ public class FilespayoutCom extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 0;
+            return 1;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 0;
+            return 1;
         }
     }
 
@@ -104,21 +103,5 @@ public class FilespayoutCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected String regexWaittime(final String html) {
-        final String waitStr = new Regex(html, "id=\"seconds\"[^>]*>\\s*(\\d+)").getMatch(0);
-        if (waitStr != null) {
-            return waitStr;
-        } else {
-            return super.regexWaittime(html);
-        }
-    }
-
-    @Override
-    protected boolean supports_availablecheck_filesize_html() {
-        // 2025-01-20
-        return false;
     }
 }

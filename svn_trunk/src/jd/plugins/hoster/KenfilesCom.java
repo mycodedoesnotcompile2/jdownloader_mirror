@@ -32,10 +32,9 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50615 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50685 $", interfaceVersion = 3, names = {}, urls = {})
 public class KenfilesCom extends XFileSharingProBasic {
     public KenfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -230,19 +229,10 @@ public class KenfilesCom extends XFileSharingProBasic {
         }
         return super.looksLikeDownloadableContent(urlConnection);
     }
-    // @Override
-    // public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
-    // if (true) {
-    // throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
-    // }
-    // }
 
     @Override
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
-        requestFileInformationWebsite(link, account);
-        if (true) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
-        }
+        super.doFree(link, account);
     }
     // @Override
     // public void handlePremium(final DownloadLink link, final Account account) throws Exception {
@@ -268,4 +258,27 @@ public class KenfilesCom extends XFileSharingProBasic {
     // protected boolean enableAccountApiOnlyMode() {
     // return true;
     // }
+
+    @Override
+    protected void waitTime(final DownloadLink link, final long timeBefore) throws PluginException {
+        try {
+            final Form download1free = this.findFormDownload1Free(br);
+            if (download1free != null) {
+                /*
+                 * Small hack: Do not wait here because the "wait 30 seconds" text only really initiales a wait time counter on download2
+                 * page.
+                 */
+                return;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        super.waitTime(link, timeBefore);
+    }
+
+    @Override
+    public ArrayList<String> getCleanupHTMLRegexes() {
+        /* Needed otherwise upper function will remove Cloudflare Turnstile related html code. */
+        return null;
+    }
 }

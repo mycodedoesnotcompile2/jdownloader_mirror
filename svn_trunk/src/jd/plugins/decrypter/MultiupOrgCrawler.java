@@ -21,6 +21,7 @@ import java.util.List;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
@@ -34,14 +35,12 @@ import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49210 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50685 $", interfaceVersion = 2, names = {}, urls = {})
 public class MultiupOrgCrawler extends antiDDoSForDecrypt {
     // DEV NOTES:
     // DO NOT REMOVE COMPONENTS YOU DONT UNDERSTAND! When in doubt ask raztoki to fix.
@@ -154,25 +153,37 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
             } else if (br.containsHTML("The file does not exist any more\\.<|<h1>\\s*The server returned a \"404 Not Found\"\\.</h2>|<h1>\\s*Oops! An Error Occurred\\s*</h1>|>\\s*File not found|>\\s*No link currently available")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+            final Form captchaform = br.getFormbyActionRegex("/mirror/");
             if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
-                /* https://svn.jdownloader.org/issues/90281 */
-                throw new DecrypterRetryException(RetryReason.BLOCKED_BY, "Cloudflare Turnstile captcha is not supported");
+                if (captchaform == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+                captchaform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                submitForm(captchaform);
+                if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
+                    /* This should never happen */
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                }
             } else if (AbstractHCaptcha.containsHCaptcha(br)) {
-                final Form form = br.getFormbyActionRegex("/mirror/");
+                if (captchaform == null) {
+                    /* This should never happen */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 final String response = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
-                form.put("h-captcha-response", Encoding.urlEncode(response));
-                form.put("g-recaptcha-response", Encoding.urlEncode(response));
-                submitForm(form);
-                if (br.containsHTML("h-recaptcha")) {
+                captchaform.put("h-captcha-response", Encoding.urlEncode(response));
+                captchaform.put("g-recaptcha-response", Encoding.urlEncode(response));
+                submitForm(captchaform);
+                if (AbstractHCaptcha.containsHCaptcha(br)) {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
             } else if (br.containsHTML("g-recaptcha")) {
-                final Form form = br.getFormbyActionRegex("/mirror/");
                 final String response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-                form.put("g-recaptcha-response", Encoding.urlEncode(response));
-                submitForm(form);
+                captchaform.put("g-recaptcha-response", Encoding.urlEncode(response));
+                submitForm(captchaform);
                 if (br.containsHTML("g-recaptcha")) {
+                    /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
             }

@@ -1,5 +1,5 @@
 //jDownloader - Downloadmanager
-//Copyright (C) 2013  JD-Team support@jdownloader.org
+//Copyright (C) 2016  JD-Team support@jdownloader.org
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -18,8 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
 import jd.plugins.Account;
@@ -27,24 +26,25 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50684 $", interfaceVersion = 3, names = {}, urls = {})
-public class FilespayoutCom extends XFileSharingProBasic {
-    public FilespayoutCom(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 50681 $", interfaceVersion = 2, names = {}, urls = {})
+public class AnonsharingCom extends YetiShareCore {
+    public AnonsharingCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(super.getPurchasePremiumURL());
+        this.enablePremium(getPurchasePremiumURL());
     }
 
     /**
-     * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
+     * DEV NOTES YetiShare<br />
+     ****************************
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2024-10-07: null <br />
-     * other:<br />
+     * captchatype-info: null solvemedia reCaptchaV2, hcaptcha<br />
+     * other: <br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filespayout.com", "filespayouts.com" });
+        ret.add(new String[] { "anonsharing.com" });
         return ret;
     }
 
@@ -58,16 +58,15 @@ public class FilespayoutCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return YetiShareCore.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        final AccountType type = account != null ? account.getType() : null;
-        if (AccountType.FREE.equals(type)) {
+        if (account != null && account.getType() == AccountType.FREE) {
             /* Free Account */
             return true;
-        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+        } else if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
             return true;
         } else {
@@ -76,13 +75,11 @@ public class FilespayoutCom extends XFileSharingProBasic {
         }
     }
 
-    @Override
     public int getMaxChunks(final Account account) {
-        final AccountType type = account != null ? account.getType() : null;
-        if (AccountType.FREE.equals(type)) {
+        if (account != null && account.getType() == AccountType.FREE) {
             /* Free Account */
             return 0;
-        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+        } else if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
             return 0;
         } else {
@@ -92,11 +89,10 @@ public class FilespayoutCom extends XFileSharingProBasic {
     }
 
     @Override
-    public int getMaxSimultaneousFreeAnonymousDownloads() {
+    public int getMaxSimultanFreeDownloadNum() {
         return -1;
     }
 
-    @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
         return -1;
     }
@@ -104,21 +100,5 @@ public class FilespayoutCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected String regexWaittime(final String html) {
-        final String waitStr = new Regex(html, "id=\"seconds\"[^>]*>\\s*(\\d+)").getMatch(0);
-        if (waitStr != null) {
-            return waitStr;
-        } else {
-            return super.regexWaittime(html);
-        }
-    }
-
-    @Override
-    protected boolean supports_availablecheck_filesize_html() {
-        // 2025-01-20
-        return false;
     }
 }

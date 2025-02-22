@@ -22,21 +22,21 @@ import java.util.Map;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
+import jd.parser.html.InputField;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49578 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50687 $", interfaceVersion = 3, names = {}, urls = {})
 public class ShrtflyVip extends MightyScriptAdLinkFly {
     public ShrtflyVip(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,16 +93,20 @@ public class ShrtflyVip extends MightyScriptAdLinkFly {
         }
         /* They call this "alias". */
         // final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        final Form form0 = br.getFormbyKey("alias");
-        submitForm(form0);
         br.getHeaders().put("Origin", "https://" + br.getHost());
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        final Form form = br.getFormbyKey("alias");
+        if (form == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        submitForm(form);
         /* 2022-12-09 */
+        final int pageMax = 15;
         int page = 1;
         Form nextForm = null;
         int totalWaitedSeconds = 0;
         do {
-            logger.info("Working on page: " + page + " | Total waited seconds so far: " + totalWaitedSeconds);
+            logger.info("Working on page: " + page + " of max " + pageMax + " | Total waited seconds so far: " + totalWaitedSeconds);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String error = (String) entries.get("error");
             if (error != null) {
@@ -127,27 +131,36 @@ public class ShrtflyVip extends MightyScriptAdLinkFly {
             if (StringUtils.isEmpty(next_page) || StringUtils.isEmpty(speed_token)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                return ret;
-            } else if (page >= 8) {
-                logger.warning("Preventing endless loop");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
             this.postPage(next_page, "speed_token=" + Encoding.urlEncode(speed_token));
             nextForm = br.getFormbyProperty("id", "form");
             if (nextForm == null) {
                 /* 2022-12-09 */
                 nextForm = br.getFormbyProperty("id", "init_next_up");
+                if (nextForm == null) {
+                    /* 2025-02-21 */
+                    nextForm = br.getFormbyActionRegex(".*/verify");
+                }
             }
             if (nextForm == null) {
                 logger.info("Stopping because: Failed to find nextForm");
                 break;
             }
-            if (CaptchaHelperCrawlerPluginRecaptchaV2.containsRecaptchaV2Class(nextForm)) {
-                /* Typically captcha is located on first page/first run. */
-                final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-                nextForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            String actionFieldValue = null;
+            final InputField actionField = nextForm.getInputFieldByName("action");
+            if (actionField != null) {
+                actionFieldValue = actionField.getValue();
+            }
+            if (StringUtils.equalsIgnoreCase(actionFieldValue, "captcha")) {
+                if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(form)) {
+                    final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+                    form.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                } else if (CaptchaHelperCrawlerPluginRecaptchaV2.containsRecaptchaV2Class(nextForm)) {
+                    /* Typically captcha is located on first page/first run. */
+                    final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+                    nextForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                }
+            } else if (StringUtils.equalsIgnoreCase(actionFieldValue, "progressbar")) {
+                logger.info("progressbar");
             }
             /* Step "progressbar". This can happen multiple times. */
             final String waitSecondsStr = br.getRegex("var progress_original = (\\d{1,2});").getMatch(0);
@@ -164,13 +177,16 @@ public class ShrtflyVip extends MightyScriptAdLinkFly {
                 totalWaitedSeconds += secs;
                 this.sleep(secs * 1001l, param);
             }
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                return ret;
+            } else if (page >= pageMax) {
+                logger.info("Stopping because: Processed max allowed number of pages");
+                break;
+            }
             this.submitForm(nextForm);
             page++;
         } while (true);
-        if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br) || br.containsHTML("challenges\\.cloudflare\\.com/turnstile")) {
-            /* https://svn.jdownloader.org/issues/90281 */
-            throw new DecrypterRetryException(RetryReason.BLOCKED_BY, "Cloudflare Turnstile captcha is not supported");
-        }
         /* Old handling down below */
         // final String alias = br.getRegex("var alias\\s*=\\s*'([a-z0-9]+)';").getMatch(0);
         // final String token = br.getRegex("var token\\s*=\\s*'([a-f0-9]{32})';").getMatch(0);

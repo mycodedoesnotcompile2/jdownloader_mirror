@@ -11,10 +11,10 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
@@ -61,6 +61,8 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
             return true;
         } else if (c instanceof CutCaptchaChallenge) {
             return true;
+        } else if (c instanceof CloudflareTurnstileChallenge) {
+            return true;
         } else {
             return false;
         }
@@ -70,91 +72,75 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
     protected void solveCES(CESSolverJob<String> job) throws InterruptedException, SolverException {
         final Challenge<String> captchaChallenge = job.getChallenge();
         try {
-            final Map<String, Object> v2postdata = new HashMap<String, Object>(); // APIv2
-            v2postdata.put("clientKey", config.getApiKey());
-            final Map<String, Object> v2task = new HashMap<String, Object>(); // APIv2
-            final UrlQuery q = new UrlQuery();
-            q.appendEncoded("key", config.getApiKey());
-            q.appendEncoded("json", "1");
-            q.appendEncoded("soft_id", getSoftID());
+            final Map<String, Object> postdata = new HashMap<String, Object>(); // APIv2
+            postdata.put("clientKey", config.getApiKey());
+            final Map<String, Object> task = new HashMap<String, Object>(); // APIv2
             if (captchaChallenge instanceof RecaptchaV2Challenge) {
                 final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
-                v2task.put("type", "RecaptchaV2TaskProxyless");
-                v2task.put("websiteKey", challenge.getSiteKey());
-                v2task.put("websiteURL", challenge.getSiteUrl());
-                q.appendEncoded("googlekey", challenge.getSiteKey());
-                q.appendEncoded("pageurl", challenge.getSiteUrl());
+                task.put("type", "RecaptchaV2TaskProxyless");
+                task.put("websiteKey", challenge.getSiteKey());
+                task.put("websiteURL", challenge.getSiteUrl());
                 final AbstractRecaptchaV2<?> recaptchaChallenge = challenge.getAbstractCaptchaHelperRecaptchaV2();
                 if (recaptchaChallenge != null) {
                     if (challenge.isEnterprise()) {
-                        v2task.put("isEnterprise", true);
-                        q.appendEncoded("enterprise", "1");
+                        task.put("isEnterprise", true);
                     }
                     final Map<String, Object> action = challenge.getV3Action();
                     if (action != null && action.containsKey("action")) {
-                        v2task.put("type", "RecaptchaV3TaskProxyless");
-                        v2task.put("pageAction", String.valueOf(action.get("action")));
-                        q.appendEncoded("version", "v3");
-                        q.appendEncoded("action", String.valueOf(action.get("action")));
+                        task.put("type", "RecaptchaV3TaskProxyless");
+                        task.put("pageAction", String.valueOf(action.get("action")));
                     } else if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
-                        q.appendEncoded("invisible", "1");
-                        v2task.put("isInvisible", true);
+                        task.put("isInvisible", true);
                     }
                 }
             } else if (captchaChallenge instanceof HCaptchaChallenge) {
                 final HCaptchaChallenge challenge = (HCaptchaChallenge) job.getChallenge();
-                v2task.put("type", "HCaptchaTaskProxyless");
-                v2task.put("websiteURL", challenge.getSiteUrl());
-                v2task.put("websiteKey", challenge.getSiteKey());
-                q.appendEncoded("method", "hcaptcha");
-                q.appendEncoded("sitekey", challenge.getSiteKey());
-                q.appendEncoded("pageurl", challenge.getSiteUrl());
+                task.put("type", "HCaptchaTaskProxyless");
+                task.put("websiteURL", challenge.getSiteUrl());
+                task.put("websiteKey", challenge.getSiteKey());
                 final AbstractHCaptcha<?> hCaptcha = challenge.getAbstractCaptchaHelperHCaptcha();
                 if (hCaptcha != null && AbstractHCaptcha.TYPE.INVISIBLE.equals(hCaptcha.getType())) {
-                    v2task.put("isInvisible", true);
-                    q.appendEncoded("invisible", "1");
+                    task.put("isInvisible", true);
                 }
             } else if (captchaChallenge instanceof CutCaptchaChallenge) {
                 /* CutCaptcha: https://2captcha.com/api-docs/cutcaptcha */
                 final CutCaptchaChallenge challenge = (CutCaptchaChallenge) job.getChallenge();
                 challenge.sendStatsSolving(this);
-                q.appendEncoded("method", "cutcaptcha");
-                q.appendEncoded("misery_key", challenge.getSiteKey());
-                q.appendEncoded("api_key", challenge.getApiKey());
-                q.appendEncoded("pageurl", challenge.getSiteUrl());
-                v2task.put("type", "CutCaptchaTaskProxyless");
-                v2task.put("miseryKey", challenge.getSiteKey());
-                v2task.put("apiKey", challenge.getApiKey());
-                v2task.put("websiteURL", challenge.getSiteUrl());
+                task.put("type", "CutCaptchaTaskProxyless");
+                task.put("miseryKey", challenge.getSiteKey());
+                task.put("apiKey", challenge.getApiKey());
+                task.put("websiteURL", challenge.getSiteUrl());
+            } else if (captchaChallenge instanceof CloudflareTurnstileChallenge) {
+                /* Cloudflare turnstile: https://2captcha.com/api-docs/cloudflare-turnstile */
+                final CloudflareTurnstileChallenge challenge = (CloudflareTurnstileChallenge) job.getChallenge();
+                challenge.sendStatsSolving(this);
+                task.put("type", "TurnstileTaskProxyless");
+                task.put("websiteURL", challenge.getSiteUrl());
+                task.put("websiteKey", challenge.getSiteKey());
             } else {
                 /* Image captcha: https://2captcha.com/api-docs/normal-captcha */
                 final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge<String>) job.getChallenge();
                 final byte[] data = IO.readFile(challenge.getImageFile());
-                q.appendEncoded("method", "base64");
-                q.appendEncoded("body", Base64.encodeToString(data, false));
-                if (challenge.getExplain() != null) {
-                    q.appendEncoded("comment", challenge.getExplain());
-                }
-                v2task.put("type", "ImageToTextTask");
-                v2task.put("body", Base64.encodeToString(data, false));
-                v2task.put("comment", challenge.getExplain());
+                task.put("type", "ImageToTextTask");
+                task.put("body", Base64.encodeToString(data, false));
+                task.put("comment", challenge.getExplain());
             }
             boolean clickCaptcha = false;
             if (clickCaptcha) {
-                v2task.put("type", "CoordinatesTask");
+                task.put("type", "CoordinatesTask");
                 // v2task.put("body", Base64.encodeToString(data, false));
                 // v2task.put("comment", challenge.getExplain());
                 /* We want a single set of coordinates -> One click */
-                v2task.put("maxClicks", 1);
+                task.put("maxClicks", 1);
             }
-            v2postdata.put("task", v2task);
+            postdata.put("task", task);
             job.showBubble(this);
             checkInterruption();
             job.getChallenge().sendStatsSolving(this);
             job.setStatus(SolverStatus.SOLVING);
             /* Submit captcha */
             final Browser br = this.createNewBrowserInstance();
-            final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBaseV2() + "/createTask", v2postdata);
+            final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBaseV2() + "/createTask", postdata);
             br.getPage(req_createTask);
             final BalanceResponse resp_createTask = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<BalanceResponse>() {
             });
@@ -183,10 +169,11 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
                     if (solution.getgRecaptchaResponse() != null) {
                         resultText = solution.getgRecaptchaResponse();
                     } else if (solution.getToken() != null) {
+                        /* For example reCaptchaV2, CloudflareTurnstile */
                         resultText = solution.getToken();
                     } else if (solution.getCorrdinates() != null && solution.getCorrdinates().size() > 0) {
                         // TODO
-                        resultText = "TODO";
+                        resultText = "TODO_IMPLEMENT_CLICK_CAPTCHA";
                     } else {
                         resultText = solution.getText();
                     }

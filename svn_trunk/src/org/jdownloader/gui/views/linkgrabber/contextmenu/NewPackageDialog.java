@@ -133,9 +133,6 @@ public class NewPackageDialog extends AbstractDialog<Object> {
 
     public void setMergeCheckboxDefaultValue(boolean b) {
         this.mergeCheckboxDefaultValue = b;
-        if (mergeCheckbox != null) {
-            mergeCheckbox.setSelected(b);
-        }
     }
 
     public boolean isExpandPackage() {
@@ -148,9 +145,6 @@ public class NewPackageDialog extends AbstractDialog<Object> {
 
     public void setExpandPackage(boolean b) {
         this.expandCheckboxDefaultValue = b;
-        if (expandCheckbox != null) {
-            expandCheckbox.setSelected(b);
-        }
     }
 
     public void setDisplayCheckboxMergeWithSameNamedPackages(boolean display) {
@@ -163,8 +157,5 @@ public class NewPackageDialog extends AbstractDialog<Object> {
 
     public void setPreSetPackageName(String preSetPackageName) {
         this.preSetPackageName = preSetPackageName;
-        if (packageNameField != null) {
-            packageNameField.setText(preSetPackageName);
-        }
     }
 }

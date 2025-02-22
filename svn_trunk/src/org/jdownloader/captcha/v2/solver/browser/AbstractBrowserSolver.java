@@ -4,6 +4,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
@@ -40,6 +41,9 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
     public boolean canHandle(Challenge<?> c) {
         if (c instanceof CutCaptchaChallenge) {
             /* 2024-09-10: Handling for CutCaptcha is unfinished thus only CES solvers like 2captcha.com can handle CutCaptcha captchas. */
+            return false;
+        } else if (c instanceof CloudflareTurnstileChallenge) {
+            /* Browser captcha handling for Clouflare Turnstile has not yet been implemented. */
             return false;
         } else if (super.canHandle(c)) {
             return BrowserSolverService.getInstance().isOpenBrowserSupported();

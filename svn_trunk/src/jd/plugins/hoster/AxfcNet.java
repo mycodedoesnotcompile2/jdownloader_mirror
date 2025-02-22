@@ -16,11 +16,13 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -36,11 +38,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50648 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = {}, urls = {})
 public class AxfcNet extends PluginForHost {
     public AxfcNet(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    private final String PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL = "allow_download_password_from_url";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -101,6 +105,20 @@ public class AxfcNet extends PluginForHost {
         return 1;
     }
 
+    private String getDownloadPasswordFromURL(final DownloadLink link) {
+        final boolean allowPassCodeFromURL = link.getBooleanProperty(PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL, true);
+        if (!allowPassCodeFromURL) {
+            return null;
+        }
+        try {
+            final String passCodeFromURL = UrlQuery.parse(link.getPluginPatternMatcher()).get("key");
+            return passCodeFromURL;
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         if (!link.isNameSet()) {
@@ -141,9 +159,11 @@ public class AxfcNet extends PluginForHost {
         if (hash_sha256 != null) {
             link.addHashInfo(HashInfo.newInstanceSafe(hash_sha256, HashInfo.TYPE.SHA256));
         }
-        final String description = br.getRegex("<h3>\\s*File description\\s*</h3>\\s*<p>([^<]+)</p>").getMatch(0);
-        if (description != null && StringUtils.isEmpty(link.getComment())) {
-            link.setComment(Encoding.htmlDecode(description).trim());
+        if (StringUtils.isEmpty(link.getComment())) {
+            final String description = br.getRegex("<h3>\\s*File description\\s*</h3>\\s*<p>([^<]+)</p>").getMatch(0);
+            if (description != null) {
+                link.setComment(Encoding.htmlDecode(description).trim());
+            }
         }
         return AvailableStatus.TRUE;
     }
@@ -155,16 +175,26 @@ public class AxfcNet extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final Form dlform = br.getFormbyActionRegex(".*dl2\\.pl");
+        final Form dlform = getDownloadform(br);
         if (dlform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String downloadPasswordFromURL = this.getDownloadPasswordFromURL(link);
+        String passCode = null;
         if (dlform.hasInputFieldByName("keyword")) {
             // TODO
             link.setPasswordProtected(true);
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Password protected links are not yet supported");
+            passCode = this.getDownloadPasswordFromURL(link);
+            if (passCode == null) {
+                passCode = link.getDownloadPassword();
+            }
+            if (passCode == null) {
+                passCode = getUserInput("Password?", link);
+            }
+            dlform.put("keyword", Encoding.urlEncode(passCode));
+        } else {
+            link.setPasswordProtected(false);
         }
-        link.setPasswordProtected(false);
         /* Captcha is not always required */
         final String captchaURL = br.getRegex("\"(/u/captcha\\.pl[^\"]+)").getMatch(0);
         if (captchaURL != null) {
@@ -172,13 +202,34 @@ public class AxfcNet extends PluginForHost {
             dlform.put("cpt", Encoding.urlEncode(code));
         }
         br.submitForm(dlform);
+        /* Check for invalid captcha */
+        if (captchaURL != null && br.containsHTML(">\\s*Captcha authentication failed")) {
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+        }
+        /* Check for invalid password */
+        if (passCode != null) {
+            if (getDownloadform(br) != null) {
+                /* Wrong password was entered */
+                link.setProperty(PROPERTY_ALLOW_DOWNLOAD_PASSWORD_FROM_URL, false);
+                if (downloadPasswordFromURL != null) {
+                    if (downloadPasswordFromURL.equals(link.getDownloadPassword())) {
+                        /*
+                         * Same [wrong] password was also set on DownloadLink -> Invalidate it here too so we don't retry with the same
+                         * wrong password.
+                         */
+                        link.setDownloadPassword(null);
+                    }
+                } else {
+                    link.setDownloadPassword(null);
+                }
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            }
+            /* Correct password was entered -> Save it */
+            link.setDownloadPassword(passCode);
+        }
         final String continuelink = br.getRegex("a href=\"([^\"]+)\"[^>]*>\\s*＜\\s*Download").getMatch(0);
         if (StringUtils.isEmpty(continuelink)) {
-            if (captchaURL != null && br.containsHTML(">\\s*Captcha authentication failed")) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.getPage(continuelink);
         String dllink = br.getRegex("<a href=\"([^\"]+)\"[^>]*>\\s*To start download").getMatch(0);
@@ -196,6 +247,10 @@ public class AxfcNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
+    }
+
+    final Form getDownloadform(final Browser br) {
+        return br.getFormbyActionRegex(".*dl2\\.pl");
     }
 
     @Override

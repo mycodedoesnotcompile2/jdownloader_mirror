@@ -36,7 +36,7 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
         }
 
         public String getLinkcheckMode_label() {
-            return "Linkcheck mode";
+            return "Linkcheck mode for password protected links";
         }
 
         public String getMaxPremiumChunks_label() {
@@ -86,16 +86,10 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
                 return "Auto";
             }
         },
-        PREFER_SINGLE_LINKCHECK_FOR_SINGLE_LINKS {
+        PREFER_SINGLE_LINKCHECK {
             @Override
             public String getLabel() {
                 return "Single linkcheck for single links via API if possible";
-            }
-        },
-        PREFER_SINGLE_LINKCHECK_FOR_ALL_LINKS {
-            @Override
-            public String getLabel() {
-                return "Single linkcheck for all links via API if possible";
             }
         },
         MASS_LINKCHECK {
@@ -109,7 +103,7 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("AUTO")
     @Order(35)
-    @DescriptionForConfigEntry("Controls, how single links are checked. Multiple links are always checked via mass linkcheck.")
+    @DescriptionForConfigEntry("1fichier does not provide the file information for password protected links via their mass linkcheck API. If you own a 1fichier account, and set the correct download password in beforehand, this setting can allow JDownloader to find the file information for single password protected items.")
     LinkcheckMode getLinkcheckMode();
 
     void setLinkcheckMode(final LinkcheckMode mode);

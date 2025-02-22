@@ -85,21 +85,24 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
     }
 
     @Override
-    protected void onActionPerformed(ActionEvent e, final SelectionType selectionType, final SelectionInfo<PackageType, ChildrenType> sel) {
+    protected void onActionPerformed(final ActionEvent e, final SelectionType selectionType, final SelectionInfo<PackageType, ChildrenType> sel) {
         if (!isEnabled()) {
             return;
         }
         final String newName;
         final String newDownloadFolder;
+        Boolean packageExpandState = null;
         if (isMergePackages() && sel.getPackageViews().size() > 1) {
             if (isAskForNewDownloadFolderAndPackageName()) {
+                NewPackageDialog d = null;
                 try {
-                    final NewPackageDialog d = new NewPackageDialog(sel) {
+                    d = new NewPackageDialog(sel) {
                         @Override
                         public String getDontShowAgainKey() {
                             return "ABSTRACTDIALOG_DONT_SHOW_AGAIN_" + AbstractSplitPackagesByHostAction.this.getClass().getSimpleName();
                         }
                     };
+                    d.setDisplayCheckboxMergeWithSameNamedPackages(false);
                     Dialog.getInstance().showDialog(d);
                     newName = d.getName();
                     newDownloadFolder = d.getDownloadFolder();
@@ -109,6 +112,7 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                 } catch (Throwable ignore) {
                     return;
                 }
+                packageExpandState = d.isExpandPackage();
             } else {
                 newName = "";
                 newDownloadFolder = sel.getFirstPackage().getDownloadDirectory();

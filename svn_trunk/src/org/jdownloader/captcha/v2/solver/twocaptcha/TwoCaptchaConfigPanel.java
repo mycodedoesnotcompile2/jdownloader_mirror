@@ -7,12 +7,6 @@ import java.io.IOException;
 import javax.swing.Icon;
 import javax.swing.JLabel;
 
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
-import jd.http.Browser;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.os.CrossSystem;
@@ -21,6 +15,12 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_TWO_CAPTCHA;
+
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
+import jd.http.Browser;
 
 public final class TwoCaptchaConfigPanel extends AbstractCaptchaSolverConfigPanel {
     /**
@@ -68,8 +68,8 @@ public final class TwoCaptchaConfigPanel extends AbstractCaptchaSolverConfigPane
                     jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "API Key is not correct!" + "\n" + "Only a-f and 0-9");
                 } else {
                     try {
-                        Browser br = new Browser();
-                        String accountcheck = br.getPage("http://2captcha.com/res.php?action=getbalance&key=" + apiKey.getText());
+                        final Browser br = new Browser();
+                        final String accountcheck = br.getPage("http://2captcha.com/res.php?action=getbalance&key=" + apiKey.getText());
                         String validcheck = br.getRegex("^([0-9.,]+$)").getMatch(0);
                         if (validcheck != null) {
                             jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com message ", "Account OK\nCredits: " + accountcheck);

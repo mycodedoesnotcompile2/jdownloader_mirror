@@ -11,10 +11,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import jd.http.Browser;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -28,6 +24,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
@@ -42,6 +39,10 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_DBC;
+
+import jd.http.Browser;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
 
 public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     private DeathByCaptchaSettings            config;
@@ -74,7 +75,11 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
 
     @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
-        if (c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge || c instanceof CutCaptchaChallenge) {
+        if (c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge) {
+            return true;
+        } else if (c instanceof CutCaptchaChallenge) {
+            return true;
+        } else if (c instanceof CloudflareTurnstileChallenge) {
             return true;
         } else {
             return false;
@@ -104,13 +109,13 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 type = "HCaptcha";
                 final HCaptchaChallenge hc = (HCaptchaChallenge) challenge;
                 r.addFormData(new FormData("type", "7"));
-                final HashMap<String, Object> hcaptcha_params = new HashMap<String, Object>();
+                final Map<String, Object> hcaptcha_params = new HashMap<String, Object>();
                 hcaptcha_params.put("pageurl", hc.getSiteUrl());
                 hcaptcha_params.put("sitekey", hc.getSiteKey());
                 r.addFormData(new FormData("hcaptcha_params", JSonStorage.serializeToJson(hcaptcha_params)));
             } else if (challenge instanceof RecaptchaV2Challenge) {
                 final RecaptchaV2Challenge rc = (RecaptchaV2Challenge) challenge;
-                final HashMap<String, Object> token_param = new HashMap<String, Object>();
+                final Map<String, Object> token_param = new HashMap<String, Object>();
                 token_param.put("googlekey", rc.getSiteKey());
                 final Map<String, Object> v3action = rc.getV3Action();
                 if (v3action != null) {
@@ -140,13 +145,20 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 type = "CutCaptcha";
                 final CutCaptchaChallenge cc = (CutCaptchaChallenge) challenge;
                 r.addFormData(new FormData("type", "19"));
-                final HashMap<String, Object> cutcaptcha_params = new HashMap<String, Object>();
+                final Map<String, Object> cutcaptcha_params = new HashMap<String, Object>();
                 cutcaptcha_params.put("apikey", cc.getApiKey());
                 cutcaptcha_params.put("miserykey", cc.getSiteKey());
                 cutcaptcha_params.put("pageurl", cc.getSiteUrl());
                 r.addFormData(new FormData("cutcaptcha_params", JSonStorage.serializeToJson(cutcaptcha_params)));
-                // r.addFormData(new FormData("miserykey", cc.getSiteKey()));
-                // r.addFormData(new FormData("pageurl", cc.getSiteUrl()));
+            } else if (challenge instanceof CloudflareTurnstileChallenge) {
+                /* See: https://deathbycaptcha.com/api/turnstile */
+                type = "CloudflareTurnstileCaptcha";
+                final CloudflareTurnstileChallenge cc = (CloudflareTurnstileChallenge) challenge;
+                r.addFormData(new FormData("type", "12"));
+                final Map<String, Object> turnstile_params = new HashMap<String, Object>();
+                turnstile_params.put("sitekey", cc.getSiteKey());
+                turnstile_params.put("pageurl", cc.getSiteUrl());
+                r.addFormData(new FormData("turnstile_params", JSonStorage.serializeToJson(turnstile_params)));
             } else if (challenge instanceof BasicCaptchaChallenge) {
                 type = "Image";
                 final BasicCaptchaChallenge bcc = (BasicCaptchaChallenge) challenge;
@@ -191,6 +203,9 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                     response = new DeathByCaptchaResponse(rv2c, this, status, status.getText(), 100);
                 } else if (challenge instanceof CutCaptchaChallenge) {
                     final CutCaptchaChallenge cc = (CutCaptchaChallenge) challenge;
+                    response = new DeathByCaptchaResponse(cc, this, status, status.getText(), 100);
+                } else if (challenge instanceof CloudflareTurnstileChallenge) {
+                    final CloudflareTurnstileChallenge cc = (CloudflareTurnstileChallenge) challenge;
                     response = new DeathByCaptchaResponse(cc, this, status, status.getText(), 100);
                 } else {
                     final BasicCaptchaChallenge bcc = (BasicCaptchaChallenge) challenge;

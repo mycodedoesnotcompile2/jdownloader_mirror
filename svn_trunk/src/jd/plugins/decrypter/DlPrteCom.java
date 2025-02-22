@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
@@ -35,8 +36,6 @@ import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
@@ -46,7 +45,7 @@ import jd.plugins.PluginException;
  * @version raz_Template
  * @author raztoki, psp
  */
-@DecrypterPlugin(revision = "$Revision: 49125 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50684 $", interfaceVersion = 3, names = {}, urls = {})
 public class DlPrteCom extends antiDDoSForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -58,6 +57,7 @@ public class DlPrteCom extends antiDDoSForDecrypt {
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("dl-protect.info"); // 2024-05-28
+        deadDomains.add("dl-protect.net"); // 2025-02-21
         return deadDomains;
     }
 
@@ -247,8 +247,8 @@ public class DlPrteCom extends antiDDoSForDecrypt {
         }
         String passCode = null;
         if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
-            /* https://svn.jdownloader.org/issues/90281 */
-            throw new DecrypterRetryException(RetryReason.BLOCKED_BY, "Cloudflare Turnstile captcha is not supported");
+            final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+            continueForm.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
         } else if (CaptchaHelperCrawlerPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
             final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
             continueForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
@@ -266,6 +266,8 @@ public class DlPrteCom extends antiDDoSForDecrypt {
             if (passCode != null) {
                 /* Assume that user entered wrong password */
                 throw new DecrypterException(DecrypterException.PASSWORD);
+            } else if (br.containsHTML(">\\s*Captcha invalide")) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
             return null;
         }
