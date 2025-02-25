@@ -4,6 +4,14 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Hash;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.parser.UrlQuery;
+
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.requests.GetRequest;
@@ -20,17 +28,8 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GofileIo;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Hash;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 49780 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 50693 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
-
     @Override
     public void init() {
         Browser.setRequestIntervalLimitGlobal(getHost(), 350);
@@ -38,7 +37,6 @@ public class GoFileIoCrawler extends PluginForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Browser brc = br.cloneBrowser();
         final String token = GofileIo.getAndSetToken(this, brc);
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
@@ -118,16 +116,20 @@ public class GoFileIoCrawler extends PluginForDecrypt {
             fp = FilePackage.getInstance();
             fp.setName(path);
         }
-        final String parentFolderShortID = response_data.get("code").toString();
-        Map<String, Map<String, Object>> files = (Map<String, Map<String, Object>>) response_data.get("contents");
-        if (files == null) {
-            /* 2024-03-11 */
-            files = (Map<String, Map<String, Object>>) response_data.get("children");
+        if (!Boolean.TRUE.equals(response_data.get("canAccess"))) {
+            throw new AccountRequiredException();
         }
-        for (final Entry<String, Map<String, Object>> item : files.entrySet()) {
+        final String parentFolderShortID = response_data.get("code").toString();
+        Map<String, Map<String, Object>> children = (Map<String, Map<String, Object>>) response_data.get("contents");
+        if (children == null) {
+            /* 2024-03-11 */
+            children = (Map<String, Map<String, Object>>) response_data.get("children");
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        for (final Entry<String, Map<String, Object>> item : children.entrySet()) {
             final Map<String, Object> entry = item.getValue();
             final String type = (String) entry.get("type");
-            if (type.equals("file")) {
+            if (type.equalsIgnoreCase("file")) {
                 final String fileID = item.getKey();
                 final String url = "https://" + getHost() + "/?c=" + folderID + "#file=" + fileID;
                 if (hosterplugin == null) {
@@ -141,12 +143,13 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 if (passCode != null) {
                     file.setDownloadPassword(passCode);
                 }
-                if (path != null) {
+                /* Do not set path/FilePackage for single files. */
+                if (path != null && (!StringUtils.equals(file.getName(), path) || children.size() > 1)) {
                     file.setRelativeDownloadFolderPath(path);
                     file._setFilePackage(fp);
                 }
                 ret.add(file);
-            } else if (type.equals("folder")) {
+            } else if (type.equalsIgnoreCase("folder")) {
                 /* Subfolder containing more files/folders */
                 final DownloadLink folder = this.createDownloadlink("https://" + this.getHost() + "/d/" + entry.get("code"));
                 if (passCode != null) {

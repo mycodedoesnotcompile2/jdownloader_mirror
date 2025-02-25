@@ -15,7 +15,9 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.images.IconIO;
@@ -75,11 +77,14 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
 
     @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
-        if (c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge) {
+        if (c instanceof BasicCaptchaChallenge) {
+            return true;
+        } else if (c instanceof RecaptchaV2Challenge) {
             return true;
         } else if (c instanceof CutCaptchaChallenge) {
             return true;
-        } else if (c instanceof CloudflareTurnstileChallenge) {
+        } else if (c instanceof CloudflareTurnstileChallenge && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* Devs only: Allow Cloudflare Turnstile captcha */
             return true;
         } else {
             return false;
@@ -106,6 +111,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
             }
             final String type;
             if (challenge instanceof HCaptchaChallenge) {
+                /* 205-02-24: Not supported anymore, see isChallengeSupported and: https://deathbycaptcha.com/api#supported_captchas */
                 type = "HCaptcha";
                 final HCaptchaChallenge hc = (HCaptchaChallenge) challenge;
                 r.addFormData(new FormData("type", "7"));
@@ -114,6 +120,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 hcaptcha_params.put("sitekey", hc.getSiteKey());
                 r.addFormData(new FormData("hcaptcha_params", JSonStorage.serializeToJson(hcaptcha_params)));
             } else if (challenge instanceof RecaptchaV2Challenge) {
+                /* https://deathbycaptcha.com/api/newtokenrecaptcha */
                 final RecaptchaV2Challenge rc = (RecaptchaV2Challenge) challenge;
                 final Map<String, Object> token_param = new HashMap<String, Object>();
                 token_param.put("googlekey", rc.getSiteKey());
@@ -178,16 +185,24 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
             if (status != null && status.getCaptcha() > 0) {
                 job.setStatus(new SolverStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_solving(), NewTheme.I().getIcon(IconKey.ICON_WAIT, 20)));
                 job.getLogger().info("CAPTCHA(" + type + ")uploaded: " + status.getCaptcha());
-                long startTime = System.currentTimeMillis();
-                while (status != null && !status.isSolved() && status.isIs_correct()) {
+                long startTime = Time.systemIndependentCurrentJVMTimeMillis();
+                while (true) {
                     checkInterruption();
-                    if (System.currentTimeMillis() - startTime > 5 * 60 * 60 * 1000l) {
-                        throw new SolverException("Failed:Timeout");
-                    }
                     Thread.sleep(1000);
-                    job.getLogger().info("deathbycaptcha.com NO answer after " + ((System.currentTimeMillis() - startTime) / 1000) + "s ");
+                    job.getLogger().info("deathbycaptcha.com NO answer after " + ((Time.systemIndependentCurrentJVMTimeMillis() - startTime) / 1000) + "s ");
                     br.getPage(API_BASE + "/captcha/" + uploadStatus.getCaptcha());
                     status = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), DBCUploadResponse.TYPE);
+                    if (status.isSolved()) {
+                        job.getLogger().info("Stopping because: isSolved = true");
+                        break;
+                    } else if (!status.isIs_correct()) {
+                        job.getLogger().info("Stopping because: isCorrect = false");
+                        break;
+                    } else if (Time.systemIndependentCurrentJVMTimeMillis() - startTime > 5 * 60 * 60 * 1000l) {
+                        throw new SolverException("Failed: Timeout");
+                    } else {
+                        continue;
+                    }
                 }
                 if (status == null || !status.isSolved()) {
                     job.getLogger().info("Failed solving CAPTCHA(" + type + ")");

@@ -44,7 +44,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50321 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50696 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
     public RedGifsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,8 +94,8 @@ public class RedGifsCom extends GfyCatCom {
         return "https://www.redgifs.com/watch/" + fid;
     }
 
-    private static Map<ProxySelectorInterface, Object> TEMPORARYTOKENS             = new WeakHashMap<ProxySelectorInterface, Object>();
-    private static AtomicBoolean                       failSafeTemporaryTokenIssue = new AtomicBoolean(false);
+    private static Map<ProxySelectorInterface, Object> TEMPORARYTOKENS  = new WeakHashMap<ProxySelectorInterface, Object>();
+    private static AtomicBoolean                       tokenInvalidated = new AtomicBoolean(false);
 
     // https://github.com/Redgifs/api/wiki/Temporary-tokens
     // tokens are bound to IP/UA
@@ -107,12 +107,9 @@ public class RedGifsCom extends GfyCatCom {
                 tokenDetails = new Object[] { null, -1l };
                 TEMPORARYTOKENS.put(br.getProxy(), tokenDetails);
             }
-            if (failSafeTemporaryTokenIssue.get()) {
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid");
-            }
             String token = (String) tokenDetails[0];
             final long now = Time.systemIndependentCurrentJVMTimeMillis();
-            if (StringUtils.equals(renewIfToken, token) || StringUtils.isEmpty(token) || ((Number) tokenDetails[1]).longValue() < now) {
+            if (StringUtils.equals(renewIfToken, token) || StringUtils.isEmpty(token) || ((Number) tokenDetails[1]).longValue() < now || tokenInvalidated.get()) {
                 if (tokenDetails[0] == null) {
                     logger.info("fetch temporary token for the first time");
                 } else {
@@ -161,9 +158,17 @@ public class RedGifsCom extends GfyCatCom {
         req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
         br.getPage(req);
         if (req.getHttpConnection().getResponseCode() == 401) {
-            failSafeTemporaryTokenIssue.set(true);
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid");
-        } else if (req.getHttpConnection().getResponseCode() == 404) {
+            if (tokenInvalidated.get()) {
+                /* Session token must have been refreshed before but is still invalid -> Wait a longer time */
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid", 1 * 60 * 60 * 1000);
+            } else {
+                /* Refresh token next time and try again */
+                tokenInvalidated.set(true);
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid", 1 * 60 * 1000);
+            }
+        }
+        tokenInvalidated.set(false);
+        if (req.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (req.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "410 gone");
@@ -235,9 +240,9 @@ public class RedGifsCom extends GfyCatCom {
     }
 
     @Override
-    public void resetDownloadlink(DownloadLink downloadLink) {
+    public void resetDownloadlink(final DownloadLink downloadLink) {
         super.resetDownloadlink(downloadLink);
-        failSafeTemporaryTokenIssue.set(false);
+        tokenInvalidated.set(false);
     }
 
     @Override

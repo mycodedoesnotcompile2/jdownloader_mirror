@@ -24,6 +24,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.BangComConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -48,26 +49,21 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BangComCrawler;
 
-@HostPlugin(revision = "$Revision: 49887 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50697 $", interfaceVersion = 3, names = {}, urls = {})
 public class BangCom extends PluginForHost {
     public BangCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/joinnow");
     }
 
-    /**
-     * Public/stable release: Allow only cookie login </br>
-     * 2023-08-07: Normal login is disabled as they're using unsupported captcha type "Cloudflare Turnstile" </br>
-     * See ticket: https://svn.jdownloader.org/issues/90281
-     */
-    private static final boolean COOKIE_LOGIN_ONLY = true;
+    private static final boolean COOKIE_LOGIN_ONLY = false;
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         if (COOKIE_LOGIN_ONLY) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
         } else {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
         }
     }
 
@@ -105,7 +101,6 @@ public class BangCom extends PluginForHost {
         br.setFollowRedirects(true);
     }
 
-    private final int          ACCOUNT_PREMIUM_MAXDOWNLOADS   = -1;
     public static final String PROPERTY_MAINLINK              = "mainlink";
     public static final String PROPERTY_CONTENT_ID            = "content_id";
     public static final String PROPERTY_QUALITY_IDENTIFIER    = "quality";
@@ -232,7 +227,7 @@ public class BangCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     public void login(final Account account, final boolean force) throws Exception {
@@ -241,89 +236,90 @@ public class BangCom extends PluginForHost {
 
     public void login(final Account account, final boolean force, final String checkurl) throws Exception {
         synchronized (account) {
-            try {
-                br.setFollowRedirects(true);
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                final Cookies userCookies = account.loadUserCookies();
-                final boolean cookieLoginOnly;
-                final boolean allowAttemptNormalLoginInDevMode = false;
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && allowAttemptNormalLoginInDevMode) {
-                    /* Testing: Allow non-cookie login */
-                    cookieLoginOnly = false;
-                } else {
-                    cookieLoginOnly = COOKIE_LOGIN_ONLY;
-                }
-                if (userCookies != null || cookies != null) {
-                    if (userCookies != null) {
-                        br.setCookies(userCookies);
-                    } else {
-                        br.setCookies(cookies);
-                    }
-                    if (!force) {
-                        /* Do not validate cookies. */
-                        return;
-                    }
-                    logger.info("Attempting cookie login");
-                    br.getPage(checkurl);
-                    if (this.isLoggedin(br)) {
-                        logger.info("Cookie login successful");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                        if (userCookies != null) {
-                            if (account.hasEverBeenValid()) {
-                                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                            } else {
-                                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                            }
-                        } else {
-                            /* Try full login to refresh cookies */
-                            br.clearAll();
-                        }
-                    }
-                }
-                if (cookieLoginOnly) {
-                    showCookieLoginInfo();
-                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
-                }
-                logger.info("Performing full login");
-                br.getPage("https://www." + this.getHost() + "/login");
-                final boolean useAjaxHandling = true;
-                if (useAjaxHandling) {
-                    final String csrftoken = br.getRegex("name=\"_csrf_token\" value=\"([^\"]+)").getMatch(0);
-                    final Map<String, Object> postdata = new HashMap<String, Object>();
-                    postdata.put("_username", account.getUser());
-                    postdata.put("_password", account.getPass());
-                    if (csrftoken != null) {
-                        postdata.put("_csrf_token", csrftoken);
-                    } else {
-                        logger.warning("Failed to find csrftoken -> Login will probably fail");
-                    }
-                    br.postPageRaw(br.getURL(), JSonStorage.serializeToJson(postdata));
-                } else {
-                    final Form loginform = br.getFormbyActionRegex(".*/modal/login.*");
-                    if (loginform == null) {
-                        logger.warning("Failed to find loginform");
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    loginform.put("username", Encoding.urlEncode(account.getUser()));
-                    loginform.put("password", Encoding.urlEncode(account.getPass()));
-                    br.submitForm(loginform);
-                }
-                br.getPage(checkurl);
-                if (!isLoggedin(br)) {
-                    logger.info("Login failed");
-                    throw new AccountInvalidException();
-                }
-                logger.info("Login successful");
-                account.saveCookies(this.br.getCookies(br.getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            final Cookies userCookies = account.loadUserCookies();
+            final boolean cookieLoginOnly;
+            final boolean allowAttemptNormalLoginInDevMode = true;
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && allowAttemptNormalLoginInDevMode) {
+                /* Testing: Allow non-cookie login */
+                cookieLoginOnly = false;
+            } else {
+                cookieLoginOnly = COOKIE_LOGIN_ONLY;
             }
+            if (userCookies != null || cookies != null) {
+                if (userCookies != null) {
+                    br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
+                }
+                if (!force) {
+                    /* Do not validate cookies. */
+                    return;
+                }
+                logger.info("Attempting cookie login");
+                br.getPage(checkurl);
+                if (this.isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    return;
+                } else {
+                    logger.info("Cookie login failed");
+                    if (userCookies != null) {
+                        if (account.hasEverBeenValid()) {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                        } else {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                        }
+                    } else {
+                        /* Try full login to refresh cookies */
+                        br.clearAll();
+                        account.clearCookies("");
+                    }
+                }
+            }
+            if (cookieLoginOnly) {
+                showCookieLoginInfo();
+                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
+            }
+            logger.info("Performing full login");
+            br.getPage("https://www." + this.getHost() + "/login");
+            final boolean useAjaxHandling = false;
+            if (useAjaxHandling) {
+                final String csrftoken = br.getRegex("name=\"_csrf_token\" value=\"([^\"]+)").getMatch(0);
+                final Map<String, Object> postdata = new HashMap<String, Object>();
+                postdata.put("_username", account.getUser());
+                postdata.put("_password", account.getPass());
+                if (csrftoken != null) {
+                    postdata.put("_csrf_token", csrftoken);
+                } else {
+                    logger.warning("Failed to find csrftoken -> Login will probably fail");
+                }
+                br.postPageRaw(br.getURL(), JSonStorage.serializeToJson(postdata));
+            } else {
+                final Form loginform = br.getFormbyActionRegex(".*/login_check");
+                if (loginform == null) {
+                    logger.warning("Failed to find loginform");
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                loginform.put("_username", Encoding.urlEncode(account.getUser()));
+                loginform.put("_password", Encoding.urlEncode(account.getPass()));
+                final String turnstileSiteKey = br.getRegex("class=\"cf-turnstile[^\"]*\" data-sitekey=\"([^\"]+)\"").getMatch(0);
+                if (turnstileSiteKey != null) {
+                    final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileSiteKey);
+                    logger.info("Detected captcha method \"CloudflareTurnstileCaptcha\" for this host");
+                    final String cfTurnstileResponse = ts.getToken();
+                    loginform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+                }
+                br.submitForm(loginform);
+            }
+            br.getPage(checkurl);
+            if (!isLoggedin(br)) {
+                logger.info("Login failed");
+                throw new AccountInvalidException();
+            }
+            logger.info("Login successful");
+            account.saveCookies(this.br.getCookies(br.getHost()), "");
         }
     }
 
@@ -385,7 +381,7 @@ public class BangCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

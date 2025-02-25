@@ -29,7 +29,7 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49070 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50692 $", interfaceVersion = 2, names = {}, urls = {})
 public class WrzucajPl extends YetiShareCore {
     public WrzucajPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,7 +111,7 @@ public class WrzucajPl extends YetiShareCore {
         final AccountInfo ai = super.fetchAccountInfoWebsite(account);
         /* 2023-10-18 */
         this.getPage("/account/edit");
-        final String availableTrafficHTML = br.getRegex("<div([^>]+)>-</div>\\s*<h3>\\s*Available transfer\\s*</h3>").getMatch(0);
+        final String availableTrafficHTML = br.getRegex("<div([^>]*)>-</div>\\s*<h3[^>]*>\\s*(Available transfer|Dostępny transfer)\\s*</h3>").getMatch(0);
         if (availableTrafficHTML != null) {
             final Regex trafficmaxRegex = new Regex(availableTrafficHTML, "data-postfix=\"\\&nbsp;/ (\\d+(\\.\\d+)?) ([A-Za-z]+)\"");
             final String trafficAvailableStr = new Regex(availableTrafficHTML, "data-end=\"(\\d+(\\.\\d+)?)\"").getMatch(0);

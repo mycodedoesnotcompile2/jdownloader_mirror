@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -58,7 +59,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 50691 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -321,17 +322,15 @@ public class DeepbridCom extends PluginForHost {
         if (!"premium".equalsIgnoreCase(type)) {
             account.setType(AccountType.FREE);
             /*
+             * 2021-01-03: Usually there are 15 Minutes wait time between downloads in free mode -> Do not allow simultaneous downloads or
+             * no downloads at all.
+             */
+            account.setMaxSimultanDownloads(1);
+            /*
              * No downloads possible via free account via API. Via website, free downloads are possible but we were too lazy to add extra
              * login support via website in order to allow free account downloads.
              */
             ai.setTrafficLeft(0);
-            account.setMaxSimultanDownloads(0);
-            // ai.setUnlimitedTraffic();
-            /*
-             * 2021-01-03: Usually there are 15 Minutes waittime between downloads in free mode -> Do not allow simultaneous downloads or no
-             * downloads at all.
-             */
-            // account.setMaxSimultanDownloads(1);
             ai.setExpired(true); // 2023-07-21
         } else {
             account.setType(AccountType.PREMIUM);
@@ -374,30 +373,42 @@ public class DeepbridCom extends PluginForHost {
         }
         final ArrayList<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final HashSet<String> dupes = new HashSet<String>();
-        final String workaroundIcerboxKey = "icerbox";
-        boolean icerboxYes = false;
+        final Map<String, String> domainWorkarounds = new HashMap<String, String>();
+        /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
+        domainWorkarounds.put("icerbox", "icerbox.com");
+        domainWorkarounds.put("filestore", "filestore.me");
+        final HashSet<String> foundWorkaroundHosts = new HashSet<String>();
+        final HashSet<String> unavailableHosts = new HashSet<String>();
         for (final Object hostO : supportedhostslistO) {
             /* List can be given in two different varieties */
             if (hostO instanceof Map) {
                 final Map<String, Object> entries = (Map<String, Object>) hostO;
                 for (final Map.Entry<String, Object> entry : entries.entrySet()) {
                     final MultiHostHost mhost = new MultiHostHost();
-                    if (!"up".equalsIgnoreCase((String) entry.getValue())) {
+                    final boolean isOnline;
+                    if ("up".equalsIgnoreCase((String) entry.getValue())) {
+                        isOnline = true;
+                    } else {
+                        isOnline = false;
                         mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                     }
                     final String[] domains = entry.getKey().split(",");
-                    boolean thisIsIcerbox = false;
-                    for (final String domain : domains) {
-                        if (domain.equalsIgnoreCase(workaroundIcerboxKey)) {
-                            /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
-                            icerboxYes = true;
-                            thisIsIcerbox = true;
+                    boolean thisIsWorkaroundHost = false;
+                    for (String domain : domains) {
+                        domain = domain.toLowerCase(Locale.ENGLISH);
+                        if (!isOnline) {
+                            unavailableHosts.add(domain);
+                        }
+                        if (domainWorkarounds.containsKey(domain)) {
+                            thisIsWorkaroundHost = true;
+                            foundWorkaroundHosts.add(domain);
                             continue;
                         } else {
                             mhost.addDomain(domain);
                         }
                     }
-                    if (thisIsIcerbox) {
+                    if (thisIsWorkaroundHost) {
+                        /* Skip entry here as it will be processed down below. */
                         continue;
                     }
                     supportedhosts.add(mhost);
@@ -405,13 +416,13 @@ public class DeepbridCom extends PluginForHost {
             } else if (hostO instanceof String) {
                 final MultiHostHost mhost = new MultiHostHost();
                 final String[] hosts = ((String) hostO).split(",");
-                for (String host : hosts) {
-                    if (host.equalsIgnoreCase(workaroundIcerboxKey)) {
-                        /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
-                        icerboxYes = true;
+                for (String domain : hosts) {
+                    domain = domain.toLowerCase(Locale.ENGLISH);
+                    if (domainWorkarounds.containsKey(domain)) {
+                        foundWorkaroundHosts.add(domain);
                         continue;
                     } else {
-                        mhost.addDomain(host);
+                        mhost.addDomain(domain);
                     }
                 }
                 supportedhosts.add(mhost);
@@ -427,10 +438,10 @@ public class DeepbridCom extends PluginForHost {
             logger.info("Checking for additional supported hosts on website (API list = unreliable)");
             getPage(br, "/service");
             final String[] crippled_hosts = br.getRegex("class=\"hosters_([A-Za-z0-9]+)[^\"]*\"").getColumn(0);
-            for (final String crippled_host : crippled_hosts) {
-                if (crippled_host.equalsIgnoreCase(workaroundIcerboxKey)) {
-                    /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
-                    icerboxYes = true;
+            for (String crippled_host : crippled_hosts) {
+                crippled_host = crippled_host.toLowerCase(Locale.ENGLISH);
+                if (domainWorkarounds.containsKey(crippled_host)) {
+                    foundWorkaroundHosts.add(crippled_host);
                     continue;
                 } else if (!dupes.add(crippled_host)) {
                     continue;
@@ -443,13 +454,14 @@ public class DeepbridCom extends PluginForHost {
             logger.log(e);
             logger.warning("Website-workaround to find additional supported hosts failed");
         }
-        if (icerboxYes) {
-            /* Small workaround */
-            final String[] extraDomains = new String[] { "icerbox.com", "icerbox.biz" };
-            for (final String domain : extraDomains) {
-                final MultiHostHost mhost = new MultiHostHost(domain);
-                supportedhosts.add(mhost);
+        /* Add workaround-hosts to list of results */
+        for (final String domain : foundWorkaroundHosts) {
+            final String realDomain = domainWorkarounds.get(domain);
+            final MultiHostHost mhost = new MultiHostHost(realDomain);
+            if (unavailableHosts.contains(domain)) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            supportedhosts.add(mhost);
         }
         account.setConcurrentUsePossible(true);
         ai.setMultiHostSupportV2(this, supportedhosts);
@@ -564,7 +576,9 @@ public class DeepbridCom extends PluginForHost {
         final String errorMsg = (String) entries.get("message");
         if (errorCode == 0) {
             /* All ok */
-        } else if (errorCode == 1) {
+            return entries;
+        }
+        if (errorCode == 1) {
             /* No link entered - this should never happen */
             mhm.handleErrorGeneric(account, link, "api_error_1", 10, 5 * 60 * 1000l);
         } else if (errorCode == 2) {
@@ -588,11 +602,11 @@ public class DeepbridCom extends PluginForHost {
             } else {
                 throw new AccountUnavailableException(errorMsg, 5 * 60 * 1000l);
             }
-        } else if (errorCode == 10) {
-            /* Filehoster under maintenance on our site */
-            mhm.putError(account, link, 5 * 60 * 1000l, errorMsg);
         } else if (errorCode == 9) {
             /* Hosters limit reached for this day */
+            mhm.putError(account, link, 5 * 60 * 1000l, errorMsg);
+        } else if (errorCode == 10) {
+            /* Filehoster under maintenance on our site */
             mhm.putError(account, link, 5 * 60 * 1000l, errorMsg);
         } else if (errorCode == 15) {
             /* Service detected usage of proxy which they do not tolerate */
@@ -611,7 +625,8 @@ public class DeepbridCom extends PluginForHost {
                 mhm.handleErrorGeneric(account, link, errorMsg, 10, 5 * 60 * 1000l);
             }
         }
-        return entries;
+        /* This code should never be reached. */
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     @Override

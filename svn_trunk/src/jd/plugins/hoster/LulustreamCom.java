@@ -15,9 +15,12 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -27,7 +30,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50691 $", interfaceVersion = 3, names = {}, urls = {})
 public class LulustreamCom extends XFileSharingProBasic {
     public LulustreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -65,7 +68,19 @@ public class LulustreamCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return LulustreamCom.buildAnnotationUrlsLulustream(getPluginDomains());
+    }
+
+    public static final String getAnnotationPatternPartLulustream() {
+        return "/(d/[A-Za-z0-9]+|(d|e)/[a-z0-9]{12}|embed(\\-|/)[a-z0-9]{12}|[a-z0-9]{12}(/[^/]+(?:\\.html)?)?)";
+    }
+
+    public static String[] buildAnnotationUrlsLulustream(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?::\\d+)?" + LulustreamCom.getAnnotationPatternPartLulustream());
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -174,5 +189,33 @@ public class LulustreamCom extends XFileSharingProBasic {
     @Override
     protected Boolean requiresCaptchaForOfficialVideoDownload() {
         return Boolean.TRUE;
+    }
+
+    @Override
+    protected URL_TYPE getURLType(final String url) {
+        if (url == null) {
+            return null;
+        }
+        if (url.matches("(?i)^https?://[A-Za-z0-9\\-\\.:]+/embed/([a-z0-9]{12}).*")) {
+            return URL_TYPE.EMBED_VIDEO;
+        } else {
+            return super.getURLType(url);
+        }
+    }
+
+    @Override
+    protected String getFUID(final String url, URL_TYPE type) {
+        if (url == null || type == null) {
+            return null;
+        }
+        try {
+            if (type == URL_TYPE.EMBED_VIDEO) {
+                final String path = new URL(url).getPath();
+                return new Regex(path, "(?i)/embed(?:-|/)([a-z0-9]{12})").getMatch(0);
+            }
+        } catch (MalformedURLException e) {
+            logger.log(e);
+        }
+        return super.getFUID(getDownloadLink(), type);
     }
 }

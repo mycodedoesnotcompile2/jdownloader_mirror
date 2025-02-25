@@ -52,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50291 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 50691 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
     public static final String PROPERTY_streamingType    = "streamingType";
@@ -112,7 +112,7 @@ public class ZdfDeMediathek extends PluginForHost {
         link.setFinalFileName(link.getStringProperty("directName", link.getName()));
         if (!isDownload) {
             if (StringUtils.containsIgnoreCase(dllink, "m3u8")) {
-                checkFFProbe(link, "Download a HLS Stream");
+                checkFFProbe(link, "Check a HLS Stream");
                 final HLSDownloader downloader = new HLSDownloader(link, br, dllink);
                 final int hlsBandwidth = link.getIntegerProperty(ZdfDeMediathek.PROPERTY_hlsBandwidth, -1);
                 if (hlsBandwidth > 0) {
@@ -387,7 +387,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -466,6 +466,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @DescriptionForConfigEntry(text_UseVideoResolutionAsQualityModifierForHTTPVideoStreams)
         @Order(8)
@@ -473,6 +474,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setUseVideoResolutionAsQualityModifierForHTTPVideoStreams(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @DescriptionForConfigEntry(text_FastLinkcheckEnabled)
         @Order(9)
@@ -480,6 +482,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setFastLinkcheckEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @DescriptionForConfigEntry(text_GrabSubtitleEnabled)
         @Order(10)
@@ -487,6 +490,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setGrabSubtitleEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @DescriptionForConfigEntry(text_GrabSubtitleForDisabledPeopleEnabled)
         @Order(11)
@@ -523,6 +527,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setPreferredSubtitleType(final SubtitleType type);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @DescriptionForConfigEntry("Grab audio only version if available?")
         @Order(14)
@@ -530,6 +535,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setGrabAudio(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @DescriptionForConfigEntry(text_GrabVideoVersionAudioDeskription)
         @Order(15)
@@ -537,6 +543,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setGrabVideoVersionAudioDeskription(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @DescriptionForConfigEntry(text_GrabVideoVersionOriginalAudio)
         @Order(16)
@@ -544,6 +551,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setGrabVideoVersionOriginalAudio(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(20)
         boolean isGrabBESTEnabled();
@@ -557,132 +565,154 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setOnlyBestVideoQualityOfSelectedQualitiesEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(22)
         boolean isAddUnknownQualitiesEnabled();
 
         void setAddUnknownQualitiesEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(30)
         boolean isGrabHLS170pVideoEnabled();
 
         void setGrabHLS170pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(40)
         boolean isGrabHLS270pVideoEnabled();
 
         void setGrabHLS270pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(50)
         boolean isGrabHLS360pVideoEnabled();
 
         void setGrabHLS360pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(60)
         boolean isGrabHLS480pVideoEnabled();
 
         void setGrabHLS480pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(70)
         boolean isGrabHLS570pVideoEnabled();
 
         void setGrabHLS570pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(80)
         boolean isGrabHLS720pVideoEnabled();
 
         void setGrabHLS720pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(false)
         @Order(81)
         boolean isGrabHLS1080pVideoEnabled();
 
         void setGrabHLS1080pVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(90)
         boolean isGrabHTTPMp4LowVideoEnabled();
 
         void setGrabHTTPMp4LowVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(91)
         boolean isGrabHTTPWebmLowVideoEnabled();
 
         void setGrabHTTPWebmLowVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(100)
         boolean isGrabHTTPMp4HighVideoEnabled();
 
         void setGrabHTTPMp4HighVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(101)
         boolean isGrabHTTPWebmHighVideoEnabled();
 
         void setGrabHTTPWebmHighVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(105)
         boolean isGrabHTTPMp4MediumVideoEnabled();
 
         void setGrabHTTPMp4MediumVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(106)
         boolean isGrabHTTPWebmMediumVideoEnabled();
 
         void setGrabHTTPWebmMediumVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(110)
         boolean isGrabHTTPMp4VeryHighVideoEnabled();
 
         void setGrabHTTPMp4VeryHighVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(111)
         boolean isGrabHTTPWebmVeryHighVideoEnabled();
 
         void setGrabHTTPWebmVeryHighVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(120)
         boolean isGrabHTTPMp4HDVideoEnabled();
 
         void setGrabHTTPMp4HDVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(121)
         boolean isGrabHTTPWebmHDVideoEnabled();
 
         void setGrabHTTPWebmHDVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(122)
         boolean isGrabHTTPMp4FHDVideoEnabled();
 
         void setGrabHTTPMp4FHDVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(123)
         boolean isGrabHTTPWebmFHDVideoEnabled();
 
         void setGrabHTTPWebmFHDVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(130)
         boolean isGrabHTTPMp4UHDVideoEnabled();
 
         void setGrabHTTPMp4UHDVideoEnabled(boolean b);
 
+        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(131)
         boolean isGrabHTTPWebmUHDVideoEnabled();

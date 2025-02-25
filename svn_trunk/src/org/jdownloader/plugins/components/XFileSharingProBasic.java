@@ -100,7 +100,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50685 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50694 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1533,6 +1533,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return link != null ? getURLType(link.getPluginPatternMatcher()) : null;
     }
 
+    private static final Pattern PATTERN_SHORTURL = Pattern.compile("/d/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+
     protected URL_TYPE getURLType(final String url) {
         if (url == null) {
             return null;
@@ -1540,7 +1542,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String shorturlID = this.supportsShortURLs() ? new Regex(url, PATTERN_SHORTURL).getMatch(0) : null;
         if (isImagehoster() && url.matches("(?i)^https?://[^/]+/(?:th|i)/\\d+/([a-z0-9]{12}).*")) {
             return URL_TYPE.IMAGE;
-        } else if (shorturlID != null && (shorturlID.length() != 12 || !shorturlID.toLowerCase(Locale.ENGLISH).equals(shorturlID))) {
+        } else if (shorturlID != null && (shorturlID.length() < 12 && !shorturlID.toLowerCase(Locale.ENGLISH).equals(shorturlID))) {
             return URL_TYPE.SHORT;
         } else if (url.matches("(?i)^https?://[^/]+/d/([a-z0-9]{12}).*")) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
@@ -1558,32 +1560,31 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    private static final Pattern PATTERN_SHORTURL = Pattern.compile("/d/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-
     protected String getFUID(final String url, URL_TYPE type) {
         if (url == null || type == null) {
             return null;
         }
         try {
+            final String path = new URL(url).getPath();
             switch (type) {
             case IMAGE:
                 if (isImagehoster()) {
-                    return new Regex(new URL(url).getPath(), "/(?:th|i)/\\d+/([a-z0-9]{12})").getMatch(0);
+                    return new Regex(path, "/(?:th|i)/\\d+/([a-z0-9]{12})").getMatch(0);
                 } else {
                     throw new IllegalArgumentException("Unsupported type:" + type + "|" + url);
                 }
             case EMBED_VIDEO:
-                return new Regex(new URL(url).getPath(), "(?i)/embed-([a-z0-9]{12})").getMatch(0);
+                return new Regex(path, "(?i)/embed-([a-z0-9]{12})").getMatch(0);
             case EMBED_VIDEO_2:
-                return new Regex(new URL(url).getPath(), "(?i)/e/([a-z0-9]{12})").getMatch(0);
+                return new Regex(path, "(?i)/e/([a-z0-9]{12})").getMatch(0);
             case FILE:
-                return new Regex(new URL(url).getPath(), "(?i)/file/([a-z0-9]{12})").getMatch(0);
+                return new Regex(path, "(?i)/file/([a-z0-9]{12})").getMatch(0);
             case SHORT:
-                return new Regex(new URL(url).getPath(), PATTERN_SHORTURL).getMatch(0);
+                return new Regex(path, PATTERN_SHORTURL).getMatch(0);
             case OFFICIAL_VIDEO_DOWNLOAD:
-                return new Regex(new URL(url).getPath(), "(?i)/d/([a-z0-9]{12})").getMatch(0);
+                return new Regex(path, "(?i)/d/([a-z0-9]{12})").getMatch(0);
             case NORMAL:
-                return new Regex(new URL(url).getPath(), "/([a-z0-9]{12})").getMatch(0);
+                return new Regex(path, "/([a-z0-9]{12})").getMatch(0);
             default:
                 throw new IllegalArgumentException("Unsupported type:" + type + "|" + url);
             }
@@ -2738,8 +2739,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected boolean handleCloudflareTurnstileCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
         final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br);
         /**
-         * This contains a workaround for a widespread design-flaw when using hcaptcha and a long wait-time in browser: <br>
-         * We need to split up the total waittime in such a case otherwise our solution token will expire before we get the chance to send
+         * This contains a workaround for a widespread design-flaw when using an interactive captcha and a long wait-time in browser: <br>
+         * We need to split up the total wait time in such a case otherwise our solution token will expire before we get the chance to send
          * it!
          */
         logger.info("Detected captcha method \"CloudflareTurnstileCaptcha\" for this host");

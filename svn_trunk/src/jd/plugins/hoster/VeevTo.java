@@ -24,11 +24,13 @@ import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
@@ -39,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50688 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50694 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -139,8 +141,6 @@ public class VeevTo extends XFileSharingProBasic {
             // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             /* 2024-07-08 */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Uploader has disabled downloads for this file");
-        } else if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
         }
         final Form preForm = new Form();
         preForm.setMethod(MethodType.POST);
@@ -153,19 +153,29 @@ public class VeevTo extends XFileSharingProBasic {
         preForm.put("wc", "0");
         preForm.put("h", "");
         preForm.put("u", "25");
+        final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
+        final String turnstileSiteKey = br.getRegex("sitekey\\s*:\\s*\"([^\"]+)").getMatch(0);
+        String cfTurnstileResponse = null;
+        if (turnstileSiteKey != null) {
+            final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileSiteKey);
+            logger.info("Detected captcha method \"CloudflareTurnstileCaptcha\" for this host");
+            cfTurnstileResponse = ts.getToken();
+            preForm.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+            preForm.put("g-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
+        }
+        this.waitTime(link, timeBefore);
         final Browser br2 = br.cloneBrowser();
         submitForm(br2, preForm);
         final Map<String, Object> entries = restoreFromString(br2.getRequest().getHtmlCode(), TypeRef.MAP);
         if (!"success".equals(entries.get("status"))) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
         }
-        // final CaptchaHelperHostPluginRecaptchaV2 rc2 = getCaptchaHelperHostPluginRecaptchaV2(this, br);
-        // final String rctoken = rc2.getToken();
-        // dlform.put("k", Encoding.urlEncode(rctoken));
-        this.handleRecaptchaV2(link, br, dlform);
+        if (cfTurnstileResponse != null) {
+            dlform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
+            dlform.put("g-recaptcha-response", Encoding.urlEncode(cfTurnstileResponse));
+        }
         br2.setFollowRedirects(false);
-        // submitForm(br2, dlform);
-        br2.submitForm(dlform);
+        submitForm(br2, dlform);
         final String dllink = br2.getRedirectLocation();
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find dllink via official video download");
@@ -181,6 +191,10 @@ public class VeevTo extends XFileSharingProBasic {
         final String betterFilename = new Regex(html, "<h4>([^<]+)</h4>").getMatch(0);
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;
+        }
+        final String betterFilesize = new Regex(html, "<i class=\"fa-solid fa-floppy-disk[^\"]*\"></i>([^<]+)<").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
         }
         return fileInfo;
     }

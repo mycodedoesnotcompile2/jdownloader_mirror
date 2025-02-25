@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -53,7 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50568 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50696 $", interfaceVersion = 2, names = {}, urls = {})
 public class GfyCatCom extends PluginForHost {
     public GfyCatCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +65,7 @@ public class GfyCatCom extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.XXX };
     }
 
-    private final boolean websiteOffline = true; // 2024-01-23
+    private final boolean websiteOffline = true; // 2024-01-23 gfycat.com offline
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -568,7 +569,7 @@ public class GfyCatCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link, true);
-        final LinkedHashSet<String> directurls = new LinkedHashSet<String>();
+        final HashSet<String> directurls = new LinkedHashSet<String>();
         directurls.add(link.getStringProperty(PROPERTY_DIRECTURL_HD));
         directurls.add(link.getStringProperty(PROPERTY_DIRECTURL_SD));
         directurls.remove(null);

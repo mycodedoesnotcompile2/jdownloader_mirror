@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50679 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50694 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -149,6 +149,12 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         setRequestIntervalLimitGlobal();
     }
 
+    @Override
+    public void clean() {
+        super.clean();
+        lazy_cache.clear();
+    }
+
     public static void setRequestIntervalLimitGlobal() {
         final int limit = PluginJsonConfig.get(InstagramConfig.class).getGlobalRequestIntervalLimitMilliseconds();
         if (limit > 0) {
@@ -167,6 +173,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     private static final Pattern       TYPE_PROFILE_TAGGED        = Pattern.compile("/([^/]+)/tagged/?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern       TYPE_PROFILE_REELS         = Pattern.compile("/([^/]+)/reels/?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern       TYPE_PROFILE               = Pattern.compile("/([^/]+)(?:/.*)?", Pattern.CASE_INSENSITIVE);
+    private Map<String, String>        lazy_cache                 = new HashMap<String, String>();
     /**
      * For links matching pattern {@link #TYPE_LEGACY_HASHTAG} --> This will be set on created DownloadLink objects as a (packagizer-)
      * property.
@@ -310,6 +317,32 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
     }
 
+    private String find_ig_app_id(final Browser br, final boolean allowStaticFallback) {
+        final String cachedAppID = lazy_cache.get("ig_app_id");
+        if (cachedAppID != null) {
+            return cachedAppID;
+        }
+        String igAppID = null;
+        if (br != null) {
+            igAppID = regex_app_id(br);
+            if (igAppID != null) {
+                lazy_cache.put("ig_app_id", igAppID);
+            }
+        }
+        if (igAppID == null && allowStaticFallback) {
+            /**
+             * Static fallback. If this id is wrong, requests done using it will get this response: <br>
+             * {"message":"useragent mismatch","status":"fail"}
+             */
+            igAppID = "936619743392459";
+        }
+        return igAppID;
+    }
+
+    private String regex_app_id(final Browser br) {
+        return br.getRegex("\"X-IG-App-ID\":\"(\\d+)").getMatch(0);
+    }
+
     // hash changes? but the value within is NEVER cleared. if map > resources || resources == null) remove storable
     private static Map<String, Qdb> QUERY_HASH = new HashMap<String, Qdb>();
 
@@ -392,62 +425,92 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             return cachedUserID;
         }
         /* Use website to find userID. */
-        final boolean useSearchToFindUserID = true;
+        final boolean allowUseSearchToFindUserID = true;
+        final boolean useallowUsebProfileInfoAPIToFindUserID = true;
         String userID = null;
         final String userProfileURL = this.generateURLProfile(username);
-        if (useSearchToFindUserID) {
+        if (useallowUsebProfileInfoAPIToFindUserID) {
+            final String igAppID = this.find_ig_app_id(null, true);
+            if (igAppID == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             /* 2022-05-11: New method: Faster and json only */
-            Request req = br.createGetRequest("https://www." + this.getHost() + "/web/search/topsearch/?context=blended&query=" + username + "&include_reel=true");
+            Request req = br.createGetRequest(InstaGramCom.ALT_API_BASE + "/users/web_profile_info/?username=" + username);
             /* None of these headers are mandatory atm. */
             req.getHeaders().put("Referer", userProfileURL);
             req.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            req.getHeaders().put("x-ig-app-id", igAppID);
             getPageAutoLogin(account, loggedIN, req.getUrl(), param, br, req, null, null);
-            Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            if (Boolean.TRUE.equals(entries.get("require_login")) || br.getHttpConnection().getResponseCode() == 401) {
-                /*
-                 * 2022-10-07 E.g.
-                 * {"message":"Bitte warte einige Minuten und versuche es dann noch einmal.","require_login":true,"status":"fail"}
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+            final Map<String, Object> user = (Map<String, Object>) data.get("user");
+            userID = user.get("id").toString();
+            if (userID != null) {
+                final String profile_pic_url_hd = (String) user.get("profile_pic_url_hd");
+                if (profile_pic_url_hd != null) {
+                    this.lazy_cache.put(userID + "_profile_pic_url_hd", "");
+                }
+            }
+        }
+        if (userID == null) {
+            if (allowUseSearchToFindUserID) {
+                /**
+                 * 2025-02-24: For some profiles, this API did not return the expected results or at least not on "pagination page 1". <br>
+                 * For this reason, another method will be preferred over this one from now on.
                  */
-                /* 2023-11-08: Also possible: response 401 with {"message":"Server Error","status":"fail"} */
-                if (loggedIN.get()) {
-                    /* Already logged in -> This should never happen */
-                    logger.warning("Login required but we're already logged in -> Possible problem with account/session");
-                    throw new AccountRequiredException();
-                } else if (account == null) {
-                    /* Account required but not available */
-                    throw new AccountRequiredException();
+                /* 2022-05-11: New method: Faster and json only */
+                Request req = br.createGetRequest("https://www." + this.getHost() + "/web/search/topsearch/?context=blended&query=" + username + "&include_reel=true");
+                /* None of these headers are mandatory atm. */
+                req.getHeaders().put("Referer", userProfileURL);
+                req.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                getPageAutoLogin(account, loggedIN, req.getUrl(), param, br, req, null, null);
+                Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (Boolean.TRUE.equals(entries.get("require_login")) || br.getHttpConnection().getResponseCode() == 401) {
+                    /*
+                     * 2022-10-07 E.g.
+                     * {"message":"Bitte warte einige Minuten und versuche es dann noch einmal.","require_login":true,"status":"fail"}
+                     */
+                    /* 2023-11-08: Also possible: response 401 with {"message":"Server Error","status":"fail"} */
+                    if (loggedIN.get()) {
+                        /* Already logged in -> This should never happen */
+                        logger.warning("Login required but we're already logged in -> Possible problem with account/session");
+                        throw new AccountRequiredException();
+                    } else if (account == null) {
+                        /* Account required but not available */
+                        throw new AccountRequiredException();
+                    }
+                    sleep(2000, param);
+                    logger.info("Logging in because: " + entries.get("message"));
+                    /* We're logged in now -> Perform request again. */
+                    req = req.cloneRequest();
+                    getPageAutoLogin(account, loggedIN, true, req.getUrl(), param, br, req, null, null);
+                    entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 }
-                sleep(2000, param);
-                logger.info("Logging in because: " + entries.get("message"));
-                /* We're logged in now -> Perform request again. */
-                req = req.cloneRequest();
-                getPageAutoLogin(account, loggedIN, true, req.getUrl(), param, br, req, null, null);
-                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            }
-            if ("fail".equals(entries.get("status"))) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final List<Map<String, Object>> users = (List<Map<String, Object>>) entries.get("users");
-            for (final Map<String, Object> entry : users) {
-                final Map<String, Object> user = (Map<String, Object>) entry.get("user");
-                if (StringUtils.equalsIgnoreCase(username, StringUtils.valueOfOrNull(user.get("username")))) {
-                    userID = user.get("pk").toString();
-                    break;
+                if ("fail".equals(entries.get("status"))) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-            }
-            if (StringUtils.isEmpty(userID)) {
-                /* Most likely that profile doesn't exist */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Profile not found");
-            }
-        } else {
-            getPageAutoLogin(account, loggedIN, userProfileURL, param, br, userProfileURL, null, null);
-            final String json = websiteGetJson();
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            userID = (String) get(entries, "entry_data/ProfilePage/{0}/user/id", "entry_data/ProfilePage/{0}/graphql/user/id");
-            if (StringUtils.isEmpty(userID)) {
-                userID = br.getRegex("\"owner\":\\s*\\{\"id\":\\s*\"(\\d+)\"\\}").getMatch(0);
+                final List<Map<String, Object>> users = (List<Map<String, Object>>) entries.get("users");
+                for (final Map<String, Object> entry : users) {
+                    final Map<String, Object> user = (Map<String, Object>) entry.get("user");
+                    if (StringUtils.equalsIgnoreCase(username, StringUtils.valueOfOrNull(user.get("username")))) {
+                        userID = user.get("pk").toString();
+                        break;
+                    }
+                }
                 if (StringUtils.isEmpty(userID)) {
-                    userID = br.getRegex("\"page_id\"\\s*:\\s*\"profilePage_(\\d+)").getMatch(0);
+                    /* Most likely that profile doesn't exist */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Profile not found");
+                }
+            } else {
+                getPageAutoLogin(account, loggedIN, userProfileURL, param, br, userProfileURL, null, null);
+                final String json = websiteGetJson();
+                final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+                userID = (String) get(entries, "entry_data/ProfilePage/{0}/user/id", "entry_data/ProfilePage/{0}/graphql/user/id");
+                if (StringUtils.isEmpty(userID)) {
+                    userID = br.getRegex("\"owner\":\\s*\\{\"id\":\\s*\"(\\d+)\"\\}").getMatch(0);
+                    if (StringUtils.isEmpty(userID)) {
+                        userID = br.getRegex("\"page_id\"\\s*:\\s*\"profilePage_(\\d+)").getMatch(0);
+                    }
                 }
             }
         }
@@ -464,11 +527,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         return userID;
     }
 
-    private void addCachedUserID(final int userID, final String username) {
-        addCachedUserID(Integer.toString(userID), username);
-    }
-
     private void addCachedUserID(final String userID, final String username) {
+        logger.info("Adding userID to cache: user: " + username + " -> userID: " + userID);
         synchronized (ID_TO_USERNAME) {
             ID_TO_USERNAME.put(userID, username);
         }
@@ -540,6 +600,20 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 this.loginOrFail(account, loginState);
             }
             getPage(param, br, request, null, null);
+            if (br.getRequest().getHtmlCode().startsWith("<")) {
+                final String ig_app_id = this.regex_app_id(br);
+                if (ig_app_id != null) {
+                    lazy_cache.put("ig_app_id", ig_app_id);
+                }
+                final String username = new Regex(br._getURL().getPath(), TYPE_PROFILE).getMatch(0);
+                if (username != null) {
+                    /* We look to be on a username page at this moment -> Look for userID of that username */
+                    final String userID = br.getRegex("profilePage_(\\d+)").getMatch(0);
+                    if (userID != null) {
+                        this.addCachedUserID(userID, username);
+                    }
+                }
+            }
             AccountRequiredException accountRequired = null;
             try {
                 InstaGramCom.checkErrors(this, br);
@@ -1052,17 +1126,21 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         InstaGramCom.prepBRAltAPI(this.br);
         Number total_media_items = null;
         boolean hasCrawledProfilePicture = false;
+        String profile_pic_url_hd = this.lazy_cache.get(userID + "_profile_pic_url_hd");
         if (crawlProfilePicture) {
             /* Crawl HD profile image, thx to: https://github.com/Ademking/profile-picture-viewer/blob/master/instagram.js#L43 */
-            logger.info("Crawling profile image");
-            InstaGramCom.getPageAltAPI(account, this.br, InstaGramCom.ALT_API_BASE + "/users/" + userID + "/info/");
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final Map<String, Object> user = (Map<String, Object>) entries.get("user");
-            total_media_items = ((Number) user.get("media_count")).intValue();
-            final Map<String, Object> hd_profile_pic_url_info = (Map<String, Object>) user.get("hd_profile_pic_url_info");
-            final String profilePictureURL = hd_profile_pic_url_info.get("url").toString();
-            final DownloadLink profilePic = this.createDownloadlink(profilePictureURL);
-            final String ext = Plugin.getFileNameExtensionFromString(profilePictureURL);
+            if (profile_pic_url_hd == null) {
+                logger.info("Crawling profile image");
+                InstaGramCom.getPageAltAPI(account, this.br, InstaGramCom.ALT_API_BASE + "/users/" + userID + "/info/");
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final Map<String, Object> user = (Map<String, Object>) entries.get("user");
+                total_media_items = ((Number) user.get("media_count")).intValue();
+                final Map<String, Object> hd_profile_pic_url_info = (Map<String, Object>) user.get("hd_profile_pic_url_info");
+                profile_pic_url_hd = hd_profile_pic_url_info.get("url").toString();
+                lazy_cache.put(userID + "_profile_pic_url_hd", profile_pic_url_hd);
+            }
+            final DownloadLink profilePic = this.createDownloadlink(profile_pic_url_hd);
+            final String ext = Plugin.getFileNameExtensionFromString(profile_pic_url_hd);
             profilePic.setFinalFileName(username + ext);
             profilePic.setAvailable(true);
             profilePic._setFilePackage(metadata.getFilePackage());
@@ -2069,7 +2147,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         /* Login is mandatory! */
         loginOrFail(account, loggedIN);
         getPageAutoLogin(account, loggedIN, null, param, br, param.getCryptedUrl(), null, null);
-        final String igAppID = br.getRegex("\"X-IG-App-ID\":\"(\\d+)").getMatch(0);
+        final String igAppID = this.find_ig_app_id(br, true);
         if (igAppID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
