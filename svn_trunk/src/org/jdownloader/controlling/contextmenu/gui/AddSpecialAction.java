@@ -11,7 +11,6 @@ import java.util.Locale;
 import javax.swing.Icon;
 import javax.swing.JComboBox;
 import javax.swing.JTextField;
-import javax.swing.tree.TreePath;
 
 import org.appwork.swing.components.searchcombo.SearchComboBox;
 import org.appwork.utils.StringUtils;
@@ -72,10 +71,9 @@ public class AddSpecialAction extends AppAction {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        List<Object> actions = new ArrayList<Object>();
-        List<Object> normalActions = managerFrame.getManager().list();
+        final List<Object> actions = new ArrayList<Object>();
+        final List<Object> normalActions = managerFrame.getManager().list();
         actions.addAll(normalActions);
-        TreePath addAt = managerFrame.getSelectionPath();
         Collections.sort(actions, new Comparator<Object>() {
             @Override
             public int compare(Object o1, Object o2) {
@@ -85,8 +83,7 @@ public class AddSpecialAction extends AppAction {
         ComboBoxDialog d = new ComboBoxDialog(0, _GUI.T.AddSpecialAction_actionPerformed_title(), _GUI.T.AddSpecialAction_actionPerformed_msg(), actions.toArray(new Object[] {}), 0, null, _GUI.T.lit_add(), null, null) {
             @Override
             protected JComboBox getComboBox(Object[] options2) {
-                // return super.getComboBox(options2);
-                SearchComboBox<Object> ret = new SearchComboBox<Object>(options2) {
+                final SearchComboBox<Object> ret = new SearchComboBox<Object>(options2) {
                     @Override
                     protected void setListSearchResults(List<Object> found, List<Object> all) {
                         final List<Object> newList = new ArrayList<Object>();
@@ -98,7 +95,7 @@ public class AddSpecialAction extends AppAction {
 
                     @Override
                     protected boolean matches(String element, String matches) {
-                        return element.toLowerCase(Locale.ROOT).contains(matches.toLowerCase(Locale.ROOT));
+                        return element != null && matches != null && (element.contains(matches) || (this.isSearchCaseSensitive() == false && element.toLowerCase(Locale.ROOT).contains(matches.toLowerCase(Locale.ROOT))));
                     }
 
                     @Override
@@ -110,7 +107,6 @@ public class AddSpecialAction extends AppAction {
                             }
                             pos = tf.getText().toLowerCase(Locale.ROOT).indexOf(txt.toLowerCase(Locale.ROOT)) + txt.length();
                         }
-                        System.out.println("Setr piot " + pos);
                         tf.setCaretPosition(pos);
                         tf.select(pos, tf.getText().length());
                     }

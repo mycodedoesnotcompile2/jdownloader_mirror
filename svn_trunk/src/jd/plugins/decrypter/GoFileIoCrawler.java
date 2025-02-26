@@ -28,7 +28,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GofileIo;
 
-@DecrypterPlugin(revision = "$Revision: 50693 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 50706 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -87,20 +87,22 @@ public class GoFileIoCrawler extends PluginForDecrypt {
             final String statustext = (String) response.get("status");
             if ("error-notPremium".equals(statustext)) {
                 // {"status":"error-notPremium","data":{}}
-                throw new AccountRequiredException();
+                throw new AccountRequiredException("Premium account required to access this link");
             } else {
                 /* Assume that folder is offline. */
                 /* E.g. {"status":"error-notFound","data":{}} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+        } else if (!Boolean.TRUE.equals(response_data.get("canAccess"))) {
+            throw new AccountRequiredException("Private link");
         }
         PluginForHost hosterplugin = null;
-        String currentFolderName = (String) response_data.get("name");
-        if (currentFolderName.matches("^quickUpload_.+") || currentFolderName.equals(folderID)) {
+        String currentFolderName = response_data.get("name").toString();
+        String path = this.getAdoptedCloudFolderStructure();
+        if (path == null && (currentFolderName.matches("^quickUpload_.+") || currentFolderName.equals(folderID) || currentFolderName.equals("root"))) {
             /* Invalid value */
             currentFolderName = null;
         }
-        String path = this.getAdoptedCloudFolderStructure();
         FilePackage fp = null;
         if (path == null) {
             if (!StringUtils.isEmpty(currentFolderName)) {
@@ -115,9 +117,6 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         if (path != null) {
             fp = FilePackage.getInstance();
             fp.setName(path);
-        }
-        if (!Boolean.TRUE.equals(response_data.get("canAccess"))) {
-            throw new AccountRequiredException();
         }
         final String parentFolderShortID = response_data.get("code").toString();
         Map<String, Map<String, Object>> children = (Map<String, Map<String, Object>>) response_data.get("contents");

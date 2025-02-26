@@ -37,7 +37,7 @@ import jd.plugins.hoster.DirectHTTP;
 import org.jdownloader.plugins.components.config.EromeComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 50277 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50705 $", interfaceVersion = 3, names = {}, urls = {})
 public class EromeComCrawler extends PluginForDecrypt {
     public EromeComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class EromeComCrawler extends PluginForDecrypt {
     }
 
     public static void setRequestIntervalLimitGlobal() {
-        Browser.setRequestIntervalLimitGlobal("erome.com", 3000);
+        Browser.setRequestIntervalLimitGlobal("erome.com", 1500);
     }
 
     @Override

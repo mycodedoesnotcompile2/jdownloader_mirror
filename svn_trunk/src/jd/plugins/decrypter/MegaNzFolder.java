@@ -46,6 +46,7 @@ import jd.plugins.hoster.MegaNz;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
+import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.MaxTimeSoftReference;
 import org.appwork.storage.config.MaxTimeSoftReferenceCleanupCallback;
 import org.appwork.storage.simplejson.JSonParser;
@@ -60,8 +61,9 @@ import org.jdownloader.plugins.components.config.MegaNzConfig.InvalidOrMissingDe
 import org.jdownloader.plugins.components.config.MegaNzFolderConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GeneralSettings;
 
-@DecrypterPlugin(revision = "$Revision: 49494 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50705 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaNz.class })
 public class MegaNzFolder extends PluginForDecrypt {
     private static AtomicLong CS = new AtomicLong(System.currentTimeMillis());
@@ -341,7 +343,9 @@ public class MegaNzFolder extends PluginForDecrypt {
                     }
                     final Object response;
                     try {
+                        final boolean lastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
                         JSonParser factory = new JSonParser(IO.BOM.read(IO.readStream(-1, con.getInputStream()), IO.BOM.UTF8.getCharSet())) {
+
                             @Override
                             protected Map<String, ? extends Object> createJSonObject() {
                                 return new MinimalMemoryMap<String, Object>();
@@ -352,7 +356,8 @@ public class MegaNzFolder extends PluginForDecrypt {
                                 if (("p".equals(key) || "u".equals(key)) && value instanceof String) {
                                     // dedupe parent node (ID)
                                     value = dedupeString((String) value);
-                                } else if ("ts".equals(key)) {// remove unused timestamp
+                                } else if ("ts".equals(key) && !lastModified) {
+                                    // remove unused timestamp
                                     return;
                                 }
                                 super.putKeyValuePair(newPath, map, key, value);
@@ -647,6 +652,7 @@ public class MegaNzFolder extends PluginForDecrypt {
                 // alternative: https://mega.nz/folder/folderID#masterKey/file/nodeID
                 link.setProperty("fa", toObject(folderNode.get("fa")));// file attributes
                 link.setFinalFileName(nodeName);
+                link.setProperty("ts", folderNode.get("ts"));
                 if (path != null) {
                     link.setRelativeDownloadFolderPath(path);
                     /*

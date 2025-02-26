@@ -48,7 +48,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
     }
 
     public static String getTranslationForDisplayNewPackageDialog() {
-        return "Display new package dialog";
+        return _JDT.FIX_ME("Display new package dialog");
     }
 
     @Customizer(link = "#getTranslationForDisplayNewPackageDialog")
@@ -62,7 +62,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
     }
 
     public static String getTranslationPackageExpandMode() {
-        return "Package expand mode";
+        return _JDT.FIX_ME("Package expand mode");
     }
 
     @Customizer(link = "#getTranslationPackageExpandMode")
@@ -299,11 +299,11 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                     index = 0;
                     break;
                 }
-                final PackageSettings mergesettings = new PackageSettings();
-                mergesettings.setExpandPackage(final_expandPackage);
-                mergesettings.setPackagePosition(index);
-                mergesettings.setMergeSameNamedPackages(final_mergeSameNamedPackages);
-                controller.merge(newPackage, sel.getChildren(), null, mergesettings);
+                final PackageSettings ps = new PackageSettings();
+                ps.setExpandPackage(final_expandPackage);
+                ps.setPackagePosition(index);
+                ps.setMergeSameNamedPackages(final_mergeSameNamedPackages);
+                controller.merge(newPackage, sel.getChildren(), null, ps);
                 return null;
             }
         });

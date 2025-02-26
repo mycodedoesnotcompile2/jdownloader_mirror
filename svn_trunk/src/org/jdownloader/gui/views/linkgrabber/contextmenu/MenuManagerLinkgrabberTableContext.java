@@ -2,6 +2,7 @@ package org.jdownloader.gui.views.linkgrabber.contextmenu;
 
 import javax.swing.KeyStroke;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.contextmenu.ActionData;
 import org.jdownloader.controlling.contextmenu.ContextMenuManager;
@@ -145,6 +146,9 @@ public class MenuManagerLinkgrabberTableContext extends ContextMenuManager<Crawl
         ret.add(CreateDLCAction.class);
         ret.add(MergeToPackageAction.class);
         ret.add(SplitPackagesByHost.class);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            ret.add(SplitPackagesByHostLinkgrabber.class);
+        }
         ret.add(MergeSameNamedPackagesAction.class);
         return ret;
     }

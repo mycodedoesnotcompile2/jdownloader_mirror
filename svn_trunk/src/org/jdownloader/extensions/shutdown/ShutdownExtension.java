@@ -15,9 +15,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package org.jdownloader.extensions.shutdown;
 
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.plugins.AddonPanel;
-
 import org.appwork.controlling.StateEvent;
 import org.appwork.controlling.StateEventListener;
 import org.appwork.controlling.StateMachine;
@@ -43,6 +40,9 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.mainmenu.MenuManagerMainmenu;
 import org.jdownloader.gui.mainmenu.container.ExtensionsMenuContainer;
 import org.jdownloader.gui.toolbar.MenuManagerMainToolbar;
+
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.plugins.AddonPanel;
 
 public class ShutdownExtension extends AbstractExtension<ShutdownConfig, ShutdownTranslation> implements StateEventListener, MenuExtenderHandler {
     private ShutdownConfigPanel     configPanel;
@@ -147,52 +147,52 @@ public class ShutdownExtension extends AbstractExtension<ShutdownConfig, Shutdow
             final boolean active = getSettings().isShutdownActive();
             if (!active) {
                 logger.info("ShutdownExtension is not active!");
-            } else {
-                logger.info("ShutdownExtension is active!");
-                if (DownloadWatchDog.getInstance().getSession().getDownloadsStarted() > 0) {
-                    final ShutdownRequest request = ShutdownController.getInstance().collectVetos(new BasicShutdownRequest(true));
-                    if (request.hasVetos()) {
+                return;
+            }
+            logger.info("ShutdownExtension is active!");
+            if (DownloadWatchDog.getInstance().getSession().getDownloadsStarted() == 0) {
+                logger.info("No downloads have been started in last session! ByPass ShutdownExtension!");
+                return;
+            }
+            final ShutdownRequest request = ShutdownController.getInstance().collectVetos(new BasicShutdownRequest(true));
+            if (!request.hasVetos()) {
+                startShutdownThread();
+                return;
+            }
+            logger.info("Vetos: " + request.getVetos().size() + " Wait until there is no veto");
+            for (ShutdownVetoException e : request.getVetos()) {
+                logger.log(e);
+                logger.info(e.getSource() + "");
+            }
+            new Thread("Wait to Shutdown") {
+                public void run() {
+                    while (true) {
+                        final StateMachine sm = DownloadWatchDog.getInstance().getStateMachine();
+                        if (sm.isState(DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.STOPPING_STATE)) {
+                            logger.info("Cancel Shutdown.");
+                            return;
+                        }
+                        final ShutdownRequest request = ShutdownController.getInstance().collectVetos(new BasicShutdownRequest(true));
+                        if (!request.hasVetos()) {
+                            logger.info("No Vetos");
+                            if (sm.isState(DownloadWatchDog.IDLE_STATE, DownloadWatchDog.STOPPED_STATE)) {
+                                startShutdownThread();
+                                return;
+                            }
+                        }
                         logger.info("Vetos: " + request.getVetos().size() + " Wait until there is no veto");
                         for (ShutdownVetoException e : request.getVetos()) {
                             logger.log(e);
                             logger.info(e.getSource() + "");
                         }
-                        new Thread("Wait to Shutdown") {
-                            public void run() {
-                                while (true) {
-                                    final StateMachine sm = DownloadWatchDog.getInstance().getStateMachine();
-                                    if (sm.isState(DownloadWatchDog.PAUSE_STATE, DownloadWatchDog.RUNNING_STATE, DownloadWatchDog.STOPPING_STATE)) {
-                                        logger.info("Cancel Shutdown.");
-                                        return;
-                                    }
-                                    final ShutdownRequest request = ShutdownController.getInstance().collectVetos(new BasicShutdownRequest(true));
-                                    if (!request.hasVetos()) {
-                                        logger.info("No Vetos");
-                                        if (sm.isState(DownloadWatchDog.IDLE_STATE, DownloadWatchDog.STOPPED_STATE)) {
-                                            startShutdownThread();
-                                            return;
-                                        }
-                                    }
-                                    logger.info("Vetos: " + request.getVetos().size() + " Wait until there is no veto");
-                                    for (ShutdownVetoException e : request.getVetos()) {
-                                        logger.log(e);
-                                        logger.info(e.getSource() + "");
-                                    }
-                                    try {
-                                        Thread.sleep(1000);
-                                    } catch (InterruptedException e) {
-                                        return;
-                                    }
-                                }
-                            }
-                        }.start();
-                    } else {
-                        startShutdownThread();
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            return;
+                        }
                     }
-                } else {
-                    logger.info("No downloads have been started in last session! ByPass ShutdownExtension!");
                 }
-            }
+            }.start();
         }
     }
 

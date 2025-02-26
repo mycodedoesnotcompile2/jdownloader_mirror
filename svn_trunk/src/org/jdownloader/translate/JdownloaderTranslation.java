@@ -903,7 +903,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Merge Packages before splitting?" })
     String SplitPackagesByHost_getTranslationForMergePackages();
 
-    @Default(lngs = { "en" }, values = { "If Merging, ask for new Downloadfolder and package name?" })
+    @Default(lngs = { "en" }, values = { "If Merging, ask for new download folder and package name?" })
     String SplitPackagesByHost_getTranslationForAskForNewDownloadFolderAndPackageName();
 
     @Default(lngs = { "en" }, values = { "Add package at" })

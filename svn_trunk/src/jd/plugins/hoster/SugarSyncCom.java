@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49217 $", interfaceVersion = 2, names = { "sugarsync.com" }, urls = { "https?://(?:www\\.)?sugarsync\\.com/pf/(D[\\d\\_]+)" })
+@HostPlugin(revision = "$Revision: 50706 $", interfaceVersion = 2, names = { "sugarsync.com" }, urls = { "https?://(?:www\\.)?sugarsync\\.com/pf/(D[\\d\\_]+)" })
 public class SugarSyncCom extends PluginForHost {
     public SugarSyncCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,7 +41,7 @@ public class SugarSyncCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.sugarsync.com/terms.html";
+        return "https://www." + getHost() + "/terms.html";
     }
 
     @Override
@@ -70,13 +70,11 @@ public class SugarSyncCom extends PluginForHost {
         dllink = null;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.setCookie("https://www.sugarsync.com/", "lang", "en");
+        br.setCookie(getHost(), "lang", "en");
         URLConnectionAdapter con = null;
         try {
             con = br.openGetConnection(link.getPluginPatternMatcher());
-            if (con.getContentType().contains("html")) {
-                br.followConnection();
-            } else {
+            if (this.looksLikeDownloadableContent(con)) {
                 /* We have a directlink */
                 dllink = link.getPluginPatternMatcher();
                 if (con.isContentDecoded()) {
@@ -90,6 +88,7 @@ public class SugarSyncCom extends PluginForHost {
                 }
                 return AvailableStatus.TRUE;
             }
+            br.followConnection();
         } finally {
             try {
                 con.disconnect();
@@ -101,8 +100,9 @@ public class SugarSyncCom extends PluginForHost {
         }
         final String sessionid = br.getCookie(br.getHost(), "JSESSIONID");
         final String somevaluesid = br.getRegex("id=\"someValuesId\" value=\"([^<>\"]+)\"").getMatch(0);
+        final boolean looksLikeFileOffline = br.containsHTML("class=\"pf-error-information-message\"");
         if (StringUtils.isEmpty(sessionid)) {
-            if (br.containsHTML("class=\"pf-error-information-message\"")) {
+            if (looksLikeFileOffline) {
                 /* 2024-06-28: They always have this text in their html so only check for this as a last resort. */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
@@ -130,6 +130,8 @@ public class SugarSyncCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("error_no_public\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("error_msg\"")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = PluginJSonUtils.getJson(br, "jsonPublicFileName");
         String filesize = PluginJSonUtils.getJson(br, "publicFileSize");
@@ -142,6 +144,9 @@ public class SugarSyncCom extends PluginForHost {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         } else {
             logger.warning("Failed to find filesize");
+        }
+        if (filename == null && filesize == null && looksLikeFileOffline) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;
     }

@@ -40,7 +40,7 @@ public interface CaptchaSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry("Enables CES captcha services for login captchas.")
+    @DescriptionForConfigEntry("Activates CES CAPTCHA services for login captchas. This is not recommended, as users generally expect a near-instant login process. Using a solver can extend login times to several minutes.")
     boolean isCaptchaExchangeForAccountLoginEnabled();
 
     void setCaptchaExchangeForAccountLoginEnabled(boolean b);

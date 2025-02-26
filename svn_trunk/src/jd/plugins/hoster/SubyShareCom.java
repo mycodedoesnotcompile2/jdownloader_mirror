@@ -23,6 +23,11 @@ import java.util.Locale;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -37,12 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50706 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -171,6 +171,8 @@ public class SubyShareCom extends XFileSharingProBasic {
              * to download the file (WTF?!)
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "The owner of this file blocked you to download it");
+        } else if (new Regex(correctedBR, ">\\s*Couldn't generate direct link").patternFind()) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Couldn't generate direct link");
         } else if (new Regex(correctedBR, "(?i)>\\s*You do no have enough traffic to download this file").patternFind()) {
             /* 2023-01-25 */
             if (account != null) {
@@ -186,12 +188,13 @@ public class SubyShareCom extends XFileSharingProBasic {
 
     @Override
     protected String regexWaittime(Browser br) {
-        String waitStr = super.regexWaittime(br);
-        if (StringUtils.isEmpty(waitStr)) {
-            /* 2018-07-19: Special */
-            waitStr = new Regex(br.getRequest().getHtmlCode(), "class\\s*=\\s*\"seconds\"[^>]*?>\\s*?(\\d+)\\s*?<").getMatch(0);
+        /* 2018-07-19: Special */
+        String waitStr = new Regex(br.getRequest().getHtmlCode(), "id=\"countdown\"[^>]*>[^<]*<[^>]*>(\\d+)</span>").getMatch(0);
+        if (waitStr != null) {
+            return waitStr;
+        } else {
+            return super.regexWaittime(br);
         }
-        return waitStr;
     }
 
     @Override

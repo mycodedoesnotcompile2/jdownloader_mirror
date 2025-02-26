@@ -13,15 +13,6 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.ListCellRenderer;
 
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
-import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.interfaces.View;
-
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.swing.MigPanel;
@@ -65,6 +56,15 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.ConfirmIncomplete
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.interfaces.View;
 
 public class ConfirmLinksContextAction extends CustomizableTableContextAppAction<CrawledPackage, CrawledLink> implements GUIListener, ActionContext {
     public static final String SELECTION_ONLY = "selectionOnly";
@@ -739,14 +739,16 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     protected static void switchToDownloadTab() {
-        if (!Application.isHeadless()) {
-            new EDTRunner() {
-                @Override
-                protected void runInEDT() {
-                    JDGui.getInstance().requestPanel(JDGui.Panels.DOWNLOADLIST);
-                }
-            };
+        if (Application.isHeadless()) {
+            /* Do nothing */
+            return;
         }
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                JDGui.getInstance().requestPanel(JDGui.Panels.DOWNLOADLIST);
+            }
+        };
     }
 
     protected static void clearLinkgrabber() {

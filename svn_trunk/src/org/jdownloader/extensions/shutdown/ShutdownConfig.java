@@ -1,12 +1,12 @@
 package org.jdownloader.extensions.shutdown;
 
-import jd.plugins.ExtensionConfigInterface;
-
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+
+import jd.plugins.ExtensionConfigInterface;
 
 public interface ShutdownConfig extends ExtensionConfigInterface {
     @DefaultBooleanValue(false)
@@ -37,13 +37,14 @@ public interface ShutdownConfig extends ExtensionConfigInterface {
 
     @DefaultIntValue(60)
     @AboutConfig
+    @DescriptionForConfigEntry("Seconds after shutdown request until JDownloader closes.")
     int getCountdownTime();
 
     void setCountdownTime(int seconds);
 
     @DefaultBooleanValue(false)
     @AboutConfig
-    @DescriptionForConfigEntry("If you want the 'Shutdown enabled' flag to be disabled in a new session, then disable this flag")
+    @DescriptionForConfigEntry("If you want the 'Shutdown enabled' flag to be enabled in a new session, then enable this flag")
     boolean isShutdownActiveByDefaultEnabled();
 
     void setShutdownActiveByDefaultEnabled(boolean b);
@@ -53,5 +54,4 @@ public interface ShutdownConfig extends ExtensionConfigInterface {
     boolean isShowWarningDialog();
 
     public void setShowWarningDialog(boolean b);
-
 }

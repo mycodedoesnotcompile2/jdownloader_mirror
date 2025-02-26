@@ -163,21 +163,21 @@ public abstract class SearchComboBox<T> extends JComboBox {
         }
 
         private DelayedRunnable delayer = new DelayedRunnable(500) {
-            @Override
-            public void delayedrun() {
-                // scheduler executes at least 50 ms after this submit.
-                // this.sheduler.run();
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (Editor.this.valueSetter.get() > 0) {
-                            return;
-                        }
-                        Editor.this.autoComplete(true);
-                    }
-                });
-            }
-        };
+                                            @Override
+                                            public void delayedrun() {
+                                                // scheduler executes at least 50 ms after this submit.
+                                                // this.sheduler.run();
+                                                SwingUtilities.invokeLater(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        if (Editor.this.valueSetter.get() > 0) {
+                                                            return;
+                                                        }
+                                                        Editor.this.autoComplete(true);
+                                                    }
+                                                });
+                                            }
+                                        };
 
         private void auto() {
             if (!SearchComboBox.this.isAutoCompletionEnabled()) {
@@ -196,19 +196,25 @@ public abstract class SearchComboBox<T> extends JComboBox {
             if (!SearchComboBox.this.isAutoCompletionEnabled()) {
                 return false;
             }
-            String rawtxt = Editor.this.tf.getText();
+            final String rawtxt = Editor.this.tf.getText();
             if (StringUtils.isEmpty(rawtxt)) {
                 /* every string will begin with "" so we return here */
                 return false;
             }
             final String finalRaw = rawtxt;
-            if (this.searchComboBox.isSearchCaseSensitive() == false) {
-                rawtxt = rawtxt.toLowerCase(Locale.ENGLISH);
+            final boolean caseSensitive = this.searchComboBox.isSearchCaseSensitive();
+            final String txt;
+            if (caseSensitive) {
+                txt = rawtxt;
+            } else {
+                txt = rawtxt.toLowerCase(Locale.ENGLISH);
             }
-            final String txt = rawtxt;
-            final T lValue = this.value;
-            if (lValue != null && SearchComboBox.this.getTextForValue(lValue).equals(txt)) {
-                return true;
+            {
+                final T lValue = this.getItem();
+                final String valueText = SearchComboBox.this.getTextForValue(lValue);
+                if (valueText != null && (valueText.equals(rawtxt) || (!caseSensitive && StringUtils.equalsIgnoreCase(valueText, rawtxt)))) {
+                    return true;
+                }
             }
             final java.util.List<T> found = new ArrayList<T>();
             final java.util.List<T> all = new ArrayList<T>();
@@ -308,7 +314,7 @@ public abstract class SearchComboBox<T> extends JComboBox {
         public void focusLost(final FocusEvent arg0) {
             if (!SearchComboBox.this.isUnkownTextInputAllowed() && !Editor.this.autoComplete(false)) {
                 // reset text after modifications to a valid value
-                final String ret = SearchComboBox.this.getTextForValue(Editor.this.value);
+                final String ret = SearchComboBox.this.getTextForValue(Editor.this.getItem());
                 this.safeSet(ret);
             } else {
                 SearchComboBox.this.updateHelpText();
@@ -332,7 +338,7 @@ public abstract class SearchComboBox<T> extends JComboBox {
          * @see javax.swing.ComboBoxEditor#getItem()
          */
         @Override
-        public Object getItem() {
+        public T getItem() {
             return this.value;
         }
 
@@ -455,15 +461,15 @@ public abstract class SearchComboBox<T> extends JComboBox {
         return element != null && matches != null && (element.startsWith(matches) || this.isSearchCaseSensitive() == false && element.toLowerCase(Locale.ENGLISH).startsWith(matches));
     }
 
-    private int               actualMaximumRowCount = 8;
-    public boolean            autoCompletionEnabled = true;
+    private int               actualMaximumRowCount  = 8;
+    public boolean            autoCompletionEnabled  = true;
     /**
      *
      */
-    private static final long serialVersionUID      = 6475635443708682554L;
-    private final ColorState  helpColorSet          = new ColorState(Color.LIGHT_GRAY);
-    private final ColorState  badColorSet           = new ColorState(Color.RED);
-    private final ColorState  normalColorSet        = new ColorState(Color.BLACK);
+    private static final long serialVersionUID       = 6475635443708682554L;
+    private final ColorState  helpColorSet           = new ColorState(Color.LIGHT_GRAY);
+    private final ColorState  badColorSet            = new ColorState(Color.RED);
+    private final ColorState  normalColorSet         = new ColorState(Color.BLACK);
     {
         this.normalColorSet.setForeground(this.getForeground());
         final Color disabled = (Color) UIManager.get("TextField.disabledForeground");
@@ -471,12 +477,12 @@ public abstract class SearchComboBox<T> extends JComboBox {
             this.helpColorSet.setForeground(disabled);
         }
     }
-    private String      helptext;
-    private boolean     unkownTextInputAllowed = false;
-    protected ImageIcon badgeIcon;
-    private ColorState  currentColorSet;
-    private List<T>     data;
-    private boolean     byPassTxtUpdate        = false;
+    private String            helptext;
+    private boolean           unkownTextInputAllowed = false;
+    protected ImageIcon       badgeIcon;
+    private ColorState        currentColorSet;
+    private List<T>           data;
+    private boolean           byPassTxtUpdate        = false;
 
     /**
      * @param plugins

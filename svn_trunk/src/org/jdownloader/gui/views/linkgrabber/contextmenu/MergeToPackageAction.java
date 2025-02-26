@@ -20,5 +20,4 @@ public class MergeToPackageAction extends org.jdownloader.gui.views.linkgrabber.
         newPackage.setDownloadFolder(downloadFolder);
         return newPackage;
     }
-
 }

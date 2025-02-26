@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -40,6 +41,30 @@ import javax.swing.JTextPane;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import javax.swing.text.JTextComponent;
+
+import jd.controlling.AccountController;
+import jd.controlling.TaskQueue;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ProxyInfoHistory;
+import jd.controlling.downloadcontroller.ProxyInfoHistory.WaitingSkipReasonContainer;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.Reconnecter;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import net.sourceforge.htmlunit.corejs.javascript.Function;
+import net.sourceforge.htmlunit.corejs.javascript.NativeArray;
+import net.sourceforge.htmlunit.corejs.javascript.NativeObject;
+import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
@@ -84,28 +109,6 @@ import org.jdownloader.plugins.WaitingSkipReason;
 import org.jdownloader.settings.SoundSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
-import jd.controlling.AccountController;
-import jd.controlling.TaskQueue;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ProxyInfoHistory;
-import jd.controlling.downloadcontroller.ProxyInfoHistory.WaitingSkipReasonContainer;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.Reconnecter;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import net.sourceforge.htmlunit.corejs.javascript.Function;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
-
 public class ScriptEnvironment {
     private static HashMap<String, Object>                       GLOBAL_PROPERTIES = new HashMap<String, Object>();
     @ScriptAPI(description = "JDownloader Installation Directory")
@@ -115,33 +118,18 @@ public class ScriptEnvironment {
 
     @ScriptAPI(description = "Show a Message Box", parameters = { "myObject1", "MyObject2", "..." }, example = "alert(JD_HOME);")
     public static void alert(Object... objects) {
-        final ScriptThread env = getScriptThread();
-        if (objects != null && objects.length == 1) {
-            if (Clazz.isPrimitiveWrapper(objects[0].getClass()) || Clazz.isString(objects[0].getClass())) {
-                showMessageDialog(objects[0] + "");
-            } else {
-                try {
-                    try {
-                        showMessageDialog(JSonStorage.serializeToJson(objects[0]));
-                    } catch (Throwable e) {
-                        showMessageDialog(format(toJson(objects[0])));
-                    }
-                } catch (Throwable e) {
-                    showMessageDialog(objects[0] + "");
-                }
-            }
-            return;
-        }
+        final Object[] args = convertJavaScriptToJava(objects);
+        String message = null;
         try {
+            message = JSonStorage.serializeToJson(args != null && args.length == 1 ? args[0] : args);
+        } catch (Exception e1) {
             try {
-                showMessageDialog(JSonStorage.serializeToJson(objects));
-            } catch (Throwable e) {
-                showMessageDialog(format(toJson(objects)));
+                message = format(toJson(args != null && args.length == 1 ? args[0] : args));
+            } catch (Exception e2) {
+                message = StringUtils.valueOfOrNull(args != null && args.length == 1 ? args[0] : args);
             }
-        } catch (Throwable e) {
-            showMessageDialog(objects + "");
         }
-        return;
+        showMessageDialog(message);
     }
 
     @ScriptAPI(description = "disable permission checks")
@@ -231,11 +219,81 @@ public class ScriptEnvironment {
         }
     }
 
+    public static Object convertJavaScriptToJava(Object param) {
+        if (param == null) {
+            return null;
+        } else if (param instanceof Boolean) {
+            return param;
+        } else if (param instanceof CharSequence) {
+            return param.toString();
+        } else if (param instanceof Number) {
+            // Javascript Double can store 2^53-1 Integer without loss of precision <-> UniqueID
+            return param;
+        } else if (param instanceof NativeArray) {
+            final NativeArray na = (NativeArray) param;
+            final int length = (int) na.getLength();
+            final Object[] elem = new Object[length];
+            for (int i = 0; i < length; i++) {
+                elem[i] = convertJavaScriptToJava(na.get(i));
+            }
+            return elem;
+        } else if (param instanceof NativeObject) {
+            final NativeObject no = (NativeObject) param;
+            final Map<Object, Object> elem = new HashMap<Object, Object>();
+            for (Entry<Object, Object> entry : no.entrySet()) {
+                elem.put(convertJavaScriptToJava(entry.getKey()), convertJavaScriptToJava(entry.getValue()));
+            }
+            return elem;
+        } else {
+            System.out.println("TODO:" + param);
+            return param;
+        }
+    }
+
+    public static Object[] convertJavaScriptToJava(Object... parameters) {
+        if (parameters == null) {
+            return null;
+        }
+        final List<Object> ret = new ArrayList<Object>();
+        for (Object param : parameters) {
+            if (param == null) {
+                ret.add(null);
+            } else if (param instanceof Boolean) {
+                ret.add(param);
+            } else if (param instanceof CharSequence) {
+                ret.add(param.toString());
+            } else if (param instanceof Number) {
+                // Javascript Double can store 2^53-1 Integer without loss of precision <-> UniqueID
+                ret.add(param);
+            } else if (param instanceof NativeArray) {
+                final NativeArray na = (NativeArray) param;
+                final int length = (int) na.getLength();
+                final Object[] elem = new Object[length];
+                for (int i = 0; i < length; i++) {
+                    elem[i] = convertJavaScriptToJava(na.get(i));
+                }
+                ret.add(elem);
+            } else if (param instanceof NativeObject) {
+                final NativeObject no = (NativeObject) param;
+                final Map<Object, Object> elem = new HashMap<Object, Object>();
+                for (Entry<Object, Object> entry : no.entrySet()) {
+                    elem.put(convertJavaScriptToJava(entry.getKey()), convertJavaScriptToJava(entry.getValue()));
+                }
+                ret.add(elem);
+            } else {
+                System.out.println("TODO:" + param);
+                ret.add(param);
+            }
+        }
+        return ret.toArray(new Object[0]);
+    }
+
     @ScriptAPI(description = "Call the MyJDownloader API locally (no network involved), see API Docs here https://my.jdownloader.org/developers/", parameters = { "\"namespace\"", "\"methodname\"", "parameter1", "parameter2", "..." }, example = "callAPI(\"downloadsV2\", \"queryLinks\", { \"name\": true})")
     public static Object callAPI(String namespace, String method, Object... parameters) throws EnvironmentException {
         askForPermission("call the Remote API: " + namespace + "/" + method);
         try {
-            final Object ret = RemoteAPIController.getInstance().call(namespace, method, parameters);
+            final Object[] args = convertJavaScriptToJava(parameters);
+            final Object ret = RemoteAPIController.getInstance().call(namespace, method, args);
             final ScriptThread env = getScriptThread();
             // convert to javascript object
             final String js = "(function(){ return " + JSonStorage.serializeToJson(ret) + ";}());";
