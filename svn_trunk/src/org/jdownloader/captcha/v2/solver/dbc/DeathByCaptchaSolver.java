@@ -15,7 +15,6 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.ImageProvider.ImageProvider;
@@ -83,8 +82,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
             return true;
         } else if (c instanceof CutCaptchaChallenge) {
             return true;
-        } else if (c instanceof CloudflareTurnstileChallenge && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* Devs only: Allow Cloudflare Turnstile captcha */
+        } else if (c instanceof CloudflareTurnstileChallenge) {
             return true;
         } else {
             return false;

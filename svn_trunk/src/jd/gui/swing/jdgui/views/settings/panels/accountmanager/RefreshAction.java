@@ -6,11 +6,6 @@ import java.util.List;
 
 import javax.swing.AbstractAction;
 
-import jd.controlling.AccountController;
-import jd.controlling.TaskQueue;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.plugins.Account;
-
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.gui.IconKey;
@@ -18,6 +13,11 @@ import org.jdownloader.gui.helpdialogs.HelpDialog;
 import org.jdownloader.gui.helpdialogs.MessageConfig;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
+
+import jd.controlling.AccountController;
+import jd.controlling.TaskQueue;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.plugins.Account;
 
 public class RefreshAction extends AbstractAction {
     /**
@@ -46,25 +46,8 @@ public class RefreshAction extends AbstractAction {
         TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                final List<Account> accountsToCheck = new ArrayList<Account>();
-                if (selection == null) {
-                    /* All accounts */
-                    for (final Account acc : AccountController.getInstance().list()) {
-                        if (acc.isEnabled() && acc.isValid()) {
-                            accountsToCheck.add(acc);
-                        }
-                    }
-                } else {
-                    /* Selected accounts only */
-                    for (final AccountEntry accEntry : selection) {
-                        final Account acc = accEntry.getAccount();
-                        if (acc == null) {
-                            continue;
-                        }
-                        accountsToCheck.add(acc);
-                    }
-                }
-                if (accountsToCheck.isEmpty()) {
+                final List<Account> accountsToCheck = getAccountsToCheck();
+                if (accountsToCheck == null || accountsToCheck.isEmpty()) {
                     /* Do nothing. This can happen if e.g. all selected items are disabled. */
                     return null;
                 }
@@ -79,6 +62,32 @@ public class RefreshAction extends AbstractAction {
                 return null;
             }
         });
+    }
+
+    private List<Account> getAccountsToCheck() {
+        final List<Account> accountsToCheck = new ArrayList<Account>();
+        if (selection == null) {
+            /* All [enabled] accounts */
+            for (final Account acc : AccountController.getInstance().list()) {
+                if (acc.isEnabled() && acc.isValid()) {
+                    accountsToCheck.add(acc);
+                }
+            }
+        } else {
+            /* Selected [enabled] accounts only */
+            for (final AccountEntry accEntry : selection) {
+                final Account acc = accEntry.getAccount();
+                if (acc == null) {
+                    continue;
+                }
+                accountsToCheck.add(acc);
+            }
+        }
+        if (accountsToCheck.isEmpty()) {
+            /* Do nothing. This can happen if e.g. all selected items are disabled. */
+            return null;
+        }
+        return accountsToCheck;
     }
 
     public static void displayMultihosterDetailOverviewHelpDialog() {

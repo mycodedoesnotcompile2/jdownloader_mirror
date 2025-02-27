@@ -1,5 +1,5 @@
 //jDownloader - Downloadmanager
-//Copyright (C) 2009  JD-Team support@jdownloader.org
+//Copyright (C) 2020  JD-Team support@jdownloader.org
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -15,179 +15,74 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
-
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50707 $", interfaceVersion = 2, names = { "sunporno.com" }, urls = { "https?://(?:www\\.)?(sunporno\\.com/videos/|embeds\\.sunporno\\.com/embed/)\\d+" })
-public class SunPornoCom extends PluginForHost {
-    private String dllink = null;
-
-    public SunPornoCom(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 50708 $", interfaceVersion = 3, names = {}, urls = {})
+public class SunPornoCom extends KernelVideoSharingComV2 {
+    public SunPornoCom(final PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    @Override
-    public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        br.setFollowRedirects(true);
-        return br;
+    /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "sunporno.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
     }
 
     @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
     }
 
-    @Override
-    public String getAGBLink() {
-        return "https://www." + getHost() + "/pages/terms.html";
-    }
-
-    @Override
-    public int getMaxSimultanFreeDownloadNum() {
-        return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public String getLinkID(final DownloadLink link) {
-        final String fid = getFID(link);
-        if (fid != null) {
-            return this.getHost() + "://" + fid;
-        } else {
-            return super.getLinkID(link);
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(v/\\d+/[a-z0-9\\-]+/?|embed/\\d+)");
         }
+        return ret.toArray(new String[0]);
     }
 
-    private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "(\\d+)$").getMatch(0);
+    private static final Pattern PATTERN_VIDEO = Pattern.compile("/v/(\\d+)/([a-z0-9\\-]+)/?", Pattern.CASE_INSENSITIVE);
+
+    @Override
+    protected String getURLTitle(final String url) {
+        if (url == null) {
+            return null;
+        }
+        return new Regex(url, PATTERN_VIDEO).getMatch(1);
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        return requestFileInformation(link, false);
-    }
-
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
-        final String extDefault = ".mp4";
-        final String videoid = this.getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(videoid + extDefault);
+    protected String getFUID(final DownloadLink link) {
+        if (link.getPluginPatternMatcher() == null) {
+            return null;
         }
-        dllink = null;
-        this.setBrowserExclusive();
-        br.getPage("https://www." + this.getHost() + "/videos/" + videoid);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(>The file you have requested was not found on this server|<title>404</title>|This video has been deleted)")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.getURL().contains(videoid)) {
-            /* E.g. redirect to main page */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        final String url = link.getPluginPatternMatcher();
+        String fid = new Regex(url, PATTERN_VIDEO).getMatch(1);
+        if (fid == null) {
+            fid = new Regex(link.getPluginPatternMatcher(), pattern_embedded).getMatch(0);
         }
-        String betterDllink = null;
-        String title = br.getRegex("class=\"block-headline-right\">[\t\n\r ]+<h2>(.*?)</h2>").getMatch(0);
-        if (title == null) {
-            title = br.getRegex("<title>\\s*(.*?)\\s*(?:(\\s+\\(New.*?\\))?\\s+-\\s+Sunporno.*?)?</title>").getMatch(0);
-        }
-        if (title != null) {
-            title = Encoding.htmlDecode(title).trim();
-            link.setFinalFileName(title + extDefault);
-        }
-        final String[] resolutions = new String[] { "high", "low" };
-        for (final String resolution : resolutions) {
-            dllink = br.getRegex("src:\"(https?://[^\"]+)\",type:\"video/mp4\",res:\"" + resolution + "\"").getMatch(0);
-            if (dllink == null) {
-                dllink = br.getRegex("<source src=\"(https?://[^\"]+)\"[^>]*type=.video/mp4[^>]*res=\"" + resolution + "\"").getMatch(0);
-            }
-            if (dllink != null) {
-                break;
-            }
-        }
-        /* Wider attempts */
-        if (dllink == null) {
-            dllink = br.getRegex("<source src=\"(https?://[^\"]+)\"[^>]*type=.video/mp4").getMatch(0);
-        }
-        if (!StringUtils.isEmpty(dllink) && !isDownload) {
-            final boolean doKeyHandling = false; // 2024-02-29: Not needed anymore
-            final String key = new Regex(dllink, "(key=.+)").getMatch(0);
-            if (key != null && doKeyHandling) {
-                /* 2019-09-06: This might not be needed anymore */
-                /* Avoids 403 issues. */
-                this.br.getPage("//www.sunporno.com/?area=movieFilePather&callback=movieFileCallbackFunc&id=1135032&url=" + Encoding.urlEncode(key) + "&_=" + System.currentTimeMillis());
-                betterDllink = PluginJSonUtils.getJsonValue(this.br, "path");
-                if (betterDllink != null && betterDllink.startsWith("http")) {
-                    dllink = betterDllink;
-                }
-            }
-            final Browser br2 = br.cloneBrowser();
-            URLConnectionAdapter con = null;
-            try {
-                con = br2.openHeadConnection(dllink);
-                /* Workaround for buggy porn servers: */
-                if (con.getResponseCode() == 404) {
-                    /*
-                     * Small workaround for buggy servers that redirect and fail if the Referer is wrong then. Examples: hdzog.com
-                     */
-                    final String redirect_url = con.getRequest().getUrl();
-                    con = br.openHeadConnection(redirect_url);
-                }
-                handleConnectionErrors(br2, con);
-                if (con.isContentDecoded()) {
-                    link.setDownloadSize(con.getCompleteContentLength());
-                } else {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
-                }
-            }
-        }
-        return AvailableStatus.TRUE;
+        return fid;
     }
 
     @Override
-    public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
-        if (StringUtils.isEmpty(dllink)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    String generateContentURL(final String host, final String fuid, final String urlSlug) {
+        if (host == null || fuid == null || urlSlug == null) {
+            return null;
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(this.br, link, dllink, true, 0);
-        handleConnectionErrors(br, dl.getConnection());
-        dl.startDownload();
-    }
-
-    @Override
-    public SiteTemplate siteTemplateType() {
-        return SiteTemplate.UnknownPornScript5;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
+        return this.getProtocol() + "www." + host + "/v/" + fuid + "/" + urlSlug + "/";
     }
 }

@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50699 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50708 $", interfaceVersion = 3, names = {}, urls = {})
 public class TendrivesCom extends PluginForHost {
     public TendrivesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -151,7 +151,7 @@ public class TendrivesCom extends PluginForHost {
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link);
-            String continuelink = br.getRegex(" href=\"(https://[^\"]+)\"[^>]*>\\s*Continue").getMatch(0);
+            String continuelink = br.getRegex("href=\"(https://[^\"]+)\"[^>]*>\\s*Continue").getMatch(0);
             if (StringUtils.isEmpty(continuelink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

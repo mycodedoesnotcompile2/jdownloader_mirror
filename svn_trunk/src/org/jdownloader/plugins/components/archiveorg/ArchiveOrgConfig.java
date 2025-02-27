@@ -14,22 +14,15 @@ import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "archive.org", type = Type.CRAWLER)
 public interface ArchiveOrgConfig extends PluginConfigInterface {
-    final String                    text_FileCrawlerCrawlOnlyOriginalVersions                    = "File crawler: Add only original versions of files?";
-    final String                    text_FileCrawlerCrawlMetadataFiles                           = "File crawler: Include metadata files (typically .xml & .sqlite files)?";
-    final String                    text_PlaylistFilenameScheme                                  = "Playlist filename scheme";
-    final String                    text_BookImageQuality                                        = "Book image quality (0 = highest, 10 = lowest)";
-    final String                    text_BookCrawlMode                                           = "Book crawl mode";
-    final String                    text_MarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable = "Mark non viewable book pages as offline if no account is available?";
-    final String                    text_SearchTermCrawlerMaxResultsLimit                        = "Search term and profile crawler: Limit max results [0 = disable this crawler]";
-    public static final TRANSLATION TRANSLATION                                                  = new TRANSLATION();
+    public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
         public String getFileCrawlerCrawlOnlyOriginalVersions_label() {
-            return text_FileCrawlerCrawlOnlyOriginalVersions;
+            return "File crawler: Add only original versions of files?";
         }
 
         public String getFileCrawlerCrawlMetadataFiles_label() {
-            return text_FileCrawlerCrawlMetadataFiles;
+            return "File crawler: Include metadata files (typically .xml & .sqlite files)?";
         }
 
         public String getFileCrawlerCrawlThumbnails_label() {
@@ -40,20 +33,24 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
             return "File crawler: What to do when single file/folder-path is not found?";
         }
 
+        public String getSingleFileAdoptFolderStructureMode_label() {
+            return "File crawler: Single files: Adopt folder structure mode";
+        }
+
         public String getPlaylistFilenameScheme_label() {
-            return text_PlaylistFilenameScheme;
+            return "Playlist filename scheme";
         }
 
         public String getBookImageQuality_label() {
-            return text_BookImageQuality;
+            return "Book image quality (0 = highest, 10 = lowest)";
         }
 
         public String getBookCrawlMode_label() {
-            return text_BookCrawlMode;
+            return "Book crawl mode";
         }
 
         public String getMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable_label() {
-            return text_MarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable;
+            return "Mark non viewable book pages as offline if no account is available?";
         }
 
         public String getPlaylistCrawlMode202404_label() {
@@ -61,13 +58,12 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         }
 
         public String getSearchTermCrawlerMaxResultsLimit_label() {
-            return text_SearchTermCrawlerMaxResultsLimit;
+            return "Search term and profile crawler: Limit max results [0 = disable this crawler]";
         }
     }
 
     @AboutConfig
     @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry(text_FileCrawlerCrawlOnlyOriginalVersions)
     @Order(10)
     boolean isFileCrawlerCrawlOnlyOriginalVersions();
 
@@ -75,7 +71,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry(text_FileCrawlerCrawlMetadataFiles)
     @Order(25)
     boolean isFileCrawlerCrawlMetadataFiles();
 
@@ -115,10 +110,39 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT")
     @Order(27)
-    @DescriptionForConfigEntry("What to do when a single added file/folder-path is not found?")
     SingleFilePathNotFoundMode getSingleFilePathNonFoundMode();
 
     void setSingleFilePathNonFoundMode(final SingleFilePathNotFoundMode mode);
+
+    final SingleFileAdoptFolderStructureMode default_SingleFileAdoptFolderStructureMode = SingleFileAdoptFolderStructureMode.ENABLE;
+
+    public static enum SingleFileAdoptFolderStructureMode implements LabelInterface {
+        DEFAULT {
+            @Override
+            public String getLabel() {
+                return "Default: " + default_SingleFileAdoptFolderStructureMode.getLabel();
+            }
+        },
+        ENABLE {
+            @Override
+            public String getLabel() {
+                return "Allow adopt folder structure";
+            }
+        },
+        DISABLE {
+            @Override
+            public String getLabel() {
+                return "Do not allow adopt folder structure";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("DEFAULT")
+    @Order(28)
+    SingleFileAdoptFolderStructureMode getSingleFileAdoptFolderStructureMode();
+
+    void setSingleFileAdoptFolderStructureMode(final SingleFileAdoptFolderStructureMode mode);
 
     public static enum PlaylistFilenameScheme implements LabelInterface {
         PLAYLIST_TITLE_WITH_TRACK_NUMBER {
@@ -138,7 +162,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("PLAYLIST_TITLE_WITH_TRACK_NUMBER")
     @Order(29)
-    @DescriptionForConfigEntry(text_PlaylistFilenameScheme)
     PlaylistFilenameScheme getPlaylistFilenameScheme();
 
     void setPlaylistFilenameScheme(final PlaylistFilenameScheme scheme);
@@ -146,7 +169,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = 0, max = 10, step = 1)
     @DefaultIntValue(0)
-    @DescriptionForConfigEntry(text_BookImageQuality)
     @Order(30)
     int getBookImageQuality();
 
@@ -176,14 +198,12 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("PREFER_ORIGINAL")
     @Order(40)
-    @DescriptionForConfigEntry(text_BookCrawlMode)
     BookCrawlMode getBookCrawlMode();
 
     void setBookCrawlMode(final BookCrawlMode bookCrawlerMode);
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_MarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable)
     @Order(41)
     boolean isMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable();
 
@@ -235,7 +255,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = 0, max = 100000, step = 100)
     @DefaultIntValue(100)
-    @DescriptionForConfigEntry(text_SearchTermCrawlerMaxResultsLimit)
     @Order(60)
     int getSearchTermCrawlerMaxResultsLimit();
 

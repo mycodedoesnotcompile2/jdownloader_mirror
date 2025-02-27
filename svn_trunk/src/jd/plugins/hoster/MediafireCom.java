@@ -16,7 +16,6 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,7 +55,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49962 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50709 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -146,7 +145,7 @@ public class MediafireCom extends PluginForHost {
         } else if (!link.isAvailable()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        return getAvailableStatus(link);
+        return link.getAvailableStatus();
     }
 
     public static abstract class PasswordSolver {
@@ -861,18 +860,5 @@ public class MediafireCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    private AvailableStatus getAvailableStatus(DownloadLink link) {
-        try {
-            final Field field = link.getClass().getDeclaredField("availableStatus");
-            field.setAccessible(true);
-            Object ret = field.get(link);
-            if (ret != null && ret instanceof AvailableStatus) {
-                return (AvailableStatus) ret;
-            }
-        } catch (final Throwable e) {
-        }
-        return AvailableStatus.UNCHECKED;
     }
 }

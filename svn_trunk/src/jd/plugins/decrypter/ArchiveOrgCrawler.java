@@ -44,6 +44,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.BookCrawlMode;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCrawlMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFileAdoptFolderStructureMode;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -73,7 +74,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 50708 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -1050,6 +1051,10 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 } else {
                     /* Single file which user wants */
                     selectedItems.clear(); // Clear list of previously collected results
+                    final SingleFileAdoptFolderStructureMode mode = cfg.getSingleFileAdoptFolderStructureMode();
+                    if (mode == SingleFileAdoptFolderStructureMode.DISABLE) {
+                        singleDesiredFile.setRelativeDownloadFolderPath(null);
+                    }
                     selectedItems.add(singleDesiredFile); // Add desired result only
                     return selectedItems;
                 }

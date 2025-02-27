@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47843 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50708 $", interfaceVersion = 2, names = {}, urls = {})
 public class FireloadCom extends YetiShareCore {
     public FireloadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +107,11 @@ public class FireloadCom extends YetiShareCore {
     @Override
     public String[] scanInfo(final DownloadLink link, final String[] fileInfo) {
         super.scanInfo(link, fileInfo);
-        final String betterFilesize = br.getRegex(">\\s*File Size:\\s*</strong>([^<]+)</p>").getMatch(0);
+        String betterFilesize = br.getRegex(">\\s*File Size:\\s*</strong>([^<]+)</p>").getMatch(0);
+        if (betterFilesize == null) {
+            /* 2025-02-26 */
+            betterFilesize = br.getRegex("class='item-size'[^>]*>([^<]+)<span").getMatch(0);
+        }
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }

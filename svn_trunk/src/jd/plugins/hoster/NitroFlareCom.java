@@ -61,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50709 $", interfaceVersion = 3, names = {}, urls = {})
 public class NitroFlareCom extends PluginForHost {
     private final String         staticBaseURL             = "https://nitroflare.com";
     /* Documentation | docs: https://nitroflare.com/member?s=api */
@@ -321,7 +321,7 @@ public class NitroFlareCom extends PluginForHost {
                     atLeastOneDL = true;
                 }
                 br.getPage(getAPIBase() + "/getFileInfo?" + sb);
-                if (br.containsHTML("(?i)In these moments we are upgrading the site system")) {
+                if (br.containsHTML("In these moments we are upgrading the site system")) {
                     for (final DownloadLink dl : links) {
                         dl.getLinkStatus().setStatusText("Nitroflare.com is maintenance mode. Try again later.");
                         dl.setAvailableStatus(AvailableStatus.UNCHECKABLE);
@@ -399,7 +399,7 @@ public class NitroFlareCom extends PluginForHost {
         } else if (!br.getURL().contains(this.getFID(link))) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("(?i)<b>File\\s*Name\\s*:\\s*</b><span title=\"([^<>\"]*?)\"").getMatch(0);
+        String filename = br.getRegex("<b>File\\s*Name\\s*:\\s*</b><span title=\"([^<>\"]*?)\"").getMatch(0);
         if (filename == null) {
             filename = br.getRegex("alt=\"\" /><span title=\"([^<>\"]*?)\">").getMatch(0);
         }
@@ -699,9 +699,9 @@ public class NitroFlareCom extends PluginForHost {
         } else if (StringUtils.startsWithCaseInsensitive(br.getRequest().getHtmlCode(), "You can't use free download with a VPN")) {
             /* You can't use free download with a VPN / proxy turned on. Please turn it off and try again. */
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "You can't use free download with a VPN / proxy turned on. Please turn it off and try again", 60 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)This file is available with premium key only|This file is available with Premium only")) {
+        } else if (br.containsHTML("This file is available with premium key only|This file is available with Premium only")) {
             throwPremiumRequiredException(this.getDownloadLink());
-        } else if (br.containsHTML("(?i)Free downloading is not possible")) {
+        } else if (br.containsHTML("Free downloading is not possible")) {
             /* E.g. Free downloading is not possible. You have to wait 70 minutes to download your next file. */
             final String waitminutesStr = br.getRegex("You have to wait (\\d+) minutes to download").getMatch(0);
             if (waitminutesStr != null) {
@@ -720,7 +720,7 @@ public class NitroFlareCom extends PluginForHost {
             }
         } else if (StringUtils.startsWithCaseInsensitive(br.getRequest().getHtmlCode(), "﻿Free download is currently unavailable due to overloading in the server")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Free download Overloaded, will try again later", 5 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)>\\s*Your ip (has|is) been blocked, if you think it is mistake contact us")) {
+        } else if (br.containsHTML(">\\s*Your ip (has|is) been blocked, if you think it is mistake contact us")) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Your ip is blocked", 30 * 60 * 1000l);
         }
         if (isLastResort) {
@@ -863,7 +863,7 @@ public class NitroFlareCom extends PluginForHost {
                 }
                 if (getLoginFormWebsite(br) != null) {
                     throw new AccountInvalidException("Incorrect User/Password");
-                } else if (br.containsHTML("(?i)>\\s*Your password has expired") || br.containsHTML("(?i)>\\s*Change Password\\s*<")) {
+                } else if (br.containsHTML(">\\s*Your password has expired") || br.containsHTML(">\\s*Change Password\\s*<")) {
                     throw new AccountInvalidException("Your password has expired. Please visit website and set new password!");
                 }
                 // final failover, we expect 'user' cookie
@@ -874,7 +874,7 @@ public class NitroFlareCom extends PluginForHost {
             }
             final AccountInfo ai = new AccountInfo();
             br.getPage("https://" + host + "/member?s=premium");
-            final String status = br.getRegex("(?i)<label>Status</label><strong[^>]+>\\s*([^<]+)\\s*</strong>").getMatch(0);
+            final String status = br.getRegex("<label>Status</label><strong[^>]+>\\s*([^<]+)\\s*</strong>").getMatch(0);
             if (!StringUtils.isEmpty(status)) {
                 if (StringUtils.equalsIgnoreCase(status, "Active")) {
                     account.setType(AccountType.PREMIUM);
@@ -886,9 +886,9 @@ public class NitroFlareCom extends PluginForHost {
             }
             // extra traffic in webmode isn't added to daily traffic, so we need to do it manually. (api mode is has been added to
             // traffic left/max)
-            final String extraTraffic = br.getRegex("(?i)<label>Your Extra Bandwidth</label><strong>(.*?)</strong>").getMatch(0);
+            final String extraTraffic = br.getRegex("<label>Your Extra Bandwidth</label><strong>(.*?)</strong>").getMatch(0);
             // do we have traffic?
-            final String[] traffic = br.getRegex("(?i)<label>[^>]*Daily Limit\\s*</label><strong>(\\d+(?:\\.\\d+)?(?:\\s*[KMGT]{0,1}B)?) / (\\d+(?:\\.\\d+)?\\s*[KMGT]{0,1}B)</strong>").getRow(0);
+            final String[] traffic = br.getRegex("<label>[^>]*Daily Limit\\s*</label><strong>(\\d+(?:\\.\\d+)?(?:\\s*[KMGT]{0,1}B)?) / (\\d+(?:\\.\\d+)?\\s*[KMGT]{0,1}B)</strong>").getRow(0);
             if (traffic != null) {
                 final long extratraffic = !StringUtils.isEmpty(extraTraffic) ? SizeFormatter.getSize(extraTraffic) : 0;
                 final long trafficmax = SizeFormatter.getSize(traffic[1]);
@@ -899,7 +899,7 @@ public class NitroFlareCom extends PluginForHost {
                 ai.setTrafficMax(trafficmax + extratraffic);
             }
             // expire time
-            final String expire = br.getRegex("(?i)<label>\\s*Time Left\\s*</label><strong>(.*?)</strong>").getMatch(0);
+            final String expire = br.getRegex("<label>\\s*Time Left\\s*</label>\\s*<strong>(.*?)</strong>").getMatch(0);
             if (!StringUtils.isEmpty(expire)) {
                 // <strong>11 days, 7 hours, 53 minutes.</strong>
                 final String tmpyears = new Regex(expire, "(\\d+)\\s*years?").getMatch(0);
@@ -1169,7 +1169,7 @@ public class NitroFlareCom extends PluginForHost {
     }
 
     private boolean requiresCaptchaVPNWarning(final Browser br) {
-        if (br.containsHTML("(?i)To get rid of the captcha, please avoid using a dedicated server|/ajax/validate-dl-recaptcha")) {
+        if (br.containsHTML("To get rid of the captcha, please avoid using a dedicated server|/ajax/validate-dl-recaptcha")) {
             return true;
         } else {
             return false;
@@ -1182,9 +1182,9 @@ public class NitroFlareCom extends PluginForHost {
         if (br.containsHTML(err1)) {
             // I don't see why this would happening logs contain no proxy!
             throw new PluginException(LinkStatus.ERROR_FATAL, err1);
-        } else if (account != null && br.getHttpConnection() != null && (br.getRequest().getHtmlCode().equals("Your premium has reached the maximum volume for today") || br.containsHTML("(?i)<p id=\"error\"[^>]+>\\s*Your premium has reached the maximum volume for today|>\\s*This download exceeds the daily download limit"))) {
+        } else if (account != null && br.getHttpConnection() != null && (br.getRequest().getHtmlCode().equals("Your premium has reached the maximum volume for today") || br.containsHTML("<p id=\"error\"[^>]+>\\s*Your premium has reached the maximum volume for today|>\\s*This download exceeds the daily download limit"))) {
             throw new AccountUnavailableException("Daily downloadlimit reached", 5 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)>\\s*This download exceeds the daily download limit\\. You can purchase")) {
+        } else if (br.containsHTML(">\\s*This download exceeds the daily download limit\\. You can purchase")) {
             // not enough traffic to download THIS file, doesn't mean zero traffic left.
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "You do not have enough traffic left to start this download.");
         }
@@ -1234,13 +1234,7 @@ public class NitroFlareCom extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
-        /* 2020-06-24: Do NOT reset the properties that hold direct-URLs anymore! */
-        if (link != null) {
-            // link.setProperty("freelink2", Property.NULL);
-            // link.setProperty("freelink", Property.NULL);
-            // link.setProperty("premlink", Property.NULL);
-            link.removeProperty(PROPERTY_PREMIUM_REQUIRED);
-        }
+        link.removeProperty(PROPERTY_PREMIUM_REQUIRED);
     }
 
     public boolean hasCaptcha(final DownloadLink downloadLink, final jd.plugins.Account acc) {

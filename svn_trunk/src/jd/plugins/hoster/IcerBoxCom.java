@@ -16,7 +16,6 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -47,10 +46,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50301 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+@HostPlugin(revision = "$Revision: 50709 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends PluginForHost {
-    private final String baseURL = "https://icerbox.com";
-    private final String apiURL  = "https://icerbox.com/api/v1";
+    private final String        baseURL                   = "https://icerbox.com";
+    private final String        apiURL                    = "https://icerbox.com/api/v1";
+    private static final String PROPERTY_PREMIUM_REQUIRED = "premiumRequired";
 
     public IcerBoxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,6 +67,12 @@ public class IcerBoxCom extends PluginForHost {
         final Browser br = super.createNewBrowserInstance();
         br.addAllowedResponseCodes(500);
         br.setFollowRedirects(true);
+        return br;
+    }
+
+    private Browser createNewBrowserInstanceAPI() {
+        final Browser br = createNewBrowserInstance();
+        br.getHeaders().put("Accept", "application/json");
         return br;
     }
 
@@ -101,9 +107,8 @@ public class IcerBoxCom extends PluginForHost {
     public boolean checkLinks(final DownloadLink[] urls) {
         boolean okay = true;
         try {
-            final Browser br = this.createNewBrowserInstance();
-            br.getHeaders().put("Accept", "application/json");
-            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            final Browser br = this.createNewBrowserInstanceAPI();
+            final List<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
             while (true) {
                 links.clear();
@@ -126,14 +131,7 @@ public class IcerBoxCom extends PluginForHost {
                     }
                 }
                 br.getPage(apiURL + "/files?ids=" + sb);
-                if (br.containsHTML("In these moments we are upgrading the site system")) {
-                    for (final DownloadLink dl : links) {
-                        dl.getLinkStatus().setStatusText("Hoster is in maintenance mode. Try again later");
-                        dl.setAvailableStatus(AvailableStatus.UNCHECKABLE);
-                    }
-                    return true;
-                }
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final Map<String, Object> entries = this.handleApiErrors(br, null, null);
                 final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
                 for (final DownloadLink dl : links) {
                     final String fid = this.getFID(dl);
@@ -149,8 +147,7 @@ public class IcerBoxCom extends PluginForHost {
                         dl.setName(fid);
                     }
                     if (fileinfo == null) {
-                        /* This should never happen! */
-                        dl.removeProperty("apiInfo");
+                        /* This should never happen but if no info for this file is found, we can only assume it's offline. */
                         dl.setAvailable(false);
                         continue;
                     }
@@ -174,18 +171,18 @@ public class IcerBoxCom extends PluginForHost {
                         dl.setMD5Hash(md5);
                     }
                     if (Boolean.TRUE.equals(free_available)) {
-                        dl.removeProperty("premiumRequired");
+                        dl.removeProperty(PROPERTY_PREMIUM_REQUIRED);
                     } else {
-                        dl.setProperty("premiumRequired", true);
+                        dl.setProperty(PROPERTY_PREMIUM_REQUIRED, true);
                     }
                     if (fileinfo.get("password") != null) {
                         dl.setPasswordProtected(true);
                     } else {
                         dl.setPasswordProtected(false);
                     }
-                    dl.setProperty("apiInfo", Boolean.TRUE);
                 }
                 if (index == urls.length) {
+                    /* All links were checked */
                     break;
                 }
             }
@@ -210,8 +207,7 @@ public class IcerBoxCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
             final AccountInfo ai = new AccountInfo();
-            final Browser ajax = this.createNewBrowserInstance();
-            ajax.getHeaders().put("Accept", "application/json");
+            final Browser ajax = this.createNewBrowserInstanceAPI();
             String token = account.getStringProperty("token", null);
             boolean tokenLoginSuccess = false;
             Map<String, Object> entries = null;
@@ -301,11 +297,11 @@ public class IcerBoxCom extends PluginForHost {
     private void handleDownload_API(final DownloadLink link, final Account account) throws Exception {
         /* links that require premium when we don't have a premium account. */
         requestFileInformationApi(link);
-        if (link.hasProperty("premiumRequired") && (account == null || AccountType.FREE.equals(account.getType()))) {
+        if (link.hasProperty(PROPERTY_PREMIUM_REQUIRED) && (account == null || AccountType.FREE.equals(account.getType()))) {
             throw new AccountRequiredException();
         }
         final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
-        final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        final String storedDirecturl = this.getStoredDirecturl(link, account);
         final String dllink;
         if (storedDirecturl != null) {
             logger.info("Re-using stored directurl: " + storedDirecturl);
@@ -313,7 +309,6 @@ public class IcerBoxCom extends PluginForHost {
         } else {
             final String token = account.getStringProperty("token", null);
             final String url = apiURL + "/dl/ticket";
-            br.getHeaders().put("Accept", "application/json");
             br.getHeaders().put("Authorization", "Bearer " + token);
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("file", getFID(link));
@@ -335,7 +330,9 @@ public class IcerBoxCom extends PluginForHost {
                 throw e;
             }
         }
-        link.setProperty(directlinkproperty, dllink);
+        if (storedDirecturl == null) {
+            link.setProperty(directlinkproperty, dllink);
+        }
         dl.startDownload();
     }
 
@@ -351,31 +348,33 @@ public class IcerBoxCom extends PluginForHost {
     private Map<String, Object> handleApiErrors(final Browser br, final Account account, final DownloadLink link) throws Exception {
         Map<String, Object> entries = null;
         try {
-            final Object o = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-            if (o instanceof Map) {
-                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            }
-            /* Response can also be array: ["user_not_found"] */
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            /**
+             * Old information: Response can also be array: ["user_not_found"] <br>
+             * 2025-02-26: I wasn't able to reproduce this (a non-map response) anymore.
+             */
         } catch (final JSonMapperException ignore) {
-            /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long waitMillis = 1 * 60 * 1000;
             if (link != null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
             } else {
-                throw new AccountUnavailableException("Invalid API response", 60 * 1000);
+                throw new AccountUnavailableException(msg, waitMillis);
             }
         }
         /* E.g. {"message":null,"status_code":401} */
         /* This status code is usually the same as the http status code. */
-        final String message = entries != null ? (String) entries.get("message") : null;
-        final Number status_codeO = entries != null ? (Number) entries.get("status_code") : br.getHttpConnection().getResponseCode();
-        if (status_codeO == null) {
-            /* No error */
-            // final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-            return entries;
+        final String message = (String) entries.get("message");
+        final String status_enum_string = (String) entries.get("err");
+        if (status_enum_string != null) {
+            /* Example: {"message":"Password expired. Enter your Account page and change it.","err":"PASSWORD_RENEW"} */
+            throw new AccountInvalidException(message);
         }
-        final int status_code = status_codeO.intValue();
+        final Number status_codeO = (Number) entries.get("status_code");
+        final int status_code = status_codeO != null ? status_codeO.intValue() : br.getHttpConnection().getResponseCode();
         if (status_code == 200) {
             /* No error */
+            // final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             return entries;
         }
         /* Check for specific account errors */
@@ -403,20 +402,7 @@ public class IcerBoxCom extends PluginForHost {
         } else if (!link.isAvailable()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        return getAvailableStatus(link);
-    }
-
-    private AvailableStatus getAvailableStatus(DownloadLink link) {
-        try {
-            final Field field = link.getClass().getDeclaredField("availableStatus");
-            field.setAccessible(true);
-            Object ret = field.get(link);
-            if (ret != null && ret instanceof AvailableStatus) {
-                return (AvailableStatus) ret;
-            }
-        } catch (final Throwable e) {
-        }
-        return AvailableStatus.UNCHECKED;
+        return link.getAvailableStatus();
     }
 
     @Override
@@ -438,8 +424,7 @@ public class IcerBoxCom extends PluginForHost {
         if (link == null) {
             return;
         }
-        link.removeProperty("apiInfo");
-        link.removeProperty("premiumRequired");
+        link.removeProperty(PROPERTY_PREMIUM_REQUIRED);
     }
 
     protected String getDownloadModeDirectlinkProperty(final Account account) {
@@ -454,8 +439,12 @@ public class IcerBoxCom extends PluginForHost {
         }
     }
 
-    public boolean hasCaptcha(final DownloadLink downloadLink, final jd.plugins.Account acc) {
-        if (acc == null) {
+    public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
+        final String storedDirecturl = getStoredDirecturl(link, acc);
+        if (storedDirecturl == null) {
+            /* Stored direct url available -> Assume it's still valid -> No captcha needed */
+            return false;
+        } else if (acc == null) {
             /* no account, yes we can expect captcha */
             return true;
         } else if (acc.getType() == AccountType.FREE) {
@@ -468,17 +457,22 @@ public class IcerBoxCom extends PluginForHost {
 
     @Override
     public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
-        final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
-        final String dllink = link.getStringProperty(directlinkproperty);
+        final String storedDirecturl = getStoredDirecturl(link, account);
         /*
          * E.g. account may not have enough traffic left but we still got a stored directurl from a previous downloadstart --> Allow
          * download attempt anyways as we can be quite sure that it will still be valid.
          */
-        if (StringUtils.isNotEmpty(dllink)) {
+        if (StringUtils.isNotEmpty(storedDirecturl)) {
             return true;
         } else {
             return super.enoughTrafficFor(link, account);
         }
+    }
+
+    private String getStoredDirecturl(final DownloadLink link, final Account account) {
+        final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
+        final String dllink = link.getStringProperty(directlinkproperty);
+        return dllink;
     }
 
     @Override

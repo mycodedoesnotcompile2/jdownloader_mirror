@@ -13,15 +13,15 @@
 //
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map.Entry;
+
+import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
@@ -31,17 +31,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 34675 $", interfaceVersion = 2, names = { "googlegroups.com" }, urls = { "http://[\\w\\.]*?googlegroups\\.com/web/.*" }) 
+@HostPlugin(revision = "$Revision: 50709 $", interfaceVersion = 2, names = { "googlegroups.com" }, urls = { "http://[\\w\\.]*?googlegroups\\.com/web/.*" })
 public class GoogleGroups extends PluginForHost {
-
     public GoogleGroups(PluginWrapper wrapper) {
         super(wrapper);
         // TODO Auto-generated constructor stub
     }
 
-    // @Override
+    @Override
     public boolean checkLinks(DownloadLink[] urls) {
         br.setCookiesExclusive(true);
         br.clearCookies(getHost());
@@ -69,7 +66,6 @@ public class GoogleGroups extends PluginForHost {
                     na = na.replaceFirst("googlegroups.com/web/.*", "googlegroups.com/web/") + URLEncoder.encode(na.replaceFirst("http://.*?\\.googlegroups.com/web/", ""), "UTF-8");
                     for (String[] strings : infos) {
                         if (strings[0].contains(na) || downloadLink.getName().equals(strings[1])) {
-
                             downloadLink.setAvailable(true);
                             downloadLink.setFinalFileName(strings[1]);
                             downloadLink.setDownloadSize(SizeFormatter.getSize(strings[2]));
@@ -82,29 +78,24 @@ public class GoogleGroups extends PluginForHost {
                 }
             } catch (IOException e) {
                 // TODO Auto-generated catch block
-                logger.log( e);
+                logger.log(e);
                 return false;
             }
         }
         return true;
     }
 
-    // @Override
+    @Override
     public String getAGBLink() {
         return "http://groups.google.com/intl/de/googlegroups/terms_of_service3.html";
     }
 
-    // @Override
+    @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return 20;
+        return Integer.MAX_VALUE;
     }
 
-    // @Override
-    /*
-     * public String getVersion() { return getVersion("$Revision: 34675 $"); }
-     */
-
-    // @Override
+    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         requestFileInformation(downloadLink);
         // .googlegroups.com/web/
@@ -115,37 +106,20 @@ public class GoogleGroups extends PluginForHost {
         dl.startDownload();
     }
 
-    // @Override
+    @Override
     public AvailableStatus requestFileInformation(DownloadLink downloadLink) throws IOException, PluginException {
         checkLinks(new DownloadLink[] { downloadLink });
-        if (getAvailableStatus(downloadLink) == AvailableStatus.FALSE) {
+        if (downloadLink.getAvailableStatus() == AvailableStatus.FALSE) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        return getAvailableStatus(downloadLink);
+        return downloadLink.getAvailableStatus();
     }
 
-    private AvailableStatus getAvailableStatus(DownloadLink link) {
-        try {
-            final Field field = link.getClass().getDeclaredField("availableStatus");
-            field.setAccessible(true);
-            Object ret = field.get(link);
-            if (ret != null && ret instanceof AvailableStatus) {
-                return (AvailableStatus) ret;
-            }
-        } catch (final Throwable e) {
-        }
-        return AvailableStatus.UNCHECKED;
-    }
-
-    // @Override
-    public void reset() {
-    }
-
-    // @Override
+    @Override
     public void resetDownloadlink(DownloadLink link) {
     }
 
-    // @Override
+    @Override
     public void resetPluginGlobals() {
     }
 }

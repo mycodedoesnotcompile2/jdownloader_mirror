@@ -1,14 +1,17 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
@@ -31,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 50618 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50710 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -492,6 +495,30 @@ public class Bunkr extends PluginForHost {
         String directurl = br.getRegex("(?i)href\\s*=\\s*\"(https?://[^\"]+)[^>]*>\\s*Download").getMatch(0);
         if (directurl == null) {
             /* Video stream (For "/v/ URLs."URL is usually the same as downloadurl.) */
+            final String internalFileID = br.getRegex("data-id=\"(\\d+)\"").getMatch(0);
+            findDirecturlViaWebAPI: if (directurl == null) {
+                if (internalFileID == null) {
+                    logger.warning("Failed to find internalFileID");
+                    break findDirecturlViaWebAPI;
+                }
+                try {
+                    final Browser brc = br.cloneBrowser();
+                    brc.getHeaders().put("Content-Type", "application/json");
+                    /* Same request also works with the other fileID ([A-Za-z0-9]{8}) as parameter "slug" on current browser domain. */
+                    brc.postPageRaw("https://get.bunkrr.su/api/vs", "{\"id\":\"" + internalFileID + "\"}");
+                    final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final Number timestamp = (Number) entries.get("timestamp");
+                    final String url = entries.get("url").toString();
+                    if (Boolean.TRUE.equals(entries.get("encrypted"))) {
+                        directurl = decryptData(url, timestamp.longValue());
+                    } else {
+                        directurl = url;
+                    }
+                } catch (final Throwable e) {
+                    logger.warning("Failed to obtain directurl via WebAPI");
+                    logger.log(e);
+                }
+            }
             if (directurl == null) {
                 String unsafeDirecturlResultForFileWithoutExtOrUnknownExt = null;
                 String unsafeDirecturlResult = null;
@@ -548,6 +575,22 @@ public class Bunkr extends PluginForHost {
         }
         link.setProperty(PROPERTY_LAST_USED_SINGLE_FILE_URL, singleFileURL);
         return directurl;
+    }
+
+    /** See https://get.bunkrr.su/js/src.enc.js */
+    public static String decryptData(final String encryptedBase64, final long timestamp) throws UnsupportedEncodingException {
+        byte[] encryptedBytes = Encoding.Base64Decode(encryptedBase64).getBytes();
+        String secretKey = "SECRET_KEY_" + (timestamp / 3600);
+        return xorDecrypt(encryptedBytes, secretKey);
+    }
+
+    private static String xorDecrypt(final byte[] data, final String key) throws UnsupportedEncodingException {
+        byte[] keyBytes = key.getBytes("UTF-8");
+        byte[] result = new byte[data.length];
+        for (int i = 0; i < data.length; i++) {
+            result[i] = (byte) (data[i] ^ keyBytes[i % keyBytes.length]);
+        }
+        return new String(result, "UTF-8");
     }
 
     public static void setFilename(final DownloadLink link, final String filename, final boolean canContainFileID, final boolean setFinalName) {
