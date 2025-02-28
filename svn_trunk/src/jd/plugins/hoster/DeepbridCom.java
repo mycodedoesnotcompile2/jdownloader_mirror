@@ -59,7 +59,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50691 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 50715 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -378,7 +378,7 @@ public class DeepbridCom extends PluginForHost {
         domainWorkarounds.put("icerbox", "icerbox.com");
         domainWorkarounds.put("filestore", "filestore.me");
         final HashSet<String> foundWorkaroundHosts = new HashSet<String>();
-        final HashSet<String> unavailableHosts = new HashSet<String>();
+        final Map<String, String> unavailableHosts = new HashMap<String, String>();
         for (final Object hostO : supportedhostslistO) {
             /* List can be given in two different varieties */
             if (hostO instanceof Map) {
@@ -386,18 +386,24 @@ public class DeepbridCom extends PluginForHost {
                 for (final Map.Entry<String, Object> entry : entries.entrySet()) {
                     final MultiHostHost mhost = new MultiHostHost();
                     final boolean isOnline;
-                    if ("up".equalsIgnoreCase((String) entry.getValue())) {
+                    String downSinceDate = null;
+                    final String onlineStatus = (String) entry.getValue();
+                    if ("up".equalsIgnoreCase(onlineStatus)) {
                         isOnline = true;
                     } else {
                         isOnline = false;
+                        downSinceDate = new Regex(onlineStatus, "down \\((.+)\\)$").getMatch(0);
                         mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                        if (downSinceDate != null) {
+                            mhost.setStatusText("Down since " + downSinceDate);
+                        }
                     }
                     final String[] domains = entry.getKey().split(",");
                     boolean thisIsWorkaroundHost = false;
                     for (String domain : domains) {
                         domain = domain.toLowerCase(Locale.ENGLISH);
                         if (!isOnline) {
-                            unavailableHosts.add(domain);
+                            unavailableHosts.put(domain, downSinceDate);
                         }
                         if (domainWorkarounds.containsKey(domain)) {
                             thisIsWorkaroundHost = true;
@@ -414,6 +420,7 @@ public class DeepbridCom extends PluginForHost {
                     supportedhosts.add(mhost);
                 }
             } else if (hostO instanceof String) {
+                /* Legacy handling TODO: Remove this after 2025-05 */
                 final MultiHostHost mhost = new MultiHostHost();
                 final String[] hosts = ((String) hostO).split(",");
                 for (String domain : hosts) {
@@ -458,8 +465,12 @@ public class DeepbridCom extends PluginForHost {
         for (final String domain : foundWorkaroundHosts) {
             final String realDomain = domainWorkarounds.get(domain);
             final MultiHostHost mhost = new MultiHostHost(realDomain);
-            if (unavailableHosts.contains(domain)) {
+            if (unavailableHosts.containsKey(domain)) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                final String downSinceDate = unavailableHosts.get(domain);
+                if (downSinceDate != null) {
+                    mhost.setStatusText("Down since " + downSinceDate);
+                }
             }
             supportedhosts.add(mhost);
         }
@@ -521,6 +532,9 @@ public class DeepbridCom extends PluginForHost {
                 loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
             }
             submitForm(br, loginform);
+            if (br.containsHTML(">\\s*The user name or password is incorrect\\s*<")) {
+                throw new AccountInvalidException();
+            }
             final Map<String, Object> userinfo = checkLoginAPI(br, account, false);
             if (userinfo == null) {
                 throw new AccountInvalidException();
@@ -533,6 +547,9 @@ public class DeepbridCom extends PluginForHost {
     private Map<String, Object> checkLoginAPI(final Browser br, final Account account, final boolean setUsernameOnAccount) throws Exception {
         final String urlpart = "?page=api&action=accountInfo";
         getPage(br, API_BASE + urlpart);
+        if (StringUtils.endsWithCaseInsensitive(br.getRedirectLocation(), "/login")) {
+            throw new AccountInvalidException();
+        }
         final Map<String, Object> resp = this.handleErrorsAPI(br, account, null);
         final String username = (String) resp.get("username");
         boolean loggedInViaCookies = false;
@@ -560,8 +577,9 @@ public class DeepbridCom extends PluginForHost {
         try {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
-            /* This should never happen. */
-            if (link != null) {
+            if (StringUtils.endsWithCaseInsensitive(br.getRedirectLocation(), "/login")) {
+                throw new AccountInvalidException();
+            } else if (link != null) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l, ignore);
             } else {
                 throw new AccountUnavailableException(ignore, "Invalid API response", 60 * 1000);
@@ -627,13 +645,5 @@ public class DeepbridCom extends PluginForHost {
         }
         /* This code should never be reached. */
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

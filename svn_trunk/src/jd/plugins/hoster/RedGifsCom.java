@@ -22,16 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.encoding.Base64;
-import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -44,7 +35,15 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50696 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.encoding.Base64;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50714 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
     public RedGifsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,24 +93,26 @@ public class RedGifsCom extends GfyCatCom {
         return "https://www.redgifs.com/watch/" + fid;
     }
 
-    private static Map<ProxySelectorInterface, Object> TEMPORARYTOKENS  = new WeakHashMap<ProxySelectorInterface, Object>();
-    private static AtomicBoolean                       tokenInvalidated = new AtomicBoolean(false);
+    private static Map<ProxySelectorInterface, Object> TEMPORARY_TOKENS         = new WeakHashMap<ProxySelectorInterface, Object>();
+    private final static String                        INVALID_TEMPORARY_TOKENS = "INVALID_TEMPORARY_TOKENS";
 
     // https://github.com/Redgifs/api/wiki/Temporary-tokens
     // tokens are bound to IP/UA
     // tokens seem to expire after 24 hours, see 'exp' field in token
     public String getTemporaryToken(final Browser br, final String renewIfToken) throws Exception {
-        synchronized (TEMPORARYTOKENS) {
-            Object tokenDetails[] = (Object[]) TEMPORARYTOKENS.get(br.getProxy());
+        synchronized (TEMPORARY_TOKENS) {
+            Object tokenDetails[] = (Object[]) TEMPORARY_TOKENS.get(br.getProxy());
             if (tokenDetails == null) {
                 tokenDetails = new Object[] { null, -1l };
-                TEMPORARYTOKENS.put(br.getProxy(), tokenDetails);
+                TEMPORARY_TOKENS.put(br.getProxy(), tokenDetails);
             }
             String token = (String) tokenDetails[0];
             final long now = Time.systemIndependentCurrentJVMTimeMillis();
-            if (StringUtils.equals(renewIfToken, token) || StringUtils.isEmpty(token) || ((Number) tokenDetails[1]).longValue() < now || tokenInvalidated.get()) {
-                if (tokenDetails[0] == null) {
+            if (StringUtils.isEmpty(token) || StringUtils.equals(renewIfToken, token) || ((Number) tokenDetails[1]).longValue() < now) {
+                if (StringUtils.isEmpty(token)) {
                     logger.info("fetch temporary token for the first time");
+                } else if (StringUtils.equals(renewIfToken, token)) {
+                    logger.info("refresh temporary token because the old one is invalid");
                 } else {
                     logger.info("refresh temporary token because the old one might be expired");
                 }
@@ -152,26 +153,41 @@ public class RedGifsCom extends GfyCatCom {
         return getPage(br, token, req);
     }
 
+    private void invalidateTemporaryToken(final Browser br, final String token) {
+        final DownloadLink downloadLink = getDownloadLink();
+        if (downloadLink == null) {
+            return;
+        }
+        Map<ProxySelectorInterface, String> invalidTokens = (Map<ProxySelectorInterface, String>) downloadLink.getTempProperties().getProperty(INVALID_TEMPORARY_TOKENS);
+        if (invalidTokens == null) {
+            invalidTokens = new WeakHashMap<ProxySelectorInterface, String>();
+            downloadLink.getTempProperties().setProperty(INVALID_TEMPORARY_TOKENS, invalidTokens);
+        }
+        invalidTokens.put(br.getProxy(), token);
+    }
+
+    private String removeInvalidatedTemporaryToken(final DownloadLink downloadLink, final Browser br) {
+        final Map<ProxySelectorInterface, String> invalidTokens = (Map<ProxySelectorInterface, String>) downloadLink.getTempProperties().getProperty(INVALID_TEMPORARY_TOKENS);
+        if (invalidTokens == null) {
+            return null;
+        }
+        return invalidTokens.remove(br.getProxy());
+    }
+
     public final Map<String, Object> getPage(final Browser br, final String token, final Request req) throws Exception {
         req.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.redgifs.com");
         req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.redgifs.com/");
         req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
         br.getPage(req);
         if (req.getHttpConnection().getResponseCode() == 401) {
-            if (tokenInvalidated.get()) {
-                /* Session token must have been refreshed before but is still invalid -> Wait a longer time */
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid", 1 * 60 * 60 * 1000);
-            } else {
-                /* Refresh token next time and try again */
-                tokenInvalidated.set(true);
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid", 1 * 60 * 1000);
-            }
-        }
-        tokenInvalidated.set(false);
-        if (req.getHttpConnection().getResponseCode() == 404) {
+            invalidateTemporaryToken(br, token);
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid", 5 * 60 * 1000);
+        } else if (req.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (req.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "410 gone");
+        } else if (req.getHttpConnection().getResponseCode() != 200) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Map<String, Object> response = restoreFromString(req.getHtmlCode(), TypeRef.MAP);
         return response;
@@ -184,7 +200,7 @@ public class RedGifsCom extends GfyCatCom {
             link.setName(fid);
         }
         this.setBrowserExclusive();
-        final String token = getTemporaryToken(br, null);
+        final String token = getTemporaryToken(br, removeInvalidatedTemporaryToken(link, br));
         final Map<String, Object> response = getView(br, token, fid);
         final Map<String, Object> gif = (Map<String, Object>) response.get("gif");
         parseFileInfo(link, gif);
@@ -242,7 +258,9 @@ public class RedGifsCom extends GfyCatCom {
     @Override
     public void resetDownloadlink(final DownloadLink downloadLink) {
         super.resetDownloadlink(downloadLink);
-        tokenInvalidated.set(false);
+        if (downloadLink.hasTempProperties()) {
+            downloadLink.getTempProperties().removeProperty(INVALID_TEMPORARY_TOKENS);
+        }
     }
 
     @Override

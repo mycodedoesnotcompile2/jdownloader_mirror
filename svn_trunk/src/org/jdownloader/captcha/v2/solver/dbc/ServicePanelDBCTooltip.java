@@ -80,7 +80,7 @@ public class ServicePanelDBCTooltip extends PanelToolTip {
                             panel.add(lbl(_GUI.T.lit_accountid(), NewTheme.I().getIcon(IconKey.ICON_PREMIUM, 18), JLabel.LEFT));
                             panel.add(lbl(account.getId() + ""));
                             panel.add(lbl(_GUI.T.ServicePanel9kwTooltip_runInEDT_credits_(), NewTheme.I().getIcon(IconKey.ICON_MONEY, 18), JLabel.LEFT));
-                            panel.add(lbl(account.getBalance() + " USD Cent"));
+                            panel.add(lbl(account.getBalance() / 100d + " USD "));
                             panel.add(lbl(_GUI.T.lit_rate(), NewTheme.I().getIcon(IconKey.ICON_PLAY, 18), JLabel.LEFT));
                             panel.add(lbl(account.getRate() + " USD Cent/Captcha"));
                             panel.add(lbl(_GUI.T.ServicePanelDBCTooltip_captcha_free(), NewTheme.I().getIcon(IconKey.ICON_OCR, 18), JLabel.LEFT));
