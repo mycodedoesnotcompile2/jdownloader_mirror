@@ -16,8 +16,6 @@ import org.jdownloader.plugins.config.Type;
 @PluginHost(host = "x.com", type = Type.HOSTER)
 public interface TwitterConfigInterface extends PluginConfigInterface {
     public static final TRANSLATION TRANSLATION                                              = new TRANSLATION();
-    final String                    text_MarkTweetRepliesViaFilename                         = "Append '_reply' to filenames of tweets that are replies to other tweets?";
-    final String                    text_CrawlURLsInsideTweetText                            = "Crawl URLs inside post text?\r\nWarning: This may result in endless crawling activity!";
     final String                    text_RegexWhitelistForCrawledUrlsInTweetText             = "RegEx whitelist for crawled URLs in tweet text e.g. '(?i).*(site\\.tld|site2\\.tld).*' [Empty = Allow all URLs]";
     final String                    text_CrawlVideoThumbnail                                 = "Crawl video thumbnail?";
     final String                    text_GlobalRequestIntervalLimitApiTwitterComMilliseconds = "Define global request limit for api.x.com in milliseconds (0 = no limit)";
@@ -35,19 +33,15 @@ public interface TwitterConfigInterface extends PluginConfigInterface {
         }
 
         public String getMarkTweetRepliesViaFilename_label() {
-            return text_MarkTweetRepliesViaFilename;
+            return "Append '_reply' to filenames of tweets that are replies to other tweets?";
         }
 
         public String getSingleTweetCrawlerTextCrawlMode_label() {
             return "Single Tweet crawler: Text crawl mode";
         }
 
-        public String getSingleTweetCrawlerCrawlMode_label() {
-            return "Single Tweet crawler: Crawl mode";
-        }
-
         public String getCrawlURLsInsideTweetText_label() {
-            return text_CrawlURLsInsideTweetText;
+            return "Crawl URLs inside post text?\r\nWarning: This may result in endless crawling activity!";
         }
 
         public String getRegexWhitelistForCrawledUrlsInTweetText_label() {
@@ -55,7 +49,11 @@ public interface TwitterConfigInterface extends PluginConfigInterface {
         }
 
         public String getCrawlRetweetsV2_label() {
-            return "Crawl Retweets?";
+            return "Profile crawler: Crawl Retweets?";
+        }
+
+        public String getProfileCrawlerCrawlQuotedTweets_label() {
+            return "Profile crawler: Crawl quoted Tweets?";
         }
 
         public String getCrawlVideoThumbnail_label() {
@@ -128,7 +126,6 @@ public interface TwitterConfigInterface extends PluginConfigInterface {
 
     @DefaultBooleanValue(false)
     @AboutConfig
-    @DescriptionForConfigEntry(text_MarkTweetRepliesViaFilename)
     @Order(25)
     boolean isMarkTweetRepliesViaFilename();
 
@@ -190,34 +187,30 @@ public interface TwitterConfigInterface extends PluginConfigInterface {
         };
     }
 
-    @AboutConfig
-    @DefaultEnumValue("AUTO")
-    @Order(31)
-    @DescriptionForConfigEntry("Define which API should be used when crawling single Tweets.")
-    /* TODO: 2024-03-02: Remove this setting as it is not needed anymore. */
-    SingleTweetCrawlerMode getSingleTweetCrawlerCrawlMode();
-
-    void setSingleTweetCrawlerCrawlMode(final SingleTweetCrawlerMode mode);
-
     @DefaultBooleanValue(true)
     @AboutConfig
-    @DescriptionForConfigEntry("Crawl Retweets when crawling a Twitter profile?")
     @Order(35)
     boolean isCrawlRetweetsV2();
 
     void setCrawlRetweetsV2(boolean b);
 
+    @DefaultBooleanValue(true)
+    @AboutConfig
+    @Order(36)
+    boolean isProfileCrawlerCrawlQuotedTweets();
+
+    void setProfileCrawlerCrawlQuotedTweets(boolean b);
+
     @DefaultBooleanValue(false)
     @AboutConfig
     @DescriptionForConfigEntry(text_CrawlVideoThumbnail)
-    @Order(36)
+    @Order(37)
     boolean isCrawlVideoThumbnail();
 
     void setCrawlVideoThumbnail(boolean b);
 
     @DefaultBooleanValue(false)
     @AboutConfig
-    @DescriptionForConfigEntry(text_CrawlURLsInsideTweetText)
     @Order(40)
     boolean isCrawlURLsInsideTweetText();
 

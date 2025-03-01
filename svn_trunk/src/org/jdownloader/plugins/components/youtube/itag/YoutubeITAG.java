@@ -31,6 +31,14 @@ public enum YoutubeITAG {
     DASH_VIDEO_4320p_AV1(402, StreamContainer.DASH_VIDEO, VideoResolution.P_4320, VideoCodec.AV1, VideoFrameRate.FPS_60),
     DASH_VIDEO_4320p_AV1_HIGHER_BITRATE(571, StreamContainer.DASH_VIDEO, VideoResolution.P_4320, VideoCodec.AV1, VideoFrameRate.FPS_60),
     DASH_VIDEO_4320p_AV1_HFR_HIGH(702, StreamContainer.DASH_VIDEO, VideoResolution.P_4320, VideoCodec.AV1, VideoFrameRate.FPS_60),
+    // Extra video formats of 608p,https://gist.github.com/MartinEesmaa/2f4b261cb90a47e9c41ba115a011a4aa
+    DASH_VIDEO_1080x608_AV1(788, StreamContainer.DASH_VIDEO, VideoResolution.P_1080_608, VideoCodec.AV1, VideoFrameRate.FPS_30),
+    DASH_VIDEO_608x1080_AV1(788, StreamContainer.DASH_VIDEO, VideoResolution.P_608_1080, VideoCodec.AV1, VideoFrameRate.FPS_30),
+    DASH_VIDEO_1080x608_VP9_EFFICIENCY(779, StreamContainer.DASH_VIDEO, VideoResolution.P_1080_608, VideoCodec.VP9, VideoFrameRate.FPS_30),
+    DASH_VIDEO_608x1080_VP9_EFFICIENCY(779, StreamContainer.DASH_VIDEO, VideoResolution.P_608_1080, VideoCodec.VP9, VideoFrameRate.FPS_30),
+    DASH_VIDEO_1080x608_VP9_BEST(780, StreamContainer.DASH_VIDEO, VideoResolution.P_1080_608, VideoCodec.VP9, VideoFrameRate.FPS_30),
+    DASH_VIDEO_608x1080_VP9_BEST(780, StreamContainer.DASH_VIDEO, VideoResolution.P_608_1080, VideoCodec.VP9, VideoFrameRate.FPS_30),
+
     // AAC (LC) 128 Kbps Stereo (2) Yes, YT Music
     DASH_AUDIO_128K_AAC(140, StreamContainer.DASH_AUDIO, AudioCodec.AAC, AudioBitrate.KBIT_128),
     // DASH_AUDIO_48K_OPUS(249, null, null, "Opus", "38kbit", YoutubeITAG.OPUS_48),
@@ -82,8 +90,8 @@ public enum YoutubeITAG {
     DASH_VIDEO_360P_H264(134, StreamContainer.DASH_VIDEO, VideoResolution.P_360, VideoCodec.H264, VideoFrameRate.FPS_30),
     DASH_VIDEO_480P_H264(135, StreamContainer.DASH_VIDEO, VideoResolution.P_480, VideoCodec.H264, VideoFrameRate.FPS_30),
     /*
-     * 
-     * 
+     *
+     *
      * Video ID : 1 Format : AVC Format/Info : Advanced Video Codec Format profile : Main@L3 Format settings, CABAC : Yes Format settings,
      * ReFrames : 3 frames Codec ID : avc1 Codec ID/Info : Advanced Video Coding Duration : 6s 773ms Bit rate : 1 063 Kbps Width : 720
      * pixels Height : 480 pixels Display aspect ratio : 3:2 Frame rate mode : Variable Frame rate : 29.970 fps Minimum frame rate : 29.970

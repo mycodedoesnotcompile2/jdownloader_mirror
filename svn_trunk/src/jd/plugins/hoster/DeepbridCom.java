@@ -59,7 +59,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50715 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 50716 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -104,7 +104,7 @@ public class DeepbridCom extends PluginForHost {
         getPage(br, link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Wrong request code")) {
+        } else if (br.containsHTML(">\\s*Wrong request code")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("(?i)<b>File Name:?\\s*?</b></font><font[^>]+>([^<>\"]+)<").getMatch(0);
@@ -487,9 +487,9 @@ public class DeepbridCom extends PluginForHost {
             final Cookies userCookies = account.loadUserCookies();
             if (cookies != null || userCookies != null) {
                 if (cookies != null) {
-                    br.setCookies(this.getHost(), cookies);
+                    br.setCookies(cookies);
                 } else {
-                    br.setCookies(this.getHost(), userCookies);
+                    br.setCookies(userCookies);
                 }
                 if (!verifyCookies) {
                     /* Do not verify cookies */
@@ -527,7 +527,7 @@ public class DeepbridCom extends PluginForHost {
             loginform.put("amember_login", Encoding.urlEncode(account.getUser()));
             loginform.put("amember_pass", Encoding.urlEncode(account.getPass()));
             loginform.put("remember_login", "1");
-            if (br.containsHTML("(?i)google\\.com/recaptcha/api")) {
+            if (br.containsHTML("google\\.com/recaptcha/api")) {
                 final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
                 loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
             }

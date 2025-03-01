@@ -16,6 +16,20 @@ import javax.swing.JComponent;
 import javax.swing.JTable;
 import javax.swing.table.JTableHeader;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountCheckerEventListener;
+import jd.gui.swing.jdgui.GUIUtils;
+import jd.gui.swing.jdgui.interfaces.SwitchPanelEvent;
+import jd.gui.swing.jdgui.interfaces.SwitchPanelListener;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountTrafficView;
+import jd.plugins.PluginForHost;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.components.ExtMergedIcon;
@@ -41,20 +55,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerEventListener;
-import jd.gui.swing.jdgui.GUIUtils;
-import jd.gui.swing.jdgui.interfaces.SwitchPanelEvent;
-import jd.gui.swing.jdgui.interfaces.SwitchPanelListener;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountTrafficView;
-import jd.plugins.PluginForHost;
 
 public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implements AccountCheckerEventListener {
     public static class TrafficColumn extends ExtProgressColumn<AccountEntry> {
@@ -814,22 +814,23 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
         if (value.isChecking()) {
             return _GUI.T.PremiumAccountTableModel_refresh();
         }
+        final String errString = value.getErrorString();
         if (value.getError() == null) {
             AccountInfo ai = value.getAccountInfo();
             String ret = ai == null ? null : ai.getStatus();
             if (StringUtils.isEmpty(ret)) {
                 if (value.isTempDisabled()) {
-                    if (StringUtils.isNotEmpty(value.getErrorString())) {
-                        return value.getErrorString();
+                    ret = errString;
+                    if (StringUtils.isEmpty(ret)) {
+                        ret = _GUI.T.PremiumAccountTableModel_getStringValue_temp_disabled();
                     }
-                    ret = _GUI.T.PremiumAccountTableModel_getStringValue_temp_disabled();
                 } else {
                     ret = _GUI.T.PremiumAccountTableModel_getStringValue_account_ok_();
                 }
             } else {
                 if (value.isTempDisabled()) {
-                    if (StringUtils.isNotEmpty(value.getErrorString())) {
-                        return value.getErrorString();
+                    if (StringUtils.isNotEmpty(errString)) {
+                        return errString;
                     }
                     ret = _GUI.T.PremiumAccountTableModel_getStringValue_temp_disabled2(ret);
                 } else {
@@ -838,10 +839,12 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             }
             return ret;
         }
-        if (StringUtils.isNotEmpty(value.getErrorString())) {
-            return value.getErrorString();
+        if (StringUtils.isNotEmpty(errString)) {
+            return errString;
         }
         switch (value.getError()) {
+        case TEMP_DISABLED:
+            return _GUI.T.PremiumAccountTableModel_getStringValue_temp_disabled();
         case EXPIRED:
             return _GUI.T.PremiumAccountTableModel_getStringValue_status_expired();
         case INVALID:

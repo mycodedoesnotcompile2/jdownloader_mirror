@@ -36,6 +36,9 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -46,11 +49,12 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50724 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -94,19 +98,95 @@ public class BoxbitApp extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
-        return AvailableStatus.UNCHECKABLE;
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException, IOException {
+        if (!link.isNameSet()) {
+            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+            final String fid = urlinfo.getMatch(0);
+            final String filenameFromURL = urlinfo.getMatch(2);
+            if (filenameFromURL != null) {
+                link.setName(Encoding.htmlDecode(filenameFromURL));
+            } else {
+                link.setName(fid);
+            }
+        }
+        final Browser brc = br.cloneBrowser();
+        URLConnectionAdapter con = null;
+        try {
+            con = brc.openHeadConnection(link.getPluginPatternMatcher());
+            handleConnectionErrors(brc, con);
+            if (con.getCompleteContentLength() > 0) {
+                if (con.isContentDecoded()) {
+                    link.setVerifiedFileSize(-1);
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
+            }
+            final String filename = Plugin.getFileNameFromConnection(con);
+            if (filename != null) {
+                link.setFinalFileName(filename);
+            }
+            parseAndSetMaxChunksLimitFromHeader(link, con);
+        } finally {
+            try {
+                if (con != null) {
+                    con.disconnect();
+                }
+            } catch (final Throwable e) {
+            }
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    private void parseAndSetMaxChunksLimitFromHeader(final DownloadLink link, final URLConnectionAdapter con) {
+        /* Get max allowed number of chunks from header. */
+        final String maxChunksStr = con.getRequest().getResponseHeader("X-Max-Chunks");
+        if (maxChunksStr != null && maxChunksStr.matches("\\d+")) {
+            logger.info("Max chunks for this item: " + maxChunksStr);
+            link.setProperty(PROPERTY_DOWNLOADLINK_maxchunks, Integer.parseInt(maxChunksStr));
+        }
+    }
+
+    @Override
+    protected void throwConnectionExceptions(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (con.getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        super.throwConnectionExceptions(br, con);
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        handleSelfhostedFileDownload(link, null);
     }
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        /* handlePremium should never get called */
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        handleSelfhostedFileDownload(link, account);
+    }
+
+    public void handleSelfhostedFileDownload(final DownloadLink link, final Account account) throws Exception {
+        if (account != null) {
+            this.setLoginHeader(br, account);
+        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), defaultRESUME, this.getMaxChunks(link));
+        this.handleConnectionErrors(br, dl.getConnection());
+        parseAndSetMaxChunksLimitFromHeader(link, dl.getConnection());
+        dl.startDownload();
     }
 
     private void handleDL(final Account account, final DownloadLink link) throws Exception {
@@ -134,20 +214,8 @@ public class BoxbitApp extends PluginForHost {
                 /* This should never happen */
                 mhm.handleErrorGeneric(account, link, "dllinknull", 50, 5 * 60 * 1000l);
             }
-            /* Check how many connections per file are allowed. */
-            int maxChunks;
-            final Number maxChunksAPI = (Number) entries.get("max_chunks");
-            if (maxChunksAPI != null) {
-                maxChunks = maxChunksAPI.intValue();
-                if (maxChunks > 1) {
-                    maxChunks = -maxChunks;
-                }
-                /* Save that so when re-using that generated directurls we can remember this limit. */
-                link.setProperty(PROPERTY_DOWNLOADLINK_maxchunks, maxChunks);
-            } else {
-                maxChunks = defaultMAXCHUNKS;
-            }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, defaultRESUME, maxChunks);
+            link.setProperty(PROPERTY_DOWNLOADLINK_maxchunks, entries.get("max_chunks"));
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, defaultRESUME, this.getMaxChunks(link));
             link.setProperty(this.getHost() + PROPERTY_DOWNLOADLINK_directlink, dl.getConnection().getURL().toString());
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
@@ -186,7 +254,11 @@ public class BoxbitApp extends PluginForHost {
     }
 
     private int getMaxChunks(final DownloadLink link) {
-        return (int) link.getLongProperty(PROPERTY_DOWNLOADLINK_maxchunks, defaultMAXCHUNKS);
+        int chunks = link.getIntegerProperty(PROPERTY_DOWNLOADLINK_maxchunks, defaultMAXCHUNKS);
+        if (chunks > 1) {
+            chunks = -chunks;
+        }
+        return chunks;
     }
 
     @Override
@@ -376,10 +448,12 @@ public class BoxbitApp extends PluginForHost {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
             /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long waitMillis = 60 * 1000l;
             if (link != null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
             } else {
-                throw new AccountUnavailableException("Invalid API response", 60 * 1000);
+                throw new AccountUnavailableException(msg, 60 * 1000);
             }
         }
         if (br.getHttpConnection().getResponseCode() == 401) {
@@ -418,5 +492,26 @@ public class BoxbitApp extends PluginForHost {
             /* No error */
         }
         return entries;
+    }
+
+    @Override
+    public int getMaxSimultanFreeDownloadNum() {
+        /**
+         * Officially, free downloads aren't possible at all but technically, their selfhosted direct URLs are also downloadable for free
+         * users. <br>
+         * We are limiting them to 1 though because there are limits which we only know in account mode since their account API tells us how
+         * many simultaneous downloads are allowed.
+         */
+        return 1;
+    }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        return false;
     }
 }

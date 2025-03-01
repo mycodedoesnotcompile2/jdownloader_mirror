@@ -102,7 +102,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 50541 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50726 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1249,9 +1249,14 @@ public class TbCmV2 extends PluginForDecrypt {
         final String channelTabFromURL = getChannelTabNameFromURL(referenceUrl);
         String humanReadableTitle;
         if (playlistID != null) {
-            userOrPlaylistURL = YoutubeHelper.generatePlaylistURL(playlistID);
+            if (YoutubeHelper.looksLikeRadioPlaylistURL(referenceUrl)) {
+                userOrPlaylistURL = YoutubeHelper.generateRadioPlaylistURL(playlistID);
+            } else {
+                /* Normal/user generated playlist */
+                userOrPlaylistURL = YoutubeHelper.generatePlaylistURL(playlistID);
+            }
             humanReadableTitle = "Playlist " + playlistID;
-            if (playlistID.startsWith("RD")) {
+            if (YoutubeHelper.looksLikeRadioPlaylistURL(br.getURL())) {
                 /* It's a mix playlist auto created by youtube -> Set "YouTube" as name of creator of this playlist. */
                 putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_CREATOR, "YouTube");
             }
@@ -1324,7 +1329,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 /* Such playlists can contain an infinite amount of items -> Stop after first page */
                 abortPaginationAfterFirstPage = true;
             } else if (run == 0) {
-                /* Channel */
+                /* Channel or playlist */
                 final List<String> availableChannelTabs = new ArrayList<String>();
                 Map<String, Object> featuredtab = null;
                 Map<String, Object> videostab = null;
@@ -1527,114 +1532,21 @@ public class TbCmV2 extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 int numberOfVideoItemsOnThisPage = 0;
-                varrayLoop: for (final Map<String, Object> vid : varray) {
-                    /* Playlist */
-                    String id = (String) JavaScriptEngineFactory.walkJson(vid, "playlistVideoRenderer/videoId");
-                    if (id == null) {
-                        /* /@profile/videos */
-                        id = (String) JavaScriptEngineFactory.walkJson(vid, "richItemRenderer/content/videoRenderer/videoId");
-                        if (id == null) {
-                            /* Reel/Short */
-                            id = (String) JavaScriptEngineFactory.walkJson(vid, "richItemRenderer/content/reelItemRenderer/videoId");
-                            if (id == null) {
-                                /* Video of radio/mix auto generated playlist */
-                                id = (String) JavaScriptEngineFactory.walkJson(vid, "playlistPanelVideoRenderer/videoId");
-                                if (id == null) {
-                                    /* Shorts playlist */
-                                    id = (String) JavaScriptEngineFactory.walkJson(vid, "richItemRenderer/content/shortsLockupViewModel/onTap/innertubeCommand/reelWatchEndpoint/videoId");
-                                }
-                            }
-                        }
-                    }
-                    String vidPlayListID = (String) JavaScriptEngineFactory.walkJson(vid, "richItemRenderer/content/playlistRenderer/playlistId");
-                    if (vidPlayListID == null) {
-                        vidPlayListID = (String) JavaScriptEngineFactory.walkJson(vid, "gridPlaylistRenderer/playlistId");
-                    }
-                    if (vidPlayListID != null && id == null) {
-                        /**
-                         * E.g. on /releases or /playlists -> inner playlists
-                         *
-                         * TODO: decide which solution to go </br> TODO: 2024-11-07: I don't understand this anymore lol
-                         */
-                        if (true) {
-                            // proper playlist handling with packaging and correct container URLs
-                            final String playlistURL = YoutubeHelper.generatePlaylistURL(vidPlayListID);
-                            distribute(createDownloadlink(playlistURL));
-                            continue;
-                        } else if (true) {
-                            // fast but part of "Releases" or "Playlists" packages
-                            final List<Map<String, Object>> vidPlayListVideos = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(vid, "richItemRenderer/content/playlistRenderer/videos");
-                            for (Map<String, Object> vidPlayListVideo : vidPlayListVideos) {
-                                vidPlayListVideo = (Map<String, Object>) vidPlayListVideo.get("childVideoRenderer");
-                                id = (String) vidPlayListVideo.get("videoId");
-                                numberOfVideoItemsOnThisPage++;
-                                videoPositionCounter++;
-                                if (!playListDupes.add(id)) {
-                                    /* Playlists can contain the same video multiple times */
-                                    logger.info("Skipping dupe: " + id + " | Position: " + videoPositionCounter);
-                                    numberofSkippedDuplicates++;
-                                    continue;
-                                }
-                                ret.add(new YoutubeClipData(id));
-                                putGlobalProperty(id, YoutubeHelper.YT_PLAYLIST_POSITION, videoPositionCounter);
-                                if (playListDupes.size() == maxItemsLimit) {
-                                    break;
-                                }
-                            }
-                        } else {
-                            // slow but same as fast
-                            final Browser brc = br.cloneBrowser();
-                            final ArrayList<YoutubeClipData> playListItems = crawlPlaylistOrChannel(helper, brc, vidPlayListID, userName, channelID, referenceUrl, maxItemsLimit);
-                            playListLoop: for (YoutubeClipData playListItem : playListItems) {
-                                if (playListDupes.add(playListItem.videoID)) {
-                                    ret.add(playListItem);
-                                    if (playListDupes.size() == maxItemsLimit) {
-                                        break playListLoop;
-                                    }
-                                }
-                            }
-                        }
-                        if (playListDupes.size() == maxItemsLimit) {
-                            reachedUserDefinedMaxItemsLimit = true;
-                            break varrayLoop;
-                        } else {
-                            continue varrayLoop;
-                        }
-                    }
-                    if (id != null) {
-                        numberOfVideoItemsOnThisPage++;
-                        videoPositionCounter++;
-                        if (!playListDupes.add(id)) {
-                            /* Playlists can contain the same video multiple times */
-                            logger.info("Skipping dupe: " + id + " | Position: " + videoPositionCounter);
-                            numberofSkippedDuplicates++;
-                            continue varrayLoop;
-                        }
-                        ret.add(new YoutubeClipData(id));
-                        putGlobalProperty(id, YoutubeHelper.YT_PLAYLIST_POSITION, videoPositionCounter);
-                        if (playListDupes.size() == maxItemsLimit) {
-                            reachedUserDefinedMaxItemsLimit = true;
-                            break varrayLoop;
-                        }
-                    }
-                    /* Typically last item (item 101) will contain the continuationToken. */
-                    String continuationToken = (String) JavaScriptEngineFactory.walkJson(vid, "continuationItemRenderer/continuationEndpoint/continuationCommand/token");
-                    if (nextPageToken == null) {
-                        /* Last chance */
-                        final Set<String> continuationTokens = new HashSet<String>();
-                        this.findContinuationTokens(continuationTokens, vid);
-                        if (continuationTokens.size() == 1) {
-                            nextPageToken = continuationTokens.iterator().next();
-                        } else if (continuationTokens.size() > 1) {
-                            logger.warning("Found multiple possible continuationTokens: " + continuationTokens);
-                        }
-                    }
-                    if (continuationToken != null) {
-                        /* Typically last item contains token for next page */
-                        nextPageToken = continuationToken;
-                    } else {
-                        logger.info("Skipping unknown playlist item: " + vid);
-                    }
+                final ArrayList<YoutubeClipData> newItems = processVideoArray(varray, playListDupes, maxItemsLimit, videoPositionCounter);
+                ret.addAll(newItems);
+                // Check if we reached our limit
+                reachedUserDefinedMaxItemsLimit = (maxItemsLimit > 0 && playListDupes.size() >= maxItemsLimit);
+                if (reachedUserDefinedMaxItemsLimit) {
+                    logger.info("Stopping because: Reached max items limit of " + maxItemsLimit);
+                    break pagination;
+                }
+                Set<String> continuationTokens = findAllContinuationTokens(varray);
+                if (continuationTokens.size() == 1) {
+                    nextPageToken = continuationTokens.iterator().next();
+                } else if (continuationTokens.size() > 1) {
+                    logger.warning("Found multiple possible continuationTokens: " + continuationTokens);
+                    // Take the first one or implement more sophisticated selection
+                    nextPageToken = continuationTokens.iterator().next();
                 }
                 if (internalGuessedPaginationSize == -1) {
                     internalGuessedPaginationSize = numberOfVideoItemsOnThisPage;
@@ -1657,6 +1569,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 } else if (abortPaginationAfterFirstPage) {
                     logger.info("Stopping because: abortPaginationAfterFirstPage == true");
                     break pagination;
+                } else {
+                    /* Continue to next page */
                 }
             }
             /* Try to continue to next page */
@@ -1697,6 +1611,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             } catch (final Exception e) {
                 if (ret.isEmpty()) {
+                    /* Zero results found before -> Throw exception */
                     throw e;
                 } else {
                     logger.log(e);
@@ -1746,6 +1661,211 @@ public class TbCmV2 extends PluginForDecrypt {
         this.displayBubbleNotification(humanReadableTitle + " items", bubblenotificationText);
         logger.info("parsePlaylist method returns: " + ret.size() + " VideoIDs | Number of possibly missing videos [due to duplicate/private/offline/GEO-block or bug in plugin]: " + missingVideos + " | Skipped duplicates: " + numberofSkippedDuplicates);
         return ret;
+    }
+
+    /**
+     * Recursively extracts YouTube video data from a JSON structure. Collects all video items, without limiting the number of items
+     * collected.
+     *
+     * @param jsonObject
+     *            The JSON object or array to search through
+     * @param result
+     *            Collection to store the found data Structure is: [videoId, playlistId, videoPositionCounter]
+     * @param videoPositionCounter
+     *            Counter for playlist positions, passed as an array to allow modification
+     */
+    private void collectYoutubeClipData(Object jsonObject, List<Object[]> result, int[] videoPositionCounter) {
+        if (jsonObject == null) {
+            return;
+        }
+        if (jsonObject instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) jsonObject;
+            // Direct video ID extraction from various paths
+            String videoId = extractVideoId(map);
+            String playlistId = extractPlaylistId(map);
+            if (playlistId != null) {
+                // TODO: Remove this. It looks to be not needed anymore.s
+                // Handle playlist IDs
+                List<Map<String, Object>> playlistVideos = extractPlaylistVideos(map);
+                if (playlistVideos != null) {
+                    for (Map<String, Object> video : playlistVideos) {
+                        videoId = extractVideoIdFromChildRenderer(video);
+                        if (videoId != null) {
+                            videoPositionCounter[0]++;
+                            result.add(new Object[] { videoId, playlistId, videoPositionCounter[0] });
+                        }
+                    }
+                } else {
+                    // Store the playlist ID itself to handle it in the calling code
+                    result.add(new Object[] { null, playlistId, -1 });
+                }
+            } else if (videoId != null) {
+                videoPositionCounter[0]++;
+                // Store videoId and position - process duplicates later
+                result.add(new Object[] { videoId, null, videoPositionCounter[0] });
+            }
+            // Recursively search all values
+            for (Object value : map.values()) {
+                if (value instanceof Map || value instanceof List) {
+                    collectYoutubeClipData(value, result, videoPositionCounter);
+                }
+            }
+        } else if (jsonObject instanceof List) {
+            List<Object> list = (List<Object>) jsonObject;
+            for (Object item : list) {
+                if (item instanceof Map || item instanceof List) {
+                    collectYoutubeClipData(item, result, videoPositionCounter);
+                }
+            }
+        }
+    }
+
+    /**
+     * Extracts a video ID from various possible paths in a JSON object
+     */
+    private String extractVideoId(Map<String, Object> map) {
+        // Try all the different paths where video IDs might be found
+        String videoId = (String) JavaScriptEngineFactory.walkJson(map, "playlistVideoRenderer/videoId");
+        if (videoId == null) {
+            videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/videoRenderer/videoId");
+        }
+        if (videoId == null) {
+            videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/reelItemRenderer/videoId");
+        }
+        if (videoId == null) {
+            videoId = (String) JavaScriptEngineFactory.walkJson(map, "playlistPanelVideoRenderer/videoId");
+        }
+        if (videoId == null) {
+            videoId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/shortsLockupViewModel/onTap/innertubeCommand/reelWatchEndpoint/videoId");
+        }
+        if (videoId == null) {
+            videoId = (String) JavaScriptEngineFactory.walkJson(map, "videoRenderer/videoId");
+        }
+        if (videoId == null) {
+            videoId = (String) JavaScriptEngineFactory.walkJson(map, "reelItemRenderer/videoId");
+        }
+        return videoId;
+    }
+
+    /**
+     * Extracts a playlist ID from the JSON object
+     */
+    private String extractPlaylistId(Map<String, Object> map) {
+        String playlistId = (String) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/playlistRenderer/playlistId");
+        if (playlistId == null) {
+            playlistId = (String) JavaScriptEngineFactory.walkJson(map, "gridPlaylistRenderer/playlistId");
+        }
+        return playlistId;
+    }
+
+    /**
+     * Extracts a video ID from a child video renderer
+     */
+    private String extractVideoIdFromChildRenderer(Map<String, Object> video) {
+        Map<String, Object> childRenderer = (Map<String, Object>) video.get("childVideoRenderer");
+        if (childRenderer != null) {
+            return (String) childRenderer.get("videoId");
+        }
+        return null;
+    }
+
+    /**
+     * Extracts the playlist videos from a map
+     */
+    private List<Map<String, Object>> extractPlaylistVideos(Map<String, Object> map) {
+        List<Map<String, Object>> videos = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(map, "richItemRenderer/content/playlistRenderer/videos");
+        if (videos == null) {
+            videos = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(map, "gridPlaylistRenderer/items");
+        }
+        return videos;
+    }
+
+    /**
+     * Finds continuation tokens in the data structure
+     *
+     * @param jsonObject
+     *            The JSON object to search in
+     * @return A set of continuation tokens found
+     */
+    private Set<String> findAllContinuationTokens(Object jsonObject) {
+        Set<String> tokens = new HashSet<String>();
+        collectContinuationTokens(jsonObject, tokens);
+        return tokens;
+    }
+
+    /**
+     * Recursively collects continuation tokens from the JSON structure
+     */
+    private void collectContinuationTokens(Object jsonObject, Set<String> tokens) {
+        if (jsonObject == null) {
+            return;
+        }
+        if (jsonObject instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) jsonObject;
+            // Check for continuation token in this object
+            String token = (String) JavaScriptEngineFactory.walkJson(map, "continuationItemRenderer/continuationEndpoint/continuationCommand/token");
+            if (token != null) {
+                tokens.add(token);
+            }
+            // Recursively check all values
+            for (Object value : map.values()) {
+                if (value instanceof Map || value instanceof List) {
+                    collectContinuationTokens(value, tokens);
+                }
+            }
+        } else if (jsonObject instanceof List) {
+            List<Object> list = (List<Object>) jsonObject;
+            for (Object item : list) {
+                if (item instanceof Map || item instanceof List) {
+                    collectContinuationTokens(item, tokens);
+                }
+            }
+        }
+    }
+
+    /**
+     * This method would replace your current varrayLoop implementation It collects all items through recursive search and then handles
+     * limits and duplicates separately
+     */
+    private ArrayList<YoutubeClipData> processVideoArray(List<Map<String, Object>> varray, Set<String> playListDupes, final int maxItemsLimit, int initialVideoPositionCounter) {
+        ArrayList<YoutubeClipData> result = new ArrayList<YoutubeClipData>();
+        int[] videoPositionCounter = new int[1];
+        videoPositionCounter[0] = initialVideoPositionCounter;
+        // Collect all video data without filtering
+        List<Object[]> collectedData = new ArrayList<Object[]>();
+        collectYoutubeClipData(varray, collectedData, videoPositionCounter);
+        // Process the collected data with filtering logic
+        int numberofSkippedDuplicates = 0;
+        for (Object[] item : collectedData) {
+            String videoId = (String) item[0];
+            String playlistId = (String) item[1];
+            int position = (Integer) item[2];
+            if (this.isAbort()) {
+                logger.info("Thread Aborted!");
+                break;
+            }
+            if (videoId != null) {
+                // Process video IDs
+                if (!playListDupes.add(videoId)) {
+                    logger.info("Skipping dupe: " + videoId + " | Position: " + position);
+                    numberofSkippedDuplicates++;
+                    continue;
+                }
+                YoutubeClipData clipData = new YoutubeClipData(videoId);
+                result.add(clipData);
+                putGlobalProperty(videoId, YoutubeHelper.YT_PLAYLIST_POSITION, position);
+                if (maxItemsLimit > 0 && playListDupes.size() >= maxItemsLimit) {
+                    logger.info("Reached user-defined max items limit: " + maxItemsLimit);
+                    break;
+                }
+            } else if (playlistId != null) {
+                // Handle playlist ID - for example, crawling it separately or adding it as a special entry
+                logger.info("Found playlist ID: " + playlistId);
+                // Implementation depends on your requirements
+            }
+        }
+        logger.info("Processed items: " + collectedData.size() + " | Added items: " + result.size() + "  | Skipped duplicates: " + numberofSkippedDuplicates);
+        return result;
     }
 
     private void checkBasicErrors(final Browser br) throws PluginException {

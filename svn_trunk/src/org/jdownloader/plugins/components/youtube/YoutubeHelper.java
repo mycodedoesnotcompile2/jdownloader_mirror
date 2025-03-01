@@ -174,18 +174,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -239,7 +239,7 @@ public class YoutubeHelper {
                 }
             } while (tagsMatcher.find());
             tagsMatcher.appendTail(sb);
-            return sb.toString();
+            return sb.toString().trim();
         }
     }
 
@@ -3610,7 +3610,7 @@ public class YoutubeHelper {
             final String playlistID = link.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID);
             final int playlistPosition = link.getIntegerProperty(YoutubeHelper.YT_PLAYLIST_POSITION, -1);
             if (cfg.isPlaylistItemsIncludePlaylistPositionAtBeginningOfFilenames() && playlistID != null && playlistPosition != -1) {
-                formattedFilename = playlistPosition + "." + formattedFilename;
+                formattedFilename = playlistPosition + "." + formattedFilename.trim();
             }
         }
         return formattedFilename;
@@ -4329,12 +4329,27 @@ public class YoutubeHelper {
         this.playlistID = playlistID;
     }
 
+    /**
+     * Generates URL for normal/user generated playlist. <br>
+     * If you use this for a radio playlistID, the URL you get will not be usable!
+     */
     public static String generatePlaylistURL(final String playlistID) {
-        if (playlistID.startsWith("RD")) {
-            /* Youtube auto generated playlist / "Mix" */
-            return getBaseURL() + "/watch?list=" + playlistID;
+        return getBaseURL() + "/playlist?list=" + playlistID;
+    }
+
+    /**
+     * Generates URL for "youtuber mix" playlist / auto generated YT playlist. <br>
+     * If you use this for a normal/user generated playlistID, the URL you get will not be usable!
+     */
+    public static String generateRadioPlaylistURL(final String playlistID) {
+        return getBaseURL() + "/watch?v=&list=" + playlistID;
+    }
+
+    public static boolean looksLikeRadioPlaylistURL(final String url) {
+        if (StringUtils.containsIgnoreCase(url, "/watch") && StringUtils.containsIgnoreCase(url, "list=RD")) {
+            return true;
         } else {
-            return getBaseURL() + "/playlist?list=" + playlistID;
+            return false;
         }
     }
 

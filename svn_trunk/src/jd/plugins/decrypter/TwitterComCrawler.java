@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 50215 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50730 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -633,7 +633,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         globalProfileCrawlerNextCursor = null;
         globalProfileCrawlerSkippedResultsByMaxDate.clear();
         globalProfileCrawlerSkippedResultsByMaxitems.clear();
-        globalProfileCrawlerSkippedResultsByRetweet.clear();
+        globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet.clear();
         globalSumberofSkippedDeadTweets = 0;
     }
 
@@ -731,7 +731,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     displayBubbleNotification(bubbleNotifyTitle, "Returning no results because:\r\nMost likely user has disabled tweet text crawler but this profile only contained text tweets.\r\nMinimum number of skipped possible Tweets: " + totalWalkedThroughTweets + bubbleNotifyTextEnding);
                 }
             }
-        } else if (totalWalkedThroughTweets < statuses_count && globalProfileCrawlerSkippedResultsByRetweet.isEmpty() && globalProfileCrawlerSkippedResultsByMaxDate.isEmpty() && globalProfileCrawlerSkippedResultsByMaxitems.isEmpty()) {
+        } else if (totalWalkedThroughTweets < statuses_count && globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet.isEmpty() && globalProfileCrawlerSkippedResultsByMaxDate.isEmpty() && globalProfileCrawlerSkippedResultsByMaxitems.isEmpty()) {
             /* No items were skipped but also not all items were found -> Notify user */
             String text = "Some items may be missing!";
             text += "\nTotal number of status items: " + statuses_count + " Crawled: " + totalWalkedThroughTweets;
@@ -792,7 +792,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
             final int numberofNewTweetsWalkedThroughThisPage = globalTweetIDsDupelist.size() - numberofTweetsWalkedThroughBefore;
             ret.addAll(resultsThisPage);
             distribute(resultsThisPage);
-            logger.info("Crawled page " + page + " | Found new Tweets on this page: " + numberofNewTweetsWalkedThroughThisPage + " | Tweets walked through so far: " + globalTweetIDsDupelist.size() + " | Tweets crawled and added so far: " + globalActuallyCrawledTweetIDs.size() + " | nextCursor = " + globalProfileCrawlerNextCursor + " | Skipped Re-Tweets: " + globalProfileCrawlerSkippedResultsByRetweet.size() + " | Skipped Tweets via user defined max-date: " + globalProfileCrawlerSkippedResultsByMaxDate.size() + " | Skipped dead Tweets so far: " + this.globalSumberofSkippedDeadTweets);
+            logger.info("Crawled page " + page + " | Found new Tweets on this page: " + numberofNewTweetsWalkedThroughThisPage + " | Tweets walked through so far: " + globalTweetIDsDupelist.size() + " | Tweets crawled and added so far: " + globalActuallyCrawledTweetIDs.size() + " | nextCursor = " + globalProfileCrawlerNextCursor + " | Skipped Tweets: " + globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet.size() + " | Skipped Tweets via user defined max-date: " + globalProfileCrawlerSkippedResultsByMaxDate.size() + " | Skipped dead Tweets so far: " + this.globalSumberofSkippedDeadTweets);
             /* Check abort conditions */
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
@@ -829,18 +829,19 @@ public class TwitterComCrawler extends PluginForDecrypt {
     /**
      * 2023-07-21: Time for some ugly codes: Public variables!
      */
-    private String                      globalProfileCrawlerNextCursor               = null;
+    private String                      globalProfileCrawlerNextCursor                           = null;
     /*
      * Returns Twitter status IDs of all items that have been walked-through. This does not mean that those will actually be returned - they
      * can be filtered by user-settings. This variable mainly exists to prevent infinite loops.
      */
-    private HashSet<String>             globalTweetIDsDupelist                       = new HashSet<String>();
+    private HashSet<String>             globalTweetIDsDupelist                                   = new HashSet<String>();
     /* List of tweetIDs which have not only been walked-through but were actually added to the list of final items. */
-    private HashSet<String>             globalActuallyCrawledTweetIDs                = new HashSet<String>();
-    private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByMaxDate  = new HashSet<DownloadLink>();
-    private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByMaxitems = new HashSet<DownloadLink>();
-    private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByRetweet  = new HashSet<DownloadLink>();
-    private long                        globalSumberofSkippedDeadTweets              = 0;                          // Counts TweetTombstone
+    private HashSet<String>             globalActuallyCrawledTweetIDs                            = new HashSet<String>();
+    private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByMaxDate              = new HashSet<DownloadLink>();
+    private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByMaxitems             = new HashSet<DownloadLink>();
+    private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet = new HashSet<DownloadLink>();
+    private long                        globalSumberofSkippedDeadTweets                          = 0;                          // Counts
+                                                                                                                               // TweetTombstone
     // items
 
     private ArrayList<DownloadLink> crawlUserProfileGraphqlTimelineInstructions(final List<Map<String, Object>> timelineInstructions, final Map<String, Object> user, final String singleTweetID, final FilePackage fp, final boolean crawlUserLikes) throws Exception {
@@ -869,7 +870,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
 
     /** Crawls all Tweets inside _any_ given Map. */
     private ArrayList<DownloadLink> crawlTweets(final Map<String, Object> sourcemap, final Map<String, Object> user, final String singleTweetID, final FilePackage fp, final boolean allowSkipRetweets) throws PluginException, MalformedURLException {
-        final String username = user != null ? user.get("screen_name").toString() : null;
+        // final String username = user != null ? user.get("screen_name").toString() : null;
         final List<Map<String, Object>> tweetResults = new ArrayList<Map<String, Object>>();
         final ArrayList<DownloadLink> allowedResults = new ArrayList<DownloadLink>();
         recursiveFindTweetMaps(sourcemap, tweetResults);
@@ -904,7 +905,6 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 /* Results of Retweet if this Tweet is a Retweet */
                 ArrayList<DownloadLink> thisRetweetResults = null;
                 if (containsQuotedTweet) {
-                    /*  */
                     /* 2024-02-21: Current Tweet is a reply to a quoted Tweet -> We need to crawl that quoted Tweet separately */
                     thisQuotedTweetResults = crawlTweetMap(null, quoted_status, fp);
                 } else if (retweetRootMap != null) {
@@ -943,13 +943,21 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 final ArrayList<DownloadLink> thisAllResults = new ArrayList<DownloadLink>();
                 thisAllResults.addAll(thisTweetResults);
                 if (thisQuotedTweetResults != null) {
-                    thisAllResults.addAll(thisQuotedTweetResults);
+                    if (PluginJsonConfig.get(TwitterConfigInterface.class).isProfileCrawlerCrawlQuotedTweets() && thisQuotedTweetResults != null) {
+                        /* User wants to crawl quoted Tweets */
+                        thisAllResults.addAll(thisQuotedTweetResults);
+                    } else {
+                        /* Quoted-Tweet crawling is disabled: Skip all quoted Tweets results of this Tweet. */
+                        logger.info("Retweet filter: Skipping QuotedTweet(s): " + thisQuotedTweetResults.size());
+                        for (final DownloadLink tweetresult : thisQuotedTweetResults) {
+                            globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet.add(tweetresult);
+                        }
+                    }
                 }
                 if (thisRetweetResults != null) {
                     thisAllResults.addAll(thisRetweetResults);
                 }
                 /* Collect some information from results */
-                final HashSet<String> thisRetweetIDs = new HashSet<String>();
                 final HashSet<String> thisAllTweetIDs = new HashSet<String>();
                 for (final DownloadLink tweetresult : thisAllResults) {
                     final String thisTweetID = tweetresult.getStringProperty(PROPERTY_TWEET_ID);
@@ -957,29 +965,24 @@ public class TwitterComCrawler extends PluginForDecrypt {
                         continue;
                     }
                     thisAllTweetIDs.add(thisTweetID);
-                    /*
-                     * Tweets from other users than the one we are crawling now are either Retweets or Tweets which are part of Tweet
-                     * comments/replies. Typicall if a user does not want to have Retweets we want to filter such items too.
-                     */
-                    if (tweetresult.hasProperty(PROPERTY_RETWEET)) {
-                        thisRetweetIDs.add(thisTweetID);
-                    }
                 }
                 /* Check some skip conditions */
-                if (singleTweetID != null && tweetResults.size() > 1 && !thisAllTweetIDs.contains(singleTweetID)) {
+                if (singleTweetID != null) {
                     /* Fail-safe */
-                    logger.info("Single Tweet filter: Skipping the following results because they do not contain the item we are looking for: " + tweetResults);
-                    continue;
-                } else if (singleTweetID == null && allowSkipRetweets && !PluginJsonConfig.get(TwitterConfigInterface.class).isCrawlRetweetsV2() && thisRetweetResults != null) {
+                    if (tweetResults.size() > 1 && !thisAllTweetIDs.contains(singleTweetID)) {
+                        logger.info("Single Tweet filter: Skipping the following results because they do not contain the item we are looking for: " + tweetResults);
+                        continue;
+                    }
+                } else if (allowSkipRetweets && !PluginJsonConfig.get(TwitterConfigInterface.class).isCrawlRetweetsV2() && thisRetweetResults != null) {
                     /* Re-Tweet crawling is disabled: Skip all results of this Tweet if it is a Re-Tweet. */
-                    logger.info("Retweet filter: Skipping Retweet(s): " + thisRetweetIDs.toString());
-                    for (final DownloadLink retweetresult : thisRetweetResults) {
-                        globalProfileCrawlerSkippedResultsByRetweet.add(retweetresult);
+                    logger.info("Retweet filter: Skipping Retweet(s): " + thisRetweetResults.size());
+                    for (final DownloadLink tweetresult : thisRetweetResults) {
+                        globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet.add(tweetresult);
                     }
                     continue;
                 }
                 /* Determine timestamp of "last Tweet". */
-                final ArrayList<DownloadLink> resultsForLastTweetDateFinder = new ArrayList<DownloadLink>();
+                final List<DownloadLink> resultsForLastTweetDateFinder = new ArrayList<DownloadLink>();
                 resultsForLastTweetDateFinder.addAll(thisTweetResults);
                 if (thisRetweetResults != null) {
                     resultsForLastTweetDateFinder.addAll(thisRetweetResults);
@@ -995,14 +998,13 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     } else if (isPinnedTweet) {
                         /* Ignore pinned items */
                         continue;
-                    } else {
-                        /* Find date of last crawled Tweet. */
-                        logger.info("Tweet used as source for last crawled Tweet timestamp: " + thisTweetD);
-                        /* If we got a Re-Tweet we want to use the date of the source Tweet here. */
-                        crawledTweetTimestamp = thisTweetResult.getLongProperty("source_" + PROPERTY_DATE_TIMESTAMP, -1);
-                        if (crawledTweetTimestamp == -1) {
-                            crawledTweetTimestamp = thisTweetResult.getLongProperty(PROPERTY_DATE_TIMESTAMP, -1);
-                        }
+                    }
+                    /* Find date of last crawled Tweet. */
+                    logger.info("Tweet used as source for last crawled Tweet timestamp: " + thisTweetD);
+                    /* If we got a Re-Tweet we want to use the date of the source Tweet here. */
+                    crawledTweetTimestamp = thisTweetResult.getLongProperty("source_" + PROPERTY_DATE_TIMESTAMP, -1);
+                    if (crawledTweetTimestamp == -1) {
+                        crawledTweetTimestamp = thisTweetResult.getLongProperty(PROPERTY_DATE_TIMESTAMP, -1);
                     }
                 }
                 /* Check if we've reached any user defined limits */

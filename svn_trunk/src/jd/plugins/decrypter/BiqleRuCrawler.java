@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 49755 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50717 $", interfaceVersion = 3, names = {}, urls = {})
 public class BiqleRuCrawler extends PluginForDecrypt {
     public BiqleRuCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +134,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
             br.followRedirect();
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML("(?i)>\\s*An error has occurred")) {
+            } else if (br.containsHTML(">\\s*An error has occurred")) {
                 /* 2022-10-14: artsporn.com e.g.: https://artsporn.com/watch/-123456_123456 */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML(">Попробуйте еще раз")) {
@@ -336,7 +336,9 @@ public class BiqleRuCrawler extends PluginForDecrypt {
         br.followRedirect();
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*An error has occurred")) {
+        } else if (br.containsHTML(">\\s*An error has occurred")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Sorry, this video has been deleted")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -347,9 +349,9 @@ public class BiqleRuCrawler extends PluginForDecrypt {
             fp.setName(title);
             fp.setAllowInheritance(true);
         }
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), "((?:\\-)?\\d+)_(\\d+)");
-        final String oid = urlinfo.getMatch(0);
-        final String id = urlinfo.getMatch(1);
+        // final Regex urlinfo = new Regex(param.getCryptedUrl(), "((?:\\-)?\\d+)_(\\d+)");
+        // final String oid = urlinfo.getMatch(0);
+        // final String id = urlinfo.getMatch(1);
         String urlstep1 = br.getRegex("((?:https?:)?//[^/]+/(?:player|playlist|download)/[a-zA-Z0-9_\\-]+\\?m=[a-f0-9]+)").getMatch(0);
         if (urlstep1 == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
