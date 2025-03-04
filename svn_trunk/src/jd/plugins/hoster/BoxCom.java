@@ -19,6 +19,13 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.requests.GetRequest;
@@ -33,17 +40,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "box.com" }, urls = { "https?://(?:\\w+\\.)*box\\.(?:com|net)/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})/file/\\d+" })
+@HostPlugin(revision = "$Revision: 50733 $", interfaceVersion = 2, names = { "box.com" }, urls = { "https?://(?:\\w+\\.)*box\\.(?:com|net)/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})/file/\\d+" })
 public class BoxCom extends antiDDoSForHost {
-    private static final String TOS_LINK           = "https://www.box.net/static/html/terms.html";
     private static final String fileLink           = "https?://(?:\\w+\\.)*box\\.com/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})/file/\\d+";
     private String              dllink             = null;
     private boolean             is_stream_download = false;
@@ -54,7 +52,7 @@ public class BoxCom extends antiDDoSForHost {
 
     @Override
     public String getAGBLink() {
-        return TOS_LINK;
+        return "https://www." + getHost() + "/static/html/terms.html";
     }
 
     @Override
@@ -62,29 +60,43 @@ public class BoxCom extends antiDDoSForHost {
         return -1;
     }
 
-    public void correctDownloadLink(final DownloadLink link) {
-        link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("box.net/", "box.com/"));
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        if ("box.net".equals(getHost())) {
-            if (host == null || "box.net".equals(host)) {
-                return "box.com";
-            }
-        }
-        return super.rewriteHost(host);
+    private String getContentURL(final DownloadLink link) {
+        return link.getPluginPatternMatcher().replace("box.net/", "box.com/");
     }
 
     public static boolean isOffline(Browser br) {
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("<title>Box \\| 404 Page Not Found</title>") || br.containsHTML("error_message_not_found")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.containsHTML("<title>Box \\| 404 Page Not Found</title>")) {
+            return true;
+        } else if (br.containsHTML("error_message_not_found")) {
             return true;
         }
         return false;
     }
 
     private boolean isPasswordProtected(final Browser br) {
-        return (br.containsHTML("passwordRequired") || br.containsHTML("incorrectPassword")) && br.containsHTML("\"status\"\\s*:\\s*403");
+        if (br.containsHTML("passwordRequired")) {
+            return true;
+        } else if (br.containsHTML("incorrectPassword") && br.containsHTML("\"status\"\\s*:\\s*403")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://file/" + fid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), "/s/([a-z0-9]+)/file/(\\d+)").getMatch(1);
     }
 
     @Override
@@ -93,18 +105,18 @@ public class BoxCom extends antiDDoSForHost {
         br.setFollowRedirects(true);
         // our default is german, this returns german!!
         br.getHeaders().put("Accept-Language", "en-gb, en;q=0.8");
-        correctDownloadLink(link);
         if (!link.getPluginPatternMatcher().matches(fileLink)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Regex dlIds = new Regex(link.getPluginPatternMatcher(), "box\\.com/s/([a-z0-9]+)/file/(\\d+)");
+        final Regex dlIds = new Regex(link.getPluginPatternMatcher(), "/s/([a-z0-9]+)/file/(\\d+)");
         final String sharedname = dlIds.getMatch(0);
         final String fileid = dlIds.getMatch(1);
         if (sharedname == null || fileid == null) {
             /* This should never happen! */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String rootFolder = new Regex(link.getPluginPatternMatcher(), "(.+)/file/\\d+").getMatch(0);
+        final String contenturl = this.getContentURL(link);
+        final String rootFolder = new Regex(contenturl, "(.+)/file/\\d+").getMatch(0);
         final String passCode;
         if (link.hasProperty("passCode")) {
             passCode = link.getStringProperty("passCode", null);
@@ -118,8 +130,10 @@ public class BoxCom extends antiDDoSForHost {
         }
         if (isPasswordProtected(br)) {
             // direct link that is password protected?
+            link.setPasswordProtected(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        link.setPasswordProtected(false);
         String requestToken = br.getRegex("Box\\.config\\.requestToken\\s*=\\s*'(.*?)'").getMatch(0);
         if (StringUtils.isEmpty(requestToken)) {
             requestToken = br.getRegex("requestToken\"\\s*:\\s*\"(.*?)\"").getMatch(0);
@@ -127,26 +141,27 @@ public class BoxCom extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage(contenturl);
         if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         // final String results = br.getRegex("<script type=\"text/x-config\">\\s*.*?\"fileName\".*?</script>").getMatch(-1);
         final String results = br.getRegex("\"items\":(.*?\\}\\])").getMatch(0);
-        if (results == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (results != null) {
+            final String filename = PluginJSonUtils.getJson(results, "name");
+            // final String filesize = br.getRegex("Size:\\s*([\\d\\.]+\\s*[KMGT]{0,1}B)").getMatch(0);
+            final String filesize = PluginJSonUtils.getJson(results, "itemSize");
+            if (filename != null) {
+                link.setName(filename);
+            } else {
+                logger.info("Failed to find filename");
+            }
+            if (filesize != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesize));
+            } else {
+                logger.info("Failed to find filesize");
+            }
         }
-        final String filename = PluginJSonUtils.getJson(results, "name");
-        // final String filesize = br.getRegex("Size:\\s*([\\d\\.]+\\s*[KMGT]{0,1}B)").getMatch(0);
-        final String filesize = PluginJSonUtils.getJson(results, "itemSize");
-        if (filename == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        link.setName(filename);
-        if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
-        }
-        link.setLinkID("box.com://file/" + fileid);
         final PostRequest tokens = br.createJSonPostRequest("https://app.box.com/app-api/enduserapp/elements/tokens", "{\"fileIDs\":[\"file_" + fileid + "\"]}");
         tokens.getHeaders().put("Request-Token", requestToken);
         tokens.getHeaders().put("X-Request-Token", requestToken);
@@ -155,7 +170,7 @@ public class BoxCom extends antiDDoSForHost {
         tokens.getHeaders().put("X-Box-Client-Version", "0.86.0");
         Browser brc = br.cloneBrowser();
         brc.getPage(tokens);
-        Map<String, Object> map = restoreFromString(brc.toString(), TypeRef.MAP);
+        Map<String, Object> map = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final String token_read = (String) ((Map<String, Object>) map.get("file_" + fileid)).get("read");
         if (StringUtils.isEmpty(token_read)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -167,19 +182,26 @@ public class BoxCom extends antiDDoSForHost {
         pre_download_req.getHeaders().put("Origin", "https://app.box.com");
         brc = br.cloneBrowser();
         brc.getPage(pre_download_req);
-        map = restoreFromString(brc.toString(), TypeRef.MAP);
+        map = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> permissions = (Map<String, Object>) map.get("permissions");
         final Map<String, Object> file_version = (Map<String, Object>) map.get("file_version");
         /*
          * 2020-05-26: is_download_available always seems to be TRUE while can_download is the interesting one as it will be FALSE for e.g.
          * videostreams which
          */
-        // final boolean is_download_available = ((Boolean) map.get("is_download_available")).booleanValue();
         /*
          * 2020-05-26: This is the hash of the original file. We cannot use this if we e.g. download the stream instead so only set it if we
          * are really able to download the original file!
          */
+        link.setFinalFileName(map.get("name").toString());
+        final Number filesize = (Number) map.get("size");
         final String sha1 = (String) map.get("sha1");
+        if (!StringUtils.isEmpty(sha1)) {
+            link.setSha1Hash(sha1);
+        }
+        if (filesize != null) {
+            link.setVerifiedFileSize(filesize.longValue());
+        }
         final boolean can_download = ((Boolean) permissions.get("can_download")).booleanValue();
         if (can_download) {
             final GetRequest download_req = br.createGetRequest("https://api.box.com/2.0/files/" + fileid + "?fields=download_url");
@@ -198,11 +220,8 @@ public class BoxCom extends antiDDoSForHost {
                 /* 2020-05-26: E.g. download is officially not allowed, item can only be watched/streamed */
                 throw new AccountRequiredException();
             }
-            map = restoreFromString(brc.toString(), TypeRef.MAP);
+            map = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             dllink = (String) map.get("download_url");
-            if (!StringUtils.isEmpty(sha1)) {
-                link.setSha1Hash(sha1);
-            }
         } else {
             /* Try to download files without download button (so far supported: mp4, pdf) */
             logger.info("Download impossible (?) --> Trying to download stream/view if possible");
@@ -255,32 +274,26 @@ public class BoxCom extends antiDDoSForHost {
                 }
             }
             if (StringUtils.isEmpty(dllink)) {
-                logger.info("This content is not downloadable/viewable at all (?)");
-                throw new AccountRequiredException();
+                throw new AccountRequiredException("This content is not downloadable/viewable at all (?)");
             }
             is_stream_download = true;
             /*
              * Because we are downloading not the original content, file-extension can be different from the original which is still in our
              * filename --> Correct that
              */
-            String finalname_old = link.getFinalFileName();
-            if (finalname_old == null) {
-                finalname_old = link.getName();
-            }
-            if (finalname_old != null && !finalname_old.endsWith("." + newFileExtension) && finalname_old.contains(".")) {
-                final String finalname_new = finalname_old.substring(0, finalname_old.lastIndexOf(".")) + "." + newFileExtension;
-                logger.info("Old filename = " + finalname_old + " | New filename = " + finalname_new);
-                link.setFinalFileName(finalname_new);
+            final String finalname_old = link.getName();
+            if (finalname_old != null) {
+                final String finalname_new = this.correctOrApplyFileNameExtension(finalname_old, "." + newFileExtension, null);
+                if (!finalname_old.equals(finalname_new)) {
+                    logger.info("Old filename = " + finalname_old + " | New filename = " + finalname_new);
+                    link.setFinalFileName(finalname_new);
+                }
             }
             // if (!StringUtils.isEmpty(file_version_sha1)) {
             // link.setSha1Hash(file_version_sha1);
             // }
         }
-        if (StringUtils.isEmpty(dllink)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else {
-            return AvailableStatus.TRUE;
-        }
+        return AvailableStatus.TRUE;
     }
 
     @Override
@@ -288,6 +301,11 @@ public class BoxCom extends antiDDoSForHost {
         requestFileInformation(link);
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (is_stream_download) {
+            /* Nullification of possibly wrong values. */
+            link.setHashInfo(null);
+            link.setVerifiedFileSize(-1);
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, true, 0);
         // final boolean isContent = !(dl.getConnection().isContentDisposition() ||

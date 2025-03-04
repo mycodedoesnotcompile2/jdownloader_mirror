@@ -56,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50734 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapideoCore extends PluginForHost {
     public RapideoCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -546,35 +546,36 @@ public abstract class RapideoCore extends PluginForHost {
             /* { "error": 1, "message": "Authtoken invalid"} */
             account.removeProperty(PROPERTY_ACCOUNT_AUTH_TOKEN);
             throw new AccountUnavailableException(message, 1 * 60 * 1000l);
+        }
+        /* 2024-08-21: At this moment, we only handle account related error messages here. */
+        final HashSet<Integer> accountInvalidErrors = new HashSet<Integer>();
+        /* { "error": 3, "message": "Invalid username or password"} */
+        accountInvalidErrors.add(3);
+        final HashSet<Integer> accountUnavailableErrors = new HashSet<Integer>();
+        /* {"error":4,"message":"Login locked for 60 minutes"} */
+        accountUnavailableErrors.add(4);
+        final HashSet<Integer> downloadErrors = new HashSet<Integer>();
+        if (accountInvalidErrors.contains(errorcode)) {
+            /* Permanent account errors like invalid user/pw */
+            throw new AccountInvalidException(message);
+        } else if (accountUnavailableErrors.contains(errorcode)) {
+            /* Temporary account errors */
+            throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+        } else if (downloadErrors.contains(errorcode) && link != null) {
+            /* Temporary account errors */
+            this.getMultiHosterManagement().handleErrorGeneric(account, link, message, 3);
+            /* This shall never be reached! */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else {
-            /* 2024-08-21: At this moment, we only handle account related error messages here. */
-            final HashSet<Integer> accountInvalidErrors = new HashSet<Integer>();
-            /* { "error": 3, "message": "Invalid username or password"} */
-            accountInvalidErrors.add(3);
-            final HashSet<Integer> accountUnavailableErrors = new HashSet<Integer>();
-            final HashSet<Integer> downloadErrors = new HashSet<Integer>();
-            if (accountInvalidErrors.contains(errorcode)) {
-                /* Permanent account errors like invalid user/pw */
-                throw new AccountInvalidException(message);
-            } else if (accountUnavailableErrors.contains(errorcode)) {
-                /* Temporary account errors */
-                throw new AccountUnavailableException(message, 5 * 60 * 1000l);
-            } else if (downloadErrors.contains(errorcode) && link != null) {
-                /* Temporary account errors */
-                this.getMultiHosterManagement().handleErrorGeneric(account, link, message, 3);
+            /* Unknown errors */
+            if (link != null) {
+                /* Treat as download related error. */
+                this.getMultiHosterManagement().handleErrorGeneric(account, link, message, 50);
                 /* This shall never be reached! */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             } else {
-                /* Unknown errors */
-                if (link != null) {
-                    /* Treat as download related error. */
-                    this.getMultiHosterManagement().handleErrorGeneric(account, link, message, 50);
-                    /* This shall never be reached! */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    /* Treat as account related error. */
-                    throw new AccountInvalidException(message);
-                }
+                /* Treat as account related error. */
+                throw new AccountInvalidException(message);
             }
         }
     }

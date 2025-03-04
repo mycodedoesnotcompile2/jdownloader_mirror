@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50731 $", interfaceVersion = 3, names = {}, urls = {})
 public class GenericYetiShareFolder extends PluginForDecrypt {
     public GenericYetiShareFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,6 +97,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         ret.add(new String[] { "megaup.net" });
         ret.add(new String[] { "sqzfile.com" });
         ret.add(new String[] { "anonsharing.com" });
+        ret.add(new String[] { "loadedfiles.org" });
         return ret;
     }
 

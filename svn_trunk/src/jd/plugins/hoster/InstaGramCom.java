@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50396 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50731 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -154,7 +154,7 @@ public class InstaGramCom extends PluginForHost {
                                                                                                                      // inside
     // post/story
     public static final String   PROPERTY_shortcode                          = "shortcode";
-    public static final String   PROPERTY_story_title              = "story_title";
+    public static final String   PROPERTY_story_title                        = "story_title";
     public static final String   PROPERTY_description                        = "description";
     public static final String   PROPERTY_uploader                           = "uploader";
     public static final String   PROPERTY_type                               = "type";
@@ -162,6 +162,7 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_hashtag                            = "hashtag";
     public static final String   PROPERTY_coauthor_producers_comma_separated = "coauthor_producers_comma_separated"; // if a post has
                                                                                                                      // multiple authors
+    public static final String   PROPERTY_json_usertags                      = "json_usertags";
     @Deprecated
     public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                  // used until crawler
                                                                                                                      // rev

@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 50710 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50739 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -505,7 +505,7 @@ public class Bunkr extends PluginForHost {
                     final Browser brc = br.cloneBrowser();
                     brc.getHeaders().put("Content-Type", "application/json");
                     /* Same request also works with the other fileID ([A-Za-z0-9]{8}) as parameter "slug" on current browser domain. */
-                    brc.postPageRaw("https://get.bunkrr.su/api/vs", "{\"id\":\"" + internalFileID + "\"}");
+                    brc.postPageRaw("https://get.bunkrr.su/api/_001", "{\"id\":\"" + internalFileID + "\"}");
                     final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                     final Number timestamp = (Number) entries.get("timestamp");
                     final String url = entries.get("url").toString();

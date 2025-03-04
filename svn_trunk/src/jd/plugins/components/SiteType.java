@@ -140,8 +140,8 @@ public class SiteType {
          */
         Qooy_Mirrors,
         /**
-         * Script used by some chinese file-hosting sites. <a href="http:/www.rosefile.net/">rosefile.net</a>. Not sure what to call this
-         * script. </br>
+         * Script used by some chinese file-hosting sites. <a href="https:/dufile.com/">dufile.com</a>. Not sure what to call this script.
+         * </br>
          * URL to manufacturer: http://www.phpdisk.com/download.html
          */
         PhpDisk,

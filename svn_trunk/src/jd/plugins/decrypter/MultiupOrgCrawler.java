@@ -40,7 +40,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 50685 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50731 $", interfaceVersion = 2, names = {}, urls = {})
 public class MultiupOrgCrawler extends antiDDoSForDecrypt {
     // DEV NOTES:
     // DO NOT REMOVE COMPONENTS YOU DONT UNDERSTAND! When in doubt ask raztoki to fix.
@@ -89,7 +89,7 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String contenturl = param.getCryptedUrl();
-        contenturl = contenturl.replaceFirst("(?i)/(en|fr)/", "/");
+        contenturl = contenturl.replaceFirst("(?i)/(en|fr)/", "/en/");
         contenturl = contenturl.replaceFirst("^(?i)http://", "https://");
         final String projectID = new Regex(contenturl, "/project/([a-f0-9]{32})").getMatch(0);
         if (projectID != null) {

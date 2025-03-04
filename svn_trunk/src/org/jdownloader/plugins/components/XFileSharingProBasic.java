@@ -18,8 +18,10 @@ package org.jdownloader.plugins.components;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.SocketException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,6 +37,36 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -70,37 +102,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
-
-@HostPlugin(revision = "$Revision: 50694 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50738 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -461,8 +463,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * <b> Enabling this will eventually lead to at least one additional website-request! </b> <br/>
      * DO NOT CALL THIS DIRECTLY - ALWAYS USE {@link #internal_supports_availablecheck_filename_abuse()}!!<br />
      *
-     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing.
-     *         <br />
+     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing. <br />
      *         false: Implies that website does NOT support {@link #getFnameViaAbuseLink()}. <br />
      *         default: true
      */
@@ -495,8 +496,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br />
      * CAUTION: Only set this to true if a filehost: <br />
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br />
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
-     * <br />
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br />
      * 3. Allows a lot of simultaneous connections. <br />
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br />
      * 5. Allows using a generated direct-URL at least two times.
@@ -1010,8 +1010,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     @Override
     public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
-        final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
-        final String dllink = link.getStringProperty(directlinkproperty);
+        final String dllink = getStoredDirectUrl(link, account);
         /*
          * E.g. account doesn't have enough traffic left but we still got a stored directurl from a previous downloadstart --> Allow
          * download attempt anyways as we can be quite sure that it will still be valid.
@@ -1051,27 +1050,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-        try {
-            /* Check if response is plaintext and contains any known error messages. */
-            final byte[] probe = urlConnection.peek(32);
-            if (probe.length > 0) {
-                final String probeContext = new String(probe, "UTF-8");
-                final Request clone = urlConnection.getRequest().cloneRequest();
-                clone.setHtmlCode(probeContext);
-                final Browser br = createNewBrowserInstance();
-                br.setRequest(clone);
-                try {
-                    // TODO: extract the html checks into own method to avoid Browser instance
-                    checkServerErrors(br, getDownloadLink(), null);
-                } catch (PluginException e) {
-                    logger.log(e);
-                    return false;
-                }
+    try {
+        /* Check if response is plaintext and contains any known error messages. */
+        final byte[] probe = urlConnection.peek(32);
+        if (probe.length > 0) {
+            final String probeContext = new String(probe, "UTF-8");
+            final Request clone = urlConnection.getRequest().cloneRequest();
+            clone.setHtmlCode(probeContext);
+            final Browser br = createNewBrowserInstance();
+            br.setRequest(clone);
+            try {
+                // TODO: extract the html checks into own method to avoid Browser instance
+                checkServerErrors(br, getDownloadLink(), null);
+            } catch (PluginException e) {
+                logger.log(e);
+                return false;
             }
-        } catch (IOException e) {
-            logger.log(e);
         }
-        return true;
+    } catch (IOException e) {
+        logger.log(e);
+    }
+    return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -2152,8 +2151,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br />
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br />
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
-     * it)!<br />
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br />
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br/>
      *
@@ -2713,8 +2711,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
-     * <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -3006,6 +3003,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return br.getFormbyProperty("name", "F1");
     }
 
+    protected String getStoredDirectUrl(final DownloadLink link, final Account account) {
+        final String directurlproperty = getDownloadModeDirectlinkProperty(account);
+        final String ret = link.getStringProperty(directurlproperty);
+        return ret;
+    }
+
     /**
      * Check if a stored directlink exists under property 'property' and if so, check if it is still valid (leads to a downloadable content
      * [NOT html]).
@@ -3013,8 +3016,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * @throws Exception
      */
     protected final String checkDirectLink(final DownloadLink link, final Account account) throws Exception {
-        final String directurlproperty = getDownloadModeDirectlinkProperty(account);
-        final String dllink = link.getStringProperty(getDownloadModeDirectlinkProperty(account));
+        final String dllink = getStoredDirectUrl(link, account);
         if (dllink == null) {
             return null;
         }
@@ -3022,7 +3024,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (validDirecturl != null) {
             return validDirecturl;
         } else {
-            link.removeProperty(directurlproperty);
+            removeStoredDirectUrl(link, account);
             return null;
         }
     }
@@ -3097,8 +3099,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected final boolean attemptStoredDownloadurlDownload(final DownloadLink link, final Account account) throws Exception {
-        final String directurlproperty = getDownloadModeDirectlinkProperty(account);
-        final String url = link.getStringProperty(directurlproperty);
+        final String url = getStoredDirectUrl(link, account);
         if (StringUtils.isEmpty(url)) {
             return false;
         }
@@ -3106,11 +3107,20 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final Browser br = createNewBrowserInstance();
         if (!this.tryDownload(br, link, account, br.createGetRequest(url), false)) {
             /* Delete stored direct-URL so it will not be re-used next time. */
-            link.removeProperty(directurlproperty);
+            removeStoredDirectUrl(link, account);
             return false;
         } else {
             return true;
         }
+    }
+
+    protected boolean removeStoredDirectUrl(final DownloadLink link, final Account account) {
+        if (true) {
+            // do not remove stored direct url until it has been replaced by newer/working one
+            return false;
+        }
+        final String directurlproperty = getDownloadModeDirectlinkProperty(account);
+        return link.removeProperty(directurlproperty);
     }
 
     protected boolean verifyURLFormat(final String url) {
@@ -4505,8 +4515,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
-     * installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
      * apikey will usually be located here: "/?op=my_account"
@@ -4695,8 +4704,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available
-                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
+                 * data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = SizeFormatter.getSize(trafficDetails[0]);
                 final long max = SizeFormatter.getSize(trafficDetails[1]);
@@ -4707,8 +4716,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
-             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
+             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);
@@ -5130,7 +5139,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
             }
             /* Open connection */
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, req, resume, maxChunks);
+            try {
+                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, req, resume, maxChunks);
+            } catch (InterruptedException e) {
+                throw e;
+            } catch (Exception e) {
+                if (Exceptions.containsInstanceOf(e, SocketException.class, UnknownHostException.class)) {
+                    if (!isFinalAttempt) {
+                        logger.log(e);
+                        return false;
+                    }
+                }
+                throw e;
+            }
             if (LinkCrawlerDeepInspector.looksLikeMpegURL(dl.getConnection())) {
                 /* Unexpected HLS download */
                 hlsURL = dl.getConnection().getURL().toExternalForm();

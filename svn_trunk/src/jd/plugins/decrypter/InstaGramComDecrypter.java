@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50694 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50731 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -1554,9 +1554,10 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         } else {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported media type: " + typename);
         }
-        String coauthor_producers_comma_separated = "";
+        String coauthor_producers_comma_separated = null;
         final List<Map<String, Object>> coauthor_producers = (List<Map<String, Object>>) post.get("coauthor_producers");
         if (coauthor_producers != null) {
+            coauthor_producers_comma_separated = "";
             for (final Map<String, Object> coauthor_producer : coauthor_producers) {
                 if (coauthor_producers_comma_separated.length() > 0) {
                     coauthor_producers_comma_separated += ",";
@@ -1642,7 +1643,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 /* Packagizer Property */
                 dl.setProperty(InstaGramCom.PROPERTY_uploader, metadata.getUsername());
             }
-            if (!StringUtils.isEmpty(coauthor_producers_comma_separated)) {
+            if (coauthor_producers_comma_separated != null) {
                 dl.setProperty(InstaGramCom.PROPERTY_coauthor_producers_comma_separated, coauthor_producers_comma_separated);
             }
             if (isPartOfStory) {
@@ -1860,6 +1861,10 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 }
                 if (!StringUtils.isEmpty(description)) {
                     dl.setProperty(InstaGramCom.PROPERTY_description, description);
+                }
+                final Object usertags = media.get("usertags");
+                if (usertags != null) {
+                    dl.setProperty(InstaGramCom.PROPERTY_json_usertags, JSonStorage.serializeToJson(usertags));
                 }
                 dl.setFinalFileName(getFilename(this, dl));
                 if (fp != null) {

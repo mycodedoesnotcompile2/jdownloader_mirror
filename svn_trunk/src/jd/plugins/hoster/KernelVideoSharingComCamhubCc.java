@@ -15,14 +15,17 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50411 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50732 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
     public KernelVideoSharingComCamhubCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -62,5 +65,26 @@ public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
         } else {
             return super.isOfflineWebsite(br);
         }
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
+        /**
+         * Special handling e.g. for camhub.cc -> camhub.cc self-embed -> camhub.world -> Final video link here <br>
+         * Example: https://www.camhub.cc/de/videos/738936/ronny-ponny-07-06-2022-2302-neoteric-chaturbate-amazing-7f78b3c0a62295f2/
+         */
+        if (!isEmbedURL(br.getURL())) {
+            final String fid = this.getFUIDFromURL(br.getURL());
+            String continueLink = br.getRegex("(/([a-z0-9]{2}/)?embed/" + fid + ")").getMatch(0);
+            if (continueLink != null) {
+                br.getPage(continueLink);
+            }
+        }
+        /* Look for "camhub.world" embed item. */
+        String continueLink2 = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)\"").getMatch(0);
+        if (continueLink2 != null) {
+            br.getPage(continueLink2);
+        }
+        return super.getDllink(link, br);
     }
 }
