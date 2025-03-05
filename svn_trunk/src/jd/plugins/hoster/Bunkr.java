@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -34,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 50739 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50743 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -83,7 +84,7 @@ public class Bunkr extends PluginForHost {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("");
+            ret.add("httpss?://get\\." + buildHostsPatternPart(domains) + PATH_FUID_NUMBERS.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -104,8 +105,16 @@ public class Bunkr extends PluginForHost {
     }
 
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning = new AtomicInteger(0);
-    private final static Pattern       PATTERN_FID = Pattern.compile("(-([A-Za-z0-9]{8}))(\\.[^\\.]+)?$");
+    private static final AtomicInteger freeRunning                                         = new AtomicInteger(0);
+    private final static Pattern       PATTERN_FID                                         = Pattern.compile("(-([A-Za-z0-9]{8}))(\\.[^\\.]+)?$");
+    private final static Pattern       PATH_FUID_NUMBERS                                   = Pattern.compile("/file/(\\d+)");
+    /* Plugin properties */
+    private static final String        PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
+    private static final String        PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
+    private static final String        PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL = "last_grabbed_image_fullsize_view_directurl";
+    private static final String        PROPERTY_LAST_USED_SINGLE_FILE_URL                  = "last_used_single_file_url";
+    public static final String         PROPERTY_FILENAME_FROM_ALBUM                        = "filename_from_album";
+    public static final String         PROPERTY_PARSED_FILESIZE                            = "parsed_filesize";
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
@@ -163,7 +172,7 @@ public class Bunkr extends PluginForHost {
         }
     }
 
-    public static String getNameFromURL(Plugin plugin, final String url) {
+    public static String getNameFromURL(final Plugin plugin, final String url) {
         String filenameFromURL = new Regex(url, BunkrAlbum.PATTERN_SINGLE_FILE).getMatch(1);
         if (filenameFromURL == null) {
             // name via n parameter from download URLs
@@ -184,7 +193,12 @@ public class Bunkr extends PluginForHost {
     }
 
     private String getFidFromURL(final String url) {
-        return new Regex(url, PATTERN_FID).getMatch(1);
+        String fid = new Regex(url, PATTERN_FID).getMatch(1);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, PATH_FUID_NUMBERS).getMatch(0);
+        return fid;
     }
 
     private String getContentURL(final DownloadLink link) {
@@ -205,6 +219,7 @@ public class Bunkr extends PluginForHost {
             }
             return "https://" + host + "/" + type + "/" + filename;
         } else {
+            /* Do not touch URL-structure, only correct dead domains. */
             final List<String> deadDomains = getDeadCDNDomains();
             if (deadDomains != null && deadDomains.contains(hostFromAddedURLWithoutSubdomain)) {
                 final String newurl = url.replaceFirst(Pattern.quote(hostFromAddedURLWithoutSubdomain) + "/", getHost() + "/");
@@ -225,13 +240,6 @@ public class Bunkr extends PluginForHost {
     private String generateSingleVideoURL(final String filename) {
         return "https://" + getHost() + "/v/" + filename;
     }
-
-    private static final String PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
-    private static final String PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
-    private static final String PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL = "last_grabbed_image_fullsize_view_directurl";
-    private static final String PROPERTY_LAST_USED_SINGLE_FILE_URL                  = "last_used_single_file_url";
-    public static final String  PROPERTY_FILENAME_FROM_ALBUM                        = "filename_from_album";
-    public static final String  PROPERTY_PARSED_FILESIZE                            = "parsed_filesize";
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -312,8 +320,12 @@ public class Bunkr extends PluginForHost {
             officialDownloadurl = getDirecturlFromSingleFileAvailablecheck(link, contenturl, true, isDownload);
             if (!isDownload) {
                 return AvailableStatus.TRUE;
-            } else if (!StringUtils.isEmpty(officialDownloadurl)) {
-                this.sleep(1000, link);
+            }
+        } else if (new Regex(link.getPluginPatternMatcher(), PATH_FUID_NUMBERS).patternFind()) {
+            crawlFileInfoInternalFuid(link, contenturl, isDownload);
+            officialDownloadurl = link.getStringProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
+            if (!isDownload) {
+                return AvailableStatus.TRUE;
             }
         } else {
             officialDownloadurl = contenturl;
@@ -445,23 +457,23 @@ public class Bunkr extends PluginForHost {
     }
 
     private String getDirecturlFromSingleFileAvailablecheck(final DownloadLink link, final String singleFileURL, final boolean accessURL, final boolean isDownload) throws PluginException, IOException {
-        link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, null);
+        link.removeProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
         if (accessURL) {
             br.getPage(singleFileURL);
         }
         handleResponsecodeErrors(br.getHttpConnection());
         final String filenameFromURL = Plugin.getFileNameFromURL(br._getURL());
-        String filenameFromHTML = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        String filenameFromHTML = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
         if (filenameFromHTML == null) {
-            /* 2024-09-11 */
             filenameFromHTML = br.getRegex("data-v=\"([^\"]+)").getMatch(0);
+            if (filenameFromHTML == null) {
+                filenameFromHTML = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+            }
         }
         if (filenameFromHTML != null) {
             filenameFromHTML = Encoding.htmlDecode(filenameFromHTML).trim();
             filenameFromHTML = filenameFromHTML.replaceAll("(?i)\\s*\\|\\s*Bunkr\\s*", "");
-        }
-        if (filenameFromHTML != null) {
-            /* Unsafe name */
+            /* Check for unsafe name */
             final boolean canContainFileID;
             if (StringUtils.equalsIgnoreCase(filenameFromHTML, filenameFromURL)) {
                 canContainFileID = true;
@@ -470,12 +482,19 @@ public class Bunkr extends PluginForHost {
             }
             setFilename(link, filenameFromHTML, canContainFileID, false);
         }
-        String filesize = br.getRegex("Download\\s*(\\d+[^<]+)</a>").getMatch(0);
-        if (filesize == null) {
-            filesize = br.getRegex("class=\"[^>]*text[^>]*\"[^>]*>\\s*([0-9\\.]+\\s+[MKG]B)").getMatch(0);
+        /* 2025-03-04: html contains "debug information" with precise file size as bytes */
+        final String filesizeBytesStr = br.getRegex("Debug:.+Size=(\\d+)").getMatch(0);
+        String filesizeStr = br.getRegex("Download\\s*(\\d+[^<]+)</a>").getMatch(0);
+        if (filesizeStr == null) {
+            filesizeStr = br.getRegex("class=\"[^>]*text[^>]*\"[^>]*>\\s*([0-9\\.]+\\s+[MKG]B)").getMatch(0);
         }
-        if (filesize != null) {
-            final long parsedFilesize = SizeFormatter.getSize(filesize);
+        if (filesizeBytesStr != null) {
+            final long parsedFilesize = Long.parseLong(filesizeBytesStr);
+            // link.setDownloadSize(parsedFilesize);
+            link.setVerifiedFileSize(parsedFilesize);
+            link.setProperty(PROPERTY_PARSED_FILESIZE, parsedFilesize);
+        } else if (filesizeStr != null) {
+            final long parsedFilesize = SizeFormatter.getSize(filesizeStr);
             link.setDownloadSize(parsedFilesize);
             link.setProperty(PROPERTY_PARSED_FILESIZE, parsedFilesize);
         }
@@ -489,36 +508,13 @@ public class Bunkr extends PluginForHost {
         }
         /* 2024-02-16: New: Additional step required to find official downloadurl */
         final String nextStepURL = br.getRegex("(https?://get\\.[^/]+/file/\\d+)").getMatch(0);
+        String directurl = null;
         if (nextStepURL != null) {
-            br.getPage(nextStepURL);
+            crawlFileInfoInternalFuid(link, nextStepURL, isDownload);
+            directurl = link.getStringProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
         }
-        String directurl = br.getRegex("(?i)href\\s*=\\s*\"(https?://[^\"]+)[^>]*>\\s*Download").getMatch(0);
         if (directurl == null) {
-            /* Video stream (For "/v/ URLs."URL is usually the same as downloadurl.) */
-            final String internalFileID = br.getRegex("data-id=\"(\\d+)\"").getMatch(0);
-            findDirecturlViaWebAPI: if (directurl == null) {
-                if (internalFileID == null) {
-                    logger.warning("Failed to find internalFileID");
-                    break findDirecturlViaWebAPI;
-                }
-                try {
-                    final Browser brc = br.cloneBrowser();
-                    brc.getHeaders().put("Content-Type", "application/json");
-                    /* Same request also works with the other fileID ([A-Za-z0-9]{8}) as parameter "slug" on current browser domain. */
-                    brc.postPageRaw("https://get.bunkrr.su/api/_001", "{\"id\":\"" + internalFileID + "\"}");
-                    final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-                    final Number timestamp = (Number) entries.get("timestamp");
-                    final String url = entries.get("url").toString();
-                    if (Boolean.TRUE.equals(entries.get("encrypted"))) {
-                        directurl = decryptData(url, timestamp.longValue());
-                    } else {
-                        directurl = url;
-                    }
-                } catch (final Throwable e) {
-                    logger.warning("Failed to obtain directurl via WebAPI");
-                    logger.log(e);
-                }
-            }
+            directurl = br.getRegex("href\\s*=\\s*\"(https?://[^\"]+)[^>]*>\\s*Download").getMatch(0);
             if (directurl == null) {
                 String unsafeDirecturlResultForFileWithoutExtOrUnknownExt = null;
                 String unsafeDirecturlResult = null;
@@ -564,7 +560,7 @@ public class Bunkr extends PluginForHost {
             directurl = Encoding.htmlOnlyDecode(directurl);
             final String filename = getNameFromURL(this, directurl);
             if (filename != null) {
-                setFilename(link, filename, true, true);
+                setFilename(link, filename, true, false);
             }
             link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, directurl);
         } else {
@@ -575,6 +571,55 @@ public class Bunkr extends PluginForHost {
         }
         link.setProperty(PROPERTY_LAST_USED_SINGLE_FILE_URL, singleFileURL);
         return directurl;
+    }
+
+    /** For links like this: https://get.bunkrr.su/file/123456... */
+    private void crawlFileInfoInternalFuid(final DownloadLink link, final String contenturl, final boolean isDownload) throws PluginException, IOException {
+        br.getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /* Check some more filename sources */
+        String filenameFromHTML = br.getRegex("var ogname = \"([^\"]+)\"").getMatch(0);
+        if (filenameFromHTML == null) {
+            filenameFromHTML = br.getRegex("<title>Download ([^<]+)</title>").getMatch(0);
+        }
+        if (filenameFromHTML != null) {
+            filenameFromHTML = Encoding.htmlDecode(filenameFromHTML).trim();
+            setFilename(link, filenameFromHTML, false, true);
+        } else {
+            logger.warning("Failed to find filename");
+        }
+        final String filesizeStr = br.getRegex("<p class=\"mt-1 text-xs\"[^>]*>(\\d+[^<]+)</p>").getMatch(0);
+        if (filesizeStr != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+        } else {
+            logger.info("Failed to find filesize");
+        }
+        if (!isDownload) {
+            return;
+        }
+        final String internalFileID = br.getRegex("data-id=\"(\\d+)\"").getMatch(0);
+        if (internalFileID == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("Content-Type", "application/json");
+        /* Same request also works with the other fileID ([A-Za-z0-9]{8}) as parameter "slug" on current browser domain. */
+        brc.postPageRaw("https://get.bunkrr.su/api/_001", "{\"id\":\"" + internalFileID + "\"}");
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Number timestamp = (Number) entries.get("timestamp");
+        final String url = entries.get("url").toString();
+        String directurl = null;
+        if (Boolean.TRUE.equals(entries.get("encrypted"))) {
+            directurl = decryptData(url, timestamp.longValue());
+        } else {
+            directurl = url;
+        }
+        if (filenameFromHTML != null && !directurl.contains("?") && !directurl.contains(filenameFromHTML)) {
+            directurl += "?n=" + URLEncode.encodeURIComponent(filenameFromHTML);
+        }
+        link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, directurl);
     }
 
     /** See https://get.bunkrr.su/js/src.enc.js */

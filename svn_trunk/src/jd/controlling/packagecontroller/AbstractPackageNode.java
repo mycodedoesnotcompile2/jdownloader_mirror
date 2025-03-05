@@ -37,4 +37,10 @@ public interface AbstractPackageNode<V extends AbstractPackageChildrenNode<E>, E
     void setComment(String comment);
 
     int indexOf(V child);
+
+    void setName(String name);
+
+    void setDownloadFolder(String directory);
+
+    void copyPropertiesTo(E destination);
 }

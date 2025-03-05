@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
@@ -35,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50604 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50744 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -214,7 +215,11 @@ public class DatanodesTo extends XFileSharingProBasic {
             try {
                 /* Parse json response */
                 final Map<String, Object> entries = restoreFromString(src, TypeRef.MAP);
-                final String url = entries.get("url").toString();
+                String url = entries.get("url").toString();
+                /* Check for encoded value and decode it if needed. */
+                if (StringUtils.startsWithCaseInsensitive(url, "https%3A%2F")) {
+                    url = Encoding.htmlDecode(url);
+                }
                 return url;
             } catch (final Throwable ignore) {
                 logger.log(ignore);

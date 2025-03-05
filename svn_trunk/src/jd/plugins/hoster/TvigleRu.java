@@ -19,10 +19,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
+import com.formdev.flatlaf.util.StringUtils;
+
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -31,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49232 $", interfaceVersion = 2, names = { "tvigle.ru" }, urls = { "https?://cloud\\.tvigle\\.ru/video/\\d+|https?://www\\.tvigle\\.ru/video/[a-z0-9\\-]+/" })
+@HostPlugin(revision = "$Revision: 50741 $", interfaceVersion = 2, names = { "tvigle.ru" }, urls = { "https?://cloud\\.tvigle\\.ru/video/\\d+|https?://www\\.tvigle\\.ru/video/[a-z0-9\\-]+/" })
 public class TvigleRu extends PluginForHost {
     public TvigleRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,6 +51,7 @@ public class TvigleRu extends PluginForHost {
     private static final boolean free_resume    = true;
     private static final int     free_maxchunks = 0;
     private String               dllink         = null;
+    private String               token          = null;
     private static final String  type_embedded  = "(?i)https?://cloud\\.tvigle\\.ru/video/\\d+";
     private static final String  type_normal    = "(?i)https?://www\\.tvigle\\.ru/video/[a-z0-9\\-]+/";
 
@@ -54,61 +60,93 @@ public class TvigleRu extends PluginForHost {
         return "http://www.tvigle.ru/";
     }
 
-    @SuppressWarnings({ "deprecation", "unchecked", "rawtypes" })
+    @SuppressWarnings({ "deprecation" })
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink downloadLink) throws Exception {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         dllink = null;
-        String filename;
-        long filesize = 0;
-        final String[] qualities = { "1080p", "720p", "480p", "360p", "240p", "180p" };
-        String videoID = downloadLink.getStringProperty("videoID", null);
+        String videoID = link.getStringProperty("videoID", null);
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final String extDefault = ".mp4";
-        if (videoID == null) {
-            if (downloadLink.getDownloadURL().matches(type_embedded)) {
-                videoID = new Regex(downloadLink.getDownloadURL(), "(\\d+)$").getMatch(0);
-            } else {
-                br.getPage(downloadLink.getDownloadURL());
-                if (br.getHttpConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                videoID = br.getRegex("var cloudId = \\'(\\d+)\\';").getMatch(0);
-                if (videoID == null) {
-                    videoID = br.getRegex("class=\"video-preview current_playing\" id=\"(\\d+)\"").getMatch(0);
-                }
-                if (videoID == null) {
-                    videoID = br.getRegex("api/v1/video/(\\d+)").getMatch(0);
-                }
-                if (videoID == null) {
-                    /* 2020-11-30 */
-                    videoID = br.getRegex("cloud\\.tvigle\\.ru/video/(\\d+)").getMatch(0);
-                }
-                if (videoID == null) {
-                    /* 2024-07-02 */
-                    videoID = br.getRegex("\"first_video_id\":(\\d+)").getMatch(0);
-                }
+        if (link.getDownloadURL().matches(type_embedded)) {
+            videoID = new Regex(link.getDownloadURL(), "(\\d+)$").getMatch(0);
+        } else {
+            br.getPage(link.getDownloadURL());
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            videoID = br.getRegex("var cloudId = \\'(\\d+)\\';").getMatch(0);
+            if (videoID == null) {
+                videoID = br.getRegex("class=\"video-preview current_playing\" id=\"(\\d+)\"").getMatch(0);
             }
             if (videoID == null) {
-                if (!br.containsHTML(Pattern.quote(br._getURL().getPath()))) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
+                videoID = br.getRegex("api/v1/video/(\\d+)").getMatch(0);
             }
-            downloadLink.setName(videoID + extDefault);
+            if (videoID == null) {
+                /* 2020-11-30 */
+                videoID = br.getRegex("cloud\\.tvigle\\.ru/video/(\\d+)").getMatch(0);
+            }
+            if (videoID == null) {
+                /* 2024-07-02 */
+                videoID = br.getRegex("\"first_video_id\":(\\d+)").getMatch(0);
+            }
         }
-        br.getPage("/api/video/" + videoID + "/");
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        if (videoID == null) {
+            if (!br.containsHTML(Pattern.quote(br._getURL().getPath()))) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
+        link.setName(videoID + extDefault);
+        br.getPage("/api/bff/updateAppToken");
+        final Map<String, Object> api_token_data = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        token = api_token_data.get("token").toString();
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Token " + token);
+        brc.getPage("/api/video/" + videoID + "/");
+        if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.getHttpConnection().getContentType().contains("application/json")) {
+        } else if (!brc.getHttpConnection().getContentType().contains("application/json")) {
             /* No json response */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        Map<String, Object> api_data = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        api_data = (Map<String, Object>) api_data.get("playlist");
-        api_data = (Map<String, Object>) ((List) api_data.get("items")).get(0);
-        final Object error_object = api_data.get("errorType");
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        String title = (String) entries.get("name");
+        if (!StringUtils.isEmpty(title)) {
+            final String ext = getFileNameExtensionFromString(dllink, extDefault);
+            String filename = this.applyFilenameExtension(title, ext);
+            link.setFinalFileName(filename);
+        }
+        link.setProperty("videoID", videoID);
+        link.setProperty("content_id", entries.get("content_id"));
+        if (StringUtils.isEmpty(link.getComment())) {
+            final String description = (String) entries.get("description");
+            if (!StringUtils.isEmpty(description)) {
+                link.setComment(description);
+            }
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    @Override
+    public void handleFree(final DownloadLink link) throws Exception {
+        requestFileInformation(link);
+        final String content_id = link.getStringProperty("content_id");
+        if (content_id == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Browser brc = br.cloneBrowser();
+        // brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Token " + token);
+        brc.getPage("https://cloud.tvigle.ru/api/play/video/" + content_id + "/");
+        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> playlist = (Map<String, Object>) entries.get("playlist");
+        final Object itemsO = playlist.get("items");
+        final Map<String, Object> video = (Map<String, Object>) ((List) itemsO).get(0);
+        if (Boolean.TRUE.equals(video.get("isGeoBlocked"))) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "GEO blocked: " + video.get("errorMessage"));
+        }
+        final Object error_object = video.get("errorType");
         if (error_object != null) {
             final long error_code = ((Number) error_object).longValue();
             if (error_code == 1 || error_code == 7) { // "errorType": 7, "isGeoBlocked": true
@@ -116,10 +154,12 @@ public class TvigleRu extends PluginForHost {
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Map<String, Object> videos = (Map<String, Object>) api_data.get("videos");
+        long filesize = -1;
+        final Map<String, Object> videos = (Map<String, Object>) video.get("videos");
         final Map<String, Object> videolinks_map = (Map<String, Object>) videos.get("mp4");
-        final Map<String, Object> video_files_size = (Map<String, Object>) api_data.get("video_files_size");
+        final Map<String, Object> video_files_size = (Map<String, Object>) video.get("video_files_size");
         final Map<String, Object> video_files_size_map = (Map<String, Object>) video_files_size.get("mp4");
+        final String[] qualities = { "1080p", "720p", "480p", "360p", "240p", "180p" };
         for (final String quality : qualities) {
             dllink = (String) videolinks_map.get(quality);
             if (dllink != null) {
@@ -127,21 +167,10 @@ public class TvigleRu extends PluginForHost {
                 break;
             }
         }
-        filename = (String) api_data.get("title");
-        if (filename == null || dllink == null) {
+        link.setDownloadSize(filesize);
+        if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String ext = getFileNameExtensionFromString(dllink, extDefault);
-        filename = this.applyFilenameExtension(filename, ext);
-        downloadLink.setFinalFileName(filename);
-        downloadLink.setDownloadSize(filesize);
-        downloadLink.setProperty("videoID", videoID);
-        return AvailableStatus.TRUE;
-    }
-
-    @Override
-    public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);

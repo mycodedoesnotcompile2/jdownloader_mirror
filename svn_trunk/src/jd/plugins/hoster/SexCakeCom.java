@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -32,10 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50743 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexCakeCom extends PluginForHost {
     public SexCakeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,15 +54,13 @@ public class SexCakeCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final int free_maxchunks = 0;
+    private String           dllink         = null;
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "sex-cake.com", "xnxxvideos.win", "fuckonly.fans", "bluevideos.net", "filmexnxx.net", "futaiuri.cc", "lupoxxx.com", "peliculasxnxx.com", "pornoxnxx.video", "pompini.org", "lupoxxx.com", "pornhubfilme.gratis", "qorno.video", "rubias19.red", "sexyfilm.blue", "redporn.video", "voglioporno.gratis", "xnxxvideos.gratis", "xxx-haus.net", "xxxbucetas.net" });
+        ret.add(new String[] { "sex-cake.com", "xnxxvideos.win", "bluevideos.net", "filmexnxx.net", "peliculasxnxx.com", "pornoxnxx.video", "pompini.org", "lupoxxx.com", "pornhubfilme.gratis", "qorno.video", "rubias19.red", "sexyfilm.blue", "redporn.video", "voglioporno.gratis", "xnxxvideos.gratis", "xxx-haus.net", "xxxbucetas.net", "xxxhindi.to" });
         return ret;
     }
 
@@ -154,7 +152,7 @@ public class SexCakeCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

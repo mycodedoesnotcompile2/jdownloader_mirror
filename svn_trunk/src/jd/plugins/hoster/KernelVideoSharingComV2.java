@@ -77,7 +77,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50430 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50741 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -510,7 +510,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         final String fuid = this.getFUID(link);
         final String contenturl = this.getContentURL(link);
         boolean useEmbedWorkaround = false;
-        if (isEmbedURL(contenturl) && this.useEmbedWorkaround()) {
+        if (this.useEmbedWorkaround() && isEmbedURL(contenturl)) {
             useEmbedWorkaround = true;
         } else {
             embedHandling: if (isEmbedURL(contenturl)) {
@@ -2023,22 +2023,21 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     protected String getURLTitle(final String url) {
         if (url == null) {
             return null;
-        } else {
-            String ret = null;
-            if (url.matches(type_normal)) {
-                ret = new Regex(url, type_normal).getMatch(1);
-            } else if (url.matches(type_normal_fuid_at_end) && hasFUIDInsideURLAtTheEnd(url)) {
-                ret = new Regex(url, type_normal_fuid_at_end).getMatch(0);
-            } else if (url.matches(type_normal_without_fuid)) {
-                ret = new Regex(url, type_normal_without_fuid).getMatch(0);
-            } else {
-                return null;
-            }
-            if (ret != null && ret.contains("%")) {
-                ret = URLEncode.decodeURIComponent(ret);
-            }
-            return ret;
         }
+        String ret = null;
+        if (url.matches(type_normal)) {
+            ret = new Regex(url, type_normal).getMatch(1);
+        } else if (url.matches(type_normal_fuid_at_end) && hasFUIDInsideURLAtTheEnd(url)) {
+            ret = new Regex(url, type_normal_fuid_at_end).getMatch(0);
+        } else if (url.matches(type_normal_without_fuid)) {
+            ret = new Regex(url, type_normal_without_fuid).getMatch(0);
+        } else {
+            return null;
+        }
+        if (ret != null && ret.contains("%")) {
+            ret = URLEncode.decodeURIComponent(ret);
+        }
+        return ret;
     }
 
     /**
@@ -2061,18 +2060,17 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     protected String getFUIDFromURL(final String url) {
         if (url == null) {
             return null;
+        }
+        if (url.matches(pattern_only_numbers)) {
+            return new Regex(url, pattern_only_numbers).getMatch(0);
+        } else if (url.matches(pattern_embedded)) {
+            return new Regex(url, pattern_embedded).getMatch(0);
+        } else if (url.matches(type_normal_fuid_at_end) && hasFUIDInsideURL(url) && hasFUIDInsideURLAtTheEnd(url)) {
+            return new Regex(url, type_normal_fuid_at_end).getMatch(1);
+        } else if (url.matches(type_normal) && hasFUIDInsideURL(url)) {
+            return new Regex(url, type_normal).getMatch(0);
         } else {
-            if (url.matches(pattern_only_numbers)) {
-                return new Regex(url, pattern_only_numbers).getMatch(0);
-            } else if (url.matches(pattern_embedded)) {
-                return new Regex(url, pattern_embedded).getMatch(0);
-            } else if (url.matches(type_normal_fuid_at_end) && hasFUIDInsideURL(url) && hasFUIDInsideURLAtTheEnd(url)) {
-                return new Regex(url, type_normal_fuid_at_end).getMatch(1);
-            } else if (url.matches(type_normal) && hasFUIDInsideURL(url)) {
-                return new Regex(url, type_normal).getMatch(0);
-            } else {
-                return null;
-            }
+            return null;
         }
     }
 

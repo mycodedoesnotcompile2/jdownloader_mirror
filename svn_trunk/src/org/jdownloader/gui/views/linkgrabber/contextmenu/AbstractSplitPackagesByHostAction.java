@@ -205,7 +205,7 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                                     destPackage = new CrawledPackage();
                                     destPackage.setExpanded(final_packageExpandState);
                                     if (sourcePackage != null) {
-                                        ((CrawledPackage) sourcePackage).copyPropertiesTo(destPackage);
+                                        sourcePackage.copyPropertiesTo(destPackage);
                                     } else {
                                         destPackage.setDownloadFolder(newDownloadFolder);
                                     }
@@ -217,11 +217,11 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                                 newPkg = (PackageType) new CrawledPackage();
                                 newPkg.setExpanded(final_packageExpandState);
                                 if (sourcePackage != null) {
-                                    ((CrawledPackage) sourcePackage).copyPropertiesTo((CrawledPackage) newPkg);
+                                    sourcePackage.copyPropertiesTo(newPkg);
                                 } else {
-                                    ((CrawledPackage) newPkg).setDownloadFolder(newDownloadFolder);
+                                    newPkg.setDownloadFolder(newDownloadFolder);
                                 }
-                                ((CrawledPackage) newPkg).setName(newPackageName);
+                                newPkg.setName(newPackageName);
                             }
                         } else {
                             if (merge) {
@@ -229,7 +229,7 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                                 if (destPackage == null) {
                                     destPackage = FilePackage.getInstance();
                                     if (sourcePackage != null) {
-                                        ((FilePackage) sourcePackage).copyPropertiesTo(destPackage);
+                                        sourcePackage.copyPropertiesTo(destPackage);
                                     } else {
                                         final String downloadFolder = PackagizerController.replaceDynamicTags(newDownloadFolder, newPackageName, destPackage);
                                         destPackage.setDownloadDirectory(downloadFolder);
@@ -241,12 +241,12 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                             } else {
                                 newPkg = (PackageType) FilePackage.getInstance();
                                 if (sourcePackage != null) {
-                                    ((FilePackage) sourcePackage).copyPropertiesTo((FilePackage) newPkg);
+                                    sourcePackage.copyPropertiesTo(newPkg);
                                 } else {
                                     final String downloadFolder = PackagizerController.replaceDynamicTags(newDownloadFolder, newPackageName, newPkg);
-                                    ((FilePackage) newPkg).setDownloadDirectory(downloadFolder);
+                                    newPkg.setDownloadFolder(downloadFolder);
                                 }
-                                ((FilePackage) newPkg).setName(newPackageName);
+                                newPkg.setName(newPackageName);
                             }
                         }
                         controller.moveOrAddAt(newPkg, next2.getValue(), 0, insertAt);

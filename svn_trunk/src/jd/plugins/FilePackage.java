@@ -21,15 +21,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-import jd.config.Property;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractNodeNotifier;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageControllerComparator;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.ModifyLock;
 import org.appwork.utils.StringUtils;
@@ -40,6 +31,15 @@ import org.jdownloader.controlling.Priority;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
+
+import jd.config.Property;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractNodeNotifier;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.controlling.packagecontroller.PackageController;
+import jd.controlling.packagecontroller.PackageControllerComparator;
 
 /**
  * Diese Klasse verwaltet Pakete
@@ -253,7 +253,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#hashCode()
      */
     @Override
@@ -263,7 +263,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
@@ -499,8 +499,8 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     /**
-     * If set to true, "child-packages" can inherit this package name. </br> Useful e.g. if a crawler crawls posts of a profile which then
-     * go into a crawler again but should all be placed into one package.
+     * If set to true, "child-packages" can inherit this package name. </br>
+     * Useful e.g. if a crawler crawls posts of a profile which then go into a crawler again but should all be placed into one package.
      */
     public void setAllowInheritance(final Boolean inheritance) {
         this.setProperty(LinkCrawler.PACKAGE_ALLOW_INHERITANCE, inheritance);
@@ -511,7 +511,9 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     /**
-     * true = Set package name will be auto-cleaned. </br> false = Set package name will not be modified. </br> Default = true
+     * true = Set package name will be auto-cleaned. </br>
+     * false = Set package name will not be modified. </br>
+     * Default = true
      */
     public void setCleanupPackageName(final Boolean cleanup) {
         this.setProperty(LinkCrawler.PACKAGE_CLEANUP_NAME, cleanup);
@@ -745,5 +747,14 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
             dest.setPriorityEnum(getPriorityEnum());
             return;
         }
+    }
+
+    /**
+     * Wrapper <br>
+     * TODO: Remove this
+     */
+    @Override
+    public void setDownloadFolder(String directory) {
+        this.setDownloadDirectory(directory);
     }
 }

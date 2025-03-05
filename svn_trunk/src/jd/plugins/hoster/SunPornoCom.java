@@ -24,7 +24,7 @@ import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50708 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50741 $", interfaceVersion = 3, names = {}, urls = {})
 public class SunPornoCom extends KernelVideoSharingComV2 {
     public SunPornoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -50,39 +50,59 @@ public class SunPornoCom extends KernelVideoSharingComV2 {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(v/\\d+/[a-z0-9\\-]+/?|embed/\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(v/\\d+/[a-z0-9\\-]+/?|videos/\\d+|embed/\\d+)");
         }
         return ret.toArray(new String[0]);
     }
 
-    private static final Pattern PATTERN_VIDEO = Pattern.compile("/v/(\\d+)/([a-z0-9\\-]+)/?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_VIDEO_OLD = Pattern.compile("/videos/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_VIDEO_NEW = Pattern.compile("/v/(\\d+)/([a-z0-9\\-]+)/?", Pattern.CASE_INSENSITIVE);
 
     @Override
     protected String getURLTitle(final String url) {
         if (url == null) {
             return null;
         }
-        return new Regex(url, PATTERN_VIDEO).getMatch(1);
+        return new Regex(url, PATTERN_VIDEO_NEW).getMatch(1);
     }
 
     @Override
-    protected String getFUID(final DownloadLink link) {
-        if (link.getPluginPatternMatcher() == null) {
+    protected String getFUIDFromURL(final String url) {
+        if (url == null) {
             return null;
         }
-        final String url = link.getPluginPatternMatcher();
-        String fid = new Regex(url, PATTERN_VIDEO).getMatch(1);
-        if (fid == null) {
-            fid = new Regex(link.getPluginPatternMatcher(), pattern_embedded).getMatch(0);
+        String fid = new Regex(url, PATTERN_VIDEO_NEW).getMatch(0);
+        if (fid != null) {
+            return fid;
         }
-        return fid;
+        fid = new Regex(url, PATTERN_VIDEO_OLD).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        return super.getFUIDFromURL(url);
     }
 
     @Override
-    String generateContentURL(final String host, final String fuid, final String urlSlug) {
-        if (host == null || fuid == null || urlSlug == null) {
+    String generateContentURL(String host, final String fuid, final String urlSlug) {
+        if (host == null || fuid == null) {
             return null;
         }
-        return this.getProtocol() + "www." + host + "/v/" + fuid + "/" + urlSlug + "/";
+        if (!host.startsWith("www.")) {
+            host = "www." + host;
+        }
+        return this.getProtocol() + host + "/v/" + fuid + "/" + urlSlug + "/";
+    }
+
+    @Override
+    protected String getContentURL(final DownloadLink link) {
+        /**
+         * Special override to be able to offer support for older types of URLs e.g.: <br>
+         * https://www.sunporno.com/videos/22128 <br>
+         * --> https://www.sunporno.com/v/22128/null -> https://www.sunporno.com/v/22128/pretty-felicia-kiss-fucked-in-the-car/
+         */
+        final String fuid = this.getFUID(link);
+        final String urlSlug = this.getURLTitle(link.getPluginPatternMatcher());
+        final String domain = getWorkingDomain(link);
+        return generateContentURL(domain, fuid, urlSlug);
     }
 }

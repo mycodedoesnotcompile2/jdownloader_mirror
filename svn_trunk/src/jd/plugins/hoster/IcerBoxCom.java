@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50709 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+@HostPlugin(revision = "$Revision: 50741 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends PluginForHost {
     private final String        baseURL                   = "https://icerbox.com";
     private final String        apiURL                    = "https://icerbox.com/api/v1";
@@ -348,11 +348,14 @@ public class IcerBoxCom extends PluginForHost {
     private Map<String, Object> handleApiErrors(final Browser br, final Account account, final DownloadLink link) throws Exception {
         Map<String, Object> entries = null;
         try {
-            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            /**
-             * Old information: Response can also be array: ["user_not_found"] <br>
-             * 2025-02-26: I wasn't able to reproduce this (a non-map response) anymore.
-             */
+            final Object parsedJson = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (!(parsedJson instanceof Map)) {
+                /**
+                 * Response can also be array: ["user_not_found"] <br>
+                 */
+                throw new AccountInvalidException();
+            }
+            entries = (Map<String, Object>) parsedJson;
         } catch (final JSonMapperException ignore) {
             final String msg = "Invalid API response";
             final long waitMillis = 1 * 60 * 1000;
