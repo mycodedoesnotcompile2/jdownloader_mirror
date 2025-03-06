@@ -676,37 +676,6 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         QUEUE.add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                if (mergesettings.getMergeSameNamedPackages()) {
-                    final Map<String, List<PackageType>> dupes;
-                    if (dest != null) {
-                        final List<PackageType> mergePackages = new ArrayList<PackageType>();
-                        mergePackages.add(dest);
-                        dupes = getPackagesWithSameName(mergePackages, mergesettings);
-                    } else {
-                        dupes = getPackagesWithSameName(srcPkgs, mergesettings);
-                    }
-                    if (dupes.isEmpty()) {
-                        /* Zero results -> Do nothing */
-                        return null;
-                    }
-                    /* Avoid endless loop as we call this function again. */
-                    mergesettings.setMergeSameNamedPackages(false);
-                    final Iterator<Entry<String, List<PackageType>>> dupes_iterator = dupes.entrySet().iterator();
-                    while (dupes_iterator.hasNext()) {
-                        final Entry<String, List<PackageType>> entry = dupes_iterator.next();
-                        final List<PackageType> thisdupes = entry.getValue();
-                        if (thisdupes.size() == 1) {
-                            /* We need at least two packages to be able to merge them. */
-                            continue;
-                        }
-                        /* Merge all duplicates into first package */
-                        final PackageType target = thisdupes.remove(0);
-                        /* Call this function in a recursive way. */
-                        merge(target, null, thisdupes, mergesettings);
-                    }
-                    /* End */
-                    return null;
-                }
                 int positionMerge = mergesettings.getPackagePositionInt();
                 // switch (mergesettings.getMergePosition()) {
                 // case BOTTOM:
@@ -718,6 +687,10 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 // default:
                 // positionMerge = -1;
                 // }
+                // TODO: Comment merging to dest does not yet work as expected
+                if (dest != null && mergesettings.getExpandPackage() != null) {
+                    dest.setExpanded(mergesettings.getExpandPackage());
+                }
                 if (srcLinks != null) {
                     /* move srcLinks to dest */
                     moveOrAddAt(dest, srcLinks, 0, positionMerge);
@@ -746,6 +719,57 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                             dest.setComment(mergedComments);
                         }
                     }
+                }
+                if (mergesettings.getMergeSameNamedPackages()) {
+                    final Map<String, List<PackageType>> dupes;
+                    if (dest != null) {
+                        final List<PackageType> mergePackages = new ArrayList<PackageType>();
+                        mergePackages.add(dest);
+                        dupes = getPackagesWithSameName(mergePackages, mergesettings);
+                    } else {
+                        dupes = getPackagesWithSameName(srcPkgs, mergesettings);
+                    }
+                    if (dupes.isEmpty()) {
+                        /* Zero results -> Do nothing */
+                        return null;
+                    }
+                    /* Avoid endless loop as we call this function again. */
+                    mergesettings.setMergeSameNamedPackages(false);
+                    final Iterator<Entry<String, List<PackageType>>> dupes_iterator = dupes.entrySet().iterator();
+                    while (dupes_iterator.hasNext()) {
+                        final Entry<String, List<PackageType>> entry = dupes_iterator.next();
+                        final List<PackageType> thisdupes = entry.getValue();
+                        if (thisdupes.size() == 1) {
+                            /* We need at least two packages to be able to merge them. */
+                            continue;
+                        }
+                        /* Merge all duplicates into first package */
+                        if (dest != null) {
+                            /**
+                             * Dest is given -> Merge into first existing duplicated package ONLY (top to bottom). </br>
+                             * Example: User selects packages "package1" + "package2" -> Merge -> Name is "test" -> User wants us to merge
+                             * that one into existing duplicates -> Now if there were to exist more packages also called "test" we do not
+                             * merge all into one but only the new "test" into the first old "test".
+                             */
+                            PackageType firstForeignDupe = null;
+                            for (final PackageType dupe : thisdupes) {
+                                if (dupe != dest) {
+                                    firstForeignDupe = dupe;
+                                    break;
+                                }
+                            }
+                            thisdupes.clear();
+                            thisdupes.add(firstForeignDupe);
+                            merge(dest, null, thisdupes, mergesettings);
+                            /* We are done (though dupes_iterator sizer should be 1 either way). */
+                            break;
+                        } else {
+                            /* No dest is given -> Merge either all duplicates in whole list or duplicates within selection */
+                            final PackageType target = thisdupes.remove(0);
+                            merge(target, null, thisdupes, mergesettings);
+                        }
+                    }
+                    /* End */
                 }
                 return null;
             }
@@ -1161,7 +1185,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             if (packages != null) {
                 /* Only return duplicates within a list of pre selected packages. */
                 dupesSelection = new HashSet<String>();
-                for (final PackageType packageNode : allpackages) {
+                for (final PackageType packageNode : packages) {
                     String packagename = packageNode.getName();
                     if (case_insensitive) {
                         packagename = packagename.toLowerCase(Locale.ENGLISH);

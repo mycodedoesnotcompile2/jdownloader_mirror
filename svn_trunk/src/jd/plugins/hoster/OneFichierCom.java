@@ -69,7 +69,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50690 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -781,7 +781,7 @@ public class OneFichierCom extends PluginForHost {
                 type = AccountType.PREMIUM;
             }
             account.setType(type);
-            ai.setStatus(type.getLabel() + " | Can't display more detailed info at this moment due to 'API flood'");
+            ai.setStatus(type.getLabel() + " | Can't display more detailed info at this moment due to 'API flood' -> Try account-check again later, downloads are not affected by this message!");
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
             if (type == AccountType.PREMIUM) {

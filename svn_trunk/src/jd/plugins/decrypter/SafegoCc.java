@@ -15,9 +15,13 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
@@ -32,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
 public class SafegoCc extends PluginForDecrypt {
     public SafegoCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,15 +86,38 @@ public class SafegoCc extends PluginForDecrypt {
         String finallink = this.findFinalLink(br);
         if (finallink == null) {
             /* Captcha required */
-            final Form form0 = br.getFormByInputFieldKeyValue("id", "comment_form");
-            final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-            form0.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-            br.submitForm(form0);
+            Form form = br.getFormByInputFieldKeyValue("id", "comment_form");
+            if (form == null) {
+                form = br.getForm(0);
+            }
+            final String imagecaptchakey = "captch4";
+            if (CaptchaHelperCrawlerPluginRecaptchaV2.containsRecaptchaV2Class(br)) {
+                final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+                form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            } else {
+                /* Maybe simple image captcha needed. */
+                final String base64captchaimage = br.getRegex("img src=\"data:image/png;base64,([^\"]+)").getMatch(0);
+                if (form == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else if (!form.hasInputFieldByName(imagecaptchakey)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else if (base64captchaimage == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final String code = this.getCaptchaCodeBase64ImageString(base64captchaimage, param);
+                if (!code.matches("\\d+")) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                }
+                form.put(imagecaptchakey, code);
+            }
+            br.submitForm(form);
             finallink = this.findFinalLink(br);
             if (finallink == null) {
                 if (br.containsHTML("Proceed to video")) {
                     /* Item is broken or offline e.g. https://safego.cc/safe.php?url=bla */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (br.containsHTML(">\\s*Incorrect " + imagecaptchakey)) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -98,6 +125,46 @@ public class SafegoCc extends PluginForDecrypt {
         }
         ret.add(createDownloadlink(finallink));
         return ret;
+    }
+
+    private String getCaptchaCodeBase64ImageString(final String captchaImageBase64, final CryptedLink param) throws Exception {
+        if (StringUtils.isEmpty(captchaImageBase64)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No captcha base64 string given");
+        }
+        final byte[] image = org.appwork.utils.encoding.Base64.decode(captchaImageBase64);
+        if (image == null || image.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Given String is not a base64 encoded String!");
+        }
+        final File captchaFile = getLocalCaptchaFile();
+        if (captchaFile.isFile()) {
+            if (captchaFile.exists() && !captchaFile.delete()) {
+                throw new IOException("Could not overwrite file: " + captchaFile);
+            }
+        }
+        final File parentFile = captchaFile.getParentFile();
+        if (parentFile != null && !parentFile.exists()) {
+            parentFile.mkdirs();
+        }
+        FileOutputStream fos = null;
+        boolean okay = false;
+        try {
+            captchaFile.createNewFile();
+            fos = new FileOutputStream(captchaFile);
+            fos.write(image, 0, image.length);
+            okay = true;
+        } catch (IOException e) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+        } finally {
+            try {
+                fos.close();
+            } catch (final Throwable e) {
+            }
+            if (okay == false) {
+                captchaFile.delete();
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to write captchafile");
+            }
+        }
+        return getCaptchaCode(captchaFile, param);
     }
 
     private String findFinalLink(final Browser br) {

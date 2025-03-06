@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 50084 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -143,7 +143,7 @@ public class ArchiveOrg extends PluginForHost {
     public static final String                            FILETYPE_VIDEO                                  = "video";
     private final String                                  PROPERTY_ACCOUNT_TIMESTAMP_BORROW_LIMIT_REACHED = "timestamp_borrow_limit_reached";
     private static HashMap<String, ArchiveOrgLendingInfo> bookBorrowSessions                              = new HashMap<String, ArchiveOrgLendingInfo>();
-    private static final String                           ERRORMSG_FILE_NOT_DOWNLOADABLE                  = "This file is not downloadable or broken";
+    private static final String                           ERRORMSG_FILE_NOT_DOWNLOADABLE                  = "The item is not available due to issues with the item's content.";
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -160,7 +160,7 @@ public class ArchiveOrg extends PluginForHost {
              */
             setFinalFilename(link, filename);
         }
-        if (getFileNotDownloadableTime(link) > 0) {
+        if (getCachedFileNotDownloadableTime(link) > 0) {
             /* Such items can neither be checked nor downloaded. */
             return AvailableStatus.UNCHECKABLE;
         }
@@ -406,14 +406,14 @@ public class ArchiveOrg extends PluginForHost {
             }
             if (ArchiveOrg.isItemUnavailable(br)) {
                 if (ArchiveOrg.isAccountRequired(br)) {
-                    checkFileNotDownloadable(link);
+                    checkCachedFileNotDownloadable(link);
                     if (account != null) {
                         /* Error happened while we're logged in -> Dead end --> File isn't even downloadable via account at this moment. */
                         link.setProperty(PROPERTY_IS_NOT_DOWNLOADABLE_TIMESTAMP, System.currentTimeMillis());
                         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMSG_FILE_NOT_DOWNLOADABLE, 5 * 60 * 1000l);
                     } else {
                         /* Make user try again with account */
-                        throw new AccountRequiredException("Item is not downloadable or only for logged in users");
+                        throw new AccountRequiredException("Item is currently not downloadable or only for logged in users");
                     }
                 } else {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403: Item not available");
@@ -456,8 +456,8 @@ public class ArchiveOrg extends PluginForHost {
      *
      * @throws PluginException
      */
-    private void checkFileNotDownloadable(final DownloadLink link) throws PluginException {
-        final long fileNotDownloadableTime = getFileNotDownloadableTime(link);
+    private void checkCachedFileNotDownloadable(final DownloadLink link) throws PluginException {
+        final long fileNotDownloadableTime = getCachedFileNotDownloadableTime(link);
         if (fileNotDownloadableTime > 0) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMSG_FILE_NOT_DOWNLOADABLE, fileNotDownloadableTime);
         }
@@ -466,7 +466,7 @@ public class ArchiveOrg extends PluginForHost {
     /**
      * Returns time in milliseconds that indicates how long that link is not downloadable (= not even downloadable when user is logged in).
      */
-    private long getFileNotDownloadableTime(final DownloadLink link) {
+    private long getCachedFileNotDownloadableTime(final DownloadLink link) {
         final int waitMillis = 3 * 60 * 60 * 1000;
         return (link.getLongProperty(PROPERTY_IS_NOT_DOWNLOADABLE_TIMESTAMP, 0) + waitMillis) - System.currentTimeMillis();
     }
@@ -494,7 +494,7 @@ public class ArchiveOrg extends PluginForHost {
 
     private void handleDownload(final Account account, final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link, account, true);
-        checkFileNotDownloadable(link);
+        checkCachedFileNotDownloadable(link);
         ArchiveOrgLendingInfo lendingInfoForBeforeDownload = null;
         if (account != null) {
             this.login(account, false);

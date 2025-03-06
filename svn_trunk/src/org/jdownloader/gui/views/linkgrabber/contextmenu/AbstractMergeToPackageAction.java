@@ -267,7 +267,6 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
             @Override
             protected Void run() throws RuntimeException {
                 final PackageType newPackage = createNewPackage(final_newPackageName, final_downloadFolder);
-                newPackage.setExpanded(final_expandPackage);
                 final List<PackageType> packages = new ArrayList<PackageType>();
                 for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
                     packages.add(pv.getPackage());

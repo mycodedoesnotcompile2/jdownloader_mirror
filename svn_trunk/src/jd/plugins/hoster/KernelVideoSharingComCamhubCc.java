@@ -25,7 +25,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50732 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50749 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
     public KernelVideoSharingComCamhubCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -69,9 +69,20 @@ public class KernelVideoSharingComCamhubCc extends KernelVideoSharingComV2 {
 
     @Override
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
+        try {
+            String dllink = super.getDllink(link, br);
+            if (dllink != null) {
+                /**
+                 * Website does not "double-embed" video but direct-URL is contained in html code on first page. <br>
+                 * Example: /videos/975585/videotitle/
+                 */
+                return dllink;
+            }
+        } catch (final Exception ignore) {
+        }
         /**
          * Special handling e.g. for camhub.cc -> camhub.cc self-embed -> camhub.world -> Final video link here <br>
-         * Example: https://www.camhub.cc/de/videos/738936/ronny-ponny-07-06-2022-2302-neoteric-chaturbate-amazing-7f78b3c0a62295f2/
+         * Example: /de/videos/738936/videotitle/
          */
         if (!isEmbedURL(br.getURL())) {
             final String fid = this.getFUIDFromURL(br.getURL());

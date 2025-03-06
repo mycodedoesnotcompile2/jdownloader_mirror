@@ -22,7 +22,9 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -35,11 +37,18 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PixhostTo;
 
-@DecrypterPlugin(revision = "$Revision: 48358 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixhostTo.class })
 public class PixhostToGallery extends PluginForDecrypt {
     public PixhostToGallery(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -74,7 +83,7 @@ public class PixhostToGallery extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
+        final String galleryID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -85,7 +94,7 @@ public class PixhostToGallery extends PluginForDecrypt {
         if (galleryTitle == null) {
             /* Fallback */
             logger.warning("Failed to find galleryTitle in html code");
-            galleryTitle = "";
+            galleryTitle = galleryID;
         }
         galleryTitle = Encoding.htmlDecode(galleryTitle).trim();
         final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
@@ -96,11 +105,12 @@ public class PixhostToGallery extends PluginForDecrypt {
         for (String url : urls) {
             /* Fix broken URLs */
             url = url.replaceAll("%5D%5Bimg.+", "");
-            if (plg.canHandle(url)) {
-                final DownloadLink image = createDownloadlink(url);
-                image.setAvailable(true);
-                ret.add(image);
+            if (!plg.canHandle(url)) {
+                continue;
             }
+            final DownloadLink image = createDownloadlink(url);
+            image.setAvailable(true);
+            ret.add(image);
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(galleryTitle);

@@ -19,7 +19,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -29,20 +33,23 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
-
     /* DEV NOTES */
     // Tags: pichost
     // protocol: no https
@@ -78,14 +85,14 @@ public class PixhostTo extends PluginForHost {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/show/((\\d+)/(\\d+)_([^/<>]+))");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:show|thumbs)/((\\d+)/(\\d+)_([^/<>#]+))");
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
     public String getAGBLink() {
-        return "https://pixhost.to/";
+        return "https://" + getHost();
     }
 
     @Override
@@ -105,6 +112,11 @@ public class PixhostTo extends PluginForHost {
         return id1 + "_ " + id2;
     }
 
+    private String getFullsizeImageContenturl(final DownloadLink link) {
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        return "https://" + getHost() + "/show/" + urlinfo.getMatch(1) + "/" + urlinfo.getMatch(2) + "_" + urlinfo.getMatch(3);
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         return requestFileInformation(link, false);
@@ -117,18 +129,17 @@ public class PixhostTo extends PluginForHost {
             link.setName(filenameFromURL);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage(getFullsizeImageContenturl(link));
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">Picture doesn\\'t exist")) {
+        } else if (br.containsHTML(">\\s*Picture doesn\\'t exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final boolean isPartOfGallery = br.containsHTML("class=\"show-gallery\"");
         /* 2019-01-31: It is better to grab the filename via URL! */
         String filename = br.getRegex("title\\s*:\\s*'([^<>\"\\']+)'").getMatch(0);
         if (filename == null) {
-            filename = br.getRegex("class=\"fa fa-picture-o\"></i>([^<]+)<").getMatch(0);
+            filename = br.getRegex("class=\"fa fa-picture-o\"[^>]*>\\s*</i>([^<]+)<").getMatch(0);
         }
         if (isPartOfGallery) {
             /*

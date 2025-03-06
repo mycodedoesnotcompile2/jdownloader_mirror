@@ -73,6 +73,7 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
             @Override
             protected Void run() throws RuntimeException {
                 final PackageSettings settings = new PackageSettings();
+                settings.setMergeSameNamedPackages(Boolean.TRUE);
                 settings.setMergeSameNamedPackagesCaseInsensitive(isMatchPackageNamesCaseInsensitive());
                 /* If user has selected package(s), only collect duplicates within selection. */
                 final List<PackageView<PackageType, ChildrenType>> selPackageViews = sel.getPackageViews();
