@@ -182,8 +182,11 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         int numberofSelectedPackages = 0;
         String singleFileName = null;
         final List<PackageView<PackageType, ChildrenType>> pvlist = sel.getPackageViews();
+        final List<PackageType> selectedPackages = new ArrayList<PackageType>();
         for (final PackageView<PackageType, ChildrenType> pv : pvlist) {
-            if (pv.getPackage().isEnabled()) {
+            final PackageType _package_ = pv.getPackage();
+            selectedPackages.add(_package_);
+            if (_package_.isEnabled()) {
                 numberofExpandedPackages++;
             }
             if (pv.isPackageSelected()) {
@@ -259,6 +262,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
             final_expandPackage = expandPackagePreSetState;
         }
         if (StringUtils.isEmpty(final_newPackageName)) {
+            // TODO: Check if this can be removed
             /* New package name cannot be used -> Do nothing */
             return;
         }
@@ -270,10 +274,6 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                 final List<PackageType> packages = new ArrayList<PackageType>();
                 for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
                     packages.add(pv.getPackage());
-                }
-                final String packageComment = controller.mergePackageComments(packages);
-                if (!StringUtils.isEmpty(packageComment)) {
-                    newPackage.setComment(packageComment);
                 }
                 int index = -1;
                 switch (getLocation()) {
@@ -302,7 +302,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                 ps.setExpandPackage(final_expandPackage);
                 ps.setPackagePosition(index);
                 ps.setMergeSameNamedPackages(final_mergeSameNamedPackages);
-                controller.merge(newPackage, sel.getChildren(), null, ps);
+                controller.merge(newPackage, sel.getChildren(), selectedPackages, ps);
                 return null;
             }
         });

@@ -85,7 +85,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 50564 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50751 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -101,7 +101,7 @@ public class PornHubCom extends PluginForHost {
     public static final String                    html_privatevideo                         = "id=\"iconLocked\"";
     public static final String                    html_privateimage                         = "profile/private-lock\\.png";
     public static final String                    html_purchase_only                        = "(?i)'Buy on video player'";
-    public static final String                    html_premium_only                         = "(?i)<h2>\\s*Upgrade to Pornhub Premium to enjoy this video\\.</h2>";
+    public static final String                    html_premium_only                         = "(?i)<h2>\\s*Upgrade to Pornhub Premium to enjoy this video\\.\\s*</h2>";
     private String                                dlUrl                                     = null;
     /** Dev: disable this if pornhub plugins shall skip all mp4 progressive streams and disable user setting for mp4 progressive streams. */
     public static final boolean                   ENABLE_INTERNAL_MP4_PROGRESSIVE_SUPPORT   = true;
@@ -608,42 +608,59 @@ public class PornHubCom extends PluginForHost {
         } else {
             link.setFinalFileName(html_filename);
         }
-        if (!StringUtils.isEmpty(this.dlUrl)) {
-            if (!verifyFinalURL(link, format, this.dlUrl, cachedURLFlag)) {
-                if (!isVideo) {
-                    /* We cannot refresh directurls of e.g. photo content - final downloadurls should be static --> WTF */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error");
-                }
-                logger.info("Directurl has expired (?) --> Trying to generate new directurl");
-                final Map<String, Map<String, String>> qualities = getVideoLinks(this, br);
-                if (qualities == null || qualities.size() == 0) {
-                    logger.warning("Failed to find any video qualities");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                this.dlUrl = qualities.containsKey(quality) ? qualities.get(quality).get(format) : null;
-                if (this.dlUrl == null && StringUtils.equalsIgnoreCase("mp4", format)) {
-                    // 2020-01-11, only HLS available, auto check for hls
-                    logger.warning("Failed to get fresh directurl: " + format + "/" + quality + " | auto check for hls");
-                    format = "hls";
-                    this.dlUrl = qualities.containsKey(quality) ? qualities.get(quality).get(format) : null;
-                }
-                if (this.dlUrl == null) {
-                    logger.warning("Failed to get fresh directurl: " + format + "/" + quality);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    /* Last chance */
-                    logger.warning("Check fresh directurl: " + format + "/" + quality + "/" + dlUrl);
-                    if (!verifyFinalURL(link, format, this.dlUrl, false)) {
-                        logger.info("Fresh directurl did not lead to downloadable content");
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to refresh directurl");
-                    } else {
-                        logger.info("Successfully refreshed directurl");
-                        link.setProperty(PROPERTY_FORMAT, format);
-                    }
-                }
-            }
+        if (StringUtils.isEmpty(this.dlUrl)) {
+            /* No directurl available -> Cannot check */
+            return AvailableStatus.TRUE;
         }
-        return AvailableStatus.TRUE;
+        if (verifyFinalURL(link, format, this.dlUrl, cachedURLFlag)) {
+            return AvailableStatus.TRUE;
+        }
+        if (!isVideo) {
+            /* We cannot refresh directurls of e.g. photo content - final downloadurls should be static --> WTF */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error");
+        }
+        logger.info("Directurl has expired (?) --> Trying to generate new directurl");
+        final Map<String, Map<String, String>> qualities = getVideoLinks(this, br);
+        if (qualities == null || qualities.size() == 0) {
+            logger.warning("Failed to find any video qualities");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        this.dlUrl = qualities.containsKey(quality) ? qualities.get(quality).get(format) : null;
+        final String hlsFallback;
+        if (StringUtils.equalsIgnoreCase("mp4", format)) {
+            hlsFallback = qualities.containsKey(quality) ? qualities.get(quality).get("hls") : null;
+        } else {
+            hlsFallback = null;
+        }
+        if (this.dlUrl == null && StringUtils.equalsIgnoreCase("mp4", format)) {
+            // 2020-01-11, only HLS available, try fallback to HLS
+            logger.warning("Failed to get fresh directurl: " + format + "/" + quality + " | try HLS fallback: " + hlsFallback);
+            format = "hls";
+            this.dlUrl = hlsFallback;
+        }
+        if (this.dlUrl == null) {
+            logger.warning("Failed to get fresh directurl: " + format + "/" + quality);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        logger.warning("Check fresh directurl: " + format + "/" + quality + "/" + dlUrl);
+        if (verifyFinalURL(link, format, this.dlUrl, false)) {
+            logger.info("Successfully refreshed directurl -> " + this.dlUrl);
+            link.setProperty(PROPERTY_FORMAT, format);
+            return AvailableStatus.TRUE;
+        }
+        logger.info("Fresh directurl did not lead to downloadable content");
+        if (!StringUtils.equalsIgnoreCase("mp4", format) || hlsFallback == null) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to refresh directurl");
+        }
+        logger.info("Attempting HLS fallback");
+        if (verifyFinalURL(link, format, hlsFallback, false)) {
+            logger.info("Successfully refreshed directurl via HLS fallback");
+            format = "hls";
+            link.setProperty(PROPERTY_FORMAT, format);
+            this.dlUrl = hlsFallback;
+            return AvailableStatus.TRUE;
+        }
+        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to refresh directurl");
     }
 
     public boolean verifyFinalURL(final DownloadLink link, final String format, final String url, final boolean cachedURLFlag) throws Exception {

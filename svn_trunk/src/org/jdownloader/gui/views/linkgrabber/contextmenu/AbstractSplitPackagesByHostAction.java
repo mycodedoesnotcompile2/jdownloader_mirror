@@ -15,10 +15,10 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
-import org.jdownloader.controlling.packagizer.PackagizerController;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.gui.views.components.LocationInList;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings;
@@ -138,17 +138,35 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
             @Override
             protected Void run() throws RuntimeException {
                 final Map<AbstractPackageNode, Map<String, List<ChildrenType>>> splitMap = new HashMap<AbstractPackageNode, Map<String, List<ChildrenType>>>();
-                int insertAt = -1;
+                // Calculate index according to location - matches AbstractMergeToPackageAction
+                int index = -1;
                 switch (getLocation()) {
+                case AFTER_SELECTION:
+                    for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
+                        index = Math.max(index, controller.indexOf(pv.getPackage()) + 1);
+                    }
+                    break;
                 case BEFORE_SELECTION:
-                    insertAt = Integer.MAX_VALUE;
+                    index = Integer.MAX_VALUE;
+                    for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
+                        index = Math.min(index, controller.indexOf(pv.getPackage()));
+                    }
+                    if (index == Integer.MAX_VALUE) {
+                        index = 0;
+                    }
+                    break;
+                case END_OF_LIST:
+                    index = Integer.MAX_VALUE;
+                    break;
+                case TOP_OF_LIST:
+                    index = 0;
+                    break;
                 }
                 for (final AbstractNode child : sel.getChildren()) {
                     if (!(child instanceof DownloadLink) && !(child instanceof CrawledLink)) {
                         continue;
                     }
                     final AbstractPackageChildrenNode childnode = (AbstractPackageChildrenNode) child;
-                    // final DownloadLink cL = (DownloadLink) child;
                     final AbstractPackageNode parent = final_mergePackages ? null : (AbstractPackageNode) childnode.getParentNode();
                     Map<String, List<ChildrenType>> parentMap = splitMap.get(parent);
                     if (parentMap == null) {
@@ -162,30 +180,13 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                         parentMap.put(host, hostList);
                     }
                     hostList.add((ChildrenType) childnode);
-                    switch (getLocation()) {
-                    case AFTER_SELECTION:
-                        insertAt = Math.max(insertAt, controller.indexOf((PackageType) ((AbstractPackageChildrenNode) child).getParentNode()) + 1);
-                        break;
-                    case BEFORE_SELECTION:
-                        insertAt = Math.min(insertAt, controller.indexOf((PackageType) ((AbstractPackageChildrenNode) child).getParentNode()));
-                        break;
-                    case END_OF_LIST:
-                        insertAt = -1;
-                        break;
-                    case TOP_OF_LIST:
-                        insertAt = 0;
-                        break;
-                    }
-                }
-                if (insertAt == Integer.MAX_VALUE) {
-                    insertAt = 0;
                 }
                 final String nameFactory = JsonConfig.create(LinkgrabberSettings.class).getSplitPackageNameFactoryPattern();
                 final boolean merge = JsonConfig.create(LinkgrabberSettings.class).isSplitPackageMergeEnabled();
+                // Use PackageSettings properly
                 final PackageSettings ps = new PackageSettings();
                 ps.setExpandPackage(final_packageExpandState);
-                // TODO
-                // ps.setPackagePosition(insertAt);
+                ps.setPackagePosition(index);
                 final Map<String, AbstractPackageNode> mergedPackages = new HashMap<String, AbstractPackageNode>();
                 final Iterator<Entry<AbstractPackageNode, Map<String, List<ChildrenType>>>> it = splitMap.entrySet().iterator();
                 while (it.hasNext()) {
@@ -198,59 +199,48 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                         final String host = next2.getKey();
                         final String newPackageName = getNewPackageName(nameFactory, sourcePackage == null ? newName : sourcePackage.getName(), host);
                         final PackageType newPkg;
-                        if (isLinkgrabber) {
-                            if (merge) {
-                                CrawledPackage destPackage = (CrawledPackage) mergedPackages.get(newPackageName);
-                                if (destPackage == null) {
+                        List<PackageType> selectedPackages = new ArrayList<PackageType>();
+                        if (merge) {
+                            AbstractPackageNode destPackage = mergedPackages.get(newPackageName);
+                            if (destPackage == null) {
+                                if (isLinkgrabber) {
                                     destPackage = new CrawledPackage();
-                                    destPackage.setExpanded(final_packageExpandState);
-                                    if (sourcePackage != null) {
-                                        sourcePackage.copyPropertiesTo(destPackage);
-                                    } else {
-                                        destPackage.setDownloadFolder(newDownloadFolder);
-                                    }
-                                    destPackage.setName(newPackageName);
-                                    mergedPackages.put(newPackageName, destPackage);
-                                }
-                                newPkg = (PackageType) destPackage;
-                            } else {
-                                newPkg = (PackageType) new CrawledPackage();
-                                newPkg.setExpanded(final_packageExpandState);
-                                if (sourcePackage != null) {
-                                    sourcePackage.copyPropertiesTo(newPkg);
                                 } else {
-                                    newPkg.setDownloadFolder(newDownloadFolder);
-                                }
-                                newPkg.setName(newPackageName);
-                            }
-                        } else {
-                            if (merge) {
-                                FilePackage destPackage = (FilePackage) mergedPackages.get(newPackageName);
-                                if (destPackage == null) {
                                     destPackage = FilePackage.getInstance();
-                                    if (sourcePackage != null) {
-                                        sourcePackage.copyPropertiesTo(destPackage);
-                                    } else {
-                                        final String downloadFolder = PackagizerController.replaceDynamicTags(newDownloadFolder, newPackageName, destPackage);
-                                        destPackage.setDownloadDirectory(downloadFolder);
-                                    }
-                                    destPackage.setName(newPackageName);
-                                    mergedPackages.put(newPackageName, destPackage);
                                 }
-                                newPkg = (PackageType) destPackage;
+                                destPackage.setExpanded(final_packageExpandState);
+                                if (sourcePackage != null) {
+                                    sourcePackage.copyPropertiesTo(destPackage);
+                                    selectedPackages.add((PackageType) sourcePackage);
+                                } else {
+                                    destPackage.setDownloadFolder(newDownloadFolder);
+                                }
+                                destPackage.setName(newPackageName);
+                                mergedPackages.put(newPackageName, destPackage);
+                            }
+                            newPkg = (PackageType) destPackage;
+                        } else {
+                            if (isLinkgrabber) {
+                                newPkg = (PackageType) new CrawledPackage();
                             } else {
                                 newPkg = (PackageType) FilePackage.getInstance();
-                                if (sourcePackage != null) {
-                                    sourcePackage.copyPropertiesTo(newPkg);
-                                } else {
-                                    final String downloadFolder = PackagizerController.replaceDynamicTags(newDownloadFolder, newPackageName, newPkg);
-                                    newPkg.setDownloadFolder(downloadFolder);
-                                }
-                                newPkg.setName(newPackageName);
                             }
+                            newPkg.setExpanded(final_packageExpandState);
+                            if (sourcePackage != null) {
+                                sourcePackage.copyPropertiesTo(newPkg);
+                                selectedPackages.add((PackageType) sourcePackage);
+                            } else {
+                                newPkg.setDownloadFolder(newDownloadFolder);
+                            }
+                            newPkg.setName(newPackageName);
                         }
-                        controller.moveOrAddAt(newPkg, next2.getValue(), 0, insertAt);
-                        insertAt++;
+                        // Use merge instead of moveOrAddAt
+                        ps.setMergeSameNamedPackages(merge);
+                        controller.merge(newPkg, next2.getValue(), selectedPackages, ps);
+                        // Increment index for next package
+                        if (ps.getPackagePosition() != Integer.MAX_VALUE) {
+                            ps.setPackagePosition(ps.getPackagePosition() + 1);
+                        }
                     }
                 }
                 return null;

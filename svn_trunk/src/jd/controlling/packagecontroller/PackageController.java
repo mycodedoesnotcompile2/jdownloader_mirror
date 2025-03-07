@@ -574,7 +574,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             setPackagePosition(null);
         }
 
-        public int getPackagePositionInt() {
+        public int getPackagePosition() {
             return packageposition;
         }
 
@@ -653,11 +653,6 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         }
     }
 
-    public void merge(final PackageType dest, final List<PackageType> srcPkgs, final PackageSettings mergesettings) {
-        // TODO: Remove this?
-        merge(dest, null, srcPkgs, mergesettings);
-    }
-
     public void merge(final PackageType dest, final List<ChildType> srcLinks, final List<PackageType> srcPkgs, final PackageSettings mergesettings) {
         if (mergesettings == null) {
             throw new IllegalArgumentException();
@@ -676,7 +671,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         QUEUE.add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                int positionMerge = mergesettings.getPackagePositionInt();
+                int positionMerge = mergesettings.getPackagePosition();
                 // switch (mergesettings.getMergePosition()) {
                 // case BOTTOM:
                 // positionMerge = dest.getChildren().size();
@@ -688,8 +683,22 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 // positionMerge = -1;
                 // }
                 // TODO: Comment merging to dest does not yet work as expected
-                if (dest != null && mergesettings.getExpandPackage() != null) {
-                    dest.setExpanded(mergesettings.getExpandPackage());
+                /* Prepare destination-package */
+                if (dest != null) {
+                    if (mergesettings.getExpandPackage() != null) {
+                        dest.setExpanded(mergesettings.getExpandPackage());
+                    }
+                    if (srcPkgs != null && Boolean.TRUE.equals(mergesettings.getMergePackageComments())) {
+                        /* Merge package comments */
+                        final List<PackageType> allPackages = new ArrayList<PackageType>();
+                        allPackages.add(dest);
+                        allPackages.addAll(srcPkgs);
+                        final String mergedComments = mergePackageComments(allPackages);
+                        if (!StringUtils.isEmpty(mergedComments)) {
+                            /* Set new comment */
+                            dest.setComment(mergedComments);
+                        }
+                    }
                 }
                 if (srcLinks != null) {
                     /* move srcLinks to dest */
@@ -707,16 +716,6 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                         if (positionMerge != -1) {
                             /* update positionMerge in case we want merge@top */
                             positionMerge += size;
-                        }
-                    }
-                    if (Boolean.TRUE.equals(mergesettings.getMergePackageComments())) {
-                        /* Merge package comments */
-                        /* Place main package at beginning of list so that comment of it is placed first in our merged comment string. */
-                        srcPkgs.add(0, dest);
-                        final String mergedComments = mergePackageComments(srcPkgs);
-                        if (!StringUtils.isEmpty(mergedComments)) {
-                            /* Set new comment */
-                            dest.setComment(mergedComments);
                         }
                     }
                 }

@@ -20,6 +20,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
@@ -55,7 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50752 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -75,7 +76,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "dood.re", "doods.pro", "dood.so", "doodstream.com", "dood.to", "doodapi.com", "dood.watch", "dood.cx", "doodstream.co", "dood.la", "dood.ws", "dood.pm", "dood.sh", "dood.one", "dood.tech", "dood.wf", "dood.yt", "dooood.com", "ds2play.com", "ds2video.com", "d0o0d.com", "do0od.com", "d0000d.com", "d000d.com", "dood.li", "dood.work", "dooodster.com" });
+        ret.add(new String[] { "dood.re", "doods.pro", "dood.so", "doodstream.com", "dood.to", "doodapi.com", "dood.watch", "dood.cx", "doodstream.co", "dood.la", "dood.ws", "dood.pm", "dood.sh", "dood.one", "dood.tech", "dood.wf", "dood.yt", "dooood.com", "ds2play.com", "ds2video.com", "d0o0d.com", "do0od.com", "d0000d.com", "d000d.com", "dood.li", "dood.work", "dooodster.com", "vidply.com" });
         ret.add(new String[] { "poophd.com", "do0d.co", "pooop.online", "poop.com.co" });
         return ret;
     }
@@ -109,6 +110,10 @@ public class DoodstreamCom extends XFileSharingProBasic {
         final Browser ret = super.createNewBrowserInstance();
         setSSLSocketStreamOptions(ret);
         return ret;
+    }
+
+    private boolean looksLikeSupportedURL(final String url) {
+        return new Regex(url, Pattern.compile("https?://[^/]+/(d|e)/.+", Pattern.CASE_INSENSITIVE)).patternFind();
     }
 
     @Override
@@ -433,9 +438,10 @@ public class DoodstreamCom extends XFileSharingProBasic {
         br.setFollowRedirects(true);
         final String contentURL = getContentURL(link);
         getPage(contentURL);
-        /* Allow redirects to other content-IDs but files should be offline if there is e.g. a redirect to an unsupported URL format. */
-        final String correctedhtml = getCorrectBR(br);
-        if (isOffline(link, br) || !this.canHandle(br.getURL())) {
+        if (isOffline(link, br)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!this.looksLikeSupportedURL(br.getURL())) {
+            /* Allow redirects to other content-IDs but files should be offline if there is e.g. a redirect to an unsupported URL format. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String cptr = br.getRegex("'(/cptr/.*?)'").getMatch(0);
@@ -443,7 +449,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
             final Browser brc = br.cloneBrowser();
             brc.getPage(cptr);
             try {
-                final Map<String, Object> response = restoreFromString(brc.toString(), TypeRef.MAP);
+                final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 String filename = doodExe((String) JavaScriptEngineFactory.walkJson(response, "ttl/crp"), (String) JavaScriptEngineFactory.walkJson(response, "ttl/crs"));
                 if (!StringUtils.isEmpty(filename)) {
                     if (!StringUtils.endsWithCaseInsensitive(filename, ".mp4")) {
@@ -460,6 +466,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
             }
         }
         if (link.getFinalFileName() == null) {
+            final String correctedhtml = getCorrectBR(br);
             String filename;
             if (contentURL.matches(TYPE_STREAM)) {
                 filename = new Regex(correctedhtml, "<meta name\\s*=\\s*\"og:title\"[^>]*content\\s*=\\s*\"([^<>\"]+)\"\\s*>").getMatch(0);

@@ -121,7 +121,7 @@ public interface TiktokConfig extends PluginConfigInterface {
     }
 
     @AboutConfig
-    @DefaultEnumValue("API")
+    @DefaultEnumValue("DEFAULT")
     @Order(40)
     @DescriptionForConfigEntry(text_MediaCrawlMode)
     MediaCrawlMode getMediaCrawlModeV2();

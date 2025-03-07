@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 50743 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50750 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -640,6 +640,12 @@ public class Bunkr extends PluginForHost {
 
     public static void setFilename(final DownloadLink link, final String filename, final boolean canContainFileID, final boolean setFinalName) {
         if (StringUtils.isEmpty(filename)) {
+            return;
+        } else if (filename.equals(link.getFinalFileName())) {
+            /*
+             * Final filename has already been set and new one to set is the same -> Regardless of the parameters we got, do not modify the
+             * given name, do not set any new name on our DownloadLink item.
+             */
             return;
         }
         final boolean fixFilename = PluginJsonConfig.get(BunkrConfig.class).isFixFilename();
