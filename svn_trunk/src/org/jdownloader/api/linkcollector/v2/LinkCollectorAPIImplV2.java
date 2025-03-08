@@ -6,8 +6,6 @@ import java.io.FileOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.CharBuffer;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,14 +41,13 @@ import org.appwork.remoteapi.exceptions.BadParameterException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Application;
+import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
-import org.appwork.utils.net.Base64InputStream;
-import org.appwork.utils.net.CharSequenceInputStream;
 import org.jdownloader.api.RemoteAPIController;
 import org.jdownloader.api.content.v2.ContentAPIImplV2;
 import org.jdownloader.api.utils.PackageControllerUtils;
@@ -476,7 +473,7 @@ public class LinkCollectorAPIImplV2 implements LinkCollectorAPIV2 {
                         } else if (!tmp.getParentFile().exists() && !tmp.getParentFile().mkdirs()) {
                             throw new IOException("Failed to create tmp folder:" + tmp.getParentFile());
                         }
-                        final InputStream is = getInputStreamFromBase64DataURL(dataURL);
+                        final InputStream is = IO.dataUrlToInputStream(dataURL);
                         final FileOutputStream fos = new FileOutputStream(tmp);
                         try {
                             final byte[] buf = new byte[8192];
@@ -785,15 +782,6 @@ public class LinkCollectorAPIImplV2 implements LinkCollectorAPIV2 {
         }
     }
 
-    public static InputStream getInputStreamFromBase64DataURL(final String dataURL) throws IOException {
-        final int base64Index = dataURL.indexOf(";base64,");
-        if (base64Index == -1 || base64Index + 8 >= dataURL.length()) {
-            throw new IOException("Invalid DataURL: " + dataURL);
-        }
-        final CharBuffer cb = CharBuffer.wrap(dataURL, base64Index + 8, dataURL.length());
-        return new Base64InputStream(new CharSequenceInputStream(cb, Charset.forName("UTF-8")));
-    }
-
     @Override
     public LinkCollectingJobAPIStorable addContainer(String type, String content) {
         return loadContainer(type, content);
@@ -808,7 +796,7 @@ public class LinkCollectorAPIImplV2 implements LinkCollectorAPIV2 {
                 } else if (!tmp.getParentFile().exists() && !tmp.getParentFile().mkdirs()) {
                     throw new IOException("Failed to create tmp folder:" + tmp.getParentFile());
                 }
-                final InputStream is = getInputStreamFromBase64DataURL(content);
+                final InputStream is = IO.dataUrlToInputStream(content);
                 final FileOutputStream fos = new FileOutputStream(tmp);
                 try {
                     final byte[] buf = new byte[8192];

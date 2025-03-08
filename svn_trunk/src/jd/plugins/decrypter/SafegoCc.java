@@ -15,14 +15,8 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,7 +30,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+
+@DecrypterPlugin(revision = "$Revision: 50756 $", interfaceVersion = 3, names = {}, urls = {})
 public class SafegoCc extends PluginForDecrypt {
     public SafegoCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,7 +92,7 @@ public class SafegoCc extends PluginForDecrypt {
                 form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
             } else {
                 /* Maybe simple image captcha needed. */
-                final String base64captchaimage = br.getRegex("img src=\"data:image/png;base64,([^\"]+)").getMatch(0);
+                final String base64captchaimage = br.getRegex("img src=\"(data:image/png;base64,[^\"]+)").getMatch(0);
                 if (form == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 } else if (!form.hasInputFieldByName(imagecaptchakey)) {
@@ -104,7 +100,7 @@ public class SafegoCc extends PluginForDecrypt {
                 } else if (base64captchaimage == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final String code = this.getCaptchaCodeBase64ImageString(base64captchaimage, param);
+                final String code = this.getCaptchaCode(base64captchaimage, param);
                 if (!code.matches("\\d+")) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
@@ -125,46 +121,6 @@ public class SafegoCc extends PluginForDecrypt {
         }
         ret.add(createDownloadlink(finallink));
         return ret;
-    }
-
-    private String getCaptchaCodeBase64ImageString(final String captchaImageBase64, final CryptedLink param) throws Exception {
-        if (StringUtils.isEmpty(captchaImageBase64)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No captcha base64 string given");
-        }
-        final byte[] image = org.appwork.utils.encoding.Base64.decode(captchaImageBase64);
-        if (image == null || image.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Given String is not a base64 encoded String!");
-        }
-        final File captchaFile = getLocalCaptchaFile();
-        if (captchaFile.isFile()) {
-            if (captchaFile.exists() && !captchaFile.delete()) {
-                throw new IOException("Could not overwrite file: " + captchaFile);
-            }
-        }
-        final File parentFile = captchaFile.getParentFile();
-        if (parentFile != null && !parentFile.exists()) {
-            parentFile.mkdirs();
-        }
-        FileOutputStream fos = null;
-        boolean okay = false;
-        try {
-            captchaFile.createNewFile();
-            fos = new FileOutputStream(captchaFile);
-            fos.write(image, 0, image.length);
-            okay = true;
-        } catch (IOException e) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
-        } finally {
-            try {
-                fos.close();
-            } catch (final Throwable e) {
-            }
-            if (okay == false) {
-                captchaFile.delete();
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to write captchafile");
-            }
-        }
-        return getCaptchaCode(captchaFile, param);
     }
 
     private String findFinalLink(final Browser br) {

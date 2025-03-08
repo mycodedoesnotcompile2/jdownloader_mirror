@@ -163,6 +163,16 @@ public class SecondLevelLaunch {
     private static void initMACProperties() {
         System.setProperty("com.apple.mrj.application.apple.menu.about.name", "JDownloader");
         System.setProperty("apple.awt.application.name", "JDownloader");
+        if (System.getProperty("apple.awt.application.appearance") == null) {
+            // appearance of window title bars
+            // possible values:
+            // - "system": use current macOS appearance (light or dark)
+            // - "NSAppearanceNameAqua": use light appearance
+            // - "NSAppearanceNameDarkAqua": use dark appearance
+            // https://bugs.openjdk.org/browse/JDK-8235363
+            // https://developer.apple.com/documentation/appkit/nsappearance/name-swift.struct?language=objc
+            System.setProperty("apple.awt.application.appearance", "system");
+        }
         // set DockIcon (most used in Building)
         try {
             MacOSApplicationAdapter.setDockIcon(NewTheme.I().getImage("logo/jd_logo_128_128", -1));

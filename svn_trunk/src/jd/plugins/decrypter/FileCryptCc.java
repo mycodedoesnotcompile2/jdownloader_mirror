@@ -23,22 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.FileCryptConfig;
-import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -64,7 +48,23 @@ import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49943 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.FileCryptConfig;
+import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 50756 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -409,15 +409,13 @@ public class FileCryptCc extends PluginForDecrypt {
             }
             if (cutCaptchaRetryIndex == 0 && logoPW == null) {
                 /**
-                 * Search password based on folder-logo. </br>
-                 * Only do this one time in the first run of this loop.
+                 * Search password based on folder-logo. </br> Only do this one time in the first run of this loop.
                  */
                 final String customLogoID = br.getRegex("custom/([a-z0-9]+)\\.png").getMatch(0);
                 if (customLogoID != null) {
                     /**
-                     * Magic auto passwords: </br>
-                     * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first
-                     * that are typically associated with folders published by those sources.
+                     * Magic auto passwords: </br> Creators can set custom logos on each folder. Each logo has a unique ID. This way we can
+                     * try specific passwords first that are typically associated with folders published by those sources.
                      */
                     if ("53d1b".equals(customLogoID) || "80d13".equals(customLogoID) || "fde1d".equals(customLogoID) || "8abe0".equals(customLogoID) || "8f073".equals(customLogoID)) {
                         logoPW = "serienfans.org";
@@ -566,9 +564,7 @@ public class FileCryptCc extends PluginForDecrypt {
                     final String captchaURL = captchaForm.getRegex("((https?://[^<>\"']*?)?/captcha/[^<>\"']*?)\"").getMatch(0);
                     if (captchaURL != null && this.containsCircleCaptcha(captchaURL)) {
                         /* Click-captcha */
-                        final File file = this.getLocalCaptchaFile();
-                        getCaptchaBrowser(br).getDownload(file, captchaURL);
-                        final ClickedPoint cp = getCaptchaClickedPoint(getHost(), file, param, "Click on the open circle");
+                        final ClickedPoint cp = getCaptchaClickedPoint(getHost(), getCaptchaImage(captchaURL), param, "Click on the open circle");
                         if (cp == null) {
                             throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                         }
@@ -693,9 +689,7 @@ public class FileCryptCc extends PluginForDecrypt {
                     logger.warning("Unsupported/unexpected captcha for single redirect link.");
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final File file = this.getLocalCaptchaFile();
-                getCaptchaBrowser(br).getDownload(file, captcha);
-                final ClickedPoint cp = getCaptchaClickedPoint(getHost(), file, param, "Click on the open circle");
+                final ClickedPoint cp = getCaptchaClickedPoint(getHost(), getCaptchaImage(captcha), param, "Click on the open circle");
                 if (cp == null) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }

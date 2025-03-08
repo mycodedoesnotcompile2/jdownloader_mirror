@@ -68,7 +68,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
         icon = new AbstractIcon(IconKey.ICON_LOGO_UPNP, 16);
         settings = JsonConfig.create(UPUPReconnectSettings.class);
         AdvancedConfigManager.getInstance().register(settings);
-
     }
 
     /**

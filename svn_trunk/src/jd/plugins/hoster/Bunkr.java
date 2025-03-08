@@ -11,13 +11,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -35,7 +28,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 50750 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 50757 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -81,6 +81,8 @@ public class Bunkr extends PluginForHost {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private final static Pattern PATH_FUID_NUMBERS = Pattern.compile("/file/(\\d+)");
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
@@ -107,7 +109,6 @@ public class Bunkr extends PluginForHost {
     /* Don't touch the following! */
     private static final AtomicInteger freeRunning                                         = new AtomicInteger(0);
     private final static Pattern       PATTERN_FID                                         = Pattern.compile("(-([A-Za-z0-9]{8}))(\\.[^\\.]+)?$");
-    private final static Pattern       PATH_FUID_NUMBERS                                   = Pattern.compile("/file/(\\d+)");
     /* Plugin properties */
     private static final String        PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
     private static final String        PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
@@ -434,9 +435,7 @@ public class Bunkr extends PluginForHost {
                     link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
                 final String filenameFromHeader = Plugin.getFileNameFromConnection(con);
-                if (!StringUtils.isEmpty(filenameFromHeader)) {
-                    setFilename(link, filenameFromHeader, true, true);
-                }
+                setFilename(link, filenameFromHeader, true, true);
                 break directurlsLoop;
             }
         } catch (final Exception e) {
@@ -483,7 +482,7 @@ public class Bunkr extends PluginForHost {
             setFilename(link, filenameFromHTML, canContainFileID, false);
         }
         /* 2025-03-04: html contains "debug information" with precise file size as bytes */
-        final String filesizeBytesStr = br.getRegex("Debug:.+Size=(\\d+)").getMatch(0);
+        final String filesizeBytesStr = br.getRegex("Debug:[^\r\n]*Size\\s*=\\s*(\\d+)").getMatch(0);
         String filesizeStr = br.getRegex("Download\\s*(\\d+[^<]+)</a>").getMatch(0);
         if (filesizeStr == null) {
             filesizeStr = br.getRegex("class=\"[^>]*text[^>]*\"[^>]*>\\s*([0-9\\.]+\\s+[MKG]B)").getMatch(0);
@@ -559,9 +558,7 @@ public class Bunkr extends PluginForHost {
         if (directurl != null) {
             directurl = Encoding.htmlOnlyDecode(directurl);
             final String filename = getNameFromURL(this, directurl);
-            if (filename != null) {
-                setFilename(link, filename, true, false);
-            }
+            setFilename(link, filename, true, false);
             link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, directurl);
         } else {
             logger.warning("Failed to find download directurl");
@@ -617,6 +614,7 @@ public class Bunkr extends PluginForHost {
             directurl = url;
         }
         if (filenameFromHTML != null && !directurl.contains("?") && !directurl.contains(filenameFromHTML)) {
+            /* n param value is returned via Content-Disposition header as filename */
             directurl += "?n=" + URLEncode.encodeURIComponent(filenameFromHTML);
         }
         link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, directurl);

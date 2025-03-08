@@ -54,7 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50724 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50755 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -155,10 +155,15 @@ public class BoxbitApp extends PluginForHost {
     private void parseAndSetMaxChunksLimitFromHeader(final DownloadLink link, final URLConnectionAdapter con) {
         /* Get max allowed number of chunks from header. */
         final String maxChunksStr = con.getRequest().getResponseHeader("X-Max-Chunks");
-        if (maxChunksStr != null && maxChunksStr.matches("\\d+")) {
-            logger.info("Max chunks for this item: " + maxChunksStr);
-            link.setProperty(PROPERTY_DOWNLOADLINK_maxchunks, Integer.parseInt(maxChunksStr));
+        if (maxChunksStr == null) {
+            logger.info("Failed to find X-Max-Chunks header");
+            return;
+        } else if (!maxChunksStr.matches("\\d+")) {
+            logger.warning("X-Max-Chunks came in unsupported format!");
+            return;
         }
+        logger.info("Max chunks for this item: " + maxChunksStr);
+        link.setProperty(PROPERTY_DOWNLOADLINK_maxchunks, Integer.parseInt(maxChunksStr));
     }
 
     @Override

@@ -18,6 +18,7 @@ package jd.plugins;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -37,6 +38,33 @@ import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkCheckerThread;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.BrowserSettingsThread;
+import jd.http.ProxySelectorInterface;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP.ENCODING;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.PluginForHost.FILENAME_SOURCE;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.utils.JDUtilities;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -48,6 +76,8 @@ import org.appwork.uio.UIOManager;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Hash;
+import org.appwork.utils.IO;
+import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.logging2.LogInterface;
@@ -86,33 +116,6 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.translate._JDT;
-
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkCheckerThread;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.BrowserSettingsThread;
-import jd.http.ProxySelectorInterface;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP.ENCODING;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.PluginForHost.FILENAME_SOURCE;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.utils.JDUtilities;
 
 /**
  * Diese abstrakte Klasse steuert den Zugriff auf weitere Plugins. Alle Plugins müssen von dieser Klasse abgeleitet werden.
@@ -975,6 +978,42 @@ public abstract class Plugin implements ActionListener {
         }
     }
 
+    protected Browser getCaptchaBrowser(Browser br) {
+        final Browser ret;
+        if (br != null) {
+            ret = br.cloneBrowser();
+        } else {
+            ret = createNewBrowserInstance();
+        }
+        ret.getHeaders().put("Accept", "image/png,image/*;q=0.8,*/*;q=0.5");
+        ret.getHeaders().put("Cache-Control", null);
+        return ret;
+    }
+
+    protected File getCaptchaImage(final String captchaAddress) throws Exception {
+        if (captchaAddress == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (StringUtils.startsWithCaseInsensitive(captchaAddress, "data:")) {
+            final String imageType = new Regex(captchaAddress, "data:image/([^;]*)").getMatch(0);
+            if (imageType == null || !imageType.matches("(?i)^(png|jpe?g|gif)$")) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final File captchaFile = this.getLocalCaptchaFile("." + imageType);
+            final InputStream is = IO.dataUrlToInputStream(captchaAddress);
+            try {
+                IO.writeToFile(captchaFile, IO.readStream(-1, is));
+            } finally {
+                is.close();
+            }
+            return captchaFile;
+        }
+        final File captchaFile = this.getLocalCaptchaFile();
+        final Browser brc = getCaptchaBrowser(br);
+        brc.getDownload(captchaFile, captchaAddress);
+        return captchaFile;
+    }
+
     /**
      * Gibt die Datei zurück in die der aktuelle captcha geladen werden soll.
      *
@@ -982,8 +1021,10 @@ public abstract class Plugin implements ActionListener {
      * @return Gibt einen Pfad zurück der für die nächste Captchadatei reserviert ist
      */
     public File getLocalCaptchaFile(String extension) {
-        if (extension == null) {
+        if (StringUtils.isEmpty(extension)) {
             extension = ".jpg";
+        } else if (!extension.startsWith(".")) {
+            extension = "." + extension;
         }
         final Calendar calendar = Calendar.getInstance();
         final String date = String.format("%1$td.%1$tm.%1$tY_%1$tH.%1$tM.%1$tS.", calendar) + new Random().nextInt(999);

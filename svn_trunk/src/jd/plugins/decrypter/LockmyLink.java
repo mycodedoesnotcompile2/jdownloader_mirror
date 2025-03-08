@@ -15,12 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.util.ArrayList;
-
-import org.appwork.utils.IO;
-import org.appwork.utils.Regex;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -34,7 +29,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48360 $", interfaceVersion = 3, names = { "lockmy.link" }, urls = { "https?://(?:www\\.)?lockmy\\.link/l/([A-Za-z0-9]+)/?" })
+import org.appwork.utils.Regex;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+
+@DecrypterPlugin(revision = "$Revision: 50756 $", interfaceVersion = 3, names = { "lockmy.link" }, urls = { "https?://(?:www\\.)?lockmy\\.link/l/([A-Za-z0-9]+)/?" })
 public class LockmyLink extends PluginForDecrypt {
     public LockmyLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,16 +93,10 @@ public class LockmyLink extends PluginForDecrypt {
         String[] results = regexDownloadurls(brc);
         if (results == null || results.length == 0) {
             logger.info("Captcha required");
-            final String captchaImageBase64 = brc.getRegex("data:image/png;base64,([a-zA-Z0-9_/\\+\\=]+)").getMatch(0);
+            final String captchaImageBase64 = brc.getRegex("(data:image/png;base64,[a-zA-Z0-9_/\\+\\=]+)").getMatch(0);
             if (captchaImageBase64 == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            byte[] image_bytes = org.appwork.utils.encoding.Base64.decode(captchaImageBase64);
-            if (image_bytes == null || image_bytes.length == 0) {
-                image_bytes = org.appwork.utils.encoding.Base64.decodeFast(captchaImageBase64);
-            }
-            final File captchaImage = getLocalCaptchaFile(".png");
-            IO.writeToFile(captchaImage, image_bytes);
             String captchaDescr = brc.getRegex("<p class=\"title\">([^<]*)</p>").getMatch(0);
             if (captchaDescr == null) {
                 /* 2022-02-16 */
@@ -114,7 +106,7 @@ public class LockmyLink extends PluginForDecrypt {
                 /* Fallback */
                 captchaDescr = "Click on the lock symbol";
             }
-            final ClickedPoint cp = getCaptchaClickedPoint(captchaImage, param, captchaDescr);
+            final ClickedPoint cp = getCaptchaClickedPoint(captchaImageBase64, param, captchaDescr);
             br.postPage("/api/ajax.php", "shortId=" + shortID + "&coords=" + cp.getX() + ".5-" + cp.getY());
             /* "Workaround" for json response */
             br.getRequest().setHtmlCode(PluginJSonUtils.unescape(br.getRequest().getHtmlCode()));

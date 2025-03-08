@@ -15,7 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,13 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
-
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-import org.jdownloader.plugins.components.config.GldSlToConfig;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -45,7 +37,14 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48211 $", interfaceVersion = 2, names = {}, urls = {})
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.jdownloader.plugins.components.config.GldSlToConfig;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 50756 $", interfaceVersion = 2, names = {}, urls = {})
 public class GldSlTo extends antiDDoSForDecrypt {
     public GldSlTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,10 +108,9 @@ public class GldSlTo extends antiDDoSForDecrypt {
         }
         if (!this.canHandle(br.getURL())) {
             /**
-             * 2023-04-17: Workaround for them not configuring redirects properly:</br>
-             * When they are changing domains, old links may get redirected to main page on new domain instead of the URL to the content
-             * although the content is available. </br>
-             * Example: goldesel.sx/bla will redirect to "https://goldesel.bz" instead of to the full URL/content.
+             * 2023-04-17: Workaround for them not configuring redirects properly:</br> When they are changing domains, old links may get
+             * redirected to main page on new domain instead of the URL to the content although the content is available. </br> Example:
+             * goldesel.sx/bla will redirect to "https://goldesel.bz" instead of to the full URL/content.
              */
             if (!domainFromContentURL.equals(this.getHost())) {
                 logger.info("Attempting domain redirect workaround | Old: " + domainFromContentURL + " | New: " + br.getHost());
@@ -232,8 +230,6 @@ public class GldSlTo extends antiDDoSForDecrypt {
                         logger.warning("Decrypter broken for link: " + contenturl);
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    final File file = this.getLocalCaptchaFile();
-                    getCaptchaBrowser(br).getDownload(file, "/" + capLink);
                     String click_on;
                     if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
                         click_on = "Klicke in den gestrichelten Kreis!";
@@ -241,7 +237,7 @@ public class GldSlTo extends antiDDoSForDecrypt {
                         click_on = "Click in the dashed circle!";
                     }
                     logger.info("Click-Captcha | Mirror " + counter + " / " + maxc + " : " + decryptID);
-                    final ClickedPoint cp = getCaptchaClickedPoint(br.getHost(), file, param, click_on);
+                    final ClickedPoint cp = getCaptchaClickedPoint("/" + capLink, param, click_on);
                     if (cp == null) {
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                     }

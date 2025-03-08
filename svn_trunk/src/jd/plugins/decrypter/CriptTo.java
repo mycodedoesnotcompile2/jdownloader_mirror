@@ -18,10 +18,6 @@ package jd.plugins.decrypter;
 import java.io.File;
 import java.util.ArrayList;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -37,7 +33,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 45812 $", interfaceVersion = 3, names = { "cript.to" }, urls = { "https?://(?:www\\.)?cript\\.to/folder/([A-Za-z0-9]+)" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+
+@DecrypterPlugin(revision = "$Revision: 50756 $", interfaceVersion = 3, names = { "cript.to" }, urls = { "https?://(?:www\\.)?cript\\.to/folder/([A-Za-z0-9]+)" })
 public class CriptTo extends PluginForDecrypt {
     private final String NO_SOLVEMEDIA = "1";
 
@@ -123,9 +123,7 @@ public class CriptTo extends PluginForDecrypt {
                 postData += "&do=captcha";
                 final String captcha = br.getRegex("<input type=\"image\" style=\"cursor:crosshair;\" src=\"([^\"]*)\" alt=\"Circle Captcha\"").getMatch(0);
                 if (captcha != null && captcha.contains("circlecaptcha")) {
-                    final File file = this.getLocalCaptchaFile();
-                    getCaptchaBrowser(br).getDownload(file, captcha);
-                    final ClickedPoint cp = getCaptchaClickedPoint(getHost(), file, param, "Click on the open circle");
+                    final ClickedPoint cp = getCaptchaClickedPoint(captcha, param, "Click on the open circle");
                     if (cp == null) {
                         if (i < 3) {
                             continue;
@@ -218,9 +216,7 @@ public class CriptTo extends PluginForDecrypt {
                     if (this.br.containsHTML("circlecaptcha")) {
                         final String captcha = br.getRegex("<input type=\"image\" style=\"cursor:crosshair;\" src=\"([^\"]*)\" alt=\"Circle Captcha\"").getMatch(0);
                         if (captcha != null && captcha.contains("circlecaptcha")) {
-                            final File file = this.getLocalCaptchaFile();
-                            getCaptchaBrowser(br).getDownload(file, captcha);
-                            final ClickedPoint cp = getCaptchaClickedPoint(getHost(), file, param, "Click on the open circle or single color circle");
+                            final ClickedPoint cp = getCaptchaClickedPoint(captcha, param, "Click on the open circle or single color circle");
                             if (cp == null) {
                                 if (i < 3) {
                                     continue;
@@ -273,20 +269,20 @@ public class CriptTo extends PluginForDecrypt {
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), NO_SOLVEMEDIA, "No solvemedia?").setDefaultValue(true));// It's
-                                                                                                                                                       // true
-                                                                                                                                                       // because
-                                                                                                                                                       // solvemedia
-                                                                                                                                                       // was
-                                                                                                                                                       // always
-                                                                                                                                                       // wrong
-                                                                                                                                                       // with
-                                                                                                                                                       // the
-                                                                                                                                                       // code
-                                                                                                                                                       // in
-                                                                                                                                                       // this
-                                                                                                                                                       // plugin
-                                                                                                                                                       // in
-                                                                                                                                                       // my
-                                                                                                                                                       // tests
+        // true
+        // because
+        // solvemedia
+        // was
+        // always
+        // wrong
+        // with
+        // the
+        // code
+        // in
+        // this
+        // plugin
+        // in
+        // my
+        // tests
     }
 }

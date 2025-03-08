@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.gui.swing.jdgui;
 
+import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
@@ -55,6 +56,7 @@ import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.ToolTipManager;
+import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
 import jd.SecondLevelLaunch;
@@ -88,6 +90,7 @@ import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
 import org.appwork.utils.IO;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.logging2.LogInterface;
@@ -1113,6 +1116,20 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         return false;
     }
 
+    private boolean initFlatLafMacToolbar() {
+        if (!CrossSystem.isMac()) {
+            return false;
+        }
+        if (!ReflectionUtils.isInstanceOf("com.formdev.flatlaf.FlatLaf", UIManager.getLookAndFeel())) {
+            return false;
+        }
+        try {
+            return ReflectionUtils.getFieldValue("com.formdev.flatlaf.util.SystemInfo", "isMacFullWindowContentSupported", null, boolean.class);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void layoutComponents() {
         final JPanel contentPane = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[grow,fill]0[shrink]"));
         contentPane.add(this.mainTabbedPane);
@@ -1122,7 +1139,28 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         contentPane.add(this.statusBar, "dock SOUTH");
         this.mainFrame.setContentPane(contentPane);
         this.mainFrame.setJMenuBar(this.menuBar);
-        this.mainFrame.add(this.toolBar, "dock NORTH");
+
+        if (initFlatLafMacToolbar()) {
+            // match titlebar color to theme color on MacOS
+            this.mainFrame.getRootPane().putClientProperty("apple.awt.transparentTitleBar", true);
+            // place toolbar with window buttons
+            this.mainFrame.getRootPane().putClientProperty("apple.awt.fullWindowContent", true);
+            // hide app name to allow space for toolbar
+            this.mainFrame.getRootPane().putClientProperty("apple.awt.windowTitleVisible", false);
+            // match window buttons size to toolbar icons
+            this.mainFrame.getRootPane().putClientProperty("FlatLaf.macOS.windowButtonsSpacing", "medium");
+            // Create Placeholder to allow for window buttons
+            JPanel placeholder = new JPanel();
+            JPanel toolBarPanel = new JPanel(new BorderLayout());
+            placeholder.putClientProperty("FlatLaf.fullWindowContent.buttonsPlaceholder", "mac zeroInFullScreen");
+            toolBarPanel.add(placeholder, BorderLayout.LINE_START);
+            // Add toolbar after window buttons
+            toolBarPanel.add(this.toolBar, BorderLayout.CENTER);
+            // Place combined bar on mainframe
+            this.mainFrame.getContentPane().add(toolBarPanel, BorderLayout.NORTH);
+        } else {
+            this.mainFrame.add(this.toolBar, "dock NORTH");
+        }
     }
 
     protected void onGuiInitComplete() {

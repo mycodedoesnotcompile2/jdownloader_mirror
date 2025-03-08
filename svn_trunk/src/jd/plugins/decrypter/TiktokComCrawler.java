@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 50449 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50755 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -194,9 +194,10 @@ public class TiktokComCrawler extends PluginForDecrypt {
             return crawlSingleMediaAPIWithWebsiteFallback(hostPlg, contenturl, account, forceGrabAll);
         } else if (mode == MediaCrawlMode.WEBSITE_EMBED) {
             return crawlSingleMediaWebsiteEmbedWithWebsiteFallback(hostPlg, contenturl, account, forceGrabAll);
-        } else if (mode == MediaCrawlMode.WEBSITE || mode == MediaCrawlMode.AUTO) {
+        } else if (mode == MediaCrawlMode.WEBSITE) {
             return crawlSingleMediaWebsiteWebsite(hostPlg, contenturl, account, forceGrabAll);
         } else {
+            /* MediaCrawlMode.AUTO */
             /* Website with API as fallback. */
             /**
              * Deprecated: Website with API fallback </br>

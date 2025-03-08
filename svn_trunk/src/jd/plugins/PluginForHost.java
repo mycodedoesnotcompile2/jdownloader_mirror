@@ -25,7 +25,6 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
@@ -59,6 +58,53 @@ import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.table.JTableHeader;
+
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import net.miginfocom.swing.MigLayout;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -178,53 +224,6 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.BasicJDTable;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.plugins.Account.AccountError;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import net.miginfocom.swing.MigLayout;
-
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
  *
@@ -233,13 +232,14 @@ import net.miginfocom.swing.MigLayout;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-            /**
-             * these patterns should split filename and fileextension (extension must include the point)
-             */
-            // multipart rar archives
-            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-            // normal files with extension
-            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+        /**
+         * these patterns should split filename and fileextension (extension must include the
+         * point)
+         */
+        // multipart rar archives
+        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+        // normal files with extension
+        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -584,68 +584,13 @@ public abstract class PluginForHost extends Plugin {
         if (StringUtils.isEmpty(captchaAddress)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No captcha url given");
         }
-        final File captchaFile = getLocalCaptchaFile();
-        final Browser brc = getCaptchaBrowser(br);
-        brc.getDownload(captchaFile, captchaAddress);
-        return getCaptchaCode(method, captchaFile, downloadLink);
-    }
-
-    /**
-     * @param captchaImageBase64
-     *            Base64 encoded String containing image.
-     */
-    protected String getCaptchaCodeBase64ImageString(final String captchaImageBase64, final DownloadLink downloadLink) throws Exception {
-        if (StringUtils.isEmpty(captchaImageBase64)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No captcha base64 string given");
-        }
-        final byte[] image = org.appwork.utils.encoding.Base64.decode(captchaImageBase64);
-        if (image == null || image.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Given String is not a base64 encoded String!");
-        }
-        final File captchaFile = getLocalCaptchaFile();
-        if (captchaFile.isFile()) {
-            if (captchaFile.exists() && !captchaFile.delete()) {
-                throw new IOException("Could not overwrite file: " + captchaFile);
-            }
-        }
-        final File parentFile = captchaFile.getParentFile();
-        if (parentFile != null && !parentFile.exists()) {
-            parentFile.mkdirs();
-        }
-        FileOutputStream fos = null;
-        boolean okay = false;
-        try {
-            captchaFile.createNewFile();
-            fos = new FileOutputStream(captchaFile);
-            fos.write(image, 0, image.length);
-            okay = true;
-        } catch (IOException e) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
-        } finally {
-            try {
-                fos.close();
-            } catch (final Throwable e) {
-            }
-            if (okay == false) {
-                captchaFile.delete();
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to write captchafile");
-            }
-        }
-        return getCaptchaCode(captchaFile, downloadLink);
+        return getCaptchaCode(method, getCaptchaImage(captchaAddress), downloadLink);
     }
 
     protected MultiClickedPoint getMultiCaptchaClickedPoint(final File file, final DownloadLink link, final String explain) throws Exception {
         final File copy = copyCaptcha(this.getHost(), file);
         final MultiClickCaptchaChallenge c = new MultiClickCaptchaChallenge(copy, explain, this);
         return handleCaptchaChallenge(link, c);
-    }
-
-    /** Returns browser instance for image captchas. */
-    protected Browser getCaptchaBrowser(Browser br) {
-        final Browser ret = br.cloneBrowser();
-        ret.getHeaders().put("Accept", "image/png,image/*;q=0.8,*/*;q=0.5");
-        ret.getHeaders().put("Cache-Control", null);
-        return ret;
     }
 
     protected String getCaptchaCode(final File captchaFile, final DownloadLink downloadLink) throws Exception {
@@ -1256,8 +1201,8 @@ public abstract class PluginForHost extends Plugin {
             }
             /**
              * In some cases, individual hosts can have different traffic calculation values than 100%. <br>
-             * This calculation applies for the global account-traffic and not for the individual host. </br>
-             * Example: File size is 1GB, individual host traffic calculation factor is 400% <br>
+             * This calculation applies for the global account-traffic and not for the individual host. </br> Example: File size is 1GB,
+             * individual host traffic calculation factor is 400% <br>
              * Account traffic needed: 4GB <br>
              * Individual host traffic needed: 1GB
              */
@@ -1442,6 +1387,9 @@ public abstract class PluginForHost extends Plugin {
             return;
         }
         final long trafficToDeduct = getTrafficRequired(downloadLink, account, bytesTransfered);
+        if (trafficToDeduct == 0) {
+            return;
+        }
         final long trafficLeft = Math.max(0, ai.getTrafficLeft() - trafficToDeduct);
         ai.setTrafficLeft(trafficLeft);
     }
