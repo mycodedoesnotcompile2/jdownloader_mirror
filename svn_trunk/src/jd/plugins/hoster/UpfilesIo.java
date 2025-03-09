@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50182 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 2, names = {}, urls = {})
 public class UpfilesIo extends PluginForHost {
     public UpfilesIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class UpfilesIo extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "upfiles.com", "upfiles.app", "upfiles.io", "upfiles.download", "upfilesurls.com", "nexnoo.com" });
+        ret.add(new String[] { "upfiles.com", "upfiles.app", "upfiles.io", "upfiles.download", "upfilesurls.com", "nexnoo.com", "upfion.com" });
         return ret;
     }
 

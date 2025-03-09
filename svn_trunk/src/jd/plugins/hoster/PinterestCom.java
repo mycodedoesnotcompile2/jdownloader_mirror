@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PinterestComDecrypter;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 3, names = {}, urls = {})
 public class PinterestCom extends PluginForHost {
     public PinterestCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -260,7 +260,7 @@ public class PinterestCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     public void login(final Account account, final boolean validateCookies) throws Exception {

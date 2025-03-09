@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50624 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -161,6 +161,9 @@ public class OneHundretSixteenPanCom extends PluginForHost {
                     }
                 }
                 br.getPage(downlink);
+                if (StringUtils.containsIgnoreCase(br.getURL(), "action=login")) {
+                    throw new AccountRequiredException();
+                }
             }
             final boolean isPremium = account != null && AccountType.PREMIUM.equals(account.getType());
             final Browser ajax = br.cloneBrowser();
@@ -194,6 +197,8 @@ public class OneHundretSixteenPanCom extends PluginForHost {
                     // throw new AccountRequiredException();
                     /* 2023-12-22: New */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Free download for this file is not possible at this moment", 5 * 60 * 1000l);
+                } else if (br.containsHTML(">\\s*抱歉，您的帐号权限当天请求数已满")) {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Daily downloadlimit reached or account required to download");
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }

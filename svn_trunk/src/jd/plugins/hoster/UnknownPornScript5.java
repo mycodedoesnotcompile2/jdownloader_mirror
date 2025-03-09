@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -49,11 +50,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50493 $", interfaceVersion = 3, names = { "boyfriendtv.com", "ashemaletube.com", "pornoxo.com", "worldsex.com", "bigcamtube.com", "porneq.com" }, urls = { "https?://(?:\\w+\\.)?boyfriendtv\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?ashemaletube\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?pornoxo\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?worldsex\\.com/videos/[a-z0-9\\-_]+\\-\\d+(?:\\.html|/)?", "https?://(?:\\w+\\.)?bigcamtube\\.com/videos/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?porneq\\.com/(?:video/\\d+/[a-z0-9\\-_]+/?|wporn/porn-videos/[a-z0-9\\-_]+/\\d+/)" })
+@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 3, names = { "boyfriendtv.com", "ashemaletube.com", "pornoxo.com", "worldsex.com", "bigcamtube.com", "porneq.com" }, urls = { "https?://(?:\\w+\\.)?boyfriendtv\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?ashemaletube\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?pornoxo\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?worldsex\\.com/videos/[a-z0-9\\-_]+\\-\\d+(?:\\.html|/)?", "https?://(?:\\w+\\.)?bigcamtube\\.com/videos/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?porneq\\.com/(?:video/\\d+/[a-z0-9\\-_]+/?|wporn/porn-videos/[a-z0-9\\-_]+/\\d+/)" })
 public class UnknownPornScript5 extends PluginForHost {
     public UnknownPornScript5(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + this.getHost() + "/registration/");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -67,11 +75,12 @@ public class UnknownPornScript5 extends PluginForHost {
     // other: Should work for all (porn) sites that use the "jwplayer" with http URLs: http://www.jwplayer.com/
     private static final String type_allow_title_as_filename = ".+FOR_WEBSITES_FOR_WHICH_HTML_TITLE_TAG_CONTAINS_GOOD_FILENAME.+";
     private static final String default_Extension            = ".mp4";
-    /* Connection stuff */
-    private static final int    free_maxdownloads            = -1;
-    private boolean             resumes                      = true;
-    private int                 chunks                       = 0;
-    private String              dllink                       = null;
+    private List<String>        directurls                   = new ArrayList<String>();
+
+    @Override
+    public void resetPluginGlobals() {
+        this.directurls.clear();
+    }
 
     @Override
     public String getAGBLink() {
@@ -84,10 +93,11 @@ public class UnknownPornScript5 extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        dllink = null;
+        this.directurls.clear();
         final String contenturl = link.getPluginPatternMatcher();
         if (!link.isNameSet()) {
-            /* Now lets find the url_slug as a fallback in case we cannot find the filename inside the html code. */
+            /* Find and set weak-filename */
+            /* Let's find the url_slug as a fallback in case we cannot find the filename inside the html code. */
             String url_slug = null;
             final String[] urlparts = new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/[^/]+/(.+)").getMatch(0).split("/");
             String url_id = null;
@@ -155,19 +165,6 @@ public class UnknownPornScript5 extends PluginForHost {
             link.setFinalFileName(title);
         }
         getDllink();
-        if (!inValidateDllink(dllink)) {
-            logger.info("dllink: " + dllink);
-            if (dllink.contains(".m3u8")) {
-                br.getPage(dllink);
-                // Get file size with checkFFProbe and StreamInfo fails with HTTP error 501 Not Implemented
-                return AvailableStatus.TRUE;
-            }
-        }
-        /* 2022-11-21: Disabled this as their servers will return wrong results when checking multiple items in a short time. */
-        final boolean checkFilesize = true;
-        if (!inValidateDllink(dllink) && !isHLS(this.dllink) && checkFilesize && !isDownload) {
-            basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, link.getFinalFileName(), default_Extension);
-        }
         return AvailableStatus.TRUE;
     }
 
@@ -187,15 +184,22 @@ public class UnknownPornScript5 extends PluginForHost {
         /* Find correct js-source, then find dllink inside of it. */
         final String[] scripts = br.getRegex("<script[^>]*?>(.*?)</script>").getColumn(0);
         for (final String script : scripts) {
-            dllink = searchDllinkInsideJWPLAYERSource(script);
+            String dllink = searchDllinkInsideJWPLAYERSource(script);
             if (dllink != null) {
+                this.directurls.add(dllink);
                 break;
             }
         }
-        if (dllink == null) {
-            dllink = br.getRegex("<(?:source|video)[^<>]*? src=(?:'|\")([^<>'\"]+)(?:'|\")").getMatch(0);
+        final String[] videolinks = br.getRegex("<(?:source|video)[^<>]*? src=(?:'|\")([^<>'\"]+)(?:'|\")").getColumn(0);
+        if (videolinks != null && videolinks.length != 0) {
+            for (final String videolink : videolinks) {
+                if (this.directurls.contains(videolink)) {
+                    continue;
+                }
+                this.directurls.add(videolink);
+            }
         }
-        if (dllink == null && !requiresAccount(br)) {
+        if (this.directurls.isEmpty() && !requiresAccount(br)) {
             /*
              * No player found --> Chances are high that there is no playable content --> Video offline
              *
@@ -364,7 +368,7 @@ public class UnknownPornScript5 extends PluginForHost {
     }
 
     private boolean requiresAccount(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*To watch this video please")) {
+        if (br.containsHTML(">\\s*To watch this video please")) {
             return true;
         } else {
             return false;
@@ -380,36 +384,52 @@ public class UnknownPornScript5 extends PluginForHost {
         requestFileInformation(link, account, true);
         if (requiresAccount(br)) {
             throw new AccountRequiredException();
-        } else if (inValidateDllink(dllink)) {
+        } else if (this.directurls.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (this.isHLS(this.dllink)) { // bigcamtube.com
-            /* hls download */
-            final String hlsurl;
-            if (this.dllink.contains(".m3u8")) {
-                /* Access hls master. */
-                br.getPage(dllink);
-                if (br.getHttpConnection().getResponseCode() == 403) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-                } else if (br.getHttpConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+        int index = 0;
+        findWorkingDirecturl: for (final String directurl : this.directurls) {
+            logger.info("Checking item " + (index + 1) + "/" + this.directurls.size() + " -> " + directurl);
+            final boolean isLastItem = index == this.directurls.size() - 1;
+            try {
+                if (this.isHLS(directurl)) { // bigcamtube.com
+                    /* hls download */
+                    final String hlsurl;
+                    if (directurl.contains(".m3u8")) {
+                        /* Access hls master. */
+                        br.getPage(directurl);
+                        if (br.getHttpConnection().getResponseCode() == 403) {
+                            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+                        } else if (br.getHttpConnection().getResponseCode() == 404) {
+                            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+                        }
+                        final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br));
+                        if (hlsbest == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        hlsurl = hlsbest.getDownloadurl();
+                    } else {
+                        hlsurl = directurl;
+                    }
+                    checkFFmpeg(link, "Download a HLS Stream");
+                    dl = new HLSDownloader(link, br, hlsurl);
+                    break;
+                } else {
+                    dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, true, 0);
+                    handleConnectionErrors(br, dl.getConnection());
+                    break findWorkingDirecturl;
                 }
-                final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br));
-                if (hlsbest == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } catch (final InterruptedException ie) {
+                throw ie;
+            } catch (final Exception e) {
+                if (isLastItem) {
+                    throw e;
                 }
-                hlsurl = hlsbest.getDownloadurl();
-            } else {
-                hlsurl = this.dllink;
+                logger.info("Skipping invalid/broken stream: " + directurl);
             }
-            checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, hlsurl);
-            dl.startDownload();
-        } else {
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resumes, chunks);
-            handleConnectionErrors(br, dl.getConnection());
-            dl.startDownload();
+            index++;
         }
+        dl.startDownload();
     }
 
     private boolean isLoggedin(final Browser br) {
@@ -427,61 +447,55 @@ public class UnknownPornScript5 extends PluginForHost {
 
     private boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setFollowRedirects(true);
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    logger.info("Attempting cookie login");
-                    this.br.setCookies(this.getHost(), cookies);
-                    if (!force) {
-                        /* Don't validate cookies */
-                        return false;
-                    }
-                    br.getPage("https://" + this.getHost() + "/");
-                    if (this.isLoggedin(br)) {
-                        logger.info("Cookie login successful");
-                        /* Refresh cookie timestamp */
-                        account.saveCookies(this.br.getCookies(this.getHost()), "");
-                        return true;
-                    } else {
-                        logger.info("Cookie login failed");
-                    }
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                logger.info("Attempting cookie login");
+                this.br.setCookies(this.getHost(), cookies);
+                if (!force) {
+                    /* Don't validate cookies */
+                    return false;
                 }
-                logger.info("Performing full login");
-                br.getPage("https://" + this.getHost() + "/login.php");
-                final Form loginform = br.getFormbyProperty("name", "loginForm");
-                if (loginform == null) {
-                    logger.warning("Failed to find loginform");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform)) {
-                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                    loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                }
-                loginform.put("login", Encoding.urlEncode(account.getUser()));
-                loginform.put("password", Encoding.urlEncode(account.getPass()));
-                loginform.put("rememberMe", "1");
-                final Request req = br.createFormRequest(loginform);
-                req.getHeaders().put("x-requested-with", "XMLHttpRequest");
-                br.getPage(req);
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                if ((Boolean) entries.get("SUCCESS") != Boolean.TRUE) {
-                    throw new AccountInvalidException();
-                }
-                /* Double-check */
-                br.getPage(entries.get("URL").toString());
-                if (!isLoggedin(br)) {
-                    throw new AccountInvalidException();
-                }
-                account.saveCookies(this.br.getCookies(this.getHost()), "");
-                return true;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
+                br.getPage("https://" + this.getHost() + "/");
+                if (this.isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    /* Refresh cookie timestamp */
+                    account.saveCookies(this.br.getCookies(this.getHost()), "");
+                    return true;
+                } else {
+                    logger.info("Cookie login failed");
                     account.clearCookies("");
                 }
-                throw e;
             }
+            logger.info("Performing full login");
+            br.getPage("https://" + this.getHost() + "/login.php");
+            final Form loginform = br.getFormbyProperty("name", "loginForm");
+            if (loginform == null) {
+                logger.warning("Failed to find loginform");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform)) {
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            }
+            loginform.put("login", Encoding.urlEncode(account.getUser()));
+            loginform.put("password", Encoding.urlEncode(account.getPass()));
+            loginform.put("rememberMe", "1");
+            final Request req = br.createFormRequest(loginform);
+            req.getHeaders().put("x-requested-with", "XMLHttpRequest");
+            br.getPage(req);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if ((Boolean) entries.get("SUCCESS") != Boolean.TRUE) {
+                throw new AccountInvalidException();
+            }
+            /* Double-check */
+            br.getPage(entries.get("URL").toString());
+            if (!isLoggedin(br)) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(this.br.getCookies(this.getHost()), "");
+            return true;
         }
     }
 
@@ -492,7 +506,7 @@ public class UnknownPornScript5 extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -515,23 +529,11 @@ public class UnknownPornScript5 extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public SiteTemplate siteTemplateType() {
         return SiteTemplate.UnknownPornScript5;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

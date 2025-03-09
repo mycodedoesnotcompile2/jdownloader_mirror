@@ -20,10 +20,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -40,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/(gallery|scraps|user)/([^/]+)" })
+@DecrypterPlugin(revision = "$Revision: 50759 $", interfaceVersion = 3, names = { "furaffinity.net" }, urls = { "https?://(?:www\\.)?furaffinity\\.net/(gallery|scraps|user)/([^/]+)" })
 public class FuraffinityNetCrawler extends PluginForDecrypt {
     public FuraffinityNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,10 +78,12 @@ public class FuraffinityNetCrawler extends PluginForDecrypt {
             br.setFollowRedirects(true);
             do {
                 br.getPage(parameter + "/" + page);
-                if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">\\s*System Message")) {
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (br.containsHTML(">\\s*System Message")) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                final String json = br.getRegex("var descriptions = (\\{.*?\\});").getMatch(0);
+                final String json = br.getRegex("id=\"js-submissionData\" type=\"application/json\"[^>]*>(\\{.*?\\})</script>").getMatch(0);
                 final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
                 final Iterator<Entry<String, Object>> iterator = entries.entrySet().iterator();
                 int itemsCounter = 0;
@@ -98,8 +98,7 @@ public class FuraffinityNetCrawler extends PluginForDecrypt {
                         title = itemID;
                     }
                     final DownloadLink dl = this.createDownloadlink("https://www.furaffinity.net/view/" + itemID);
-                    dl.setMimeHint(CompiledFiletypeFilter.ImageExtensions.JPG);
-                    dl.setName(title);
+                    dl.setName(title + ".jpg");
                     if (!StringUtils.isEmpty(description)) {
                         dl.setComment(description);
                     }

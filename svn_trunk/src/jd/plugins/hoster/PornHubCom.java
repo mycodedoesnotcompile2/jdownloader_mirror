@@ -85,7 +85,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 50751 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -481,7 +481,7 @@ public class PornHubCom extends PluginForHost {
         String html_filename = null;
         String server_filename = null;
         boolean isVideo = false;
-        final String quality = link.getStringProperty(PROPERTY_QUALITY, null);
+        final String quality = link.getStringProperty(PROPERTY_QUALITY);
         /*
          * TODO account handling: Prefer account from handlePremium to be sure not to use ANY account for downloading but the account the
          * upper handling is using!
@@ -574,7 +574,7 @@ public class PornHubCom extends PluginForHost {
             /* Offline links should also have nice filenames */
             link.setName(viewKey + ".mp4");
             html_filename = link.getStringProperty("decryptedfilename", null);
-            dlUrl = link.getStringProperty(PROPERTY_DIRECTLINK, null);
+            dlUrl = link.getStringProperty(PROPERTY_DIRECTLINK);
             cachedURLFlag = true;
             if (dlUrl == null || html_filename == null) {
                 /* This should never happen as every url goes into the decrypter first! */
@@ -597,11 +597,6 @@ public class PornHubCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        String format = link.getStringProperty(PROPERTY_FORMAT);
-        if (format == null) {
-            // older links
-            format = "mp4";
-        }
         server_filename = getFilenameFromURL(dlUrl);
         if (this.getPluginConfig().getBooleanProperty(USE_ORIGINAL_SERVER_FILENAME, false) && server_filename != null) {
             link.setFinalFileName(server_filename);
@@ -612,6 +607,9 @@ public class PornHubCom extends PluginForHost {
             /* No directurl available -> Cannot check */
             return AvailableStatus.TRUE;
         }
+        /* Get desired format. Older links do not have this property but were always using progressive format -> Use "mp4" as fallback. */
+        final String originalFormat = link.getStringProperty(PROPERTY_FORMAT, "mp4");
+        String format = originalFormat;
         if (verifyFinalURL(link, format, this.dlUrl, cachedURLFlag)) {
             return AvailableStatus.TRUE;
         }
@@ -625,16 +623,11 @@ public class PornHubCom extends PluginForHost {
             logger.warning("Failed to find any video qualities");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        this.dlUrl = qualities.containsKey(quality) ? qualities.get(quality).get(format) : null;
-        final String hlsFallback;
-        if (StringUtils.equalsIgnoreCase("mp4", format)) {
-            hlsFallback = qualities.containsKey(quality) ? qualities.get(quality).get("hls") : null;
-        } else {
-            hlsFallback = null;
-        }
-        if (this.dlUrl == null && StringUtils.equalsIgnoreCase("mp4", format)) {
+        this.dlUrl = qualities.containsKey(quality) ? qualities.get(quality).get(originalFormat) : null;
+        final String hlsFallback = qualities.containsKey(quality) ? qualities.get(quality).get("hls") : null;
+        if (this.dlUrl == null && StringUtils.equalsIgnoreCase("mp4", originalFormat)) {
             // 2020-01-11, only HLS available, try fallback to HLS
-            logger.warning("Failed to get fresh directurl: " + format + "/" + quality + " | try HLS fallback: " + hlsFallback);
+            logger.warning("Failed to get fresh directurl: " + originalFormat + "/" + quality + " | try HLS fallback: " + hlsFallback);
             format = "hls";
             this.dlUrl = hlsFallback;
         }
@@ -653,9 +646,9 @@ public class PornHubCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to refresh directurl");
         }
         logger.info("Attempting HLS fallback");
+        format = "hls";
         if (verifyFinalURL(link, format, hlsFallback, false)) {
             logger.info("Successfully refreshed directurl via HLS fallback");
-            format = "hls";
             link.setProperty(PROPERTY_FORMAT, format);
             this.dlUrl = hlsFallback;
             return AvailableStatus.TRUE;

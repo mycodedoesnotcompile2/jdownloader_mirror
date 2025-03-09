@@ -54,7 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50275 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50760 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -529,6 +529,21 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         if (pinID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String[] jssnippets = br.getRegex("<script data-relay-response=\"true\" type=\"application/json\">(.*?)</script>").getColumn(0);
+        if (jssnippets != null && jssnippets.length > 0) {
+            /* Try to find json source in html code */
+            for (final String jssnippet : jssnippets) {
+                final Object parsedjson = JavaScriptEngineFactory.jsonToJavaObject(jssnippet);
+                if (!(parsedjson instanceof Map)) {
+                    continue;
+                }
+                final Map<String, Object> map = (Map<String, Object>) parsedjson;
+                final Map<String, Object> pin_root = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "response/data/v3GetPinQuery/data");
+                if (pin_root != null) {
+                    return pin_root;
+                }
+            }
+        }
         List<Object> resource_data_cache = null;
         final String pin_json_url = "https://www.pinterest.com/resource/PinResource/get/?source_url=%2Fpin%2F" + pinID + "%2F&data=%7B%22options%22%3A%7B%22field_set_key%22%3A%22detailed%22%2C%22ptrf%22%3Anull%2C%22fetch_visual_search_objects%22%3Atrue%2C%22id%22%3A%22" + pinID + "%22%7D%2C%22context%22%3A%7B%7D%7D&module_path=Pin(show_pinner%3Dtrue%2C+show_board%3Dtrue%2C+is_original_pin_in_related_pins_grid%3Dtrue)&_=" + System.currentTimeMillis();
         br.getPage(pin_json_url);
@@ -583,8 +598,13 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         /* No video --> Must be photo item */
         final Map<String, Object> imagesmap = (Map<String, Object>) map.get("images");
         if (imagesmap != null) {
+            String originalImageURL = (String) imagesmap.get("url");
+            if (originalImageURL != null) {
+                /* V3GetPin */
+                ret.add(originalImageURL);
+                return ret;
+            }
             /* Original image NOT available --> Take the best we can find */
-            String originalImageURL = null;
             String bestNonOriginalImage = null;
             int bestHeight = -1;
             final Iterator<Entry<String, Object>> it = imagesmap.entrySet().iterator();

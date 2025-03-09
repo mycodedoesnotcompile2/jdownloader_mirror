@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49511 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50759 $", interfaceVersion = 2, names = {}, urls = {})
 public class BcVc extends PluginForDecrypt {
     public BcVc(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,12 +85,12 @@ public class BcVc extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String url = param.getCryptedUrl();
+        String contenturl = param.getCryptedUrl();
         /* Correct domain inside URL if we know it is dead. */
         final List<String> deadDomains = getDeadDomains();
-        final String domainFromURL = Browser.getHost(url, false);
+        final String domainFromURL = Browser.getHost(contenturl, false);
         if (deadDomains.contains(domainFromURL)) {
-            url = url.replaceFirst(Pattern.quote(domainFromURL), this.getHost());
+            contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), this.getHost());
         }
         final String linkInsideLink = new Regex(param.getCryptedUrl(), "https?://[^/]+//\\d+/(.+)").getMatch(0);
         if (linkInsideLink != null) {
@@ -102,20 +102,20 @@ public class BcVc extends PluginForDecrypt {
             }
             if (!StringUtils.containsIgnoreCase(finalLinkInsideLink, getHost() + "/")) {
                 final DownloadLink link = createDownloadlink(finalLinkInsideLink);
-                link.setReferrerUrl(url);
+                link.setReferrerUrl(contenturl);
                 ret.add(link);
                 return ret;
             } else {
-                url = linkInsideLink;
+                contenturl = linkInsideLink;
             }
         }
         /**
          * we have to rename them here because we can damage urls within urls.</br>
          * URLs containing www. will always be offline.
          */
-        url = url.replaceFirst("://www.", "://").replaceFirst("http://", "https://");
+        contenturl = contenturl.replaceFirst("://www.", "://").replaceFirst("http://", "https://");
         br.setFollowRedirects(false);
-        br.getPage(url);
+        br.getPage(contenturl);
         /* Check for direct redirect */
         String redirect = null;
         int counter = -1;
