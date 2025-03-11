@@ -46,7 +46,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.BbcCom;
 
-@DecrypterPlugin(revision = "$Revision: 50354 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "https?://(?:www\\.)?(?:bbc\\.com|bbc\\.co\\.uk)/.+" })
+@DecrypterPlugin(revision = "$Revision: 50762 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "https?://(?:www\\.)?(?:bbc\\.com|bbc\\.co\\.uk)/.+" })
 public class BbcComDecrypter extends PluginForDecrypt {
     public BbcComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -562,7 +562,7 @@ public class BbcComDecrypter extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> lookForProgrammesURLs(final CryptedLink param) throws PluginException {
-        if (new Regex(param.getCryptedUrl(), TYPE_PROGRAMMES).matches()) {
+        if (new Regex(param.getCryptedUrl(), TYPE_PROGRAMMES).patternFind()) {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

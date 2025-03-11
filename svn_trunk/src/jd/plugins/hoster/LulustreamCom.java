@@ -30,7 +30,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50691 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50761 $", interfaceVersion = 3, names = {}, urls = {})
 public class LulustreamCom extends XFileSharingProBasic {
     public LulustreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -216,6 +216,6 @@ public class LulustreamCom extends XFileSharingProBasic {
         } catch (MalformedURLException e) {
             logger.log(e);
         }
-        return super.getFUID(getDownloadLink(), type);
+        return super.getFUID(url, type);
     }
 }

@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48579 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50761 $", interfaceVersion = 3, names = {}, urls = {})
 public class BestfileIo extends PluginForHost {
     public BestfileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,13 +52,14 @@ public class BestfileIo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://bestfile.io/";
+        return "https://" + getHost();
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "bestfile.io" });
+        ret.add(new String[] { "uploadhub.io" });
         return ret;
     }
 
@@ -74,15 +75,14 @@ public class BestfileIo extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[a-z]{2}/([A-Za-z0-9]+)/file");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:[a-z]{2}/)?([A-Za-z0-9]+)/file");
         }
         return ret.toArray(new String[0]);
     }
 
     /* Connection stuff */
-    private final boolean FREE_RESUME       = true;
-    private final int     FREE_MAXCHUNKS    = 0;
-    private final int     FREE_MAXDOWNLOADS = -1;
+    private final boolean FREE_RESUME    = true;
+    private final int     FREE_MAXCHUNKS = 0;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -188,7 +188,7 @@ public class BestfileIo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BbcCom;
 
-@DecrypterPlugin(revision = "$Revision: 49799 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50762 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcComiPlayerCrawler extends PluginForDecrypt {
     public BbcComiPlayerCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -240,7 +240,8 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
              * https://github.com/ytdl-org/youtube-dl/issues/30136
              */
             logger.info("Attempting workaround to get 1080p quality even though it is not officially available");
-            hlscontainer_chosen.setStreamURL(hlscontainer_chosen.getDownloadurl().replace(urlpartToReplace, "-video=12000000.m3u8"));
+            final String newurl = hlscontainer_chosen.getDownloadurl().replace(urlpartToReplace, "-video=12000000.m3u8");
+            hlscontainer_chosen.setStreamURL(newurl);
             hlscontainer_chosen.setWidth(1920);
             hlscontainer_chosen.setHeight(1080);
             hlscontainer_chosen.setFramerate(50);

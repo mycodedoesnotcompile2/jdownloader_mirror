@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 3, names = { "boyfriendtv.com", "ashemaletube.com", "pornoxo.com", "worldsex.com", "bigcamtube.com", "porneq.com" }, urls = { "https?://(?:\\w+\\.)?boyfriendtv\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?ashemaletube\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?pornoxo\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?worldsex\\.com/videos/[a-z0-9\\-_]+\\-\\d+(?:\\.html|/)?", "https?://(?:\\w+\\.)?bigcamtube\\.com/videos/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?porneq\\.com/(?:video/\\d+/[a-z0-9\\-_]+/?|wporn/porn-videos/[a-z0-9\\-_]+/\\d+/)" })
+@HostPlugin(revision = "$Revision: 50761 $", interfaceVersion = 3, names = { "boyfriendtv.com", "ashemaletube.com", "pornoxo.com", "worldsex.com", "bigcamtube.com", "porneq.com" }, urls = { "https?://(?:\\w+\\.)?boyfriendtv\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?ashemaletube\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?pornoxo\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?worldsex\\.com/videos/[a-z0-9\\-_]+\\-\\d+(?:\\.html|/)?", "https?://(?:\\w+\\.)?bigcamtube\\.com/videos/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?porneq\\.com/(?:video/\\d+/[a-z0-9\\-_]+/?|wporn/porn-videos/[a-z0-9\\-_]+/\\d+/)" })
 public class UnknownPornScript5 extends PluginForHost {
     public UnknownPornScript5(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,7 +132,6 @@ public class UnknownPornScript5 extends PluginForHost {
             link.setName(url_slug + default_Extension);
         }
         br.setAllowedResponseCodes(new int[] { 410 });
-        br.setFollowRedirects(true);
         if (StringUtils.containsIgnoreCase(contenturl, "bigcamtube.com")) {
             br.setCookie("www.bigcamtube.com", "age_verify", "1");
             br.addAllowedResponseCodes(500);
@@ -447,7 +446,6 @@ public class UnknownPornScript5 extends PluginForHost {
 
     private boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {

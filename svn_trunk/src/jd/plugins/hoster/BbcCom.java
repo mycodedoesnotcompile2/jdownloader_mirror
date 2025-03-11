@@ -39,7 +39,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BbcComDecrypter;
 import jd.plugins.decrypter.BbcComiPlayerCrawler;
 
-@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50762 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcCom extends PluginForHost {
     public BbcCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -314,7 +314,7 @@ public class BbcCom extends PluginForHost {
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_VIDEO_FORMAT, FORMATS, "Select preferred video resolution:").setDefaultValue(0));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_ATTEMPT_FHD_WORKAROUND, "Try to download 1080p 50fps streams if not officially available?\r\nOnly has an effect when best quality is chosen!\r\nWarning: This may lead to download failures!").setDefaultValue(default_SETTING_ATTEMPT_FHD_WORKAROUND));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_ATTEMPT_FHD_WORKAROUND, "Try to download 1080p 50fps streams if not officially available?\r\nOnly applies when the best quality is selected!\r\nWarning: This may cause issues like missing video, failed downloads, or other unwanted effects.").setDefaultValue(default_SETTING_ATTEMPT_FHD_WORKAROUND));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_CRAWL_SUBTITLE, "Crawl subtitle?").setDefaultValue(default_SETTING_CRAWL_SUBTITLE));
     }
 
