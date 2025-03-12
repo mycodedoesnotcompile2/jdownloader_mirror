@@ -36,6 +36,11 @@ package org.appwork.utils.images;
 
 import java.awt.Component;
 import java.awt.Graphics;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 
@@ -95,7 +100,7 @@ public class CroppedIcon extends AbstractIconPipe {
      * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
      */
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
         int xOffset = 0;
         int yOffset = 0;
         if (alignHorizontal != null) {
@@ -130,7 +135,7 @@ public class CroppedIcon extends AbstractIconPipe {
                 throw new NotSupportedException();
             }
         }
-        paintDelegate(c, g, x + xOffset, y + yOffset);
+        paintDelegate(c, g, x + xOffset, y + yOffset, parents);
     }
 
     /**
@@ -164,5 +169,15 @@ public class CroppedIcon extends AbstractIconPipe {
         this.alignHorizontal = horizonal;
         this.alignVertical = vertical;
         return this;
+    }
+
+    private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.SIZE)));
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getModifications()
+     */
+    @Override
+    public Set<ModificationType> getModifications() {
+        return MODIFICATIONS;
     }
 }

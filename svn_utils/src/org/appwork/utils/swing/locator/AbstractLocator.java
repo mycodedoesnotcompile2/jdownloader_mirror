@@ -44,6 +44,7 @@ import java.awt.Window;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.swing.SwingUtils;
 
 /**
@@ -108,9 +109,7 @@ public abstract class AbstractLocator implements Locator {
             }
         }
         final Rectangle bounds = SwingUtils.getUsableScreenBounds(biggestInteresctionScreen);
-        switch (CrossSystem.getOS()) {
-        case WINDOWS_10:
-        case WINDOWS_8:
+        if (CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_8)) {
             /*
              * IT seems that for windows 10 (i guess 8 as well) windows have a huge border (Probably the shadow).<br> That results in a
              * strange behaviour:<br> screen specs: with bounds 0 0 1920 1080 the window is in the top left corner. The window's content
@@ -122,9 +121,6 @@ public abstract class AbstractLocator implements Locator {
             bounds.y -= 16;
             bounds.width += 32;
             bounds.height += 32;
-            break;
-        default:
-            break;
         }
         if (preferedRect.x + preferedRect.width > bounds.x + bounds.width) {
             preferedRect.x = bounds.x + bounds.width - preferedRect.width;
@@ -149,11 +145,11 @@ public abstract class AbstractLocator implements Locator {
     public static Point validate(Point point, final Window dialog) {
         point = AbstractLocator.correct(point, dialog);
         final GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        final GraphicsDevice[] screens = ge.getScreenDevices();       
+        final GraphicsDevice[] screens = ge.getScreenDevices();
         for (final GraphicsDevice screen : screens) {
             final Rectangle bounds = screen.getDefaultConfiguration().getBounds();
             if (bounds.contains(point)) {
-                return point;     
+                return point;
             }
         }
         return new CenterOfScreenLocator().getLocationOnScreen(dialog);

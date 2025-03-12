@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50709 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     // DEV NOTES
     // other: currently they 302 redirect all non www. to www. which kills most of this plugin.
@@ -627,7 +627,6 @@ public class FileFactory extends PluginForHost {
             account.setType(AccountType.PREMIUM);
             if (isPremiumLifetime) {
                 account.setType(AccountType.LIFETIME);
-                ai.setValidUntil(-1);
             } else {
                 if (expireTimestamp > System.currentTimeMillis()) {
                     ai.setValidUntil(expireTimestamp);

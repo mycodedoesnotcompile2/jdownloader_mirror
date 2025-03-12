@@ -49,6 +49,11 @@ import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.awt.font.FontRenderContext;
 import java.awt.font.GlyphVector;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 
@@ -104,8 +109,8 @@ public class DebugIcon extends AbstractIconPipe {
      * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
      */
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
-        paintDelegate(c, g, x, y);
+    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
+        paintDelegate(c, g, x, y, parents);
         if (!CTRL_PRESSED) {
             Graphics2D g2d = (Graphics2D) g.create();
             String text = "" + (getIconWidth() * g2d.getTransform().getScaleX());
@@ -138,5 +143,15 @@ public class DebugIcon extends AbstractIconPipe {
             g2d.fill(textShape);
             g2d.dispose();
         }
+    }
+
+    private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.OVERLAY)));
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getModifications()
+     */
+    @Override
+    public Set<ModificationType> getModifications() {
+        return MODIFICATIONS;
     }
 }

@@ -76,6 +76,7 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.URLStream;
+import org.appwork.utils.images.DisabledIcon;
 import org.appwork.utils.images.IconIO;
 
 /**
@@ -318,10 +319,9 @@ public class ImageProvider {
                 final MinTimeWeakReference<Icon> cache = ImageProvider.DISABLED_ICON_CACHE.get(icon);
                 final Icon cachedDisabledIcon = cache == null ? null : cache.get();
                 if (cachedDisabledIcon != null) {
-                    //
                     return cachedDisabledIcon;
                 }
-                final Icon disabledIcon = new ImageIcon(IconIO.toGrayScale(IconIO.toImage(icon)));
+                final Icon disabledIcon = new DisabledIcon(icon);
                 ImageProvider.DISABLED_ICON_CACHE.put(icon, new MinTimeWeakReference<Icon>(disabledIcon, ImageProvider.MIN_LIFETIME, "disabled icon"));
                 return disabledIcon;
             }

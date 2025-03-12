@@ -39,16 +39,20 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.geom.AffineTransform;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import org.appwork.swing.components.IDIcon;
-import org.appwork.swing.components.IconIdentifier;
 import org.appwork.utils.images.AbstractIconPipe;
 import org.appwork.utils.images.AlignHorizontal;
 import org.appwork.utils.images.AlignVertical;
 import org.appwork.utils.images.CroppedIcon;
+import org.appwork.utils.images.ModificationType;
 
 /**
  * @author thomas
@@ -60,6 +64,16 @@ public class HighDPIIcon extends AbstractIconPipe {
         super(icon);
     }
 
+    private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.NONE)));
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getModifications()
+     */
+    @Override
+    public Set<ModificationType> getModifications() {
+        return MODIFICATIONS;
+    }
+
     /**
      * @param image
      */
@@ -68,26 +82,16 @@ public class HighDPIIcon extends AbstractIconPipe {
     }
 
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
         if (!(delegate instanceof ImageIcon)) {
-            paintDelegate(c, g, x, y);
+            paintDelegate(c, g, x, y, parents);
             return;
-        }
-        if (parent instanceof IDIcon) {
-            IconIdentifier iden = ((IDIcon) parent).getIdentifier();
-            if (iden.getKey().contains("plus")) {
-                // System.out.println(12);
-            }
         }
         Image image = ((ImageIcon) delegate).getImage();
         Graphics2D g2 = (Graphics2D) g;
         AffineTransform transform = g2.getTransform();
         double scaleX = transform.getScaleX();
         double scaleY = transform.getScaleY();
-        // if (parent instanceof IDIcon) {
-        // IconIdentifier iden = ((IDIcon) parent).getIdentifier();
-        // System.out.println("Paint: " + parent);
-        // }
         if (scaleX != 1d || scaleY != 1d) {
             if (isHDPIFixRequired(scaleX, scaleY, transform.getTranslateX(), transform.getTranslateY())) {
                 double scaledW = getIconWidth() * scaleX;
@@ -108,7 +112,7 @@ public class HighDPIIcon extends AbstractIconPipe {
                 } else if (Math.abs(scaledW - best.getWidth(null)) > 1 || Math.abs(scaledH - best.getHeight(null)) > 1) {
                     // we have no highRes image. draw normal
                     // System.out.println("bypass HighDPI");
-                    paintDelegate(c, g, x, y);
+                    paintDelegate(c, g, x, y, parents);
                     g2.translate(fixtX, fixtY);
                     return;
                 } else {
@@ -121,7 +125,7 @@ public class HighDPIIcon extends AbstractIconPipe {
                 return;
             }
         }
-        paintDelegate(c, g, x, y);
+        paintDelegate(c, g, x, y, parents);
     }
 
     /**

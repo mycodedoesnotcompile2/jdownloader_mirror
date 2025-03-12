@@ -66,8 +66,11 @@ import java.lang.reflect.ParameterizedType;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.ImageIO;
@@ -101,10 +104,19 @@ public class IconIO {
     }
 
     public static class ScaledIcon extends AbstractIconPipe implements Icon, IDIcon {
-        private final int           width;
-        private final int           height;
-        private final Interpolation interpolation;
-        private final double        faktor;
+        private final int                          width;
+        private final int                          height;
+        private final Interpolation                interpolation;
+        private final double                       faktor;
+        private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.SIZE)));
+
+        /**
+         * @see org.appwork.utils.images.IconPipe#getModifications()
+         */
+        @Override
+        public Set<ModificationType> getModifications() {
+            return MODIFICATIONS;
+        }
 
         /**
          * @param icon
@@ -168,7 +180,7 @@ public class IconIO {
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
-        public void paintIcon(final Component c, final Graphics g, final int x, final int y, Icon parent) {
+        public void paintIcon(final Component c, final Graphics g, final int x, final int y, List<Icon> parents) {
             if (delegate instanceof ScalableIcon) {
                 ((ScalableIcon) delegate).paintIcon(c, g, x, y, getIconWidth(), getIconHeight());
                 return;
@@ -180,7 +192,7 @@ public class IconIO {
             final AffineTransform old = g2.getTransform();
             g2.translate(x, y);
             g2.scale(this.faktor, this.faktor);
-            paintDelegate(c, g2, 0, 0);
+            paintDelegate(c, g2, 0, 0, parents);
             g2.setTransform(old);
         }
     }
@@ -587,6 +599,8 @@ public class IconIO {
                     return newScaledIcon;
                 }
             }
+        } else if (icon instanceof CanScaleItSelfIcon) {
+            return ((CanScaleItSelfIcon) icon).getScaledInstance(width, height, bicubic);
         }
         return new ScaledIcon(icon, width, height, bicubic);
     }
@@ -625,15 +639,10 @@ public class IconIO {
     public static Image getScaledInstance(Image img, int width, int height, final Interpolation interpolation, final boolean higherQuality, boolean keepratio) {
         DebugMode.breakIf(img == null);
         final double faktor = Math.max((double) img.getWidth(null) / width, (double) img.getHeight(null) / height);
-        if (MultiResolutionImageHelper.isInstanceOf(img)) {
-            // find best base variant
-            img = MultiResolutionImageHelper.getResolutionVariant(img, width, height);
-        }
         if (keepratio || width <= 0 || height <= 0) {
             if (faktor == 1.0) {
                 return img;
             }
-            double test = img.getHeight(null) / faktor;
             // if height or width is 0 or less, this means to keep ratio and scale based on the remaining dimension
             width = (int) Math.max(Math.round(img.getWidth(null) / faktor), 1);
             height = (int) Math.max(Math.round(img.getHeight(null) / faktor), 1);
@@ -641,6 +650,10 @@ public class IconIO {
             if (height == img.getHeight(null) && width == img.getWidth(null)) {
                 return img;
             }
+        }
+        if (MultiResolutionImageHelper.isInstanceOf(img)) {
+            // find best base variant
+            img = MultiResolutionImageHelper.getResolutionVariant(img, width, height);
         }
         Image ret = img;
         int w, h;
@@ -1000,25 +1013,30 @@ public class IconIO {
      * @return
      */
     public static Image toGrayScale(Image input) {
-        if (MultiResolutionImageHelper.isSupported() && MultiResolutionImageHelper.isInstanceOf(input)) {
-            List<Image> variants = MultiResolutionImageHelper.getResolutionVariants(input);
-            Image[] newList = new Image[variants.size()];
-            int baseIndex = 0;
-            for (int i = 0; i < newList.length; i++) {
-                Image v = variants.get(i);
-                newList[i] = GrayFilter.createDisabledImage(v);
-            }
-            return MultiResolutionImageHelper.create(baseIndex, newList);
-        }
-        return GrayFilter.createDisabledImage(input);
+        // GrayFilter.createDisabledImage has already multiressupport
+        Image ret = GrayFilter.createDisabledImage(input);
+        return ret;
     }
 
     public static Image toImage(final Icon icon) {
-        if (icon instanceof ImageIcon) {
-            return ((ImageIcon) icon).getImage();
-        } else {
-            return toBufferedImage(icon);
+        Icon i = icon;
+        while (i != null) {
+            if (i.getIconHeight() != icon.getIconHeight() || i.getIconWidth() != icon.getIconWidth()) {
+                break;
+            }
+            if (i instanceof ImageIcon) {
+                return ((ImageIcon) i).getImage();
+            }
+            if (i instanceof IconPipe) {
+                Set<ModificationType> mods = ((IconPipe) i).getModifications();
+                if (mods == null || mods.contains(ModificationType.NONE)) {
+                    i = ((IconPipe) i).getDelegate();
+                    continue;
+                }
+            }
+            break;
         }
+        return toBufferedImage(icon);
     }
 
     /**
@@ -1051,5 +1069,59 @@ public class IconIO {
         ImageProvider.writeImage(jpg, "jpg", bos);
         bos.close();
         return bos.toByteArray();
+    }
+
+    /**
+     * @param icon
+     * @return
+     */
+    public static IconIdentifier getPrimaryIdentifier(Icon icon) {
+        while (icon != null) {
+            if (icon instanceof IDIcon) {
+                return ((IDIcon) icon).getIdentifier();
+            }
+            if (icon instanceof IconPipe) {
+                icon = ((IconPipe) icon).getDelegate();
+            } else {
+                break;
+            }
+        }
+        return null;
+    }
+
+    public static Image getPrimaryImage(Icon icon) {
+        while (icon != null) {
+            if (icon instanceof ImageIcon) {
+                return ((ImageIcon) icon).getImage();
+            }
+            if (icon instanceof IconPipe) {
+                icon = ((IconPipe) icon).getDelegate();
+            } else {
+                break;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * parameters may be -1. what means : don't care
+     *
+     * @param tolerateFromWidth
+     * @param tolerateToWidth
+     * @param tolerateFromHeight
+     * @param tolerateToHeight
+     * @return true if the image is within the given range (incl.)
+     */
+    public static boolean isImageDimensionWithinRange(Image img, int fromWidth, int toWidth, int fromHeight, int toHeight) {
+        boolean widthInTolerance = fromWidth <= 0 || img.getWidth(null) >= fromWidth;
+        widthInTolerance &= toWidth <= 0 || img.getWidth(null) <= toWidth;
+        if (widthInTolerance) {
+            boolean heightInTolerance = fromHeight <= 0 || img.getHeight(null) >= fromHeight;
+            heightInTolerance &= toHeight <= 0 || img.getHeight(null) <= toHeight;
+            if (heightInTolerance) {
+                return true;
+            }
+        }
+        return false;
     }
 }

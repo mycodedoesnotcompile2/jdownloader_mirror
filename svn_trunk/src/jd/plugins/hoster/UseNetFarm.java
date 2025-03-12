@@ -21,12 +21,13 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import jd.PluginWrapper;
 import jd.http.Cookies;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "usenet.farm" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "usenet.farm" }, urls = { "" })
 public class UseNetFarm extends UseNet {
     public UseNetFarm(PluginWrapper wrapper) {
         super(wrapper);
@@ -141,93 +142,87 @@ public class UseNetFarm extends UseNet {
         final AccountInfo ai = new AccountInfo();
         br.setFollowRedirects(false);
         final Cookies cookies = account.loadCookies("");
-        try {
-            if (cookies != null) {
-                br.setCookies(getHost(), cookies);
-                br.getPage("https://usenet.farm/action/auth/state");
-                final Map<String, Object> state = restoreFromString(br.toString(), TypeRef.MAP);
-                if (state == null || !Boolean.TRUE.equals(state.get("state"))) {
-                    account.clearCookies("");
-                }
-            }
-            if (br.getCookie(getHost(), "sessid") == null) {
-                account.clearCookies("");
-                if (!StringUtils.containsIgnoreCase(account.getPass(), "uuid") || !StringUtils.startsWithCaseInsensitive(account.getPass(), "http")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "Please enter the complete login URL!\r\nIf you are using JD in Headless mode, enter your login URL in the username & password fields.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                // login url
-                br.setAllowedResponseCodes(400);// Bad Request on invalid Login
-                br.getPage(account.getPass());
-                if (br.getCookie(getHost(), "sessid") == null) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                br.getPage("https://usenet.farm/action/auth/state");
-                final Map<String, Object> state = restoreFromString(br.toString(), TypeRef.MAP);
-                if (state == null || !Boolean.TRUE.equals(state.get("state"))) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-            }
-            account.saveCookies(br.getCookies(getHost()), "");
-            br.getPage("https://usenet.farm/action/notify/dash");
-            final Map<String, Object> dash = restoreFromString(br.toString(), TypeRef.MAP);
-            if (dash != null) {
-                final String email = (String) dash.get("email");
-                if (email != null) {
-                    account.setUser(email);
-                }
-            }
-            br.getPage("https://usenet.farm/action/payment/list");
-            final Map<String, Object> list = restoreFromString(br.toString(), TypeRef.MAP);
-            if (list != null) {
-                if (Boolean.TRUE.equals(list.get("lifetime"))) {
-                    ai.setValidUntil(-1);
-                } else {
-                    final List<Map<String, Object>> lines = (List<Map<String, Object>>) list.get("lines");
-                    final Map<String, Object> current = lines.get(0);
-                    final String date_end = (String) current.get("date_end");
-                    final long date = TimeFormatter.getMilliSeconds(date_end, "yyyy'-'MM'-'dd", null);
-                    if (date > 0) {
-                        ai.setValidUntil(date + (24 * 60 * 60 * 1000l));
-                    }
-                }
-                br.getPage("https://usenet.farm/action/metric/usage");
-                final Map<String, Object> usage = restoreFromString(br.toString(), TypeRef.MAP);
-                if (usage != null) {
-                    final Number total = getNumber(usage, "total");
-                    final Number remain = getNumber(usage, "remain");
-                    if (total != null && remain != null) {
-                        ai.setTrafficMax(total.longValue());
-                        ai.setTrafficLeft(remain.longValue());
-                    } else if (remain != null) {
-                        ai.setTrafficLeft(remain.longValue());
-                    }
-                }
-                br.getPage("https://usenet.farm/action/config/userpass");
-                final Map<String, Object> userpass = restoreFromString(br.toString(), TypeRef.MAP);
-                if (userpass != null) {
-                    final String user = (String) userpass.get("user");
-                    final String pass = (String) userpass.get("pass");
-                    if (user != null && pass != null) {
-                        account.setProperty(USENET_USERNAME, user);
-                        account.setProperty(USENET_PASSWORD, pass);
-                        final Number conns = getNumber(userpass, "conns");
-                        if (conns != null) {
-                            account.setConcurrentUsePossible(true);
-                            account.setMaxSimultanDownloads(conns.intValue());
-                        }
-                        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
-                        account.setRefreshTimeout(2 * 60 * 60 * 1000l);
-                        return ai;
-                    }
-                }
-            }
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-        } catch (final PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
+        if (cookies != null) {
+            br.setCookies(cookies);
+            br.getPage("https://usenet.farm/action/auth/state");
+            final Map<String, Object> state = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (state == null || !Boolean.TRUE.equals(state.get("state"))) {
                 account.clearCookies("");
             }
-            throw e;
         }
+        if (br.getCookie(getHost(), "sessid") == null) {
+            account.clearCookies("");
+            if (!StringUtils.containsIgnoreCase(account.getPass(), "uuid") || !StringUtils.startsWithCaseInsensitive(account.getPass(), "http")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Please enter the complete login URL!\r\nIf you are using JD in Headless mode, enter your login URL in the username & password fields.", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            // login url
+            br.setAllowedResponseCodes(400);// Bad Request on invalid Login
+            br.getPage(account.getPass());
+            if (br.getCookie(getHost(), "sessid") == null) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            br.getPage("https://usenet.farm/action/auth/state");
+            final Map<String, Object> state = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (state == null || !Boolean.TRUE.equals(state.get("state"))) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+        }
+        account.saveCookies(br.getCookies(br.getHost()), "");
+        br.getPage("https://usenet.farm/action/notify/dash");
+        final Map<String, Object> dash = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (dash != null) {
+            final String email = (String) dash.get("email");
+            if (email != null) {
+                account.setUser(email);
+            }
+        }
+        br.getPage("https://usenet.farm/action/payment/list");
+        final Map<String, Object> list = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (list != null) {
+            if (Boolean.TRUE.equals(list.get("lifetime"))) {
+                account.setType(AccountType.LIFETIME);
+            } else {
+                account.setType(AccountType.PREMIUM);
+                final List<Map<String, Object>> lines = (List<Map<String, Object>>) list.get("lines");
+                final Map<String, Object> current = lines.get(0);
+                final String date_end = (String) current.get("date_end");
+                final long date = TimeFormatter.getMilliSeconds(date_end, "yyyy'-'MM'-'dd", null);
+                if (date > 0) {
+                    ai.setValidUntil(date + (24 * 60 * 60 * 1000l));
+                }
+            }
+            br.getPage("https://usenet.farm/action/metric/usage");
+            final Map<String, Object> usage = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (usage != null) {
+                final Number total = getNumber(usage, "total");
+                final Number remain = getNumber(usage, "remain");
+                if (total != null && remain != null) {
+                    ai.setTrafficMax(total.longValue());
+                    ai.setTrafficLeft(remain.longValue());
+                } else if (remain != null) {
+                    ai.setTrafficLeft(remain.longValue());
+                }
+            }
+            br.getPage("https://usenet.farm/action/config/userpass");
+            final Map<String, Object> userpass = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (userpass != null) {
+                final String user = (String) userpass.get("user");
+                final String pass = (String) userpass.get("pass");
+                if (user != null && pass != null) {
+                    account.setProperty(USENET_USERNAME, user);
+                    account.setProperty(USENET_PASSWORD, pass);
+                    final Number conns = getNumber(userpass, "conns");
+                    if (conns != null) {
+                        account.setConcurrentUsePossible(true);
+                        account.setMaxSimultanDownloads(conns.intValue());
+                    }
+                    ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
+                    account.setRefreshTimeout(2 * 60 * 60 * 1000l);
+                    return ai;
+                }
+            }
+        }
+        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
     }
 
     @Override

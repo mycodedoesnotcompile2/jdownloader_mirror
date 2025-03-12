@@ -40,6 +40,11 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 
@@ -49,8 +54,9 @@ import javax.swing.Icon;
  *
  */
 public class BorderedIcon extends AbstractIconPipe {
-    private int   borderWidth;
-    private Color borderColor;
+    private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.OVERLAY, ModificationType.SIZE)));
+    private int                                borderWidth;
+    private Color                              borderColor;
 
     /**
      * @param checkBox
@@ -64,7 +70,7 @@ public class BorderedIcon extends AbstractIconPipe {
     }
 
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
         Graphics2D g2d = (Graphics2D) g.create();
         AffineTransform originalTransform = g2d.getTransform();
         double scaleX = originalTransform.getScaleX();
@@ -91,7 +97,7 @@ public class BorderedIcon extends AbstractIconPipe {
             g2d.setTransform(originalTransform);
         }
         g2d.setColor(Color.green);
-        paintDelegate(c, g, x + borderWidth, y + borderWidth);
+        paintDelegate(c, g, x + borderWidth, y + borderWidth, parents);
     }
 
     /**
@@ -108,5 +114,13 @@ public class BorderedIcon extends AbstractIconPipe {
     @Override
     public int getIconHeight() {
         return super.getIconHeight() + borderWidth * 2;
+    }
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getModifications()
+     */
+    @Override
+    public Set<ModificationType> getModifications() {
+        return MODIFICATIONS;
     }
 }

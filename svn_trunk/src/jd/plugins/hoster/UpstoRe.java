@@ -53,7 +53,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50347 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
@@ -184,7 +184,7 @@ public class UpstoRe extends antiDDoSForHost {
         final Regex fileInfo = br.getRegex("<h2 style=\"margin:0\">([^<]+)</h2>\\s*<div class=\"comment\">([^<]+)<");
         String filename = fileInfo.getMatch(0);
         if (filename == null) {
-            filename = br.getRegex("(?i)<title>Download file ([^<>\"]*?) \\&mdash; Upload, store \\& share your files on").getMatch(0);
+            filename = br.getRegex("<title>Download file ([^<>\"]*?) \\&mdash; Upload, store \\& share your files on").getMatch(0);
         }
         final String filesize = fileInfo.getMatch(1);
         if (filename != null) {
@@ -197,7 +197,7 @@ public class UpstoRe extends antiDDoSForHost {
     }
 
     private boolean isOffline1() {
-        return br.containsHTML("(?i)>\\s*File not found<|>File was deleted by owner or due to a violation of service rules\\.|not found|>SmartErrors powered by");
+        return br.containsHTML(">\\s*File not found<|>File was deleted by owner or due to a violation of service rules\\.|not found|>SmartErrors powered by");
     }
 
     @SuppressWarnings({ "unchecked", "deprecation" })
@@ -291,7 +291,7 @@ public class UpstoRe extends antiDDoSForHost {
             if (captchaForm != null) {
                 submitForm(captchaForm);
             }
-            if (br.containsHTML("(?i)limit for today|several files recently")) {
+            if (br.containsHTML("limit for today|several files recently")) {
                 if (currentIP == null) {
                     currentIP = new BalancedWebIPCheck(br.getProxy()).getExternalIP().getIP();
                 }
@@ -377,7 +377,7 @@ public class UpstoRe extends antiDDoSForHost {
 
     /** Handles errors which are returned after accessing final downloadurl. */
     private void handleServerErrors(final Browser br) throws PluginException {
-        if (br.containsHTML("(?i)not found")) {
+        if (br.containsHTML("not found")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'not found'", 30 * 60 * 1000l);
         }
     }
@@ -387,7 +387,7 @@ public class UpstoRe extends antiDDoSForHost {
          * Example error json:
          * {"errors":["Sorry, download server with your file is temporary unavailable... Try again later or contact support."]}
          */
-        if (this.br.containsHTML("(?i)Sorry, download server with your file is temporarily unavailable")) {
+        if (this.br.containsHTML("Sorry, download server with your file is temporarily unavailable")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 30 * 60 * 1000l);
         }
     }
@@ -396,14 +396,14 @@ public class UpstoRe extends antiDDoSForHost {
         /* Example: "<span class="error">File size is larger than 2 GB. Unfortunately, it can be downloaded only with premium</span>" */
         if (isOffline1()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (this.br.containsHTML("(?i)File size is larger than|it can be downloaded only with premium")) {
+        } else if (this.br.containsHTML("File size is larger than|it can be downloaded only with premium")) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
-        } else if (br.containsHTML("(?i)>\\s*This file is available only for Premium users")) {
+        } else if (br.containsHTML(">\\s*This file is available only for Premium users")) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
-        } else if (br.containsHTML("(?i)>\\s*Server for free downloads is overloaded<")) {
+        } else if (br.containsHTML(">\\s*Server for free downloads is overloaded<")) {
             /* Here some errors that should only happen in free(account) mode: */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Server for free downloads is overloaded'", 30 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)>\\s*Server with file not found<")) {
+        } else if (br.containsHTML(">\\s*Server with file not found<")) {
             // Same server error (displayed differently) also exists for premium users
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Server with file not found'", 60 * 60 * 1000l);
         }
@@ -421,64 +421,50 @@ public class UpstoRe extends antiDDoSForHost {
 
     private void login(final Account account, final boolean verifyCookies) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    br.setCookies(this.getHost(), cookies);
-                    getPage("https://" + this.getHost());
-                    if (!this.isLoggedinHTML(br)) {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(br.getHost());
-                        setDefaultCookies(br);
-                    } else {
-                        logger.info("Cookie login successful");
-                        /* Save new cookie timestamp */
-                        account.saveCookies(br.getCookies(this.getHost()), "");
-                        return;
-                    }
-                }
-                logger.info("Full login required");
-                if (!isMail(account.getUser())) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Bitte gib deine E-Mail Adresse in das 'Benutzername' Feld ein!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Please enter your e-mail address in the 'username' field!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                br.setCookies(cookies);
                 getPage("https://" + this.getHost());
-                getPage("https://" + this.getHost() + "/account/login/");
-                final Form login = br.getFormbyActionRegex(".+/login.*");
-                if (login == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (!this.isLoggedinHTML(br)) {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(br.getHost());
+                    setDefaultCookies(br);
+                } else {
+                    logger.info("Cookie login successful");
+                    /* Save new cookie timestamp */
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
                 }
-                login.put("email", Encoding.urlEncode(account.getUser()));
-                login.put("password", Encoding.urlEncode(account.getPass()));
-                if (login.containsHTML(regexLoginCaptcha)) {
-                    final String cap = br.getRegex(regexLoginCaptcha).getMatch(-1);
-                    final String code = getCaptchaCode(cap, this.getDownloadLink());
-                    if (code == null) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    } else {
-                        login.put("captcha", Encoding.urlEncode(code));
-                    }
-                }
-                submitForm(login);
-                if (br.containsHTML("(?i)>\\s*Wrong email or password\\.\\s*<")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nUngültiger Benutzername oder ungültiges Passwort!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else if (br.containsHTML(regexLoginCaptcha)) {
-                    // incorrect login-captcha, or form values changed
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                } else if (!this.isLoggedinHTML(br)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                account.saveCookies(br.getCookies(this.getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             }
+            logger.info("Full login required");
+            getPage("https://" + this.getHost());
+            getPage("https://" + this.getHost() + "/account/login/");
+            final Form login = br.getFormbyActionRegex(".+/login.*");
+            if (login == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            login.put("email", Encoding.urlEncode(account.getUser()));
+            login.put("password", Encoding.urlEncode(account.getPass()));
+            if (login.containsHTML(regexLoginCaptcha)) {
+                final String cap = br.getRegex(regexLoginCaptcha).getMatch(-1);
+                final String code = getCaptchaCode(cap, this.getDownloadLink());
+                if (code == null) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                } else {
+                    login.put("captcha", Encoding.urlEncode(code));
+                }
+            }
+            submitForm(login);
+            if (br.containsHTML(">\\s*Wrong email or password\\.\\s*<")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nUngültiger Benutzername oder ungültiges Passwort!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            } else if (br.containsHTML(regexLoginCaptcha)) {
+                // incorrect login-captcha, or form values changed
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            } else if (!this.isLoggedinHTML(br)) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -509,21 +495,17 @@ public class UpstoRe extends antiDDoSForHost {
         return new String[] { "usid", "upst" };
     }
 
-    private boolean isMail(final String parameter) {
-        return parameter.matches(".+@.+");
-    }
-
     // please note: this might cause cookies to go out of session and errors else where...
     // effectively 4 times a day!
     private final String regexLoginCaptcha = "/captcha/\\?\\d+";
 
     private long getPremiumTill(final Browser br) {
         long result = -1;
-        String expire = br.getRegex("(?i)premium till\\s*(\\d{1,2}/\\d{1,2}/\\d{2})").getMatch(0);
+        String expire = br.getRegex("premium till\\s*(\\d{1,2}/\\d{1,2}/\\d{2})").getMatch(0);
         if (expire != null) {
             result = TimeFormatter.getMilliSeconds(expire, "MM/dd/yy", null);
         }
-        expire = br.getRegex("(?i)premium till\\s*([a-zA-Z.]+\\s*\\d{1,2}\\s*,\\s*(\\d{4}|\\d{2}))").getMatch(0);
+        expire = br.getRegex("premium till\\s*([a-zA-Z.]+\\s*\\d{1,2}\\s*,\\s*(\\d{4}|\\d{2}))").getMatch(0);
         if (expire != null && result == -1) {
             result = TimeFormatter.getMilliSeconds(expire, "MMMM dd','yyyy", Locale.ENGLISH);
         }
@@ -545,21 +527,16 @@ public class UpstoRe extends antiDDoSForHost {
         getPage((br.getHttpConnection() == null ? "https://" + this.getHost() : "") + "/?lang=en");
         getPage((br.getHttpConnection() == null ? "https://" + this.getHost() : "") + "/stat/download/?lang=en");
         // Check for never-ending premium accounts
-        if (br.containsHTML("(?i)eternal premium")) {
+        if (br.containsHTML("eternal premium")) {
             account.setType(AccountType.LIFETIME);
         } else {
             account.setType(AccountType.PREMIUM);
             final long validUntil = getPremiumTill(br);
             if (validUntil == -1) {
-                if (br.containsHTML("(?i)unlimited premium")) {
-                    ai.setValidUntil(-1);
+                if (br.containsHTML("unlimited premium")) {
                     ai.setStatus("Unlimited Premium Account");
                 } else {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new AccountUnavailableException("Kostenlose Accounts dieses Anbieters werden nicht unterstützt!", 5 * 60 * 1000l);
-                    } else {
-                        throw new AccountUnavailableException("Free Accounts of this host are not supported!", 5 * 60 * 1000l);
-                    }
+                    throw new AccountUnavailableException("Free Accounts of this host are not supported!", 5 * 60 * 1000l);
                 }
             } else {
                 ai.setValidUntil(validUntil);
@@ -569,7 +546,7 @@ public class UpstoRe extends antiDDoSForHost {
         // ai.setUnlimitedTraffic();
         // this is in MiB, more accurate than the top rounded figure
         // final String trafficUsed = br.getRegex(">Total:</td>\\s*<td>([\\d+\\.]+)<").getMatch(0);
-        final String traffic[] = br.getRegex("(?i)Downloaded in last \\d+ hours: ([\\d+\\.]+) of ([\\d+\\.]+) GB").getRow(0);
+        final String traffic[] = br.getRegex("Downloaded in last \\d+ hours: ([\\d+\\.]+) of ([\\d+\\.]+) GB").getRow(0);
         final long trafficDaily = SizeFormatter.getSize(traffic[1] + "GiB");
         final long trafficLeft = trafficDaily - SizeFormatter.getSize(traffic[0] + "GiB");
         ai.setTrafficLeft(trafficLeft);

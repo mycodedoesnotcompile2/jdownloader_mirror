@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
 public class TwojLimitPl extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private String                                         Info               = null;
@@ -130,12 +130,8 @@ public class TwojLimitPl extends PluginForHost {
             ai.setValidUntil(0);
         } else {
             ai.setExpired(false);
-            if (validUntil != null) {
-                if (validUntil.trim().equals("expire=00")) {
-                    ai.setValidUntil(-1);
-                } else {
-                    ai.setValidUntil(TimeFormatter.getMilliSeconds(validUntil));
-                }
+            if (validUntil != null && !validUntil.trim().equals("expire=00")) {
+                ai.setValidUntil(TimeFormatter.getMilliSeconds(validUntil));
             }
         }
         ai.setMultiHostSupport(this, supportedhosts);

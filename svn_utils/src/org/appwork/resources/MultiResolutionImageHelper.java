@@ -82,8 +82,8 @@ public class MultiResolutionImageHelper {
                 cls = Class.forName("java.awt.image.BaseMultiResolutionImage");
                 intfs = Class.forName("java.awt.image.MultiResolutionImage");
                 cons = cls.getConstructor(int.class, Image[].class);
-                variants = cls.getMethod("getResolutionVariants");
-                variant = cls.getMethod("getResolutionVariant", double.class, double.class);
+                variants = intfs.getMethod("getResolutionVariants");
+                variant = intfs.getMethod("getResolutionVariant", double.class, double.class);
                 isSupported = true;
             } catch (NoSuchMethodException e) {
                 LogV3.log(e);

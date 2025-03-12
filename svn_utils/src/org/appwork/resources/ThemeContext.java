@@ -51,9 +51,9 @@ public class ThemeContext {
     private boolean              usecache                      = true;
     private boolean              createMultiResolutionImages   = true;
     private boolean              doNotUpscaleButThrowException = false;
-    private boolean              debugDrawEnabled              = false;
     private HashMap<String, URL> urls                          = new HashMap<String, URL>();
     private Target               target                        = null;
+    private boolean              debugDrawEnabled              = false;
 
     /**
      * @return the debugDrawEnabled
@@ -119,7 +119,20 @@ public class ThemeContext {
      * @return
      */
     public String toKeyID() {
-        return isCreateMultiResolutionImages() + "_" + isDoNotUpscaleButThrowException() + "_" + isDebugDrawEnabled();
+        StringBuilder key = null;
+        if (isCreateMultiResolutionImages()) {
+            key = key == null ? new StringBuilder() : key;
+            key.append(".MULTIRES");
+        }
+        if (isDoNotUpscaleButThrowException()) {
+            key = key == null ? new StringBuilder() : key;
+            key.append(".NO_UPSCALE");
+        }
+        if (isDebugDrawEnabled()) {
+            key = key == null ? new StringBuilder() : key;
+            key.append(".DEBUG");
+        }
+        return key == null ? "" : key.toString();
     }
 
     /**

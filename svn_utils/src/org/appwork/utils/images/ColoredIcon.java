@@ -41,8 +41,13 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Paint;
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import javax.swing.Icon;
 
@@ -193,8 +198,8 @@ public class ColoredIcon extends AbstractIconPipe {
     }
 
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
-        paintDelegate(c, new Graphics2DProxyImpl((Graphics2D) g, this), x, y);
+    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
+        paintDelegate(c, new Graphics2DProxyImpl((Graphics2D) g, this), x, y, parents);
     }
 
     /**
@@ -241,5 +246,15 @@ public class ColoredIcon extends AbstractIconPipe {
             return modifyColor((Color) paint);
         }
         return paint;
+    }
+
+    private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.COLOR)));
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getModifications()
+     */
+    @Override
+    public Set<ModificationType> getModifications() {
+        return MODIFICATIONS;
     }
 }

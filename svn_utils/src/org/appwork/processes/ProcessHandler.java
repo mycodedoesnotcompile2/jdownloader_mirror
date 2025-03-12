@@ -60,7 +60,7 @@ public interface ProcessHandler {
     List<ProcessInfo> listByPids(int... pids) throws NotSupportedException, IOException, InterruptedException;
 
     /**
-     * Forced Kill Returns false if the process is not running any more.
+     * Forced Kill Returns false if the process is not running any more
      *
      * @param exitCode
      *            TODO
@@ -71,9 +71,13 @@ public interface ProcessHandler {
     boolean terminateForced(ProcessInfo process, int exitCode) throws NotSupportedException, IOException;
 
     /**
-     * Try to soft kill. The process may ignore this. Returns false if the process is not running any more.
+     * Try to soft kill. The process may ignore this. Returns false if the process is not running any more, or if the process did not get at
+     * least one termination request (may happen due to the options)
      *
+     * @param options
+     *            TODO
      * @param found
+     *
      * @throws InterruptedException
      */
     boolean terminateRequest(ProcessInfo process) throws NotSupportedException, IOException;
@@ -82,7 +86,8 @@ public interface ProcessHandler {
 
     /**
      * tries a soft close, waits the timeout and force kills remaining processes<br>
-     * Returns false if at least one process is not running any more
+     * Returns false if at least one process is not running any more, or if any process did not get at least one termination request (may
+     * happen due to the options)
      *
      * @param exitCode
      *            TODO
@@ -101,4 +106,14 @@ public interface ProcessHandler {
      * @throws InterruptedException
      */
     List<ProcessInfo> waitForExit(TimeSpan maxWait, ProcessInfo... processes) throws IOException, NotSupportedException, InterruptedException;
+
+    /**
+     * bring all related windows to fronts
+     *
+     * @return
+     * @throws InterruptedException
+     * @throws IOException
+     * @throws NotSupportedException
+     */
+    public int toFront(ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException;
 }

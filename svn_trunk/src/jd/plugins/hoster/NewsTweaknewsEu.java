@@ -26,7 +26,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "tweaknews.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "tweaknews.eu" }, urls = { "" })
 public class NewsTweaknewsEu extends UseNet {
     public NewsTweaknewsEu(PluginWrapper wrapper) {
         super(wrapper);
@@ -147,7 +147,6 @@ public class NewsTweaknewsEu extends UseNet {
             final long max = SizeFormatter.getSize(blockPackageSize);
             final String dataRemaining = br.getRegex("Data Remaining:</td>.*?<td>(.*?\\s*?GB)").getMatch(0);
             final long left = SizeFormatter.getSize(dataRemaining);
-            ai.setValidUntil(-1);
             ai.setTrafficMax(max);
             ai.setTrafficLeft(left);
             if (left <= 0) {

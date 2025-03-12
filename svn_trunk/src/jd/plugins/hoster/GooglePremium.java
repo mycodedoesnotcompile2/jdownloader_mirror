@@ -12,7 +12,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = { "recaptcha.google.com" }, urls = { "google://.+" })
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "recaptcha.google.com" }, urls = { "google://.+" })
 public class GooglePremium extends PluginForHost {
     @Override
     public Boolean siteTesterDisabled() {
@@ -43,7 +43,6 @@ public class GooglePremium extends PluginForHost {
         final GoogleHelper helper = new GoogleHelper(br);
         helper.login(account, true);
         final AccountInfo ai = new AccountInfo();
-        ai.setValidUntil(-1);
         return ai;
     }
 

@@ -52,7 +52,9 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.imageio.ImageIO;
@@ -63,7 +65,6 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.resources.ThemeContext.Target;
 import org.appwork.storage.config.MinTimeWeakReference;
 import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
-import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -74,7 +75,9 @@ import org.appwork.utils.images.IconDebugger;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.IconPipe;
 import org.appwork.utils.images.Interpolation;
+import org.appwork.utils.images.ModificationType;
 import org.appwork.utils.images.ScalableIcon;
+import org.appwork.utils.reflection.Clazz;
 
 /**
  *
@@ -201,18 +204,22 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @return
      */
     protected String getCacheKey(final Object... objects) {
-        if (objects.length == 1) {
-            return objects[0].toString();
-        }
         final StringBuilder sb = new StringBuilder();
-        for (final Object o : objects) {
+        for (Object o : objects) {
+            if (o == null) {
+                o = "null";
+            }
             if (sb.length() > 0) {
                 sb.append("_");
             }
             if (o instanceof ThemeContext) {
                 sb.append(((ThemeContext) o).toKeyID());
-            } else {
+            } else if (Clazz.isPrimitive(o.getClass())) {
                 sb.append(String.valueOf(o));
+            } else if (Clazz.isString(o.getClass())) {
+                sb.append(String.valueOf(o));
+            } else {
+                DebugMode.debugger("Forbidden key element");
             }
         }
         return sb.toString();
@@ -238,12 +245,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 ret = delegate.getDisabledIcon(input);
             }
             if (ret == null) {
-                final String key = this.getCacheKey(input, "disabled");
-                ret = this.getCached(key);
-                if (ret == null) {
-                    ret = FACTORY.getDisabled(component, input);
-                    this.cache(ret, key);
-                }
+                ret = FACTORY.getDisabled(component, input);
             }
             return ret;
         }
@@ -309,15 +311,12 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             ret = this.getCached(cacheKey);
             if (ret == null) {
                 // try vector
-                ret = this.getCached(relativePath);
-                if (ret != null && ret instanceof ScalableIcon) {
-                    // reuse a cached svg
-                    ret = FACTORY.scale(ret, width, height);
+                Icon cachedRawIcon = this.getCached(relativePath);
+                if (cachedRawIcon instanceof ScalableIcon) {
+                    // re-use a cached svg
+                    ret = FACTORY.scale(cachedRawIcon, width, height);
                     cache(ret, cacheKey);
                     return ret;
-                } else if (ret != null) {
-                    DebugMode.debugger();
-                    ret = null;
                 }
             }
         }
@@ -330,13 +329,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             context = createNewDefaultContext();
         }
         context.ensureTarget(Target.ICON);
-        if (StringUtils.equalsIgnoreCase(relativePath, "disabled") || StringUtils.equalsIgnoreCase(relativePath, "checkbox_false")) {
-            ret = new CheckBoxIcon(Math.max(width, height), false, true);
-        } else if (StringUtils.equalsIgnoreCase(relativePath, "enabled") || StringUtils.equalsIgnoreCase(relativePath, "checkbox_true")) {
-            ret = new CheckBoxIcon(Math.max(width, height), true, true);
-        } else if (StringUtils.equalsIgnoreCase(relativePath, "checkbox_undefined")) {
-            ret = new CheckBoxIcon(Math.max(width, height), true, false);
-        }
         if (ret == null) {
             final URL url = lookupImageUrl(relativePath, context);
             if (url == null) {
@@ -345,16 +337,18 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             ret = FACTORY.urlToVectorIcon(url, width, height);
             if (ret != null) {
                 Icon search = ret;
-                // find the scalable icon to cache it
+                // find the scalable icon to cache it. the icon might be wrapped as IDIcon or anything like this
                 while (search != null) {
                     if (search instanceof ScalableIcon) {
-                        synchronized (this.imageIconCache) {
-                            this.imageIconCache.put(relativePath, new MinTimeWeakRefNamed<Icon>(search, this.getCacheLifetime(), relativePath, this));
-                        }
+                        cache(search, relativePath);
                         break;
                     }
                     if (search instanceof IconPipe) {
-                        search = ((IconPipe) search).getDelegate();
+                        Set<ModificationType> mods = ((IconPipe) search).getModifications();
+                        if (mods == null || mods.contains(ModificationType.NONE)) {
+                            // just a wrapper icon - we can search deeper without risking to skip any important modifications
+                            search = ((IconPipe) search).getDelegate();
+                        }
                     } else {
                         break;
                     }
@@ -364,8 +358,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             // do not use the getImage fallback if the origin request came from the getImage Method
             if (ret == null && context.getTarget() == Target.ICON) {
                 // fallback code if the requested icon is not a vector graphics, but a png or anything like this
-                Image image = null;
-                image = getImage(relativePath, width, height, context);
+                final Image image = getImage(relativePath, width, height, context);
                 if (image != null) {
                     // we cache the icon as well, else we would get many lookupImageUrl calls - slow!
                     ret = FACTORY.imageToIcon(image, width, height);
@@ -759,7 +752,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                     LogV3.log(e);
                 }
             }
-            LogV3.info("Downscaled Image: " + key + "/" + input.getWidth(null) + ":" + input.getHeight(null) + " --> View:" + targetWidth + ":" + targetHeight + " --> Actual: " + baseImageHighDPIFinal.getWidth(null) + ":" + baseImageHighDPIFinal.getHeight(null));
         }
     }
 
@@ -1075,23 +1067,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         return ret;
     }
 
-    public Icon getScaledInstance(final Icon imageIcon, final int size) {
-        Icon ret = null;
-        final Theme delegate = getDelegate();
-        if (delegate != null) {
-            ret = delegate.getScaledInstance(imageIcon, size);
-        }
-        if (ret == null) {
-            final String key = this.getCacheKey(imageIcon, size);
-            ret = this.getCached(key);
-            if (ret == null) {
-                ret = FACTORY.scale(imageIcon, size, size);
-                this.cache(ret, key);
-            }
-        }
-        return ret;
-    }
-
     public String getText(final String string) {
         String ret = null;
         final Theme delegate = getDelegate();
@@ -1192,16 +1167,36 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         return ret;
     }
 
-    public boolean hasIcon(final String string) {
+    public boolean hasIcon(final String key) {
         boolean hasIcon = false;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            hasIcon = delegate.hasIcon(string);
+            hasIcon = delegate.hasIcon(key);
         }
         if (!hasIcon) {
-            hasIcon = lookupImageUrl(string, null) != null;
+            hasIcon = lookupImageUrl(key, null) != null;
         }
         return hasIcon;
+    }
+
+    /**
+     * Returns the file extension for a key. lower case. Might be null if no resource found or "" if there is no extension;
+     *
+     * @param string
+     * @return
+     */
+    public String getIconType(String key) {
+        URL url = getIconURL(key);
+        if (url == null) {
+            return null;
+        }
+        String path = url.getPath().toLowerCase(Locale.ROOT);
+        int nameIndex = path.lastIndexOf("/");
+        int index = path.lastIndexOf(".", nameIndex > 0 ? nameIndex + 1 : 0);
+        if (index < 0) {
+            return "";
+        }
+        return path.substring(index + 1);
     }
 
     public URL getIconURL(final String string) {
@@ -1218,7 +1213,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.storage.config.MinTimeWeakReferenceCleanup# onMinTimeWeakReferenceCleanup
      * (org.appwork.storage.config.MinTimeWeakReference)
      */

@@ -47,6 +47,7 @@ import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.Request;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -66,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50764 $", interfaceVersion = 2, names = {}, urls = {})
 public class FreeDiscPl extends PluginForHost {
     public FreeDiscPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -650,11 +651,11 @@ public class FreeDiscPl extends PluginForHost {
                     br.followConnection(true);
                     if (this.br.containsHTML("Ten plik jest chwilowo niedos")) {
                         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 5 * 60 * 1000l);
-                    } else if (br.getURL().contains("freedisc.pl/pierrw,f-")) {
+                    } else if (br.getURL().contains("/pierrw,f-")) {
                         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 5 * 60 * 1000l);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
+                    throwConnectionExceptions(br, dl.getConnection());
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 link.setProperty(getDirecturlproperty(account), dllink);
             }
@@ -668,6 +669,23 @@ public class FreeDiscPl extends PluginForHost {
             /* Remove download slot */
             controlMaxFreeDownloads(account, link, -1);
         }
+    }
+
+    @Override
+    protected void throwConnectionExceptions(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        switch (con.getResponseCode()) {
+        case 403:
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+        case 404:
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+        case 416:
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 416", 60 * 60 * 1000l);
+        case 429:
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "429 Too Many Requests", 1 * 60 * 1000l);
+        case 503:
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 503 connection limit reached", 5 * 60 * 1000l);
+        }
+        super.throwConnectionExceptions(br, con);
     }
 
     protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {

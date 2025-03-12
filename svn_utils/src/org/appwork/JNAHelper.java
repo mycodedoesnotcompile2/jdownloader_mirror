@@ -62,15 +62,23 @@ public class JNAHelper {
      *
      */
     public static final String JNA_HELPER_USE_JNA                    = "JNAHelper.useJNA";
+    private static boolean     unsupportedClassVersionError          = false;
 
     /**
      * @return
      */
     public static boolean isJNAAvailable() {
         try {
+            if (unsupportedClassVersionError) {
+                return false;
+            }
             // Try to load the JNA class
             Class.forName(CLASS_COM_SUN_JNA_NATIVE, false, JNAHelper.class.getClassLoader());
             return true;
+        } catch (final UnsupportedClassVersionError e) {
+            unsupportedClassVersionError = true;
+            // JNA >=5.14.0 requires minimum JDK8
+            return false;
         } catch (final Exception e) {
             return false;
         }

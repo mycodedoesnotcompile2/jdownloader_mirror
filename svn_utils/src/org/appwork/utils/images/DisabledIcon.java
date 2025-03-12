@@ -7,7 +7,6 @@
  *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
- *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -36,32 +35,90 @@ package org.appwork.utils.images;
 
 import java.awt.Component;
 import java.awt.Graphics;
+import java.awt.Image;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import javax.swing.Icon;
 
+import org.appwork.resources.HighDPIIcon;
+import org.appwork.resources.MultiResolutionImageHelper;
+
 /**
  * @author thomas
- * @date Feb 8, 2025
+ * @date 13.12.2023
  *
  */
-public interface IconPipe {
-    /**
-     * may return null!
-     *
-     * @return
-     */
-    public Icon getDelegate();
+public class DisabledIcon extends AbstractIconPipe {
+    private HighDPIIcon grayedIcon;
+    private final int   width;
+    private final int   height;
 
-    public Set<ModificationType> getModifications();
+    public DisabledIcon(Icon icon) {
+        super(icon);
+        width = icon.getIconWidth();
+        height = icon.getIconHeight();
+    }
+
+    @Override
+    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
+        if (grayedIcon == null) {
+            synchronized (this) {
+                if (grayedIcon == null) {
+                    // System.out.println("To GrayScale DisabledIcon: " + IconIO.getPrimaryIdentifier(delegate));
+                    Image image = IconIO.toImage(delegate);
+                    if (MultiResolutionImageHelper.isSupported() && !MultiResolutionImageHelper.isInstanceOf(image)) {
+                        // if delegate is e.g. a extmergeIcon, we cannot get an multiRes image from it.
+                        // this workaround. assumes, that there might be some highdpi icons inside it, and create a bigger version of it
+                        double scaling = MultiResolutionImageHelper.getHighestMonitorScaling();
+                        if (scaling != 1.0) {
+                            Image imagebig = IconIO.toImage(IconIO.getScaledInstance(delegate, (int) Math.round(getIconWidth() * scaling), (int) Math.round(getIconHeight() * scaling)));
+                            image = MultiResolutionImageHelper.create(image, Arrays.asList(image, imagebig));
+                        }
+                    }
+                    Image grayImage = IconIO.toGrayScale(image);
+                    grayedIcon = new HighDPIIcon(grayImage);
+                    delegate = null;
+                }
+            }
+        }
+        if (parents == null) {
+            parents = new ArrayList<Icon>();
+        }
+        parents.add(this);
+        grayedIcon.paintIcon(c, g, x, y, parents);
+    }
 
     /**
-     * @param c
-     * @param g
-     * @param x
-     * @param y
-     * @param identifierWrapperIcon
+     * @see org.appwork.utils.images.AbstractIconPipe#getIconHeight()
      */
-    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents);
+    /**
+     * @see org.appwork.utils.images.AbstractIconPipe#getIconWidth()
+     */
+    @Override
+    public int getIconWidth() {
+        return width;
+    }
+
+    /**
+     * @see org.appwork.utils.images.AbstractIconPipe#getIconHeight()
+     */
+    @Override
+    public int getIconHeight() {
+        return height;
+    }
+
+    private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.COLOR)));
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getModifications()
+     */
+    @Override
+    public Set<ModificationType> getModifications() {
+        return MODIFICATIONS;
+    }
 }

@@ -75,24 +75,6 @@ public class NotSupportedProcessHandler implements ProcessHandler {
 
     /**
      * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateRequest(org.appwork.processes.ProcessInfo)
-     */
-    @Override
-    public boolean terminateRequest(ProcessInfo process) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateForcedAfterRequest(org.appwork.utils.duration.TimeSpan, int, org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public boolean terminateForcedAfterRequest(TimeSpan waitForSoftClose, int exitCode, ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
      * @see org.appwork.processes.ProcessHandler#waitForExit(org.appwork.utils.duration.TimeSpan, org.appwork.processes.ProcessInfo[])
      */
     @Override
@@ -105,6 +87,32 @@ public class NotSupportedProcessHandler implements ProcessHandler {
      */
     @Override
     public List<ProcessInfo> listByProcessInfo(ProcessInfo... processes) throws NotSupportedException, IOException {
+        throw new NotSupportedException("No Supported");
+    }
+
+    /**
+     * @see org.appwork.processes.ProcessHandler#terminateRequest(org.appwork.processes.ProcessInfo)
+     */
+    @Override
+    public boolean terminateRequest(ProcessInfo process) throws NotSupportedException, IOException {
+        throw new NotSupportedException("No Supported");
+    }
+
+    /**
+     * @see org.appwork.processes.ProcessHandler#terminateForcedAfterRequest(org.appwork.utils.duration.TimeSpan, int,
+     *      org.appwork.processes.ProcessInfo[])
+     */
+    @Override
+    public boolean terminateForcedAfterRequest(TimeSpan waitForSoftClose, int exitCode, ProcessInfo... processes) throws IOException, NotSupportedException, InterruptedException {
+        throw new NotSupportedException("No Supported");
+    }
+
+    /**
+     * @throws NotSupportedException
+     * @see org.appwork.processes.ProcessHandler#toFront(org.appwork.processes.ProcessInfo[])
+     */
+    @Override
+    public int toFront(ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
         throw new NotSupportedException("No Supported");
     }
 }

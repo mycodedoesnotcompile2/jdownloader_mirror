@@ -38,6 +38,7 @@ import java.util.Date;
 import java.util.Locale;
 
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.formatter.TimeFormatter;
 
 /**
@@ -45,6 +46,7 @@ import org.appwork.utils.formatter.TimeFormatter;
  * @date Feb 13, 2025
  *
  */
+@TestDependency({ "org.appwork.utils.formatter.TimeFormatter" })
 public class TimeFormatterTest extends AWTest {
     public static void main(String[] args) {
         run();

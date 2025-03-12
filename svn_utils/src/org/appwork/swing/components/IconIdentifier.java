@@ -48,7 +48,6 @@ public class IconIdentifier implements Storable {
      *
      */
     public IconIdentifier(/* Storable */) {
-
     }
 
     private HashMap<String, Object> prps;
@@ -67,6 +66,14 @@ public class IconIdentifier implements Storable {
 
     public String getKey() {
         return key;
+    }
+
+    /**
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "IconID " + getKey();
     }
 
     public void setKey(String key) {
@@ -92,7 +99,7 @@ public class IconIdentifier implements Storable {
     private ArrayList<IconIdentifier> rsc;
 
     /**
-    * 
+    *
     */
     public IconIdentifier(String cls) {
         this.cls = cls;
@@ -105,7 +112,6 @@ public class IconIdentifier implements Storable {
     public IconIdentifier(String cls, String tld) {
         this(cls);
         this.key = tld;
-
     }
 
     /**
@@ -127,6 +133,5 @@ public class IconIdentifier implements Storable {
             prps = new HashMap<String, Object>();
         }
         prps.put(key, value);
-
     }
 }

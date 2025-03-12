@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50764 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -162,6 +162,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
                 }
                 br.getPage(downlink);
                 if (StringUtils.containsIgnoreCase(br.getURL(), "action=login")) {
+                    /* Free or premium account needed to be able to download this file. */
                     throw new AccountRequiredException();
                 }
             }
@@ -247,7 +248,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
                 logger.info("Attempting cookie login");
-                this.br.setCookies(this.getHost(), cookies);
+                this.br.setCookies(cookies);
                 if (!force) {
                     /* Do not verify cookies */
                     return false;
@@ -256,7 +257,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
                 if (this.isLoggedin(br)) {
                     logger.info("Cookie login successful");
                     /* Refresh cookie timestamp */
-                    account.saveCookies(this.br.getCookies(this.getHost()), "");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
                     return true;
                 } else {
                     logger.info("Cookie login failed");
@@ -282,7 +283,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
             if (!isLoggedin(br)) {
                 throw new AccountInvalidException();
             }
-            account.saveCookies(br.getCookies(this.getHost()), "");
+            account.saveCookies(br.getCookies(br.getHost()), "");
             return true;
         }
     }
@@ -301,7 +302,8 @@ public class OneHundretSixteenPanCom extends PluginForHost {
         login(account, true);
         ai.setUnlimitedTraffic();
         final String premiumExpire = br.getRegex("VIP结束时间\\s*</b>[^<]*<span[^>]*>(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
-        if (premiumExpire == null) {
+        final boolean premiumExpired = br.containsHTML("/no_vip\\.gif");
+        if (premiumExpire == null || premiumExpired) {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
         } else {

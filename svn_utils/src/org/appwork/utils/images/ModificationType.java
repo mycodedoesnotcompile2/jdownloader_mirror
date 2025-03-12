@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,21 +32,28 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.flexijson.mapper;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+package org.appwork.utils.images;
 
 /**
- * @deprecated Use FlexiKeyLookup instead
  * @author thomas
- * @date 17.11.2021 Use FlexiKeyLookup instead
+ * @date Feb 26, 2025
+ *
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.FIELD, ElementType.METHOD })
-@Deprecated
-public @interface FlexiJsonProperty {
-    String value();
+public enum ModificationType {
+    /**
+     * marks a plain delegate icon - the delegate actually paints the same icon
+     */
+    NONE,
+    /**
+     * this icon adds overlays, like another icon, a border, or anything like this
+     */
+    OVERLAY,
+    /**
+     * this icon changes the size of the icon
+     */
+    SIZE,
+    /**
+     * this icon changes the color if the icon. Replaced colors, grayscale or anthing like this
+     */
+    COLOR
 }

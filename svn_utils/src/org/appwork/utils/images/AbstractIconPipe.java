@@ -36,6 +36,8 @@ package org.appwork.utils.images;
 
 import java.awt.Component;
 import java.awt.Graphics;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.Icon;
 
@@ -68,11 +70,16 @@ public abstract class AbstractIconPipe implements IconPipe, Icon {
     }
 
     /**
+     * @param parents
      *
      */
-    protected void paintDelegate(Component c, Graphics g, int x, int y) {
+    protected void paintDelegate(Component c, Graphics g, int x, int y, List<Icon> parents) {
         if (delegate instanceof IconPipe) {
-            ((IconPipe) delegate).paintIcon(c, g, x, y, this);
+            if (parents == null) {
+                parents = new ArrayList<Icon>();
+            }
+            parents.add(this);
+            ((IconPipe) delegate).paintIcon(c, g, x, y, parents);
         } else {
             delegate.paintIcon(c, g, x, y);
         }

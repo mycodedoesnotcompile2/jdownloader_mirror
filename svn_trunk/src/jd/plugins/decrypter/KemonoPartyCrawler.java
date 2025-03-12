@@ -19,12 +19,22 @@ import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -46,18 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 50726 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50769 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +106,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+)(/post/[a-z0-9]+)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?o=(\\d+))?)(/post/[a-z0-9]+)?");
         }
         return ret.toArray(new String[0]);
     }
@@ -141,15 +140,24 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         }
         final String service = urlinfo.getMatch(0);
         final String userID = urlinfo.getMatch(1);
+        final String startOffsetStr = urlinfo.getMatch(3);
+        Integer startOffset = null;
+        if (startOffsetStr != null) {
+            startOffset = Integer.parseInt(startOffsetStr);
+        }
         final boolean useAPI = true;
         if (useAPI) {
-            return crawlProfileAPI(service, userID);
+            return crawlProfileAPI(service, userID, startOffset);
         } else {
-            return crawlProfileWebsite(param, service, userID);
+            return crawlProfileWebsite(param, service, userID, startOffset);
         }
     }
 
-    private ArrayList<DownloadLink> crawlProfileAPI(final String service, final String usernameOrUserID) throws Exception {
+    /**
+     * @param startOffset:
+     *            If provided, only this offset/page will be crawled.
+     */
+    private ArrayList<DownloadLink> crawlProfileAPI(final String service, final String usernameOrUserID, final Integer startOffset) throws Exception {
         if (service == null || usernameOrUserID == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -160,6 +168,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final FilePackage profileFilePackage = getFilePackageForProfileCrawler(service, usernameOrUserID);
         int offset = 0;
+        if (startOffset != null) {
+            logger.info("Starting from offset: " + startOffset);
+            offset = startOffset.intValue();
+        }
         int page = 1;
         final int maxItemsPerPage = 50;
         int numberofContinuousPagesWithoutAnyNewItems = 0;
@@ -169,7 +181,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final List<HashMap<String, Object>> posts = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.LIST_HASHMAP);
+            final List<Map<String, Object>> posts = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
             if (posts == null || posts.isEmpty()) {
                 if (ret.isEmpty()) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -180,7 +192,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 }
             }
             final int numberofUniqueItemsOld = dupes.size();
-            for (final HashMap<String, Object> post : posts) {
+            for (final Map<String, Object> post : posts) {
                 final ArrayList<DownloadLink> thisresults = this.crawlProcessPostAPI(post, dupes, useAdvancedDupecheck);
                 for (final DownloadLink thisresult : thisresults) {
                     if (!perPostPackageEnabled) {
@@ -201,6 +213,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
+            } else if (startOffset != null) {
+                logger.info("Stopping because: User provided specific offset to crawl: " + startOffset);
+                break;
             } else if (numberofContinuousPagesWithoutAnyNewItems >= maxPagesWithoutNewItems) {
                 logger.info("Stopping because: Too many pages without any new items: " + maxPagesWithoutNewItems);
                 break;
@@ -217,13 +232,17 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     @Deprecated
-    private ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param, final String service, final String userID) throws Exception {
+    private ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param, final String service, final String userID, final Integer startOffset) throws Exception {
         if (service == null || userID == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        /* Always begin on page 1 no matter which page param is given in users' added URL. */
-        getPage(br, "https://" + this.getHost() + "/" + service + "/user/" + userID);
+        String url = "https://" + this.getHost() + "/" + service + "/user/" + userID;
+        if (startOffset != null) {
+            logger.info("Starting from offset: " + startOffset);
+            url += "?o=" + startOffset;
+        }
+        getPage(br, url);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!br.getURL().matches(TYPE_PROFILE)) {
@@ -264,6 +283,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 break;
             } else if (ret.size() == totalNumberofItems) {
                 logger.info("Stopping because: Found all items");
+                break;
+            } else if (startOffset != null) {
+                logger.info("Stopping because: User provided specific offset to crawl");
                 break;
             } else if (nextpageurl == null) {
                 /* Additional fail-safe */
@@ -647,13 +669,15 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                                                              return size() > 100;
-                                                          };
-                                                      };
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > 100;
+        };
+    };
 
     /**
-     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br>
+     * Uses API to find userID. </br>
+     * Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {

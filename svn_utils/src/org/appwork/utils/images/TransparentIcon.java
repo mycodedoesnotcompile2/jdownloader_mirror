@@ -39,6 +39,11 @@ import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 
@@ -48,7 +53,16 @@ import javax.swing.Icon;
  *
  */
 public class TransparentIcon extends AbstractIconPipe {
-    private AlphaComposite composite;
+    private AlphaComposite                     composite;
+    private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.COLOR)));
+
+    /**
+     * @see org.appwork.utils.images.IconPipe#getModifications()
+     */
+    @Override
+    public Set<ModificationType> getModifications() {
+        return MODIFICATIONS;
+    }
 
     /**
      * @param icon2
@@ -64,12 +78,12 @@ public class TransparentIcon extends AbstractIconPipe {
      * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
      */
     @Override
-    public void paintIcon(Component c, Graphics g, int x, int y, Icon parent) {
+    public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
         Graphics2D g2 = (Graphics2D) g;
         Composite restore = g2.getComposite();
         try {
             g2.setComposite(composite);
-            paintDelegate(c, g2, x, y);
+            paintDelegate(c, g2, x, y, parents);
         } finally {
             g2.setComposite(restore);
         }

@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50394 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50771 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -833,13 +833,13 @@ public abstract class HighWayCore extends UseNet {
                 maxChunks = hostMaxchunksMap.get(hostFromLink);
             }
         }
-        if (maxChunks == null) {
+        if (maxChunks == null && account != null) {
             /* Look for account specific chunk limit. */
             maxChunks = (Number) account.getProperty(PROPERTY_ACCOUNT_MAXCHUNKS);
-            if (maxChunks == null) {
-                /* Fallback to default */
-                maxChunks = defaultMAXCHUNKS;
-            }
+        }
+        if (maxChunks == null) {
+            /* Fallback to default */
+            maxChunks = defaultMAXCHUNKS;
         }
         return correctChunks(maxChunks.intValue());
     }

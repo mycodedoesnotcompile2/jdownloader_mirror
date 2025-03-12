@@ -198,6 +198,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
         if (b) {
             setValidUntil(0);
         } else {
+            // TODO: Maybe use Long.MAX_VALUE as "unlimited"
             setValidUntil(-1);
         }
     }
@@ -279,6 +280,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
      */
     public final boolean setValidUntil(final long validuntil, final Browser br, final String formatter) {
         if (validuntil == -1) {
+            // TODO: Maybe use Long.MAX_VALUE as "unlimited"
             setValidUntil(-1);
             return true;
         }

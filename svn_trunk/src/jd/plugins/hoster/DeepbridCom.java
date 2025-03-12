@@ -59,7 +59,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50716 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 50771 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -75,12 +75,12 @@ public class DeepbridCom extends PluginForHost {
 
     public DeepbridCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.deepbrid.com/signup");
+        this.enablePremium("https://www." + getHost() + "/signup");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.deepbrid.com/page/terms";
+        return "https://www." + getHost() + "/page/terms";
     }
 
     @Override
@@ -107,8 +107,8 @@ public class DeepbridCom extends PluginForHost {
         } else if (br.containsHTML(">\\s*Wrong request code")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("(?i)<b>File Name:?\\s*?</b></font><font[^>]+>([^<>\"]+)<").getMatch(0);
-        final String filesize = br.getRegex("(?i)<b>File Size:?\\s*?</b></font><font[^>]+>([^<>\"]+)<").getMatch(0);
+        String filename = br.getRegex("<b>File Name:?\\s*?</b></font><font[^>]+>([^<>\"]+)<").getMatch(0);
+        final String filesize = br.getRegex("<b>File Size:?\\s*?</b></font><font[^>]+>([^<>\"]+)<").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
@@ -313,9 +313,15 @@ public class DeepbridCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> userinfo = login(account, true);
-        final Number points = (Number) userinfo.get("points");
+        Number points = (Number) userinfo.get("points");
+        if (points == null) {
+            points = (Number) userinfo.get("fidelity_points");
+        }
+        String humanReadablePointsStr = "N/A";
         if (points != null) {
-            ai.setPremiumPoints(points.intValue());
+            final int pointsInt = points.intValue();
+            ai.setPremiumPoints(pointsInt);
+            humanReadablePointsStr = Integer.toString(pointsInt);
         }
         final String type = userinfo.get("type").toString();
         final Number maxSimultaneousDownloads = (Number) userinfo.get("maxDownloads");
@@ -352,7 +358,7 @@ public class DeepbridCom extends PluginForHost {
             account.setProperty(PROPERTY_ACCOUNT_maxchunks, maxConnections.intValue());
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            ai.setStatus(account.getType().getLabel() + " | MaxDls: " + maxSimultaneousDownloads + " MaxCon: " + maxConnections + " | Points: " + points);
+            ai.setStatus(account.getType().getLabel() + " | MaxDls: " + maxSimultaneousDownloads + " MaxCon: " + maxConnections + " | Points: " + humanReadablePointsStr);
         }
         getPage(br, API_BASE + "?page=api&action=hosters");
         final List<Object> supportedhostslistO;

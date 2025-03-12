@@ -146,7 +146,7 @@ public class IncreasingNonce {
             try {
                 IO.secureWrite(this.file, "v2;" + this.value + ";" + onShutDownSave + ";", SYNC.META_AND_DATA);
                 this.lastSavedValue = this.value;
-                LogV3.info("Saved EventCounter onShutdown: " + inShutdown + ": " + DateMapper.formatJsonDefault(this.value));
+                LogV3.info("Saved EventCounter isShutdownRunning: " + inShutdown + ": " + DateMapper.formatJsonDefault(this.value));
             } catch (final Exception e) {
                 onException(e);
             }

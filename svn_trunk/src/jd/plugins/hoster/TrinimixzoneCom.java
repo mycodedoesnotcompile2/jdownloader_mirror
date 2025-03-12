@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 40566 $", interfaceVersion = 3, names = { "trinimixzone.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "trinimixzone.com" }, urls = { "" })
 public class TrinimixzoneCom extends PluginForHost {
     public TrinimixzoneCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,8 +49,6 @@ public class TrinimixzoneCom extends PluginForHost {
         if (!login(br, account)) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
         }
-        ai.setStatus("Account is OK");
-        ai.setValidUntil(-1);
         return ai;
     }
 

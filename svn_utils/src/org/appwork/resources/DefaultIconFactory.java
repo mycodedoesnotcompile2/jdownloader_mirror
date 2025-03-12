@@ -70,7 +70,6 @@ public class DefaultIconFactory implements IconFactory {
      */
     @Override
     public Icon getDisabled(JComponent component, Icon icon) {
-        // (DebugMode.debugger();
         return ImageProvider.getDisabledIcon(component, icon);
     }
 

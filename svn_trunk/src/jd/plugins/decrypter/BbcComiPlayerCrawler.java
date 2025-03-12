@@ -24,10 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.hls.HlsContainer;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -45,10 +42,20 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BbcCom;
 
-@DecrypterPlugin(revision = "$Revision: 50762 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 50768 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcComiPlayerCrawler extends PluginForDecrypt {
     public BbcComiPlayerCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     public static List<String[]> getPluginDomains() {
@@ -209,21 +216,25 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
         final String configuredPreferredVideoFramerateStr = hosterPlugin.getConfiguredVideoFramerate();
         HlsContainer hlscontainer_chosen = null;
         final boolean userWantsBest;
+        final int configuredPreferredVideoHeight = configuredPreferredVideoHeightStr.matches("\\d+") ? Integer.parseInt(configuredPreferredVideoHeightStr) : -1;
+        final String height_for_quality_selection = hosterPlugin.getHeightForQualitySelection(configuredPreferredVideoHeight);
+        boolean is_1080p_50fps_available = false;
+        for (final HlsContainer hlscontainer_temp : hlsContainers) {
+            final int height = hlscontainer_temp.getHeight();
+            final int fps = hlscontainer_temp.getFramerate(25);
+            final String height_for_quality_selection_temp = hosterPlugin.getHeightForQualitySelection(height);
+            final String fps_str = Integer.toString(hlscontainer_temp.getFramerate(25));
+            if (!is_1080p_50fps_available && height == 1080 && fps == 50) {
+                is_1080p_50fps_available = true;
+            }
+            if (hlscontainer_chosen == null && height_for_quality_selection_temp.equals(height_for_quality_selection) && fps_str.equals(configuredPreferredVideoFramerateStr)) {
+                logger.info("Found user selected quality:" + height_for_quality_selection + "/" + configuredPreferredVideoFramerateStr);
+                hlscontainer_chosen = hlscontainer_temp;
+            }
+        }
         if (configuredPreferredVideoHeightStr.matches("\\d+")) {
             /* Look for user-preferred quality */
             userWantsBest = false;
-            final int configuredPreferredVideoHeight = Integer.parseInt(configuredPreferredVideoHeightStr);
-            final String height_for_quality_selection = hosterPlugin.getHeightForQualitySelection(configuredPreferredVideoHeight);
-            for (final HlsContainer hlscontainer_temp : hlsContainers) {
-                final int height = hlscontainer_temp.getHeight();
-                final String height_for_quality_selection_temp = hosterPlugin.getHeightForQualitySelection(height);
-                final String framerate = Integer.toString(hlscontainer_temp.getFramerate(25));
-                if (height_for_quality_selection_temp.equals(height_for_quality_selection) && framerate.equals(configuredPreferredVideoFramerateStr)) {
-                    logger.info("Found user selected quality");
-                    hlscontainer_chosen = hlscontainer_temp;
-                    break;
-                }
-            }
             if (hlscontainer_chosen == null) {
                 logger.info("Failed to find user selected quality --> Fallback to BEST");
                 hlscontainer_chosen = HlsContainer.findBestVideoByBandwidth(hlsContainers);
@@ -233,18 +244,26 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
             hlscontainer_chosen = HlsContainer.findBestVideoByBandwidth(hlsContainers);
             userWantsBest = true;
         }
-        final String urlpartToReplace = "-video=5070000.m3u8";
-        if (hosterPlugin.isAttemptToDownloadUnofficialFullHD() && hlscontainer_chosen.getDownloadurl().contains(urlpartToReplace) && userWantsBest) {
+        final String urlpartToReplace = "video=5070000";
+        if (userWantsBest && hosterPlugin.isAttemptToDownloadUnofficialFullHD() && !is_1080p_50fps_available && hlscontainer_chosen.getDownloadurl().contains(urlpartToReplace)) {
             /*
              * 2022-03-14: This can get us an upscaled/higher quality version of that video according to discussion in public ticket:
              * https://github.com/ytdl-org/youtube-dl/issues/30136
              */
             logger.info("Attempting workaround to get 1080p quality even though it is not officially available");
-            final String newurl = hlscontainer_chosen.getDownloadurl().replace(urlpartToReplace, "-video=12000000.m3u8");
-            hlscontainer_chosen.setStreamURL(newurl);
-            hlscontainer_chosen.setWidth(1920);
-            hlscontainer_chosen.setHeight(1080);
-            hlscontainer_chosen.setFramerate(50);
+            final String videopart = "video=12000000";
+            final String newurl = hlscontainer_chosen.getDownloadurl().replace(urlpartToReplace, videopart);
+            final Browser br_hls = br.cloneBrowser();
+            br_hls.getPage(newurl);
+            if (br_hls.containsHTML(Pattern.quote(videopart))) {
+                logger.info("1080p trick successful");
+                hlscontainer_chosen.setStreamURL(newurl);
+                hlscontainer_chosen.setWidth(1920);
+                hlscontainer_chosen.setHeight(1080);
+                hlscontainer_chosen.setFramerate(50);
+            } else {
+                logger.info("1080p trick failed");
+            }
         }
         qualityString = String.format("hls_%s@%d", hlscontainer_chosen.getResolution(), hlscontainer_chosen.getFramerate(25));
         final DownloadLink link = new DownloadLink(hosterPlugin, hosterPlugin.getHost(), hlscontainer_chosen.getDownloadurl(), true);

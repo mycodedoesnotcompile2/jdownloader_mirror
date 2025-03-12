@@ -128,11 +128,18 @@ public abstract class ExtComboColumn<E, ModelType> extends ExtTextColumn<E> impl
     }
 
     protected Icon createDropUpIcon() {
-        return ExtTableIcon.TABLE_COLUMN_COMBO_popUpLarge.get(-1);
+        return ExtTableIcon.TABLE_COLUMN_COMBO_popUpLarge.get(getPopIconSize());
     }
 
     protected Icon createDropDownIcon() {
-        return ExtTableIcon.TABLE_COLUMN_COMBO_popDownLarge.get(-1);
+        return ExtTableIcon.TABLE_COLUMN_COMBO_popDownLarge.get(getPopIconSize());
+    }
+
+    /**
+     * @return
+     */
+    protected int getPopIconSize() {
+        return 8;
     }
 
     /*
@@ -215,7 +222,7 @@ public abstract class ExtComboColumn<E, ModelType> extends ExtTextColumn<E> impl
 
     @Override
     public void configureRendererComponent(final E value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-		final ModelType selected = getSelectedItem(value);
+        final ModelType selected = getSelectedItem(value);
         rendererPanel.setEditable(isEditable(value));
         rendererPanel.setIcon(editing == value ? iconUp : iconDown);
         Icon icon = getIconForRenderer(value, selected);
@@ -229,12 +236,9 @@ public abstract class ExtComboColumn<E, ModelType> extends ExtTextColumn<E> impl
         if (getTableColumn() != null && str.length() > 0) {
             try {
                 int upDownIconWidth = rendererPanel.getIcon() != null ? rendererPanel.getIcon().getIconWidth() : 0;
-
                 int iconWidth = icon != null ? icon.getIconWidth() : 0;
                 int availableWidth = getTableColumn().getWidth() - upDownIconWidth - iconWidth - 5 - 10;
-
                 String clipped = org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(rendererField, rendererField.getFontMetrics(rendererField.getFont()), str, availableWidth);
-
                 rendererField.setText(clipped);
             } catch (Throwable e) {
                 // fallback if org.appwork.swing.sunwrapper.SwingUtilities2 disappears someday

@@ -45,8 +45,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.BbcCom;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50762 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "https?://(?:www\\.)?(?:bbc\\.com|bbc\\.co\\.uk)/.+" })
+@DecrypterPlugin(revision = "$Revision: 50771 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "https?://(?:www\\.)?(?:bbc\\.com|bbc\\.co\\.uk)/.+" })
 public class BbcComDecrypter extends PluginForDecrypt {
     public BbcComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +71,7 @@ public class BbcComDecrypter extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)This programme is not currently available on BBC iPlayer")) {
+        } else if (br.containsHTML("This programme is not currently available on BBC iPlayer")) {
             /* Content is online but not streamable at the moment */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -587,12 +588,72 @@ public class BbcComDecrypter extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        /* Check if specific episode/expected content is offline */
-        if (br.containsHTML("(?i)>\\s*Sorry, this episode is not currently available")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         final String contentID = urlInfo.getMatch(0);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final boolean tryAPI = true;
+        if (tryAPI) {
+            /* Thx to: https://gist.github.com/werid/19d4197147617fbe8e7a439ff9fab885#file-bbc-py-L467 */
+            try {
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("https://www.bbc.co.uk/programmes/" + contentID + "/playlist.json");
+                if (brc.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final Map<String, Object> root = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                final List<Map<String, Object>> allAvailableVersions = (List<Map<String, Object>>) root.get("allAvailableVersions");
+                String rootCoverImagURL = (String) root.get("holdingImage");
+                if (allAvailableVersions.isEmpty() && StringUtils.isEmpty(rootCoverImagURL)) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                if (allAvailableVersions.size() > 0) {
+                    for (final Map<String, Object> version : allAvailableVersions) {
+                        final Map<String, Object> smpConfig = (Map<String, Object>) version.get("smpConfig");
+                        final String title = smpConfig.get("title").toString();
+                        final String summary = (String) smpConfig.get("summary");
+                        String coverImageURL = (String) smpConfig.get("holdingImageURL");
+                        final List<Map<String, Object>> items = (List<Map<String, Object>>) smpConfig.get("items");
+                        for (final Map<String, Object> item : items) {
+                            final String kind = item.get("kind").toString();
+                            if (!kind.matches("programme|radioProgramme")) {
+                                logger.info("Skipping invalid kind: " + kind);
+                                continue;
+                            }
+                            final String vpid = item.get("vpid").toString();
+                            final DownloadLink link = this.generateDownloadlink(vpid);
+                            link.setProperty(BbcCom.PROPERTY_TITLE, title);
+                            link.setProperty(BbcCom.PROPERTY_TV_BRAND, smpConfig.get("masterBrandName"));
+                            if (!StringUtils.isEmpty(summary)) {
+                                link.setComment(summary);
+                            }
+                            ret.add(link);
+                        }
+                        if (!StringUtils.isEmpty(coverImageURL)) {
+                            coverImageURL = brc.getURL(coverImageURL).toExternalForm();
+                            coverImageURL = coverImageURL.replace("$recipe", "976x549");
+                            final DownloadLink cover = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(coverImageURL));
+                            cover.setAvailable(true);
+                            ret.add(cover);
+                        }
+                    }
+                } else {
+                    /* Content not available anymore but cover still available. */
+                    rootCoverImagURL = brc.getURL(rootCoverImagURL).toExternalForm();
+                    rootCoverImagURL = rootCoverImagURL.replace("$recipe", "976x549");
+                    final DownloadLink cover = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(rootCoverImagURL));
+                    cover.setAvailable(true);
+                    ret.add(cover);
+                }
+                return ret;
+            } catch (final Exception e) {
+                logger.log(e);
+                logger.info("json crawler failed due to exception -> Returning website crawler results");
+            }
+        }
+        /* Check if specific episode/expected content is offline */
+        if (br.containsHTML(">\\s*Sorry, this episode is not currently available")) {
+            /* Episode offline. Only cover may be downloadable. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final String specificIplayerEpisode = br.getRegex("(/iplayer/episode/" + Pattern.quote(contentID) + ")").getMatch(0);
         if (specificIplayerEpisode != null) {
             ret.add(this.createDownloadlink(br.getURL(specificIplayerEpisode).toString()));

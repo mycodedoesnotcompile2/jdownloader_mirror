@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,21 +32,28 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.flexijson.mapper;
+package org.appwork.jna.windows;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import com.sun.jna.Native;
+import com.sun.jna.platform.win32.WinDef;
+import com.sun.jna.win32.W32APIOptions;
 
 /**
- * @deprecated Use FlexiKeyLookup instead
  * @author thomas
- * @date 17.11.2021 Use FlexiKeyLookup instead
+ * @date 11.03.2025
+ *
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.FIELD, ElementType.METHOD })
-@Deprecated
-public @interface FlexiJsonProperty {
-    String value();
+public interface User32Ext extends com.sun.jna.platform.win32.User32 {
+    final static User32Ext INSTANCE = Native.load("user32", User32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
+
+    WinDef.HWND GetWindow(WinDef.HWND hWnd, int uCmd);
+    // // Get process ID associated with a window
+    // int GetWindowThreadProcessId(HWND hWnd, IntByReference lpdwProcessId);
+
+    public int GetWindowTextW(HWND hwnd, char[] windowTitle, int length);
+
+    // Attach or detach the input processing mechanism of two threads.
+    boolean AttachThreadInput(int idAttach, int idAttachTo, boolean fAttach);
+
+    boolean AllowSetForegroundWindow(int dwProcessId);
 }

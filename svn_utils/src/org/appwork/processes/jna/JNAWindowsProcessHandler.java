@@ -40,17 +40,20 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
 import org.appwork.jna.processes.CTRLSender;
 import org.appwork.jna.windows.Kernel32Ext;
+import org.appwork.jna.windows.User32Ext;
 import org.appwork.jna.windows.wmi.JNAWMIUtils;
 import org.appwork.jna.windows.wmi.WMIException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.processes.ProcessHandler;
 import org.appwork.processes.ProcessInfo;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.NonInterruptibleRunnable;
 import org.appwork.utils.StringUtils;
@@ -72,6 +75,8 @@ import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.HWND;
+import com.sun.jna.platform.win32.WinDef.LPARAM;
+import com.sun.jna.platform.win32.WinDef.WPARAM;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.WinUser;
@@ -323,9 +328,8 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
      */
     public boolean terminateRequest(ProcessInfo p) throws IOException {
         final HWND window = findMainWindow(p.getPid());
-        LogV3.info("Close " + p + " WindowHandle: " + window);
         if (isValid(window)) {
-            LogV3.info("Valid Window Found");
+            LogV3.info("Close " + p + " WindowHandle: " + window);
             try {
                 if (!StringUtils.isEmpty(p.getId())) {
                     // check the internal id
@@ -340,6 +344,7 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
             } finally {
                 Kernel32.INSTANCE.CloseHandle(window);
             }
+            return true;
         } else {
             if (!StringUtils.isEmpty(p.getId())) {
                 // check the internal id
@@ -359,8 +364,8 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
                 }
                 throw e;
             }
+            return true;
         }
-        return true;
     }
 
     /**
@@ -492,6 +497,7 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         }
         LogV3.info("Close requested. Wait Timeout " + timeout);
         final List<ProcessInfo> running = waitForExit(timeout, proccesses);
+        LogV3.info("Done. Remaining: " + running.size());
         if (running.size() > 0) {
             int failed = 0;
             LogV3.info("Timeout " + timeout + " expired. Terminate remaining processes");
@@ -545,5 +551,84 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
             running = listByProcessInfo(running.toArray(new ProcessInfo[0]));
         }
         return running;
+    }
+
+    /**
+     * @throws InterruptedException
+     * @throws IOException
+     * @see org.appwork.processes.ProcessHandler#toFront(java.util.ArrayList)
+     */
+    @Override
+    public int toFront(ProcessInfo... processes) throws IOException, InterruptedException {
+        final HashSet<Integer> set = new HashSet<Integer>();
+        // update pids based on the extended process ids
+        for (ProcessInfo p : listByProcessInfo(processes)) {
+            set.add(p.getPid());
+        }
+        // note: Windows tries to block automated focus changed, thus all of the following is kind of a workaround
+        final Thread th = Thread.currentThread();
+        final int[] count = new int[] { 0 };
+        User32.INSTANCE.EnumWindows(new WinUser.WNDENUMPROC() {
+            @Override
+            public boolean callback(HWND hWnd, Pointer data) {
+                if (th.isInterrupted()) {
+                    return false;
+                }
+                if (User32.INSTANCE.IsWindowVisible(hWnd)) {
+                    IntByReference pid = new IntByReference();
+                    User32.INSTANCE.GetWindowThreadProcessId(hWnd, pid);
+                    if (set.remove(pid.getValue())) {
+                        // tested 11.03.25 with windows 11 23h2
+                        count[0]++;
+                        LogV3.info("Bring Window to Front: PID: " + pid.getValue());
+                        // allow the process to set the active window
+                        if (!User32Ext.INSTANCE.AllowSetForegroundWindow(pid.getValue())) {
+                            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                System.err.println("Failed to allow foreground for PID " + pid.getValue());
+                            }
+                        }
+                        int currentThreadId = Kernel32.INSTANCE.GetCurrentThreadId();
+                        int targetThreadId = User32Ext.INSTANCE.GetWindowThreadProcessId(hWnd, null);
+                        boolean attached = false;
+                        try {
+                            attached = User32Ext.INSTANCE.AttachThreadInput(currentThreadId, targetThreadId, true);
+                            if (!attached) {
+                                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                    System.err.println("Failed to attach thread input.");
+                                }
+                            }
+                            // tested 11.03.25 with windows 11 23h2 minimize -> restore is what actuallay worked today.
+                            // minimize window
+                            User32Ext.INSTANCE.ShowWindow(hWnd, WinUser.SW_MINIMIZE);
+                            // restore window
+                            User32Ext.INSTANCE.ShowWindow(hWnd, WinUser.SW_RESTORE);
+                            // Send WM_SYSCOMMAND/SC_RESTORE to restore the window
+                            User32Ext.INSTANCE.SendMessage(hWnd, WinUser.WM_SYSCOMMAND, new WPARAM(WinUser.SW_RESTORE), new LPARAM(0));
+                            // try to bring the window to front
+                            if (!User32Ext.INSTANCE.SetForegroundWindow(hWnd)) {
+                                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                    System.err.println("Failed to set foreground window.");
+                                }
+                            }
+                            // try show window
+                            User32Ext.INSTANCE.ShowWindow(hWnd, WinUser.SW_SHOW);
+                        } finally {
+                            if (attached) {
+                                if (!User32Ext.INSTANCE.AttachThreadInput(currentThreadId, targetThreadId, false)) {
+                                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                        System.err.println("Failed to detach thread input.");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return set.size() > 0;
+            }
+        }, null);
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        }
+        return count[0];
     }
 }

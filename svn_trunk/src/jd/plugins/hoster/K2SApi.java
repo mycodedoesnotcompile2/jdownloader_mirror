@@ -70,7 +70,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50397 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -282,7 +282,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 50397 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 50770 $"));
     }
 
     /**
@@ -621,7 +621,6 @@ public abstract class K2SApi extends PluginForHost {
                 final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 if (Boolean.TRUE.equals(response.get("isLifetime"))) {
                     ai.setStatus("Lifetime Account");
-                    ai.setValidUntil(-1);
                     account.setType(AccountType.LIFETIME);
                 }
                 return true;
@@ -691,8 +690,6 @@ public abstract class K2SApi extends PluginForHost {
             account.setAllowReconnectToResetLimits(true);
         } else {
             if (AccountType.LIFETIME.equals(account.getType())) {
-                // avoid recheck of lifetime status
-                ai.setValidUntil(-1);
                 ai.setStatus("Lifetime Account");
             } else {
                 account.setType(AccountType.PREMIUM);

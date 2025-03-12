@@ -300,6 +300,18 @@ public class Multi extends IExtraction {
         switch (os.getFamily()) {
         case BSD:
             switch (arch) {
+            case ARM:
+                switch (os) {
+                case FREEBSD:
+                    if (is64BitJvm) {
+                        libIDs.add("FreeBSD-arm64");
+                        libIDs.add("FreeBSD-aarch64");
+                    }
+                    break;
+                default:
+                    break;
+                }
+                break;
             case RISCV:
                 switch (os) {
                 case FREEBSD:
@@ -330,7 +342,7 @@ public class Multi extends IExtraction {
                     }
                     break;
                 case NETBSD:
-                    if (Application.is64BitJvm()) {
+                    if (is64BitJvm) {
                         libIDs.add("NetBSD-amd64");
                     } else {
                         libIDs.add("NetBSD-i386");

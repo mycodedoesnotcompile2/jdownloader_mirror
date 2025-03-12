@@ -23,24 +23,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
@@ -60,7 +42,25 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 50305 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+
+@HostPlugin(revision = "$Revision: 50771 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -135,42 +135,30 @@ public class DebridLinkCom extends PluginForHost {
         /* User could have entered his real password -> We don't want to store that! */
         account.setPass(null);
         final int accountType = ((Number) entries.get("accountType")).intValue();
-        final long premiumLeft = ((Number) entries.get("premiumLeft")).longValue();
+        final Number premiumLeft = (Number) entries.get("premiumLeft");
         final String registerDate = (String) entries.get("registerDate");
         final Object serverDetected = entries.get("serverDetected");
         final boolean isFree;
         switch (accountType) {
         case 0:
-            ac.setStatus("Free Account");
             account.setType(AccountType.FREE);
-            ac.setValidUntil(-1);
             isFree = true;
             break;
         case 1:
-            if (premiumLeft > 0) {
-                ac.setValidUntil(System.currentTimeMillis() + (premiumLeft * 1000l));
+            if (premiumLeft != null) {
+                ac.setValidUntil(System.currentTimeMillis() + (premiumLeft.longValue() * 1000l));
             }
-            if (premiumLeft < 0 || ac.isExpired()) {
-                ac.setStatus("Premium Account (Expired)");
-                account.setType(AccountType.FREE);
-                ac.setValidUntil(-1);
-                isFree = true;
-            } else {
-                ac.setStatus("Premium Account");
-                account.setType(AccountType.PREMIUM);
-                isFree = false;
-            }
+            account.setType(AccountType.PREMIUM);
+            isFree = false;
             break;
         case 2:
             ac.setStatus("Lifetime Account");
             account.setType(AccountType.LIFETIME);
-            ac.setValidUntil(-1);
             isFree = false;
             break;
         default:
+            account.setType(AccountType.UNKNOWN);
             isFree = true;
-            ac.setStatus("Unknown account type: " + accountType);
-            account.setType(AccountType.FREE);
             logger.warning("Unknown account type: " + accountType);
             break;
         }
@@ -237,8 +225,8 @@ public class DebridLinkCom extends PluginForHost {
             ac.setStatus(ac.getStatus() + " | " + usedPercent + "% used");
         }
         /**
-         * 2021-02-23: This service doesn't allow users to use it whenever they use a VPN/Proxy. </br> Accounts can be checked but downloads
-         * will not work!
+         * 2021-02-23: This service doesn't allow users to use it whenever they use a VPN/Proxy. </br>
+         * Accounts can be checked but downloads will not work!
          */
         if (serverDetected != null && serverDetected instanceof Boolean && ((Boolean) serverDetected).booleanValue()) {
             throw new AccountUnavailableException("VPN/Proxy detected: Turn it off to be able to use this account", 5 * 60 * 1000l);
@@ -370,7 +358,8 @@ public class DebridLinkCom extends PluginForHost {
     }
 
     /**
-     * Sets token validity. </br> 2021-02-19: Token validity is set to 1 month via: https://debrid-link.com/webapp/account/apps
+     * Sets token validity. </br>
+     * 2021-02-19: Token validity is set to 1 month via: https://debrid-link.com/webapp/account/apps
      */
     private void accountSetTokenValidity(final Account account, final long expiresIn) {
         account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN_TIMESTAMP_VALID_UNTIL, System.currentTimeMillis() + expiresIn * 1000l);

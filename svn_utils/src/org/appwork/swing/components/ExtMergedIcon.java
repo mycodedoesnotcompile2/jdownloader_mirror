@@ -176,6 +176,9 @@ public class ExtMergedIcon implements Icon, IDIcon {
         if (icon != null && icon instanceof IDIcon) {
             return;
         }
+        if (icon != null && icon.getClass().isAnonymousClass()) {
+            return;
+        }
         if (!Application.isJared(null)) {
             new Exception(this.getClass() + ": Warning. Not an  IDIcon").printStackTrace();
         }

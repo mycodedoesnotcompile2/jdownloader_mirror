@@ -59,12 +59,19 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.TwitterComCrawler;
 
-@HostPlugin(revision = "$Revision: 49813 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50771 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterCom extends PluginForHost {
     public TwitterCom(PluginWrapper wrapper) {
         super(wrapper);
         /* 2020-01-20: Disabled login functionality as it is broken */
-        this.enablePremium("https://x.com/signup");
+        this.enablePremium("https://" + getHost() + "/signup");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -705,7 +712,6 @@ public class TwitterCom extends PluginForHost {
     public void login(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            br.setFollowRedirects(true);
             final Cookies userCookies = account.loadUserCookies();
             if ((userCookies == null || userCookies.isEmpty()) && allowCookieLoginOnly) {
                 showCookieLoginInfo();
@@ -717,7 +723,8 @@ public class TwitterCom extends PluginForHost {
                     /* Do not check if cookies are valid. */
                     return;
                 }
-                if (checkLogin(br)) {
+                final Browser brc = br.cloneBrowser();
+                if (checkLogin(brc)) {
                     logger.info("User Cookie login successful");
                     return;
                 } else if (account.hasEverBeenValid()) {
@@ -737,7 +744,8 @@ public class TwitterCom extends PluginForHost {
                     /* Do not check if cookies are valid. */
                     return;
                 }
-                if (this.checkLogin(br)) {
+                final Browser brc = br.cloneBrowser();
+                if (this.checkLogin(brc)) {
                     /* Set new cookie timestamp */
                     logger.info("Cookie login successful");
                     account.saveCookies(br.getCookies(br.getHost()), "");
@@ -749,7 +757,7 @@ public class TwitterCom extends PluginForHost {
                     account.clearCookies("");
                 }
             }
-            br.getPage("https://" + account.getHoster() + "/login");
+            br.getPage("https://" + getHost() + "/login");
             String authenticytoken = br.getRegex("type=\"hidden\" value=\"([^<>\"]*?)\" name=\"authenticity_token\"").getMatch(0);
             if (authenticytoken == null) {
                 authenticytoken = br.getCookie(br.getHost(), "_mb_tk", Cookies.NOTDELETEDPATTERN);
@@ -780,18 +788,23 @@ public class TwitterCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
-        br.getPage("https://" + this.getHost() + "/i/api/1.1/account/settings.json?include_mention_filter=true&include_nsfw_user_flag=true&include_nsfw_admin_flag=true&include_ranked_timeline=true&include_alt_text_compose=true&ext=ssoConnections&include_country_code=true&include_ext_dm_nsfw_media_filter=true&include_ext_sharing_audiospaces_listening_data_with_followers=true");
-        final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final String username = (String) user.get("screen_name");
-        final Cookies userCookies = account.loadUserCookies();
-        /*
-         * Users can enter anything into the "username" field when cookie login is used --> Correct that so we got an unique 'username'
-         * value. Otherwise users could easily add one account multiple times -> Could cause issues.
-         */
-        if (!StringUtils.isEmpty(username) && userCookies != null) {
-            account.setUser(username);
+        final AccountInfo ai = new AccountInfo();
+        // final String cookie_twid = br.getCookie(br.getHost(), "twid");
+        // final String thisAccountUserID = cookie_twid != null ? new Regex(Encoding.htmlDecode(cookie_twid), "u=(\\d+)").getMatch(0) :
+        // null;
+        final Browser brc = br.cloneBrowser();
+        try {
+            brc.getPage("https://" + getHost() + "/notifications");
+            final String username = brc.getRegex("\"remote\":\\{\"settings\":\\{[^\\}]*\"screen_name\":\"([^\"]+)\"").getMatch(0);
+            if (username != null) {
+                account.setUser(username);
+            } else {
+                logger.warning("Failed to find username");
+            }
+        } catch (final Exception e) {
+            logger.warning("Failed to find username due to Exception");
+            logger.log(e);
         }
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);

@@ -332,7 +332,6 @@ public class AccountController implements AccountControllerListener, AccountProp
                     /* reset expired and setValid */
                     ai.setLastValidUntil(ai.getValidUntil());
                     ai.setExpired(false);
-                    ai.setValidUntil(-1);
                 }
                 long tempDisabledCounterBefore = account.getTmpDisabledTimeout();
                 try {

@@ -77,7 +77,6 @@ public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
         this.enabled = enabled;
         this.size = size;
         if (Application.isHeadless() || false) {
-            final Icon icon;
             if (selected) {
                 image = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(size);
             } else {
@@ -104,7 +103,6 @@ public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
                 unscaledDimensionAndPosition = record.getCompleteDrawnArea();
             } catch (Exception e) {
                 LogV3.log(e);
-                final Icon icon;
                 if (selected) {
                     image = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(size);
                 } else {
