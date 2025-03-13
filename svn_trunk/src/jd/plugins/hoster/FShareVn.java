@@ -69,7 +69,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
 public class FShareVn extends PluginForHost {
     private final String         SERVERERROR                            = "Tài nguyên bạn yêu cầu không tìm thấy";
     private final String         IPBLOCKED                              = "<li>Tài khoản của bạn thuộc GUEST nên chỉ tải xuống";
@@ -1097,17 +1097,10 @@ public class FShareVn extends PluginForHost {
                 // }
                 ai.setValidUntil(validuntil, br, "EEE, dd MMM yyyy HH:mm:ss z");
             }
-            if (ai.isExpired()) {
-                account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
-                account.setConcurrentUsePossible(true);
-                ai.setStatus("Free (expired Premium)Account");
-                account.setType(AccountType.FREE);
-            } else {
-                ai.setStatus("VIP Account");
-                account.setType(AccountType.PREMIUM);
-                account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
-                account.setConcurrentUsePossible(true);
-            }
+            ai.setStatus("VIP Account");
+            account.setType(AccountType.PREMIUM);
+            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setConcurrentUsePossible(true);
         } else if (StringUtils.equalsIgnoreCase("Bundle", accountType)) {
             /* This is a kind of account that they give to their ADSL2+/FTTH service users. It works like VIP. */
             account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
@@ -1125,17 +1118,10 @@ public class FShareVn extends PluginForHost {
                 validuntil += 24 * 60 * 60 * 1000l;
             }
             ai.setValidUntil(validuntil, br, "EEE, dd MMM yyyy HH:mm:ss z");
-            if (ai.isExpired()) {
-                account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
-                account.setConcurrentUsePossible(true);
-                ai.setStatus("Free (expired Premium)Account");
-                account.setType(AccountType.FREE);
-            } else {
-                account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
-                account.setConcurrentUsePossible(true);
-                ai.setStatus("Premium Account");
-                account.setType(AccountType.PREMIUM);
-            }
+            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setConcurrentUsePossible(true);
+            ai.setStatus("Premium Account");
+            account.setType(AccountType.PREMIUM);
         } else {
             account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
             account.setConcurrentUsePossible(true);

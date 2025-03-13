@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
@@ -39,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 47988 $", interfaceVersion = 2, names = { "gigapeta.com" }, urls = { "https?://[\\w\\.]*?gigapeta\\.com/dl/(\\w+)" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 2, names = { "gigapeta.com" }, urls = { "https?://[\\w\\.]*?gigapeta\\.com/dl/(\\w+)" })
 public class GigaPetaCom extends PluginForHost {
     // Gehört zu tenfiles.com/tenfiles.info
     public GigaPetaCom(PluginWrapper wrapper) {
@@ -89,11 +90,11 @@ public class GigaPetaCom extends PluginForHost {
         if (fileSize != null) {
             link.setDownloadSize(SizeFormatter.getSize(fileSize.trim()));
         }
-        if (br.containsHTML("(?i)All threads for IP")) {
+        if (br.containsHTML("All threads for IP")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, JDL.L("plugins.hoster.gigapeta.unavailable", "Your IP is already downloading a file"));
-        } else if (br.containsHTML("(?i)Due to technical reasons, file is temporarily not available")) {
+        } else if (br.containsHTML("Due to technical reasons, file is temporarily not available")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Due to technical reasons, file is temporarily not available.");
-        } else if (br.containsHTML("<div id=\"page_error\">") && !br.containsHTML("(?i)To download this file please ")) {
+        } else if (br.containsHTML("<div id=\"page_error\">") && !br.containsHTML("To download this file please ")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (fileName == null || fileSize == null) {
@@ -163,13 +164,13 @@ public class GigaPetaCom extends PluginForHost {
     }
 
     protected void handleErrors(final Browser br, final boolean downloading) throws PluginException {
-        if (br.containsHTML("(?i)All threads for IP")) {
+        if (br.containsHTML("All threads for IP")) {
             if (downloading) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, JDL.L("plugins.hoster.gigapeta.unavailable", "Your IP is already downloading a file"));
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, JDL.L("plugins.hoster.gigapeta.unavailable", "Your IP is already downloading a file"));
             }
-        } else if (br.containsHTML("(?i)Due to technical reasons, file is temporarily not available.")) {
+        } else if (br.containsHTML("Due to technical reasons, file is temporarily not available.")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Due to technical reasons, file is temporarily not available.");
         }
     }
@@ -178,15 +179,13 @@ public class GigaPetaCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         this.login(account, true);
         final AccountInfo ai = new AccountInfo();
-        final String expire = br.getRegex("You have <b>premium</b> account till(.*?)</p>").getMatch(0);
+        final String expire = br.getRegex("You have <b>premium</b>\\s*account till(.*?)</p>").getMatch(0);
         if (expire != null) {
             account.setType(AccountType.PREMIUM);
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(expire.trim(), "dd.MM.yyyy HH:mm", null));
-            if (!ai.isExpired()) {
-                account.setMaxSimultanDownloads(-1);
-            }
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(expire.trim(), "dd.MM.yyyy HH:mm", Locale.ENGLISH));
+            account.setMaxSimultanDownloads(-1);
         }
-        if (br.containsHTML("(?i)You have <b>basic</b> account") || ai.isExpired()) {
+        if (br.containsHTML("You have\\s*<b>basic</b>\\s*account") || ai.isExpired()) {
             account.setMaxSimultanDownloads(1);
             account.setConcurrentUsePossible(false);
             account.setType(AccountType.FREE);

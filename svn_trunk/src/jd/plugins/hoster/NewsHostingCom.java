@@ -5,6 +5,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.usenet.InvalidAuthException;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -17,15 +25,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.usenet.InvalidAuthException;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-
-@HostPlugin(revision = "$Revision: 50231 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
 public class NewsHostingCom extends UseNet {
     public NewsHostingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,16 +60,23 @@ public class NewsHostingCom extends UseNet {
 
     private AccountInfo quickCheckAccountInfo(Account account) throws Exception {
         final AccountInfo ai = account.getAccountInfo();
-        if (ai != null && !ai.isExpired() && ai.isUnlimitedTraffic() && account.getStringProperty(USENET_USERNAME, null) != null) {
-            try {
-                verifyUseNetLogins(account);
-                account.setRefreshTimeout(5 * 60 * 60 * 1000l);
-                ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
-                return ai;
-            } catch (InvalidAuthException e2) {
-                account.removeProperty(USENET_USERNAME);
-                logger.log(e2);
-            }
+        if (ai == null) {
+            return null;
+        } else if (!ai.isUnlimitedTraffic()) {
+            /* Limitedtraffic -> Extended check required to find current traffic-left value */
+            return null;
+        } else if (account.getStringProperty(USENET_USERNAME, null) == null) {
+            /* No usenet username available -> Quick check impossible */
+            return null;
+        }
+        try {
+            verifyUseNetLogins(account);
+            account.setRefreshTimeout(5 * 60 * 60 * 1000l);
+            ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
+            return ai;
+        } catch (InvalidAuthException e2) {
+            account.removeProperty(USENET_USERNAME);
+            logger.log(e2);
         }
         return null;
     }

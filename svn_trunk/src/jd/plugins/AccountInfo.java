@@ -174,20 +174,29 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     /**
-     * Gibt zurück ob der Account abgelaufen ist
+     * Method to check if an account is expired.
      *
-     * @return
+     * @return true if the account is expired, false otherwise
      */
     public boolean isExpired() {
         final long validUntil = getValidUntil();
-        if (validUntil < 0) {
+        // Explicitly handle special cases
+        if (validUntil == -1) {
+            // -1 represents an unlimited/never-expiring account
             return false;
         }
         if (validUntil == 0) {
+            // 0 explicitly means the account is expired
             return true;
         }
-        final boolean expired = validUntil < System.currentTimeMillis();
-        return expired;
+        // Handle potential invalid negative values
+        if (validUntil < 0) {
+            // Any negative value other than -1 is considered expired
+            // This handles potential time-shift issues or accidental negative setting
+            return true;
+        }
+        // Standard expiration check
+        return validUntil < System.currentTimeMillis();
     }
 
     public void setAccountBalance(final long num) {

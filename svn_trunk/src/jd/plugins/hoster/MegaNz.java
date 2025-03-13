@@ -114,7 +114,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -622,10 +622,6 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
             if (isPro && uq.containsKey("suntil")) {
                 final Number expire = getNumber(uq, "suntil");
                 ai.setValidUntil(expire.longValue() * 1000);
-                if (ai.isExpired()) {
-                    accountStatus += "(expired)";
-                    isPro = false;
-                }
             }
             if (uq.containsKey("srvratio")) {
                 final Number srvratio = getNumber(uq, "srvratio");

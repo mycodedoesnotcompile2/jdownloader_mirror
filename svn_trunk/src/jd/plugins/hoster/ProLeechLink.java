@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
 public class ProLeechLink extends antiDDoSForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,7 +142,7 @@ public class ProLeechLink extends antiDDoSForHost {
             traffic_max_dailyStr = this.regexMaxDailyTrafficWebsite(br);
         }
         /* Set supported hosts depending on account type */
-        if (account.getType() == AccountType.PREMIUM && !ai.isExpired()) {
+        if (account.getType() == AccountType.PREMIUM) {
             /* Premium account - bigger list of supported hosts */
             ai.setMultiHostSupport(this, filehosts_premium_onlineArray);
             if (traffic_max_dailyStr != null) {
@@ -448,22 +448,14 @@ public class ProLeechLink extends antiDDoSForHost {
         }
     }
 
-    /**
-     * @param validateCookies
-     *            true = Check whether stored cookies are still valid, if not, perform full login <br/>
-     *            false = Set stored cookies and trust them if they're not older than 300000l
-     *
-     */
     private boolean loginWebsite(final Account account, final AccountInfo ai, final boolean validateCookies) throws Exception {
         synchronized (account) {
             try {
                 final Cookies cookies = account.loadCookies("");
                 boolean loggedIN = false;
                 if (cookies != null) {
-                    br.setCookies(getHost(), cookies);
-                    if (System.currentTimeMillis() - account.getCookiesTimeStamp("") <= 300000l && !validateCookies) {
-                        /* We trust these cookies as they're not that old --> Do not check them */
-                        logger.info("Trust login-cookies without checking as they should still be fresh");
+                    br.setCookies(cookies);
+                    if (!validateCookies) {
                         return false;
                     }
                     getPage("https://" + this.getHost() + "/member");

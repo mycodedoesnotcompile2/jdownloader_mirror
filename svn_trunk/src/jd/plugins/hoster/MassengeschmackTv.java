@@ -53,7 +53,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.VariantInfoMassengeschmackTv;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "massengeschmack.tv" }, urls = { "https?://massengeschmack\\.tv/dl.+|https?://[^/]+\\.massengeschmack\\.tv/deliver.+" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "massengeschmack.tv" }, urls = { "https?://massengeschmack\\.tv/dl.+|https?://[^/]+\\.massengeschmack\\.tv/deliver.+" })
 public class MassengeschmackTv extends PluginForHost {
     public static final long trust_cookie_age = 300000l;
 
@@ -363,7 +363,6 @@ public class MassengeschmackTv extends PluginForHost {
         br.getPage("https://" + this.br.getHost() + "/u/");
         boolean hasActiveSubscription = this.br.containsHTML(">Abonnement aktiv");
         boolean isPremium = this.br.containsHTML("Zugang bis \\d{1,2}\\. (?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember) 20\\d{2}");
-        boolean isExpired = false;
         br.getPage("/account/");
         if (!hasActiveSubscription) {
             /* Fallback */
@@ -386,11 +385,8 @@ public class MassengeschmackTv extends PluginForHost {
             isPremium = true;
             expirelong = TimeFormatter.getMilliSeconds(expire, "dd. MMMM yyyy", Locale.GERMANY);
             ai.setValidUntil(expirelong);
-            if (ai.isExpired()) {
-                isExpired = true;
-            }
         }
-        if (!isExpired && (isPremium || hasActiveSubscription)) {
+        if (isPremium || hasActiveSubscription) {
             /* Expiredate has already been set via code above. */
             account.setType(AccountType.PREMIUM);
             if (hasActiveSubscription) {

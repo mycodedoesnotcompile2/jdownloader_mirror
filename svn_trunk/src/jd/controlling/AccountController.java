@@ -867,6 +867,7 @@ public class AccountController implements AccountControllerListener, AccountProp
                 } else if (isExpired != null) {
                     final AccountInfo ai = account.getAccountInfo();
                     if (ai != null) {
+                        // TODO: Use ai.isExpired()?
                         final long validUntilTimeStamp = ai.getValidUntil();
                         final boolean expired = validUntilTimeStamp > 0 && validUntilTimeStamp - System.currentTimeMillis() < 0;
                         if (isExpired != expired) {

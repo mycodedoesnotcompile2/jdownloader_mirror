@@ -40,7 +40,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48121 $", interfaceVersion = 3, names = { "romulation.org" }, urls = { "https?://(?:www\\.)?romulation\\.(?:net|org)/rom/([^/]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "romulation.org" }, urls = { "https?://(?:www\\.)?romulation\\.(?:net|org)/rom/([^/]+/[^/]+)" })
 public class RomulationOrg extends PluginForHost {
     public RomulationOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,13 +114,13 @@ public class RomulationOrg extends PluginForHost {
             }
             this.br.getPage(dllink);
             /* Downloadable via free account */
-            final boolean tooBigForGuests = br.containsHTML("(?i)File too big for guests");
+            final boolean tooBigForGuests = br.containsHTML("File too big for guests");
             /* Premium required */
-            final boolean premiumonly = br.containsHTML("(?i)Sorry, this game is restricted");
+            final boolean premiumonly = br.containsHTML("Sorry, this game is restricted");
             if (tooBigForGuests || premiumonly) {
                 throw new AccountRequiredException();
             }
-            if (br.containsHTML("(?i)>\\s*Too many active connections")) {
+            if (br.containsHTML(">\\s*Too many active connections")) {
                 /* If the user is using only JD for downloading, this should never happen. */
                 /*
                  * <li>Too many active connections. <a
@@ -193,12 +193,10 @@ public class RomulationOrg extends PluginForHost {
                 if (renew != null) {
                     ai.setValidUntil(TimeFormatter.getMilliSeconds(renew, "yyyy'-'MM'-'dd", Locale.ENGLISH));
                 }
-                if (!ai.isExpired()) {
-                    return ai;
-                }
+                return ai;
             }
         }
-        if (br.containsHTML("(?i)User class\\s*:\\s*Regular Member")) {
+        if (br.containsHTML("User class\\s*:\\s*Regular Member")) {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
             account.setConcurrentUsePossible(true);

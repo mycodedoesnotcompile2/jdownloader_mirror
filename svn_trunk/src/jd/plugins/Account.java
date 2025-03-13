@@ -665,30 +665,28 @@ public class Account extends Property {
     private static final long DEFAULT_REFRESH_TIMEOUT = 30 * 60 * 1000l;
     private static final long MIN_REFRESH_TIMEOUT     = 5 * 60 * 1000l;
 
-    /** In which interval (milliseconds) will this account get checked? Min. = 5 minutes, default = 30 minutes. */
+    /**
+     * In which interval (milliseconds) will this account get checked? Min. = 5 minutes, default = 30 minutes.
+     */
     public long getRefreshTimeout() {
-        Long timeout = this.getLongProperty(PROPERTY_REFRESH_TIMEOUT, DEFAULT_REFRESH_TIMEOUT);
-        if (timeout == null || timeout <= 0) {
-            timeout = DEFAULT_REFRESH_TIMEOUT;
-        } else if (timeout < MIN_REFRESH_TIMEOUT) {
-            timeout = MIN_REFRESH_TIMEOUT;
-        }
+        // Get the configured timeout, defaulting to DEFAULT_REFRESH_TIMEOUT if null or invalid
+        long timeout = this.getLongProperty(PROPERTY_REFRESH_TIMEOUT, DEFAULT_REFRESH_TIMEOUT);
+        // Ensure timeout is at least MIN_REFRESH_TIMEOUT
+        timeout = Math.max(MIN_REFRESH_TIMEOUT, timeout <= 0 ? DEFAULT_REFRESH_TIMEOUT : timeout);
         final AccountInfo ai = this.getAccountInfo();
-        if (ai != null) {
-            /*
-             * Check if account is is about to expire. If that happens earlier than our next planned check, return time until account
-             * expires.
-             */
-            final long validUntil = ai.getValidUntil();
-            if (validUntil == -1) {
-                return timeout;
-            }
-            final long timeValid = validUntil - System.currentTimeMillis();
-            if (timeValid > 0 && timeValid < timeout) {
-                return timeValid;
-            }
+        if (ai == null) {
+            return timeout;
+        } else if (ai.isExpired()) {
+            return timeout;
         }
-        return timeout;
+        final long validUntil = ai.getValidUntil();
+        if (validUntil < 0) {
+            return timeout;
+        }
+        // Calculate remaining valid time
+        final long timeValid = validUntil - System.currentTimeMillis();
+        // Return the minimum of timeout and time valid
+        return Math.min(timeout, Math.max(timeValid, 0));
     }
 
     /** In which interval (milliseconds) will this account get checked? Min. = 5 minutes, default = 30 minutes. */

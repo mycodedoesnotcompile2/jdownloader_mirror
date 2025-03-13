@@ -64,7 +64,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 50336 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -826,15 +826,22 @@ public class XHamsterCom extends PluginForHost {
         Map<String, Object> hlsMap = null;
         try {
             final Map<String, Object> json = restoreFromString(br.getRegex(">\\s*window\\.initials\\s*=\\s*(\\{.*?\\})\\s*;\\s*</").getMatch(0), TypeRef.MAP);
-            List<Map<String, Object>> sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/mp4");
-            if (sources == null) {
+            // TODO: Maybe save subtitle information as plugin property
+            // final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json,
+            // "xplayerPluginSettings/subtitles/tracks");
+            // if (subtitles != null) {
+            // for (final Map<String, Object> subtitle : subtitles) {
+            // }
+            // }
+            List<Map<String, Object>> video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/mp4");
+            if (video_sources == null) {
                 /* 2023-07-31: VR */
-                sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/h264");
+                video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/h264");
             }
-            if (sources != null) {
+            if (video_sources != null) {
                 String firstHTTPQualityDownloadurl = null;
                 for (final String quality : qualities) {
-                    for (final Map<String, Object> source : sources) {
+                    for (final Map<String, Object> source : video_sources) {
                         final String qualityTmp = (String) source.get("quality");
                         String url = (String) source.get("url");
                         if (hlsMap == null && StringUtils.containsIgnoreCase(url, ".m3u8")) {

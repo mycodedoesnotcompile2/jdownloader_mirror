@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47510 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50774 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZoomUs extends PluginForHost {
     public ZoomUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,9 +128,16 @@ public class ZoomUs extends PluginForHost {
             }
             Map<String, Object> entries = accessPlayShareOnfo(br, meetingID);
             Map<String, Object> result = (Map<String, Object>) entries.get("result");
+            final String componentName = result.get("componentName").toString();
+            if (componentName.equalsIgnoreCase("play-forbidden")) {
+                /**
+                 * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","message":"Diese Aufzeichnung ist
+                 * abgelaufen.","redirectUrl":"/rec/component-page","componentName":"play-forbidden","meetingId":"REDACTED","needRedirect":true}}
+                 */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             if (!Boolean.TRUE.equals(result.get("canPlayFromShare"))) {
                 /* Usually password protected item */
-                final String componentName = result.get("componentName").toString();
                 if (!componentName.equals("need-password")) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }

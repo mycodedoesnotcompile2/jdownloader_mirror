@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50416 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,7 +150,7 @@ public class MetArtCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         this.setBrowserExclusive();
         final AccountInfo ai = this.login(account, true);
-        findMoreInformation: if (account.getType() == AccountType.PREMIUM && ai.getValidUntil() == -1) {
+        findMoreInformation: if (account.getType() == AccountType.PREMIUM && ai.getValidUntil() < 0) {
             /* Try to find the expire-date the hard way... */
             if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 /* 2025-01-09: This is debug mode only code! */

@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
 public class UploadgigCom extends antiDDoSForHost {
     @Override
     protected long getStartIntervall(DownloadLink downloadLink, Account account) {
@@ -489,13 +489,12 @@ public class UploadgigCom extends antiDDoSForHost {
         final String traffic_used_str = trafficregex.getMatch(0);
         final String traffic_max_str = trafficregex.getMatch(1);
         final String timeLeft = br.getRegex(">\\s*\\(([a-z0-9\\s]*)left\\s*\\)\\s*</").getMatch(0);
-        Long timeStamp = null;
         String expire = br.getRegex("Package expire date:</dt>\\s*<dd>\\s*(\\d{4}/\\d{2}/\\d{2})").getMatch(0);
         if (expire == null) {
             expire = br.getRegex(">\\s*(\\d{4}/\\d{2}/\\d{2})<").getMatch(0);
         }
         if (expire != null) {
-            timeStamp = TimeFormatter.getMilliSeconds(expire, "yyyy/MM/dd", Locale.ENGLISH);
+            long timeStamp = TimeFormatter.getMilliSeconds(expire, "yyyy/MM/dd", Locale.ENGLISH);
             final String months = new Regex(timeLeft, "(\\d+) months?").getMatch(0);
             final String days = new Regex(timeLeft, "(\\d+) days?").getMatch(0);
             final String hours = new Regex(timeLeft, "(\\d+) hours?").getMatch(0);
@@ -516,17 +515,14 @@ public class UploadgigCom extends antiDDoSForHost {
                 }
             }
             ai.setValidUntil(timeStamp);
-        }
-        if (timeStamp == null || ai.isExpired()) {
-            ai.setExpired(false);
-            account.setType(AccountType.FREE);
-            /* free accounts can still have captcha */
-            account.setMaxSimultanDownloads(1);
-            account.setConcurrentUsePossible(false);
-        } else {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(-1);
             account.setConcurrentUsePossible(true);
+        } else {
+            ai.setExpired(false);
+            /* free accounts can still have captcha */
+            account.setMaxSimultanDownloads(1);
+            account.setConcurrentUsePossible(false);
         }
         if (traffic_used_str != null && traffic_max_str != null) {
             final long traffic_used = SizeFormatter.getSize(traffic_used_str + "MB");

@@ -1338,6 +1338,21 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Move to new Package" })
     String MergeToPackageAction_MergeToPackageAction_();
 
+    @Default(lngs = { "en" }, values = { "Display new package dialog" })
+    String MergeToPackageAction_setting_SettingDisplayDialog();
+
+    @Default(lngs = { "en" }, values = { "Path of first selected package" })
+    String MergeToPackageAction_setting_SettingDownloadPathChoiceFirstSelectedPackage();
+
+    @Default(lngs = { "en" }, values = { "Last used download directory" })
+    String MergeToPackageAction_setting_SettingDownloadPathChoiceLastDownloadDirectory();
+
+    @Default(lngs = { "en" }, values = { "Default download directory" })
+    String MergeToPackageAction_setting_SettingDownloadPathChoiceGlobalDefaultDownloadDirectory();
+
+    @Default(lngs = { "en" }, values = { "Package expand mode" })
+    String MergeToPackageAction_setting_PackageExpandMode();
+
     @Default(lngs = { "en" }, values = { "Merge packages with the same name" })
     String MergeSameNamedPackagesAction_();
 
@@ -1839,7 +1854,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Never" })
     String gui_config_general_AutoDownloadStartOption_never();
 
-    @Default(lngs = { "en" }, values = { "Autostart Downloads at Application Start" })
+    @Default(lngs = { "en" }, values = { "Autostart downloads at application start" })
     String system_download_autostart();
 
     @Default(lngs = { "en" }, values = { "Show Countdown (seconds)" })

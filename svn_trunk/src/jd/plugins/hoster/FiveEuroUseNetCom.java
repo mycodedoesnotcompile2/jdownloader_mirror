@@ -21,7 +21,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
 public class FiveEuroUseNetCom extends UseNet {
     public FiveEuroUseNetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,7 +84,7 @@ public class FiveEuroUseNetCom extends UseNet {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
         }
-        account.saveCookies(br.getCookies(getHost()), "");
+        account.saveCookies(br.getCookies(br.getHost()), "");
         final String accountType = br.getRegex("Account type\\s*:\\s*</div>\\s*<div[^<]*>\\s*(.*?)</").getMatch(0);
         ai.setStatus(accountType);
         final String endDate = br.getRegex("<div[^<]*>\\s*End date\\s*:\\s*</div>\\s*<div[^<]*>\\s*(.*?)\\s*</").getMatch(0);

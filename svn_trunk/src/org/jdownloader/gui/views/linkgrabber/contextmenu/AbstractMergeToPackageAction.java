@@ -48,7 +48,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
     }
 
     public static String getTranslationForDisplayNewPackageDialog() {
-        return _JDT.FIX_ME("Display new package dialog");
+        return _GUI.T.MergeToPackageAction_setting_SettingDisplayDialog();
     }
 
     @Customizer(link = "#getTranslationForDisplayNewPackageDialog")
@@ -62,7 +62,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
     }
 
     public static String getTranslationPackageExpandMode() {
-        return _JDT.FIX_ME("Package expand mode");
+        return _GUI.T.MergeToPackageAction_setting_PackageExpandMode();
     }
 
     @Customizer(link = "#getTranslationPackageExpandMode")
@@ -97,7 +97,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
     }
 
     public static String getTranslationForDownloadPath() {
-        return _JDT.FIX_ME("Download path");
+        return _GUI.T.gui_config_general_downloaddirectory();
     }
 
     @Customizer(link = "#getTranslationForDownloadPath")
@@ -114,19 +114,19 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         PATH_OF_FIRST_SELECTED_PACKAGE {
             @Override
             public String getLabel() {
-                return _JDT.FIX_ME("Path of first selected package");
+                return _GUI.T.MergeToPackageAction_setting_SettingDownloadPathChoiceFirstSelectedPackage();
             }
         },
         LAST_DOWNLOAD_PATH {
             @Override
             public String getLabel() {
-                return _JDT.FIX_ME("Last used download path");
+                return _GUI.T.MergeToPackageAction_setting_SettingDownloadPathChoiceLastDownloadDirectory();
             }
         },
         GLOBAL_DEFAULT {
             @Override
             public String getLabel() {
-                return _JDT.FIX_ME("Global default download path");
+                return _GUI.T.MergeToPackageAction_setting_SettingDownloadPathChoiceGlobalDefaultDownloadDirectory();
             }
         };
     }

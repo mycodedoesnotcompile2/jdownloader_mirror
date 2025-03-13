@@ -62,7 +62,7 @@ import jd.utils.locale.JDL;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50493 $", interfaceVersion = 3, names = { "grab8.com", "prem.link" }, urls = { "https?://(?:\\w+\\.)?grab8.com/dl\\.php\\?id=(\\d+)", "https?://(?:\\w+\\.)?prem.link/dl\\.php\\?id=(\\d+)" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "grab8.com", "prem.link" }, urls = { "https?://(?:\\w+\\.)?grab8.com/dl\\.php\\?id=(\\d+)", "https?://(?:\\w+\\.)?prem.link/dl\\.php\\?id=(\\d+)" })
 public class Grab8Com extends antiDDoSForHost {
     private static final String          CLEAR_DOWNLOAD_HISTORY         = "CLEAR_DOWNLOAD_HISTORY";
     private final boolean                default_clear_download_history = false;
@@ -567,7 +567,8 @@ public class Grab8Com extends antiDDoSForHost {
             // is account free account?
             boolean freeAccount = isAccountFree(br);
             final Long expire = getExpire(br);
-            if (!freeAccount && expire != null && ai.setValidUntil(expire, br) && !ai.isExpired()) {
+            if (!freeAccount && expire != null) {
+                ai.setValidUntil(expire, br);
                 account.setType(AccountType.PREMIUM);
             } else {
                 account.setType(AccountType.FREE);

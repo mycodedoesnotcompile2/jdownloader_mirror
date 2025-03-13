@@ -51,7 +51,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurbobitCore extends antiDDoSForHost {
     /**
      * TODO: Check if we already got errorhandling for this kind of error http://turbobit.net/error/download/dcount/xxxtesst --> "
@@ -313,7 +313,7 @@ public class TurbobitCore extends antiDDoSForHost {
         try {
             login(account, true);
         } catch (final PluginException e) {
-            if (br.containsHTML("(?i)Our service is currently unavailable in your country\\.")) {
+            if (br.containsHTML("Our service is currently unavailable in your country\\.")) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nWebsite is currently unavailable in your country!\r\nDiese webseite ist in deinem Land momentan nicht verfügbar!", PluginException.VALUE_ID_PREMIUM_DISABLE, e);
             } else {
                 throw e;
@@ -321,7 +321,7 @@ public class TurbobitCore extends antiDDoSForHost {
         }
         ai.setUnlimitedTraffic();
         // >Turbo access till 27.09.2015</span>
-        String expire = br.getRegex("(?i)>\\s*Turbo access till\\s*(.*?)\\s*</span>").getMatch(0);
+        String expire = br.getRegex(">\\s*Turbo access till\\s*(.*?)\\s*</span>").getMatch(0);
         if (expire == null) {
             /* 2019-05-22: hitfile.net */
             expire = br.getRegex("'/premium(?:/info)?'\\s*>\\s*(\\d+\\.\\d+\\.\\d+)\\s*<").getMatch(0);
@@ -762,11 +762,11 @@ public class TurbobitCore extends antiDDoSForHost {
             accessContentURL(br, link);
             handlePremiumCaptcha(br, link, account);
             String dllink = null;
-            final String[] mirrors = br.getRegex("(?i)('|\")(https?://([a-z0-9\\.]+)?[^/\\'\"]+//?download/redirect/.*?)\\1").getColumn(1);
+            final String[] mirrors = br.getRegex("('|\")(https?://([a-z0-9\\.]+)?[^/\\'\"]+//?download/redirect/.*?)\\1").getColumn(1);
             if (mirrors == null || mirrors.length == 0) {
-                if (br.containsHTML("(?i)You have reached the.*? limit of premium downloads")) {
+                if (br.containsHTML("You have reached the.*? limit of premium downloads")) {
                     throw new AccountUnavailableException("Downloadlimit reached", 30 * 60 * 1000l);
-                } else if (br.containsHTML("(?i)'>\\s*Premium access is blocked\\s*<")) {
+                } else if (br.containsHTML("'>\\s*Premium access is blocked\\s*<")) {
                     logger.info("Premium access is blocked --> No traffic available?");
                     throw new AccountUnavailableException("Error 'Premium access is blocked' --> No traffic available?", 30 * 60 * 1000l);
                 }
@@ -921,14 +921,14 @@ public class TurbobitCore extends antiDDoSForHost {
     }
 
     private void handleGeneralErrors(final Browser br, final Account account) throws PluginException {
-        if (br.containsHTML("(?i)Try to download it once again after")) {
+        if (br.containsHTML("Try to download it once again after")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Try again later'", 20 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)>\\s*Ссылка просрочена\\. Пожалуйста получите")) {
+        } else if (br.containsHTML(">\\s*Ссылка просрочена\\. Пожалуйста получите")) {
             /* Either user waited too long for the captcha or maybe slow servers */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'link expired'", 5 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)Our service is currently unavailable in your country\\.")) {
+        } else if (br.containsHTML("Our service is currently unavailable in your country\\.")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, this.getHost() + " is currently unavailable in your country!");
-        } else if (br.containsHTML("(?i)>\\s*Your IP exceeded the max\\.? number of files that can be downloaded")) {
+        } else if (br.containsHTML(">\\s*Your IP exceeded the max\\.? number of files that can be downloaded")) {
             final Regex durationRegex = br.getRegex("You will be able to download at high speed again in (\\d+) hour\\(s\\) (\\d+) minute");
             final String hoursStr = durationRegex.getMatch(0);
             final String minutesStr = durationRegex.getMatch(1);
@@ -1152,21 +1152,20 @@ public class TurbobitCore extends antiDDoSForHost {
     }
 
     protected boolean isLoggedIN(final Browser br) {
-        return br != null && br.containsHTML("(?i)/user/logout");
+        return br.containsHTML("/user/logout");
     }
 
     private Form findAndPrepareLoginForm(Browser br, final Account account) throws PluginException {
         if (account == null) {
             return null;
+        }
+        final Form loginForm = findLoginForm(br, account);
+        if (loginForm != null) {
+            loginForm.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
+            loginForm.put("user%5Bpass%5D", Encoding.urlEncode(account.getPass()));
+            return loginForm;
         } else {
-            final Form loginForm = findLoginForm(br, account);
-            if (loginForm != null) {
-                loginForm.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
-                loginForm.put("user%5Bpass%5D", Encoding.urlEncode(account.getPass()));
-                return loginForm;
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
     }
 
@@ -1175,7 +1174,7 @@ public class TurbobitCore extends antiDDoSForHost {
     }
 
     public static void universalLoginErrorhandling(final Browser br) throws PluginException {
-        if (br.containsHTML(">Limit of login attempts exceeded for your account")) {
+        if (br.containsHTML(">\\s*Limit of login attempts exceeded for your account")) {
             if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nMaximale Anzahl von Loginversuchen überschritten - dein Account wurde temporär gesperrt!\r\nBestätige deinen Account per E-Mail um ihn zu entsperren.\r\nFalls du keine E-Mail bekommen hast, gib deine E-Mail Adresse auf folgender Seite ein und lasse dir erneut eine zuschicken: " + br.getHost() + "/restoreaccess", PluginException.VALUE_ID_PREMIUM_DISABLE);
             } else {

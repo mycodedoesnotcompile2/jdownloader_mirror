@@ -47,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@HostPlugin(revision = "$Revision: 49684 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
 public class FilestoreTo extends PluginForHost {
     public FilestoreTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -297,12 +297,10 @@ public class FilestoreTo extends PluginForHost {
         if (validUntilString != null) {
             final long until = TimeFormatter.getMilliSeconds(validUntilString, "dd'.'MM'.'yyyy' - 'HH':'mm", Locale.ENGLISH);
             ai.setValidUntil(until);
-            if (!ai.isExpired()) {
-                account.setType(AccountType.PREMIUM);
-                account.setMaxSimultanDownloads(20);
-                account.setConcurrentUsePossible(true);
-                return ai;
-            }
+            account.setType(AccountType.PREMIUM);
+            account.setMaxSimultanDownloads(20);
+            account.setConcurrentUsePossible(true);
+            return ai;
         }
         account.setType(AccountType.FREE);
         account.setMaxSimultanDownloads(2);

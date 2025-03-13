@@ -20,12 +20,15 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -55,12 +58,17 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50709 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50774 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
     public static final String  PROPERTY_FILE_ID                  = "fileid";
     public static final String  PROPERTY_ACCOUNT_SESSION_TOKEN    = "session_token";
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
+    }
 
     @Override
     public String[] siteSupportedNames() {
@@ -200,48 +208,50 @@ public class MediafireCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public MediafireCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.mediafire.com/upgrade/");
+        this.enablePremium("https://www." + getHost() + "/upgrade/");
         setConfigElements();
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.mediafire.com/terms_of_service.php";
+        return "https://www." + getHost() + "/terms_of_service.php";
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> response = login(this.br, account, true);
+        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user_info = (Map<String, Object>) response.get("user_info");
-        final String accounType = user_info.get("premium").toString();
-        if (StringUtils.equalsIgnoreCase(accounType, "yes")) {
-            account.setType(AccountType.PREMIUM);
-        } else {
-            account.setType(AccountType.FREE);
-        }
+        final String isPremium = user_info.get("premium").toString();
         final Object used_storage_sizeO = user_info.get("used_storage_size");
-        if (used_storage_sizeO != null) {
-            ai.setUsedSpace(JavaScriptEngineFactory.toLong(used_storage_sizeO, 0));
+        final Object bandwidthO = user_info.get("bandwidth");
+        final String createDate = (String) user_info.get("created");
+        if (createDate != null) {
+            ai.setCreateTime(TimeFormatter.getMilliSeconds(createDate, "yyyy-MM-dd", Locale.ENGLISH));
         }
-        if (account.getType() == AccountType.FREE) {
-            ai.setUnlimitedTraffic();
-            account.setMaxSimultanDownloads(10);
-            account.setConcurrentUsePossible(true);
-        } else {
-            final Object bandwidthO = user_info.get("bandwidth");
-            if (bandwidthO != null) {
-                ai.setTrafficLeft(JavaScriptEngineFactory.toLong(bandwidthO, 0));
-            }
+        if (used_storage_sizeO != null && used_storage_sizeO.toString().matches("\\d+")) {
+            ai.setUsedSpace(Long.parseLong(used_storage_sizeO.toString()));
+        }
+        if (StringUtils.equalsIgnoreCase(isPremium, "yes")) {
+            account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(-1);
             account.setConcurrentUsePossible(true);
+        } else {
+            account.setType(AccountType.FREE);
+            account.setMaxSimultanDownloads(10);
+            account.setConcurrentUsePossible(true);
+        }
+        if (bandwidthO != null && bandwidthO.toString().matches("\\d+")) {
+            ai.setTrafficLeft(Long.parseLong(bandwidthO.toString()));
+        } else {
+            ai.setUnlimitedTraffic();
         }
         return ai;
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     public static void storeDirecturl(final DownloadLink link, final Account account, final String directurl) {
@@ -470,89 +480,72 @@ public class MediafireCom extends PluginForHost {
     }
 
     public Map<String, Object> login(final Browser br, final Account account, boolean force) throws Exception {
-        try {
-            final Cookies cookies = account.loadCookies("");
-            if (cookies != null) {
-                br.setCookies(this.getHost(), cookies);
-                if (!force) {
-                    logger.info("Trust cookie without check");
-                    return null;
-                }
-                logger.info("Checking cookie validity");
-                try {
-                    final Map<String, Object> resp = apiCommand(null, account, "user/get_info.php", null);
-                    final String email = (String) JavaScriptEngineFactory.walkJson(resp, "user_info/email");
-                    if (StringUtils.equalsIgnoreCase(email, account.getUser())) {
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(br.getHost()), "");
-                        return resp;
-                    } else {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(null);
-                        /** Don't do this. Upper errorhandling does this if necessary. */
-                        // this.dumpSession(account);
-                    }
-                } catch (final PluginException ignore) {
-                    /*
-                     * E.g. {"response":{"action":"user\/get_info","message":"The supplied Session Token is expired or invalid","error":105,
-                     * "result":"Error","current_api_version":"1.5"}}
-                     */
-                    logger.exception("API returned error -> Full login required", ignore);
-                }
+        final Cookies cookies = account.loadCookies("");
+        if (cookies != null) {
+            br.setCookies(cookies);
+            if (!force) {
+                logger.info("Trust cookie without check");
+                return null;
             }
-            logger.info("Performing full login");
-            this.setBrowserExclusive(); // Important
-            if (!looksLikeValidMailAdress(account.getUser())) {
-                if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                    throw new AccountInvalidException("\r\nBitte trage deine E-Mail Adresse in das 'Name'-Feld ein.");
+            logger.info("Checking cookie validity");
+            try {
+                final Map<String, Object> resp = apiCommand(null, account, "user/get_info.php", null);
+                final String email = (String) JavaScriptEngineFactory.walkJson(resp, "user_info/email");
+                if (StringUtils.equalsIgnoreCase(email, account.getUser())) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return resp;
                 } else {
-                    throw new AccountInvalidException("\r\nPlease enter your e-mail adress in the 'Name'-field.");
+                    logger.info("Cookie login failed");
                 }
+            } catch (final PluginException ignore) {
+                /*
+                 * E.g. {"response":{"action":"user\/get_info","message":"The supplied Session Token is expired or invalid","error":105,
+                 * "result":"Error","current_api_version":"1.5"}}
+                 */
+                logger.exception("API session login threw exception -> Full login required", ignore);
             }
-            final Browser br2 = br.cloneBrowser();
-            br2.getPage("https://www." + this.getHost() + "/login/");
-            br2.getPage("/templates/login_signup/login_signup.php?dc=loginPath");
-            Form form = br2.getFormbyProperty("id", "form_login1");
-            if (form == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            if (form.getAction() == null) {
-                form.setAction("/dynamic/client_login/mediafire.php");
-            }
-            final String security = br2.getRegex("security\\s*:\\s*\"([^\"]+)").getMatch(0);
-            if (security != null) {
-                form.put("security", security);
-            }
-            /* We want to get long lasting cookies! */
-            form.put("login_remember", "true");
-            form.put("login_email", Encoding.urlEncode(account.getUser()));
-            form.put("login_pass", Encoding.urlEncode(account.getPass()));
-            // submit via the same browser
-            br2.submitForm(form);
-            /* 2021-04-29: This might return an error via json but as long as we get the cookie all is fine! */
-            final String cookie = br2.getCookie(br2.getHost(), "user", Cookies.NOTDELETEDPATTERN);
-            if (cookie == null || cookie.equalsIgnoreCase("x")) {
-                throw new AccountInvalidException();
-            }
-            br2.getPage("/myaccount/");
-            String sessionToken = br2.getRegex("parent\\.bqx\\(\"([a-f0-9]+)\"\\)").getMatch(0);
-            if (sessionToken == null) {
-                sessionToken = br2.getRegex("LoadIframeLightbox\\('/templates/tos\\.php\\?token=([a-f0-9]+)").getMatch(0);
-            }
-            if (StringUtils.isEmpty(sessionToken)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            account.setProperty(PROPERTY_ACCOUNT_SESSION_TOKEN, sessionToken);
-            // apiCommand(account, "device/get_status.php", null);
-            final Map<String, Object> resp = apiCommand(null, account, "user/get_info.php", null);
-            account.saveCookies(br.getCookies(br.getHost()), "");
-            return resp;
-        } catch (PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                account.clearCookies("");
-            }
-            throw e;
         }
+        logger.info("Performing full login");
+        this.setBrowserExclusive(); // Important
+        final Browser br2 = br.cloneBrowser();
+        br2.getPage("https://www." + this.getHost() + "/login/");
+        br2.getPage("/templates/login_signup/login_signup.php?dc=loginPath");
+        Form form = br2.getFormbyProperty("id", "form_login1");
+        if (form == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (form.getAction() == null) {
+            form.setAction("/dynamic/client_login/mediafire.php");
+        }
+        final String security = br2.getRegex("security\\s*:\\s*\"([^\"]+)").getMatch(0);
+        if (security != null) {
+            form.put("security", security);
+        }
+        /* We want to get long lasting cookies! */
+        form.put("login_remember", "true");
+        form.put("login_email", Encoding.urlEncode(account.getUser()));
+        form.put("login_pass", Encoding.urlEncode(account.getPass()));
+        // submit via the same browser
+        br2.submitForm(form);
+        /* 2021-04-29: This might return an error via json but as long as we get the cookie all is fine! */
+        final String cookie = br2.getCookie(br2.getHost(), "user", Cookies.NOTDELETEDPATTERN);
+        if (cookie == null || cookie.equalsIgnoreCase("x")) {
+            throw new AccountInvalidException();
+        }
+        br2.getPage("/myaccount/");
+        String sessionToken = br2.getRegex("parent\\.bqx\\(\"([a-f0-9]+)\"\\)").getMatch(0);
+        if (sessionToken == null) {
+            sessionToken = br2.getRegex("LoadIframeLightbox\\('/templates/tos\\.php\\?token=([a-f0-9]+)").getMatch(0);
+        }
+        if (StringUtils.isEmpty(sessionToken)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        account.setProperty(PROPERTY_ACCOUNT_SESSION_TOKEN, sessionToken);
+        // apiCommand(account, "device/get_status.php", null);
+        final Map<String, Object> resp = apiCommand(null, account, "user/get_info.php", null);
+        account.saveCookies(br.getCookies(br.getHost()), "");
+        return resp;
     }
 
     public Map<String, Object> apiCommand(final DownloadLink link, final Account account, final String command, UrlQuery query) throws Exception {
@@ -826,10 +819,6 @@ public class MediafireCom extends PluginForHost {
             long t = ((time != null ? Long.parseLong(time) : 60) * 1000l) + 2;
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "This file is temporarily unavailable!", t);
         }
-    }
-
-    private boolean looksLikeValidMailAdress(final String value) {
-        return value.matches(".+@.+");
     }
 
     @Override

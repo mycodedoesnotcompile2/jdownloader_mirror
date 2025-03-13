@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50430 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50774 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdencodeOrg extends PluginForDecrypt {
     public HdencodeOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,14 +81,12 @@ public class HdencodeOrg extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         int maxCaptchaForm = 3;
-        String[] htmls = null;
+        boolean captchaFailed = true;
         while (maxCaptchaForm-- >= 0) {
             final Form captchaform = br.getFormByRegex(".*content-protector-access-form.*");
             if (captchaform == null) {
+                captchaFailed = false;
                 break;
-            }
-            if (isAbort()) {
-                return ret;
             }
             /*
              * Add special values to Form - without them, captcha will not be accepted (in browser, js needs to be active for this to work).
@@ -116,14 +114,13 @@ public class HdencodeOrg extends PluginForDecrypt {
                 captchaform.put("g-recaptcha-response", helper.getToken());
             }
             br.submitForm(captchaform);
-            htmls = br.getRegex("<blockquote>(.*?)</blockquote>").getColumn(0);
-            if (htmls != null && htmls.length > 0) {
-                break;
-            }
         }
+        if (captchaFailed) {
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+        }
+        final String[] htmls = br.getRegex("<blockquote>(.*?)</blockquote>").getColumn(0);
         if (htmls == null || htmls.length == 0) {
             /* This should never happen. */
-            logger.warning("Somehow wrong captcha or plugin broken");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         for (final String html : htmls) {
@@ -145,10 +142,11 @@ public class HdencodeOrg extends PluginForDecrypt {
             /* Title contains file-size -> Remove that */
             title = title.replaceFirst("\\s*– [0-9\\.]+ ?(KB|MB|GB|TB)$", "");
         }
-        final String nfoArchiveContentFilename = br.getRegex("Filename[\\.]*: (.*?)\\s").getMatch(0);
+        String nfoArchiveContentFilename = br.getRegex("Filename\\.*: ([^\\r\\n]+)").getMatch(0);
         /* We want all results to go into one package */
         final FilePackage fp = FilePackage.getInstance();
         if (nfoArchiveContentFilename != null) {
+            nfoArchiveContentFilename = nfoArchiveContentFilename.trim();
             if (nfoArchiveContentFilename.contains(".")) {
                 /* Package name = Filename without file-extension */
                 fp.setName(nfoArchiveContentFilename.substring(0, nfoArchiveContentFilename.lastIndexOf(".")));

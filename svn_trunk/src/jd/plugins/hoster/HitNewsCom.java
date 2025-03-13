@@ -23,7 +23,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
 public class HitNewsCom extends UseNet {
     public HitNewsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,100 +44,93 @@ public class HitNewsCom extends UseNet {
         final AccountInfo ai = new AccountInfo();
         br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
-        try {
-            Form login = null;
-            if (cookies != null) {
-                br.setCookies(getHost(), cookies);
-                br.getPage("https://member.hitnews.com/member.php");
-                login = br.getFormbyActionRegex("/member\\.php");
-                if (login != null && login.containsHTML("amember_login") && login.containsHTML("amember_pass")) {
-                    br.getCookies(getHost()).clear();
-                } else if (br.getCookie(getHost(), "PHPSESSID") == null) {
-                    br.getCookies(getHost()).clear();
-                } else if (br.getRegex(">Your payment history<.*?<tr>.*?</tr>\\s*<tr.*?>\\s*<td>\\s*(.*?)\\s*</td>\\s*<td.*?>\\s*(\\d+/\\d+/\\d+)\\s*</td>\\s*<td.*?>\\s*(\\d+/\\d+/\\d+)\\s*</td>").getRow(0) == null) {
-                    br.getCookies(getHost()).clear();
-                }
+        Form login = null;
+        if (cookies != null) {
+            br.setCookies(getHost(), cookies);
+            br.getPage("https://member.hitnews.com/member.php");
+            login = br.getFormbyActionRegex("/member\\.php");
+            if (login != null && login.containsHTML("amember_login") && login.containsHTML("amember_pass")) {
+                br.getCookies(getHost()).clear();
+            } else if (br.getCookie(getHost(), "PHPSESSID") == null) {
+                br.getCookies(getHost()).clear();
+            } else if (br.getRegex(">Your payment history<.*?<tr>.*?</tr>\\s*<tr.*?>\\s*<td>\\s*(.*?)\\s*</td>\\s*<td.*?>\\s*(\\d+/\\d+/\\d+)\\s*</td>\\s*<td.*?>\\s*(\\d+/\\d+/\\d+)\\s*</td>").getRow(0) == null) {
+                br.getCookies(getHost()).clear();
             }
-            if (br.getCookie(getHost(), "PHPSESSID") == null) {
-                account.clearCookies("");
-                br.getPage("https://member.hitnews.com/login");
-                final String pleaseWait = br.getRegex("Please wait\\s*(\\d+)\\s*seconds before next login attempt").getMatch(0);
-                if (pleaseWait != null) {
-                    throw new AccountUnavailableException("Please wait before next login attempt", Integer.parseInt(pleaseWait) * 1000l);
-                }
-                login = br.getFormbyKey("login_attempt_id");
-                login.put("amember_login", Encoding.urlEncode(account.getUser()));
-                login.put("amember_pass", Encoding.urlEncode(account.getPass()));
-                br.submitForm(login);
-                login = br.getFormbyKey("login_attempt_id");
-                if (login != null && login.containsHTML("amember_login") && login.containsHTML("amember_pass")) {
-                    final String errmsg = br.getRegex("class\\s*=\\s*\"am-errors\">\\s*<li>\\s*(.*?)\\s*</li>").getMatch(0);
-                    if (errmsg != null) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, errmsg, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                } else if (br.getCookie(getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN) == null) {
+        }
+        if (br.getCookie(getHost(), "PHPSESSID") == null) {
+            account.clearCookies("");
+            br.getPage("https://member.hitnews.com/login");
+            final String pleaseWait = br.getRegex("Please wait\\s*(\\d+)\\s*seconds before next login attempt").getMatch(0);
+            if (pleaseWait != null) {
+                throw new AccountUnavailableException("Please wait before next login attempt", Integer.parseInt(pleaseWait) * 1000l);
+            }
+            login = br.getFormbyKey("login_attempt_id");
+            login.put("amember_login", Encoding.urlEncode(account.getUser()));
+            login.put("amember_pass", Encoding.urlEncode(account.getPass()));
+            br.submitForm(login);
+            login = br.getFormbyKey("login_attempt_id");
+            if (login != null && login.containsHTML("amember_login") && login.containsHTML("amember_pass")) {
+                final String errmsg = br.getRegex("class\\s*=\\s*\"am-errors\">\\s*<li>\\s*(.*?)\\s*</li>").getMatch(0);
+                if (errmsg != null) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, errmsg, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                } else {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
+            } else if (br.getCookie(getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN) == null) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
-            account.saveCookies(br.getCookies(getHost()), "");
-            final String packageInfos[];
-            if (false) {
-                // does not contain expire date but billing date
-                if (br.getRequest() == null || !StringUtils.endsWithCaseInsensitive(br.getURL(), "/member/payment-history")) {
-                    br.getPage("/member/payment-history");
-                }
-                final String paymentHistory = br.getRegex("(?i)>\\s*(?:Your)?\\s*Payments? history\\s*<.*<table.*?>(.*?)</table>").getMatch(0);
-                packageInfos = new Regex(paymentHistory, "<tr[^>]*>(.*?)</tr>").getColumn(0);
+        }
+        account.saveCookies(br.getCookies(br.getHost()), "");
+        final String packageInfos[];
+        if (false) {
+            // does not contain expire date but billing date
+            if (br.getRequest() == null || !StringUtils.endsWithCaseInsensitive(br.getURL(), "/member/payment-history")) {
+                br.getPage("/member/payment-history");
+            }
+            final String paymentHistory = br.getRegex("(?i)>\\s*(?:Your)?\\s*Payments? history\\s*<.*<table.*?>(.*?)</table>").getMatch(0);
+            packageInfos = new Regex(paymentHistory, "<tr[^>]*>(.*?)</tr>").getColumn(0);
+        } else {
+            if (br.getRequest() == null || !StringUtils.endsWithCaseInsensitive(br.getURL(), "/member")) {
+                br.getPage("/member");
+            }
+            final String paymentHistory = br.getRegex("(?i)<ul[^>]*id\\s*=\\s*\"member-subscriptions\"[^>]*>(.*?)</ul>").getMatch(0);
+            packageInfos = new Regex(paymentHistory, "<li[^>]*>(.*?)</li>").getColumn(0);
+        }
+        if (packageInfos == null || packageInfos.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        boolean subscriptionFound = false;
+        for (final String packageInfo : packageInfos) {
+            String product = new Regex(packageInfo, "history-items\"[^>]*>\\s*(.*?)\\s*</td>").getMatch(0);
+            if (product == null) {
+                product = new Regex(packageInfo, "subscriptions-title\"[^>]*>\\s*<strong>\\s*(.*?)\\s*</strong>").getMatch(0);
+            }
+            if (product == null || !product.matches("(?i).*(day|power|family)\\s*plan.*")) {
+                continue;
+            }
+            ai.setStatus(product);
+            long validUntil = -1;
+            String expireDate = new Regex(packageInfo, "date\"[^>]*>\\s*(\\d{2}/\\d{2}/\\d{4})\\s*<").getMatch(0);
+            if (expireDate != null) {
+                validUntil = TimeFormatter.getMilliSeconds(expireDate, "dd'/'MM'/'yyyy", Locale.ENGLISH) + (24 * 60 * 60 * 1000l);
             } else {
-                if (br.getRequest() == null || !StringUtils.endsWithCaseInsensitive(br.getURL(), "/member")) {
-                    br.getPage("/member");
-                }
-                final String paymentHistory = br.getRegex("(?i)<ul[^>]*id\\s*=\\s*\"member-subscriptions\"[^>]*>(.*?)</ul>").getMatch(0);
-                packageInfos = new Regex(paymentHistory, "<li[^>]*>(.*?)</li>").getColumn(0);
+                expireDate = new Regex(packageInfo, "expires_date\"[^>]*data-date\\s*=\\s*\"(\\d{4}-\\d{2}-\\d{2})\"").getMatch(0);
+                validUntil = TimeFormatter.getMilliSeconds(expireDate, "yyyy'-'MM'-'dd", Locale.ENGLISH) + (24 * 60 * 60 * 1000l);
             }
-            if (packageInfos == null || packageInfos.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (validUntil == -1) {
+                continue;
             }
-            boolean subscriptionFound = false;
-            for (String packageInfo : packageInfos) {
-                String product = new Regex(packageInfo, "history-items\"[^>]*>\\s*(.*?)\\s*</td>").getMatch(0);
-                if (product == null) {
-                    product = new Regex(packageInfo, "subscriptions-title\"[^>]*>\\s*<strong>\\s*(.*?)\\s*</strong>").getMatch(0);
-                }
-                if (product == null || !product.matches("(?i).*(day|power|family)\\s*plan.*")) {
-                    continue;
-                } else {
-                    ai.setStatus(product);
-                    long validUntil = -1;
-                    String expireDate = new Regex(packageInfo, "date\"[^>]*>\\s*(\\d{2}/\\d{2}/\\d{4})\\s*<").getMatch(0);
-                    if (expireDate != null) {
-                        validUntil = TimeFormatter.getMilliSeconds(expireDate, "dd'/'MM'/'yyyy", Locale.ENGLISH) + (24 * 60 * 60 * 1000l);
-                    } else {
-                        expireDate = new Regex(packageInfo, "expires_date\"[^>]*data-date\\s*=\\s*\"(\\d{4}-\\d{2}-\\d{2})\"").getMatch(0);
-                        validUntil = TimeFormatter.getMilliSeconds(expireDate, "yyyy'-'MM'-'dd", Locale.ENGLISH) + (24 * 60 * 60 * 1000l);
-                    }
-                    if (validUntil != -1) {
-                        account.setType(AccountType.PREMIUM);
-                        account.setMaxSimultanDownloads(100);
-                        ai.setStatus(product);
-                        ai.setValidUntil(validUntil);
-                        if (!ai.isExpired()) {
-                            subscriptionFound = true;
-                            break;
-                        }
-                    }
-                }
+            account.setType(AccountType.PREMIUM);
+            account.setMaxSimultanDownloads(100);
+            ai.setStatus(product);
+            ai.setValidUntil(validUntil);
+            if (!ai.isExpired()) {
+                subscriptionFound = true;
+                break;
             }
-            if (!subscriptionFound) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "No active usenet subscription found!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        } catch (final PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                account.clearCookies("");
-            }
-            throw e;
+        }
+        if (!subscriptionFound) {
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, "No active usenet subscription found!", PluginException.VALUE_ID_PREMIUM_DISABLE);
         }
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
