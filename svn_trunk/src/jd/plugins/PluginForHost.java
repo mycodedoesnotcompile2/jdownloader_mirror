@@ -120,8 +120,6 @@ import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.RecaptchaV1CaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMediaCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.controlling.UrlProtection;
@@ -756,13 +754,7 @@ public abstract class PluginForHost extends Plugin {
     }
 
     protected BasicCaptchaChallenge createChallenge(final String method, File file, final int flag, final DownloadLink link, final String defaultValue, final String explain) {
-        if ("recaptcha".equalsIgnoreCase(method)) {
-            return new RecaptchaV1CaptchaChallenge(file, defaultValue, explain, this, flag);
-        } else if ("solvemedia".equalsIgnoreCase(method)) {
-            return new SolveMediaCaptchaChallenge(file, defaultValue, explain, this, flag);
-        } else {
-            return new BasicCaptchaChallenge(method, file, defaultValue, explain, this, flag);
-        }
+        return new BasicCaptchaChallenge(method, file, defaultValue, explain, this, flag);
     }
 
     protected volatile DownloadInterface dl                                           = null;

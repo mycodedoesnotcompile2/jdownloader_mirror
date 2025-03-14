@@ -7,12 +7,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.nutils.encoding.Encoding;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -24,15 +18,19 @@ import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.SolverStatus;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.RecaptchaV1CaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
-import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMediaCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA_SOLUTIONS;
+
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.nutils.encoding.Encoding;
 
 public class CaptchaSolutionsSolver extends CESChallengeSolver<String> implements GenericConfigEventListener<String> {
     private final CaptchaSolutionsConfigInterface config;
@@ -66,13 +64,7 @@ public class CaptchaSolutionsSolver extends CESChallengeSolver<String> implement
 
     @Override
     protected boolean isChallengeSupported(Challenge<?> c) {
-        if (c instanceof RecaptchaV1CaptchaChallenge) {
-            return false;
-        } else if (c instanceof SolveMediaCaptchaChallenge) {
-            return false;
-        } else {
-            return c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge;
-        }
+        return c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge;
     }
 
     protected <T> Challenge<T> getChallenge(CESSolverJob<T> job) throws SolverException {
@@ -164,6 +156,7 @@ public class CaptchaSolutionsSolver extends CESChallengeSolver<String> implement
         }
     }
 
+    @Override
     protected boolean validateLogins() {
         if (!CFG_CAPTCHA_SOLUTIONS.ENABLED.isEnabled()) {
             return false;

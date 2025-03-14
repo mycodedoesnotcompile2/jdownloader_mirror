@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50250 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50777 $", interfaceVersion = 3, names = {}, urls = {})
 public class MovingImageFansOrg extends PluginForDecrypt {
     public MovingImageFansOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,8 +74,7 @@ public class MovingImageFansOrg extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 400) {
-            logger.info("Added URL expired and cannot be re-used");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Added URL expired and cannot be re-used");
         } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

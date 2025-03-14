@@ -58,9 +58,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DropBoxComCrawler;
-import jd.plugins.hoster.DropboxCom.DropboxAccountFactory;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50776 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
 public class DropboxCom extends PluginForHost {
     public DropboxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -285,7 +284,7 @@ public class DropboxCom extends PluginForHost {
              * File owner has disabled downloads and there is no streaming link available as fallback. </br>
              * --> File is online but cannot be downloaded.
              */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "File owner has disabled downloads");
+            throw new PluginException(LinkStatus.ERROR_FATAL, "File owner has disabled downloads or downloads are temporarily unavailable");
         }
         return AvailableStatus.TRUE;
     }

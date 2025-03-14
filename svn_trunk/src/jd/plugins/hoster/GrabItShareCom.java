@@ -15,14 +15,12 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -43,9 +41,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48665 $", interfaceVersion = 2, names = { "grabitshare.com" }, urls = { "https?://(?:www\\.)?grabitshare\\.com/((\\?d|download\\.php\\?id)=[A-Z0-9]+|([a-z]{2}/)?file/[0-9]+/)" })
+@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "grabitshare.com" }, urls = { "https?://(?:www\\.)?grabitshare\\.com/((\\?d|download\\.php\\?id)=[A-Z0-9]+|([a-z]{2}/)?file/[0-9]+/)" })
 public class GrabItShareCom extends PluginForHost {
-    private static final String RECAPTCHATEXT    = "(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)";
     private static final String CHEAPCAPTCHATEXT = "captcha\\.php";
     /* 2024-02-12: They do not support https lol */
     private static final String PROTOCOL         = "http://";
@@ -172,20 +169,12 @@ public class GrabItShareCom extends PluginForHost {
             }
         }
         if (captchaform != null) {
-            if (br.containsHTML("class=textinput name=downloadpw") || br.containsHTML(RECAPTCHATEXT) || br.containsHTML(CHEAPCAPTCHATEXT)) {
+            if (br.containsHTML("class=textinput name=downloadpw") || br.containsHTML(CHEAPCAPTCHATEXT)) {
                 for (int i = 0; i <= 3; i++) {
                     if (br.containsHTML(CHEAPCAPTCHATEXT)) {
                         logger.info("Found normal captcha");
                         String code = getCaptchaCode("/captcha.php", link);
                         captchaform.put("captchacode", code);
-                    } else if (br.containsHTML(RECAPTCHATEXT)) {
-                        logger.info("Found reCaptcha");
-                        final Recaptcha rc = new Recaptcha(br, this);
-                        rc.parse();
-                        rc.load();
-                        File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                        captchaform.put("recaptcha_challenge_field", rc.getChallenge());
-                        captchaform.put("recaptcha_response_field", getCaptchaCode("recaptcha", cf, link));
                     }
                     if (br.containsHTML("class=textinput name=downloadpw")) {
                         if (link.getDownloadPassword() == null) {
@@ -203,7 +192,7 @@ public class GrabItShareCom extends PluginForHost {
                         continue;
                     }
                     checkErrors(br);
-                    if (br.containsHTML("Captcha number error") || br.containsHTML(RECAPTCHATEXT) || br.containsHTML(CHEAPCAPTCHATEXT)) {
+                    if (br.containsHTML("Captcha number error") || br.containsHTML(CHEAPCAPTCHATEXT)) {
                         logger.warning("Wrong captcha or wrong password!");
                         link.setDownloadPassword(null);
                         continue;
@@ -218,7 +207,7 @@ public class GrabItShareCom extends PluginForHost {
             if (br.containsHTML("Password Error")) {
                 link.setDownloadPassword(null);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password");
-            } else if (br.containsHTML("Captcha number error") || br.containsHTML(RECAPTCHATEXT) || br.containsHTML(CHEAPCAPTCHATEXT)) {
+            } else if (br.containsHTML("Captcha number error") || br.containsHTML(CHEAPCAPTCHATEXT)) {
                 logger.info("Wrong captcha or wrong password!");
                 link.setDownloadPassword(null);
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);

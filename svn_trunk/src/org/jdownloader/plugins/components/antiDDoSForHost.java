@@ -1,6 +1,5 @@
 package org.jdownloader.plugins.components;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -27,10 +26,8 @@ import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia;
 import org.jdownloader.plugins.components.RequestHistory.TYPE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.ConsString;
@@ -65,7 +62,7 @@ import jd.plugins.components.UserAgents.BrowserName;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@HostPlugin(revision = "$Revision: 50475 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForHost extends PluginForHost {
     public antiDDoSForHost(PluginWrapper wrapper) {
         super(wrapper);
@@ -572,14 +569,6 @@ public abstract class antiDDoSForHost extends PluginForHost {
         return br != null && AbstractHCaptcha.containsHCaptcha(br);
     }
 
-    protected boolean containsSolvemediaCaptcha(final String string) {
-        return SolveMedia.containsSolvemediaCaptcha(string);
-    }
-
-    protected boolean containsSolvemediaCaptcha(final Form form) {
-        return form != null && containsSolvemediaCaptcha(form.getHtmlCode());
-    }
-
     protected boolean containsHCaptcha(String string) {
         return AbstractHCaptcha.containsHCaptcha(string);
     }
@@ -768,41 +757,6 @@ public abstract class antiDDoSForHost extends PluginForHost {
                                     }
                                     cloudflareForm.put("id", Encoding.urlEncode(rayId));
                                     cloudflareForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                                }
-                                // recapthca v1
-                                else if (cloudflareForm.hasInputFieldByName("recaptcha_response_field")) {
-                                    // they seem to add multiple input fields which is most likely meant to be corrected by js ?
-                                    // we will manually remove all those
-                                    while (cloudflareForm.hasInputFieldByName("recaptcha_response_field")) {
-                                        cloudflareForm.remove("recaptcha_response_field");
-                                    }
-                                    while (cloudflareForm.hasInputFieldByName("recaptcha_challenge_field")) {
-                                        cloudflareForm.remove("recaptcha_challenge_field");
-                                    }
-                                    // this one is null, needs to be ""
-                                    if (cloudflareForm.hasInputFieldByName("message")) {
-                                        cloudflareForm.remove("message");
-                                        cloudflareForm.put("messsage", "\"\"");
-                                    }
-                                    // recaptcha bullshit,
-                                    String apiKey = cloudflareForm.getRegex("/recaptcha/api/(?:challenge|noscript)\\?k=([A-Za-z0-9%_\\+\\- ]+)").getMatch(0);
-                                    if (apiKey == null) {
-                                        apiKey = ibr.getRegex("/recaptcha/api/(?:challenge|noscript)\\?k=([A-Za-z0-9%_\\+\\- ]+)").getMatch(0);
-                                        if (apiKey == null) {
-                                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                                        }
-                                    }
-                                    final DownloadLink dllink = new DownloadLink(null, (this.getDownloadLink() != null ? this.getDownloadLink().getName() + " :: " : "") + "antiDDoS Provider 'Clouldflare' requires Captcha", this.getHost(), "http://" + this.getHost(), true);
-                                    final Recaptcha rc = new Recaptcha(ibr, this);
-                                    rc.setId(apiKey);
-                                    rc.load();
-                                    final File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                                    final String response = getCaptchaCode("recaptcha", cf, dllink);
-                                    if (inValidate(response)) {
-                                        throw new PluginException(LinkStatus.ERROR_CAPTCHA, "CloudFlare, invalid captcha response!");
-                                    }
-                                    cloudflareForm.put("recaptcha_challenge_field", rc.getChallenge());
-                                    cloudflareForm.put("recaptcha_response_field", Encoding.urlEncode(response));
                                 }
                                 if (request != null) {
                                     ibr.openFormConnection(cloudflareForm);

@@ -1,21 +1,5 @@
 package org.jdownloader.plugins.components;
 
-//jDownloader - Downloadmanager
-//Copyright (C) 2013  JD-Team support@jdownloader.org
-//
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
-//
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-//GNU General Public License for more details.
-//
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.SocketException;
@@ -102,7 +86,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50761 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -210,7 +194,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * See official changelogs for upcoming XFS changes: https://sibsoft.net/xfilesharing/changelog.html |
      * https://sibsoft.net/xvideosharing/changelog.html <br/>
      * limit-info:<br />
-     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
+     * captchatype-info: null 4dignum reCaptchaV2, hcaptcha<br />
      */
     @Override
     public String getAGBLink() {
@@ -2906,23 +2890,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             } else if (new Regex(getCorrectBR(br), "(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)").patternFind()) {
                 logger.info("Detected captcha method \"reCaptchaV1\" for this host");
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Website uses reCaptchaV1 which has been shut down by Google. Contact website owner!");
-            } else if (this.containsSolvemediaCaptcha(getCorrectBR(br))) {
-                logger.info("Detected captcha method \"solvemedia\" for this host");
-                final org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                File cf = null;
-                try {
-                    cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                } catch (final Exception e) {
-                    if (org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia.FAIL_CAUSE_CKEY_MISSING.equals(e.getMessage())) {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "Host side solvemedia.com captcha error - please contact the " + this.getHost() + " support", -1, e);
-                    } else {
-                        throw e;
-                    }
-                }
-                final String code = getCaptchaCode("solvemedia", cf, link);
-                final String chid = sm.getChallenge(code);
-                captchaForm.put("adcopy_challenge", chid);
-                captchaForm.put("adcopy_response", "manual_challenge");
             } else if (br.containsHTML("id=\"capcode\" name= \"capcode\"")) {
                 logger.info("Detected captcha method \"keycaptcha\"");
                 String result = handleCaptchaChallenge(getDownloadLink(), new KeyCaptcha(this, br, getDownloadLink()).createChallenge(this));
@@ -5094,7 +5061,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected boolean containsCaptcha(final String str) {
         if (str == null) {
             return false;
-        } else if (this.containsSolvemediaCaptcha(str) || containsHCaptcha(str) || containsRecaptchaV2Class(str) || containsPlainTextCaptcha(str)) {
+        } else if (containsHCaptcha(str) || containsRecaptchaV2Class(str) || containsPlainTextCaptcha(str)) {
             return true;
         } else {
             return false;

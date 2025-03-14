@@ -57,16 +57,14 @@ import jd.plugins.components.SiteType.SiteTemplate;
  * @tags: similar to OuoIo
  * @examples: Without captcha: met.bz <br />
  *            With reCaptchaV2 (like most): sh2rt.com <br />
- *            With solvemedia: clik.pw
  *
  */
-@DecrypterPlugin(revision = "$Revision: 49534 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     public enum CaptchaType {
         hCaptcha,
         reCaptchaV2,
         reCaptchaV2_invisible,
-        solvemedia,
         WTF
     };
 
@@ -267,18 +265,6 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                     } else if (captchaType == CaptchaType.reCaptchaV2 || captchaType == CaptchaType.reCaptchaV2_invisible) {
                         requiresCaptchaWhichCanFail = false;
                         handleRecaptcha(captchaType, br, form);
-                    } else if (captchaType == CaptchaType.solvemedia) {
-                        final String solvemediaChallengeKey = this.getAppVarsResult("solvemedia_challenge_key");
-                        if (StringUtils.isEmpty(solvemediaChallengeKey)) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find solvemedia_challenge_key");
-                        }
-                        requiresCaptchaWhichCanFail = true;
-                        final org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                        sm.setChallengeKey(solvemediaChallengeKey);
-                        final String code = getCaptchaCode("solvemedia", sm.downloadCaptcha(getLocalCaptchaFile()), param);
-                        final String chid = sm.getChallenge(code);
-                        form.put("adcopy_challenge", chid);
-                        form.put("adcopy_response", "manual_challenge");
                     } else if (captchaType != null) {
                         /* This should never happen */
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captcha type:" + captchaType);
@@ -718,53 +704,11 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
             } else {
                 return null;
             }
-        } else if (captchaTypeStr.equalsIgnoreCase("solvemedia")) {
-            if (getAppVarsResult("solvemedia_challenge_key") != null) {
-                return CaptchaType.solvemedia;
-            } else {
-                return null;
-            }
         } else {
             return CaptchaType.WTF;
         }
     }
 
-    // private boolean evalulateRecaptchaV2(final Form form) {
-    // final String captchaBtn = form.getRegex("<div [^>]*id=\"captchaShortlink\"[^>]*>").getMatch(-1);
-    // if (captchaBtn != null) {
-    // /*
-    // * "recaptcha" === app_vars.captcha_type && ("" === app_vars.user_id && "1" === app_vars.captcha_short_anonymous &&
-    // * $("#captchaShort").length && ($("#shorten .btn-captcha").attr("disabled", "disabled"), captchaShort =
-    // * grecaptcha.render("captchaShort", {
-    // */
-    // /*
-    // * yes" === app_vars.captcha_shortlink && $("#captchaShortlink").length && ($("#link-view
-    // * .btn-captcha").attr("disabled", "disabled"), captchaShortlink = grecaptcha.render("captchaShortlink", {
-    // */
-    // final String captchaType = getAppVarsResult("captcha_type");
-    // final String userId = getAppVarsResult("user_id");
-    // if ("recaptcha".equals(captchaType) && "".equals(userId)) {
-    // return true;
-    // }
-    // }
-    // // fail over, some seem to be using this
-    // if (form.containsHTML("(?:id|class)=(\"|')g-recaptcha\\1")) {
-    // return true;
-    // } else if (form.containsHTML("invisibleCaptchaShortlink")) {
-    // /* 'Invisible' reCaptchaV2 */
-    // return true;
-    // }
-    // return false;
-    // }
-    //
-    // private boolean evalulateSolvemedia(final Form form) {
-    // final String solvemediaChallengeKey =
-    // br.getRegex("app_vars\\[\\'solvemedia_challenge_key\\'\\]\\s*?=\\s*?\\'([^<>\"\\']+)\\';").getMatch(0);
-    // if (form.containsHTML("adcopy_response") && solvemediaChallengeKey != null) {
-    // return true;
-    // }
-    // return false;
-    // }
     protected String getAppVarsResult(final String input) {
         String result = new Regex(this.appVars, "app_vars\\['" + Pattern.quote(input) + "'\\]\\s*=\\s*'([^']*)'").getMatch(0);
         if (result == null) {

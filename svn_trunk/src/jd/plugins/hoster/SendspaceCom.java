@@ -15,12 +15,10 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.File;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
 import jd.PluginWrapper;
@@ -46,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(\\w+\\.)?sendspace\\.com/(file|pro/dl)/[0-9a-zA-Z]+" })
+@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(\\w+\\.)?sendspace\\.com/(file|pro/dl)/[0-9a-zA-Z]+" })
 public class SendspaceCom extends PluginForHost {
     public SendspaceCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -361,30 +359,6 @@ public class SendspaceCom extends PluginForHost {
                         throw new PluginException(LinkStatus.ERROR_FATAL, "Wrong Password");
                     }
                 }
-                /* handle captcha */
-                if (br.containsHTML(regexRecaptcha)) {
-                    final Recaptcha rc = new Recaptcha(br, this);
-                    rc.parse();
-                    rc.load();
-                    String id = br.getRegex("\\?k=([A-Za-z0-9%_\\+\\- ]+)\"").getMatch(0);
-                    rc.setId(id);
-                    final int repeat = 5;
-                    for (int i = 0; i <= repeat; i++) {
-                        File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                        String c = getCaptchaCode("recaptcha", cf, link);
-                        rc.setCode(c);
-                        if (br.containsHTML(regexRecaptcha)) {
-                            if (i + 1 >= repeat) {
-                                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                            } else {
-                                rc.reload();
-                                continue;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                }
                 handleErrors(false);
                 /* Link holen */
                 linkurl = br.getRegex("<a id=\"download_button\" href=\"(https?://.*?)\"").getMatch(0);
@@ -421,8 +395,6 @@ public class SendspaceCom extends PluginForHost {
         }
         dl.startDownload();
     }
-
-    private final String regexRecaptcha = "api\\.recaptcha\\.net|google\\.com/recaptcha/api/";
 
     private String checkDirectLink(DownloadLink downloadLink, String property) {
         String dllink = downloadLink.getStringProperty(property);

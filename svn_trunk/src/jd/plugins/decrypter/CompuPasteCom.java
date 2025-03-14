@@ -15,7 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +22,6 @@ import java.util.List;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -41,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49578 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
 public class CompuPasteCom extends PluginForDecrypt {
     public CompuPasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,47 +102,7 @@ public class CompuPasteCom extends PluginForDecrypt {
         }
         final Form captchaForm = br.getForm(0);
         if (captchaForm != null) {
-            if (SolveMedia.containsSolvemediaCaptcha(captchaForm)) {
-                boolean success = false;
-                for (int i = 0; i <= 3; i++) {
-                    final org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                    File cf = null;
-                    try {
-                        cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                    } catch (final InterruptedException e) {
-                        throw e;
-                    } catch (final Exception e) {
-                        if (org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia.FAIL_CAUSE_CKEY_MISSING.equals(e.getMessage())) {
-                            throw new PluginException(LinkStatus.ERROR_FATAL, "Host side solvemedia.com captcha error - please contact the " + this.getHost() + " support", -1, e);
-                        } else {
-                            throw e;
-                        }
-                    }
-                    final String code = getCaptchaCode("solvemedia", cf, param);
-                    String chid = null;
-                    try {
-                        chid = sm.getChallenge(code);
-                    } catch (final PluginException e) {
-                        if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA) {
-                            logger.info("Wrong captcha");
-                            continue;
-                        } else {
-                            throw e;
-                        }
-                    }
-                    captchaForm.put("adcopy_challenge", Encoding.urlEncode(chid));
-                    br.submitForm(captchaForm);
-                    if (!SolveMedia.containsSolvemediaCaptcha(br)) {
-                        success = true;
-                        break;
-                    } else {
-                        logger.info("Wrong captcha");
-                    }
-                }
-                if (!success) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                }
-            } else if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(captchaForm)) {
+            if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(captchaForm)) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(captchaForm);

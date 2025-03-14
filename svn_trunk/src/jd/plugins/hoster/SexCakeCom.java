@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50750 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50775 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexCakeCom extends PluginForHost {
     public SexCakeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,7 +58,7 @@ public class SexCakeCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "sex-cake.com", "xnxxvideos.win", "bluevideos.net", "filmexnxx.net", "peliculasxnxx.com", "pornoxnxx.video", "pompini.org", "lupoxxx.com", "pornhubfilme.gratis", "qorno.video", "rubias19.red", "sexyfilm.blue", "redporn.video", "voglioporno.gratis", "xnxxvideos.gratis", "xxx-haus.net", "xxxbucetas.net" });
+        ret.add(new String[] { "sex-cake.com", "xnxxvideos.win", "bluevideos.net", "filmexnxx.net", "peliculasxnxx.com", "pornoxnxx.video", "pompini.org", "lupoxxx.com", "pornhubfilme.gratis", "qorno.video", "rubias19.red", "sexyfilm.blue", "redporn.video", "voglioporno.gratis", "voglioporno.cc", "xnxxvideos.gratis", "xxx-haus.net", "xxxbucetas.net", "sambaporno.cc" });
         return ret;
     }
 

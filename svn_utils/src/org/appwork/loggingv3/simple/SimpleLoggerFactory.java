@@ -134,7 +134,17 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
      * @param logToFileSink
      */
     public boolean addSink(final Sink sink) {
-        return sink != null && this.sinks.addIfAbsent(sink);
+        if (sink != null && this.sinks.addIfAbsent(sink)) {
+            if (sink instanceof LogToFileSink) {
+                this.sinkToFile = (LogToFileSink) sink;
+            }
+            if (sink instanceof LogToStdOutSink) {
+                this.sinkToConsole = (LogToStdOutSink) sink;
+            }
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**

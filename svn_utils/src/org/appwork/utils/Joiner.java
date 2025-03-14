@@ -35,6 +35,7 @@
 package org.appwork.utils;
 
 import java.util.Collection;
+import java.util.HashSet;
 
 /**
  * @author thomas
@@ -136,33 +137,8 @@ public class Joiner {
     /**
      * add the separator at the end - a trailing separator
      */
-    private boolean postfix                 = false;
-    private boolean skipEmptyOrNullElements = false;
-
-    /**
-     * @return the skipEmptyOrNullElements
-     */
-    public boolean isSkipEmptyOrNullElements() {
-        return skipEmptyOrNullElements;
-    }
-
-    /**
-     * @param skipEmptyOrNullElements
-     *            the skipEmptyOrNullElements to set
-     * @return
-     */
-    public Joiner skipEmptyOrNullElements(boolean skipEmptyOrNullElements) {
-        this.skipEmptyOrNullElements = skipEmptyOrNullElements;
-        return this;
-    }
-
-    /**
-     * @param skipEmptyOrNullElements
-     *            the skipEmptyOrNullElements to set
-     */
-    public void setSkipEmptyOrNullElements(boolean skipEmptyOrNullElements) {
-        this.skipEmptyOrNullElements = skipEmptyOrNullElements;
-    }
+    private boolean postfix     = false;
+    private boolean ignoreDupes = false;
 
     public String join(Collection<?> params) {
         return joinInternal(params.toArray(new Object[0]));
@@ -183,7 +159,11 @@ public class Joiner {
     public String joinInternal(Object[] parameters) {
         StringBuilder sb = new StringBuilder();
         int added = 0;
+        HashSet<Object> dupes = isIgnoreDupes() ? new HashSet<Object>() : null;
         for (Object s : parameters) {
+            if (dupes != null && !dupes.add(s)) {
+                continue;
+            }
             if (skip(s)) {
                 continue;
             }
@@ -239,5 +219,29 @@ public class Joiner {
         if (addedElements > 0) {
             sb.append(elementToString(getSeparator(addedElements, element, parameters, sb)));
         }
+    }
+
+    /**
+     * @param b
+     * @return
+     */
+    public Joiner ignoreDupes(boolean ignoreDupes) {
+        this.ignoreDupes = ignoreDupes;
+        return this;
+    }
+
+    /**
+     * @return the ignoreDupes
+     */
+    public boolean isIgnoreDupes() {
+        return ignoreDupes;
+    }
+
+    /**
+     * @param ignoreDupes
+     *            the ignoreDupes to set
+     */
+    public void setIgnoreDupes(boolean ignoreDupes) {
+        this.ignoreDupes = ignoreDupes;
     }
 }

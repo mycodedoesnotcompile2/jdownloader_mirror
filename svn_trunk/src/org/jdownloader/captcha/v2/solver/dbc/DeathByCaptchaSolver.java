@@ -249,6 +249,7 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
         return ret;
     }
 
+    @Override
     protected boolean validateLogins() {
         if (!CFG_DBC.ENABLED.isEnabled()) {
             return false;

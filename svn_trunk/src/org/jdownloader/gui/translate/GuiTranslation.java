@@ -2214,6 +2214,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Yes" })
     String lit_yes();
 
+    @Default(lngs = { "en", "de" }, values = { "Auto", "Automatisch" })
+    String lit_auto();
+
     @Default(lngs = { "en" }, values = { "dd.MM.yy" })
     String PremiumAccountTableModel_getDateFormatString_();
 
@@ -3437,7 +3440,7 @@ public interface GuiTranslation extends TranslateInterface {
     // String NinekwService_createPanel_useragent();
     // TODO Remove unused code found by UCDetector
     // @Default(lngs = { "en" }, values = {
-    // "A user agent may have an effect for captchas of Recaptcha and Solvemedia have to get any easier images." })
+    // "A user agent may have an effect for captchas of Recaptcha have to get any easier images." })
     // String NinekwService_createPanel_useragent_description();
     @Default(lngs = { "en" }, values = { "Records on activation all processes with captchas and 9kw.eu in a temporary log." })
     String NinekwService_createPanel_debug_description();
@@ -4425,12 +4428,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Imported %s1 account(s)" })
     String AccountLoader_onNewFile_accounts_imported(int size);
-
-    @Default(lngs = { "en" }, values = { "Convert CLR Script to LiveHeader" })
-    String ConvertCLRAction_actionPerformed_title();
-
-    @Default(lngs = { "en" }, values = { "Please enter the Cryptload CLR Reconnect Script..." })
-    String ConvertCLRAction_actionPerformed_msg();
 
     @Default(lngs = { "en" }, values = { "Done - %s1!" })
     String ConvertCLRAction_actionPerformed_finished_title(String lh);

@@ -43,7 +43,7 @@ import jd.utils.JDUtilities;
  * @author bismarck - parts of the original
  * @author psp - parts of the original
  */
-@DecrypterPlugin(revision = "$Revision: 48457 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     public abstractSafeLinking(PluginWrapper wrapper) {
         super(wrapper);
@@ -172,18 +172,11 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                         // };
                         final Browser captchaBr = br.cloneBrowser();
                         // captcha handling yay!
-                        // at this given time its always solvemedia by default, recaptcha seems to be secondary default for the
+                        // at this given time its alwaysby default, recaptcha seems to be secondary default for the
                         // refresh/toggle
                         switch (0) { // Integer.parseInt(captchaType)) {
                         case 0: {
-                            org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                            sm.setChallengeKey(br.getHost().equalsIgnoreCase("safelinking.net") ? "OZ987i6xTzNs9lw5.MA-2Vxbc-UxFrLu" : "t62EJ1oSPvEIEl.tnmC0la5sdfLHDPsl");
-                            File cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                            String code = getCaptchaCode(cf, param);
-                            String chid = sm.getChallenge(code);
-                            nextPost = PluginJSonUtils.ammendJson(nextPost, "answer", code);
-                            nextPost = PluginJSonUtils.ammendJson(nextPost, "challengeId", chid);
-                            nextPost = PluginJSonUtils.ammendJson(nextPost, "type", 0);
+                            /*captcha handling used to be here butdoes not exist anymore. */
                             break;
                         }
                         case 1: {
@@ -596,10 +589,10 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                     }
                 }
                 case 1:
-                    /* 2020-01-28: SolveMedia cannot even be selected as a captcha type when creating new short URLs! */
+                    /* 2020-01-28:cannot even be selected as a captcha type when creating new short URLs! */
                     final boolean solvemediaNotUsedAnymore = true;
                     if (solvemediaNotUsedAnymore) {
-                        logger.info("Skipping SolveMedia captcha as it does not exist anymore --> False-positive");
+                        logger.info("Skippingcaptcha as it does not exist anymore --> False-positive");
                         break;
                     } else {
                         if (i == 0 && isCaptchaSkipable()) {
@@ -614,13 +607,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                             protectedForm.put("adcopy_response", "");
                             break;
                         } else {
-                            org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                            File cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                            String code = getCaptchaCode(cf, param);
-                            String chid = sm.getChallenge(code);
-                            protectedForm.put("solvemedia_response", Encoding.urlEncode(code));
-                            protectedForm.put("adcopy_challenge", Encoding.urlEncode(chid));
-                            protectedForm.put("adcopy_response", Encoding.urlEncode(code));
+                            /*captcha handling used to be here butdoes not exist anymore. */
                             break;
                         }
                     }

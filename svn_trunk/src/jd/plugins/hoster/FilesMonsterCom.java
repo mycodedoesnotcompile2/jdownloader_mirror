@@ -15,14 +15,12 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 
@@ -49,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://[\\w\\.\\d]*?filesmonsterdecrypted\\.com/(download\\.php\\?id=|dl/.*?/free/2/).+" })
+@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://[\\w\\.\\d]*?filesmonsterdecrypted\\.com/(download\\.php\\?id=|dl/.*?/free/2/).+" })
 public class FilesMonsterCom extends PluginForHost {
     private static final String POSTTHATREGEX            = "\"((?:https?://(?:www\\.)?filesmonster\\.com)?/dl/.*?/free/.*?)\"";
     private static final String POSTTHATREGEX2           = "((?:https?://(?:www\\.)?filesmonster\\.com)?/dl/.*?/free/.+)";
@@ -318,17 +316,6 @@ public class FilesMonsterCom extends PluginForHost {
                 final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
                 continueform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                 this.br.submitForm(continueform);
-            } else {
-                final Recaptcha rc = new Recaptcha(br, this);
-                rc.parse();
-                rc.load();
-                File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                String c = getCaptchaCode("recaptcha", cf, link);
-                rc.setCode(c);
-                handleErrors(this.br);
-                if (br.containsHTML("(Captcha number error or expired|api\\.recaptcha\\.net)")) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                }
             }
             if (!link.getDownloadURL().contains("/free/2/")) {
                 String finalPage = br.getRegex("reserve_ticket\\(\\'(/dl/.*?)\\'\\)").getMatch(0);
@@ -429,23 +416,6 @@ public class FilesMonsterCom extends PluginForHost {
                 final Form login = br.getFormbyProperty("name", "login");
                 if (login == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                if (br.containsHTML("(api\\.recaptcha\\.net|google\\.com/recaptcha/api)")) {
-                    DownloadLink dummyLink = new DownloadLink(this, "Account", "http://filesmonster.com", "http://filesmonster.com", true);
-                    final Recaptcha rc = new Recaptcha(br, this);
-                    String id = br.getRegex("\\?k=([A-Za-z0-9%_\\+\\- ]+)\"").getMatch(0);
-                    if (id == null) {
-                        id = br.getRegex("sitekey=\"([A-Za-z0-9%_\\+\\- ]+)\"").getMatch(0);
-                        if (id == null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                    }
-                    rc.setId(id);
-                    rc.load();
-                    final File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                    final String c = getCaptchaCode("recaptcha", cf, dummyLink);
-                    login.put("recaptcha_challenge_field", rc.getChallenge());
-                    login.put("recaptcha_response_field", Encoding.urlEncode(c));
                 }
                 login.put("user", Encoding.urlEncode(account.getUser()));
                 login.put("pass", Encoding.urlEncode(account.getPass()));

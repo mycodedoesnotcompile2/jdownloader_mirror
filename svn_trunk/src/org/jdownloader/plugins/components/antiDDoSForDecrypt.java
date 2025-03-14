@@ -1,6 +1,5 @@
 package org.jdownloader.plugins.components;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -25,7 +24,6 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.RequestHistory.TYPE;
@@ -62,7 +60,7 @@ import jd.plugins.components.UserAgents.BrowserName;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
     public antiDDoSForDecrypt(PluginWrapper wrapper) {
         super(wrapper);
@@ -700,40 +698,6 @@ public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
                                 }
                                 cloudflareForm.put("id", Encoding.urlEncode(rayId));
                                 cloudflareForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                            }
-                            // recapthca v1
-                            else if (cloudflareForm.hasInputFieldByName("recaptcha_response_field")) {
-                                // they seem to add multiple input fields which is most likely meant to be corrected by js ?
-                                // we will manually remove all those
-                                while (cloudflareForm.hasInputFieldByName("recaptcha_response_field")) {
-                                    cloudflareForm.remove("recaptcha_response_field");
-                                }
-                                while (cloudflareForm.hasInputFieldByName("recaptcha_challenge_field")) {
-                                    cloudflareForm.remove("recaptcha_challenge_field");
-                                }
-                                // this one is null, needs to be ""
-                                if (cloudflareForm.hasInputFieldByName("message")) {
-                                    cloudflareForm.remove("message");
-                                    cloudflareForm.put("messsage", "\"\"");
-                                }
-                                // recaptcha bullshit,
-                                String apiKey = cloudflareForm.getRegex("/recaptcha/api/(?:challenge|noscript)\\?k=([A-Za-z0-9%_\\+\\- ]+)").getMatch(0);
-                                if (apiKey == null) {
-                                    apiKey = ibr.getRegex("/recaptcha/api/(?:challenge|noscript)\\?k=([A-Za-z0-9%_\\+\\- ]+)").getMatch(0);
-                                    if (apiKey == null) {
-                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                                    }
-                                }
-                                final Recaptcha rc = new Recaptcha(ibr, this);
-                                rc.setId(apiKey);
-                                rc.load();
-                                final File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                                final String response = getCaptchaCode("recaptcha", cf, param);
-                                if (inValidate(response)) {
-                                    throw new PluginException(LinkStatus.ERROR_CAPTCHA, "CloudFlare, invalid captcha response!");
-                                }
-                                cloudflareForm.put("recaptcha_challenge_field", rc.getChallenge());
-                                cloudflareForm.put("recaptcha_response_field", Encoding.urlEncode(response));
                             }
                             if (request != null) {
                                 ibr.openFormConnection(cloudflareForm);

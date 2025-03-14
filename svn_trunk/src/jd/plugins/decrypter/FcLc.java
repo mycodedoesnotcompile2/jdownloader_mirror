@@ -15,7 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -41,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 49578 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
 public class FcLc extends antiDDoSForDecrypt {
     private static final String[]     domains                    = { "fc.lc", "fcc.lc", "short.fc-lc.com", "short.articlix.com", "fc-lc.com", "fc-lc.xyz" };
     /** List of services for which waittime is skippable. */
@@ -86,7 +85,6 @@ public class FcLc extends antiDDoSForDecrypt {
     public enum CaptchaType {
         reCaptchaV2,
         reCaptchaV2_invisible,
-        solvemedia,
         WTF
     };
 
@@ -262,21 +260,6 @@ public class FcLc extends antiDDoSForDecrypt {
                             }.getToken();
                             form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                         }
-                    } else if (captchaType == CaptchaType.solvemedia) {
-                        final String solvemediaChallengeKey = this.getAppVarsResult("solvemedia_challenge_key");
-                        if (StringUtils.isEmpty(solvemediaChallengeKey)) {
-                            logger.warning("Failed to find solvemedia_challenge_key");
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                        requiresCaptchaWhichCanFail = true;
-                        final org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                        sm.setChallengeKey(solvemediaChallengeKey);
-                        File cf = null;
-                        cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                        final String code = getCaptchaCode("solvemedia", cf, param);
-                        final String chid = sm.getChallenge(code);
-                        form.put("adcopy_challenge", chid);
-                        form.put("adcopy_response", "manual_challenge");
                     } else {
                         /* Unsupported captchaType */
                         logger.warning("Unsupported captcha type!");
@@ -470,49 +453,11 @@ public class FcLc extends antiDDoSForDecrypt {
             return CaptchaType.reCaptchaV2;
         } else if (captchaTypeStr.equalsIgnoreCase("invisible-recaptcha")) {
             return CaptchaType.reCaptchaV2_invisible;
-        } else if (captchaTypeStr.equalsIgnoreCase("solvemedia")) {
-            return CaptchaType.solvemedia;
         } else {
             return CaptchaType.WTF;
         }
     }
 
-    // private boolean evalulateRecaptchaV2(final Form form) {
-    // final String captchaBtn = form.getRegex("<div [^>]*id=\"captchaShortlink\"[^>]*>").getMatch(-1);
-    // if (captchaBtn != null) {
-    // /*
-    // * "recaptcha" === app_vars.captcha_type && ("" === app_vars.user_id && "1" === app_vars.captcha_short_anonymous &&
-    // * $("#captchaShort").length && ($("#shorten .btn-captcha").attr("disabled", "disabled"), captchaShort =
-    // * grecaptcha.render("captchaShort", {
-    // */
-    // /*
-    // * yes" === app_vars.captcha_shortlink && $("#captchaShortlink").length && ($("#link-view
-    // * .btn-captcha").attr("disabled", "disabled"), captchaShortlink = grecaptcha.render("captchaShortlink", {
-    // */
-    // final String captchaType = getAppVarsResult("captcha_type");
-    // final String userId = getAppVarsResult("user_id");
-    // if ("recaptcha".equals(captchaType) && "".equals(userId)) {
-    // return true;
-    // }
-    // }
-    // // fail over, some seem to be using this
-    // if (form.containsHTML("(?:id|class)=(\"|')g-recaptcha\\1")) {
-    // return true;
-    // } else if (form.containsHTML("invisibleCaptchaShortlink")) {
-    // /* 'Invisible' reCaptchaV2 */
-    // return true;
-    // }
-    // return false;
-    // }
-    //
-    // private boolean evalulateSolvemedia(final Form form) {
-    // final String solvemediaChallengeKey =
-    // br.getRegex("app_vars\\[\\'solvemedia_challenge_key\\'\\]\\s*?=\\s*?\\'([^<>\"\\']+)\\';").getMatch(0);
-    // if (form.containsHTML("adcopy_response") && solvemediaChallengeKey != null) {
-    // return true;
-    // }
-    // return false;
-    // }
     private String getAppVarsResult(final String input) {
         String result = new Regex(this.appVars, "app_vars\\['" + Pattern.quote(input) + "'\\]\\s*=\\s*'([^']*)'").getMatch(0);
         if (result == null) {

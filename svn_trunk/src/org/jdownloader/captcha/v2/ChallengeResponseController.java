@@ -13,7 +13,6 @@ import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
 import org.appwork.utils.Application;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.api.captcha.CaptchaAPISolver;
 import org.jdownloader.captcha.blacklist.BlacklistEntry;
@@ -25,7 +24,6 @@ import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaDialogSolver;
 import org.jdownloader.captcha.v2.challenge.keycaptcha.jac.KeyCaptchaJACSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.RecaptchaV1CaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComSolver;
 import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
@@ -86,7 +84,6 @@ public class ChallengeResponseController {
             rules = new HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>>();
         }
         boolean save = false;
-        save = addDefaultRules(rules, RecaptchaV1CaptchaChallenge.RECAPTCHAV1, new CaptchaQualityEnsuranceRule(20, 10 * 60 * 1000), new CaptchaQualityEnsuranceRule(4, 60 * 1000), new CaptchaQualityEnsuranceRule(3, 30 * 1000), new CaptchaQualityEnsuranceRule(2, 10 * 1000)) || save;
         save = addDefaultRules(rules, RecaptchaV2Challenge.RECAPTCHAV2, new CaptchaQualityEnsuranceRule(60, 10 * 60 * 1000), new CaptchaQualityEnsuranceRule(6, 60 * 1000), new CaptchaQualityEnsuranceRule(3, 30 * 1000), new CaptchaQualityEnsuranceRule(2, 10 * 1000)) || save;
         save = addDefaultRules(rules, HCaptchaChallenge.getChallengeType(), new CaptchaQualityEnsuranceRule(60, 10 * 60 * 1000), new CaptchaQualityEnsuranceRule(6, 60 * 1000), new CaptchaQualityEnsuranceRule(3, 30 * 1000), new CaptchaQualityEnsuranceRule(2, 10 * 1000)) || save;
         if (save) {
@@ -235,28 +232,16 @@ public class ChallengeResponseController {
         final ArrayList<ChallengeSolver<T>> solver = createList(c);
         logger.info("Solver: " + solver);
         if (solver.size() == 0) {
+            /*
+             * TODO: Check for state "No browser solve available, external solver required" to dispaly more accurate error messages to the
+             * user, see https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required
+             */
             logger.info("No solver available!");
             throw new SkipException(c, SkipRequest.BLOCK_HOSTER, "No solver available!");
         }
         final SolverJob<T> job = new SolverJob<T>(this, c, solver);
         job.setLogger(logger);
         c.initController(job);
-        if (c instanceof RecaptchaV1CaptchaChallenge) {
-            final LogInterface log = c.getPlugin() != null ? c.getPlugin().getLogger() : logger;
-            if (log != null) {
-                log.info("Apply RecaptchaV1 dummy response workaround!");
-            }
-            /* rc1 is shut down since 01.04.2018 */
-            /* dummy answer */
-            final AbstractResponse<T> dummyResponse = new AbstractResponse<T>(c, null, 100, null) {
-                @Override
-                public T getValue() {
-                    return (T) "Test Test";
-                }
-            };
-            job.addAnswer(dummyResponse);
-            return job;
-        }
         final UniqueAlltimeID challengeID = c.getId();
         synchronized (activeJobs) {
             activeJobs.add(job);
@@ -323,11 +308,11 @@ public class ChallengeResponseController {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> ArrayList<ChallengeSolver<T>> createList(Challenge<T> c) {
+    private <T> ArrayList<ChallengeSolver<T>> createList(final Challenge<T> c) {
         final ArrayList<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         for (final ChallengeSolver<?> s : solverList) {
             try {
-                if (s.isEnabled() && s.validateBlackWhite(c) && s.canHandle(c)) {
+                if (s.isEnabled() && s.validateLogins() && s.canHandle(c) && s.validateBlackWhite(c)) {
                     ret.add((ChallengeSolver<T>) s);
                 }
             } catch (final Throwable e) {

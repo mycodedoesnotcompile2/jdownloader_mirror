@@ -13,11 +13,13 @@
 //
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package jd.plugins.hoster;
 
-import java.io.File;
 import java.io.IOException;
+
+import org.appwork.utils.Hash;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.antiDDoSForHost;
 
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
@@ -30,18 +32,11 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.utils.Hash;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
-@HostPlugin(revision = "$Revision: 49779 $", interfaceVersion = 2, names = { "upfile.vn" }, urls = { "http://(www\\.)?upfile\\.vn/(?!faq|register|login|terms|report_file)[a-z0-9~]+(?:/.*?\\.html)?" })
+@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "upfile.vn" }, urls = { "http://(www\\.)?upfile\\.vn/(?!faq|register|login|terms|report_file)[a-z0-9~]+(?:/.*?\\.html)?" })
 public class UpFileVn extends antiDDoSForHost {
-
     public UpFileVn(PluginWrapper wrapper) {
         super(wrapper);
     }
-
     // YetiShareBasic Version 0.1.7-psp
     // mods: fInfo regex, many changes, DO NOT UPGRADE!
     // non account: chunks * maxdls
@@ -91,7 +86,6 @@ public class UpFileVn extends antiDDoSForHost {
         if (filename == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-
         link.setName(Encoding.htmlDecode(filename.trim()));
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", "")));
@@ -101,7 +95,6 @@ public class UpFileVn extends antiDDoSForHost {
 
     @Override
     public void handleFree(final DownloadLink downloadLink) throws Exception, PluginException {
-        boolean captcha = false;
         requestFileInformation(downloadLink);
         if (br.getURL().contains(SIMULTANDLSLIMIT)) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, SIMULTANDLSLIMITUSERTEXT, 1 * 60 * 1000l);
@@ -118,36 +111,10 @@ public class UpFileVn extends antiDDoSForHost {
         // 3 sec wait
         sleep(4 * 1001l, downloadLink);
         dl = jd.plugins.BrowserAdapter.openDownload(br, downloadLink, dllink, RESUME, MAXCHUNKS);
-        if (!dl.getConnection().isContentDisposition()) {
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             if (br.getURL().contains(SERVERERROR)) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, SERVERERRORUSERTEXT, 5 * 60 * 1000l);
-            }
-            final String captchaAction = br.getRegex("<div class=\"captchaPageTable\">[\t\n\r ]+<form method=\"POST\" action=\"(http://[^<>\"]*?)\"").getMatch(0);
-            final String rcID = br.getRegex("recaptcha/api/noscript\\?k=([^<>\"]*?)\"").getMatch(0);
-            if (rcID == null || captchaAction == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final Recaptcha rc = new Recaptcha(br, this);
-            rc.setId(rcID);
-            rc.load();
-            for (int i = 0; i <= 5; i++) {
-                File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                String c = getCaptchaCode("recaptcha", cf, downloadLink);
-                dl = jd.plugins.BrowserAdapter.openDownload(br, downloadLink, captchaAction, "submit=continue&submitted=1&d=1&recaptcha_challenge_field=" + rc.getChallenge() + "&recaptcha_response_field=" + c, RESUME, MAXCHUNKS);
-                if (!dl.getConnection().isContentDisposition()) {
-                    br.followConnection();
-                    rc.reload();
-                    continue;
-                }
-                break;
-            }
-            captcha = true;
-        }
-        if (!dl.getConnection().isContentDisposition()) {
-            br.followConnection();
-            if (captcha && br.containsHTML("(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)")) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -176,5 +143,4 @@ public class UpFileVn extends antiDDoSForHost {
     public SiteTemplate siteTemplateType() {
         return SiteTemplate.MFScripts_YetiShare;
     }
-
 }

@@ -15,14 +15,12 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.FacebookConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -51,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FaceBookComGallery;
 
-@HostPlugin(revision = "$Revision: 50037 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = {}, urls = {})
 public class FaceBookComVideos extends PluginForHost {
     private final boolean enforceCookieLogin = true;
 
@@ -591,29 +589,6 @@ public class FaceBookComVideos extends PluginForHost {
                             continue;
                         }
                         br.postPage(br.getURL(), "fb_dtsg=" + Encoding.urlEncode(dstc) + "&nh=" + nh + "&geo=true&captcha_persist_data=" + Encoding.urlEncode(captchaPersistData) + "&captcha_response=" + Encoding.urlEncode(code) + "&achal=" + achal + "&submit%5BSubmit%5D=Submit");
-                    }
-                    // reCaptcha handling
-                    for (int i = 1; i <= 3; i++) {
-                        final String rcID = br.getRegex("\"recaptchaPublicKey\":\"([^<>\"]*?)\"").getMatch(0);
-                        if (rcID == null) {
-                            break;
-                        }
-                        final String extraChallengeParams = br.getRegex("name=\"extra_challenge_params\" value=\"([^<>\"]*?)\"").getMatch(0);
-                        final String captchaSession = br.getRegex("name=\"captcha_session\" value=\"([^<>\"]*?)\"").getMatch(0);
-                        if (extraChallengeParams == null || captchaSession == null) {
-                            break;
-                        }
-                        final Recaptcha rc = new Recaptcha(br, this);
-                        rc.setId(rcID);
-                        rc.load();
-                        final File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                        String c;
-                        try {
-                            c = getCaptchaCode("recaptcha", cf, dummyLink);
-                        } catch (final Exception e) {
-                            continue;
-                        }
-                        br.postPage(br.getURL(), "fb_dtsg=" + Encoding.urlEncode(dstc) + "&nh=" + nh + "&geo=true&captcha_persist_data=" + Encoding.urlEncode(captchaPersistData) + "&captcha_session=" + Encoding.urlEncode(captchaSession) + "&extra_challenge_params=" + Encoding.urlEncode(extraChallengeParams) + "&recaptcha_type=password&recaptcha_challenge_field=" + Encoding.urlEncode(rc.getChallenge()) + "&captcha_response=" + Encoding.urlEncode(c) + "&achal=1&submit%5BSubmit%5D=Submit");
                     }
                     for (int i = 1; i <= 3; i++) {
                         if (br.containsHTML(">To confirm your identity, please enter your birthday")) {

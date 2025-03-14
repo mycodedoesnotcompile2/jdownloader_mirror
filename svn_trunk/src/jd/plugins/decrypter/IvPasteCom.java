@@ -15,8 +15,11 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.util.ArrayList;
+
+import org.jdownloader.captcha.v2.challenge.areyouahuman.CaptchaHelperCrawlerPluginAreYouHuman;
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -31,12 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.jdownloader.captcha.v2.challenge.areyouahuman.CaptchaHelperCrawlerPluginAreYouHuman;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-
-@DecrypterPlugin(revision = "$Revision: 40863 $", interfaceVersion = 3, names = { "ivpaste.com" }, urls = { "https?://(www\\.)?ivpaste\\.com/(v/|view\\.php\\?id=)[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = { "ivpaste.com" }, urls = { "https?://(www\\.)?ivpaste\\.com/(v/|view\\.php\\?id=)[A-Za-z0-9]+" })
 public class IvPasteCom extends PluginForDecrypt {
     public IvPasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,25 +91,6 @@ public class IvPasteCom extends PluginForDecrypt {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(form);
-            } else if (form.containsHTML("api\\.recaptcha\\.net") || form.containsHTML("google\\.com/recaptcha/api/")) {
-                final Recaptcha rc = new Recaptcha(br, this);
-                String apiKey = br.getRegex("/recaptcha/api/(?:challenge|noscript)\\?k=([A-Za-z0-9%_\\+\\- ]+)").getMatch(0);
-                if (apiKey == null) {
-                    apiKey = br.getRegex("/recaptcha/api/(?:challenge|noscript)\\?k=([A-Za-z0-9%_\\+\\- ]+)").getMatch(0);
-                    if (apiKey == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                }
-                rc.setForm(form);
-                rc.setId(apiKey);
-                rc.load();
-                File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                String c = getCaptchaCode("recaptcha", cf, param);
-                rc.setCode(c);
-                if (br.containsHTML(RECAPTCHAFAILED)) {
-                    br.getPage("https://ivpaste.com/p/" + ID);
-                    continue;
-                }
             } else if (form.containsHTML("KeyCAPTCHA code")) {
                 String result = null;
                 if (auto < 3) {
@@ -124,16 +103,6 @@ public class IvPasteCom extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
                 br.postPage(br.getURL(), "capcode=" + Encoding.urlEncode(result) + "&save=&save=");
-            } else if (form.containsHTML("solvemedia\\.com")) {
-                org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                File cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                String code = "";
-                String chid = sm.getChallenge();
-                code = getCaptchaCode("solvemedia", cf, param);
-                chid = sm.getChallenge(code);
-                form.put("adcopy_challenge", chid);
-                form.put("adcopy_response", Encoding.urlEncode(code));
-                br.submitForm(form);
             } else {
                 // this logic is bad, unsupported captcha will result in premature breaking and plugin defect.
                 break;

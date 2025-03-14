@@ -48,10 +48,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 import jd.plugins.hoster.SoundcloudCom;
 
-@DecrypterPlugin(revision = "$Revision: 49085 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 50776 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
 public class SoundCloudComDecrypter extends PluginForDecrypt {
     public SoundCloudComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,6 +97,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
     private boolean          crawlPurchaseURL              = false;
     private boolean          crawl500Thumb                 = false;
     private boolean          crawlOriginalThumb            = false;
+    private SoundcloudCom    hostPlugin                    = null;
 
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
@@ -121,6 +121,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
         if (new Regex(param.getCryptedUrl(), PATTERN_INVALID).patternFind()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        hostPlugin = (SoundcloudCom) this.getNewPluginForHostInstance(this.getHost());
         cfg = SubConfiguration.getConfig(this.getHost());
         crawlPurchaseURL = cfg.getBooleanProperty(GRAB_PURCHASE_URL, SoundcloudCom.defaultGRAB_PURCHASE_URL);
         crawl500Thumb = cfg.getBooleanProperty(GRAB500THUMB, SoundcloudCom.defaultGRAB500THUMB);
@@ -129,8 +130,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
         /* Login whenever possible, helps to get links which need the user to be logged in e.g. users' own favorites. */
         final Account acc = AccountController.getInstance().getValidAccount(this.getHost());
         if (acc != null) {
-            final PluginForHost hostPlugin = this.getNewPluginForHostInstance(this.getHost());
-            ((jd.plugins.hoster.SoundcloudCom) hostPlugin).login(this.br, acc, false);
+            hostPlugin.login(this.br, acc, false);
         }
         final String contenturl = getContentURL(param);
         if (isList(contenturl)) {
@@ -816,7 +816,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
 
     private void parseFileInfo(final DownloadLink dl, final Map<String, Object> data) throws Exception {
         if (data != null) {
-            final AvailableStatus status = SoundcloudCom.checkStatusJson(this, dl, null, data);
+            final AvailableStatus status = this.hostPlugin.checkStatusJson(this, dl, null, data);
             dl.setAvailableStatus(status);
         }
     }

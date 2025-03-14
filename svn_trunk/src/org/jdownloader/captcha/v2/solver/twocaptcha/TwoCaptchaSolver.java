@@ -9,7 +9,6 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.IO;
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -191,14 +190,22 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
         }
     }
 
+    @Override
     protected boolean validateLogins() {
         if (!CFG_TWO_CAPTCHA.ENABLED.isEnabled()) {
             return false;
-        } else if (StringUtils.isEmpty(CFG_TWO_CAPTCHA.API_KEY.getValue())) {
+        } else if (!looksLikeValidAPIKey(CFG_TWO_CAPTCHA.API_KEY.getValue())) {
             return false;
         } else {
             return true;
         }
+    }
+
+    public static boolean looksLikeValidAPIKey(final String str) {
+        if (str == null) {
+            return false;
+        }
+        return str.matches("[a-f0-9]{32}");
     }
 
     @Override
@@ -256,6 +263,8 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
         private String   cost;
         private String   status;
         private Solution solution;
+        private String   errorCode;
+        private String   errorDescription;
 
         public int getErrorId() {
             return errorId;
@@ -303,6 +312,22 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
 
         public void setTaskId(String taskId) {
             this.taskId = taskId;
+        }
+
+        public String getErrorCode() {
+            return errorCode;
+        }
+
+        public void setErrorCode(String errorCode) {
+            this.errorCode = errorCode;
+        }
+
+        public String getErrorDescription() {
+            return errorDescription;
+        }
+
+        public void setErrorDescription(String errorDescription) {
+            this.errorDescription = errorDescription;
         }
     }
 
@@ -384,7 +409,7 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
             final BalanceResponse response = JSonStorage.restoreFromString(json, new TypeRef<BalanceResponse>() {
             });
             if (response.getErrorId() != 0) {
-                ret.setError("Bad Login: " + json);
+                ret.setError("Error code " + response.getErrorId() + ": " + response.getErrorDescription());
                 return ret;
             }
             ret.setBalance(response.getBalance());

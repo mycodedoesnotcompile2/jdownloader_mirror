@@ -13,13 +13,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import jd.controlling.captcha.SkipException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+
+import jd.controlling.captcha.SkipException;
 
 public abstract class ChallengeSolver<T> {
     public static final ChallengeSolver EXTERN = new ChallengeSolver<Object>() {
@@ -88,13 +88,15 @@ public abstract class ChallengeSolver<T> {
         return service;
     }
 
+    /* If logins are required for a solver, return false if they are invalid (e.g. empty API key field or invalid API key format). */
+    protected boolean validateLogins() {
+        return true;
+    }
+
     public boolean isEnabled() {
         return getService().getConfig().isEnabled();
     }
 
-    // public void setEnabled(boolean b) {
-    // getService().getConfig().setEnabled(b);
-    // }
     public List<SolverJob<T>> listJobs() {
         synchronized (map) {
             return new ArrayList<SolverJob<T>>(map.keySet());
@@ -132,15 +134,16 @@ public abstract class ChallengeSolver<T> {
     }
 
     public void kill(SolverJob<T> job) {
-        if (job != null) {
-            synchronized (map) {
-                final JobRunnable<T> jr = map.remove(job);
-                if (jr != null) {
-                    job.getLogger().info("Cancel " + jr);
-                    jr.cancel();
-                } else {
-                    job.getLogger().info("Could not kill " + job + " in " + this);
-                }
+        if (job == null) {
+            return;
+        }
+        synchronized (map) {
+            final JobRunnable<T> jr = map.remove(job);
+            if (jr != null) {
+                job.getLogger().info("Cancel " + jr);
+                jr.cancel();
+            } else {
+                job.getLogger().info("Could not kill " + job + " in " + this);
             }
         }
     }
@@ -188,48 +191,49 @@ public abstract class ChallengeSolver<T> {
     }
 
     public boolean validateBlackWhite(Challenge<?> c) {
-        if (getService().getConfig().isBlackWhiteListingEnabled()) {
-            final String host = c.getHost();
-            final ArrayList<String> whitelist = getService().getConfig().getWhitelistEntries();
-            if (whitelist != null) {
-                for (final String s : whitelist) {
-                    try {
-                        final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
-                        if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
-                            if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                                return true;
-                            }
-                            if (pattern.matcher(host).matches()) {
-                                return true;
-                            }
-                        }
-                        if (pattern.matcher(c.getTypeID()).matches()) {
+        if (!getService().getConfig().isBlackWhiteListingEnabled()) {
+            return true;
+        }
+        final String host = c.getHost();
+        final ArrayList<String> whitelist = getService().getConfig().getWhitelistEntries();
+        if (whitelist != null) {
+            for (final String s : whitelist) {
+                try {
+                    final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
+                    if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
+                        if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
                             return true;
                         }
-                    } catch (Throwable e) {
-                        e.printStackTrace();
+                        if (pattern.matcher(host).matches()) {
+                            return true;
+                        }
                     }
+                    if (pattern.matcher(c.getTypeID()).matches()) {
+                        return true;
+                    }
+                } catch (Throwable e) {
+                    e.printStackTrace();
                 }
             }
-            final ArrayList<String> blacklist = getService().getConfig().getBlacklistEntries();
-            if (blacklist != null) {
-                for (final String s : blacklist) {
-                    try {
-                        final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
-                        if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
-                            if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                                return false;
-                            }
-                            if (pattern.matcher(host).matches()) {
-                                return false;
-                            }
-                        }
-                        if (pattern.matcher(c.getTypeID()).matches()) {
+        }
+        final ArrayList<String> blacklist = getService().getConfig().getBlacklistEntries();
+        if (blacklist != null) {
+            for (final String s : blacklist) {
+                try {
+                    final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
+                    if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
+                        if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
                             return false;
                         }
-                    } catch (Throwable e) {
-                        e.printStackTrace();
+                        if (pattern.matcher(host).matches()) {
+                            return false;
+                        }
                     }
+                    if (pattern.matcher(c.getTypeID()).matches()) {
+                        return false;
+                    }
+                } catch (Throwable e) {
+                    e.printStackTrace();
                 }
             }
         }

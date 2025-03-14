@@ -58,7 +58,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50774 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50775 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -484,7 +484,6 @@ public class MediafireCom extends PluginForHost {
         if (cookies != null) {
             br.setCookies(cookies);
             if (!force) {
-                logger.info("Trust cookie without check");
                 return null;
             }
             logger.info("Checking cookie validity");
@@ -507,36 +506,43 @@ public class MediafireCom extends PluginForHost {
             }
         }
         logger.info("Performing full login");
-        this.setBrowserExclusive(); // Important
-        final Browser br2 = br.cloneBrowser();
-        br2.getPage("https://www." + this.getHost() + "/login/");
-        br2.getPage("/templates/login_signup/login_signup.php?dc=loginPath");
-        Form form = br2.getFormbyProperty("id", "form_login1");
+        br.clearCookies(null);
+        br.getPage("https://www." + this.getHost() + "/login/");
+        Form form = br.getFormbyProperty("id", "form_login1");
         if (form == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (form.getAction() == null) {
-            form.setAction("/dynamic/client_login/mediafire.php");
+            final String[] posturls = br.getRegex("mSendDataByPostJSON\\('(/[^'\"]+)'").getColumn(0);
+            if (posturls != null && posturls.length == 1) {
+                /* Exactly one result -> The result we want */
+                form.setAction(posturls[0]);
+            } else {
+                /* Use hardcoded action value */
+                form.setAction("/dynamic/client_login/mediafire.php");
+            }
         }
-        final String security = br2.getRegex("security\\s*:\\s*\"([^\"]+)").getMatch(0);
+        final String security = br.getRegex("security\\s*:\\s*\"([^\"]+)").getMatch(0);
         if (security != null) {
             form.put("security", security);
+        } else {
+            logger.warning("Failed to find value for field 'security'");
         }
         /* We want to get long lasting cookies! */
         form.put("login_remember", "true");
         form.put("login_email", Encoding.urlEncode(account.getUser()));
         form.put("login_pass", Encoding.urlEncode(account.getPass()));
         // submit via the same browser
-        br2.submitForm(form);
+        br.submitForm(form);
         /* 2021-04-29: This might return an error via json but as long as we get the cookie all is fine! */
-        final String cookie = br2.getCookie(br2.getHost(), "user", Cookies.NOTDELETEDPATTERN);
+        final String cookie = br.getCookie(br.getHost(), "user", Cookies.NOTDELETEDPATTERN);
         if (cookie == null || cookie.equalsIgnoreCase("x")) {
             throw new AccountInvalidException();
         }
-        br2.getPage("/myaccount/");
-        String sessionToken = br2.getRegex("parent\\.bqx\\(\"([a-f0-9]+)\"\\)").getMatch(0);
+        br.getPage("/myaccount/");
+        String sessionToken = br.getRegex("parent\\.bqx\\(\"([a-f0-9]+)\"\\)").getMatch(0);
         if (sessionToken == null) {
-            sessionToken = br2.getRegex("LoadIframeLightbox\\('/templates/tos\\.php\\?token=([a-f0-9]+)").getMatch(0);
+            sessionToken = br.getRegex("LoadIframeLightbox\\('/templates/tos\\.php\\?token=([a-f0-9]+)").getMatch(0);
         }
         if (StringUtils.isEmpty(sessionToken)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

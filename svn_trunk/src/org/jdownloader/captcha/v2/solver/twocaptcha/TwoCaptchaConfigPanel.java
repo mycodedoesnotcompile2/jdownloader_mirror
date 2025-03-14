@@ -2,7 +2,6 @@ package org.jdownloader.captcha.v2.solver.twocaptcha;
 
 import java.awt.Component;
 import java.awt.event.ActionEvent;
-import java.io.IOException;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -20,7 +19,6 @@ import jd.gui.swing.jdgui.views.settings.components.Checkbox;
 import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
 import jd.gui.swing.jdgui.views.settings.components.TextInput;
 import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
-import jd.http.Browser;
 
 public final class TwoCaptchaConfigPanel extends AbstractCaptchaSolverConfigPanel {
     /**
@@ -64,23 +62,15 @@ public final class TwoCaptchaConfigPanel extends AbstractCaptchaSolverConfigPane
             public void actionPerformed(ActionEvent e) {
                 if (apiKey.getText().length() < 5) {
                     jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "No api key.");
-                } else if (!apiKey.getText().matches("^[a-f0-9]+$")) {
-                    jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "API Key is not correct!" + "\n" + "Only a-f and 0-9");
+                } else if (!TwoCaptchaSolver.looksLikeValidAPIKey(apiKey.getText())) {
+                    jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "API Key is not correct!" + "\nFormat: [a-f0-9]{32}");
                 } else {
-                    try {
-                        final Browser br = new Browser();
-                        final String accountcheck = br.getPage("http://2captcha.com/res.php?action=getbalance&key=" + apiKey.getText());
-                        String validcheck = br.getRegex("^([0-9.,]+$)").getMatch(0);
-                        if (validcheck != null) {
-                            jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com message ", "Account OK\nCredits: " + accountcheck);
-                        } else if (accountcheck.startsWith("ERROR")) {
-                            jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "Account error\n" + accountcheck);
-                        } else {
-                            jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error(1)", "Unknown error.");
-                        }
-                    } catch (IOException e9kw) {
-                        jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error(2) ", "No connection or unknown error.");
+                    final TwoCaptchaAccount acc = TwoCaptchaSolver.getInstance().loadAccount();
+                    if (acc.getError() != null) {
+                        jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "Account error\n" + acc.getError());
+                        return;
                     }
+                    jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com message ", "Account OK\nCredits: " + acc.getBalance());
                 }
             }
         });

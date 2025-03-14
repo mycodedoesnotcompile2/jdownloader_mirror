@@ -59,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50650 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 50776 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -258,6 +258,11 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         }
         final String edison_page_name = br.getRegex("edison_page_name(?:=|:)([\\w\\-]+)").getMatch(0);
         final String dws_page_name = br.getRegex("dws_page_name=([\\w\\-]+)").getMatch(0);
+        /**
+         * Other possible values: <br>
+         * scl_oboe_file -> Single file <br>
+         * scl_oboe_folder -> Folder
+         */
         if (StringUtils.equals(edison_page_name, "shared_link_deleted")) {
             /* Item was deleted */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -270,6 +275,16 @@ public class DropBoxComCrawler extends PluginForDecrypt {
         } else if (br.containsHTML("invitation-claimed-access-request-container")) {
             /* User is logged in but has no access to this folder item */
             throw new AccountRequiredException();
+        }
+        if (StringUtils.equals(edison_page_name, "scl_oboe_file")) {
+            /* Nothing has been found before -> Assume that we got a single file. */
+            final DownloadLink singleFile = createSingleFileDownloadLink(br.getURL());
+            setDownloadPasswordProperties(singleFile, passCode, passwordCookieValue);
+            if (cfg.isEnableFastLinkcheckForSingleFiles()) {
+                singleFile.setAvailable(true);
+            }
+            ret.add(singleFile);
+            return ret;
         }
         /**
          * Very important as sometimes the initially added URL does not contain a path/filename but it gets added later e.g. </br>

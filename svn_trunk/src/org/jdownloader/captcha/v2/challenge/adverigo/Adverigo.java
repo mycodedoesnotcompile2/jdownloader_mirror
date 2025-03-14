@@ -3,13 +3,13 @@ package org.jdownloader.captcha.v2.challenge.adverigo;
 import java.io.File;
 import java.io.IOException;
 
+import org.appwork.utils.StringUtils;
+
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.UserAgents;
-
-import org.appwork.utils.StringUtils;
 
 /**
  *
@@ -22,7 +22,6 @@ import org.appwork.utils.StringUtils;
  *
  */
 public class Adverigo {
-
     // preserve original browser
     private final Browser       br;
     // for Averigo related requests
@@ -31,7 +30,6 @@ public class Adverigo {
     private String              sid;
     // websites unique id
     private String              apiKey;
-
     // primary api server
     private static final String SERVER       = "http://api.adverigo.com";
     // captcha image
@@ -65,7 +63,6 @@ public class Adverigo {
         // headers are for an image
         abr.getHeaders().put("Accept", "image/webp,image/*,*/*;q=0.8");
         if (abr.getURL() == null || !Browser.getHost(abr.getURL()).contains("adverigo.com")) {
-            // this prevents solvemedia group from seeing referrer
             if (clearReferer) {
                 abr.getHeaders().put("Referer", "");
             }
@@ -92,7 +89,6 @@ public class Adverigo {
         abr = br.cloneBrowser();
         abr.getHeaders().put("Accept", "*/*");
         abr.getHeaders().put("User-Agent", userAgent);
-
         if (abr.getURL() == null || !Browser.getHost(abr.getURL()).contains("adverigo.com")) {
             if (clearReferer) {
                 abr.getHeaders().put("Referer", "");
@@ -104,12 +100,10 @@ public class Adverigo {
         setSid();
         // now set the captcha address!
         setCaptchaAddress();
-
         // might need these
         abr = br.cloneBrowser();
         abr.getHeaders().put("Accept", "*/*");
         abr.getHeaders().put("User-Agent", userAgent);
-
         if (abr.getURL() == null || !Browser.getHost(abr.getURL()).contains("adverigo.com")) {
             if (clearReferer) {
                 abr.getHeaders().put("Referer", "");
@@ -157,5 +151,4 @@ public class Adverigo {
         final boolean success = PluginJSonUtils.parseBoolean(PluginJSonUtils.getJsonValue(abr, "status"));
         return success;
     }
-
 }

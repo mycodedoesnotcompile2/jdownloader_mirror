@@ -15,7 +15,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -40,15 +39,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-/**
- * NOTE: <br />
- * - UID case sensitive.<br />
- * - primary captcha is their own. I looked at this couple days earlier, and swear I got solvemedia. So I have placed that code as failover.
- *
- * @version raz_Template-pastebin-201508200000
- * @author raztoki
- */
-@DecrypterPlugin(revision = "$Revision: 50134 $", interfaceVersion = 3, names = { "spaste.com", "binbucks.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)", "https?://(?:www\\.)?(?:binbucks\\.com|binb\\.me)/(?:shrinker/)?[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = { "spaste.com", "binbucks.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)", "https?://(?:www\\.)?(?:binbucks\\.com|binb\\.me)/(?:shrinker/)?[A-Za-z0-9]+" })
 public class SpasteCom extends antiDDoSForDecrypt {
     public SpasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,7 +112,6 @@ public class SpasteCom extends antiDDoSForDecrypt {
              * 2= captchaScript </br>
              * 6 = image
              */
-            // they can have captcha, I've seen Solvemedia and their own
             String captchaScript = null;
             {
                 final String[] mm = form.getRegex("<script[^>]*>.*?</script>").getColumn(-1);
@@ -140,24 +130,6 @@ public class SpasteCom extends antiDDoSForDecrypt {
                 // form only has one input...its static
                 form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(form);
-            } else if (form.containsHTML("api\\.solvemedia\\.com/papi")) {
-                final org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                File cf = null;
-                try {
-                    cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                } catch (final Exception e) {
-                    if (org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia.FAIL_CAUSE_CKEY_MISSING.equals(e.getMessage())) {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "Host side solvemedia.com captcha error - please contact the " + this.getHost() + " support");
-                    }
-                    throw e;
-                }
-                final String code = getCaptchaCode("solvemedia", cf, param);
-                final String chid = sm.getChallenge(code);
-                form.put("adcopy_response", "manual_challenge");
-                form.put("adcopy_challenge", Encoding.urlEncode(chid));
-                form.put("pasteUrlForm%5Bsubmit%5D", "submit");
-                submitForm(form);
-                break;
             } else if (this.containsHCaptcha(form)) {
                 final String hcaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
                 form.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));

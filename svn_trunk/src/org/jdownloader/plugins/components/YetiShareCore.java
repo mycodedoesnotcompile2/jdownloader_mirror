@@ -1,21 +1,5 @@
 package org.jdownloader.plugins.components;
 
-//jDownloader - Downloadmanager
-//Copyright (C) 2016  JD-Team support@jdownloader.org
-//
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
-//
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-//GNU General Public License for more details.
-//
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -52,7 +36,6 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHos
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -85,7 +68,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 50684 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -826,49 +809,6 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                             hookBeforeCaptchaFormSubmit(br, continueform);
                             dl = jd.plugins.BrowserAdapter.openDownload(br, link, continueform, this.isResumeable(link, account), this.getMaxChunks(account));
                             numberofCaptchasRequested++;
-                        } else if (containsSolvemediaCaptcha(continueform) || this.containsSolvemediaCaptcha(br.getRequest().getHtmlCode())) {
-                            loopLog += " --> SolvemediaCaptcha";
-                            hasRequestedCaptcha = true;
-                            logger.info("Detected captcha method \"solvemedia\" for this host");
-                            final org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                            if (br.containsHTML("api\\-secure\\.solvemedia\\.com/")) {
-                                sm.setSecure(true);
-                            }
-                            File cf = null;
-                            try {
-                                cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                            } catch (final Exception e) {
-                                if (org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia.FAIL_CAUSE_CKEY_MISSING.equals(e.getMessage())) {
-                                    throw new PluginException(LinkStatus.ERROR_FATAL, "Host side solvemedia.com captcha error - please contact the " + this.getHost() + " support", -1, e);
-                                } else {
-                                    throw e;
-                                }
-                            }
-                            final String code = getCaptchaCode("solvemedia", cf, link);
-                            String chid = null;
-                            try {
-                                chid = sm.getChallenge(code);
-                            } catch (final PluginException e) {
-                                if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA) {
-                                    logger.info("Wrong captcha");
-                                    if (captchaAttemptCounter >= maxCaptchaAttempts) {
-                                        logger.info("Ending main loop because: Too many wrong captchas");
-                                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                                    } else {
-                                        this.invalidateLastChallengeResponse();
-                                        continue;
-                                    }
-                                } else {
-                                    throw e;
-                                }
-                            }
-                            waitTime(this.br, link, timeBeforeCaptchaInput);
-                            continueform.put("adcopy_challenge", Encoding.urlEncode(chid));
-                            continueform.put("adcopy_response", Encoding.urlEncode(code));
-                            continueform.setMethod(MethodType.POST);
-                            hookBeforeCaptchaFormSubmit(br, continueform);
-                            dl = jd.plugins.BrowserAdapter.openDownload(br, link, continueform, this.isResumeable(link, account), this.getMaxChunks(account));
-                            numberofCaptchasRequested++;
                         } else if (continueform != null && continueform.getMethod() == MethodType.POST) {
                             /* Form + no captcha */
                             loopLog += " --> Form_POST";
@@ -980,7 +920,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     protected boolean containsCaptcha(final Browser br) {
-        if (AbstractRecaptchaV2.containsRecaptchaV2Class(br) || SolveMedia.containsSolvemediaCaptcha(br) || br.containsHTML("(api\\.recaptcha\\.net|google\\.com/recaptcha/api/|solvemedia\\.com/papi/)") || AbstractHCaptcha.containsHCaptcha(br)) {
+        if (AbstractRecaptchaV2.containsRecaptchaV2Class(br) || br.containsHTML("(api\\.recaptcha\\.net|google\\.com/recaptcha/api/|solvemedia\\.com/papi/)") || AbstractHCaptcha.containsHCaptcha(br)) {
             return true;
         } else {
             return false;
@@ -1946,26 +1886,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                     loginform.put("submitme", "1");
                 }
                 fillWebsiteLoginForm(br, loginform, account);
-                if (br.containsHTML("solvemedia\\.com/papi/")) {
-                    /* Handle login-captcha if required */
-                    final org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia sm = new org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia(br);
-                    if (br.containsHTML("api\\-secure\\.solvemedia\\.com/")) {
-                        sm.setSecure(true);
-                    }
-                    File cf = null;
-                    try {
-                        cf = sm.downloadCaptcha(getLocalCaptchaFile());
-                    } catch (final Exception e) {
-                        if (org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia.FAIL_CAUSE_CKEY_MISSING.equals(e.getMessage())) {
-                            throw new PluginException(LinkStatus.ERROR_FATAL, "Host side solvemedia.com captcha error - please contact the " + this.getHost() + " support");
-                        }
-                        throw e;
-                    }
-                    final String code = getCaptchaCode("solvemedia", cf, new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true));
-                    final String chid = sm.getChallenge(code);
-                    loginform.put("adcopy_challenge", chid);
-                    loginform.put("adcopy_response", "manual_challenge");
-                } else if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform)) {
+                if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform)) {
                     /* E.g. thotdrive.com */
                     final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
                     loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));

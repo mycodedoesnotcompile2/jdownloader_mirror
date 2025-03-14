@@ -4,8 +4,6 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
-import jd.http.Browser;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -26,6 +24,8 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_ANTICAPTCHA_COM;
+
+import jd.http.Browser;
 
 public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     private static final AntiCaptchaComSolver INSTANCE = new AntiCaptchaComSolver();
@@ -272,6 +272,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
         }
     }
 
+    @Override
     protected boolean validateLogins() {
         if (!CFG_ANTICAPTCHA_COM.ENABLED.isEnabled()) {
             return false;

@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50608 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamhbNet extends XFileSharingProBasic {
     public StreamhbNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -37,7 +37,7 @@ public class StreamhbNet extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
+     * captchatype-info: null 4dignumreCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {

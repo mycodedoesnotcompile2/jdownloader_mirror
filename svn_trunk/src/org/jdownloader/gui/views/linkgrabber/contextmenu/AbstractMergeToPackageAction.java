@@ -75,11 +75,53 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         this.packageExpandMode = mode;
     }
 
+    public static String getTranslationForDownloadPath() {
+        return _GUI.T.gui_config_general_downloaddirectory();
+    }
+
+    @Customizer(link = "#getTranslationForDownloadPath")
+    @Order(201)
+    public DownloadPath getDownloadPath() {
+        return downloadpath;
+    }
+
+    public void setDownloadPath(DownloadPath path) {
+        this.downloadpath = path;
+    }
+
+    public static String getTranslationForLocation() {
+        return _JDT.T.MergeToPackageAction_getTranslationForLocation();
+    }
+
+    @Customizer(link = "#getTranslationForLocation")
+    @Order(201)
+    public LocationInList getLocation() {
+        return location;
+    }
+
+    public void setLocation(LocationInList location) {
+        this.location = location;
+    }
+
+    public static String getTranslationForMergeSameNamedPackages() {
+        return _GUI.T.MergeSameNamedPackagesAction_();
+    }
+
+    @Customizer(link = "#getTranslationForMergeSameNamedPackages")
+    @Order(300)
+    public boolean isMergeSameNamedPackages() {
+        return this.mergeSameNamedPackages;
+    }
+
+    public void setMergeSameNamedPackages(final boolean bool) {
+        this.mergeSameNamedPackages = bool;
+    }
+
     public static enum PackageExpandMode implements LabelInterface {
         AUTO {
             @Override
             public String getLabel() {
-                return _JDT.FIX_ME("Auto");
+                return _GUI.T.lit_auto();
             }
         },
         EXPANDED {
@@ -94,20 +136,6 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                 return _JDT.T.PackageExpandBehavior_COLLAPSED();
             }
         };
-    }
-
-    public static String getTranslationForDownloadPath() {
-        return _GUI.T.gui_config_general_downloaddirectory();
-    }
-
-    @Customizer(link = "#getTranslationForDownloadPath")
-    @Order(201)
-    public DownloadPath getDownloadPath() {
-        return downloadpath;
-    }
-
-    public void setDownloadPath(DownloadPath path) {
-        this.downloadpath = path;
     }
 
     public enum DownloadPath implements LabelInterface {
@@ -143,34 +171,6 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
             final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
             return LinkTreeUtils.getRawDownloadDirectory(sel.getFirstPackage()).getAbsolutePath();
         }
-    }
-
-    public static String getTranslationForLocation() {
-        return _JDT.T.MergeToPackageAction_getTranslationForLocation();
-    }
-
-    @Customizer(link = "#getTranslationForLocation")
-    @Order(201)
-    public LocationInList getLocation() {
-        return location;
-    }
-
-    public void setLocation(LocationInList location) {
-        this.location = location;
-    }
-
-    public static String getTranslationForMergeSameNamedPackages() {
-        return _GUI.T.MergeSameNamedPackagesAction_();
-    }
-
-    @Customizer(link = "#getTranslationForMergeSameNamedPackages")
-    @Order(300)
-    public boolean isMergeSameNamedPackages() {
-        return this.mergeSameNamedPackages;
-    }
-
-    public void setMergeSameNamedPackages(final boolean bool) {
-        this.mergeSameNamedPackages = bool;
     }
 
     @Override

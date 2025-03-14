@@ -15,12 +15,9 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -41,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 2, names = { "shutterstock.com" }, urls = { "http://(www\\.)?shutterstock\\.com/pic\\-\\d+/[a-z0-9\\-]+\\.html" })
+@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "shutterstock.com" }, urls = { "http://(www\\.)?shutterstock\\.com/pic\\-\\d+/[a-z0-9\\-]+\\.html" })
 public class ShutterStockCom extends PluginForHost {
     public ShutterStockCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,42 +124,12 @@ public class ShutterStockCom extends PluginForHost {
                 }
                 login.put("user", Encoding.urlEncode(account.getUser()));
                 login.put("pass", Encoding.urlEncode(account.getPass()));
-                if (login.containsHTML("google\\.com/recaptcha/")) {
-                    // Handle stupid login captcha
-                    final String rcID = br.getRegex("challenge\\?k=([^<>\"]*?)\"").getMatch(0);
-                    if (rcID == null) {
-                        logger.warning("Expected login captcha is not there!");
-                        if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlugin defekt, bitte den JDownloader Support kontaktieren!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        } else {
-                            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlugin broken, please contact the JDownloader Support!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        }
-                    }
-                    final Recaptcha rc = new Recaptcha(br, this);
-                    rc.setId(rcID);
-                    rc.load();
-                    final File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                    final DownloadLink dummyLink = new DownloadLink(this, "Account", this.getHost(), "http://" + this.getHost(), true);
-                    final String c = getCaptchaCode("recaptcha", cf, dummyLink);
-                    login.put("recaptcha_challenge_field", Encoding.urlEncode(rc.getChallenge()));
-                    login.put("recaptcha_response_field", Encoding.urlEncode(c));
-                    br.submitForm(login);
-                    if (br.containsHTML("google\\.com/recaptcha/")) {
-                        logger.info("Wrong password, username or captcha, stopping...");
-                        if ("de".equalsIgnoreCase(lang)) {
-                            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername/Passwort oder Login-Captcha!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        } else {
-                            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password or login-captcha!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        }
-                    }
-                } else {
-                    br.submitForm(login);
-                    if (br.containsHTML("You\\'ve entered an incorrect username/password combination")) {
-                        if ("de".equalsIgnoreCase(lang)) {
-                            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        } else {
-                            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        }
+                br.submitForm(login);
+                if (br.containsHTML("You\\'ve entered an incorrect username/password combination")) {
+                    if ("de".equalsIgnoreCase(lang)) {
+                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
                     }
                 }
                 // Save cookies

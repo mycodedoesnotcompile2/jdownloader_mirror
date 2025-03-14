@@ -15,7 +15,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,7 +28,6 @@ import javax.script.ScriptEngineManager;
 
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -54,7 +52,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
+@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
 public class HulkShareCom extends PluginForHost {
     private String              BRBEFORE            = "";
     private static final String PASSWORDTEXT        = "(<br><b>Password:</b> <input|<br><b>Passwort:</b> <input)";
@@ -412,22 +410,6 @@ public class HulkShareCom extends PluginForHost {
                 String code = getCaptchaCode("xfilesharingprobasic", captchaurl, link);
                 dlForm.put("code", code);
                 logger.info("Put captchacode " + code + " obtained by captcha metod \"Standard captcha\" in the form.");
-            } else if (new Regex(BRBEFORE, "(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)").matches()) {
-                logger.info("Detected captcha method \"Re Captcha\" for this host");
-                final Recaptcha rc = new Recaptcha(br, this);
-                rc.setForm(dlForm);
-                String id = this.br.getRegex("\\?k=([A-Za-z0-9%_\\+\\- ]+)\"").getMatch(0);
-                rc.setId(id);
-                rc.load();
-                File cf = rc.downloadCaptcha(getLocalCaptchaFile());
-                String c = getCaptchaCode("recaptcha", cf, link);
-                Form rcform = rc.getForm();
-                rcform.put("recaptcha_challenge_field", rc.getChallenge());
-                rcform.put("recaptcha_response_field", Encoding.urlEncode(c));
-                logger.info("Put captchacode " + c + " obtained by captcha metod \"Re Captcha\" in the form and submitted it.");
-                dlForm = rc.getForm();
-                // waittime is often skippable for reCaptcha handling
-                // skipWaittime = true;
             }
             /* Captcha END */
             if (password) {
