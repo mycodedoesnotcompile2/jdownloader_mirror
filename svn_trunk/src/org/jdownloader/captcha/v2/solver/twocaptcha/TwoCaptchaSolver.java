@@ -4,12 +4,15 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.IO;
 import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.SolverStatus;
@@ -22,18 +25,31 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYP
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_TWO_CAPTCHA;
 
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
 
-public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
-    private static final TwoCaptchaSolver INSTANCE = new TwoCaptchaSolver();
+public class TwoCaptchaSolver extends CESChallengeSolver<String> {
+    private static final TwoCaptchaSolver     INSTANCE           = new TwoCaptchaSolver();
+    private String                            accountStatusString;
+    protected final TwoCaptchaConfigInterface config;
+    AtomicInteger                             counter            = new AtomicInteger();
+    AtomicInteger                             counterInterrupted = new AtomicInteger();
+    AtomicInteger                             counterNotOK       = new AtomicInteger();
+    AtomicInteger                             counterOK          = new AtomicInteger();
+    AtomicInteger                             counterSend        = new AtomicInteger();
+    AtomicInteger                             counterSendError   = new AtomicInteger();
+    AtomicInteger                             counterSolved      = new AtomicInteger();
+    AtomicInteger                             counterUnused      = new AtomicInteger();
+    protected final LogSource                 logger;
 
     public static TwoCaptchaSolver getInstance() {
         return INSTANCE;
@@ -50,8 +66,25 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
     }
 
     private TwoCaptchaSolver() {
-        super();
+        super(new TwoCaptchaSolverService(), Math.max(1, Math.min(25, JsonConfig.create(TwoCaptchaConfigInterface.class).getThreadpoolSize())));
+        config = JsonConfig.create(TwoCaptchaConfigInterface.class);
+        logger = LogController.getInstance().getLogger(TwoCaptchaSolver.class.getName());
+        threadPool.allowCoreThreadTimeOut(true);
         getService().setSolver(this);
+    }
+
+    @Override
+    public String getAccountStatusString() {
+        return accountStatusString;
+    }
+
+    @Override
+    protected void solveBasicCaptchaChallenge(CESSolverJob<String> job, BasicCaptchaChallenge challenge) throws SolverException {
+        // not used. solveCES is overwritten
+    }
+
+    protected String getApiBaseV2() {
+        return "https://api.2captcha.com";
     }
 
     @Override
@@ -201,7 +234,7 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
         }
     }
 
-    public static boolean looksLikeValidAPIKey(final String str) {
+    protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
         }

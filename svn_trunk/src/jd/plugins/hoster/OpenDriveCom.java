@@ -18,18 +18,14 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
-import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.HTTPHeader;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
-import jd.http.Request;
 import jd.http.URLConnectionAdapter;
-import jd.http.requests.HeadRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -43,13 +39,21 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50191 $", interfaceVersion = 2, names = { "opendrive.com" }, urls = { "https?://(?:www\\.)?(?:[a-z0-9]+\\.)?(?:opendrive\\.com/files\\?[A-Za-z0-9\\-_]+|od\\.lk/(?:d|f)/[A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50784 $", interfaceVersion = 2, names = { "opendrive.com" }, urls = { "https?://(?:www\\.)?(?:[a-z0-9]+\\.)?(?:opendrive\\.com/files\\?[A-Za-z0-9\\-_]+|od\\.lk/(?:d|f)/[A-Za-z0-9\\-_]+)" })
 public class OpenDriveCom extends PluginForHost {
     public OpenDriveCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/");
+    }
+
+    private static final String PROPERTY_DIRECTURL = "directlink";
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -97,9 +101,15 @@ public class OpenDriveCom extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformation(link, null);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
+        if (account != null) {
+            this.login(account, false);
+        }
         final String fileID = getFID(link);
         if (!link.isNameSet()) {
             /* Set fallback name */
@@ -121,6 +131,7 @@ public class OpenDriveCom extends PluginForHost {
             if (filesize.matches("\\d+")) {
                 link.setVerifiedFileSize(Long.parseLong(filesize));
             }
+            link.setProperty(PROPERTY_DIRECTURL, entries.get("DirectLink"));
         } else if (access_mode == MODE.WEBSITE_AJAX) {
             prepBRAjax(this.br);
             br.getPage("https://web." + this.getHost() + "/api/file/info.json/" + fileID);
@@ -138,6 +149,7 @@ public class OpenDriveCom extends PluginForHost {
             if (md5hash != null) {
                 link.setMD5Hash(md5hash);
             }
+            link.setProperty(PROPERTY_DIRECTURL, entries.get("DownloadLink"));
         } else {
             /* access_mode == MODE.WEBSITE_HTML */
             logger.info("NOT using API");
@@ -148,9 +160,10 @@ public class OpenDriveCom extends PluginForHost {
 
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)>\\s*File not found<|>or access limited<|List file info failed|File was not found")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*File not found<|>or access limited<|List file info failed|File was not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Regex fInfo = br.getRegex("<h1 class=\"filename\">([^<>\"]*?)  \\((\\d+(\\.\\d+)? [A-Za-z]+)\\)</h1>");
@@ -187,46 +200,49 @@ public class OpenDriveCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
+        this.handleDownload(link, null);
+    }
+
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link);
         if (br.containsHTML("File is private and cannot be downloaded\">Download</a>")) {
             throw new AccountRequiredException("File is private and cannot be downloaded");
         }
-        String dllink = checkDirectLink(link, "directurl");
-        if (StringUtils.isEmpty(dllink)) {
-            boolean useWebsiteFallback = false;
-            if (access_mode == MODE.API) {
-                dllink = getJson("DirectLink");
-            } else if (access_mode == MODE.WEBSITE_AJAX) {
-                dllink = PluginJSonUtils.getJson(br, "DownloadLink");
-                if (StringUtils.equalsIgnoreCase(dllink, "n/a")) {
-                    // /* 2021-11-17: Workaround */
-                    logger.info("API did not provide downloadurl --> Fallback to website");
-                    requestFileInformationWebsite(link);
-                    useWebsiteFallback = true;
-                }
-            } else {
-                /* access_mode == MODE.WEBSITE_HTML */
+        String dllink = null;
+        boolean useWebsiteFallback = false;
+        if (access_mode == MODE.API) {
+            dllink = link.getStringProperty(PROPERTY_DIRECTURL);
+        } else if (access_mode == MODE.WEBSITE_AJAX) {
+            dllink = link.getStringProperty(PROPERTY_DIRECTURL);
+            if (StringUtils.isEmpty(dllink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            if (access_mode == MODE.WEBSITE_HTML || useWebsiteFallback) {
-                dllink = br.getRegex("\"(https?://[^/]+/api/v\\d+/download/file\\.json/[^<>\"]+)\"").getMatch(0);
+            if (StringUtils.equalsIgnoreCase(dllink, "n/a")) {
+                // /* 2021-11-17: Workaround */
+                logger.info("API did not provide valid downloadurl --> Fallback to website");
+                requestFileInformationWebsite(link);
+                useWebsiteFallback = true;
+            }
+        } else {
+            /* access_mode == MODE.WEBSITE_HTML */
+        }
+        if (access_mode == MODE.WEBSITE_HTML || useWebsiteFallback) {
+            dllink = br.getRegex("\"(https?://[^/]+/api/v\\d+/download/file\\.json/[^<>\"]+)\"").getMatch(0);
+            if (dllink == null) {
+                dllink = br.getRegex("<a class=\"[^\"]*download\" href=\"(http[^<>\"]*?|/download/[^\"]+)\"").getMatch(0);
                 if (dllink == null) {
-                    dllink = br.getRegex("<a class=\"[^\"]*download\" href=\"(http[^<>\"]*?|/download/[^\"]+)\"").getMatch(0);
-                    if (dllink == null) {
-                        dllink = br.getRegex("\"(https?://(www\\.)?([a-z0-9]+\\.)?(?:opendrive\\.com|od\\.lk)/files/[A-Za-z0-9\\-_]+/[^<>\"]*?)\"").getMatch(0);
-                    }
-                    if (dllink == null) {
-                        /* 2021-11-17 */
-                        dllink = br.getRegex("(/download/[A-Za-z0-9\\-_]+\\?)").getMatch(0);
-                    }
+                    dllink = br.getRegex("\"(https?://(www\\.)?([a-z0-9]+\\.)?(?:opendrive\\.com|od\\.lk)/files/[A-Za-z0-9\\-_]+/[^<>\"]*?)\"").getMatch(0);
+                }
+                if (dllink == null) {
+                    /* 2021-11-17 */
+                    dllink = br.getRegex("(/download/[A-Za-z0-9\\-_]+\\?)").getMatch(0);
                 }
             }
         }
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Request initialRequest = br.createGetRequest(Encoding.htmlDecode(dllink));
-        initialRequest.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "", false));
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, initialRequest, this.isResumeable(link, null), 1);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), 1);
         this.handleConnectionErrors(br, dl.getConnection());
         link.setProperty("directurl", dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
@@ -240,7 +256,6 @@ public class OpenDriveCom extends PluginForHost {
                 br.setCookies(this.getHost(), cookies);
                 return;
             }
-            this.br.setFollowRedirects(true);
             this.br.getPage("https://www." + this.getHost() + "/login");
             Form loginform = this.br.getFormbyProperty("id", "login-form");
             if (loginform == null) {
@@ -255,7 +270,7 @@ public class OpenDriveCom extends PluginForHost {
             loginform.put("remember_me", "on");
             for (int i = 0; i < 3; i++) { // Sometimes retry is needed, redirected to /login?ref=%2Ffiles&s=...
                 br.submitForm(loginform);
-                if (br.containsHTML("(?i)>\\s*Invalid  username or password\\s*<")) {
+                if (br.containsHTML(">\\s*Invalid  username or password\\s*<")) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nUngültiger Benutzername oder ungültiges Passwort!", PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
                 if (br.containsHTML("\"user-controls-menu\"")) {
@@ -271,7 +286,7 @@ public class OpenDriveCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, true);
         br.getPage("/settings");
-        if (br.containsHTML("(?i)<b>\\s*Personal account\\s*</b><br>\\s*Basic")) {
+        if (br.containsHTML("<b>\\s*Personal account\\s*</b><br>\\s*Basic")) {
             if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nNicht unterstützter Accounttyp!\r\nFalls du denkst diese Meldung sei falsch die Unterstützung dieses Account-Typs sich\r\ndeiner Meinung nach aus irgendeinem Grund lohnt,\r\nkontaktiere uns über das support Forum.", PluginException.VALUE_ID_PREMIUM_DISABLE);
             } else {
@@ -287,53 +302,14 @@ public class OpenDriveCom extends PluginForHost {
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         requestFileInformation(link);
         login(account, false);
-        br.setFollowRedirects(false);
         br.getPage(link.getPluginPatternMatcher());
         final String dllink = br.getRegex("<a class=\"download\" href=\"(https://[^<>\"]*?)\"").getMatch(0);
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Request initialRequest = br.createGetRequest(Encoding.htmlDecode(dllink));
-        initialRequest.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "", false));
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, initialRequest, this.isResumeable(link, account), 1);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), 1);
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
-    }
-
-    private String checkDirectLink(final DownloadLink link, final String property) {
-        String dllink = link.getStringProperty(property);
-        if (dllink != null) {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
-                final HeadRequest request = br2.createHeadRequest(dllink);
-                // server ignores identity header but handles empty header
-                request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "");
-                con = br2.openRequestConnection(request);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    }
-                    return dllink;
-                } else {
-                    throw new IOException();
-                }
-            } catch (final Exception e) {
-                link.removeProperty(property);
-                logger.log(e);
-                return null;
-            } finally {
-                if (con != null) {
-                    con.disconnect();
-                }
-            }
-        }
-        return null;
     }
 
     @Override
@@ -342,6 +318,7 @@ public class OpenDriveCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Limit exeeded");
         }
         if (this.looksLikeDownloadableContent(con)) {
+            /* No error */
             return;
         }
         br.followConnection(true);
@@ -364,25 +341,9 @@ public class OpenDriveCom extends PluginForHost {
         throwFinalConnectionException(br, con);
     }
 
-    private String getJson(final String parameter) {
-        return getJson(this.br.toString(), parameter);
-    }
-
-    private String getJson(final String source, final String parameter) {
-        String result = new Regex(source, "\"" + parameter + "\":([\t\n\r ]+)?([0-9\\.]+)").getMatch(1);
-        if (result == null) {
-            result = new Regex(source, "\"" + parameter + "\":([\t\n\r ]+)?\"([^<>\"]*?)\"").getMatch(1);
-        }
-        return result;
-    }
-
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

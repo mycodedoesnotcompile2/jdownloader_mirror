@@ -60,9 +60,10 @@ public final class TwoCaptchaConfigPanel extends AbstractCaptchaSolverConfigPane
 
             @Override
             public void actionPerformed(ActionEvent e) {
+                final TwoCaptchaSolver solver = TwoCaptchaSolver.getInstance();
                 if (apiKey.getText().length() < 5) {
                     jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "No api key.");
-                } else if (!TwoCaptchaSolver.looksLikeValidAPIKey(apiKey.getText())) {
+                } else if (!solver.looksLikeValidAPIKey(apiKey.getText())) {
                     jd.gui.UserIO.getInstance().requestMessageDialog("2Captcha.com Error", "API Key is not correct!" + "\nFormat: [a-f0-9]{32}");
                 } else {
                     final TwoCaptchaAccount acc = TwoCaptchaSolver.getInstance().loadAccount();

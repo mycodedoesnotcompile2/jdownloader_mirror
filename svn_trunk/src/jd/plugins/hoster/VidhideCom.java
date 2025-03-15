@@ -19,9 +19,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
+import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -32,9 +30,14 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50787 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +54,7 @@ public class VidhideCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidhide.com", "vidhidehub.com", "vidhidepro.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com" });
+        ret.add(new String[] { "vidhidepro.com", "vidhide.com", "vidhidehub.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com", "niikaplayerr.com" });
         return ret;
     }
 
@@ -63,7 +66,22 @@ public class VidhideCom extends XFileSharingProBasic {
         deadDomains.add("filelions.site"); // 2024-08-02
         deadDomains.add("alions.pro"); // 2024-08-02
         deadDomains.add("filelions.site"); // 2024-11-25
+        deadDomains.add("vidhide.com"); // 2025-03-14
         return deadDomains;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        return this.rewriteHost(getPluginDomains(), host);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        // final download URLs are signed with IP but download servers only support IPv4 -> signature containing IPv6 will fail on IPv4
+        // Server
+        final Browser ret = new PluginBrowser<VidhideCom>(this);
+        ret.setIPVersion(IPVERSION.IPV4_ONLY);
+        return ret;
     }
 
     /**
@@ -189,15 +207,27 @@ public class VidhideCom extends XFileSharingProBasic {
         } else {
             logger.info("[DownloadMode] Trying to find official video downloads");
         }
-        final String[][] videoInfo = br.getRegex("href=\"(/download/[a-z0-9]{12}_[a-z]{1})\".*?<small class=\"text-muted\">\\s*\\d+x\\d+ ([^<]+)</small>").getMatches();
-        if (videoInfo == null || videoInfo.length == 0) {
+        final String[] videourls = br.getRegex("(/download/[a-z0-9]{12}_[a-z]{1})").getColumn(0);
+        final String[][] videoresolutionsAndFilesizes = br.getRegex(">\\s*(\\d+x\\d+),? (\\d+(\\.\\d{1,2})?,? [A-Za-z]{1,5})").getMatches();
+        if (videourls == null || videourls.length == 0) {
             logger.info("Failed to find any official video downloads");
             return null;
+        }
+        final String[][] videoInfo = new String[videourls.length][];
+        for (int i = 0; i < videourls.length; i++) {
+            final String[] thisVideoInfos = new String[3];
+            thisVideoInfos[0] = videourls[i];
+            if (videoresolutionsAndFilesizes != null && videoresolutionsAndFilesizes.length == videourls.length) {
+                final String[] thisVideoResolutionAndFilesize = videoresolutionsAndFilesizes[i];
+                thisVideoInfos[1] = thisVideoResolutionAndFilesize[0];
+                thisVideoInfos[2] = thisVideoResolutionAndFilesize[1];
+            }
+            videoInfo[i] = thisVideoInfos;
         }
         /*
          * Internal quality identifiers highest to lowest (inside 'download_video' String): o = original, h = high, n = normal, l=low
          */
-        final HashMap<String, Integer> qualityMap = new HashMap<String, Integer>();
+        final Map<String, Integer> qualityMap = new HashMap<String, Integer>();
         qualityMap.put("l", 20); // low
         qualityMap.put("n", 40); // normal
         qualityMap.put("h", 60); // high
@@ -216,7 +246,7 @@ public class VidhideCom extends XFileSharingProBasic {
         }
         for (final String videoInfos[] : videoInfo) {
             final String videoURL = videoInfos[0];
-            final String filesizeStr = videoInfos[1];
+            final String filesizeStr = videoInfos[2];
             final String videoQualityStrTmp = new Regex(videoURL, "_([a-z]{1})$").getMatch(0);
             if (StringUtils.isEmpty(videoQualityStrTmp)) {
                 /*
@@ -249,7 +279,6 @@ public class VidhideCom extends XFileSharingProBasic {
                      */
                     filesizeStrSelected = filesizeStr;
                 }
-                break;
             }
         }
         if (videoURLBest == null && videoURLSelected == null) {
@@ -276,35 +305,37 @@ public class VidhideCom extends XFileSharingProBasic {
             return filesizeStrChosen;
         }
         getPage(br, continueURL);
+        checkErrors(br, continueURL, link, account, false);
         final Form download1 = br.getFormByInputFieldKeyValue("op", "download_orig");
         if (download1 != null) {
-            this.handleCaptcha(link, br, download1);
-            this.submitForm(br, download1);
-            this.checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
+            handleCaptcha(link, br, download1);
+            logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
+            this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
+            submitForm(br, download1);
+            checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
         }
-        String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
-        if (StringUtils.isEmpty(dllink)) {
-            /*
-             * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
-             */
-            dllink = br.getRegex("<a href\\s*=\\s*\"(https?[^\"]+)\"[^>]*>\\s*Direct Download Link\\s*</a>").getMatch(0);
-        }
+        final String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find dllink via official video download");
-            String specialErrorDownloadImpossible = br.getRegex("<b class=\"err\"[^>]*>([^<]+)</b>").getMatch(0);
-            if (specialErrorDownloadImpossible != null) {
-                /* 2024-04-02: e.g. "Downloads disabled 6210" */
-                final String msgRemove = new Regex(specialErrorDownloadImpossible, ".+ (\\(\\{.+)").getMatch(0);
-                if (msgRemove != null) {
-                    specialErrorDownloadImpossible = specialErrorDownloadImpossible.replace(msgRemove, "");
-                }
-                throw new PluginException(LinkStatus.ERROR_FATAL, specialErrorDownloadImpossible);
-            } else {
-                return null;
-            }
+            return null;
         }
         logger.info("Successfully found dllink via official video download");
+        final String filesizeBytesStr = br.getRegex("Exact size\\s*</td>\\s*<td>(\\d+) bytes").getMatch(0);
+        if (filesizeBytesStr != null) {
+            logger.info("Found precise expected filesize");
+            link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+        }
         return dllink;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilename = new Regex(html, "<h3[^>]*>\\s*Download([^<]*)</h3>").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = betterFilename;
+        }
+        return fileInfo;
     }
 
     @Override

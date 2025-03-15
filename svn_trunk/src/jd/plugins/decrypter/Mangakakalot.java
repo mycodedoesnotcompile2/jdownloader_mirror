@@ -36,15 +36,22 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50759 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50784 $", interfaceVersion = 2, names = {}, urls = {})
 public class Mangakakalot extends PluginForDecrypt {
     public Mangakakalot(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
     private static final Pattern TYPE_MANGA             = Pattern.compile("/manga-([a-z0-9\\-]+)/?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_MANGA_CHAPTER_OLD = Pattern.compile("/(?:manga-|chapter/)([a-z0-9\\-_]+)/chapter[\\-_](\\d+(\\.\\d+)?)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_MANGA_CHAPTER_NEW = Pattern.compile("/manga/([\\w-]+)/chapter[\\-_](\\d+(\\.\\d+)?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MANGA_CHAPTER_NEW = Pattern.compile("/manga/([\\w-]+)/chapter[\\-_](\\d+([.-]\\d+)?)$", Pattern.CASE_INSENSITIVE);
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
@@ -95,7 +102,6 @@ public class Mangakakalot extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br.setFollowRedirects(true);
         String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         /* Correct domain inside URL if we know it is dead. */
         final List<String> deadDomains = getDeadDomains();
@@ -206,7 +212,8 @@ public class Mangakakalot extends PluginForDecrypt {
         } else if (chapterurl_new.patternFind()) {
             /* New 2025-03-08 */
             /* Find all images of a chapter */
-            final String chapterNumber = chapterurl_new.getMatch(1);
+            /* Replace minus by dot to mimic chapter-names from html code without the need to extract this information from html. */
+            final String chapterNumber = chapterurl_new.getMatch(1).replace("-", ".");
             String breadcrumb = br.getRegex("<div[^>]+class\\s*=\\s*\"(?:panel-)?breadcrumb[^\"]*\"[^>]*>\\s*([^§]+)<div[^>]+class\\s*=\\s*\"panel").getMatch(0);
             breadcrumb = breadcrumb != null ? breadcrumb.replaceAll("<div[^>]+class\\s*=\\s*\\\"panel[^§]+", "") : null;
             //

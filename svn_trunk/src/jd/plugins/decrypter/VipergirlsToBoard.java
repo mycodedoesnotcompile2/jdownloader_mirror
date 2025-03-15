@@ -11,6 +11,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -19,7 +20,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50487 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50783 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipergirlsToBoard extends PluginForDecrypt {
     public VipergirlsToBoard(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,9 +128,16 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                     fp.setName(title);
                     fp.setComment("https://" + br.getHost(true) + "/threads/" + threadID + "?p=" + postID + "&viewfull=1#post" + postID);
                 }
-                final String[] results = new Regex(postContent, "<a href=\"(https?://[^\"]+)").getColumn(0);
+                String[] results = new Regex(postContent, "<a href=\"(https?://[^\"]+)").getColumn(0);
+                if (results == null || results.length == 0) {
+                    /* For older/broken posts containing plain-text. */
+                    results = HTMLParser.getHttpLinks(postContent, br.getURL());
+                }
                 for (final String result : results) {
                     if (!dupes.add(result)) {
+                        continue;
+                    } else if (this.canHandle(result)) {
+                        /* Do not allow links that would be crawled by the viper.to crawler. */
                         continue;
                     }
                     numberofNewItemsThisPage++;

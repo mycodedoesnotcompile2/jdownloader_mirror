@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50731 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50788 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -307,7 +307,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 502) {
                 throw br.new BrowserException("ResponseCode: 502", br.getRequest(), null);
             } else if (br.getHttpConnection().getResponseCode() == 403 || br.getHttpConnection().getResponseCode() == 429) {
-                throw new DecrypterRetryException(RetryReason.CAPTCHA, "RATE_LIMIT_REACHED_EXHAUSTED_RETRY_COUNT_" + br._getURL().getPath(), "Rate limit has been reached and crawler failed to avoid it. Try again later.");
+                throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT, "RATE_LIMIT_REACHED_EXHAUSTED_RETRY_COUNT_" + br._getURL().getPath(), "Rate limit has been reached and crawler failed to avoid it. Try again later.");
             } else {
                 /* Developer mistake */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -528,8 +528,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     private void addCachedUserID(final String userID, final String username) {
-        logger.info("Adding userID to cache: user: " + username + " -> userID: " + userID);
         synchronized (ID_TO_USERNAME) {
+            /* Log only if item is not in map yet to prevent log spam */
+            if (!ID_TO_USERNAME.containsKey(userID)) {
+                logger.info("Adding userID to cache: user: " + username + " -> userID: " + userID);
+            }
             ID_TO_USERNAME.put(userID, username);
         }
     }
@@ -1719,9 +1722,16 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
+        final Number deleted_reason = (Number) item.get("deleted_reason");
+        if (deleted_reason != null && deleted_reason.intValue() != 0) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final ArrayList<DownloadLink> results = new ArrayList<DownloadLink>();
         final Map<String, Object> user = (Map<String, Object>) item.get("user");
         final String username = user.get("username").toString();
+        final String userID = user.get("id").toString();
+        /* Now that we already have this data, we can also cache it which will save requests later on. */
+        this.addCachedUserID(userID, username);
         final Object reel_typeO = item.get("reel_type");
         final InstagramConfig cfg = PluginJsonConfig.get(InstagramConfig.class);
         if (reel_typeO != null) {
@@ -2459,11 +2469,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
 
     /** Crawls list of post/story items obtained via alt API. */
     private ArrayList<DownloadLink> crawlPostListAltAPI(final CryptedLink param, final List<Map<String, Object>> mediaItems, final InstagramMetadata metadata) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (final Map<String, Object> mediaItem : mediaItems) {
-            decryptedLinks.addAll(this.crawlPostAltAPI(param, metadata, mediaItem));
+            ret.addAll(this.crawlPostAltAPI(param, metadata, mediaItem));
         }
-        return decryptedLinks;
+        return ret;
     }
 
     private void prepBrAjax(final Browser br, final Qdb qdb) {

@@ -39,7 +39,7 @@ public interface InstagramConfig extends PluginConfigInterface {
     final String                    text_HashtagCrawlerMaxItemsLimit                  = "Hashtag crawler: How many items shall be grabbed for /explore/tags/<tagName>? [0 = disable]";
     final String                    text_SearchCrawlerMaxItemsLimit                   = "Search crawler: How many items shall be grabbed for /explore/search/keyword/?q=<searchTerm>? [0 = disable]";
     final String                    text_ActionOnRateLimitReached                     = "Crawler: Action on rate limit reached";
-    final String                    text_GlobalRequestIntervalLimitMilliseconds       = "Define global request limit for domains 'instagram.com' and 'cdninstagram.com' in milliseconds [0 = no limit]";
+    final String                    text_GlobalRequestIntervalLimitMilliseconds       = "Global request limit for domains 'instagram.com' and 'cdninstagram.com' in milliseconds [0 = no limit]";
     final String                    text_EnforceLoginIfAccountIsAvailable             = "Debug: Enforce login if account is available?";
     public static final TRANSLATION TRANSLATION                                       = new TRANSLATION();
 

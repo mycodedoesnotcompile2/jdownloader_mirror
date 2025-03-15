@@ -12,6 +12,8 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.SecondLevelLaunch;
 import jd.controlling.captcha.CaptchaSettings;
@@ -41,6 +43,13 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
         return isAccountLoginSupported(c) && super.canHandle(c);
     }
 
+    public FEATURE[] getFeatures() {
+        // Implementation would depend on the hoster and its capabilities
+        // This is a placeholder implementation
+        // return new FEATURE[] { FEATURE.API_KEY_LOGIN };
+        return null;
+    }
+
     final public void solve(final SolverJob<T> job) throws InterruptedException, SolverException {
         if (!validateLogins()) {
             return;
@@ -57,7 +66,25 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
             cesJob.hideBubble();
         }
     }
+    /**
+     * Enum representing different types of captchas. <br>
+     * Mockup code
+     */
+    // public enum CAPTCHA_TYPE {
+    // IMAGE,
+    // RECAPTCHA_V2,
+    // HCAPTCHA,
+    // FUNCAPTCHA,
+    // GEETEST,
+    // KEYCAPTCHA
+    // }
 
+    /** Placeholder / mockup code */
+    // public java.util.List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+    // java.util.List<CAPTCHA_TYPE> types = new java.util.ArrayList<CAPTCHA_TYPE>();
+    // types.add(CAPTCHA_TYPE.IMAGE);
+    // return types;
+    // }
     protected Browser createNewBrowserInstance() {
         return new Browser();
     }
@@ -75,7 +102,7 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
 
     protected abstract void solveBasicCaptchaChallenge(CESSolverJob<T> job, BasicCaptchaChallenge challenge) throws InterruptedException, SolverException;
 
-    /** Override this to only return true if a */
+    /** Override this to only return true if login looks to be valid. */
     protected boolean validateLogins() {
         return false;
     }
@@ -105,5 +132,26 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
 
     public String getAccountStatusString() {
         return null;
+    }
+
+    /** Override if API key login is used for this solvers' account functionality. */
+    protected boolean looksLikeValidAPIKey(final String str) {
+        return false;
+    }
+
+    public boolean hasFeature(final LazyPlugin.FEATURE feature) {
+        if (feature == null) {
+            return false;
+        }
+        final LazyPlugin.FEATURE[] features = getFeatures();
+        if (features == null) {
+            return false;
+        }
+        for (int i = 0; i < features.length; i++) {
+            if (features[i] == feature) {
+                return true;
+            }
+        }
+        return false;
     }
 }

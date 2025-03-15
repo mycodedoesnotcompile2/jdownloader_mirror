@@ -7,15 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import jd.SecondLevelLaunch;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
-
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.SolverService;
+
+import jd.SecondLevelLaunch;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
 
 public abstract class AbstractSolverService implements SolverService {
     public AbstractSolverService() {
@@ -68,7 +68,7 @@ public abstract class AbstractSolverService implements SolverService {
 
     @Override
     public synchronized Map<String, Integer> getWaitForMapCopy() {
-        final HashMap<String, Integer> ret = new HashMap<String, Integer>();
+        final Map<String, Integer> ret = new HashMap<String, Integer>();
         Map<String, Integer> map = getConfig().getWaitForMap();
         if (map == null) {
             map = getWaitForOthersDefaultMap();
@@ -90,25 +90,26 @@ public abstract class AbstractSolverService implements SolverService {
     }
 
     protected void initServicePanel(final KeyHandler... handlers) {
-        if (!org.appwork.utils.Application.isHeadless()) {
-            SecondLevelLaunch.GUI_COMPLETE.executeWhenReached(new Runnable() {
-                @SuppressWarnings("unchecked")
-                public void run() {
-                    for (KeyHandler k : handlers) {
-                        k.getEventSender().addListener(new GenericConfigEventListener<Object>() {
-                            @Override
-                            public void onConfigValidatorError(KeyHandler<Object> keyHandler, Object invalidValue, ValidationException validateException) {
-                            }
-
-                            @Override
-                            public void onConfigValueModified(KeyHandler<Object> keyHandler, Object newValue) {
-                                ServicePanel.getInstance().requestUpdate(true);
-                            }
-                        });
-                    }
-                }
-            });
+        if (org.appwork.utils.Application.isHeadless()) {
+            return;
         }
+        SecondLevelLaunch.GUI_COMPLETE.executeWhenReached(new Runnable() {
+            @SuppressWarnings("unchecked")
+            public void run() {
+                for (KeyHandler k : handlers) {
+                    k.getEventSender().addListener(new GenericConfigEventListener<Object>() {
+                        @Override
+                        public void onConfigValidatorError(KeyHandler<Object> keyHandler, Object invalidValue, ValidationException validateException) {
+                        }
+
+                        @Override
+                        public void onConfigValueModified(KeyHandler<Object> keyHandler, Object newValue) {
+                            ServicePanel.getInstance().requestUpdate(true);
+                        }
+                    });
+                }
+            }
+        });
     }
 
     public static ArrayList<SolverService> validateWaittimeQueue(SolverService start, SolverService check) {

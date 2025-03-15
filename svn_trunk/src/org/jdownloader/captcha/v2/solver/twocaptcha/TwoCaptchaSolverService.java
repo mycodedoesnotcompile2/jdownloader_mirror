@@ -68,36 +68,37 @@ public class TwoCaptchaSolverService extends AbstractSolverService implements Se
 
     @Override
     public void extendServicePabel(List<ServiceCollection<?>> services) {
-        if (solver.validateLogins()) {
-            services.add(new ServiceCollection<TwoCaptchaSolver>() {
-                private static final long serialVersionUID = -2069081821971909269L;
-
-                @Override
-                public Icon getIcon() {
-                    return TwoCaptchaSolverService.this.getIcon(18);
-                }
-
-                @Override
-                public boolean isEnabled() {
-                    return config.isEnabled();
-                }
-
-                @Override
-                protected long getLastActiveTimestamp() {
-                    return System.currentTimeMillis();
-                }
-
-                @Override
-                protected String getName() {
-                    return "2Captcha.com";
-                }
-
-                @Override
-                public ExtTooltip createTooltip(ServicePanel owner) {
-                    return new TwoCaptchaTooltip(owner, solver);
-                }
-            });
+        if (!solver.validateLogins()) {
+            return;
         }
+        services.add(new ServiceCollection<TwoCaptchaSolver>() {
+            private static final long serialVersionUID = -2069081821971909269L;
+
+            @Override
+            public Icon getIcon() {
+                return TwoCaptchaSolverService.this.getIcon(18);
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return config.isEnabled();
+            }
+
+            @Override
+            protected long getLastActiveTimestamp() {
+                return System.currentTimeMillis();
+            }
+
+            @Override
+            protected String getName() {
+                return "2Captcha.com";
+            }
+
+            @Override
+            public ExtTooltip createTooltip(ServicePanel owner) {
+                return new TwoCaptchaTooltip(owner, solver);
+            }
+        });
     }
 
     @Override

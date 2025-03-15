@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50501 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50785 $", interfaceVersion = 3, names = {}, urls = {})
 public class AbstreamTo extends XFileSharingProBasic {
     public AbstreamTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -88,6 +89,21 @@ public class AbstreamTo extends XFileSharingProBasic {
             /* Free(anonymous) and unknown account type */
             return 0;
         }
+    }
+
+    @Override
+    protected boolean isVideohoster_enforce_video_filename() {
+        return true;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilename = new Regex(html, "<h1[^<]*class=\"h5\"[^>]*>([^<]+)</h1>").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = betterFilename;
+        }
+        return fileInfo;
     }
 
     @Override

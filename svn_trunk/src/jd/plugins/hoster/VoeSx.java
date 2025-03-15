@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50784 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -447,10 +447,15 @@ public class VoeSx extends XFileSharingProBasic {
     @Override
     protected void runPostRequestTask(final Browser ibr) throws Exception {
         super.runPostRequestTask(ibr);
-        final String redirect = ibr.getRegex("else \\{\\s*window\\.location\\.href = '(https?://[^\"\\']+)';").getMatch(0);
+        String redirect = ibr.getRegex("else \\{\\s*window\\.location\\.href = '(https?://[^\"\\']+)';").getMatch(0);
         if (redirect == null) {
             return;
         }
+        /*
+         * 2025-03-14: Workaround for server side bug where links ending with "/download" will do endless redirects on themselves, ending in
+         * http response 429 too many requests.
+         */
+        redirect = redirect.replaceFirst("/download$", "");
         final String fuid = this.getFUIDFromURL(this.getDownloadLink());
         if (canHandle(redirect) || (fuid != null && redirect.endsWith("/" + fuid))) {
             logger.info("Handle special js redirect: " + redirect);
@@ -586,7 +591,7 @@ public class VoeSx extends XFileSharingProBasic {
                         index++;
                     }
                 }
-                final ArrayList<DownloadLink> apiLinkcheckLinks = new ArrayList<DownloadLink>();
+                final List<DownloadLink> apiLinkcheckLinks = new ArrayList<DownloadLink>();
                 sb.delete(0, sb.capacity());
                 for (final DownloadLink link : links) {
                     try {
