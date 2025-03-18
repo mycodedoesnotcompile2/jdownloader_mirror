@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50784 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50795 $", interfaceVersion = 2, names = {}, urls = {})
 public class Mangakakalot extends PluginForDecrypt {
     public Mangakakalot(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +61,8 @@ public class Mangakakalot extends PluginForDecrypt {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mangakakalot.com", "manganelo.com", "manganato.com", "manganelo.com", "chapmanganato.com", "chapmanganato.to", "readmanganato.com", "mangakakalot.gg" });
+        ret.add(new String[] { "manganato.info", "manganelo.com", "manganato.com", "manganelo.com", "chapmanganato.com", "chapmanganato.to", "readmanganato.com" });
+        ret.add(new String[] { "mangakakalot.gg", "mangakakalot.com" });
         return ret;
     }
 
@@ -72,6 +73,7 @@ public class Mangakakalot extends PluginForDecrypt {
         deadDomains.add("manganato.com");
         deadDomains.add("manganelo.com");
         deadDomains.add("chapmanganato.com");
+        deadDomains.add("chapmanganato.to");
         deadDomains.add("readmanganato.com");
         return deadDomains;
     }
@@ -132,6 +134,7 @@ public class Mangakakalot extends PluginForDecrypt {
             }
             fp.addLinks(ret);
         } else if (chapterurl_old.patternFind()) {
+            /* e.g. manganato.info */
             /* Find all images of a chapter */
             final String chapterNumber = chapterurl_old.getMatch(1);
             String breadcrumb = br.getRegex("<div[^>]+class\\s*=\\s*\"(?:panel-)?breadcrumb[^\"]*\"[^>]*>\\s*([^§]+)<div[^>]+class\\s*=\\s*\"panel").getMatch(0);
@@ -210,7 +213,7 @@ public class Mangakakalot extends PluginForDecrypt {
                 pageNumber++;
             }
         } else if (chapterurl_new.patternFind()) {
-            /* New 2025-03-08 */
+            /* New 2025-03-08 e.g. mangakakalot.gg */
             /* Find all images of a chapter */
             /* Replace minus by dot to mimic chapter-names from html code without the need to extract this information from html. */
             final String chapterNumber = chapterurl_new.getMatch(1).replace("-", ".");
@@ -276,8 +279,11 @@ public class Mangakakalot extends PluginForDecrypt {
                     continue;
                 }
                 final DownloadLink link = createDownloadlink(realURL);
-                /* Important for download else Cloudflare may block */
-                link.setReferrerUrl(br.getURL());
+                /**
+                 * Important for download else Cloudflare may block. <br>
+                 * Main page is needed as referer, not the URL our current browser instance is on!!
+                 */
+                link.setReferrerUrl("https://" + br.getHost(true) + "/");
                 /* 2024-08-27: Direct URL to images won't work in browser due to missing referer + Cloudflare. */
                 link.setContentUrl(br.getURL());
                 final String ext = getFileNameExtensionFromURL(realURL);

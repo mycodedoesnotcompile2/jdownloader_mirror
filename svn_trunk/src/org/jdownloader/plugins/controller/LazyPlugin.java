@@ -7,10 +7,6 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.config.Property;
-import jd.plugins.Plugin;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.MinTimeWeakReference;
 import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
@@ -21,6 +17,10 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.translate._JDT;
+
+import jd.PluginWrapper;
+import jd.config.Property;
+import jd.plugins.Plugin;
 
 public abstract class LazyPlugin<T extends Plugin> implements MinTimeWeakReferenceCleanup {
     public static enum FEATURE implements LabelInterface, TooltipInterface {
@@ -113,6 +113,22 @@ public abstract class LazyPlugin<T extends Plugin> implements MinTimeWeakReferen
             @Override
             public String getTooltip() {
                 return _JDT.T.LazyHostPlugin_FEATURE_MULTIHOST_TOOLTIP();
+            }
+
+            @Override
+            public boolean isInternal() {
+                return false;
+            }
+        },
+        CAPTCHA_SOLVER {
+            @Override
+            public String getLabel() {
+                return _JDT.FIX_ME("Captcha solver plugin");
+            }
+
+            @Override
+            public String getTooltip() {
+                return _JDT.FIX_ME("Captcha solver plugin");
             }
 
             @Override
@@ -311,7 +327,8 @@ public abstract class LazyPlugin<T extends Plugin> implements MinTimeWeakReferen
         }
 
         /**
-         * Return true if this is an internal feature. </br> Internal features are used internally only and are not displayed in GUI.
+         * Return true if this is an internal feature. </br>
+         * Internal features are used internally only and are not displayed in GUI.
          */
         public abstract boolean isInternal();
     }

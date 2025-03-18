@@ -46,6 +46,14 @@ import jd.parser.Regex;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 
 public class AccountInfo extends Property implements AccountTrafficView {
+    /**
+     * Enum representing different currencies.
+     */
+    public enum CURRENCY {
+        EUR,
+        USD
+    }
+
     private static final long   serialVersionUID           = 1825140346023286206L;
     private volatile long       account_validUntil         = -1;
     private volatile long       account_LastValidUntil     = -1;
@@ -59,6 +67,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
     private long                account_createTime         = 0;
     private static final String PROPERTY_MULTIHOST_SUPPORT = "multiHostSupport";
     private Account             account                    = null;
+    private CURRENCY            currency                   = null;
 
     protected void setAccount(Account account) {
         this.account = account;
@@ -107,13 +116,21 @@ public class AccountInfo extends Property implements AccountTrafficView {
         this.account_createTime = createTime;
     }
 
-    /**
-     * Gibt zurück wieviel (in Cent) Geld gerade auf diesem Account ist
-     *
-     * @return
-     */
     public long getAccountBalance() {
         return account_accountBalance;
+    }
+
+    public void setCurrency(CURRENCY currency) {
+        this.currency = currency;
+    }
+
+    /**
+     * Gets the currency used for the account balance.
+     *
+     * @return The currency
+     */
+    public CURRENCY getCurrency() {
+        return this.currency;
     }
 
     /**
@@ -201,6 +218,11 @@ public class AccountInfo extends Property implements AccountTrafficView {
 
     public void setAccountBalance(final long num) {
         this.account_accountBalance = Math.max(0, num);
+    }
+
+    public void setAccountBalance(final double num) {
+        // TODO: Set as double
+        this.account_accountBalance = (long) Math.max(0, num);
     }
 
     public void setExpired(final boolean b) {
@@ -667,22 +689,6 @@ public class AccountInfo extends Property implements AccountTrafficView {
 
     protected List<MultiHostHost> multihostSupportV2 = null;
 
-    @Deprecated
-    // will be removed by Jiaz
-    public List<String> getMultiHostSupport() {
-        final Object ret = getProperty(PROPERTY_MULTIHOST_SUPPORT, null);
-        if (ret == null) {
-            return null;
-        } else if (!(ret instanceof List)) {
-            return null;
-        }
-        final List<String> list = (List<String>) ret;
-        if (list.size() > 0) {
-            return list;
-        }
-        return null;
-    }
-
     @Override
     public boolean removeProperty(String key) {
         if (PROPERTY_MULTIHOST_SUPPORT.equals(key)) {
@@ -691,7 +697,6 @@ public class AccountInfo extends Property implements AccountTrafficView {
         return super.removeProperty(key);
     }
 
-    /** 2024-09-06: wrapper function */
     public List<MultiHostHost> getMultiHostSupportV2() {
         return this.multihostSupportV2;
     }

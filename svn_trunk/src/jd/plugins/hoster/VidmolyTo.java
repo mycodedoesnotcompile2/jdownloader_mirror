@@ -31,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50106 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50793 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -72,7 +72,7 @@ public class VidmolyTo extends XFileSharingProBasic {
 
     public static final String getDefaultAnnotationPatternPartCustom() {
         /* 2020-05-18: Special */
-        return "/(?:embed-|dl?/|w/)?[a-z0-9]{12}(?:/[^/]+(?:\\.html)?)?";
+        return "/(?:embed-|dl?/|w/)?[a-z0-9]{12}(/[^/]+)?(\\.html)?";
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {

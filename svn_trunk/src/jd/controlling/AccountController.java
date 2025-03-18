@@ -56,6 +56,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.PluginClassLoader;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
@@ -254,6 +255,10 @@ public class AccountController implements AccountControllerListener, AccountProp
             return ai;
         }
         final AccountError errorBefore = account.getError();
+        double balanceBefore = -1;
+        if (ai != null) {
+            balanceBefore = ai.getAccountBalance();
+        }
         PluginForHost plugin = null;
         final HashMap<AccountProperty.Property, AccountProperty> propertyChanges = new HashMap<AccountProperty.Property, AccountProperty>();
         try {
@@ -347,9 +352,21 @@ public class AccountController implements AccountControllerListener, AccountProp
                     logger.info("Account:" + whoAmI + "|Invalid!");
                     account.setError(AccountError.INVALID, -1, null);
                     return ai;
-                } else {
-                    account.setLastValidTimestamp(System.currentTimeMillis());
                 }
+                if (plugin.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+                    // TODO: Add formatting, add currency (EUR/USD)
+                    ai.setStatus("Balance: " + ai.getAccountBalance());
+                    if (ai.getAccountBalance() <= 0) {
+                        account.setError(AccountError.INVALID, -1, "Zero balance");
+                    }
+                    /* Warn on low balance */
+                    final double lowBalanceThreshold = 1.0;
+                    if (balanceBefore >= lowBalanceThreshold && ai.getAccountBalance() < lowBalanceThreshold) {
+                        // TODO: Display notification on low balance
+                    }
+                }
+                /* Account check was successful. Account can still get an error status down below if it is expired or out of traffic. */
+                account.setLastValidTimestamp(System.currentTimeMillis());
                 if (ai != null && ai.isExpired()) {
                     /* expired account */
                     logger.clear();

@@ -16,10 +16,6 @@ import java.util.Map.Entry;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-
 import org.appwork.utils.Application;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.IO;
@@ -30,28 +26,32 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.updatev2.ClassLoaderExtension;
 
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+
 public class PluginClassLoader extends URLClassLoader {
     private static final HashMap<String, HashMap<String, Object>> sharedPluginObjectsPool     = new HashMap<String, HashMap<String, Object>>();
-    private static final WeakHashMap<Object, String>              sharedPluginObjectsPoolLock = new WeakHashMap<Object, String>();              ;
+    private static final WeakHashMap<Object, String>              sharedPluginObjectsPoolLock = new WeakHashMap<Object, String>();;
     // http://docs.oracle.com/javase/7/docs/technotes/guides/lang/cl-mt.html
     private static final HashSet<String>                          immutableClasses            = new HashSet<String>() {
-        /**
-         *
-         */
-        private static final long serialVersionUID = -5337264051307565501L;
-        {
-            add("java.lang.Boolean");
-            add("java.lang.Byte");
-            add("java.lang.String");
-            add("java.lang.Double");
-            add("java.lang.Integer");
-            add("java.lang.Long");
-            add("java.lang.Float");
-            add("java.lang.Short");
-            add("java.math.BigInteger");
-            add("java.math.BigDecimal");
-        }
-    };
+                                                                                                  /**
+                                                                                                   *
+                                                                                                   */
+                                                                                                  private static final long serialVersionUID = -5337264051307565501L;
+                                                                                                  {
+                                                                                                      add("java.lang.Boolean");
+                                                                                                      add("java.lang.Byte");
+                                                                                                      add("java.lang.String");
+                                                                                                      add("java.lang.Double");
+                                                                                                      add("java.lang.Integer");
+                                                                                                      add("java.lang.Long");
+                                                                                                      add("java.lang.Float");
+                                                                                                      add("java.lang.Short");
+                                                                                                      add("java.math.BigInteger");
+                                                                                                      add("java.math.BigDecimal");
+                                                                                                  }
+                                                                                              };
 
     private static class PluginClassLoaderClass {
         private final WeakReference<Class<?>> clazz;
@@ -390,9 +390,6 @@ public class PluginClassLoader extends URLClassLoader {
                     }
                 }
                 if (!name.startsWith("jd.plugins.hoster") && !name.startsWith("jd.plugins.decrypter")) {
-                    return super.loadClass(name);
-                }
-                if (name.startsWith("jd.plugins.hoster.RTMPDownload")) {
                     return super.loadClass(name);
                 }
                 PluginClassLoaderClass pCLc = null;

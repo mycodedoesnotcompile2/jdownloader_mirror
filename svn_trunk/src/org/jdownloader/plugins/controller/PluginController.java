@@ -14,18 +14,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.JVMVersion;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
+
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.HostPlugin;
 import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
-
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.JVMVersion;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 
 public abstract class PluginController<T extends Plugin> {
     public static class PluginClassInfo<T extends Plugin> {
@@ -41,6 +41,7 @@ public abstract class PluginController<T extends Plugin> {
         FAILED_DEPENDENCIES,
         SUCCESSFUL_DEPENDENCIES,
         SUCCESSFUL;
+
         public static boolean isSuccessFul(CHECK_RESULT result) {
             switch (result) {
             case SUCCESSFUL:
@@ -55,7 +56,6 @@ public abstract class PluginController<T extends Plugin> {
     protected final static HashSet<String> IGNORELIST = new HashSet<String>();
     static {
         IGNORELIST.add("YoutubeDashConfigPanel");
-        IGNORELIST.add("RTMPDownload");
         IGNORELIST.add("YoutubeHelper");
         IGNORELIST.add("K2SApi");
         IGNORELIST.add("antiDDoSForDecrypt");

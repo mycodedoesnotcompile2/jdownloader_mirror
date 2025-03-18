@@ -200,7 +200,6 @@ public class IconKey {
     public static final String ICON_LOGO_FIREFOX                = "logo/firefox";
     public static final String ICON_LOGO_JD_LOGO_54_54_TRANS    = "logo/jd_logo_54_54_trans";
     public static final String ICON_LOGO_PAYPAL_LARGE           = "logo/paypal_large";
-    public static final String ICON_LOGO_CAPTCHASOLUTIONS       = "logo/CaptchaSolutions";
     public static final String ICON_LOGO_LOGO_48X48             = "logo/logo-48x48";
     public static final String ICON_LOGO_DBC                    = "logo/dbc";
     public static final String ICON_LOGO_PAYSAFECARD_LARGE      = "logo/paysafecard_large";

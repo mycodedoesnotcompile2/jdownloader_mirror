@@ -6378,9 +6378,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Stop all running downloads" })
     String StopDownloadsAction();
 
-    @Default(lngs = { "en" }, values = { "CaptchaSolutions.com" })
-    String CaptchaSolutionsSolver_gettypeName_();
-
     @Default(lngs = { "en" }, values = { "Invalid answer: %s1" })
     String DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer_bad(String string);
 

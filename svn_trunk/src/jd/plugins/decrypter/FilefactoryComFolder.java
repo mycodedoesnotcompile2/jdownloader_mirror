@@ -23,6 +23,7 @@ import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -37,11 +38,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-@DecrypterPlugin(revision = "$Revision: 46794 $", interfaceVersion = 2, names = { "filefactory.com" }, urls = { "https?://(?:www\\.)?filefactory\\.com/((?:folder|f)/[\\w]+|share/fi[a-z0-9,:]+)" })
+@DecrypterPlugin(revision = "$Revision: 50793 $", interfaceVersion = 2, names = { "filefactory.com" }, urls = { "https?://(?:www\\.)?filefactory\\.com/((?:folder|f)/[\\w]+|share/fi[a-z0-9,:]+)" })
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -70,14 +78,16 @@ public class FilefactoryComFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
-        if (param.getCryptedUrl().matches(".+/share/fi.+")) {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String[] fileIDs = new Regex(param.getCryptedUrl(), "fi:([a-z0-9]+)").getColumn(0);
+        if (fileIDs != null && fileIDs.length > 0) {
             /* 2019-08-17: New type of folder which contains all fileIDs inside URL */
-            final String[] fileIDs = new Regex(param.getCryptedUrl(), "fi:([a-z0-9]+)").getColumn(0);
+            final FilePackage fp = FilePackage.getInstance();
             for (final String fileid : fileIDs) {
                 final String url = "http://www." + this.getHost() + "/file/" + fileid;
-                ret.add(this.createDownloadlink(url));
+                final DownloadLink link = this.createDownloadlink(url);
+                link._setFilePackage(fp);
+                ret.add(link);
             }
         } else {
             br.getHeaders().put("Accept-Language", "en-gb, en;q=0.8");
@@ -100,7 +110,10 @@ public class FilefactoryComFolder extends PluginForDecrypt {
                 if (i > 1) {
                     br.getPage(param.getCryptedUrl() + "/?sort=filename&order=ASC&show=100&page=" + i);
                 }
-                add(ret);
+                final String links[] = br.getRegex(Pattern.compile("\"(https?://(?:www\\.)?filefactory\\.com/file/[^<>\"]*?)\"", Pattern.CASE_INSENSITIVE)).getColumn(0);
+                for (String element : links) {
+                    ret.add(createDownloadlink(element));
+                }
             }
             if (!StringUtils.isEmpty(fpName)) {
                 final FilePackage fp = FilePackage.getInstance();
@@ -111,13 +124,7 @@ public class FilefactoryComFolder extends PluginForDecrypt {
         return ret;
     }
 
-    private void add(final ArrayList<DownloadLink> declinks) {
-        final String links[] = br.getRegex(Pattern.compile("\"(https?://(?:www\\.)?filefactory\\.com/file/[^<>\"]*?)\"", Pattern.CASE_INSENSITIVE)).getColumn(0);
-        for (String element : links) {
-            declinks.add(createDownloadlink(element));
-        }
-    }
-
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }
