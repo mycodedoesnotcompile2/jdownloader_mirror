@@ -18,13 +18,15 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -35,10 +37,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50802 $", interfaceVersion = 3, names = {}, urls = {})
-public class RanozGg extends PluginForHost {
-    public RanozGg(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 50803 $", interfaceVersion = 3, names = {}, urls = {})
+public class SledujtetoCz extends PluginForHost {
+    public SledujtetoCz(PluginWrapper wrapper) {
         super(wrapper);
+        // this.enablePremium("");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     @Override
@@ -56,7 +64,7 @@ public class RanozGg extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "ranoz.gg" });
+        ret.add(new String[] { "sledujteto.cz" });
         return ret;
     }
 
@@ -72,7 +80,7 @@ public class RanozGg extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/file/([A-Za-z0-9]{8})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/file/(\\d+)/([\\w\\-]+)\\.html/?");
         }
         return ret.toArray(new String[0]);
     }
@@ -102,28 +110,31 @@ public class RanozGg extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        final String extDefault = ".mp4";
         if (!link.isNameSet()) {
             /* Fallback */
-            link.setName(this.getFID(link));
+            final String titleSlug = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
+            final String title = titleSlug.replace("-", " ").trim();
+            link.setName(this.applyFilenameExtension(title, extDefault));
         }
         this.setBrowserExclusive();
-        /* 2025-03-18: Website is returning http responsecode 500 for no reason */
-        br.setAllowedResponseCodes(500);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Tento soubor již neexistuje")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("property=\"og:title\" content=\"([^\"]+)").getMatch(0);
-        String filesize = br.getRegex("\">\\s*Size\\s*</div><div[^>]*>([^<]+)</div>").getMatch(0);
-        if (filesize == null) {
-            filesize = br.getRegex("page_box_value__xc7Wi.\",.\"children.\":.\"(\\d+ (KB|MB|GB)).\"").getMatch(0);
-        }
+        String filename = br.getRegex("property=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
-        }
-        if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
+            String filesizeStr = new Regex(filename, "(\\d+\\.\\d{1,2} [A-Za-z]{2,5})$").getMatch(0);
+            if (filesizeStr != null) {
+                /* Remove filesize-string from filename */
+                filename = filename.replace(filesizeStr, "").trim();
+                /* Set filesize */
+                link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+            }
+            link.setName(this.applyFilenameExtension(filename, extDefault));
         }
         return AvailableStatus.TRUE;
     }
@@ -137,25 +148,28 @@ public class RanozGg extends PluginForHost {
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link);
-            String dllink = br.getRegex("\"(https?://st\\d+\\.[^/]+/[^/\"\\\\]+)").getMatch(0);
-            if (dllink == null) {
-                /* 2025-03-18 */
-                dllink = br.getRegex("\"(https?://paster\\.vip/[^/\"\\\\]+)").getMatch(0);
-            }
-            if (StringUtils.isEmpty(dllink)) {
-                logger.warning("Failed to find final downloadurl");
+            final String hostForReferer = br.getHost(true);
+            final String fileServer = br.getRegex("(data\\d+)\\.sledujteto").getMatch(0);
+            final String fileID = br.getRegex("var files_id = (\\d+);").getMatch(0);
+            if (fileServer == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else if (fileID == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            br.postPageRaw("https://" + fileServer + ".sledujteto.cz/services/add-file-link", "{\"params\":{\"id\":" + fileID + "}}");
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String fileHash = entries.get("hash").toString();
+            final String dllink = "/player/index/sledujteto/" + fileHash;
+            br.getHeaders().put("Referer", "https://" + hostForReferer + "/");
+            br.getHeaders().put("sec-fetch-dest", "video");
+            // TODO: Make this work
+            // link.setProperty("oldraf_preferOpenRangeFirst", true);
+            // br.getHeaders().put("Range", "bytes=0-");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-            handleConnectionErrors(br, dl.getConnection());
+            this.handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
-    }
-
-    @Override
-    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     @Override

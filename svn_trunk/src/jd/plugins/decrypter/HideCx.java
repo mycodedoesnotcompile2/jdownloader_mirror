@@ -1,0 +1,149 @@
+//jDownloader - Downloadmanager
+//Copyright (C) 2009  JD-Team support@jdownloader.org
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <http://www.gnu.org/licenses/>.
+package jd.plugins.decrypter;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.jdownloader.plugins.components.config.HideCxConfig;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.parser.Regex;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+
+@DecrypterPlugin(revision = "$Revision: 50809 $", interfaceVersion = 3, names = {}, urls = {})
+public class HideCx extends PluginForDecrypt {
+    public HideCx(PluginWrapper wrapper) {
+        super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "hide.cx" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/container/([a-f0-9-]{32,36})");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        if (!contentID.replace("-", "").matches("[a-f0-9]{32}")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid format");
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final HideCxConfig cfg = PluginJsonConfig.get(HideCxConfig.class);
+        final String apikey = cfg.getAPIKey();
+        if (apikey != null) {
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + apikey);
+        }
+        // br.getHeaders().put("Content-Type", "application/json");
+        // br.getHeaders().put("Origin", "https://hide.cx");
+        // br.getHeaders().put("Referer", "https://hide.cx/");
+        /* Important, else we will get http response 404 */
+        br.getHeaders().put("Accept", "application/json, text/plain, */*");
+        /* API docs: https://hide.cx/settings?tab=api */
+        br.getPage("https://api.hide.cx/containers/" + contentID);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String title = (String) entries.get("name");
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            fp.setName(title);
+        } else {
+            fp.setName(contentID);
+        }
+        fp.setPackageKey("hide.cx//container/" + contentID);
+        final List<Map<String, Object>> downloads = (List<Map<String, Object>>) entries.get("links");
+        int progr = 1;
+        for (final Map<String, Object> download : downloads) {
+            logger.info("Crawling item " + progr + "/" + downloads.size());
+            final String filename = (String) download.get("file");
+            final Number link_size = (Number) download.get("link_size");
+            String url = (String) download.get("hoster_url");
+            if (url == null) {
+                /* http request needed */
+                br.getPage("/containers/" + contentID + "/links/" + download.get("id"));
+                final Map<String, Object> linkresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                url = linkresponse.get("url").toString();
+            }
+            final DownloadLink link = this.createDownloadlink(url);
+            if (filename != null) {
+                link.setName(filename);
+            }
+            if (link_size != null) {
+                link.setDownloadSize(link_size.longValue());
+            }
+            if (download.get("link_status").toString().equalsIgnoreCase("online")) {
+                link.setAvailable(true);
+            }
+            link._setFilePackage(fp);
+            ret.add(link);
+            distribute(link);
+            progr++;
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        return ret;
+    }
+
+    @Override
+    public Class<? extends PluginConfigInterface> getConfigInterface() {
+        return HideCxConfig.class;
+    }
+}

@@ -39,6 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.LogV3Factory;
@@ -61,40 +62,39 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
         return Collections.unmodifiableList(this.sinks);
     }
 
-    protected final HashMap<String, LoggerToSink> logger = new HashMap<String, LoggerToSink>();
-    protected LogToFileSink                       sinkToFile;
+    protected final HashMap<String, LoggerToSink> logger     = new HashMap<String, LoggerToSink>();
+    protected final AtomicReference<Sink>         sinkToFile = new AtomicReference<Sink>();
 
     public LogToFileSink getSinkToFile() {
-        return this.sinkToFile;
+        return (LogToFileSink) this.sinkToFile.get();
     }
 
     public void setSinkToFile(final LogToFileSink sinkToFile) {
-        this.removeSink(this.sinkToFile);
-        this.sinkToFile = sinkToFile;
+        final LogToFileSink currentSinkToFile = getSinkToFile();
         this.addSink(sinkToFile);
+        removeSink(currentSinkToFile);
     }
 
     public LogToStdOutSink getSinkToConsole() {
-        return this.sinkToConsole;
+        return (LogToStdOutSink) this.sinkToConsole.get();
     }
 
     public void setSinkToConsole(final LogToStdOutSink sinkToConsole) {
-        this.removeSink(this.sinkToConsole);
-        this.sinkToConsole = sinkToConsole;
+        final LogToStdOutSink currentSinkToConsole = getSinkToConsole();
         this.addSink(sinkToConsole);
+        this.removeSink(currentSinkToConsole);
     }
 
-    protected LogToStdOutSink sinkToConsole;
+    protected final AtomicReference<Sink> sinkToConsole = new AtomicReference<Sink>();
 
     public SimpleLoggerFactory() {
     }
 
     public SimpleLoggerFactory initDefaults() {
-        this.sinkToConsole = new LogToStdOutSink();
         // do not add a file sink by default. Else every application that uses the lib, will create log files. this must be enabled in the
         // application itself, usually by overwriting the facrory and put its path in the properties
         // addSink(sinkToFile);
-        this.addSink(this.sinkToConsole);
+        this.addSink(new LogToStdOutSink());
         return this;
     }
 
@@ -136,10 +136,10 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     public boolean addSink(final Sink sink) {
         if (sink != null && this.sinks.addIfAbsent(sink)) {
             if (sink instanceof LogToFileSink) {
-                this.sinkToFile = (LogToFileSink) sink;
+                this.sinkToFile.set(sink);
             }
             if (sink instanceof LogToStdOutSink) {
-                this.sinkToConsole = (LogToStdOutSink) sink;
+                this.sinkToConsole.set(sink);
             }
             return true;
         } else {
@@ -151,7 +151,10 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
      * @param logToFileSink
      */
     public boolean removeSink(final Sink sink) {
-        return sink != null && this.sinks.remove(sink);
+        final boolean ret = sink != null && this.sinks.remove(sink);
+        sinkToConsole.compareAndSet(sink, null);
+        sinkToFile.compareAndSet(sink, null);
+        return ret;
     }
 
     private volatile HashSet<LogVetoListener> vetoListener;

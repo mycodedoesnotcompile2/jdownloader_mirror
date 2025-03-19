@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.hoster.FilesMonsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48300 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://(?:www\\.)?filesmonster\\.com/(?:download\\.php\\?id=[A-Za-z0-9_-]+(?:\\&wbst=[^\\&]+)?|player/v\\d+/video/[A-Za-z0-9_-]+|dl/[A-Za-z0-9_-]+/free/.+)" })
+@DecrypterPlugin(revision = "$Revision: 50810 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://(?:www\\.)?filesmonster\\.com/(?:download\\.php\\?id=[A-Za-z0-9_-]+(?:\\&wbst=[^\\&]+)?|player/v\\d+/video/[A-Za-z0-9_-]+|dl/[A-Za-z0-9_-]+/free/.+)" })
 public class FilesMonsterDecrypter extends PluginForDecrypt {
     public FilesMonsterDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,7 @@ public class FilesMonsterDecrypter extends PluginForDecrypt {
             } catch (final Throwable t) {
             }
             // traditional account
-            final ArrayList<Account> hoster = AccountController.getInstance().getAllAccounts("filesmonster.com");
+            final ArrayList<Account> hoster = AccountController.getInstance().list("filesmonster.com");
             if (hoster != null && hoster.size() != 0) {
                 accs.addAll(hoster);
             }

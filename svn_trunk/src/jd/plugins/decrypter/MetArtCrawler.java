@@ -37,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.MetArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50326 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50810 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MetArtCom.class })
 public class MetArtCrawler extends PluginForDecrypt {
     public MetArtCrawler(PluginWrapper wrapper) {
@@ -100,7 +100,7 @@ public class MetArtCrawler extends PluginForDecrypt {
                 return ret;
             }
         }
-        final ArrayList<Account> accounts = AccountController.getInstance().getAllAccounts(this.getHost());
+        final ArrayList<Account> accounts = AccountController.getInstance().list(this.getHost());
         Account useAcc = null;
         if (accounts != null && accounts.size() != 0) {
             Iterator<Account> it = accounts.iterator();

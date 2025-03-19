@@ -29,6 +29,14 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -45,15 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.RuTubeVariant;
 import jd.plugins.hoster.RuTubeRu;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
-@DecrypterPlugin(revision = "$Revision: 48641 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
+@DecrypterPlugin(revision = "$Revision: 50805 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
 public class RuTubeRuDecrypter extends PluginForDecrypt {
     public RuTubeRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -174,7 +174,10 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final RuTubeRu hosterplugin = (RuTubeRu) this.getNewPluginForHostInstance(this.getHost());
         final DownloadLink ret = super.createDownloadlink("https://" + this.getHost() + "/video/" + videoHash);
+        ret.setDefaultPlugin(hosterplugin);
+        ret.setHost(hosterplugin.getHost());
         final String title = (String) entries.get("title");
         final long durationSeconds = ((Number) entries.get("duration")).longValue();
         final String videoDescription = (String) entries.get("description");

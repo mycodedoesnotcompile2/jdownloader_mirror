@@ -31,6 +31,8 @@ import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
@@ -40,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50785 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50807 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +124,16 @@ public class VoeSxCrawler extends PluginForDecrypt {
                 int newItemsThisPage = 0;
                 final String[] fileIDs = br.getRegex("/([a-z0-9]{12})\"").getColumn(0);
                 if (fileIDs == null || fileIDs.length == 0) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    if (ret.size() > 0) {
+                        logger.info("Stopping because: Current page contains zero file items");
+                        break pagination;
+                    }
+                    final boolean maybeEmptyFolder = br.containsHTML("/folder/" + folderID);
+                    if (maybeEmptyFolder) {
+                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                 }
                 for (final String fileID : fileIDs) {
                     if (!dupes.add(fileID)) {

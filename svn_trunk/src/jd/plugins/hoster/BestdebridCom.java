@@ -21,13 +21,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
@@ -46,7 +41,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50812 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
 public class BestdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://bestdebrid.com/api/v1";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("bestdebrid.com");
@@ -110,19 +111,20 @@ public class BestdebridCom extends PluginForHost {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
+            final String clientIPv4 = new BalancedWebIPCheck(br.getProxy()).getExternalIP().getIP();
             /* 2019-08-27: Test-code regarding Free Account download which is only possible via website. */
             final boolean use_website_for_free_account_downloads = false;
             if (account.getType() == AccountType.FREE && use_website_for_free_account_downloads) {
-                this.br.postPage("https://bestdebrid.com/api/v1/generateLink", "link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)) + "&pass=&boxlinklist=0");
+                this.br.postPage(API_BASE + "/generateLink", "&ip=" + clientIPv4 + "&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)) + "&pass=&boxlinklist=0");
                 dllink = PluginJSonUtils.getJsonValue(br, "link");
                 if (!StringUtils.isEmpty(dllink) && !dllink.startsWith("http") && !dllink.startsWith("/")) {
                     dllink = "https://" + this.getHost() + "/" + dllink;
                 }
             } else {
-                this.br.getPage(API_BASE + "/generateLink?auth=" + Encoding.urlEncode(account.getPass()) + "&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+                this.br.getPage(API_BASE + "/generateLink?auth=" + Encoding.urlEncode(account.getPass()) + "&ip=" + clientIPv4 + "&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+                final Map<String, Object> entries = handleAPIErrors(br, account, link);
+                dllink = entries.get("link").toString();
             }
-            final Map<String, Object> entries = handleAPIErrors(br, account, link);
-            dllink = entries.get("link").toString();
         }
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -134,6 +136,9 @@ public class BestdebridCom extends PluginForHost {
                 mhm.handleErrorGeneric(account, link, "Final downloadlink did not lead to file", 50, 5 * 60 * 1000l);
             }
         } catch (final Exception e) {
+            if (e instanceof InterruptedException) {
+                throw e;
+            }
             if (storedDirecturl != null) {
                 link.removeProperty(directlinkproperty);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);

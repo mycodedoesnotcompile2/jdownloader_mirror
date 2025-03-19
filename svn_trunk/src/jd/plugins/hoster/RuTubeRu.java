@@ -37,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.RuTubeVariant;
 
-@HostPlugin(revision = "$Revision: 45023 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://rutube\\.ru/video/([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 50805 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "" })
 public class RuTubeRu extends PluginForHost {
     public RuTubeRu(final PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,7 @@ public class RuTubeRu extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://rutube.ru/agreement.html";
+        return "https://" + getHost() + "/agreement.html";
     }
 
     @Override
@@ -116,7 +116,11 @@ public class RuTubeRu extends PluginForHost {
 
     /** Returns stored directurl for current variant. */
     private String getStoredDirecturl(final DownloadLink link) {
-        final String newHandlingValue = link.getStringProperty("directurl_" + link.getVariant(RuTubeVariant.class).getStreamID());
+        String variantStr = null;
+        if (link.getVariant(RuTubeVariant.class) != null) {
+            variantStr = link.getVariant(RuTubeVariant.class).getStreamID();
+        }
+        final String newHandlingValue = link.getStringProperty("directurl_" + variantStr);
         if (newHandlingValue != null) {
             return newHandlingValue;
         } else {

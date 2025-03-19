@@ -31,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50793 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50802 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -166,7 +166,11 @@ public class VidmolyTo extends XFileSharingProBasic {
         /* 2020-05-18: Special */
         super.scanInfo(fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = br.getRegex(">([^<>\"]+)</span><br>\\s+<span style=").getMatch(0);
+            fileInfo[0] = br.getRegex(">([^>]+)</span><br>\\s+<span style=").getMatch(0);
+        }
+        final String betterFilesize = br.getRegex(">\\((\\d+[^<]+)\\) Download\\s*</a>").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
         }
         return fileInfo;
     }
@@ -189,6 +193,21 @@ public class VidmolyTo extends XFileSharingProBasic {
             return true;
         } else {
             return super.isOffline(link, br);
+        }
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filename_abuse() {
+        return false;
+    }
+
+    @Override
+    protected String buildURLPath(final DownloadLink link, final String fuid, final URL_TYPE type) {
+        if (type == URL_TYPE.NORMAL) {
+            /* 2025-03-18: Special: .html ending needed */
+            return "/" + fuid + ".html";
+        } else {
+            return super.buildURLPath(link, fuid, type);
         }
     }
 }

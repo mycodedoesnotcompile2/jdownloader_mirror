@@ -8,10 +8,17 @@ import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
+
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.api.captcha.CaptchaAPISolver;
@@ -44,10 +51,8 @@ import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
-
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
@@ -307,6 +312,11 @@ public class ChallengeResponseController {
 
     @SuppressWarnings("unchecked")
     private <T> ArrayList<ChallengeSolver<T>> createList(final Challenge<T> c) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
+            final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
+            final List<Account> accs = AccountController.getInstance().list();
+        }
         final ArrayList<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         for (final ChallengeSolver<?> s : solverList) {
             try {

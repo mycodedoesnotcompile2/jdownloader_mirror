@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50805 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipfileCc extends XFileSharingProBasic {
     public VipfileCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +107,7 @@ public class VipfileCc extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFilename = new Regex(html, "(?i)Download File\\s*:\\s*</span>([^<]+)<span").getMatch(0);
+        String betterFilename = new Regex(html, ">\\s*File Name: ([^<]+)<").getMatch(0);
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;
         }

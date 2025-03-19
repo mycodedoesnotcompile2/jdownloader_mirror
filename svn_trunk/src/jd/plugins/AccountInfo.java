@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -28,6 +29,12 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
+
+import jd.config.Property;
+import jd.http.Browser;
+import jd.nutils.NaturalOrderComparator;
+import jd.parser.Regex;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -39,20 +46,7 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
-import jd.config.Property;
-import jd.http.Browser;
-import jd.nutils.NaturalOrderComparator;
-import jd.parser.Regex;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-
 public class AccountInfo extends Property implements AccountTrafficView {
-    /**
-     * Enum representing different currencies.
-     */
-    public enum CURRENCY {
-        EUR,
-        USD
-    }
 
     private static final long   serialVersionUID           = 1825140346023286206L;
     private volatile long       account_validUntil         = -1;
@@ -61,13 +55,13 @@ public class AccountInfo extends Property implements AccountTrafficView {
     private volatile long       account_trafficMax         = -1;
     private long                account_filesNum           = -1;
     private long                account_premiumPoints      = -1;
-    private long                account_accountBalance     = -1;
+    private double              account_balance            = -1;
     private long                account_usedSpace          = -1;
     private volatile String     account_status;
     private long                account_createTime         = 0;
     private static final String PROPERTY_MULTIHOST_SUPPORT = "multiHostSupport";
     private Account             account                    = null;
-    private CURRENCY            currency                   = null;
+    private Currency            currency                   = null;
 
     protected void setAccount(Account account) {
         this.account = account;
@@ -88,9 +82,8 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     /**
-     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br>
-     * Set this to false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account
-     * stays empty.
+     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br> Set this to
+     * false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account stays empty.
      */
     public void setTrafficRefill(boolean account_trafficRefill) {
         this.account_trafficRefill = account_trafficRefill;
@@ -116,11 +109,20 @@ public class AccountInfo extends Property implements AccountTrafficView {
         this.account_createTime = createTime;
     }
 
-    public long getAccountBalance() {
-        return account_accountBalance;
+    public double getAccountBalance() {
+        return account_balance;
     }
 
-    public void setCurrency(CURRENCY currency) {
+    public String getAccountBalanceFormatted() {
+        String balanceStr = String.format("%.3f", this.getAccountBalance());
+        final Currency currency = getCurrency();
+        if (currency != null) {
+            balanceStr += currency.getSymbol();
+        }
+        return balanceStr;
+    }
+
+    public void setCurrency(Currency currency) {
         this.currency = currency;
     }
 
@@ -129,7 +131,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
      *
      * @return The currency
      */
-    public CURRENCY getCurrency() {
+    public Currency getCurrency() {
         return this.currency;
     }
 
@@ -216,13 +218,8 @@ public class AccountInfo extends Property implements AccountTrafficView {
         return validUntil < System.currentTimeMillis();
     }
 
-    public void setAccountBalance(final long num) {
-        this.account_accountBalance = Math.max(0, num);
-    }
-
     public void setAccountBalance(final double num) {
-        // TODO: Set as double
-        this.account_accountBalance = (long) Math.max(0, num);
+        this.account_balance = Math.max(0, num);
     }
 
     public void setExpired(final boolean b) {
@@ -622,9 +619,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
             final_results.add(mhost);
         }
         /**
-         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br>
-         * If a multihost provides multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but
-         * "rg.to" may remain on the list of unassigned hosts.
+         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br> If a multihost provides
+         * multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but "rg.to" may remain on the
+         * list of unassigned hosts.
          */
         for (final String item : alternativeDomainsOfFoundHits) {
             unassignedMultiHostSupport.remove(item);
@@ -688,6 +685,22 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     protected List<MultiHostHost> multihostSupportV2 = null;
+
+    @Deprecated
+    // will be removed by Jiaz
+    public List<String> getMultiHostSupport() {
+        final Object ret = getProperty(PROPERTY_MULTIHOST_SUPPORT, null);
+        if (ret == null) {
+            return null;
+        } else if (!(ret instanceof List)) {
+            return null;
+        }
+        final List<String> list = (List<String>) ret;
+        if (list.size() > 0) {
+            return list;
+        }
+        return null;
+    }
 
     @Override
     public boolean removeProperty(String key) {

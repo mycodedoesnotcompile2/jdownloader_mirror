@@ -90,7 +90,7 @@ import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 50802 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String CLIENT_SECRET_KEY = "client_secret";
     private static final String CLIENT_ID_KEY     = "client_id";
@@ -571,13 +571,11 @@ public class RealDebridCom extends PluginForHost {
             case FILE_UNAVAILABLE:
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, _JDT.T.downloadlink_status_error_hoster_temp_unavailable(), 10 * 60 * 1000l, e);
             case UNSUPPORTED_HOSTER:
-                // logger.severe("Unsupported Hoster: " + link.getDefaultPlugin().buildExternalDownloadURL(link, this));
-                // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported Hoster: " + link.getHost());
-                // 20170501-raztoki not unsupported url format. When this error is returned by rd, we should just jump to the next download
-                // candidate, as another link from the same host might work.
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, e.getMessage(), e);
+                mhm.putError(account, link, 5 * 60 * 1000l, "Hoster not supported");
             case HOSTER_TEMP_UNAVAILABLE:
+                mhm.putError(account, link, 5 * 60 * 1000l, "Hoster temporarily not supported");
             case HOSTER_IN_MAINTENANCE:
+                mhm.putError(account, link, 5 * 60 * 1000l, "Hoster under maintenance");
             case HOSTER_LIMIT_REACHED:
             case HOSTER_PREMIUM_ONLY:
             case TRAFFIC_EXHAUSTED:

@@ -29,6 +29,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.simplejson.JSonUtils;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.config.SubConfiguration;
@@ -61,18 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.simplejson.JSonUtils;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 50614 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50806 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -3264,20 +3264,12 @@ public class VKontakteRu extends PluginForDecrypt {
         final String htmlrefresh = br.getRequest().getHTMLRefresh();
         if (StringUtils.containsIgnoreCase(htmlrefresh, "badbrowser.php")) {
             /**
-             * If this happens user needs to change User-Agent of this plugin to continue using it. </br> vk.com does not necessarily simply
-             * block a User-Agent value. They may as well just block it for specific users/IPs.
+             * If this happens user needs to change User-Agent of this plugin to continue using it. </br>
+             * vk.com does not necessarily simply block a User-Agent value. They may as well just block it for specific users/IPs.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Blocked User-Agent");
         }
         /* General errorhandling end */
-    }
-
-    public static String generateContentURLVideo(final String oid, final String id) {
-        return "https://vk.com/video" + oid + "_" + id;
-    }
-
-    private static String generateContentURLPhoto(final String ownerID, final String contentID) {
-        return getProtocol() + "vk.com/photo" + ownerID + "_" + contentID;
     }
 
     private DownloadLink getAudioDownloadLink(final String ownerID, final String contentID) throws IOException {
@@ -3285,6 +3277,7 @@ public class VKontakteRu extends PluginForDecrypt {
         final DownloadLink dl = createDownloadlink("http://vkontaktedecrypted.ru/audiolink/" + ownerIDAndContentID);
         dl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_owner_id, ownerID);
         dl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_content_id, contentID);
+        dl.setContentUrl(generateContentURLAudio(ownerID, contentID));
         if (fastcheck_audio) {
             dl.setAvailable(true);
         }
@@ -3310,6 +3303,18 @@ public class VKontakteRu extends PluginForDecrypt {
 
     private DownloadLink getPhotoDownloadLink(final String ownerID, final String contentID) throws IOException {
         return getPhotoDownloadLink(ownerID, contentID, null);
+    }
+
+    public static String generateContentURLVideo(final String oid, final String id) {
+        return "https://vk.com/video" + oid + "_" + id;
+    }
+
+    private static String generateContentURLPhoto(final String ownerID, final String contentID) {
+        return getProtocol() + "vk.com/photo" + ownerID + "_" + contentID;
+    }
+
+    private static String generateContentURLAudio(final String ownerID, final String contentID) {
+        return getProtocol() + "vk.com/audio" + ownerID + "_" + contentID;
     }
 
     @Override

@@ -6,18 +6,18 @@ import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
-
 import jd.controlling.proxy.ProxyController;
 import jd.controlling.reconnect.ReconnectConfig;
 import jd.http.Browser;
 import jd.http.NoGateWayException;
 import jd.http.ProxySelectorInterface;
 import jd.http.StaticProxySelector;
+
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
 
 /**
  * Balanced IP check uses the jdownloader ip check servers. This type of ip check is default, and fallback for all reconnect methods
@@ -38,9 +38,9 @@ public class BalancedWebIPCheck implements IPCheckProvider {
     /**
      * All registered ip check urls
      */
-    protected final Browser br;
-    private final Pattern   pattern;
-    private final Object    LOCK = new Object();
+    protected final Browser                     br;
+    private final Pattern                       pattern;
+    private final Object                        LOCK     = new Object();
 
     public BalancedWebIPCheck() {
         this(CFG_RECONNECT.CFG.isIPCheckUsesProxyEnabled() ? ProxyController.getInstance() : new StaticProxySelector(HTTPProxy.NONE));
@@ -48,14 +48,19 @@ public class BalancedWebIPCheck implements IPCheckProvider {
 
     public BalancedWebIPCheck(final ProxySelectorInterface proxySelector) {
         this.pattern = Pattern.compile("(\\d+\\.\\d+\\.\\d+\\.\\d+)");
-        this.br = new Browser();
-        this.br.setDebug(true);
-        this.br.setVerbose(true);
+        this.br = initBrowser(proxySelector);
+    }
+
+    protected Browser initBrowser(ProxySelectorInterface proxySelector) {
+        final Browser br = new Browser();
+        br.setDebug(true);
+        br.setVerbose(true);
         if (proxySelector != null) {
             br.setProxySelector(proxySelector);
         }
-        this.br.setConnectTimeout(JsonConfig.create(ReconnectConfig.class).getIPCheckConnectTimeout());
-        this.br.setReadTimeout(JsonConfig.create(ReconnectConfig.class).getIPCheckReadTimeout());
+        br.setConnectTimeout(JsonConfig.create(ReconnectConfig.class).getIPCheckConnectTimeout());
+        br.setReadTimeout(JsonConfig.create(ReconnectConfig.class).getIPCheckReadTimeout());
+        return br;
     }
 
     /**

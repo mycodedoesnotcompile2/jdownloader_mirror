@@ -301,8 +301,7 @@
 
 				<exclude name="jd/http/**" />
 				<include name="jd/nutils/**" />
-				<exclude name="jd/plugins/hoster/**" />
-				<include name="jd/plugins/hoster/RTMPDownload.class" />
+				<exclude name="jd/plugins/hoster/**" />			
 				<exclude name="jd/plugins/decrypter/**" />
 				<exclude name="org/jdownloader/extensions/*/**/*" />
 				<exclude name="jd/utils/dev/**" />
@@ -316,10 +315,7 @@
 				<include name="org/jdownloader/captcha/v2/challenge/recaptcha/v2/example/*.jpg" />
 				<include name="org/jdownloader/captcha/v2/solver/browser/html/**/*" />
 
-			</fileset>
-			<fileset dir="${cls}">
-				<include name="jd/plugins/hoster/RTMPDownload.class" />
-			</fileset>
+			</fileset>	
 
 
 
@@ -378,8 +374,7 @@
 		<mkdir dir="${dist}/jd/plugins/hoster/" />
 		<copy todir="${dist}/jd/plugins/hoster/">
 			<fileset dir="${cls}/jd/plugins/hoster/">
-				<include name="**/*" />
-				<exclude name="RTMPDownload*" />
+				<include name="**/*" />				
 			</fileset>
 		</copy>
 		<mkdir dir="${dist}/jd/plugins/decrypter/" />

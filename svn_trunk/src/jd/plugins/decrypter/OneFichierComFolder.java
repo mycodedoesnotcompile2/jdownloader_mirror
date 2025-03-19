@@ -16,15 +16,12 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
@@ -44,7 +41,10 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.OneFichierCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50675 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@DecrypterPlugin(revision = "$Revision: 50816 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierComFolder extends PluginForDecrypt {
     public OneFichierComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,22 +76,14 @@ public class OneFichierComFolder extends PluginForDecrypt {
     private ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<Account> accounts = AccountController.getInstance().getAllAccounts(this.getHost());
         Account account = null;
-        if (accounts != null && accounts.size() != 0) {
-            Iterator<Account> it = accounts.iterator();
-            while (it.hasNext()) {
-                Account n = it.next();
-                if (n.isEnabled() && n.isValid() && n.getType() == AccountType.PREMIUM) {
-                    account = n;
-                    break;
-                }
-            }
+        List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true).setAccountType(AccountType.PREMIUM).setMaxResultsNum(1));
+        if (!filteredAccounts.isEmpty()) {
+            account = filteredAccounts.get(0);
         }
         /**
          * 2019-04-05: Folder support via API does not work (serverside) as it requires us to have the internal folder-IDs which we do not
-         * have! </br>
-         * Basically their folder API call is only for internal folders of the current user -> Not useful for us! See also:
+         * have! </br> Basically their folder API call is only for internal folders of the current user -> Not useful for us! See also:
          * https://1fichier.com/api.html
          */
         final boolean internal_allow_api_usage_in_crawler = false;

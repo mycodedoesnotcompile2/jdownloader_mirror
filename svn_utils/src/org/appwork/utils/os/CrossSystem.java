@@ -171,7 +171,7 @@ public class CrossSystem {
         KALILINUX_2024_4(OSFamily.LINUX, "2024\\.4"),
         /*
          * https://www.debian.org/releases/
-         *
+         * 
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -188,7 +188,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         *
+         * 
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -201,9 +201,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         *
+         * 
          * https://wiki.ubuntu.com/Releases
-         *
+         * 
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -296,7 +296,6 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H1(OSFamily.WINDOWS);
-
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -363,7 +362,6 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -400,7 +398,7 @@ public class CrossSystem {
     }
 
     private static volatile String[]                     BROWSER_COMMANDLINE = null;
-    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>();;
+    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>(); ;
     private static String[]                              FILE_COMMANDLINE    = null;
     private static String                                JAVAINT             = null;
     /**
@@ -556,7 +554,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         *
+         * 
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -791,18 +789,33 @@ public class CrossSystem {
             public void run() {
                 Process process = null;
                 try {
-                    process = new ProcessBuilder("cmd", "-c", "ver").start();
-                    final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                    final String line = reader.readLine();
-                    process.destroy();
-                    process = null;
-                    final String buildNumberString = new Regex(line, "Microsoft\\s*Windows\\s*\\[Version\\s*\\d+\\.\\d+\\.(\\d+)").getMatch(0);
+                    process = new ProcessBuilder("cmd", "/c", "ver").start();
+                    String buildNumberString = null;
+                    try {
+                        final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                        while (true) {
+                            final String line = reader.readLine();
+                            if (line == null) {
+                                break;
+                            }
+                            buildNumberString = new Regex(line, "Microsoft\\s*Windows\\s*\\[Versi(?:ó|o)n\\s*\\d+\\.\\d+\\.(\\d+)").getMatch(0);
+                            if (buildNumberString == null) {
+                                buildNumberString = new Regex(line, "\\d+\\.\\d+\\.(\\d+)").getMatch(0);
+                            }
+                            if (buildNumberString != null) {
+                                break;
+                            }
+                        }
+                    } finally {
+                        process.destroy();
+                        process = null;
+                    }
                     final int buildNumber = Integer.parseInt(buildNumberString);
                     // TODO: query is workstation
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);
