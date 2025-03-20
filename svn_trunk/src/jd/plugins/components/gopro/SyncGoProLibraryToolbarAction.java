@@ -4,6 +4,16 @@ import java.awt.event.ActionEvent;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.controlling.AccountFilter;
+import jd.controlling.TaskQueue;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.plugins.Account.AccountType;
+
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
@@ -17,14 +27,6 @@ import org.jdownloader.controlling.contextmenu.MenuItemData;
 import org.jdownloader.gui.mainmenu.MenuManagerMainmenu;
 import org.jdownloader.gui.toolbar.MenuManagerMainToolbar;
 import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.controlling.TaskQueue;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkOrigin;
 
 public class SyncGoProLibraryToolbarAction extends AbstractToolBarAction {
     public SyncGoProLibraryToolbarAction() {
@@ -67,7 +69,7 @@ public class SyncGoProLibraryToolbarAction extends AbstractToolBarAction {
     private static final WeakHashMap<SyncGoProLibraryToolbarAction, Object> ACTION_REFERENCES   = new WeakHashMap<SyncGoProLibraryToolbarAction, Object>();
 
     private static void updateEnabled() {
-        final boolean enabled = AccountController.getInstance().hasAccount("gopro.com", Boolean.TRUE, Boolean.TRUE, Boolean.TRUE, null);
+        final boolean enabled = AccountController.getInstance().listAccounts(new AccountFilter("gopro.com").setEnabled(true).setValid(true).setAccountTypes(AccountType.PREMIUM, AccountType.LIFETIME).setMaxResultsNum(1)).size() > 0;
         ENABLED.set(enabled);
         new EDTRunner() {
             @Override

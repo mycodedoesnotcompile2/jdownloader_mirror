@@ -826,29 +826,34 @@ public abstract class Plugin implements ActionListener {
         return false;
     }
 
-    protected static enum PluginEnvironment {
+    public static enum PluginEnvironment {
         UNKNOWN,
         DOWNLOAD,
         CRAWLER,
         LINK_CHECK,
-        ACCOUNT_CHECK
+        ACCOUNT_CHECK;
+
+        public static PluginEnvironment getPluginEnvironment() {
+            final Thread thread = Thread.currentThread();
+            if (thread instanceof SingleDownloadController) {
+                return PluginEnvironment.DOWNLOAD;
+            }
+            if (thread instanceof LinkCrawlerThread) {
+                return PluginEnvironment.CRAWLER;
+            }
+            if (thread instanceof LinkCrawlerThread) {
+                return PluginEnvironment.LINK_CHECK;
+            }
+            if (thread instanceof AccountCheckerThread) {
+                return PluginEnvironment.ACCOUNT_CHECK;
+            }
+            return PluginEnvironment.UNKNOWN;
+        }
+
     }
 
     protected final PluginEnvironment getPluginEnvironment() {
-        final Thread thread = Thread.currentThread();
-        if (thread instanceof SingleDownloadController) {
-            return PluginEnvironment.DOWNLOAD;
-        }
-        if (thread instanceof LinkCrawlerThread) {
-            return PluginEnvironment.CRAWLER;
-        }
-        if (thread instanceof LinkCrawlerThread) {
-            return PluginEnvironment.LINK_CHECK;
-        }
-        if (thread instanceof AccountCheckerThread) {
-            return PluginEnvironment.ACCOUNT_CHECK;
-        }
-        return PluginEnvironment.UNKNOWN;
+        return PluginEnvironment.getPluginEnvironment();
     }
 
     public abstract Matcher getMatcher();

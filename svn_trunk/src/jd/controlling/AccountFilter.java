@@ -15,18 +15,18 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
  * Filter class to query accounts with specific criteria
  */
 public class AccountFilter {
-
-    private List<String>  hosts               = null;
-    private Boolean       enabled             = null;
-    private Boolean       valid               = null;
-    private AccountType   accountType         = null;
-    private Boolean       expired             = null;
-    private Boolean       temporarilyDisabled = null;
-    private Boolean       multiHost           = null;
-    private Long          minimumTrafficLeft  = null;
-    private Double        minimumBalance      = null;
-    private List<FEATURE> features            = null;
-    private Integer       maxResultsNum       = null; // Default: unlimited results
+    private List<String>      hosts               = null;
+    private Boolean           enabled             = null;
+    private Boolean           valid               = null;
+    private List<AccountType> accountTypes        = null;
+    private Boolean           expired             = null;
+    private Boolean           temporarilyDisabled = null;
+    private Boolean           multiHost           = null;
+    private Long              minimumTrafficLeft  = null;
+    private Double            minimumBalance      = null;
+    private List<FEATURE>     features            = null;
+    private Integer           maxResultsNum       = null; // Default: unlimited results
+    private String            username            = null;
 
     /**
      * Creates a new account filter with no criteria (matches all accounts)
@@ -52,9 +52,7 @@ public class AccountFilter {
      *            variable number of hosts to filter for
      */
     public AccountFilter(String... hosts) {
-        if (hosts != null && hosts.length > 0) {
-            this.hosts = new ArrayList<String>(Arrays.asList(hosts));
-        }
+        setHosts(hosts);
     }
 
     /**
@@ -82,15 +80,23 @@ public class AccountFilter {
     }
 
     /**
-     * Filter accounts by account type
+     * Filter accounts by multiple account types using varargs
      *
-     * @param accountType
-     *            the account type to filter for
+     * @param accountTypes
+     *            variable number of account types to filter for
      * @return this filter for chaining
      */
-    public AccountFilter setAccountType(AccountType accountType) {
-        this.accountType = accountType;
+    public AccountFilter setAccountTypes(AccountType... accountTypes) {
+        if (accountTypes != null && accountTypes.length > 0) {
+            this.accountTypes = Arrays.asList(accountTypes);
+        } else {
+            this.accountTypes = null;
+        }
         return this;
+    }
+
+    public List<AccountType> getAccountTypes() {
+        return accountTypes;
     }
 
     /**
@@ -154,29 +160,33 @@ public class AccountFilter {
     }
 
     /**
-     * Filter accounts by plugin features
-     *
-     * @param features
-     *            a list of features that the plugin must have
-     * @return this filter for chaining
-     */
-    public AccountFilter setFeatures(List<FEATURE> features) {
-        this.features = features;
-        return this;
-    }
-
-    /**
      * Filter accounts by a single plugin feature
      *
      * @param feature
      *            a feature that the plugin must have
      * @return this filter for chaining
      */
-    public AccountFilter setFeature(FEATURE feature) {
-        if (feature != null) {
-            List<FEATURE> featureList = new ArrayList<FEATURE>();
-            featureList.add(feature);
-            this.features = featureList;
+    public AccountFilter setFeature(FEATURE... features) {
+        if (features != null && features.length > 0) {
+            this.features = Arrays.asList(features);
+        } else {
+            this.features = null;
+        }
+        return this;
+    }
+
+    /**
+     * Set the list of hosts to filter for
+     *
+     * @param hosts
+     *            list of hosts to filter for
+     * @return this filter for chaining
+     */
+    public AccountFilter setHosts(String... hosts) {
+        if (hosts != null && hosts.length > 0) {
+            this.hosts = Arrays.asList(hosts);
+        } else {
+            this.hosts = null;
         }
         return this;
     }
@@ -206,21 +216,32 @@ public class AccountFilter {
         return hosts;
     }
 
-    /**
-     * Set the list of hosts to filter for
-     *
-     * @param hosts
-     *            list of hosts to filter for
-     * @return this filter for chaining
-     */
-    public AccountFilter setHosts(List<String> hosts) {
-        this.hosts = hosts;
+    public AccountFilter setUsername(String username) {
+        this.username = username;
         return this;
     }
 
+    /**
+     * Get the username to filter for
+     *
+     * @return the username
+     */
+    public String getUsername() {
+        return username;
+    }
+
     protected boolean matchesAccountType(Account account) {
-        final AccountType accountType = this.accountType;
-        if (accountType != null && !accountType.equals(account.getType())) {
+        final List<AccountType> accountTypes = this.accountTypes;
+        if (accountTypes != null && !accountTypes.isEmpty()) {
+            final AccountType accountType = account.getType();
+            if (accountType == null) {
+                return false;
+            }
+            for (AccountType type : accountTypes) {
+                if (type != null && type.equals(accountType)) {
+                    return true;
+                }
+            }
             return false;
         }
         return true;
@@ -260,6 +281,18 @@ public class AccountFilter {
         return true;
     }
 
+    protected boolean matchesUsername(Account account) {
+        final String username = this.username;
+        if (username != null) {
+            final String accountUsername = account.getUser();
+            if (accountUsername == null) {
+                return false;
+            }
+            return accountUsername.equalsIgnoreCase(username);
+        }
+        return true;
+    }
+
     /**
      * Check if an account matches the filter criteria
      *
@@ -292,6 +325,9 @@ public class AccountFilter {
         }
         // Check hosts list
         if (!matchesHost(account)) {
+            return false;
+        }
+        if (!matchesUsername(account)) {
             return false;
         }
         // Check expired
@@ -338,16 +374,18 @@ public class AccountFilter {
      */
     public List<Account> filter(List<Account> accounts) {
         final List<Account> result = new ArrayList<Account>();
-        if (accounts != null) {
-            final Integer maxResultsNum = getMaxResultsNum();
-            for (final Account account : accounts) {
-                if (matches(account)) {
-                    result.add(account);
-                    // Check if we've reached the maximum number of results
-                    if (maxResultsNum != null && result.size() >= maxResultsNum.intValue()) {
-                        break;
-                    }
-                }
+        if (accounts == null) {
+            return result;
+        }
+        final Integer maxResultsNum = getMaxResultsNum();
+        for (final Account account : accounts) {
+            if (!matches(account)) {
+                continue;
+            }
+            result.add(account);
+            // Check if we've reached the maximum number of results
+            if (maxResultsNum != null && result.size() >= maxResultsNum.intValue()) {
+                break;
             }
         }
         return result;

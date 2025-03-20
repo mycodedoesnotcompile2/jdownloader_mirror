@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import jd.PluginWrapper;
+import jd.controlling.captcha.SkipException;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
 import jd.plugins.Account;
@@ -34,6 +35,7 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYP
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
+import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaResponse;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -65,13 +67,12 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptcha extends abstractP
         final Map<String, Object> entries = this.handleAPIErrors(br, account);
         final double balance = ((Number) entries.get("balance")).doubleValue();
         final AccountInfo ai = new AccountInfo();
-        ai.setAccountBalance(balance);
-        ai.setCurrency(Currency.getInstance("USD"));
+        ai.setAccountBalance(balance, Currency.getInstance("USD"));
         return ai;
     }
 
     @Override
-    protected void solveCES(CESSolverJob<?> job, Account account) throws Exception {
+    public void solve(CESSolverJob<?> job, Account account) throws InterruptedException, SolverException, SkipException {
         final Challenge<String> captchaChallenge = (Challenge<String>) job.getChallenge();
         try {
             final Map<String, Object> postdata = new HashMap<String, Object>();
@@ -189,12 +190,12 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptcha extends abstractP
     }
 
     @Override
-    protected boolean setInvalid(AbstractResponse<?> response) {
+    public boolean setInvalid(AbstractResponse<?> response) {
         return sendCaptchaFeedback(response, false);
     }
 
     @Override
-    protected boolean setValid(AbstractResponse<?> response) {
+    public boolean setValid(AbstractResponse<?> response) {
         return sendCaptchaFeedback(response, true);
     }
 

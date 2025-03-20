@@ -15,8 +15,6 @@ public interface SolverService {
 
     public abstract Icon getIcon(int size);
 
-    public abstract void addSolver(ChallengeSolver<?> solver);
-
     public abstract String getType();
 
     public int getWaitForByID(String solverID);

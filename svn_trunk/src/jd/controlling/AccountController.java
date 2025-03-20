@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -35,7 +34,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 
 import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerThread;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.WarnLevel;
@@ -51,6 +49,8 @@ import jd.plugins.AccountProperty;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.Plugin;
+import jd.plugins.Plugin.PluginEnvironment;
 import jd.plugins.PluginForHost;
 
 import org.appwork.scheduler.DelayedRunnable;
@@ -773,8 +773,9 @@ public class AccountController implements AccountControllerListener, AccountProp
     }
 
     public void onAccountControllerEvent(final AccountControllerEvent event) {
-        Account acc = event.getAccount();
+        final Account acc = event.getAccount();
         delayedSaver.resetAndStart();
+        final PluginEnvironment pluginEnvironment = Plugin.PluginEnvironment.getPluginEnvironment();
         boolean forceRecheck = false;
         switch (event.getType()) {
         case ADDED:
@@ -782,11 +783,15 @@ public class AccountController implements AccountControllerListener, AccountProp
             updateInternalMultiHosterMap(acc, acc.getAccountInfo());
             break;
         case ACCOUNT_PROPERTY_UPDATE:
-            AccountProperty propertyChange = ((AccountPropertyChangedEvent) event).getProperty();
+            final AccountProperty propertyChange = ((AccountPropertyChangedEvent) event).getProperty();
             switch (propertyChange.getProperty()) {
             case ENABLED:
                 if (Boolean.FALSE.equals(propertyChange.getValue())) {
                     return;
+                }
+                final AccountInfo ai = acc.getAccountInfo();
+                if (!acc.isValid() || (ai != null && ai.isExpired())) {
+                    acc.setUpdateTime(0);
                 }
                 forceRecheck = true;
                 break;
@@ -798,7 +803,14 @@ public class AccountController implements AccountControllerListener, AccountProp
                 break;
             case PASSWORD:
             case USERNAME:
-                forceRecheck = true;
+                if (PluginEnvironment.UNKNOWN.equals(pluginEnvironment)) {
+                    // username/password has changed outside of a Plugin
+                    // *reset* Account and dump all previous stored information (AccountInfo, Properties...)
+                    acc.setAccountInfo(null);
+                    acc.setProperties(null);
+                    acc.setUpdateTime(0);
+                    forceRecheck = true;
+                }
                 break;
             }
             break;
@@ -809,10 +821,9 @@ public class AccountController implements AccountControllerListener, AccountProp
             updateInternalMultiHosterMap(acc, null);
             return;
         }
-        if (acc == null || acc != null && acc.isEnabled() == false) {
+        if (acc == null || acc.isEnabled() == false) {
             return;
-        }
-        if ((Thread.currentThread() instanceof AccountCheckerThread)) {
+        } else if (PluginEnvironment.ACCOUNT_CHECK.equals(pluginEnvironment)) {
             return;
         }
         AccountChecker.getInstance().check(acc, forceRecheck);
@@ -842,15 +853,18 @@ public class AccountController implements AccountControllerListener, AccountProp
 
     /** Returns first account that is enabled and valid. */
     public Account getValidAccount(final String host) {
-        final List<Account> accounts = listAccounts(new AccountFilter(host).setEnabled(true).setValid(true).setTemporarilyDisabled(false).setMaxResultsNum(1));
-        return accounts.isEmpty() ? null : accounts.get(0);
+        final List<Account> ret = getValidAccounts(host);
+        if (ret != null && ret.size() > 0) {
+            return ret.get(0);
+        } else {
+            return null;
+        }
     }
 
     public ArrayList<Account> getValidAccounts(final String host) {
         if (StringUtils.isEmpty(host)) {
             return null;
         }
-        final ArrayList<Account> ret;
         final Thread currentThread = Thread.currentThread();
         if (currentThread instanceof SingleDownloadController) {
             // requestFileInformation must use the account from DownloadLinkCandidate of SingleDownloadController
@@ -859,36 +873,17 @@ public class AccountController implements AccountControllerListener, AccountProp
             if (acc == null) {
                 return null;
             } else if (StringUtils.equals(acc.getHosterByPlugin(), host)) {
-                ret = new ArrayList<Account>();
+                final ArrayList<Account> ret = new ArrayList<Account>();
                 ret.add(acc);
                 return ret;
             }
         }
-        synchronized (AccountController.this) {
-            final List<Account> accounts = ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
-            if (accounts == null || accounts.size() == 0) {
-                return null;
-            }
-            ret = new ArrayList<Account>(accounts);
+        final ArrayList<Account> ret = listAccounts(new AccountFilter(host).setEnabled(true).setValid(true).setTemporarilyDisabled(false));
+        if (ret == null || ret.size() == 0) {
+            return null;
+        } else {
+            return ret;
         }
-        final ListIterator<Account> it = ret.listIterator(ret.size());
-        while (it.hasPrevious()) {
-            final Account next = it.previous();
-            if (!next.isEnabled() || !next.isValid() || next.isTempDisabled() || next.getPlugin() == null) {
-                /* we remove every invalid/disabled/tempdisabled/blocked account */
-                it.remove();
-            }
-        }
-        return ret;
-    }
-
-    /** Checks if account with expected properties exists. */
-    public boolean hasAccount(final String host, final Boolean isEnabled, final Boolean isValid, final Boolean isPremium, final Boolean isExpired) {
-        if (StringUtils.isEmpty(host)) {
-            return false;
-        }
-        final AccountFilter filter = new AccountFilter(host).setEnabled(isEnabled).setValid(isValid).setMaxResultsNum(1).setAccountType(Boolean.TRUE.equals(isPremium) ? AccountType.PREMIUM : null).setExpired(isExpired);
-        return !listAccounts(filter).isEmpty();
     }
 
     public List<Account> getMultiHostAccounts(final String host) {

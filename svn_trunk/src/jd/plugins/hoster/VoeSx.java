@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -55,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50803 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50819 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -530,7 +531,7 @@ public class VoeSx extends XFileSharingProBasic {
             if (balanceO != null) {
                 final String balanceStr = balanceO.toString();
                 if (balanceStr.matches("[0-9.]+")) {
-                    ai.setAccountBalance(Double.parseDouble(balanceStr));
+                    ai.setAccountBalance(Double.parseDouble(balanceStr), Currency.getInstance("USD"));
                 }
             }
             /* 2019-07-26: values can also be "inf" for "Unlimited": "storage_left":"inf" */

@@ -63,7 +63,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50816 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50825 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     // DEV NOTES
     // other: currently they 302 redirect all non www. to www. which kills most of this plugin.
@@ -449,7 +449,7 @@ public class FileFactory extends PluginForHost {
         final Browser br = this.createNewBrowserInstance();
         // logic to grab account cookie to do fast linkchecking vs one at a time.
         boolean loggedIn = false;
-        List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true));
+        final List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true));
         for (Account n : filteredAccounts) {
             try {
                 loginWebsite(n, false, br);

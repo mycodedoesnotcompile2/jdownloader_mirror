@@ -8,6 +8,7 @@ import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -86,7 +87,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50803 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50819 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -5531,7 +5532,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (balanceO != null) {
                 final String balanceStr = balanceO.toString();
                 if (balanceStr.matches("[0-9.]+")) {
-                    ai.setAccountBalance(Double.parseDouble(balanceStr));
+                    ai.setAccountBalance(Double.parseDouble(balanceStr), Currency.getInstance("USD"));
                 }
             }
             /* 2019-07-26: values can also be "inf" for "Unlimited": "storage_left":"inf" */

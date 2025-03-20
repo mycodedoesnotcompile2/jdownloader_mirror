@@ -16,7 +16,10 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -32,6 +35,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -39,39 +43,117 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49330 $", interfaceVersion = 2, names = { "whatboyswant.com" }, urls = { "https://(?:www\\.)?whatboyswant\\.com/(?:babes|movies|cars)/show/\\d+|https?://(?:www\\.)?whatboyswant\\.com/videos/[a-z0-9\\-]+/[a-z0-9\\-]+\\-\\d+" })
+@HostPlugin(revision = "$Revision: 50824 $", interfaceVersion = 2, names = {}, urls = {})
 public class WhatBoysWantCom extends PluginForHost {
     public WhatBoysWantCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://whatboyswant.com/register");
+        this.enablePremium("https://" + getHost() + "/register");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
     public String getAGBLink() {
-        return "https://whatboyswant.com/pages/display/termsofuse";
+        return "https://" + getHost() + "/pages/display/termsofuse";
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME               = false;
-    private static final int     FREE_MAXCHUNKS            = 1;
-    private static final boolean ACCOUNT_FREE_RESUME       = true;
-    private static final int     ACCOUNT_FREE_MAXCHUNKS    = 0;
-    private static final boolean ACCOUNT_PREMIUM_RESUME    = true;
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = 0;
-    private static final String  TYPE_BABE                 = "(?i)h.+/babes/show/\\d+";
-    private static final String  TYPE_CAR                  = "(?i).+/car/show/\\d+";
-    private static final String  TYPE_MOVIE                = "(?i).+/(?:movies/show/\\d+|videos/.+)";
-    private static final String  TYPE_VIDEOS               = "https?://[^/]+/videos/[^/]+/([a-z0-9\\-]+)-(\\d+)";
-    private static final String  default_EXT_photo         = ".jpg";
+    private static final boolean   FREE_RESUME               = false;
+    private static final int       FREE_MAXCHUNKS            = 1;
+    private static final boolean   ACCOUNT_FREE_RESUME       = true;
+    private static final int       ACCOUNT_FREE_MAXCHUNKS    = 0;
+    private static final boolean   ACCOUNT_PREMIUM_RESUME    = true;
+    private static final int       ACCOUNT_PREMIUM_MAXCHUNKS = 0;
+    private static final Pattern   TYPE_BABES_OLD            = Pattern.compile("/babes/show/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern   TYPE_BABES_NEW            = Pattern.compile("/babes/([\\w-]+)/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern   TYPE_CAR                  = Pattern.compile("/car/show/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern   TYPE_MOVIES               = Pattern.compile("/movies/show/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern   TYPE_VIDEOS               = Pattern.compile("/videos/([\\w-]+)/([\\w-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final String    default_EXT_photo         = ".jpg";
+    private static final Pattern[] patterns                  = new Pattern[] { TYPE_BABES_OLD, TYPE_BABES_NEW, TYPE_CAR, TYPE_MOVIES };
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "whatboyswant.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(";
+            int index = 0;
+            for (final Pattern pattern : patterns) {
+                if (index > 0) {
+                    regex += "|";
+                }
+                regex += pattern.pattern();
+                index++;
+            }
+            regex += ")";
+            ret.add(regex);
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink dl) {
+        String fid = new Regex(dl.getPluginPatternMatcher(), TYPE_BABES_NEW).getMatch(1);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(dl.getPluginPatternMatcher(), TYPE_BABES_OLD).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(dl.getPluginPatternMatcher(), TYPE_CAR).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(dl.getPluginPatternMatcher(), TYPE_MOVIES).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(dl.getPluginPatternMatcher(), TYPE_VIDEOS).getMatch(2);
+        if (fid != null) {
+            return fid;
+        }
+        return fid;
+    }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final String fid = getFID(link);
         final String type = getTYPE(link);
-        String filename = null;
+        String title = null;
         this.setBrowserExclusive();
         final String default_EXT_video = ".mp4";
         final Account account = AccountController.getInstance().getValidAccount(this);
+        final String ext;
         if (account != null) {
             this.login(account, false);
             br.getPage("https://whatboyswant.com/" + type + "/properties/" + fid + "/");
@@ -79,31 +161,45 @@ public class WhatBoysWantCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             String filesize = br.getRegex("<th>\\s*Filesize\\s*:\\s*</th>\\s*<td>([^<>\"]*?)</td>").getMatch(0);
-            filename = br.getRegex("<th>\\s*Filename\\s*:\\s*</th>\\s*<td>([^<>\"]*?)</td>").getMatch(0);
-            if (filename == null || filesize == null) {
+            title = br.getRegex("<th>\\s*Filename\\s*:\\s*</th>\\s*<td>([^<>\"]*?)</td>").getMatch(0);
+            if (title == null || filesize == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            filename = Encoding.htmlDecode(filename).trim();
+            title = Encoding.htmlDecode(title).trim();
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+            ext = default_EXT_video;
         } else {
             br.getPage(link.getDownloadURL());
-            if (br.getHttpConnection().getResponseCode() == 404 || br.getURL().contains("/error404")) {
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.getURL().contains("/error404")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            filename = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
-            if (filename == null) {
-                filename = fid;
+            title = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
+            if (title == null) {
+                title = this.getURLTitle(link);
+                if (title != null) {
+                    title = title.replace("-", " ").trim();
+                }
             }
-            if (link.getPluginPatternMatcher().matches(TYPE_VIDEOS)) {
-                filename = this.getURLTitle(link).replace("-", " ");
-                filename += default_EXT_video;
-            } else if (link.getDownloadURL().matches(TYPE_MOVIE)) {
-                filename += default_EXT_video;
+            if (title == null) {
+                /* Fallback */
+                title = fid;
+            }
+            if (new Regex(link.getPluginPatternMatcher(), TYPE_VIDEOS).patternFind()) {
+                title = this.getURLTitle(link).replace("-", " ");
+                ext = default_EXT_video;
+            } else if (new Regex(link.getPluginPatternMatcher(), TYPE_MOVIES).patternFind()) {
+                ext = default_EXT_video;
             } else {
-                filename += default_EXT_photo;
+                ext = default_EXT_photo;
             }
         }
-        link.setFinalFileName(Encoding.htmlDecode(filename.trim()));
+        /* Some corrections */
+        title = Encoding.htmlDecode(title).trim();
+        title = title.replaceFirst(" - WhatBoysWant$", "");
+        final String filename = title += ext;
+        link.setFinalFileName(filename);
         return AvailableStatus.TRUE;
     }
 
@@ -114,29 +210,28 @@ public class WhatBoysWantCom extends PluginForHost {
     }
 
     private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
-        final String fid = getFID(link);
         String dllink = checkDirectLink(link, directlinkproperty);
         if (dllink == null) {
-            dllink = br.getRegex("\"(/picture/(?:babe|car)/" + fid + "/[^<>\"]*?)\"").getMatch(0);
+            dllink = br.getRegex("src=\"(/[^\"]+)\"[^<]*class=\"img-fluid\"").getMatch(0);
             if (dllink == null) {
                 /* 2020-12-09 */
                 dllink = br.getRegex("\"(/stream/videos[^\"]+)").getMatch(0);
             }
             if (dllink == null) {
-                if (link.getPluginPatternMatcher().matches(TYPE_MOVIE)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+                if (new Regex(link.getPluginPatternMatcher(), TYPE_MOVIES).patternFind()) {
+                    /* Account required to watch/download this video */
+                    throw new AccountRequiredException();
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            dllink = "https://whatboyswant.com" + dllink;
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        link.setProperty(directlinkproperty, dllink);
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -146,7 +241,6 @@ public class WhatBoysWantCom extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br.setFollowRedirects(true);
                 con = br2.openGetConnection(dllink);
                 if (looksLikeDownloadableContent(con)) {
                     return dllink;
@@ -167,22 +261,13 @@ public class WhatBoysWantCom extends PluginForHost {
         return dllink;
     }
 
-    private String getFID(final DownloadLink dl) {
-        final String fid;
-        if (dl.getDownloadURL().contains("/videos/")) {
-            fid = new Regex(dl.getDownloadURL(), "(\\d+)$").getMatch(0);
-        } else {
-            fid = new Regex(dl.getDownloadURL(), "/show/(\\d+)").getMatch(0);
+    private String getURLTitle(final DownloadLink link) {
+        String urlTitle = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEOS).getMatch(1);
+        if (urlTitle != null) {
+            return urlTitle;
         }
-        return fid;
-    }
-
-    private String getURLTitle(final DownloadLink dl) {
-        if (dl.getPluginPatternMatcher().matches(TYPE_VIDEOS)) {
-            return new Regex(dl.getPluginPatternMatcher(), TYPE_VIDEOS).getMatch(0);
-        } else {
-            return null;
-        }
+        urlTitle = new Regex(link.getPluginPatternMatcher(), TYPE_BABES_NEW).getMatch(0);
+        return urlTitle;
     }
 
     private String getTYPE(final DownloadLink dl) {
@@ -203,7 +288,6 @@ public class WhatBoysWantCom extends PluginForHost {
                 br.setCookies(cookies);
                 return;
             }
-            br.setFollowRedirects(false);
             br.postPage("https://whatboyswant.com/login", "data%5BUser%5D%5Bremember%5D=0&data%5BUser%5D%5Bremember%5D=1&_method=POST&data%5BUser%5D%5Busername%5D=" + Encoding.urlEncode(account.getUser()) + "&data%5BUser%5D%5Bpassword%5D=" + Encoding.urlEncode(account.getPass()));
             if (br.getCookie(br.getHost(), "UsersCookie[RememberMe]", Cookies.NOTDELETEDPATTERN) == null) {
                 if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
@@ -253,9 +337,8 @@ public class WhatBoysWantCom extends PluginForHost {
         final String type = getTYPE(link);
         requestFileInformation(link);
         login(account, false);
-        br.setFollowRedirects(false);
         /* Free accounts have credits (traffic) - premium accounts have unlimited credits. */
-        if (account.getBooleanProperty("free", false)) {
+        if (AccountType.FREE.equals(account.getType())) {
             resume = ACCOUNT_FREE_RESUME;
             maxchunks = ACCOUNT_FREE_MAXCHUNKS;
             directlinkproperty = "account_free_directlink";
@@ -277,7 +360,7 @@ public class WhatBoysWantCom extends PluginForHost {
             dllink = this.checkDirectLink(link, directlinkproperty);
         }
         if (dllink == null) {
-            if (link.getDownloadURL().matches(TYPE_MOVIE)) {
+            if (new Regex(link.getPluginPatternMatcher(), TYPE_MOVIES).patternFind()) {
                 /* We might have already accessed the link above in case the user is using a free account. */
                 if (br.getURL() != null && !br.getURL().equals(link.getDownloadURL())) {
                     br.getPage(link.getDownloadURL());
@@ -288,7 +371,7 @@ public class WhatBoysWantCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             } else {
-                dllink = "https://whatboyswant.com/" + type + "/download/" + fid + "/category";
+                dllink = "/" + type + "/download/" + fid + "/category";
             }
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxchunks);
@@ -297,7 +380,7 @@ public class WhatBoysWantCom extends PluginForHost {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        link.setProperty(directlinkproperty, dllink);
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 

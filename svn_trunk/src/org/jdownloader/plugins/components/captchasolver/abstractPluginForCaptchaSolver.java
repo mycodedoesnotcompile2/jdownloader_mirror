@@ -2,10 +2,19 @@ package org.jdownloader.plugins.components.captchasolver;
 
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.controlling.captcha.SkipException;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.PluginForHost;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
@@ -13,14 +22,8 @@ import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaC
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
+import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.plugins.controller.LazyPlugin;
-
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.PluginForHost;
 
 /**
  * Abstract base class for captcha solver plugins.
@@ -60,24 +63,13 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
                     return false;
                 }
                 final RecaptchaV2Challenge cl = (RecaptchaV2Challenge) c;
-                if (cl.isEnterprise()) {
-                    return true;
-                } else {
-                    return false;
-                }
+                return cl.isEnterprise();
             }
         },
         RECAPTCHA_V2 {
             @Override
             public boolean canHandle(Challenge<?> c) {
-                if (!(c instanceof RecaptchaV2Challenge)) {
-                    return false;
-                }
-                if (c instanceof RecaptchaV2Challenge) {
-                    return true;
-                } else {
-                    return false;
-                }
+                return c instanceof RecaptchaV2Challenge;
             }
         },
         HCAPTCHA {
@@ -132,18 +124,18 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
          * @return true if this captcha type can handle the challenge, false otherwise
          */
         public abstract boolean canHandle(Challenge<?> c);
-    }
 
-    public static CAPTCHA_TYPE getCaptchaTypeForChallenge(Challenge<?> c) {
-        if (c == null) {
+        public static CAPTCHA_TYPE getCaptchaTypeForChallenge(Challenge<?> c) {
+            if (c == null) {
+                return null;
+            }
+            for (CAPTCHA_TYPE type : CAPTCHA_TYPE.values()) {
+                if (type.canHandle(c)) {
+                    return type;
+                }
+            }
             return null;
         }
-        for (CAPTCHA_TYPE type : CAPTCHA_TYPE.values()) {
-            if (type.canHandle(c)) {
-                return type;
-            }
-        }
-        return null;
     }
 
     /**
@@ -154,13 +146,29 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return true if this solver can handle the challenge, false otherwise
      */
     public final boolean canHandle(final Challenge<?> c) {
+        if (!validateBlackWhite(c)) {
+            return false;
+        }
+        boolean allowedByType = false;
         final List<CAPTCHA_TYPE> supportedTypes = this.getSupportedCaptchaTypes();
         for (final CAPTCHA_TYPE supportedType : supportedTypes) {
             if (supportedType.canHandle(c)) {
-                return true;
+                allowedByType = true;
+                break;
             }
         }
-        return false;
+        if (!allowedByType) {
+            return false;
+        }
+        return true;
+    }
+
+    public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, Account account) throws Exception {
+        if (!canHandle(c)) {
+            return null;
+        }
+        final abstractPluginForCaptchaSolver plugin = getNewPluginInstance(getLazyP());
+        return new PluginChallengeSolver<T>(account, plugin, /* TODO */null);
     }
 
     /**
@@ -175,6 +183,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             this.enablePremium(getBuyPremiumUrl());
         }
     }
+
     // @Override
     // public boolean isPremiumEnabled() {
     // /* Every paid captcha solver needs a paid "premium" account in order to use it. */
@@ -200,7 +209,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The captcha response to report as invalid
      * @return true if the report was successfully sent, false otherwise
      */
-    protected abstract boolean setInvalid(final AbstractResponse<?> response);
+    public abstract boolean setInvalid(final AbstractResponse<?> response);
 
     /**
      * Reports a captcha as valid.
@@ -209,7 +218,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The captcha response to report as valid
      * @return true if the report was successfully sent, false otherwise
      */
-    protected abstract boolean setValid(final AbstractResponse<?> response);
+    public abstract boolean setValid(final AbstractResponse<?> response);
+
     // public boolean setUnused(AbstractResponse<?> response) {
     // return false;
     // }
@@ -244,8 +254,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     @Override
     public abstract AccountInfo fetchAccountInfo(final Account account) throws Exception;
 
-    protected void solveCES(CESSolverJob<?> job, Account account) throws Exception {
-    }
+    public abstract void solve(CESSolverJob<?> solverJob, Account account) throws InterruptedException, SolverException, SkipException;
 
     public boolean validateBlackWhite(Challenge<?> c) {
         // TODO: Add functionality

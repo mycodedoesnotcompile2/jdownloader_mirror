@@ -51,6 +51,7 @@ import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
@@ -232,7 +233,7 @@ public class ChallengeResponseController {
         }
         logger.info("Log to " + logger.getName());
         logger.info("Handle Challenge: " + c);
-        final ArrayList<ChallengeSolver<T>> solver = createList(c);
+        final List<ChallengeSolver<T>> solver = createList(c);
         logger.info("Solver: " + solver);
         if (solver.size() == 0) {
             /*
@@ -311,13 +312,8 @@ public class ChallengeResponseController {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> ArrayList<ChallengeSolver<T>> createList(final Challenge<T> c) {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
-            final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
-            final List<Account> accs = AccountController.getInstance().list();
-        }
-        final ArrayList<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
+    private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c) {
+        final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         for (final ChallengeSolver<?> s : solverList) {
             try {
                 if (s.isEnabled() && s.validateLogins() && s.canHandle(c) && s.validateBlackWhite(c)) {
@@ -325,6 +321,21 @@ public class ChallengeResponseController {
                 }
             } catch (final Throwable e) {
                 logger.log(e);
+            }
+        }
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
+            final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
+            for (Account solverAccount : solverAccounts) {
+                try {
+                    final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
+                    final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
+                    if (solver != null) {
+                        ret.add(solver);
+                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                }
             }
         }
         return ret;

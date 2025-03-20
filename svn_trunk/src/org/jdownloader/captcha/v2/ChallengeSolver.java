@@ -13,13 +13,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import jd.controlling.captcha.SkipException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
-
-import jd.controlling.captcha.SkipException;
 
 public abstract class ChallengeSolver<T> {
     public static final ChallengeSolver EXTERN = new ChallengeSolver<Object>() {
@@ -29,7 +29,7 @@ public abstract class ChallengeSolver<T> {
         }
     };
 
-    private ChallengeSolver() {
+    protected ChallengeSolver() {
     }
 
     public boolean setInvalid(AbstractResponse<?> response) {
@@ -59,7 +59,6 @@ public abstract class ChallengeSolver<T> {
         if (service == null) {
             this.service = (SolverService) this;
         }
-        service.addSolver(this);
         initThreadPool(i);
         Class<?> cls = this.getClass();
         while (true) {

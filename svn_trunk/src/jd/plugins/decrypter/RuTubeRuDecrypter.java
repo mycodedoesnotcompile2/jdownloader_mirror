@@ -45,6 +45,8 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
@@ -53,7 +55,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.RuTubeVariant;
 import jd.plugins.hoster.RuTubeRu;
 
-@DecrypterPlugin(revision = "$Revision: 50805 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
+@DecrypterPlugin(revision = "$Revision: 50824 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
 public class RuTubeRuDecrypter extends PluginForDecrypt {
     public RuTubeRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -184,6 +186,10 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
         final Map<String, Object> author = (Map<String, Object>) entries.get("author");
         final String uploaderName = (String) author.get("name");
         final Map<String, Object> videoBalancer = (Map<String, Object>) entries.get("video_balancer");
+        final Map<String, Object> live_streams = (Map<String, Object>) entries.get("live_streams");
+        if ((videoBalancer == null || videoBalancer.isEmpty()) && live_streams != null) {
+            throw new DecrypterRetryException(RetryReason.UNSUPPORTED_LIVESTREAM);
+        }
         final String streamDefault = (String) videoBalancer.get("default");
         final String streamHLSMaster = (String) videoBalancer.get("m3u8");
         final String expireTimestampStr;

@@ -26,6 +26,12 @@ import java.util.TimeZone;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import jd.config.Property;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
@@ -40,12 +46,6 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
-
-import jd.config.Property;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
 
 public class Account extends Property {
     private static final String VALID_UNTIL              = "VALID_UNTIL";
@@ -66,8 +66,13 @@ public class Account extends Property {
 
     private static final String OBJECT_STORAGE = "OBJECT_STORAGE";
 
+    /** Returns unique hash generated via username + password. */
+    public String getAccountFootprintString() {
+        return Hash.getSHA256(getUser() + ":" + getPass());
+    }
+
     public synchronized void storeObject(final String storageID, final Object object) {
-        setProperty(OBJECT_STORAGE + ".validation." + storageID, Hash.getSHA256(getUser() + ":" + getPass()));
+        setProperty(OBJECT_STORAGE + ".validation." + storageID, getAccountFootprintString());
         setProperty(OBJECT_STORAGE + ".object." + storageID, JSonStorage.serializeToJson(object));
         setProperty(OBJECT_STORAGE + ".ts." + storageID, System.currentTimeMillis());
     }
@@ -81,7 +86,7 @@ public class Account extends Property {
     public synchronized <T> T restoreObject(final String storageID, final TypeRef<T> type) {
         final boolean containsObject = hasProperty(OBJECT_STORAGE + ".object." + storageID);
         if (containsObject) {
-            if (StringUtils.equals(getStringProperty(OBJECT_STORAGE + ".validation." + storageID), Hash.getSHA256(getUser() + ":" + getPass()))) {
+            if (StringUtils.equals(getStringProperty(OBJECT_STORAGE + ".validation." + storageID), getAccountFootprintString())) {
                 return JSonStorage.restoreFromString(getStringProperty(OBJECT_STORAGE + ".object." + storageID), type, null);
             } else {
                 clearObject(storageID);
@@ -119,8 +124,8 @@ public class Account extends Property {
         return getLongProperty(OBJECT_STORAGE + ".ts." + storageID, -1);
     }
 
-    public synchronized long saveCookies(final Cookies cookies, final String ID) {
-        final String validation = Hash.getSHA256(getUser() + ":" + getPass());
+    public synchronized void saveCookies(final Cookies cookies, final String ID) {
+        final String validation = getAccountFootprintString();
         /*
          * Do not cache antiddos cookies, this is job of the antiddos module, otherwise it can and will cause conflicts!
          */
@@ -132,8 +137,7 @@ public class Account extends Property {
         final String COOKIE_STORAGE_TIMESTAMP_ID = COOKIE_STORAGE + ":TS:" + ID;
         final long ret = System.currentTimeMillis();
         setProperty(COOKIE_STORAGE_TIMESTAMP_ID, ret);
-        // TODO: add support for UserAgent, eg dropbox/filestore.to
-        return ret;
+        // TODO: add support for UserAgent which can be given e.g. in cookies exported via browser addon "FlagCookies"
     }
 
     /** TODO: This might not be the right place for this satatic method! */
@@ -184,7 +188,7 @@ public class Account extends Property {
 
     /** Returns list of stored cookies WITHOUT additional information such as User-Agent header. */
     public synchronized Cookies loadCookies(final String ID) {
-        final String validation = Hash.getSHA256(getUser() + ":" + getPass());
+        final String validation = getAccountFootprintString();
         if (StringUtils.equals(getStringProperty(COOKIE_STORAGE), validation)) {
             final String COOKIE_STORAGE_ID = COOKIE_STORAGE + ":" + ID;
             // TODO: add support for UserAgent, eg dropbox/filestore.to
@@ -284,9 +288,9 @@ public class Account extends Property {
     }
 
     /**
-     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br>
-     * Most of all services will store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account
-     * limits by changing their IP.
+     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br> Most of all services will
+     * store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account limits by changing their
+     * IP.
      */
     public void setAllowReconnectToResetLimits(final boolean b) {
         /* 2022-07-19: TODO: Dummy function, see: https://svn.jdownloader.org/issues/87351 */
@@ -653,10 +657,6 @@ public class Account extends Property {
         if (this.enabled != enabled) {
             this.enabled = enabled;
             if (forceAccountCheckOnChange) {
-                final AccountInfo ai = accinfo;
-                if (enabled && (!isValid() || ai != null && ai.isExpired())) {
-                    setUpdateTime(0);
-                }
                 notifyUpdate(AccountProperty.Property.ENABLED, enabled);
             }
         }
@@ -739,8 +739,6 @@ public class Account extends Property {
         if (!StringUtils.equals(this.pass, newPass)) {
             this.pass = newPass;
             if (forceAccountCheckOnChange) {
-                accinfo = null;
-                setUpdateTime(0);
                 notifyUpdate(AccountProperty.Property.PASSWORD, newPass);
             }
         }
@@ -761,8 +759,6 @@ public class Account extends Property {
         newUser = trim(newUser);
         if (!StringUtils.equals(this.user, newUser)) {
             this.user = newUser;
-            accinfo = null;
-            setUpdateTime(0);
             notifyUpdate(AccountProperty.Property.USERNAME, newUser);
         }
     }

@@ -44,7 +44,7 @@ import jd.utils.JDUtilities;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@DecrypterPlugin(revision = "$Revision: 50816 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50825 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierComFolder extends PluginForDecrypt {
     public OneFichierComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,7 +77,7 @@ public class OneFichierComFolder extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         Account account = null;
-        List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true).setAccountType(AccountType.PREMIUM).setMaxResultsNum(1));
+        List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true).setAccountTypes(AccountType.PREMIUM).setMaxResultsNum(1));
         if (!filteredAccounts.isEmpty()) {
             account = filteredAccounts.get(0);
         }
