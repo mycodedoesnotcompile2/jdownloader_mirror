@@ -7,13 +7,14 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
+import jd.nutils.encoding.Base64;
+import jd.plugins.Plugin;
+
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.net.Base64OutputStream;
 import org.jdownloader.captcha.v2.Challenge;
 import org.seamless.util.io.IO;
-
-import jd.plugins.Plugin;
 
 public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
     protected volatile File imageFile;
@@ -25,7 +26,11 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
     }
 
     public Image getImage() throws IOException {
-        return ImageIO.read(getImageFile());
+        final File imageFile = getImageFile();
+        if (imageFile == null || !imageFile.isFile()) {
+            return null;
+        }
+        return ImageIO.read(imageFile);
     }
 
     public byte[] getAnnotatedImageBytes() throws IOException {
@@ -58,6 +63,15 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
             imageFile = plugin.getLocalCaptchaFile();
         }
         return imageFile;
+    }
+
+    public String getBase64ImageFile() throws IOException {
+        final File imageFile = getImageFile();
+        if (imageFile == null || !imageFile.isFile()) {
+            return null;
+        }
+        final byte[] data = IO.readBytes(imageFile);
+        return Base64.encodeToString(data, false);
     }
 
     public void setImageFile(File imageFile) {

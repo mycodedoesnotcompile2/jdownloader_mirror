@@ -17,19 +17,21 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
+import java.util.regex.Pattern;
 
 import org.jdownloader.plugins.components.config.XvideosComXnxxComConfig;
 
-@HostPlugin(revision = "$Revision: 48784 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+
+@HostPlugin(revision = "$Revision: 50841 $", interfaceVersion = 2, names = {}, urls = {})
 public class XnxxCom extends XvideosCore {
     public XnxxCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.xnxx.com/");
+        this.enablePremium("https://www." + getHost() + "/");
     }
 
     @Override
@@ -62,12 +64,18 @@ public class XnxxCom extends XvideosCore {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_VIDEO = Pattern.compile("/video-([a-z0-9\\-]+)/([^/]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED = Pattern.compile("/embedframe/\\d+", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            String pattern = "https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(";
-            pattern += "video-[a-z0-9\\-]+/[^/]+";
-            pattern += "|embedframe/\\d+";
+            String pattern = "https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "(";
+            pattern += PATTERN_VIDEO.pattern();
+            pattern += "|";
+            pattern += PATTERN_EMBED.pattern();
+            pattern += "|";
+            pattern += TYPE_CLICK.pattern();
             pattern += ")";
             ret.add(pattern);
         }
@@ -76,7 +84,7 @@ public class XnxxCom extends XvideosCore {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -86,11 +94,15 @@ public class XnxxCom extends XvideosCore {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     protected String buildNormalContentURL(final DownloadLink link) {
+        if (new Regex(link.getPluginPatternMatcher(), TYPE_CLICK).patternFind()) {
+            /* We cannot change this type of link to any other type. */
+            return link.getPluginPatternMatcher();
+        }
         final String urlHost = Browser.getHost(link.getPluginPatternMatcher(), false);
         final String videoID = this.getVideoidFromURL(link.getPluginPatternMatcher());
         if (videoID != null) {
@@ -106,6 +118,17 @@ public class XnxxCom extends XvideosCore {
             return newURL;
         }
         return null;
+    }
+
+    @Override
+    protected boolean looksLikeSupportedLink(final String url) {
+        if (new Regex(url, PATTERN_VIDEO).patternFind()) {
+            return true;
+        }
+        if (new Regex(url, PATTERN_EMBED).patternFind()) {
+            return true;
+        }
+        return this.canHandle(url);
     }
 
     @Override

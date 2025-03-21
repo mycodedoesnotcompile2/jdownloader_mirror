@@ -25,7 +25,7 @@ import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50049 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50840 $", interfaceVersion = 2, names = {}, urls = {})
 public class XnxxGold extends XvideosCore {
     public XnxxGold(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,7 @@ public class XnxxGold extends XvideosCore {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -86,7 +86,7 @@ public class XnxxGold extends XvideosCore {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

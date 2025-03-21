@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49128 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50841 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XvideosCore extends PluginForHost {
     public XvideosCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -176,15 +176,15 @@ public abstract class XvideosCore extends PluginForHost {
             return new Regex(url, type_embed).getMatch(0);
         } else if (url.matches(type_normal)) {
             return new Regex(url, type_normal).getMatch(0);
-        } else if (url.matches(type_normal_dot)) {
-            return new Regex(url, type_normal_dot).getMatch(0);
+        } else if (new Regex(url, TYPE_NORMAL_DOT).patternFind()) {
+            return new Regex(url, TYPE_NORMAL_DOT).getMatch(0);
         } else if (url.matches(type_normal_dash)) {
             return new Regex(url, type_normal_dash).getMatch(0);
         } else if (url.matches(type_special1)) {
             return new Regex(url, type_special1).getMatch(0);
         } else if (url.matches(type_special2)) {
             return new Regex(url, type_special2).getMatch(2);
-        } else if ((regex_type_Click = new Regex(url, type_click)).patternFind()) {
+        } else if ((regex_type_Click = new Regex(url, TYPE_CLICK)).patternFind()) {
             return regex_type_Click.getMatch(1);
         } else {
             return null;
@@ -217,7 +217,7 @@ public abstract class XvideosCore extends PluginForHost {
             return regex_type_special1.getMatch(1);
         } else if ((regex_type_special2 = new Regex(url, type_special2)).patternFind()) {
             return regex_type_special2.getMatch(1);
-        } else if ((regex_type_Click = new Regex(url, type_click)).patternFind()) {
+        } else if ((regex_type_Click = new Regex(url, TYPE_CLICK)).patternFind()) {
             return regex_type_Click.getMatch(2);
         } else {
             /* Not all URLs have titles */
@@ -225,28 +225,29 @@ public abstract class XvideosCore extends PluginForHost {
         }
     }
 
+    /* TODO: Change all of the patterns below to type PATTERN */
     /* xvideos.com */
-    protected static final String type_normal                     = "(?i)https?://[^/]+/video(\\d+)(/(.+))?$";
-    protected static final String type_normal_dot                 = "(?i)https?://[^/]+/video\\.([a-z0-9\\-]+)(.*?/[^/]+)?$";
-    protected static final String type_click                      = "(?i)https?://[^/]+/prof-video-click/upload/([a-z0-9\\-_]+)/([a-z0-9\\-]+)/([a-z0-9\\-_]+)";
+    protected static final String  type_normal                     = "(?i)https?://[^/]+/video(\\d+)(/(.+))?$";
+    protected static final Pattern TYPE_NORMAL_DOT                 = Pattern.compile("/video\\.([a-z0-9\\-]+)(.*?/[^/]+)?$", Pattern.CASE_INSENSITIVE);
+    protected static final Pattern TYPE_CLICK                      = Pattern.compile("/prof-video-click/upload/([a-z0-9\\-_]+)/([a-z0-9\\-]+)/([a-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
     /* xnxx.gold */
-    protected static final String type_normal_dash                = "(?i)https?://[^/]+/video-([a-z0-9\\-]+)(/[^/]+)?$";                                        // xnxx.com&
+    protected static final String  type_normal_dash                = "(?i)https?://[^/]+/video-([a-z0-9\\-]+)(/[^/]+)?$";                                                                 // xnxx.com&
     // xnxx.gold
-    protected static final String type_embed                      = "(?i)https?://[^/]+/embedframe/(\\d+)";
-    protected static final String type_special1                   = "(?i)https?://[^/]+/[^/]+/upload/[^/]+/(\\d+)/([^/]+)";
-    protected static final String type_special2                   = "(?i)https?://[^/]+/[^/]+/(upload|pornstar|model)/([a-z0-9\\-\\_]+)/(\\d+).*";
-    protected static final String NOCHUNKS                        = "NOCHUNKS";
-    private String                streamURL                       = null;
-    private HlsContainer          hlsContainer                    = null;
-    public static final String    PROPERTY_USERNAME               = "username";
-    private static final String   PROPERTY_TAGS                   = "tags";
-    public static final String    PROPERTY_VIDEOID                = "videoid";
-    private static final String   PROPERTY_LAST_USED_DIRECTURL    = "last_used_directurl";
-    private final String          PROPERTY_ACCOUNT_PREMIUM_DOMAIN = "premium_domain";
+    protected static final String  type_embed                      = "(?i)https?://[^/]+/embedframe/(\\d+)";
+    protected static final String  type_special1                   = "(?i)https?://[^/]+/[^/]+/upload/[^/]+/(\\d+)/([^/]+)";
+    protected static final String  type_special2                   = "(?i)https?://[^/]+/[^/]+/(upload|pornstar|model)/([a-z0-9\\-\\_]+)/(\\d+).*";
+    protected static final String  NOCHUNKS                        = "NOCHUNKS";
+    private String                 streamURL                       = null;
+    private HlsContainer           hlsContainer                    = null;
+    public static final String     PROPERTY_USERNAME               = "username";
+    private static final String    PROPERTY_TAGS                   = "tags";
+    public static final String     PROPERTY_VIDEOID                = "videoid";
+    private static final String    PROPERTY_LAST_USED_DIRECTURL    = "last_used_directurl";
+    private final String           PROPERTY_ACCOUNT_PREMIUM_DOMAIN = "premium_domain";
 
     protected String getContentURL(final DownloadLink link) {
         String url = link.getPluginPatternMatcher();
-        if (!url.matches(type_normal) && !url.matches(type_normal_dash) && !url.matches(type_normal_dot)) {
+        if (!url.matches(type_normal) && !url.matches(type_normal_dash) && !new Regex(url, TYPE_NORMAL_DOT).patternFind()) {
             final String normalContentURL = buildNormalContentURL(link);
             if (normalContentURL != null) {
                 url = normalContentURL;
@@ -316,6 +317,10 @@ public abstract class XvideosCore extends PluginForHost {
         }
     }
 
+    protected boolean looksLikeSupportedLink(final String url) {
+        return this.canHandle(url);
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
@@ -334,250 +339,257 @@ public abstract class XvideosCore extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, Account account, final boolean isDownload) throws Exception {
-        final String contentURL = this.getContentURL(link);
-        final String urlTitle = getURLTitle(link);
-        if (!link.isNameSet() && urlTitle != null) {
-            link.setName(urlTitle + ".mp4");
-        }
-        br.setFollowRedirects(false);
-        br.getHeaders().put("Accept-Encoding", "gzip");
-        /* 2021-07-07: They seem to ignore this header and set language randomly or by IP or by user-choice! */
-        br.getHeaders().put("Accept-Language", "en-gb");
-        if (account != null) {
-            this.login(account, false);
-        }
-        final boolean useLanguageSwitcherHandling = true;
-        if (useLanguageSwitcherHandling) {
-            /**
-             * Use this to prefer English language. </br>
-             * 2021-07-07: Not yet required - only in crawler plugin: Seems like they set the language for the main website/video overview
-             * based on IP and for single videos, default is English(?)
-             */
-            disableAutoTranslation(this, Browser.getHost(contentURL), br);
-        }
-        br.getPage(contentURL);
-        int counter = 0;
-        String videoID = this.getVideoID(link);
-        while (br.getRedirectLocation() != null) {
-            final String redirect = br.getRedirectLocation();
-            /*
-             * 2019-09-30: Only set new URL if it is valid. E.g. when using xvideos2.com (= for india) in germany, it will only redirect us
-             * to their mainpage!
-             */
-            if (this.canHandle(redirect) && videoID != null && redirect.contains(videoID)) {
-                logger.info("Setting new PluginPatternMatcher: " + redirect);
-                link.setPluginPatternMatcher(redirect);
-            } else {
-                logger.info("Progressing to redirect WITHOUT setting new PluginPatternMatcher: " + redirect);
+        try {
+            final String contentURL = this.getContentURL(link);
+            final String urlTitle = getURLTitle(link);
+            if (!link.isNameSet() && urlTitle != null) {
+                link.setName(urlTitle + ".mp4");
             }
-            if (counter >= 10) {
-                /* This should never happen */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Too many redirects");
-            }
-            br.getPage(redirect);
-            counter += 1;
-        }
-        if (br.containsHTML("(?i)(This video has been deleted|Page not found|>Sorry, this video is not available\\.|>We received a request to have this video deleted|class=\"inlineError\")")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!this.canHandle(br.getURL())) {
-            /* 2020-12-15: E.g. redirect to mainpage */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        /* Original title (independent from selected language) */
-        String filename = br.getRegex("\"video_title_ori\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-        if (filename == null) {
-            /* Can be translated titles */
-            filename = br.getRegex("\"video_title\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-            if (filename == null) {
-                filename = br.getRegex("(?i)<title>([^<>\"]*?)\\- XVIDEOS\\.COM</title>").getMatch(0);
-            }
-        }
-        {
-            /* Set packagizer properties */
-            final String uploadername = PluginJSonUtils.getJson(br, "uploader");
-            if (StringUtils.isEmpty(link.getStringProperty(PROPERTY_USERNAME)) && !StringUtils.isEmpty(uploadername)) {
-                link.setProperty(PROPERTY_USERNAME, uploadername);
-            }
-            final String[] tagsList = br.getRegex("<a[^>]*href=\"/tags/([^\"]+)\"[^>]*class=\"btn btn-default\"[^>]*>").getColumn(0);
-            if (tagsList.length > 0) {
-                final StringBuilder sb = new StringBuilder();
-                for (String tag : tagsList) {
-                    tag = Encoding.htmlDecode(tag).trim();
-                    if (StringUtils.isNotEmpty(tag)) {
-                        if (sb.length() > 0) {
-                            sb.append(",");
-                        }
-                        sb.append(tag);
-                    }
-                }
-                if (sb.length() > 0) {
-                    link.setProperty(PROPERTY_TAGS, sb.toString());
-                }
-            }
-        }
-        videoID = getVideoID(this.br, link);
-        if (videoID == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        if (filename != null) {
-            filename = Encoding.unicodeDecode(filename);
-            filename = Encoding.htmlDecode(filename);
-            filename = videoID + "_" + filename.trim();
-            link.setFinalFileName(filename + ".mp4");
-        } else {
-            logger.warning("Failed to find nice final filename");
-        }
-        final XvideosComConfigCore config = getConfigInterface() != null ? PluginJsonConfig.get(getConfigInterface()) : null;
-        if (isDownload || (config != null && !config.isEnableFastLinkcheckForHostPlugin())) {
-            final String hlsMaster = br.getRegex("setVideoHLS\\('(.*?)'\\)").getMatch(0);
-            /**
-             * 2021-01-27: This website can "shadow ban" users who download "too much". They will then deliver all videos in 240p only. This
-             * is an attempt to detect this.</br>
-             * See also: https://board.jdownloader.org/showthread.php?t=86587 </br>
-             * Do not check when premium account is given because it usually allows official downloads so downloads will work fine even if
-             * HLS streaming is not available.
-             */
-            final boolean lowQualityBlockDetected = StringUtils.isEmpty(hlsMaster) && (account == null || account.getType() != AccountType.PREMIUM) && config != null && config.isTryToRecognizeLimit() && isDownload;
-            if (config == null || config.isPreferHLSStreamDownload()) {
-                logger.info("User prefers HLS download");
-                if (StringUtils.isNotEmpty(hlsMaster)) {
-                    logger.info("FoundHlsMaster --> Looking for preferred quality");
-                    final Browser m3u8 = br.cloneBrowser();
-                    m3u8.getPage(hlsMaster);
-                    final int preferredHLSQuality = getPreferredHLSQuality();
-                    HlsContainer userPreferredQuality = null;
-                    final List<HlsContainer> hlsqualities = HlsContainer.getHlsQualities(m3u8);
-                    for (final HlsContainer currentQuality : hlsqualities) {
-                        final int width = currentQuality.getHeight();
-                        if (width == preferredHLSQuality) {
-                            /* We found the quality our user prefers. */
-                            userPreferredQuality = currentQuality;
-                            break;
-                        }
-                    }
-                    final HlsContainer chosenQuality;
-                    if (userPreferredQuality != null) {
-                        chosenQuality = userPreferredQuality;
-                        logger.info("Found user selected HLS quality: " + preferredHLSQuality + ">" + userPreferredQuality.getHeight());
-                    } else {
-                        chosenQuality = HlsContainer.findBestVideoByBandwidth(hlsqualities);
-                        logger.info("Failed to find user-selected HLS quality --> Fallback to BEST: " + chosenQuality.getHeight());
-                    }
-                    link.setProperty(PROPERTY_LAST_USED_DIRECTURL, chosenQuality.getDownloadurl());
-                    if (isDownload) {
-                        this.hlsContainer = chosenQuality;
-                    }
-                    /* Set estimated filesize. */
-                    final List<M3U8Playlist> playLists = M3U8Playlist.loadM3U8(chosenQuality.getDownloadurl(), m3u8);
-                    long estimatedSize = -1;
-                    for (M3U8Playlist playList : playLists) {
-                        if (chosenQuality.getBandwidth() > 0) {
-                            playList.setAverageBandwidth(chosenQuality.getBandwidth());
-                            estimatedSize += playList.getEstimatedSize();
-                        }
-                    }
-                    if (estimatedSize > 0) {
-                        link.setDownloadSize(estimatedSize);
-                    }
-                    return AvailableStatus.TRUE;
-                } else {
-                    logger.info("Failed to find HLS qualities!");
-                }
-            }
-            /**
-             * 2022-09-08: Looks like HLS is available up to 1080p while official downloads are only available for up to 360p (?). </br>
-             * Tested with a free xvideos.com account. </br>
-             * If official download was >= HLS/stream download it would make sense to prefer this over stream download.
-             */
-            String videoURL = null;
+            br.setFollowRedirects(false);
+            br.getHeaders().put("Accept-Encoding", "gzip");
+            /* 2021-07-07: They seem to ignore this header and set language randomly or by IP or by user-choice! */
+            br.getHeaders().put("Accept-Language", "en-gb");
             if (account != null) {
-                /* When logged-in, official downloadlinks can be available */
-                logger.info("Looking for official download ...");
-                final Browser brc = br.cloneBrowser();
-                brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
-                brc.getHeaders().put("x-Requested-With", "XMLHttpRequest");
-                brc.getPage(this.br.getURL("/video-download/" + videoID + "/"));
-                if (brc.getURL().contains(videoID)) {
-                    final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.toString());
-                    String bestQualityDownloadurl = null;
-                    String bestQualityString = null;
-                    String preferredQualityDownloadurl = null;
-                    final String preferredQualityStr = getPreferredOfficialDownloadQualityStr();
-                    final String[] qualities = getOfficialDownloadQualitiesSorted();
-                    for (final String qualityStrTmp : qualities) {
-                        final String downloadURLTmp = (String) entries.get(qualityStrTmp);
-                        if (!StringUtils.isEmpty(downloadURLTmp)) {
-                            if (bestQualityDownloadurl == null) {
-                                bestQualityDownloadurl = downloadURLTmp;
-                                bestQualityString = qualityStrTmp;
+                this.login(account, false);
+            }
+            final boolean useLanguageSwitcherHandling = true;
+            if (useLanguageSwitcherHandling) {
+                /**
+                 * Use this to prefer English language. </br>
+                 * 2021-07-07: Not yet required - only in crawler plugin: Seems like they set the language for the main website/video
+                 * overview based on IP and for single videos, default is English(?)
+                 */
+                disableAutoTranslation(this, Browser.getHost(contentURL), br);
+            }
+            br.getPage(contentURL);
+            int counter = 0;
+            String videoID = this.getVideoID(link);
+            while (br.getRedirectLocation() != null) {
+                final String redirect = br.getRedirectLocation();
+                /*
+                 * 2019-09-30: Only set new URL if it is valid. E.g. when using xvideos2.com (= for india) in germany, it will only redirect
+                 * us to their mainpage!
+                 */
+                if (this.looksLikeSupportedLink(redirect) && videoID != null && redirect.contains(videoID)) {
+                    logger.info("Setting new PluginPatternMatcher: " + redirect);
+                    link.setPluginPatternMatcher(redirect);
+                } else {
+                    logger.info("Progressing to redirect WITHOUT setting new PluginPatternMatcher: " + redirect);
+                }
+                if (counter >= 10) {
+                    /* This should never happen */
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Too many redirects");
+                }
+                br.getPage(redirect);
+                counter += 1;
+            }
+            if (br.containsHTML("(This video has been deleted|Page not found|>Sorry, this video is not available\\.|>We received a request to have this video deleted|class=\"inlineError\")")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (!this.looksLikeSupportedLink(br.getURL())) {
+                /* 2020-12-15: E.g. redirect to mainpage */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            /* Original title (independent from selected language) */
+            String filename = br.getRegex("\"video_title_ori\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+            if (filename == null) {
+                /* Can be translated titles */
+                filename = br.getRegex("\"video_title\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+                if (filename == null) {
+                    filename = br.getRegex("(?i)<title>([^<>\"]*?)\\- XVIDEOS\\.COM</title>").getMatch(0);
+                }
+            }
+            {
+                /* Set packagizer properties */
+                final String uploadername = PluginJSonUtils.getJson(br, "uploader");
+                if (StringUtils.isEmpty(link.getStringProperty(PROPERTY_USERNAME)) && !StringUtils.isEmpty(uploadername)) {
+                    link.setProperty(PROPERTY_USERNAME, uploadername);
+                }
+                final String[] tagsList = br.getRegex("<a[^>]*href=\"/tags/([^\"]+)\"[^>]*class=\"btn btn-default\"[^>]*>").getColumn(0);
+                if (tagsList.length > 0) {
+                    final StringBuilder sb = new StringBuilder();
+                    for (String tag : tagsList) {
+                        tag = Encoding.htmlDecode(tag).trim();
+                        if (StringUtils.isNotEmpty(tag)) {
+                            if (sb.length() > 0) {
+                                sb.append(",");
                             }
-                            if (StringUtils.equals(qualityStrTmp, preferredQualityStr)) {
-                                preferredQualityDownloadurl = downloadURLTmp;
+                            sb.append(tag);
+                        }
+                    }
+                    if (sb.length() > 0) {
+                        link.setProperty(PROPERTY_TAGS, sb.toString());
+                    }
+                }
+            }
+            videoID = getVideoID(this.br, link);
+            if (videoID == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            if (filename != null) {
+                filename = Encoding.unicodeDecode(filename);
+                filename = Encoding.htmlDecode(filename);
+                filename = videoID + "_" + filename.trim();
+                link.setFinalFileName(filename + ".mp4");
+            } else {
+                logger.warning("Failed to find nice final filename");
+            }
+            final XvideosComConfigCore config = getConfigInterface() != null ? PluginJsonConfig.get(getConfigInterface()) : null;
+            if (isDownload || (config != null && !config.isEnableFastLinkcheckForHostPlugin())) {
+                final String hlsMaster = br.getRegex("setVideoHLS\\('(.*?)'\\)").getMatch(0);
+                /**
+                 * 2021-01-27: This website can "shadow ban" users who download "too much". They will then deliver all videos in 240p only.
+                 * This is an attempt to detect this.</br>
+                 * See also: https://board.jdownloader.org/showthread.php?t=86587 </br>
+                 * Do not check when premium account is given because it usually allows official downloads so downloads will work fine even
+                 * if HLS streaming is not available.
+                 */
+                final boolean lowQualityBlockDetected = StringUtils.isEmpty(hlsMaster) && (account == null || account.getType() != AccountType.PREMIUM) && config != null && config.isTryToRecognizeLimit() && isDownload;
+                if (config == null || config.isPreferHLSStreamDownload()) {
+                    logger.info("User prefers HLS download");
+                    if (StringUtils.isNotEmpty(hlsMaster)) {
+                        logger.info("FoundHlsMaster --> Looking for preferred quality");
+                        final Browser m3u8 = br.cloneBrowser();
+                        m3u8.getPage(hlsMaster);
+                        final int preferredHLSQuality = getPreferredHLSQuality();
+                        HlsContainer userPreferredQuality = null;
+                        final List<HlsContainer> hlsqualities = HlsContainer.getHlsQualities(m3u8);
+                        for (final HlsContainer currentQuality : hlsqualities) {
+                            final int width = currentQuality.getHeight();
+                            if (width == preferredHLSQuality) {
+                                /* We found the quality our user prefers. */
+                                userPreferredQuality = currentQuality;
                                 break;
                             }
                         }
-                    }
-                    if (preferredQualityDownloadurl != null) {
-                        logger.info("Using user selected quality: " + preferredQualityStr);
-                        videoURL = preferredQualityDownloadurl;
-                    } else if (bestQualityDownloadurl != null) {
-                        logger.info("Using best quality: " + bestQualityString);
-                        videoURL = bestQualityDownloadurl;
+                        final HlsContainer chosenQuality;
+                        if (userPreferredQuality != null) {
+                            chosenQuality = userPreferredQuality;
+                            logger.info("Found user selected HLS quality: " + preferredHLSQuality + ">" + userPreferredQuality.getHeight());
+                        } else {
+                            chosenQuality = HlsContainer.findBestVideoByBandwidth(hlsqualities);
+                            logger.info("Failed to find user-selected HLS quality --> Fallback to BEST: " + chosenQuality.getHeight());
+                        }
+                        link.setProperty(PROPERTY_LAST_USED_DIRECTURL, chosenQuality.getDownloadurl());
+                        if (isDownload) {
+                            this.hlsContainer = chosenQuality;
+                        }
+                        /* Set estimated filesize. */
+                        final List<M3U8Playlist> playLists = M3U8Playlist.loadM3U8(chosenQuality.getDownloadurl(), m3u8);
+                        long estimatedSize = -1;
+                        for (M3U8Playlist playList : playLists) {
+                            if (chosenQuality.getBandwidth() > 0) {
+                                playList.setAverageBandwidth(chosenQuality.getBandwidth());
+                                estimatedSize += playList.getEstimatedSize();
+                            }
+                        }
+                        if (estimatedSize > 0) {
+                            link.setDownloadSize(estimatedSize);
+                        }
+                        return AvailableStatus.TRUE;
                     } else {
-                        logger.warning("Failed to find any official downloads -> json has changed?");
+                        logger.info("Failed to find HLS qualities!");
                     }
-                } else {
-                    /*
-                     * Either user has a free account or something with the login went wrong. All premium users should be able to download
-                     * via download button!
-                     */
-                    logger.info("No official video download possible");
+                }
+                /**
+                 * 2022-09-08: Looks like HLS is available up to 1080p while official downloads are only available for up to 360p (?). </br>
+                 * Tested with a free xvideos.com account. </br>
+                 * If official download was >= HLS/stream download it would make sense to prefer this over stream download.
+                 */
+                String videoURL = null;
+                if (account != null) {
+                    /* When logged-in, official downloadlinks can be available */
+                    logger.info("Looking for official download ...");
+                    final Browser brc = br.cloneBrowser();
+                    brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
+                    brc.getHeaders().put("x-Requested-With", "XMLHttpRequest");
+                    brc.getPage(this.br.getURL("/video-download/" + videoID + "/"));
+                    if (brc.getURL().contains(videoID)) {
+                        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.toString());
+                        String bestQualityDownloadurl = null;
+                        String bestQualityString = null;
+                        String preferredQualityDownloadurl = null;
+                        final String preferredQualityStr = getPreferredOfficialDownloadQualityStr();
+                        final String[] qualities = getOfficialDownloadQualitiesSorted();
+                        for (final String qualityStrTmp : qualities) {
+                            final String downloadURLTmp = (String) entries.get(qualityStrTmp);
+                            if (!StringUtils.isEmpty(downloadURLTmp)) {
+                                if (bestQualityDownloadurl == null) {
+                                    bestQualityDownloadurl = downloadURLTmp;
+                                    bestQualityString = qualityStrTmp;
+                                }
+                                if (StringUtils.equals(qualityStrTmp, preferredQualityStr)) {
+                                    preferredQualityDownloadurl = downloadURLTmp;
+                                    break;
+                                }
+                            }
+                        }
+                        if (preferredQualityDownloadurl != null) {
+                            logger.info("Using user selected quality: " + preferredQualityStr);
+                            videoURL = preferredQualityDownloadurl;
+                        } else if (bestQualityDownloadurl != null) {
+                            logger.info("Using best quality: " + bestQualityString);
+                            videoURL = bestQualityDownloadurl;
+                        } else {
+                            logger.warning("Failed to find any official downloads -> json has changed?");
+                        }
+                    } else {
+                        /*
+                         * Either user has a free account or something with the login went wrong. All premium users should be able to
+                         * download via download button!
+                         */
+                        logger.info("No official video download possible");
+                    }
+                    if (StringUtils.isEmpty(videoURL)) {
+                        logger.info("Failed to find any official downloadlink");
+                    }
                 }
                 if (StringUtils.isEmpty(videoURL)) {
-                    logger.info("Failed to find any official downloadlink");
+                    /* Download http streams */
+                    final PreferredHTTPQuality qualityhttp = getPreferredHTTPQuality();
+                    boolean foundValidURL = false;
+                    String httpVideoURL = null;
+                    switch (qualityhttp) {
+                    case HIGH:
+                        httpVideoURL = getVideoHigh(br);
+                        if (isValidVideoURL(link, httpVideoURL, true)) {
+                            foundValidURL = true;
+                            break;
+                        }
+                    case LOW:
+                        httpVideoURL = getVideoLow(br);
+                        if (isValidVideoURL(link, httpVideoURL, true)) {
+                            foundValidURL = true;
+                            break;
+                        }
+                    default:
+                        httpVideoURL = getVideoFlv(br);
+                        if (isValidVideoURL(link, httpVideoURL, true)) {
+                            foundValidURL = true;
+                            break;
+                        }
+                    }
+                    if (foundValidURL && httpVideoURL != null) {
+                        videoURL = Encoding.htmlOnlyDecode(httpVideoURL);
+                    }
+                }
+                if (videoURL != null) {
+                    link.setProperty(PROPERTY_LAST_USED_DIRECTURL, videoURL);
+                }
+                if (StringUtils.isEmpty(videoURL)) {
+                    throw new AccountRequiredException();
+                } else if (lowQualityBlockDetected) {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Low quality block active", 60 * 60 * 1000l);
+                } else if (isDownload) {
+                    streamURL = videoURL;
                 }
             }
-            if (StringUtils.isEmpty(videoURL)) {
-                /* Download http streams */
-                final PreferredHTTPQuality qualityhttp = getPreferredHTTPQuality();
-                boolean foundValidURL = false;
-                String httpVideoURL = null;
-                switch (qualityhttp) {
-                case HIGH:
-                    httpVideoURL = getVideoHigh(br);
-                    if (isValidVideoURL(link, httpVideoURL, true)) {
-                        foundValidURL = true;
-                        break;
-                    }
-                case LOW:
-                    httpVideoURL = getVideoLow(br);
-                    if (isValidVideoURL(link, httpVideoURL, true)) {
-                        foundValidURL = true;
-                        break;
-                    }
-                default:
-                    httpVideoURL = getVideoFlv(br);
-                    if (isValidVideoURL(link, httpVideoURL, true)) {
-                        foundValidURL = true;
-                        break;
-                    }
-                }
-                if (foundValidURL && httpVideoURL != null) {
-                    videoURL = Encoding.htmlOnlyDecode(httpVideoURL);
-                }
+        } catch (final AccountRequiredException e) {
+            if (isDownload) {
+                throw e;
             }
-            if (videoURL != null) {
-                link.setProperty(PROPERTY_LAST_USED_DIRECTURL, videoURL);
-            }
-            if (StringUtils.isEmpty(videoURL)) {
-                throw new AccountRequiredException();
-            } else if (lowQualityBlockDetected) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Low quality block active", 60 * 60 * 1000l);
-            } else if (isDownload) {
-                streamURL = videoURL;
-            }
+            /* Catch this exception if it happens during linkcheck */
         }
         return AvailableStatus.TRUE;
     }

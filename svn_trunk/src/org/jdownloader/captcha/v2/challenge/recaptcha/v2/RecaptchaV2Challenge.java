@@ -59,7 +59,7 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         return siteKey;
     }
 
-    public static class RecaptchaV2APIStorable implements Storable {
+    public static class RecaptchaV2APIStorable implements Storable, AbstractBrowserChallengeAPIStorable {
         public RecaptchaV2APIStorable() {
         }
 

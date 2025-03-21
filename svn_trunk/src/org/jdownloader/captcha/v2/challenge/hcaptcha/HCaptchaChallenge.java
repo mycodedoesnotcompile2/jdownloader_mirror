@@ -45,7 +45,7 @@ public class HCaptchaChallenge extends AbstractBrowserChallenge {
         return AbstractHCaptcha.TYPE.NORMAL.name();
     };
 
-    public static class HCaptchaAPIStorable implements Storable {
+    public static class HCaptchaAPIStorable implements Storable, AbstractBrowserChallengeAPIStorable {
         public HCaptchaAPIStorable() {
         }
 

@@ -89,14 +89,15 @@ import org.jdownloader.settings.AccountSettings;
 public class AccountController implements AccountControllerListener, AccountPropertyChangeHandler {
     private static final long                                                    serialVersionUID = -7560087582989096645L;
     private final HashMap<String, List<Account>>                                 ACCOUNTS;
+    @Deprecated
     private final HashMap<String, Map<Account, Object>>                          MULTIHOSTER_ACCOUNTS;
     private static AccountController                                             INSTANCE         = new AccountController();
     private final Eventsender<AccountControllerListener, AccountControllerEvent> broadcaster      = new Eventsender<AccountControllerListener, AccountControllerEvent>() {
-        @Override
-        protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
-            listener.onAccountControllerEvent(event);
-        }
-    };
+                                                                                                      @Override
+                                                                                                      protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
+                                                                                                          listener.onAccountControllerEvent(event);
+                                                                                                      }
+                                                                                                  };
 
     public Eventsender<AccountControllerListener, AccountControllerEvent> getEventSender() {
         return broadcaster;
@@ -886,6 +887,7 @@ public class AccountController implements AccountControllerListener, AccountProp
         }
     }
 
+    @Deprecated
     public List<Account> getMultiHostAccounts(final String host) {
         if (host == null) {
             return null;
@@ -897,16 +899,6 @@ public class AccountController implements AccountControllerListener, AccountProp
             }
         }
         return null;
-    }
-
-    public boolean hasMultiHostAccounts(final String host) {
-        if (host == null) {
-            return false;
-        }
-        synchronized (AccountController.this) {
-            final Map<Account, Object> list = MULTIHOSTER_ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
-            return list != null && list.size() > 0;
-        }
     }
 
     public static String createFullBuyPremiumUrl(String buyPremiumUrl, String id) {

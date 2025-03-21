@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50831 $", interfaceVersion = 3, names = {}, urls = {})
 public class XfreeCom extends PluginForHost {
     public XfreeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,12 +118,16 @@ public class XfreeCom extends PluginForHost {
             /* Extract title from URL */
             title = UrlQuery.parse(br.getURL()).get("title");
         }
-        dllink = br.getRegex("property=\"og:video\" content=\"([^\"]+)").getMatch(0);
         if (title != null) {
             title = Encoding.htmlDecode(title);
             title = title.trim();
             link.setFinalFileName(title + extDefault);
         }
+        if (br.containsHTML("mimeType:\"audio")) {
+            /* E.g. /video?id=505648 */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported media type 'Audio with images'");
+        }
+        dllink = br.getRegex("property=\"og:video\" content=\"([^\"]+)").getMatch(0);
         if (!StringUtils.isEmpty(dllink)) {
             this.basicLinkCheck(br, br.createHeadRequest(dllink), link, title, extDefault);
         }

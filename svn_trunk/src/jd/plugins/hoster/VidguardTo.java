@@ -51,10 +51,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49283 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50834 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidguardTo extends PluginForHost {
     public VidguardTo(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -64,13 +71,13 @@ public class VidguardTo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://vidguard.to/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidguard.to", "vid-guard.com", "vgfplay.com", "vgembed.com", "v6embed.xyz", "vembed.net", "bembed.net", "listeamed.net" });
+        ret.add(new String[] { "vidguard.to", "vid-guard.com", "vgfplay.com", "vgembed.com", "v6embed.xyz", "vembed.net", "bembed.net", "listeamed.net", "moflix-stream.day" });
         return ret;
     }
 
@@ -118,8 +125,9 @@ public class VidguardTo extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    private final Pattern PATTERN_VIDEO_EMBED = Pattern.compile("(?i)https?://[^/]+/e/(.+)");
-    private final Pattern PATTERN_VIDEO_VIEW  = Pattern.compile("(?i)https?://[^/]+/v/(.+)");
+    private final Pattern PATTERN_VIDEO_EMBED    = Pattern.compile("/e/(.+)", Pattern.CASE_INSENSITIVE);
+    private final Pattern PATTERN_VIDEO_VIEW     = Pattern.compile("/v/(.+)", Pattern.CASE_INSENSITIVE);
+    private final Pattern PATTERN_VIDEO_DOWNLOAD = Pattern.compile("/d/(.+)", Pattern.CASE_INSENSITIVE);
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
@@ -130,9 +138,14 @@ public class VidguardTo extends PluginForHost {
             link.setName(fuid + extDefault);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         String filename;
-        if (new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO_EMBED).patternFind()) {
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO_DOWNLOAD).patternFind()) {
+            br.getPage("https://" + this.getHost() + new URL(link.getPluginPatternMatcher()).getPath());
+            filename = br.getRegex("<h4>Download ([^<]+)</h4>").getMatch(0);
+            if (filename == null) {
+                filename = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+            }
+        } else if (new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO_EMBED).patternFind()) {
             /* Embed-URL */
             br.getPage("https://" + this.getHost() + new URL(link.getPluginPatternMatcher()).getPath());
             filename = br.getRegex("name=\"twitter:title\" content=\"([^\"]+)").getMatch(0);
@@ -154,6 +167,8 @@ public class VidguardTo extends PluginForHost {
             /* Extension is not always given but we can be sure that this filehost is only hosting video content! */
             filename = this.applyFilenameExtension(filename, extDefault);
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
@@ -166,6 +181,7 @@ public class VidguardTo extends PluginForHost {
     }
 
     private String getUrlPathVideoView(final String fuid) {
+        /* 2025-03-20: This type of link does not exist anymore? */
         return "/v/" + fuid;
     }
 
@@ -190,17 +206,16 @@ public class VidguardTo extends PluginForHost {
         } else {
             requestFileInformation(link);
             final String fuid = this.getFID(link);
-            if (!new Regex(br.getURL(), PATTERN_VIDEO_VIEW).patternFind()) {
-                br.getPage(getUrlPathVideoView(fuid));
-            }
-            final String nextStepURL = this.getUrlPathVideoDownload(fuid);
-            if (!br.containsHTML(nextStepURL)) {
-                /* TODO: Implement embed stream download: https://svn.jdownloader.org/issues/90418 */
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Video download has been disabled by uploader");
-            }
-            br.getPage(nextStepURL);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404");
+            final String pathVideoDownload = this.getUrlPathVideoDownload(fuid);
+            if (new Regex(br.getURL(), PATTERN_VIDEO_DOWNLOAD).patternFind()) {
+                /* We are already on download page */
+                logger.info("We are already on download page -> Download looks to be possible");
+            } else {
+                /* Check if download is possible */
+                br.getPage(pathVideoDownload);
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404");
+                }
             }
             final Browser brc = br.cloneBrowser();
             brc.setAllowedResponseCodes(400);
@@ -233,17 +248,18 @@ public class VidguardTo extends PluginForHost {
             final int fontSizeCaptchaDescription = 9;
             graphic.setFont(new Font(ImageProvider.getDrawFontName(), Font.BOLD, fontSizeCaptchaDescription));
             final String captchaExplanationText;
-            final String[] textRows;
+            final String[] textRowsForImage;
             if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
                 captchaExplanationText = "Klicke auf alle Zeichen aus dem Beispielbild und bestätige durch Klick auf 'Senden'.";
-                textRows = new String[] { "Klicke die Zeichen aus dem", "Beispielbild der Reihenfolge", "nach an und bestätige mit Ok.", "<--- Beispielbild" };
+                textRowsForImage = new String[] { "Klicke die Zeichen aus dem", "Beispielbild der Reihenfolge", "nach an und bestätige mit Ok.", "<--- Beispielbild" };
             } else {
                 captchaExplanationText = "Click the characters in order and confirm by clicking on 'Send'.";
-                textRows = new String[] { "Click on all characters you can", "see inside the example image", "in order. Hit Ok to confirm.", "<--- Example image" };
+                textRowsForImage = new String[] { "Click on all characters you can", "see inside the example image", "in order. Hit Ok to confirm.", "<--- Example image" };
             }
             try {
+                /* Write instructions into image file. */
                 int textRowPosition = 1;
-                for (final String textRow : textRows) {
+                for (final String textRow : textRowsForImage) {
                     graphic.drawString(textRow, exampleImage.getWidth() + 1, fontSizeCaptchaDescription * textRowPosition);
                     textRowPosition++;
                 }
@@ -289,25 +305,30 @@ public class VidguardTo extends PluginForHost {
             }
             // Valid answer: {"token":"<hash[a-f]{32}>"}
             /* Access that same URL. Now we should get downloadable direct-urls. */
-            br.getPage(nextStepURL);
+            br.getPage(pathVideoDownload);
+            String dllink = br.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*>\\s*Download").getMatch(0);
             final String[][] qualities = br.getRegex("\"(https?://[^\"]+)\"[^>]*>(\\d+)p</a>").getMatches();
-            if (qualities == null || qualities.length == 0) {
+            if ((qualities == null || qualities.length == 0) && dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            String dllink = null;
-            int maxHeight = 0;
-            for (final String[] qualityInfo : qualities) {
-                final int height = Integer.parseInt(qualityInfo[1]);
-                if (dllink == null || height > maxHeight) {
-                    dllink = qualityInfo[0];
-                    maxHeight = height;
+            if (qualities != null && qualities.length > 0) {
+                /* We have the choice -> Find best quality */
+                int maxHeight = 0;
+                for (final String[] qualityInfo : qualities) {
+                    final int height = Integer.parseInt(qualityInfo[1]);
+                    if (dllink == null || height > maxHeight) {
+                        dllink = qualityInfo[0];
+                        maxHeight = height;
+                    }
                 }
+                if (StringUtils.isEmpty(dllink)) {
+                    logger.warning("Failed to find final downloadurl");
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                logger.info("Chosen qualily: " + maxHeight + "p");
+            } else {
+                logger.info("Found single direct downloadlink");
             }
-            if (StringUtils.isEmpty(dllink)) {
-                logger.warning("Failed to find final downloadurl");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            logger.info("Chosen qualily: " + maxHeight + "p");
             dllink = Encoding.htmlOnlyDecode(dllink);
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(null));
         }
@@ -326,7 +347,7 @@ public class VidguardTo extends PluginForHost {
                 }
             }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -341,7 +362,7 @@ public class VidguardTo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

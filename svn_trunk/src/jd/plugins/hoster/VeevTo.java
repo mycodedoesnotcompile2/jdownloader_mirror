@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50694 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50829 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -58,8 +58,20 @@ public class VeevTo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "veev.to" });
+        ret.add(new String[] { "veev.to", "doods.to" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        /**
+         * 2025-03-20: This domain is not dead but such links will fail even in browser due to wrong domain for their Cloudflare Turnstile
+         * captcha. <br>
+         * Marking it as dead here will work around this problem.
+         */
+        deadDomains.add("doods.to");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

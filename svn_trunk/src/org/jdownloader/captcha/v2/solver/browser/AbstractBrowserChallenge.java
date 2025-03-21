@@ -21,6 +21,17 @@ public abstract class AbstractBrowserChallenge extends Challenge<String> {
     protected final Plugin  plugin;
     protected final Browser pluginBrowser;
 
+    public static interface AbstractBrowserChallengeAPIStorable {
+
+        public String getSiteUrl();
+
+        public String getType();
+
+        public String getSiteKey();
+
+        public String getContextUrl();
+    }
+
     public Plugin getPlugin() {
         return plugin;
     }

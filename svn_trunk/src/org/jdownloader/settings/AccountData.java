@@ -40,6 +40,7 @@ public class AccountData implements Storable {
     private boolean                 specialtraffic;
     private boolean                 concurrentUsePossible = true;
     private boolean                 trafficRefill         = true;
+    private double                  accountBalance;
 
     // Constructor
     public AccountData(/* Storable */) {
@@ -217,6 +218,14 @@ public class AccountData implements Storable {
         this.user = user;
     }
 
+    public double getAccountBalance() {
+        return accountBalance;
+    }
+
+    public void setAccountBalance(double accountBalance) {
+        this.accountBalance = accountBalance;
+    }
+
     /**
      * @return the hosterHistory
      */
@@ -268,6 +277,7 @@ public class AccountData implements Storable {
             ret.trafficUnlimited = ai.isUnlimitedTraffic();
             ret.specialtraffic = ai.isSpecialTraffic();
             ret.statusString = ai.getStatus();
+            ret.accountBalance = ai.getAccountBalance(); // Added this line to store account balance
             ret.infoSupportedhostlist = MultiHostHostData.createFromMultiHostHostList(ai.getMultiHostSupportV2());
         }
         ret.concurrentUsePossible = a.isConcurrentUsePossible();
@@ -292,6 +302,7 @@ public class AccountData implements Storable {
             ai.setValidUntil(validUntil);
             ai.setStatus(statusString);
             ai.setTrafficRefill(trafficRefill);
+            ai.setAccountBalance(accountBalance);
             if (trafficUnlimited) {
                 ai.setUnlimitedTraffic();
             }

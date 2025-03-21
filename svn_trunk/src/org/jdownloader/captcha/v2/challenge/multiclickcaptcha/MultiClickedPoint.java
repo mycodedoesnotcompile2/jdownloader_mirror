@@ -3,7 +3,6 @@ package org.jdownloader.captcha.v2.challenge.multiclickcaptcha;
 import org.appwork.storage.Storable;
 
 public class MultiClickedPoint implements Storable {
-
     private int[] x;
     private int[] y;
 
@@ -11,6 +10,13 @@ public class MultiClickedPoint implements Storable {
     }
 
     public MultiClickedPoint(int[] x, int[] y) {
+        if (x == null || y == null) {
+            throw new IllegalArgumentException();
+        } else if (x.length == 0 || x.length == 0) {
+            throw new IllegalArgumentException();
+        } else if (x.length != y.length) {
+            throw new IllegalArgumentException();
+        }
         this.x = x;
         this.y = y;
     }

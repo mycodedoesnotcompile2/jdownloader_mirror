@@ -3,7 +3,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptcha;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -12,8 +12,8 @@ import jd.plugins.HostPlugin;
 /**
  * Plugin for 2Captcha captcha solving service (https://2captcha.com/).
  */
-@HostPlugin(revision = "$Revision: 50808 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
-public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptcha {
+@HostPlugin(revision = "$Revision: 50838 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
@@ -37,18 +37,15 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
         types.add(CAPTCHA_TYPE.IMAGE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        types.add(CAPTCHA_TYPE.HCAPTCHA);
-        /* TODO: Add implementation for click captchas */
         types.add(CAPTCHA_TYPE.SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.MULTI_CLICK_CAPTCHA);
-        /* TODO: Add implementation for geetest captchas */
-        types.add(CAPTCHA_TYPE.GEETEST_V1);
-        types.add(CAPTCHA_TYPE.GEETEST_V4);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        types.add(CAPTCHA_TYPE.HCAPTCHA);
+        types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
         return types;
     }
 
-    protected String getApiBaseV2() {
+    protected String getApiBase() {
         return "https://api." + getHost();
     }
 

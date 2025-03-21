@@ -9,6 +9,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.PluginForHost;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 /**
@@ -21,12 +22,13 @@ public class AccountFilter {
     private List<AccountType> accountTypes        = null;
     private Boolean           expired             = null;
     private Boolean           temporarilyDisabled = null;
-    private Boolean           multiHost           = null;
+    private Boolean           multiHostAccount    = null;
     private Long              minimumTrafficLeft  = null;
     private Double            minimumBalance      = null;
     private List<FEATURE>     features            = null;
     private Integer           maxResultsNum       = null; // Default: unlimited results
     private String            username            = null;
+    private String            multiHostSupport    = null;
 
     /**
      * Creates a new account filter with no criteria (matches all accounts)
@@ -130,8 +132,13 @@ public class AccountFilter {
      *            true to match only multi-host accounts, false to match only single-host accounts
      * @return this filter for chaining
      */
-    public AccountFilter setMultiHost(Boolean multiHost) {
-        this.multiHost = multiHost;
+    public AccountFilter setMultiHostAccount(Boolean multiHostAccount) {
+        this.multiHostAccount = multiHostAccount;
+        return this;
+    }
+
+    public AccountFilter setMultiHostSupported(String multiHostSupport) {
+        this.multiHostSupport = StringUtils.toLowerCaseOrNull(multiHostSupport);
         return this;
     }
 
@@ -293,6 +300,28 @@ public class AccountFilter {
         return true;
     }
 
+    protected boolean matchesMultiHostSupport(Account account) {
+        final String multiHostSupport = this.multiHostSupport;
+        if (multiHostSupport != null) {
+            if (!account.isMultiHost()) {
+                return false;
+            }
+            AccountInfo ai = account.getAccountInfo();
+            if (ai == null || ai.getMultihostSupportedHost(multiHostSupport) == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    protected boolean matchesMultiHostAccount(Account account) {
+        final Boolean multiHostAccount = this.multiHostAccount;
+        if (multiHostAccount != null && multiHostAccount != account.isMultiHost()) {
+            return false;
+        }
+        return true;
+    }
+
     /**
      * Check if an account matches the filter criteria
      *
@@ -319,8 +348,11 @@ public class AccountFilter {
             return false;
         }
         // Check multiHost
-        final Boolean multiHost = this.multiHost;
-        if (multiHost != null && multiHost != account.isMultiHost()) {
+        if (!matchesMultiHostAccount(account)) {
+            return false;
+        }
+        // Check supported multiHost host
+        if (!matchesMultiHostSupport(account)) {
             return false;
         }
         // Check hosts list

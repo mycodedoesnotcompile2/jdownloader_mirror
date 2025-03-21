@@ -22,11 +22,12 @@ import org.jdownloader.plugins.components.config.XvideosComConfig;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 
-@HostPlugin(revision = "$Revision: 50210 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50841 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XvideosComProfile.class })
 public class XvideosCom extends XvideosCore {
     public XvideosCom(PluginWrapper wrapper) {
@@ -100,7 +101,7 @@ public class XvideosCom extends XvideosCore {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -110,7 +111,7 @@ public class XvideosCom extends XvideosCore {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -121,7 +122,7 @@ public class XvideosCom extends XvideosCore {
             return null;
         }
         String newURL;
-        if (link.getPluginPatternMatcher().matches(type_normal_dot) || link.getPluginPatternMatcher().matches(type_click)) {
+        if (new Regex(link.getPluginPatternMatcher(), TYPE_NORMAL_DOT).patternFind() || new Regex(link.getPluginPatternMatcher(), TYPE_CLICK).patternFind()) {
             newURL = "https://www." + urlHost + "/video." + videoID;
         } else {
             newURL = "https://www." + urlHost + "/video" + videoID;

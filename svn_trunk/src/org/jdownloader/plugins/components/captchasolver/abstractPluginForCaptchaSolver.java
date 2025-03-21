@@ -2,14 +2,6 @@ package org.jdownloader.plugins.components.captchasolver;
 
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.controlling.captcha.SkipException;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.PluginForHost;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -18,12 +10,20 @@ import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaCategoryChallenge;
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaPuzzleChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
-import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.plugins.controller.LazyPlugin;
+
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.PluginForHost;
 
 /**
  * Abstract base class for captcha solver plugins.
@@ -112,7 +112,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         KEY_CAPTCHA {
             @Override
             public boolean canHandle(Challenge<?> c) {
-                return false;
+                return c instanceof KeyCaptchaPuzzleChallenge || c instanceof KeyCaptchaCategoryChallenge;
             }
         };
 
@@ -136,6 +136,11 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             }
             return null;
         }
+    }
+
+    /** Returns false if the solver does not have enough balance to solve the given captcha challenge. */
+    public boolean enoughBalanceFor(final Challenge<?> c, final Account account) throws Exception {
+        return true;
     }
 
     /**
@@ -184,12 +189,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         }
     }
 
-    // @Override
-    // public boolean isPremiumEnabled() {
-    // /* Every paid captcha solver needs a paid "premium" account in order to use it. */
-    // return true;
-    // }
-
     public abstract String getBuyPremiumUrl();
 
     /**
@@ -219,7 +218,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return true if the report was successfully sent, false otherwise
      */
     public abstract boolean setValid(final AbstractResponse<?> response);
-
     // public boolean setUnused(AbstractResponse<?> response) {
     // return false;
     // }
@@ -254,7 +252,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     @Override
     public abstract AccountInfo fetchAccountInfo(final Account account) throws Exception;
 
-    public abstract void solve(CESSolverJob<?> solverJob, Account account) throws InterruptedException, SolverException, SkipException;
+    public abstract void solve(CESSolverJob<?> job, Account account) throws Exception;
 
     public boolean validateBlackWhite(Challenge<?> c) {
         // TODO: Add functionality

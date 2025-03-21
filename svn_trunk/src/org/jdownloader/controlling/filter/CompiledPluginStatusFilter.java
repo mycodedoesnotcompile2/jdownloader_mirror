@@ -1,11 +1,9 @@
 package org.jdownloader.controlling.filter;
 
-import java.util.List;
-
 import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter;
-import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 
 import org.appwork.storage.Storable;
@@ -54,17 +52,11 @@ public class CompiledPluginStatusFilter extends PluginStatusFilter implements St
         if (link.isDirectHTTP() || link.isFTP()) {
             return true;
         }
-        if (AccountController.getInstance().hasAccount(link.getHost(), Boolean.TRUE, Boolean.TRUE, null, null)) {
-            final List<Account> accounts = AccountController.getInstance().getValidAccounts(link.getHost());
-            if (accounts != null && accounts.size() > 0) {
-                return true;
-            }
+        if (AccountController.getInstance().listAccounts(new AccountFilter().setEnabled(true).setValid(true).setTemporarilyDisabled(false).setMaxResultsNum(1).setHosts(link.getHost())).size() > 0) {
+            return true;
         }
-        if (AccountController.getInstance().hasMultiHostAccounts(link.getHost())) {
-            final List<Account> accounts = AccountController.getInstance().getMultiHostAccounts(link.getHost());
-            if (accounts != null && accounts.size() > 0) {
-                return true;
-            }
+        if (AccountController.getInstance().listAccounts(new AccountFilter().setEnabled(true).setValid(true).setTemporarilyDisabled(false).setMaxResultsNum(1).setMultiHostSupported(link.getHost())).size() > 0) {
+            return true;
         }
         return false;
     }
@@ -80,31 +72,11 @@ public class CompiledPluginStatusFilter extends PluginStatusFilter implements St
         if (link.isDirectHTTP() || link.isFTP()) {
             return true;
         }
-        if (AccountController.getInstance().hasAccount(link.getHost(), Boolean.TRUE, Boolean.TRUE, null, null)) {
-            final List<Account> accounts = AccountController.getInstance().getValidAccounts(link.getHost());
-            if (accounts != null) {
-                for (final Account accountToVerify : accounts) {
-                    if (AccountType.PREMIUM.equals(accountToVerify.getType())) {
-                        long lgValidUntil = accountToVerify.getValidPremiumUntil();
-                        if (lgValidUntil < 0 || lgValidUntil > System.currentTimeMillis()) {
-                            return true;
-                        }
-                    }
-                }
-            }
+        if (AccountController.getInstance().listAccounts(new AccountFilter().setEnabled(true).setAccountTypes(AccountType.PREMIUM, AccountType.LIFETIME).setValid(true).setExpired(false).setTemporarilyDisabled(false).setMaxResultsNum(1).setHosts(link.getHost())).size() > 0) {
+            return true;
         }
-        if (AccountController.getInstance().hasMultiHostAccounts(link.getHost())) {
-            final List<Account> accounts = AccountController.getInstance().getMultiHostAccounts(link.getHost());
-            if (accounts != null) {
-                for (final Account accountToVerify : accounts) {
-                    if (AccountType.PREMIUM.equals(accountToVerify.getType())) {
-                        long lgValidUntil = accountToVerify.getValidPremiumUntil();
-                        if (lgValidUntil < 0 || lgValidUntil > System.currentTimeMillis()) {
-                            return true;
-                        }
-                    }
-                }
-            }
+        if (AccountController.getInstance().listAccounts(new AccountFilter().setEnabled(true).setAccountTypes(AccountType.PREMIUM, AccountType.LIFETIME).setValid(true).setExpired(false).setTemporarilyDisabled(false).setMaxResultsNum(1).setMultiHostSupported(link.getHost())).size() > 0) {
+            return true;
         }
         return false;
     }

@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 50763 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50831 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -147,10 +147,12 @@ public class TwitterComCrawler extends PluginForDecrypt {
     private final String                   API_BASE_GRAPHQL                                                 = "https://x.com/i/api/graphql";
     private static Map<String, String>     graphqlQueryids                                                  = new HashMap<String, String>();
     /**
-     * Enabled Juli 2023: https://www.reuters.com/technology/twitter-now-needs-users-sign-view-tweets-2023-06-30/ </br>
-     * Disabled August 2023: https://techcrunch.com/2023/07/05/twitter-silently-removes-login-requirement-for-viewing-tweets/
+     * Enabled Juli 2023: https://www.reuters.com/technology/twitter-now-needs-users-sign-view-tweets-2023-06-30/ <br>
+     * Disabled August 2023: https://techcrunch.com/2023/07/05/twitter-silently-removes-login-requirement-for-viewing-tweets/ <br>
+     * 2025-03-20: Enabled this again as the webAPI nearly always requires authentication since this incident:
+     * https://www.theguardian.com/technology/2025/mar/10/elon-musk-cyberattack-x-outages
      */
-    public static final boolean            ACCOUNT_IS_ALWAYS_REQUIRED                                       = false;
+    public static final boolean            ACCOUNT_IS_ALWAYS_REQUIRED                                       = true;
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
