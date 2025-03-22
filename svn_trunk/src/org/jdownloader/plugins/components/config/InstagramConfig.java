@@ -6,7 +6,6 @@ import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DefaultStringValue;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
@@ -17,133 +16,108 @@ import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "instagram.com", type = Type.HOSTER)
 public interface InstagramConfig extends PluginConfigInterface {
-    final String                    text_PostCrawlerAddPostDescriptionAsTextfile      = "Post crawler: Add post description as textfile?";
-    final String                    text_PostCrawlerPackagenameSchemeType             = "Post crawler: Package name scheme type for /p/<id>";
-    final String                    text_PostCrawlerPackagenameScheme                 = "Post crawler: Custom package name scheme for /p/<id>";
-    final String                    text_StoryPackagenameSchemeType                   = "Story crawler: Package name scheme type for /stories/username/<storyID>/ URLs";
-    final String                    text_StoryPackagenameScheme                       = "Story crawler: Custom package name scheme for /stories/username/<storyID>/";
-    final String                    text_StoriesHighlightsPackagenameSchemeType       = "Story highlights crawler: Package name scheme type for /stories/highlights/<storyID>/";
-    final String                    text_StoriesHighlightsPackagenameScheme           = "Story highlights crawler: Custom package name scheme for /stories/highlights/<storyID>/";
-    final String                    text_FilenameType                                 = "File name type for all crawled media items";
-    final String                    text_FilenameScheme                               = "Custom filenames: Filename scheme";
-    final String                    text_AddDateToFilenames                           = "Default file names: Include date (yyyy-MM-dd) in filenames?";
-    final String                    text_AddOrderidToFilenames                        = "Default file names: Include 'order-ID' in file names if an album contains more than one element?";
-    final String                    text_AddShortcodeToFilenames                      = "Default file names: Include 'shortcode' in file names if it is available?";
-    final String                    text_MediaQualityDownloadMode                     = "Media quality download mode.\r\nOriginal quality = bigger filesize, without image-effects, works only when an account is available.";
-    final String                    text_ProfileCrawlerMaxItemsLimit                  = "Profile crawler: Only grab X latest posts? [0 = disable, -1 = crawl all]";
-    final String                    text_ProfileCrawlerCrawlStory                     = "Profile crawler: Crawl story?";
-    final String                    text_ProfileCrawlerCrawlStoryHighlights           = "Profile crawler: Crawl story highlights?";
-    final String                    text_ProfileCrawlerCrawlProfilePicture            = "Profile crawler: Crawl profile picture?";
-    final String                    text_ProfileCrawlerReelsPaginationMaxItemsPerPage = "Profile reels crawler: Max items per pagination (higher value = faster crawl process, can result in account ban!)";
-    final String                    text_ProfileTaggedCrawledMaxItemsLimit            = "Tagged profile crawler: How many items shall be grabbed for /profile/tagged/? [0 = disable tagged profile crawler]";
-    final String                    text_HashtagCrawlerMaxItemsLimit                  = "Hashtag crawler: How many items shall be grabbed for /explore/tags/<tagName>? [0 = disable]";
-    final String                    text_SearchCrawlerMaxItemsLimit                   = "Search crawler: How many items shall be grabbed for /explore/search/keyword/?q=<searchTerm>? [0 = disable]";
-    final String                    text_ActionOnRateLimitReached                     = "Crawler: Action on rate limit reached";
-    final String                    text_GlobalRequestIntervalLimitMilliseconds       = "Global request limit for domains 'instagram.com' and 'cdninstagram.com' in milliseconds [0 = no limit]";
-    final String                    text_EnforceLoginIfAccountIsAvailable             = "Debug: Enforce login if account is available?";
-    public static final TRANSLATION TRANSLATION                                       = new TRANSLATION();
+    public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
         public String getPostCrawlerAddPostDescriptionAsTextfile_label() {
-            return text_PostCrawlerAddPostDescriptionAsTextfile;
+            return "Post crawler: Add post description as textfile?";
         }
 
         public String getPostCrawlerPackagenameSchemeType_label() {
-            return text_PostCrawlerPackagenameSchemeType;
+            return "Post crawler: Package name scheme type for /p/<id>";
         }
 
         public String getPostCrawlerPackagenameScheme_label() {
-            return text_PostCrawlerPackagenameScheme;
+            return "Post crawler: Custom package name scheme for /p/<id>";
         }
 
         public String getStoryPackagenameSchemeType_label() {
-            return text_StoryPackagenameSchemeType;
+            return "Story crawler: Package name scheme type for /stories/username/<storyID>/ URLs";
         }
 
         public String getStoryPackagenameScheme_label() {
-            return text_StoryPackagenameScheme;
+            return "Story crawler: Custom package name scheme for /stories/username/<storyID>/";
         }
 
         public String getStoriesHighlightsPackagenameSchemeType_label() {
-            return text_StoriesHighlightsPackagenameSchemeType;
+            return "Story highlights crawler: Package name scheme type for /stories/highlights/<storyID>/";
         }
 
         public String getStoriesHighlightsPackagenameScheme_label() {
-            return text_StoriesHighlightsPackagenameScheme;
+            return "Story highlights crawler: Custom package name scheme for /stories/highlights/<storyID>/";
         }
 
         public String getFilenameType_label() {
-            return text_FilenameType;
+            return "File name type for all crawled media items";
         }
 
         public String getFilenameScheme_label() {
-            return text_FilenameScheme;
+            return "Custom filenames: Filename scheme";
         }
 
         public String getAddDateToFilenames_label() {
-            return text_AddDateToFilenames;
+            return "Default file names: Include date (yyyy-MM-dd) in filenames?";
         }
 
         public String getAddOrderidToFilenames_label() {
-            return text_AddOrderidToFilenames;
+            return "Default file names: Include 'order-ID' in file names if an album contains more than one element?";
         }
 
         public String getAddShortcodeToFilenames_label() {
-            return text_AddShortcodeToFilenames;
+            return "Default file names: Include 'shortcode' in file names if it is available?";
         }
 
         public String getMediaQualityDownloadMode_label() {
-            return text_MediaQualityDownloadMode;
+            return "Media quality download mode.\r\nOriginal quality = bigger filesize, without image-effects, works only when an account is available.";
         }
 
         public String getProfileCrawlerMaxItemsLimit_label() {
-            return text_ProfileCrawlerMaxItemsLimit;
+            return "Profile crawler: Only grab X latest posts? [0 = disable, -1 = crawl all]";
         }
 
         public String getProfileCrawlerCrawlStory_label() {
-            return text_ProfileCrawlerCrawlStory;
+            return "Profile crawler: Crawl story?";
         }
 
         public String getProfileCrawlerCrawlStoryHighlights_label() {
-            return text_ProfileCrawlerCrawlStoryHighlights;
+            return "Profile crawler: Crawl story highlights?";
         }
 
         public String getProfileCrawlerCrawlProfilePicture_label() {
-            return text_ProfileCrawlerCrawlProfilePicture;
+            return "Profile crawler: Crawl profile picture?";
         }
 
         public String getProfileCrawlerReelsPaginationMaxItemsPerPage_label() {
-            return text_ProfileCrawlerReelsPaginationMaxItemsPerPage;
+            return "Profile reels crawler: Max items per pagination (higher value = faster crawl process, can result in account ban!)";
         }
 
         public String getProfileTaggedCrawledMaxItemsLimit_label() {
-            return text_ProfileTaggedCrawledMaxItemsLimit;
+            return "Tagged profile crawler: How many items shall be grabbed for /profile/tagged/? [0 = disable tagged profile crawler]";
         }
 
         public String getHashtagCrawlerMaxItemsLimit_label() {
-            return text_HashtagCrawlerMaxItemsLimit;
+            return "Hashtag crawler: How many items shall be grabbed for /explore/tags/<tagName>? [0 = disable]";
         }
 
         public String getSearchCrawlerMaxItemsLimit_label() {
-            return text_SearchCrawlerMaxItemsLimit;
+            return "Search crawler: How many items shall be grabbed for /explore/search/keyword/?q=<searchTerm>? [0 = disable]";
         }
 
         public String getActionOnRateLimitReached_label() {
-            return text_ActionOnRateLimitReached;
+            return "Crawler: Action on rate limit reached";
         }
 
         public String getGlobalRequestIntervalLimitMilliseconds_label() {
-            return text_GlobalRequestIntervalLimitMilliseconds;
+            return "Global request limit for domains 'instagram.com' and 'cdninstagram.com' in milliseconds [0 = no limit]";
         }
 
         public String getEnforceLoginIfAccountIsAvailable_label() {
-            return text_EnforceLoginIfAccountIsAvailable;
+            return "Debug: Enforce login if account is available?";
         }
     }
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_PostCrawlerAddPostDescriptionAsTextfile)
     @Order(1)
     boolean isPostCrawlerAddPostDescriptionAsTextfile();
 
@@ -173,14 +147,12 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("UPLOADER")
     @Order(2)
-    @DescriptionForConfigEntry(text_PostCrawlerPackagenameSchemeType)
     SinglePostPackagenameSchemeType getPostCrawlerPackagenameSchemeType();
 
     void setPostCrawlerPackagenameSchemeType(final SinglePostPackagenameSchemeType namingSchemeType);
 
     @AboutConfig
     @DefaultStringValue("*date*_*uploader* - *main_content_id*")
-    @DescriptionForConfigEntry(text_PostCrawlerPackagenameScheme)
     @Order(3)
     String getPostCrawlerPackagenameScheme();
 
@@ -204,14 +176,12 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT_1")
     @Order(4)
-    @DescriptionForConfigEntry(text_StoryPackagenameSchemeType)
     StoryPackagenameSchemeType getStoryPackagenameSchemeType();
 
     void setStoryPackagenameSchemeType(final StoryPackagenameSchemeType namingSchemeType);
 
     @AboutConfig
     @DefaultStringValue("*date*_*uploader*")
-    @DescriptionForConfigEntry(text_StoryPackagenameScheme)
     @Order(5)
     String getStoryPackagenameScheme();
 
@@ -235,14 +205,12 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT_1")
     @Order(6)
-    @DescriptionForConfigEntry(text_StoriesHighlightsPackagenameSchemeType)
     StoriesHighlightsPackagenameSchemeType getStoriesHighlightsPackagenameSchemeType();
 
     void setStoriesHighlightsPackagenameSchemeType(final StoriesHighlightsPackagenameSchemeType namingSchemeType);
 
     @AboutConfig
     @DefaultStringValue("*date*_*uploader* - *title*")
-    @DescriptionForConfigEntry(text_StoriesHighlightsPackagenameScheme)
     @Order(7)
     String getStoriesHighlightsPackagenameScheme();
 
@@ -272,14 +240,12 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT")
     @Order(10)
-    @DescriptionForConfigEntry(text_FilenameType)
     FilenameType getFilenameType();
 
     void setFilenameType(final FilenameType filenameNamingSchemeType);
 
     @AboutConfig
     @DefaultStringValue("*date*_*uploader* - *main_content_id* *orderid*_of_*orderid_max* - *shortcode**ext*")
-    @DescriptionForConfigEntry(text_FilenameScheme)
     @Order(15)
     String getFilenameScheme();
 
@@ -288,7 +254,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(false)
     @TakeValueFromSubconfig("ADD_DATE_TO_FILENAMES")
-    @DescriptionForConfigEntry(text_AddDateToFilenames)
     @Order(20)
     boolean isAddDateToFilenames();
 
@@ -297,7 +262,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(false)
     @TakeValueFromSubconfig("ADD_ORDERID_TO_FILENAMES")
-    @DescriptionForConfigEntry(text_AddOrderidToFilenames)
     @Order(30)
     boolean isAddOrderidToFilenames();
 
@@ -306,7 +270,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(false)
     @TakeValueFromSubconfig("ADD_SHORTCODE_TO_FILENAMES")
-    @DescriptionForConfigEntry(text_AddShortcodeToFilenames)
     @Order(40)
     boolean isAddShortcodeToFilenames();
 
@@ -336,7 +299,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT_QUALITY")
     @Order(50)
-    @DescriptionForConfigEntry(text_MediaQualityDownloadMode)
     @DefaultOnNull
     MediaQualityDownloadMode getMediaQualityDownloadMode();
 
@@ -345,7 +307,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = -1, max = 1024, step = 1)
     @DefaultIntValue(-1)
-    @DescriptionForConfigEntry(text_ProfileCrawlerMaxItemsLimit)
     @Order(70)
     int getProfileCrawlerMaxItemsLimit();
 
@@ -353,7 +314,6 @@ public interface InstagramConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_ProfileCrawlerCrawlStory)
     @Order(71)
     boolean isProfileCrawlerCrawlStory();
 
@@ -361,7 +321,6 @@ public interface InstagramConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_ProfileCrawlerCrawlStoryHighlights)
     @Order(72)
     boolean isProfileCrawlerCrawlStoryHighlights();
 
@@ -369,7 +328,6 @@ public interface InstagramConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_ProfileCrawlerCrawlProfilePicture)
     @Order(73)
     boolean isProfileCrawlerCrawlProfilePicture();
 
@@ -378,7 +336,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = 1, max = 100, step = 1)
     @DefaultIntValue(12)
-    @DescriptionForConfigEntry(text_ProfileCrawlerReelsPaginationMaxItemsPerPage)
     @Order(85)
     int getProfileCrawlerReelsPaginationMaxItemsPerPage();
 
@@ -387,7 +344,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = 0, max = 10000, step = 25)
     @DefaultIntValue(25)
-    @DescriptionForConfigEntry(text_ProfileTaggedCrawledMaxItemsLimit)
     @Order(85)
     int getProfileTaggedCrawledMaxItemsLimit();
 
@@ -397,7 +353,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @SpinnerValidator(min = 0, max = 10000, step = 25)
     @DefaultIntValue(25)
     @TakeValueFromSubconfig("ONLY_GRAB_X_ITEMS_HASHTAG_CRAWLER_NUMBER")
-    @DescriptionForConfigEntry(text_HashtagCrawlerMaxItemsLimit)
     @Order(90)
     int getHashtagCrawlerMaxItemsLimit();
 
@@ -406,7 +361,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = 0, max = 10000, step = 25)
     @DefaultIntValue(25)
-    @DescriptionForConfigEntry(text_SearchCrawlerMaxItemsLimit)
     @Order(91)
     int getSearchCrawlerMaxItemsLimit();
 
@@ -430,7 +384,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("CONTINUE")
     @Order(500)
-    @DescriptionForConfigEntry(text_ActionOnRateLimitReached)
     @DefaultOnNull
     ActionOnRateLimitReached getActionOnRateLimitReached();
 
@@ -439,7 +392,6 @@ public interface InstagramConfig extends PluginConfigInterface {
     @AboutConfig
     @SpinnerValidator(min = 0, max = 60000, step = 100)
     @DefaultIntValue(400)
-    @DescriptionForConfigEntry(text_GlobalRequestIntervalLimitMilliseconds)
     @Order(510)
     int getGlobalRequestIntervalLimitMilliseconds();
 
@@ -447,7 +399,6 @@ public interface InstagramConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry(text_EnforceLoginIfAccountIsAvailable)
     @Order(600)
     boolean isEnforceLoginIfAccountIsAvailable();
 

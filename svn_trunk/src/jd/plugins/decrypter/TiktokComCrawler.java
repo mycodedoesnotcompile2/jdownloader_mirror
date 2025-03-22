@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 50755 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50842 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -206,8 +206,9 @@ public class TiktokComCrawler extends PluginForDecrypt {
             try {
                 return crawlSingleMediaWebsiteWebsite(hostPlg, contenturl, account, forceGrabAll);
             } catch (final PluginException e) {
-                logger.info("Attempting API fallback in website mode");
                 if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND && br.containsHTML("\"(?:status_msg|message)\"\\s*:\\s*\"Something went wrong\"")) {
+                    // TODO: Check/review this fallback/workaround
+                    logger.info("Attempting API fallback in website mode");
                     return this.crawlSingleMediaAPI(contenturl, null, forceGrabAll);
                 } else {
                     throw e;
@@ -673,6 +674,20 @@ public class TiktokComCrawler extends PluginForDecrypt {
         final Map<String, Object> videomap = (Map<String, Object>) media.get("video");
         final Map<String, Object> imagePost = (Map<String, Object>) media.get("imagePost");
         final Map<String, Object> music = (Map<String, Object>) media.get("music");
+        if (authormap == null && stats == null && (imagePost == null || imagePost.isEmpty()) && (music == null || music.isEmpty()) && (videomap == null || videomap.isEmpty())) {
+            /* Video unavailable -> Try to find out why */
+            if (Boolean.TRUE.equals(media.get("isContentClassified"))) {
+                throw new AccountRequiredException("Mature content");
+            } else if (Boolean.TRUE.equals(media.get("privateItem"))) {
+                throw new AccountRequiredException("Private content");
+            }
+            final Object takedownO = media.get("takeDown");
+            if (takedownO != null && takedownO.toString().equals("1")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String username = authormap.get("uniqueId").toString();
         final String videoID = (String) media.get("id");

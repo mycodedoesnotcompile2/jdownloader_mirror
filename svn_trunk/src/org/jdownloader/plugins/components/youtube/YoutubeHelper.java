@@ -38,6 +38,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -105,22 +121,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 public class YoutubeHelper {
     static {
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
@@ -174,18 +174,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -1521,31 +1521,46 @@ public class YoutubeHelper {
                     return trusted;
                 }
             };
-            try {
-                JSRhinoPermissionRestricter.THREAD_JSSHUTTER.put(Thread.currentThread(), jsShutter);
-                final ScriptEngineManager manager = org.jdownloader.scripting.JavaScriptEngineFactory.getScriptEngineManager(this);
-                final ScriptEngine engine = manager.getEngineByName("javascript");
-                final String js = "var calculate" + function + " var result=calculate(\"" + input + "\")";
-                engine.eval(js);
-                final String result = StringUtils.valueOfOrNull(engine.get("result"));
-                if (result != null) {
-                    output = result;
-                    if (result.startsWith("org.mozilla.javascript")) {
-                        throw new ScriptException(result);
-                    } else if (result.startsWith("enhanced_except")) {
-                        throw new Exception("Invalid result:" + result);
+            final Map<String, String> additionalMap = new HashMap<String, String>();
+            while (true) {
+                try {
+                    JSRhinoPermissionRestricter.THREAD_JSSHUTTER.put(Thread.currentThread(), jsShutter);
+                    final ScriptEngineManager manager = org.jdownloader.scripting.JavaScriptEngineFactory.getScriptEngineManager(this);
+                    final ScriptEngine engine = manager.getEngineByName("javascript");
+                    for (final String additional : additionalMap.values()) {
+                        engine.eval(additional);
+                    }
+                    final String js = "var calculate" + function + " var result=calculate(\"" + input + "\")";
+                    engine.eval(js);
+                    final String result = StringUtils.valueOfOrNull(engine.get("result"));
+                    if (result != null) {
+                        output = result;
+                        if (result.startsWith("org.mozilla.javascript")) {
+                            throw new ScriptException(result);
+                        } else if (result.startsWith("enhanced_except")) {
+                            throw new Exception("Invalid result:" + result);
+                        } else {
+                            synchronized (jsCache) {
+                                jsCache.put(resultCacheKey, output);
+                            }
+                            break;
+                        }
                     } else {
-                        synchronized (jsCache) {
-                            jsCache.put(resultCacheKey, output);
+                        throw new Exception();
+                    }
+                } catch (Exception e) {
+                    final String undefined = new Regex(e.getMessage(), "ReferenceError\\s*:\\s*\"(.*?)\" is not defined").getMatch(0);
+                    if (undefined != null && !additionalMap.containsKey(undefined)) {
+                        final String reference = new Regex(ensurePlayerSource(), "(var\\s*" + Pattern.quote(undefined) + ".*?;)\\w+\\s*=\\s*function").getMatch(0);
+                        if (reference != null) {
+                            additionalMap.put(undefined, reference);
+                            continue;
                         }
                     }
-                } else {
-                    throw new Exception();
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+                } finally {
+                    JSRhinoPermissionRestricter.THREAD_JSSHUTTER.remove(Thread.currentThread());
                 }
-            } catch (Exception e) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
-            } finally {
-                JSRhinoPermissionRestricter.THREAD_JSSHUTTER.remove(Thread.currentThread());
             }
         }
         logger.info("nsig(" + vid.videoID + "," + playerID + "):" + input + "->" + output + "(cached:" + (cachedResult != null) + ")");
@@ -1553,7 +1568,7 @@ public class YoutubeHelper {
     }
 
     private String getPlayerID(String playerJS) {
-        final String ret = new Regex(playerJS, "/player/([^/]+)/player_").getMatch(0);
+        final String ret = new Regex(playerJS, "/player/([^/]+)/(?:tv-)?player(?:_|-)").getMatch(0);
         if (ret != null) {
             return ret;
         } else {
@@ -2684,7 +2699,7 @@ public class YoutubeHelper {
             clientNameID = 85;
         } else {
             client.put("clientName", "TVHTML5");
-            client.put("clientVersion", "7.20250120.19.00");
+            client.put("clientVersion", "7.20250312.16.00");
             client.put("userAgent", "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version");
             clientNameID = 7;
         }

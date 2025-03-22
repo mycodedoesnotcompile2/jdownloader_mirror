@@ -95,6 +95,18 @@ public class Account extends Property {
         return null;
     }
 
+    @Deprecated
+    // will be removed by Jiaz
+    public void setTempDisabled(final boolean tempDisabled) {
+        if (tempDisabled) {
+            setError(AccountError.TEMP_DISABLED, -1, null);
+        } else {
+            if (AccountError.TEMP_DISABLED.equals(getError())) {
+                setError(null, -1, null);
+            }
+        }
+    }
+
     private DomainInfo domainInfo;
 
     public DomainInfo getDomainInfo() {
@@ -503,17 +515,7 @@ public class Account extends Property {
     }
 
     public boolean isTempDisabled() {
-        if (AccountError.TEMP_DISABLED.equals(getError())) {
-            synchronized (this) {
-                if (getTmpDisabledTimeout() < 0 || System.currentTimeMillis() >= getTmpDisabledTimeout()) {
-                    setTmpDisabledTimeout(-1);
-                    setTempDisabled(false);
-                    return false;
-                }
-                return true;
-            }
-        }
-        return false;
+        return AccountError.TEMP_DISABLED.equals(getError());
     }
 
     public static enum AccountError {
@@ -531,7 +533,7 @@ public class Account extends Property {
         if (error == null) {
             errorString = null;
         }
-        if (this.error != error || !StringUtils.equals(this.errorString, errorString)) {
+        if (getError() != error || !StringUtils.equals(this.errorString, errorString)) {
             if (AccountError.TEMP_DISABLED.equals(error)) {
                 final long timeout;
                 if (setTimeout <= 0) {
@@ -641,6 +643,15 @@ public class Account extends Property {
     }
 
     public AccountError getError() {
+        final AccountError error = this.error;
+        if (AccountError.TEMP_DISABLED.equals(error)) {
+            final long disabledTimeStamp = getTmpDisabledTimeout();
+            if (disabledTimeStamp < 0 || System.currentTimeMillis() >= disabledTimeStamp) {
+                // do not change error via setError here,we don't want a get method to throw events
+                setTmpDisabledTimeout(-1);
+                return null;
+            }
+        }
         return error;
     }
 
@@ -740,17 +751,6 @@ public class Account extends Property {
             this.pass = newPass;
             if (forceAccountCheckOnChange) {
                 notifyUpdate(AccountProperty.Property.PASSWORD, newPass);
-            }
-        }
-    }
-
-    @Deprecated
-    public void setTempDisabled(final boolean tempDisabled) {
-        if (tempDisabled) {
-            setError(AccountError.TEMP_DISABLED, -1, null);
-        } else {
-            if (AccountError.TEMP_DISABLED.equals(getError())) {
-                setError(null, -1, null);
             }
         }
     }

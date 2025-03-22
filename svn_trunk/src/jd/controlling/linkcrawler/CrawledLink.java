@@ -569,6 +569,11 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
         }
     }
 
+    public Priority getPriorityEnum() {
+        return getPriority();
+    }
+
+    @Deprecated
     public Priority getPriority() {
         try {
             final DownloadLink dlLink = getDownloadLink();

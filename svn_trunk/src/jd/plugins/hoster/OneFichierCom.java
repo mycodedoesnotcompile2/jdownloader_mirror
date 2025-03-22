@@ -69,7 +69,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50850 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -394,7 +394,7 @@ public class OneFichierCom extends PluginForHost {
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         /* Do not perform availablecheck here to save requests */
         // requestFileInformation(link);
-        if (checkShowFreeDialog(getHost())) {
+        if (false && checkShowFreeDialog(getHost())) {
             showFreeDialog(getHost());
         }
         doFree(null, link);

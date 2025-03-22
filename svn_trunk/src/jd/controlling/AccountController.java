@@ -93,11 +93,11 @@ public class AccountController implements AccountControllerListener, AccountProp
     private final HashMap<String, Map<Account, Object>>                          MULTIHOSTER_ACCOUNTS;
     private static AccountController                                             INSTANCE         = new AccountController();
     private final Eventsender<AccountControllerListener, AccountControllerEvent> broadcaster      = new Eventsender<AccountControllerListener, AccountControllerEvent>() {
-                                                                                                      @Override
-                                                                                                      protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
-                                                                                                          listener.onAccountControllerEvent(event);
-                                                                                                      }
-                                                                                                  };
+        @Override
+        protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
+            listener.onAccountControllerEvent(event);
+        }
+    };
 
     public Eventsender<AccountControllerListener, AccountControllerEvent> getEventSender() {
         return broadcaster;
@@ -381,7 +381,9 @@ public class AccountController implements AccountControllerListener, AccountProp
                 if (tempDisabledCounterBefore > 0 && account.getTmpDisabledTimeout() == tempDisabledCounterBefore) {
                     /* Reset temp disabled information */
                     logger.info("no longer temp disabled!");
-                    account.setTempDisabled(false);
+                    if (AccountError.TEMP_DISABLED.equals(account.getError())) {
+                        account.setError(null, -1, null);
+                    }
                 }
                 logger.clear();
             } catch (final Throwable e) {
