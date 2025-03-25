@@ -66,9 +66,9 @@ public abstract class FFprobe extends AbstractFFmpegBinary {
                 final HttpServer server = this.server;
                 if (server != null && server.isRunning()) {
                     if (StringUtils.endsWithCaseInsensitive(url, ".m3u8")) {
-                        commandLine.add("http://" + server.getServerAddress() + "/m3u8?id=" + processID);
+                        commandLine.add("http://" + server.getServerAddress() + "/m3u8.m3u8?id=" + processID);
                     } else {
-                        commandLine.add("http://" + server.getServerAddress() + "/download?id=" + processID + "&url=" + Encoding.urlEncode(url));
+                        commandLine.add("http://" + server.getServerAddress() + "/download.ts?id=" + processID + "&url=" + Encoding.urlEncode(url));
                     }
                 } else {
                     commandLine.add(url);

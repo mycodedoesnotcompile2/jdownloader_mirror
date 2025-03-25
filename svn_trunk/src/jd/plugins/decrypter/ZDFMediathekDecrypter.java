@@ -36,6 +36,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
@@ -56,11 +57,12 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 50820 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 50852 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -86,12 +88,12 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         this.br.setAllowedResponseCodes(new int[] { 500 });
         setBrowserExclusive();
         br.setFollowRedirects(true);
-        if (param.getCryptedUrl().matches(TYPE_PHOENIX)) {
-            return crawlPhoenix(param);
-        } else if (param.getCryptedUrl().matches(TYPE_PHOENIX_RSS)) {
-            return crawlPhoenixRSS(param);
+        if (this.getHost().equals("phoenix.de")) {
+            return this.crawlPhoenix(param);
+        } else if (this.getHost().equals("3sat.de")) {
+            return this.crawl3Sat(param);
         } else {
-            return crawlZdfNew(param);
+            return crawlZdf(param);
         }
     }
 
@@ -198,7 +200,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         return all_known_qualities;
     }
 
-    protected DownloadLink createDownloadlink(final String url) {
+    protected DownloadLink createDownloadlinkForHosterplugin(final String url) {
         final DownloadLink dl = super.createDownloadlink(url.replaceAll("https?://", "decryptedmediathek://"));
         if (this.fastlinkcheck) {
             dl.setAvailable(true);
@@ -240,6 +242,69 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             results.add(super.createDownloadlink(finallink));
         }
         return results;
+    }
+
+    private ArrayList<DownloadLink> crawl3Sat(final CryptedLink param) throws Exception {
+        String videoContentID = null;
+        // sophoraID = "tafeln-reduzierung-lebensmittel-ausgabe-video-100";
+        br.getPage(param.getCryptedUrl());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String[] embeddedVideos = br.getRegex("/embed/\\?mediaID=(/[^<>\"']+)").getColumn(0);
+        if (embeddedVideos != null && embeddedVideos.length > 0) {
+            /*
+             * Check for embedded video items e.g.:
+             * https://www.zdf.de/nachrichten/heute-sendungen/tafeln-reduzierung-lebensmittel-ausgabe-video-100.html
+             */
+            final HashSet<String> sophoraIDs = new HashSet<String>();
+            for (final String url : embeddedVideos) {
+                final String[] urlparts = url.split("/");
+                final String lastPart = urlparts[urlparts.length - 1];
+                if (lastPart.matches("[a-z0-9\\-_]+")) {
+                    sophoraIDs.add(lastPart);
+                    videoContentID = lastPart;
+                }
+            }
+            if (sophoraIDs.size() > 1) {
+                logger.warning("Website contains multiple video embedIDs -> Crawling only last video: " + videoContentID);
+            }
+        }
+        if (videoContentID == null) {
+            // TODO: 2025-03-19: Check if this is still needed
+            videoContentID = br.getRegex("\"embed_content\"\\s*:\\s*\"(/.*?)\"").getMatch(0);
+            if (videoContentID == null) {
+                videoContentID = br.getRegex("embed_content\\s*:\\s*'([^\"\\']+)").getMatch(0);
+            }
+        }
+        if (videoContentID == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String apitoken = br.getRegex("\"apiToken\"\\s*:\\s*\"([^\"\\']+)").getMatch(0);
+        if (apitoken == null) {
+            apitoken = br.getRegex("apiToken\\s*:\\s*'([^\"\\']+)").getMatch(0);
+        }
+        final String apiAccessURL = br.getRegex("\"content\":\\s*\"(https?://[^/]+/content/documents/[^\"]+\\.json\\?profile=[^\"]+)\"").getMatch(0);
+        if (apiAccessURL == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        /* e.g. 3sat.de: https://www.3sat.de/kabarett/bosetti-late-night/bosetti-late-night-folge-11-bln-102.html */
+        logger.info("Found api access URL in html: " + apiAccessURL);
+        final GetRequest request = br.createGetRequest(apiAccessURL);
+        request.getHeaders().put("Api-Auth", "Bearer " + apitoken);
+        br.getPage(request);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        return handleZdfJson(param, br, apitoken);
+    }
+
+    private ArrayList<DownloadLink> crawlPhoenix(final CryptedLink param) throws Exception {
+        if (param.getCryptedUrl().matches(TYPE_PHOENIX)) {
+            return crawlPhoenixNormal(param);
+        } else {
+            return crawlPhoenixRSS(param);
+        }
     }
 
     private ArrayList<DownloadLink> crawlPhoenixRSS(final CryptedLink param) throws IOException, PluginException {
@@ -285,7 +350,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlPhoenix(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlPhoenixNormal(final CryptedLink param) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String phoenixContentID = new Regex(param.getCryptedUrl(), TYPE_PHOENIX).getMatch(0);
         if (phoenixContentID == null) {
@@ -327,7 +392,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlZdfNew(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlZdf(final CryptedLink param) throws Exception {
         final String contenturl;
         if (param.getCryptedUrl().matches(TYPER_ZDF_REDIRECT)) {
             final Browser brc = br.cloneBrowser();
@@ -343,13 +408,21 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         }
         final String videoContentIDFromURL = new Regex(contenturl, "/([\\w-]+)[^/]*$").getMatch(0);
         String videoContentID = null;
-        // sophoraID = "tafeln-reduzierung-lebensmittel-ausgabe-video-100";
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*Video leider nicht mehr verfügbar")) {
             /* E.g. https://www.zdf.de/3sat/politik-und-gesellschaft/die-schweizer-alpen-3-100.html */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String seriesSlug = new Regex(contenturl, "https?://[^/]+/(?:filme|serien)/([\\w-]+)").getMatch(0);
+        if (seriesSlug != null) {
+            /* Crawl all episodes of a series */
+            final String html_unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+            final String seriesHash = new Regex(html_unescaped, "\"__typename\":\"Season\",\"id\":\"([^\"]+)").getMatch(0);
+            final String seasonStr = UrlQuery.parse(contenturl).get("staffel");
+            final Integer season = seasonStr != null ? Integer.parseInt(seasonStr) : null;
+            return this.crawlZdfSeries(seriesSlug, seriesHash, season);
         }
         final String[] embeddedVideos = br.getRegex("/embed/\\?mediaID=(/[^<>\"']+)").getColumn(0);
         if (embeddedVideos != null && embeddedVideos.length > 0) {
@@ -391,52 +464,46 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             /* 2024-12-16: Static fallback */
             apitoken = "20c238b5345eb428d01ae5c748c5076f033dfcc7";
         }
-        String apiAccessURL = br.getRegex("\"content\":\\s*\"(https?://[^/]+/content/documents/[^\"]+\\.json\\?profile=[^\"]+)\"").getMatch(0);
-        if (apiAccessURL != null) {
-            /* e.g. 3sat.de: https://www.3sat.de/kabarett/bosetti-late-night/bosetti-late-night-folge-11-bln-102.html */
-            logger.info("Found api access URL in html: " + apiAccessURL);
-        } else {
-            /* E.g. zdf.de content */
-            String api_base = br.getRegex("apiService\\s*:\\s*'(https?://[^<>\"\\']+)").getMatch(0);
-            if (api_base == null) {
-                /* 2024-12-16 */
-                api_base = "https://api.zdf.de";
-            }
-            final String profileStatic = "player-3";
-            final boolean useStaticProfile = true;
-            String profile = null;
-            if (useStaticProfile) {
-                profile = profileStatic;
-            } else {
-                String config = br.getRegex("\"config\"\\s*:\\s*\"(https?://.*?)\"").getMatch(0);
-                if (config == null) {
-                    config = br.getRegex("player\\s*:\\s*\\{[^\\}]*js\\s*:\\s*'(https?://[^\"\\']+)").getMatch(0);
-                }
-                if (config == null) {
-                    config = "https://ngp.zdf.de/configs/zdf/zdf2016/configuration.json";
-                    // config = "https://ngp.zdf.de/miniplayer/embed/configuration.json";
-                }
-                profile = br.getRegex("\\.json\\?profile=([^\"]+)\"").getMatch(0);
-                if (config != null) {
-                    final Browser brc = br.cloneBrowser();
-                    brc.getPage(config);
-                    String profileTmp = brc.getRegex("\"apiProfile\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-                    if (profileTmp == null) {
-                        profileTmp = brc.getRegex("apiProfile\\s*:\\s*(?:\"|')([^\"\\']+)").getMatch(0);
-                    }
-                    if (profileTmp == null) {
-                        profileTmp = brc.getRegex("DEFAULT_API_PROFILE\\s*=\\s*(?:\"|')([^\"\\']+)").getMatch(0);
-                    }
-                    if (profileTmp != null) {
-                        profile = profileTmp;
-                    }
-                }
-                if (profile == null) {
-                    profile = profileStatic;
-                }
-            }
-            apiAccessURL = api_base + "/content/documents/" + videoContentID + ".json?profile=" + profile;
+        /* E.g. zdf.de content */
+        String api_base = br.getRegex("apiService\\s*:\\s*'(https?://[^<>\"\\']+)").getMatch(0);
+        if (api_base == null) {
+            /* 2024-12-16 */
+            api_base = "https://api.zdf.de";
         }
+        final String profileStatic = "player-3";
+        final boolean useStaticProfile = true;
+        String profile = null;
+        if (useStaticProfile) {
+            profile = profileStatic;
+        } else {
+            String config = br.getRegex("\"config\"\\s*:\\s*\"(https?://.*?)\"").getMatch(0);
+            if (config == null) {
+                config = br.getRegex("player\\s*:\\s*\\{[^\\}]*js\\s*:\\s*'(https?://[^\"\\']+)").getMatch(0);
+            }
+            if (config == null) {
+                config = "https://ngp.zdf.de/configs/zdf/zdf2016/configuration.json";
+                // config = "https://ngp.zdf.de/miniplayer/embed/configuration.json";
+            }
+            profile = br.getRegex("\\.json\\?profile=([^\"]+)\"").getMatch(0);
+            if (config != null) {
+                final Browser brc = br.cloneBrowser();
+                brc.getPage(config);
+                String profileTmp = brc.getRegex("\"apiProfile\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+                if (profileTmp == null) {
+                    profileTmp = brc.getRegex("apiProfile\\s*:\\s*(?:\"|')([^\"\\']+)").getMatch(0);
+                }
+                if (profileTmp == null) {
+                    profileTmp = brc.getRegex("DEFAULT_API_PROFILE\\s*=\\s*(?:\"|')([^\"\\']+)").getMatch(0);
+                }
+                if (profileTmp != null) {
+                    profile = profileTmp;
+                }
+            }
+            if (profile == null) {
+                profile = profileStatic;
+            }
+        }
+        final String apiAccessURL = api_base + "/content/documents/" + videoContentID + ".json?profile=" + profile;
         final GetRequest request = br.createGetRequest(apiAccessURL);
         request.getHeaders().put("Api-Auth", "Bearer " + apitoken);
         br.getPage(request);
@@ -444,6 +511,48 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return handleZdfJson(param, br, apitoken);
+    }
+
+    /**
+     * Examples: <br>
+     * https://www.zdf.de/filme/collection-index-page-ard-collection-ard-dxjuomfyzdpzag93oji0ytqxodqzy2q5mtlmyjg-762?staffel=2025 <br>
+     * https://www.zdf.de/serien/hacks-104
+     */
+    private ArrayList<DownloadLink> crawlZdfSeries(final String seriesSlug, final String seriesHash, final Integer season) throws Exception {
+        logger.info("Crawling series " + seriesSlug + " | Season: " + season);
+        if (seriesSlug == null) {
+            throw new IllegalArgumentException();
+        } else if (seriesHash == null) {
+            throw new IllegalArgumentException();
+        }
+        br.getHeaders().put("Accept", "*/*");
+        br.getHeaders().put("api-auth", "Bearer aa3noh4ohz9eeboo8shiesheec9ciequ9Quah7el");
+        br.getHeaders().put("content-type", "application/json");
+        br.getHeaders().put("Origin", "https://www.zdf.de");
+        br.getHeaders().put("Referer", "https://www.zdf.de/");
+        br.getHeaders().put("zdf-app-id", "ffw-mt-web-05d9aa4f");
+        br.getPage("https://api.zdf.de/graphql?operationName=seasonByCanonical&variables=%7B%22seasonIndex%22%3A0%2C%22episodesPageSize%22%3A24%2C%22canonical%22%3A%22" + seriesSlug + "%22%2C%22filterBy%22%3A%7B%22idIn%22%3A%5B%22" + seriesHash + "%22%5D%7D%2C%22sortBy%22%3A%5B%7B%22field%22%3A%22EPISODE_NUMBER%22%2C%22direction%22%3A%22ASC%22%7D%5D%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%229412a0f4ac55dc37d46975d461ec64bfd14380d815df843a1492348f77b5c99a%22%7D%7D");
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> seasons = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/smartCollectionByCanonical/seasons");
+        // TODO: Implement pagination
+        final Map<String, Object> seasons_pageInfo = (Map<String, Object>) seasons.get("pageInfo");
+        final List<Map<String, Object>> seasons_nodes = (List<Map<String, Object>>) seasons.get("nodes");
+        for (final Map<String, Object> season_node : seasons_nodes) {
+            final Map<String, Object> episodes = (Map<String, Object>) season_node.get("episodes");
+            final List<Map<String, Object>> episodes_nodes = (List<Map<String, Object>>) episodes.get("nodes");
+            final Map<String, Object> episodes_pageInfo = (Map<String, Object>) episodes.get("pageInfo");
+            for (final Map<String, Object> episode_node : episodes_nodes) {
+                final String url = episode_node.get("sharingUrl").toString();
+                final DownloadLink link = this.createDownloadlink(url);
+                ret.add(link);
+                distribute(link);
+            }
+        }
+        return ret;
     }
 
     /** Handles ZDF json present in given browser after API request has been made before. */
@@ -498,9 +607,9 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                 /* Not a series */
                 break findSeriesInfo;
             }
-            final Number seasonEpisodesTotal = (Number) seriesSeasonInfo.get("seasonEpisodesTotal");
-            if (seasonEpisodesTotal == null) {
-                /* Not a series */
+            final Number episodeDuration = (Number) seriesMetadata.get("episodeDuration");
+            if (episodeDuration == null || episodeDuration.intValue() == 0) {
+                /* Not a series, example: https://kurz.zdf.de/Rxpnz/ */
                 break findSeriesInfo;
             }
             seriesTitle = (String) seriesMetadata.get("title");
@@ -862,7 +971,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         ext = hlscontainer.getFileExtension().replace(".", "");
                         linkid = this.getHost() + "://" + String.format(linkid_format, internalVideoID, type, cdn, language, audio_class, protocol, resolution);
                         final_filename = filename_packagename_base_title + "_" + protocol + "_" + resolution + "_" + language + "_" + audio_class_user_readable + "." + ext;
-                        final DownloadLink dl = createDownloadlink(finalDownloadURL);
+                        final DownloadLink dl = this.createDownloadlinkForHosterplugin(finalDownloadURL);
                         dl.setContentUrl(param.getCryptedUrl());
                         if (hlscontainer.getBandwidth() > highestHlsBandwidth) {
                             /*
@@ -943,7 +1052,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                             qualityIdentifierForFilename = httpQualityIdentifierWeak;
                         }
                         final_filename = filename_packagename_base_title + "_" + protocol + "_" + qualityIdentifierForFilename + "_" + language + "_" + audio_class_user_readable + "." + ext;
-                        final DownloadLink dl = createDownloadlink(finalDownloadURL);
+                        final DownloadLink dl = this.createDownloadlinkForHosterplugin(finalDownloadURL);
                         dl.setContentUrl(param.getCryptedUrl());
                         /**
                          * Usually filesize is only given for the official downloads.</br>
@@ -1178,7 +1287,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             final String longSubtitleName = this.convertInternalSubtitleClassToUserReadable(selectedSubtitleType);
             final String final_filename = dl.getFinalFileName().replace(current_ext, "_" + longSubtitleName + ext);
             final String linkid = dl.getLinkID() + "_" + longSubtitleName;
-            final DownloadLink dl_subtitle = this.createDownloadlink(subtitleSource.get(selectedSubtitleType));
+            final DownloadLink dl_subtitle = this.createDownloadlinkForHosterplugin(subtitleSource.get(selectedSubtitleType));
             setDownloadlinkProperties(dl_subtitle, final_filename, "subtitle_" + ext, linkid, null, null, null, null);
             if (convertSubtitle) {
                 dl_subtitle.setProperty(ZdfDeMediathek.PROPERTY_convert_subtitle, true);

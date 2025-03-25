@@ -69,7 +69,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50850 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50853 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -541,40 +541,40 @@ public class OneFichierCom extends PluginForHost {
         if (ibr.getHttpConnection() != null) {
             responsecode = ibr.getHttpConnection().getResponseCode();
         }
-        if (ibr.containsHTML("(?i)>\\s*File not found")) {
+        if (ibr.containsHTML(">\\s*File not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (ibr.containsHTML("(?i)>\\s*Software error:<")) {
+        } else if (ibr.containsHTML(">\\s*Software error:<")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Software error'", 10 * 60 * 1000l);
-        } else if (ibr.containsHTML("(?i)>\\s*Connexion à la base de données impossible<|>Can\\'t connect DB")) {
+        } else if (ibr.containsHTML(">\\s*Connexion à la base de données impossible<|>Can\\'t connect DB")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Internal database error", 5 * 60 * 1000l);
-        } else if (ibr.containsHTML("(?i)not possible to free unregistered users")) {
+        } else if (ibr.containsHTML("not possible to free unregistered users")) {
             throw new AccountRequiredException();
-        } else if (ibr.containsHTML("(?i)Your account will be unlock")) {
+        } else if (ibr.containsHTML("Your account will be unlock")) {
             if (account != null) {
                 throw new AccountUnavailableException("Locked for security reasons", 60 * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "IP blocked for security reasons", 60 * 60 * 1000l);
             }
-        } else if (ibr.containsHTML("(?i)>\\s*Access to this file is protected|>\\s*This file is protected")) {
+        } else if (ibr.containsHTML(">\\s*Access to this file is protected|>\\s*This file is protected")) {
             /* Access restricted by IP / only registered users / only premium users / only owner */
-            if (ibr.containsHTML("(?i)>\\s*The owner of this file has reserved access to the subscribers of our services")) {
+            if (ibr.containsHTML(">\\s*The owner of this file has reserved access to the subscribers of our services")) {
                 throw new AccountRequiredException();
             } else {
                 errorAccessControlLimit(link);
             }
-        } else if (ibr.containsHTML("(?i)>\\s*Your requests are too fast")) {
+        } else if (ibr.containsHTML(">\\s*Your requests are too fast")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Rate limit reached", 30 * 1000l);
         } else if (ibr.getURL().contains("/?c=DB")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Internal database error", 5 * 60 * 1000l);
         } else if (responsecode == 403) {
-            if (ibr.containsHTML("(?i)>\\s*Premium status must not be used on professional services")) {
+            if (ibr.containsHTML(">\\s*Premium status must not be used on professional services")) {
                 if (account != null) {
                     throw new AccountUnavailableException("Premium status must not be used on professional services (VPN, proxies, ...). Use CDN credits", 60 * 60 * 1000l);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            if (ibr.containsHTML("(?i)>\\s*Premium status is only allowed to be used on residential private and dedicated")) {
+            if (ibr.containsHTML(">\\s*Premium status is only allowed to be used on residential private and dedicated")) {
                 if (account != null) {
                     throw new AccountUnavailableException("Premium status is only allowed to be used on residential private and dedicated - internet connexion. Use CDN credits", 60 * 60 * 1000l);
                 } else {
@@ -584,7 +584,7 @@ public class OneFichierCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 15 * 60 * 1000l);
         } else if (responsecode == 404) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 30 * 60 * 1000l);
-        } else if (ibr.getHttpConnection().getResponseCode() == 503 && ibr.containsHTML("(?i)>\\s*Our services are in maintenance\\.\\s*Please come back after")) {
+        } else if (ibr.getHttpConnection().getResponseCode() == 503 && ibr.containsHTML(">\\s*Our services are in maintenance\\.\\s*Please come back after")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Hoster is in maintenance mode!", 20 * 60 * 1000l);
         } else {
             ipBlockedErrorHandling(account, ibr);
@@ -613,24 +613,24 @@ public class OneFichierCom extends PluginForHost {
                 waittimeMinutesStr = br.getRegex(">\\s*Vous devez attendre encore\\s*(\\d+)\\s*minutes").getMatch(0);
             }
         }
-        if (br.containsHTML("(?i)>\\s*IP Locked|>\\s*Will be unlocked within 1h\\.")) {
+        if (br.containsHTML(">\\s*IP Locked|>\\s*Will be unlocked within 1h\\.")) {
             waittimeMinutesStr = "60";
         }
         final int defaultWaitMinutes = 5;
         boolean isBlocked = waittimeMinutesStr != null;
-        isBlocked |= br.containsHTML("(?i)/>\\s*Téléchargements en cours");
-        isBlocked |= br.containsHTML("(?i)En téléchargement standard, vous ne pouvez télécharger qu\\'un seul fichier");
-        isBlocked |= br.containsHTML("(?i)>\\s*veuillez patienter avant de télécharger un autre fichier");
-        isBlocked |= br.containsHTML("(?i)>\\s*You already downloading (some|a) file");
-        isBlocked |= br.containsHTML("(?i)>\\s*You can download only one file at a time");
-        isBlocked |= br.containsHTML("(?i)>\\s*Please wait a few seconds before downloading new ones");
-        isBlocked |= br.containsHTML("(?i)>\\s*You must wait for another download");
-        isBlocked |= br.containsHTML("(?i)Without premium status, you can download only one file at a time");
-        isBlocked |= br.containsHTML("(?i)Without Premium, you can only download one file at a time");
-        isBlocked |= br.containsHTML("(?i)Without Premium, you must wait between downloads");
+        isBlocked |= br.containsHTML("/>\\s*Téléchargements en cours");
+        isBlocked |= br.containsHTML("En téléchargement standard, vous ne pouvez télécharger qu\\'un seul fichier");
+        isBlocked |= br.containsHTML(">\\s*veuillez patienter avant de télécharger un autre fichier");
+        isBlocked |= br.containsHTML(">\\s*You already downloading (some|a) file");
+        isBlocked |= br.containsHTML(">\\s*You can download only one file at a time");
+        isBlocked |= br.containsHTML(">\\s*Please wait a few seconds before downloading new ones");
+        isBlocked |= br.containsHTML(">\\s*You must wait for another download");
+        isBlocked |= br.containsHTML("Without premium status, you can download only one file at a time");
+        isBlocked |= br.containsHTML("Without Premium, you can only download one file at a time");
+        isBlocked |= br.containsHTML("Without Premium, you must wait between downloads");
         // jdlog://3278035891641 jdlog://7543779150841
-        isBlocked |= br.containsHTML("(?i)Warning ! Without subscription, you can only download one file at|<span style=\"color:red\">Warning\\s*!\\s*</span>\\s*<br/>Without subscription, you can only download one file at a time\\.\\.\\.");
-        isBlocked |= br.containsHTML("(?i)>\\s*Votre adresse IP ouvre trop de connexions vers le serveur");
+        isBlocked |= br.containsHTML("Warning ! Without subscription, you can only download one file at|<span style=\"color:red\">Warning\\s*!\\s*</span>\\s*<br/>Without subscription, you can only download one file at a time\\.\\.\\.");
+        isBlocked |= br.containsHTML(">\\s*Votre adresse IP ouvre trop de connexions vers le serveur");
         if (isBlocked) {
             if (account != null) {
                 final long waitMilliseconds;
@@ -680,8 +680,8 @@ public class OneFichierCom extends PluginForHost {
             // if (validUntilTimestamp > 0) {
             // setValidUntil(ai, validUntilTimestamp);
             // }
-            // final boolean isPremium = br.containsHTML("(?i)>\\s*Premium\\s*(offer)?\\s*Account\\s*<");
-            // final boolean isAccess = br.containsHTML("(?i)>\\s*Access\\s*(offer)\\s*Account\\s*<");
+            // final boolean isPremium = br.containsHTML(">\\s*Premium\\s*(offer)?\\s*Account\\s*<");
+            // final boolean isAccess = br.containsHTML(">\\s*Access\\s*(offer)\\s*Account\\s*<");
             final boolean isPremium = true;
             setValidUntil(ai, validUntilTimestamp);
             if (isPremium) {
@@ -1110,10 +1110,10 @@ public class OneFichierCom extends PluginForHost {
                 if (errorTooManyLoginAttempts != null) {
                     throw new AccountUnavailableException(errorTooManyLoginAttempts, 1 * 60 * 1000l);
                 }
-                if (br.containsHTML("(?i)following many identification errors")) {
-                    if (br.containsHTML("(?i)Your account will be unlock")) {
+                if (br.containsHTML("following many identification errors")) {
+                    if (br.containsHTML("Your account will be unlock")) {
                         throw new AccountUnavailableException("Your account will be unlocked within 1 hour", 60 * 60 * 1000l);
-                    } else if (br.containsHTML("(?i)your IP address") && br.containsHTML("(?i)is temporarily locked")) {
+                    } else if (br.containsHTML("your IP address") && br.containsHTML("is temporarily locked")) {
                         throw new AccountUnavailableException("For security reasons, following many identification errors, your IP address is temporarily locked.", 60 * 60 * 1000l);
                     } else {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -1299,10 +1299,10 @@ public class OneFichierCom extends PluginForHost {
             br.postPage(getContentURLWebsite(link), postData);
             dllink = br.getRedirectLocation();
             if (dllink == null) {
-                if (br.containsHTML("(?i)\">Warning \\! Without premium status, you can download only")) {
+                if (br.containsHTML("\">Warning \\! Without premium status, you can download only")) {
                     logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else if (br.containsHTML("(?i)>\\s*You can use your account only for downloading from") || br.containsHTML(">\\s*Our services are not compatible with massively shared internet access") || br.containsHTML(">\\s*Be carrefull? to not use simultaneously your IPv4 and IPv6 IP")) {
+                } else if (br.containsHTML(">\\s*You can use your account only for downloading from") || br.containsHTML(">\\s*Our services are not compatible with massively shared internet access") || br.containsHTML(">\\s*Be carrefull? to not use simultaneously your IPv4 and IPv6 IP")) {
                     logger.warning("Your using account on multiple IP addresses at once");
                     throw new AccountUnavailableException("Account been used on another Internet connection", 10 * 60 * 1000l);
                 } else {

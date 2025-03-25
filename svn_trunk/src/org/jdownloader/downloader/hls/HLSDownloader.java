@@ -31,24 +31,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.raf.FileBytesMap;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -101,6 +83,24 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.raf.FileBytesMap;
 
 //http://tools.ietf.org/html/draft-pantos-http-live-streaming-13
 public class HLSDownloader extends DownloadInterface {
@@ -350,7 +350,7 @@ public class HLSDownloader extends DownloadInterface {
             } else {
                 this.processID = new UniqueAlltimeID().getID();
                 initPipe(ffprobe);
-                return ffprobe.getStreamInfo("http://" + server.getServerAddress() + "/m3u8?id=" + processID);
+                return ffprobe.getStreamInfo("http://" + server.getServerAddress() + "/m3u8.m3u8?id=" + processID);
             }
         } finally {
             if (stopHttpServer()) {
@@ -897,7 +897,7 @@ public class HLSDownloader extends DownloadInterface {
         l.add("-analyzeduration");// required for low bandwidth streams!
         l.add("15000000");// 15 secs
         l.add("-i");
-        l.add("http://" + server.getServerAddress() + "/m3u8?id=" + processID);
+        l.add("http://" + server.getServerAddress() + "/m3u8.m3u8?id=" + processID);
         if (isMapMetaDataEnabled()) {
             final FFmpegMetaData ffMpegMetaData = getFFmpegMetaData();
             if (ffMpegMetaData != null && !ffMpegMetaData.isEmpty()) {
@@ -1183,7 +1183,7 @@ public class HLSDownloader extends DownloadInterface {
                         }
                         requestOkay = true;
                         return true;
-                    } else if ("/m3u8".equals(request.getRequestedPath())) {
+                    } else if ("/m3u8.m3u8".equals(request.getRequestedPath())) {
                         ffmpeg.updateLastUpdateTimestamp();
                         final M3U8Playlist m3u8 = getCurrentPlayList();
                         if (isSupported(m3u8)) {
@@ -1204,11 +1204,11 @@ public class HLSDownloader extends DownloadInterface {
                                 final M3U8Segment segment = m3u8.getSegment(index);
                                 sb.append("#EXTINF:" + M3U8Segment.toExtInfDuration(segment.getDuration()));
                                 // prefer relative URLs
-                                sb.append("\r\ndownload?id=" + processID + "&ts_index=" + index + "\r\n");
+                                sb.append("\r\ndownload.ts?id=" + processID + "&ts_index=" + index + "\r\n");
                             }
                             sb.append("#EXT-X-ENDLIST\r\n");
                             response.setResponseCode(ResponseCode.get(200));
-                            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/x-mpegURL"));
+                            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "application/vnd.apple.mpegurl"));
                             final byte[] bytes = sb.toString().getBytes("UTF-8");
                             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, String.valueOf(bytes.length)));
                             final OutputStream out = response.getOutputStream(true);
@@ -1219,7 +1219,7 @@ public class HLSDownloader extends DownloadInterface {
                         }
                         requestOkay = true;
                         return true;
-                    } else if ("/download".equals(request.getRequestedPath())) {
+                    } else if ("/download".equals(request.getRequestedPath()) || "/download.ts".equals(request.getRequestedPath())) {
                         final String url = request.getParameterbyKey("url");
                         final String segmentIndex = request.getParameterbyKey("ts_index");
                         if (segmentIndex == null && url == null) {

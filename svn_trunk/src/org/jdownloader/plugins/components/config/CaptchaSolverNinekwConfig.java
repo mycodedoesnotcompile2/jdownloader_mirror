@@ -189,7 +189,7 @@ public interface CaptchaSolverNinekwConfig extends PluginConfigInterface {
     void setMouseconfirm(boolean mouseconfirm);
 
     @AboutConfig
-    @SpinnerValidator(min = 0, max = 10, step = 1)
+    @SpinnerValidator(min = 0, max = 20, step = 1)
     @DefaultIntValue(0)
     @Order(90)
     int getPrio();

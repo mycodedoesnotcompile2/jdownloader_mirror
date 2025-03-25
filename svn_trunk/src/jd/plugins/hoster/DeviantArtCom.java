@@ -61,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50656 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50854 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -497,7 +497,7 @@ public class DeviantArtCom extends PluginForHost {
                     if (StringUtils.equalsIgnoreCase(premiumType, "watchers")) {
                         throw new AccountRequiredException("Item is only accessible for followers of this artist");
                     } else if (blockReasons != null && blockReasons.size() > 0) {
-                        throw new AccountRequiredException("Paid content and blocked for reasons: " + blockReasons);
+                        throw new AccountRequiredException("Paid content and blocked for reasons: " + getCommaSeparatedHumanReadableBlockedReasonString(blockReasons));
                     } else {
                         throw new AccountRequiredException("Paid content");
                     }
@@ -506,7 +506,7 @@ public class DeviantArtCom extends PluginForHost {
                     /* Examples for block reasons we can always circumvent: mature_filter */
                     this.accountRequiredWhenDownloadImpossible = true;
                     if (dllink == null && officialDownloadurl == null) {
-                        throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
+                        throw new AccountRequiredException("Item undownloadable for reasons: " + getCommaSeparatedHumanReadableBlockedReasonString(blockReasons));
                     }
                     /*
                      * Item is blocked due to mature content (= the only blocked reason here) but that limitation can be skipped as image
@@ -518,7 +518,7 @@ public class DeviantArtCom extends PluginForHost {
                     if (remainingReasons.isEmpty() && !isBlurredImageLink(dllink)) {
                         return;
                     } else {
-                        throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
+                        throw new AccountRequiredException("Item undownloadable for reasons: " + getCommaSeparatedHumanReadableBlockedReasonString(blockReasons));
                     }
                 }
             } catch (final AccountRequiredException ar) {
@@ -565,6 +565,37 @@ public class DeviantArtCom extends PluginForHost {
                 } catch (Throwable e) {
                 }
             }
+        }
+    }
+
+    private String getCommaSeparatedHumanReadableBlockedReasonString(final List<String> blockedReasons) {
+        if (blockedReasons == null || blockedReasons.isEmpty()) {
+            throw new IllegalArgumentException();
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (final String blockedReason : blockedReasons) {
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
+            sb.append(getHumanReadableBlockedReason(blockedReason));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns human readable error message to the provided blocked/error key. <br>
+     * If no human readable string is known, the key will be returned instead.
+     */
+    private String getHumanReadableBlockedReason(final String blockedReasonKey) {
+        if (blockedReasonKey == null) {
+            throw new IllegalArgumentException();
+        }
+        if (blockedReasonKey.equalsIgnoreCase("mature_filter")) {
+            return "Mature content: This deviation has been labeled as containing themes not suitable for all deviants.";
+        } else if (blockedReasonKey.equalsIgnoreCase("mature_loggedout")) {
+            return "You need to login";
+        } else {
+            return blockedReasonKey;
         }
     }
 

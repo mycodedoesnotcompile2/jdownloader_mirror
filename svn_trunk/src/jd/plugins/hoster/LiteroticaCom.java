@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48872 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50857 $", interfaceVersion = 3, names = {}, urls = {})
 public class LiteroticaCom extends PluginForHost {
     public LiteroticaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,7 +123,7 @@ public class LiteroticaCom extends PluginForHost {
     }
 
     private void doFree(final DownloadLink link) throws Exception, PluginException {
-        final String contentID = br.getRegex("\"favorite_count\":\\d+,\"id\":(\\d+)").getMatch(0);
+        final String contentID = br.getRegex("(\"|)favorite_count\\1\\s*:\\s*\\d+\\s*,\\s*\\1id\\1\\s*:\\s*(\\d+)").getMatch(1);
         if (contentID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -146,17 +146,16 @@ public class LiteroticaCom extends PluginForHost {
             if (maxPages == -1) {
                 maxPages = ((Number) JavaScriptEngineFactory.walkJson(entries, "meta/pages_count")).intValue();
             }
-            String text = (String) entries.get("pageText");
+            final String text = (String) entries.get("pageText");
             if (StringUtils.isEmpty(text)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            /* Use HTML linebreaks. */
-            text = text.replace("\r\n", "<br  />");
             /* Add page marker */
             sb.append("<br  />");
             sb.append("***** Page " + pageCounter + " *****");
             sb.append("<br  />");
-            sb.append(text);
+            /* Use HTML linebreaks. */
+            sb.append(text.replace("\r\n", "<br  />"));
             if (maxPages == -1) {
                 logger.info("Stopping because: Failed to find maxPages");
                 break;

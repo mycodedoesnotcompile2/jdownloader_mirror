@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50824 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50852 $", interfaceVersion = 2, names = {}, urls = {})
 public class WhatBoysWantCom extends PluginForHost {
     public WhatBoysWantCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,7 +75,7 @@ public class WhatBoysWantCom extends PluginForHost {
     private static final Pattern   TYPE_MOVIES               = Pattern.compile("/movies/show/(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern   TYPE_VIDEOS               = Pattern.compile("/videos/([\\w-]+)/([\\w-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final String    default_EXT_photo         = ".jpg";
-    private static final Pattern[] patterns                  = new Pattern[] { TYPE_BABES_OLD, TYPE_BABES_NEW, TYPE_CAR, TYPE_MOVIES };
+    private static final Pattern[] patterns                  = new Pattern[] { TYPE_BABES_OLD, TYPE_BABES_NEW, TYPE_CAR, TYPE_MOVIES, TYPE_VIDEOS };
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -205,13 +205,16 @@ public class WhatBoysWantCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        requestFileInformation(link);
         doFree(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
     }
 
     private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
         String dllink = checkDirectLink(link, directlinkproperty);
         if (dllink == null) {
+            requestFileInformation(link);
+            if (br.containsHTML(">\\s*Sign up now to watch this video")) {
+                throw new AccountRequiredException("Sign up now to watch this video");
+            }
             dllink = br.getRegex("src=\"(/[^\"]+)\"[^<]*class=\"img-fluid\"").getMatch(0);
             if (dllink == null) {
                 /* 2020-12-09 */

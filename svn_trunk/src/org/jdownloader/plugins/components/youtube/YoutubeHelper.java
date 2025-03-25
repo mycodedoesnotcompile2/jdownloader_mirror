@@ -38,22 +38,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -121,6 +105,22 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 public class YoutubeHelper {
     static {
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
@@ -174,18 +174,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-        @Override
-        public boolean add(final YoutubeReplacer e) {
-            for (final String tag : e.getTags()) {
-                if (REPLACER_MAP.put(tag, e) != null) {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        throw new WTFException("Duplicate error:" + tag);
-                    }
-                }
-            }
-            return super.add(e);
-        };
-    };
+                                                                       @Override
+                                                                       public boolean add(final YoutubeReplacer e) {
+                                                                           for (final String tag : e.getTags()) {
+                                                                               if (REPLACER_MAP.put(tag, e) != null) {
+                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                                                                       throw new WTFException("Duplicate error:" + tag);
+                                                                                   }
+                                                                               }
+                                                                           }
+                                                                           return super.add(e);
+                                                                       };
+                                                                   };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -1485,7 +1485,7 @@ public class YoutubeHelper {
                     function = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
                     if (function != null) {
                         final String varName = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(1);
-                        function = function.replaceAll("if\\s*\\(typeof\\s*[^=]*+\\s*===\\s*\\\"undefined\\\"\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
+                        function = function.replaceAll("if\\s*\\(typeof\\s*[^=]*+\\s*===\\s*(?:\\\"undefined\\\"|\\w+\\[\\d+\\])\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
                     }
                     if (function == null) {
                         // since 2024-08-06
@@ -1535,7 +1535,9 @@ public class YoutubeHelper {
                     final String result = StringUtils.valueOfOrNull(engine.get("result"));
                     if (result != null) {
                         output = result;
-                        if (result.startsWith("org.mozilla.javascript")) {
+                        if (result.equals(value)) {
+                            throw new Exception("Invalid result(unchanged):" + result);
+                        } else if (result.startsWith("org.mozilla.javascript")) {
                             throw new ScriptException(result);
                         } else if (result.startsWith("enhanced_except")) {
                             throw new Exception("Invalid result:" + result);
@@ -1597,7 +1599,10 @@ public class YoutubeHelper {
                         if (descrambler == null) {
                             descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
                             if (descrambler == null) {
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\])\\)").getMatch(0);
+                                if (descrambler == null) {
+                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                                }
                             }
                         }
                     }
@@ -1644,6 +1649,8 @@ public class YoutubeHelper {
                 if (result != null) {
                     if (result.startsWith("org.mozilla.javascript")) {
                         throw new ScriptException(result);
+                    } else if (result.equals(sig)) {
+                        throw new Exception("Invalid result(unchanged):" + result);
                     }
                     logger.info("sig1(" + vid.videoID + "," + playerID + "):" + sig + "->" + result);
                     return result;
@@ -1657,7 +1664,10 @@ public class YoutubeHelper {
                     if (ee != null) {
                         String html5PlayerSource = ensurePlayerSource();
                         // lets look for missing reference
-                        final String ref = new Regex(html5PlayerSource, "var\\s+" + Pattern.quote(ee) + "\\s*=\\s*\\{.*?\\};").getMatch(-1);
+                        String ref = new Regex(html5PlayerSource, "var\\s+" + Pattern.quote(ee) + "\\s*=\\s*\\{.*?\\};").getMatch(-1);
+                        if (ref == null) {
+                            ref = new Regex(html5PlayerSource, "(var\\s*" + Pattern.quote(ee) + ".*?;)\\w+\\s*=\\s*function").getMatch(0);
+                        }
                         if (ref != null) {
                             all = ref + "\r\n" + all;
                             continue;

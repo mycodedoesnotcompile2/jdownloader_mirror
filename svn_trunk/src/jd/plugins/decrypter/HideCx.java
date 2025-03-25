@@ -30,14 +30,16 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 50809 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50853 $", interfaceVersion = 3, names = {}, urls = {})
 public class HideCx extends PluginForDecrypt {
     public HideCx(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,12 +96,43 @@ public class HideCx extends PluginForDecrypt {
         // br.getHeaders().put("Referer", "https://hide.cx/");
         /* Important, else we will get http response 404 */
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
+        final String api_base = "https://api.hide.cx";
         /* API docs: https://hide.cx/settings?tab=api */
-        br.getPage("https://api.hide.cx/containers/" + contentID);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        Map<String, Object> entries = null;
+        String passCode = param.getDecrypterPassword();
+        boolean passwordSuccess = false;
+        passwordLoop: for (int i = 0; i <= 3; i++) {
+            if (i > 0 || passCode != null) {
+                if (i > 0) {
+                    passCode = getUserInput("Password?", param);
+                }
+                br.postPageRaw(api_base + "/containers/" + contentID + "/unlock", "{\"password\":\"" + PluginJSonUtils.escape(passCode) + "\"}");
+                if (br.getHttpConnection().getResponseCode() == 403) {
+                    /* {"error":"no permission password is required"} */
+                    logger.info("Wrong password or password required");
+                    continue;
+                }
+                logger.info("User entered correct password: " + passCode);
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                passwordSuccess = true;
+                break passwordLoop;
+            }
+            br.getPage(api_base + "/containers/" + contentID);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (br.getHttpConnection().getResponseCode() == 403) {
+                /* {"error":"no permission password is required"} */
+                logger.info("Wrong password or password required");
+                continue;
+            }
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            passwordSuccess = true;
+            break passwordLoop;
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (!passwordSuccess) {
+            throw new DecrypterException(DecrypterException.PASSWORD);
+        }
         final String title = (String) entries.get("name");
         final FilePackage fp = FilePackage.getInstance();
         if (title != null) {

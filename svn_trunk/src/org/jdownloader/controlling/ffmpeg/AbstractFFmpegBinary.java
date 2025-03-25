@@ -19,11 +19,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.raf.FileBytesMap;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.resources.AWUTheme;
@@ -50,6 +45,11 @@ import org.jdownloader.controlling.ffmpeg.FFMpegException.ERROR;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
 
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.raf.FileBytesMap;
+
 public abstract class AbstractFFmpegBinary {
     public static enum FLAGTYPE {
         LIB,
@@ -64,6 +64,7 @@ public abstract class AbstractFFmpegBinary {
         WEBM(FLAGTYPE.FORMAT, "E\\s*(webm|matroska,webm)"), // mux
         DASH(FLAGTYPE.FORMAT, "E\\s*dash"), // mux
         HLS(FLAGTYPE.FORMAT, "D\\s*(hls|applehttp)");// demux
+
         private final Pattern  pattern;
         private final FLAGTYPE type;
 
@@ -538,7 +539,7 @@ public abstract class AbstractFFmpegBinary {
                     if (!validateID(request)) {
                         return false;
                     }
-                    if ("/m3u8".equals(request.getRequestedPath())) {
+                    if ("/m3u8.m3u8".equals(request.getRequestedPath())) {
                         updateLastUpdateTimestamp();
                         final Browser br = getRequestBrowser();
                         // work around for longggggg m3u pages
@@ -572,7 +573,7 @@ public abstract class AbstractFFmpegBinary {
                                     if (sb.length() > 0) {
                                         sb.append("\n");
                                     }
-                                    sb.append("http://" + finalServer.getServerAddress() + "/download?id=" + processID + "&ts_index=" + index);
+                                    sb.append("http://" + finalServer.getServerAddress() + "/download.ts?id=" + processID + "&ts_index=" + index);
                                 }
                                 lastSegmentDuration = -1;
                             } else {
@@ -610,7 +611,7 @@ public abstract class AbstractFFmpegBinary {
                         out.flush();
                         requestOkay = true;
                         return true;
-                    } else if ("/download".equals(request.getRequestedPath())) {
+                    } else if ("/download".equals(request.getRequestedPath()) || "/download.ts".equals(request.getRequestedPath())) {
                         final String url = request.getParameterbyKey("url");
                         final String indexString = request.getParameterbyKey("ts_index");
                         if (indexString == null && url == null) {

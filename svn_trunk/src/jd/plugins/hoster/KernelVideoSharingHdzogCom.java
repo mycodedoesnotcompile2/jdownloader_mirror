@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49345 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50853 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingHdzogCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingHdzogCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -32,7 +32,7 @@ public class KernelVideoSharingHdzogCom extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "hdzog.com" });
+        ret.add(new String[] { "hdzog.com", "videohdzog.com" });
         return ret;
     }
 

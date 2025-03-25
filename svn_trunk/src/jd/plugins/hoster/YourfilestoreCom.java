@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49584 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50851 $", interfaceVersion = 3, names = {}, urls = {})
 public class YourfilestoreCom extends PluginForHost {
     public YourfilestoreCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,6 +107,9 @@ public class YourfilestoreCom extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*I cannot find what you|<h1>\\s*Sorry!\\s*</h1>")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*It looks like you got something wrong")) {
+            /* 2025-03-24 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("have requested\\s*<strong>([^<]+)</strong>").getMatch(0);

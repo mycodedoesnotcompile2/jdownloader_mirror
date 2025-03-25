@@ -39,22 +39,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50774 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50854 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZoomUs extends PluginForHost {
     public ZoomUs(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    /* Connection stuff */
-    private static final boolean free_resume        = true;
-    private static final int     free_maxchunks     = 0;
-    private static final int     free_maxdownloads  = -1;
-    private final String         PROPERTY_DIRECTURL = "directurl";
+    private final String PROPERTY_DIRECTURL = "directurl";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "zoom.us" });
+        ret.add(new String[] { "zoom.us", "zoom.com" });
         return ret;
     }
 
@@ -77,7 +73,7 @@ public class ZoomUs extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://zoom.us/de-de/terms.html";
+        return "https://" + getHost() + "/en-us/terms.html";
     }
 
     @Override
@@ -111,17 +107,17 @@ public class ZoomUs extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String errorFromHTML = br.getRegex("class=\"error-message\"[^>]*>(.*?)<").getMatch(0);
+        if (errorFromHTML != null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         String meetingID = br.getRegex("meeting_id\\s*:\\s*\"([^\"]+)\"").getMatch(0);
         if (meetingID == null) {
             meetingID = br.getRegex("meetingID\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
         }
         String fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
-        final String error = br.getRegex("class=\"error-message\"[^>]*>(.*?)<").getMatch(0);
         String topic = null;
         String displayFileName = null;
-        if (error != null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         if (fileId == null) {
             if (meetingID == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -129,13 +125,6 @@ public class ZoomUs extends PluginForHost {
             Map<String, Object> entries = accessPlayShareOnfo(br, meetingID);
             Map<String, Object> result = (Map<String, Object>) entries.get("result");
             final String componentName = result.get("componentName").toString();
-            if (componentName.equalsIgnoreCase("play-forbidden")) {
-                /**
-                 * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","message":"Diese Aufzeichnung ist
-                 * abgelaufen.","redirectUrl":"/rec/component-page","componentName":"play-forbidden","meetingId":"REDACTED","needRedirect":true}}
-                 */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
             if (!Boolean.TRUE.equals(result.get("canPlayFromShare"))) {
                 /* Usually password protected item */
                 if (!componentName.equals("need-password")) {
@@ -200,18 +189,17 @@ public class ZoomUs extends PluginForHost {
                 }
                 pwform.put("recaptcha", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(pwform);
-                final Map<String, Object> entries5 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final Map<String, Object> entries5 = checkErrorsWebAPI(br);
                 /* E.g. invalid password: {"status":false,"errorCode":3302,"errorMessage":"Falscher Kenncode","result":null} */
                 if (Boolean.FALSE.equals(entries5.get("status"))) {
                     link.setDownloadPassword(null);
                     throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-                } else {
-                    /* Correct password! Item should now be downloadable. */
-                    link.setDownloadPassword(passCode);
-                    // br.getPage(link.getPluginPatternMatcher());
-                    entries = accessPlayShareOnfo(br, meetingID);
-                    result = (Map<String, Object>) entries.get("result");
                 }
+                /* Correct password! Item should now be downloadable. */
+                link.setDownloadPassword(passCode);
+                // br.getPage(link.getPluginPatternMatcher());
+                entries = accessPlayShareOnfo(br, meetingID);
+                result = (Map<String, Object>) entries.get("result");
             }
             final String redirectUrl = result.get("redirectUrl").toString();
             if (StringUtils.isEmpty(redirectUrl)) {
@@ -224,10 +212,13 @@ public class ZoomUs extends PluginForHost {
             }
         }
         br.getPage("/nws/recording/1.0/play/info/" + fileId + "?canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
-        final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries2 = checkErrorsWebAPI(br);
         final Map<String, Object> result2 = (Map<String, Object>) entries2.get("result");
         link.setProperty(PROPERTY_DIRECTURL, result2.get("viewMp4Url"));
         final Map<String, Object> meet = (Map<String, Object>) result2.get("meet");
+        if (meet == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         topic = (String) meet.get("topic");
         final Map<String, Object> recording = (Map<String, Object>) result2.get("recording");
         displayFileName = (String) recording.get("displayFileName");
@@ -245,9 +236,28 @@ public class ZoomUs extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    private Map<String, Object> accessPlayShareOnfo(final Browser br, final String meetingID) throws IOException {
+    private Map<String, Object> accessPlayShareOnfo(final Browser br, final String meetingID) throws IOException, PluginException {
         br.getPage("/nws/recording/1.0/play/share-info/" + Encoding.urlEncode(meetingID));
-        return restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        return checkErrorsWebAPI(br);
+    }
+
+    private Map<String, Object> checkErrorsWebAPI(final Browser br) throws IOException, PluginException {
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> result = (Map<String, Object>) entries.get("result");
+        final String componentName = (String) result.get("componentName");
+        if (StringUtils.equalsIgnoreCase(componentName, "play-forbidden")) {
+            /**
+             * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","message":"Diese Aufzeichnung ist
+             * abgelaufen.","redirectUrl":"/rec/component-page","componentName":"play-forbidden","meetingId":"REDACTED","needRedirect":true}}
+             */
+            /*
+             * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","redirectUrl":"/rec/component-page",
+             * "componentName":"play-forbidden","meetingId":
+             * "t4PioJBgTixwd8D5YQJZKh06iVF0wFJs3DZ0YMFpRako760l-KqrIodqNyLS2kqM.6XJax0XtQFFEXjUD","needRedirect":true}}
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        return entries;
     }
 
     @Override
@@ -258,7 +268,7 @@ public class ZoomUs extends PluginForHost {
             throwExceptionOnCaptcha(br);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {
@@ -292,7 +302,7 @@ public class ZoomUs extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -22,12 +22,13 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50851 $", interfaceVersion = 3, names = {}, urls = {})
 public class DailyuploadsNet extends XFileSharingProBasic {
     public DailyuploadsNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -115,5 +116,18 @@ public class DailyuploadsNet extends XFileSharingProBasic {
             return null;
         }
         return dllink;
+    }
+
+    @Override
+    public Form findFormDownload2Premium(final DownloadLink downloadLink, final Account account, final Browser br) throws Exception {
+        /*
+         * 2025-03-24: Special because they've renamed the forms' ID so it differs from XFS default: <form name="F29" method="POST"
+         * action="" id="F29">
+         */
+        final Form form = br.getFormByInputFieldKeyValue("op", "download2");
+        if (form != null) {
+            return form;
+        }
+        return super.findFormDownload2Premium(downloadLink, account, br);
     }
 }
