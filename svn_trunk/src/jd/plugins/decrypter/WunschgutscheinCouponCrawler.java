@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.WunschgutscheinCouponDownload;
 
-@DecrypterPlugin(revision = "$Revision: 50854 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50862 $", interfaceVersion = 3, names = {}, urls = {})
 public class WunschgutscheinCouponCrawler extends PluginForDecrypt {
     public WunschgutscheinCouponCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,13 +80,35 @@ public class WunschgutscheinCouponCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final String contenturl = param.getCryptedUrl();
         final String redeem_id = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
-        br.getPage(getAPIBase(contenturl) + "/api/v2/redeem/link/" + redeem_id);
+        br.getPage(getAPIBase(contenturl) + "/redeem/link/" + redeem_id);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final WunschgutscheinCouponDownload hosterplugin = (WunschgutscheinCouponDownload) this.getNewPluginForHostInstance(this.getHost());
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final List<Map<String, Object>> merchantCodes = (List<Map<String, Object>>) entries.get("merchantCodes");
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        List<Map<String, Object>> merchantCodes = (List<Map<String, Object>>) entries.get("merchantCodes");
+        String comment = "Code war bereits geöffnet";
+        if (merchantCodes.isEmpty()) {
+            /* Gutscheincode "Entschlüsseln" */
+            logger.info("Opening RedeemHash for the first time");
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
+            br.postPageRaw(getAPIBase(contenturl) + "/redeem/merchantcode", String.format("{\"redeemLinkToken\":\"%s\"}", redeem_id));
+            final Object responseO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (!(responseO instanceof List)) {
+                entries = (Map<String, Object>) responseO;
+                final Object errors = entries.get("errors");
+                if (errors != null) {
+                    /* Treat any error as offline error */
+                    logger.info("Found error(s): " + errors);
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            merchantCodes = (List<Map<String, Object>>) responseO;
+            comment = "Code wurde soeben geöffnet";
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int index = -1;
         for (final Map<String, Object> merchantCode : merchantCodes) {
@@ -110,9 +132,11 @@ public class WunschgutscheinCouponCrawler extends PluginForDecrypt {
         fp.setName(entries.get("shopId") + "_" + entries.get("valueInCent") + "_" + redeem_id);
         for (final DownloadLink result : ret) {
             result.setContentUrl(contenturl);
+            result.setProperty(WunschgutscheinCouponDownload.PROPERTY_REDEEM_URL, contenturl);
             result.setProperty(WunschgutscheinCouponDownload.PROPERTY_REDEEM_ID, redeem_id);
             result.setProperty(WunschgutscheinCouponDownload.PROPERTY_SHOP_ID, entries.get("shopId"));
             result.setProperty(WunschgutscheinCouponDownload.PROPERTY_INDEX_MAX, index);
+            result.setComment(comment);
             result._setFilePackage(fp);
             hosterplugin.setFilename(result);
         }
@@ -122,9 +146,15 @@ public class WunschgutscheinCouponCrawler extends PluginForDecrypt {
     public String getAPIBase(final String sourceURL) {
         final boolean isAT = StringUtils.containsIgnoreCase(sourceURL, "wunschgutschein.at");
         if (isAT) {
-            return "https://app.wunschgutschein.at/";
+            return "https://app.wunschgutschein.at/api/v2";
         } else {
-            return "https://app.wunschgutschein.de/";
+            return "https://app.wunschgutschein.de/api/v2";
         }
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* Limit to 1 to try to avoid running into any kind of rate limits. */
+        return 1;
     }
 }

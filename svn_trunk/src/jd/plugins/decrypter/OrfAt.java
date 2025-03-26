@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 50243 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50862 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -697,9 +697,35 @@ public class OrfAt extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        String encryptedID = null;
+        final String json = br.getRegex("id=\"__NUXT_DATA__\"[^>]*>(\\[[^>]+)<").getMatch(0);
+        if (json != null) {
+            /* New 2025-03-25 */
+            final String targetPositionStr = br.getRegex("\"encrypted_id\":(\\d+)").getMatch(0);
+            final List<Object> objects = (List<Object>) restoreFromString(json, TypeRef.OBJECT);
+            if (targetPositionStr != null) {
+                /* Get ID by known position */
+                encryptedID = objects.get(Integer.parseInt(targetPositionStr)).toString();
+            } else {
+                /* Fallback: Search ID by pattern */
+                for (final Object object : objects) {
+                    if (!(object instanceof String)) {
+                        continue;
+                    }
+                    final String str = object.toString();
+                    if (str.matches("[A-Za-z0-9]{36}")) {
+                        encryptedID = str;
+                        break;
+                    }
+                }
+            }
+            if (encryptedID != null) {
+                return crawlOrfmediathekNewEncryptedID(encryptedID, contenturl);
+            }
+        }
+        /* Old way */
         final String videoSource = br.getRegex("data-ssr=\"true\"[^>]*>(.+)</script>").getMatch(0);
         final String videoDurationStr = new Regex(videoSource, "duration=(\\d+)").getMatch(0);
-        String encryptedID = null;
         if (videoDurationStr != null) {
             encryptedID = new Regex(videoSource, "\"([^\"]+)\"," + videoDurationStr).getMatch(0);
         }

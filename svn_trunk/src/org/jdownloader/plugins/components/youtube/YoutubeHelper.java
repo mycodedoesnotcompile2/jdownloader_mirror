@@ -38,6 +38,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -105,22 +121,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 public class YoutubeHelper {
     static {
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
@@ -174,18 +174,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -1397,7 +1397,7 @@ public class YoutubeHelper {
         private String src;
     }
 
-    private HashMap<String, String>  jsCache                 = new HashMap<String, String>();
+    private Map<String, Object>      jsCache                 = new HashMap<String, Object>();
     private HashSet<String>          subtitleUrls;
     private HashSet<StreamMap>       fmtMaps;
     private LinkedHashSet<StreamMap> mpdUrls;
@@ -1469,15 +1469,15 @@ public class YoutubeHelper {
         String output = input;
         final String playerID = getPlayerID(html5PlayerJs);
         final String resultCacheKey = value + "/" + playerID;
+        final String functionCacheKey = "descrambleThrottle/" + playerID;
         String function = null;
         final String cachedResult;
         synchronized (jsCache) {
-            cachedResult = jsCache.get(resultCacheKey);
+            cachedResult = (String) jsCache.get(resultCacheKey);
         }
         if (cachedResult == null) {
-            final String functionCacheKey = "descrambleThrottle/" + playerID;
             synchronized (jsCache) {
-                function = jsCache.get(functionCacheKey);
+                function = (String) jsCache.get(functionCacheKey);
                 if (function == null) {
                     // String[][] func = new Regex(html5PlayerSource,
                     // "(?x)(?:\\.get\\(\"n\"\\)\\)&&\\(b=|b=String\\.fromCharCode\\(110\\),c=a\\.get\\(b\\)\\)&&\\(c=)([a-zA-Z0-9$]+)(?:\\[(\\d+)\\])?\\([a-zA-Z0-9]\\)").getMatches();
@@ -1522,6 +1522,12 @@ public class YoutubeHelper {
                 }
             };
             final Map<String, String> additionalMap = new HashMap<String, String>();
+            synchronized (jsCache) {
+                final Map<String, String> cachedAdditionalMap = (Map<String, String>) jsCache.get(functionCacheKey + "_additional");
+                if (cachedAdditionalMap != null) {
+                    additionalMap.putAll(cachedAdditionalMap);
+                }
+            }
             while (true) {
                 try {
                     JSRhinoPermissionRestricter.THREAD_JSSHUTTER.put(Thread.currentThread(), jsShutter);
@@ -1543,6 +1549,7 @@ public class YoutubeHelper {
                             throw new Exception("Invalid result:" + result);
                         } else {
                             synchronized (jsCache) {
+                                jsCache.put(functionCacheKey + "_additional", new HashMap<String, String>(additionalMap));
                                 jsCache.put(resultCacheKey, output);
                             }
                             break;
@@ -1551,7 +1558,7 @@ public class YoutubeHelper {
                         throw new Exception();
                     }
                 } catch (Exception e) {
-                    final String undefined = new Regex(e.getMessage(), "ReferenceError\\s*:\\s*\"(.*?)\" is not defined").getMatch(0);
+                    final String undefined = new Regex(e.getMessage(), "ReferenceError\\s*:\\s*\"(.*?)\"\\s*(is not defined|n'est pas défini|未定义)?").getMatch(0);
                     if (undefined != null && !additionalMap.containsKey(undefined)) {
                         final String reference = new Regex(ensurePlayerSource(), "(var\\s*" + Pattern.quote(undefined) + ".*?;)\\w+\\s*=\\s*function").getMatch(0);
                         if (reference != null) {
@@ -1588,9 +1595,9 @@ public class YoutubeHelper {
         String descrambler = null;
         String des = null;
         synchronized (jsCache) {
-            all = jsCache.get(resultCacheKey + "all");
-            descrambler = jsCache.get(resultCacheKey + "descrambler");
-            des = jsCache.get(resultCacheKey + "des");
+            all = (String) jsCache.get(resultCacheKey + "all");
+            descrambler = (String) jsCache.get(resultCacheKey + "descrambler");
+            des = (String) jsCache.get(resultCacheKey + "des");
             if (descrambler == null) {
                 if (descrambler == null) {
                     descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
@@ -1659,7 +1666,7 @@ public class YoutubeHelper {
                 if (e.getMessage() != null) {
                     // do not use language components of the error message. Only static identifies, otherwise other languages will fail!
                     // -raztoki
-                    final String ee = new Regex(e.getMessage(), "ReferenceError: \"([\\$\\w]+)\".+<Unknown source>").getMatch(0);
+                    final String ee = new Regex(e.getMessage(), "ReferenceError\\s*:\\s*\"(.*?)\"\\s*(is not defined|n'est pas défini|未定义)?").getMatch(0);
                     // should only be needed on the first entry, then on after 'cache' should get result the first time!
                     if (ee != null) {
                         String html5PlayerSource = ensurePlayerSource();

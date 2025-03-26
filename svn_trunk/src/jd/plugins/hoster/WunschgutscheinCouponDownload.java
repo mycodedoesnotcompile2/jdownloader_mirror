@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50854 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50862 $", interfaceVersion = 3, names = {}, urls = {})
 public class WunschgutscheinCouponDownload extends PluginForHost {
     public WunschgutscheinCouponDownload(PluginWrapper wrapper) {
         super(wrapper);
@@ -190,11 +190,15 @@ public class WunschgutscheinCouponDownload extends PluginForHost {
     }
 
     private String getTextToWrite(final DownloadLink link) {
+        final String downloadlink = link.getStringProperty(PROPERTY_DOWNLOADLINK);
         final StringBuilder sb = new StringBuilder();
-        sb.append("Link: " + link.getContentUrl());
+        sb.append("Link: " + link.getStringProperty(PROPERTY_REDEEM_URL));
+        if (downloadlink != null) {
+            sb.append("\nDownloadlink: " + downloadlink);
+        }
         sb.append("\nRedeemID: " + link.getStringProperty(PROPERTY_REDEEM_ID));
         sb.append("\nShopID: " + link.getStringProperty(PROPERTY_SHOP_ID));
-        sb.append("\nWert: " + link.getIntegerProperty(PROPERTY_VALUE_IN_CENT));
+        sb.append("\nWert: " + String.format("%.2f", link.getIntegerProperty(PROPERTY_VALUE_IN_CENT) / 100.0));
         final String code = link.getStringProperty(PROPERTY_CODE);
         if (code != null) {
             sb.append("\nCode: " + code);

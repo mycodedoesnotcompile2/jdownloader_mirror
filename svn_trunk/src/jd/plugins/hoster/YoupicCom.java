@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49352 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50859 $", interfaceVersion = 3, names = {}, urls = {})
 public class YoupicCom extends PluginForHost {
     public YoupicCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -153,8 +153,23 @@ public class YoupicCom extends PluginForHost {
         }
         final String appB64 = br.getRegex("\"app\"\\), \"([^\"]+)").getMatch(0);
         if (appB64 != null) {
-            /* TODO: Fix this, encoding is wrong */
-            System.out.println(Encoding.Base64Decode(appB64));
+            final String b64decoded = Encoding.Base64Decode(appB64);
+            String internalImgFilename = new Regex(b64decoded, "(\\d+_[a-zA-Z0-9]{10,}_\\d+\\.(?:jpg|JPG))").getMatch(0);
+            if (internalImgFilename == null) {
+                /* Same without file extension e.g. old "short" img ID: 19094620 */
+                internalImgFilename = new Regex(b64decoded, "(\\d+_[a-zA-Z0-9]{10,}_\\d+)").getMatch(0);
+            }
+            /* TODO: This does not work for all images, since not all are available via "legacy" URL. Example: /image/934666914683904 */
+            if (internalImgFilename != null) {
+                this.dllink = "https://youpic.com/i/legacy/0000fa/" + internalImgFilename;
+            }
+        }
+        if (dllink == null) {
+            /*
+             * TODO: This is not the image we want as it contains a "Twitter frame". This is just to provide the user something to download
+             * vs just failing!
+             */
+            dllink = br.getRegex("(/card/message/\\d+/\\d+)").getMatch(0);
         }
         if (!StringUtils.isEmpty(dllink)) {
             dllink = dllink.replaceFirst("(?i)/large/", "/huge/"); // Higher image quality

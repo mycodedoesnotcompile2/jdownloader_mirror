@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -39,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50854 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50859 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZoomUs extends PluginForHost {
     public ZoomUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -190,11 +191,6 @@ public class ZoomUs extends PluginForHost {
                 pwform.put("recaptcha", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(pwform);
                 final Map<String, Object> entries5 = checkErrorsWebAPI(br);
-                /* E.g. invalid password: {"status":false,"errorCode":3302,"errorMessage":"Falscher Kenncode","result":null} */
-                if (Boolean.FALSE.equals(entries5.get("status"))) {
-                    link.setDownloadPassword(null);
-                    throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-                }
                 /* Correct password! Item should now be downloadable. */
                 link.setDownloadPassword(passCode);
                 // br.getPage(link.getPluginPatternMatcher());
@@ -211,9 +207,31 @@ public class ZoomUs extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        br.getPage("/nws/recording/1.0/play/info/" + fileId + "?canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
+        final String originRequestUrl = link.getPluginPatternMatcher();
+        final UrlQuery query0 = new UrlQuery();
+        query0.appendEncoded("canPlayFromShare", "true");
+        query0.appendEncoded("from", "share_recording_detail");
+        query0.appendEncoded("continueMode", "true");
+        query0.appendEncoded("componentName", "rec-play");
+        query0.appendEncoded("originRequestUrl", originRequestUrl);
+        br.getPage("/nws/recording/1.0/play/info/" + fileId + "?" + query0.toString());
         final Map<String, Object> entries2 = checkErrorsWebAPI(br);
         final Map<String, Object> result2 = (Map<String, Object>) entries2.get("result");
+        final String componentName = (String) result2.get("componentName");
+        if (StringUtils.equalsIgnoreCase(componentName, "vanity-url-check")) {
+            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                // TODO: Finish implementation
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("accessLevel", "");
+            query.appendEncoded("vanityURL", result2.get("vanityURL").toString());
+            query.appendEncoded("emid", result2.get("emid").toString());
+            query.appendEncoded("componentName", "vanity-url-check");
+            query.appendEncoded("meetingId", result2.get("emid").toString());
+            query.appendEncoded("originRequestUrl", originRequestUrl);
+            br.getPage("https://" + result2.get("vanityURL") + "/rec/component-page?" + query.toString());
+        }
         link.setProperty(PROPERTY_DIRECTURL, result2.get("viewMp4Url"));
         final Map<String, Object> meet = (Map<String, Object>) result2.get("meet");
         if (meet == null) {
@@ -243,19 +261,39 @@ public class ZoomUs extends PluginForHost {
 
     private Map<String, Object> checkErrorsWebAPI(final Browser br) throws IOException, PluginException {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        /* E.g. invalid password: {"status":false,"errorCode":3302,"errorMessage":"Falscher Kenncode","result":null} */
+        if (Boolean.FALSE.equals(entries.get("status"))) {
+            final Number errorCodeO = (Number) entries.get("errorCode");
+            final String errorMessage = (String) entries.get("errorMessage");
+            if (errorCodeO != null) {
+                final int errorCode = errorCodeO.intValue();
+                if (errorCode == 3301) {
+                    /* {"status":false,"errorCode":3301,"errorMessage":"Diese Aufzeichnung ist nicht vorhanden.","result":null} */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMessage);
+                } else if (errorCode == 3302) {
+                    this.getDownloadLink().setDownloadPassword(null);
+                    throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+                } else {
+                    /* Unknown error */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, errorMessage);
+                }
+            }
+        }
         final Map<String, Object> result = (Map<String, Object>) entries.get("result");
-        final String componentName = (String) result.get("componentName");
-        if (StringUtils.equalsIgnoreCase(componentName, "play-forbidden")) {
-            /**
-             * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","message":"Diese Aufzeichnung ist
-             * abgelaufen.","redirectUrl":"/rec/component-page","componentName":"play-forbidden","meetingId":"REDACTED","needRedirect":true}}
-             */
-            /*
-             * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","redirectUrl":"/rec/component-page",
-             * "componentName":"play-forbidden","meetingId":
-             * "t4PioJBgTixwd8D5YQJZKh06iVF0wFJs3DZ0YMFpRako760l-KqrIodqNyLS2kqM.6XJax0XtQFFEXjUD","needRedirect":true}}
-             */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        if (result != null) {
+            final String componentName = (String) result.get("componentName");
+            if (StringUtils.equalsIgnoreCase(componentName, "play-forbidden")) {
+                /**
+                 * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","message":"Diese Aufzeichnung ist
+                 * abgelaufen.","redirectUrl":"/rec/component-page","componentName":"play-forbidden","meetingId":"REDACTED","needRedirect":true}}
+                 */
+                /*
+                 * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","redirectUrl":"/rec/component-page",
+                 * "componentName":"play-forbidden","meetingId":
+                 * "t4PioJBgTixwd8D5YQJZKh06iVF0wFJs3DZ0YMFpRako760l-KqrIodqNyLS2kqM.6XJax0XtQFFEXjUD","needRedirect":true}}
+                 */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
         }
         return entries;
     }

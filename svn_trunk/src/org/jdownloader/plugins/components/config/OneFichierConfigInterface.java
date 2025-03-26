@@ -20,7 +20,7 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
 
     public static class OneFichierConfigInterfaceTranslation {
         public String getPreferReconnectEnabled_label() {
-            return _JDT.T.lit_prefer_reconnect();
+            return "Free download and IP related download limits: Prefer reconnect?";
         }
 
         public String getPreferSSLEnabled_label() {

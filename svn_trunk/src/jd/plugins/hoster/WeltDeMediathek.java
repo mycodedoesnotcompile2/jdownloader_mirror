@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49338 $", interfaceVersion = 3, names = { "welt.de" }, urls = { "https?://(?:www\\.)?welt\\.de/.*?/(?:video|sendung)\\d+/[A-Za-z0-9\\-]+\\.html" })
+@HostPlugin(revision = "$Revision: 50858 $", interfaceVersion = 3, names = { "welt.de" }, urls = { "https?://(?:www\\.)?welt\\.de/.*?/(?:video|sendung)\\d+/[A-Za-z0-9\\-]+\\.html" })
 public class WeltDeMediathek extends PluginForHost {
     public WeltDeMediathek(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,8 +76,6 @@ public class WeltDeMediathek extends PluginForHost {
         br.getPage(link.getDownloadURL());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("\"DreifaltigkeitLiveMarker\"")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Livestreams are not supported");
         }
         final String url_title = new Regex(link.getDownloadURL(), ".+/(.+)\\.html").getMatch(0);
         /* Tags: schema.org */
@@ -156,6 +154,11 @@ public class WeltDeMediathek extends PluginForHost {
         }
         if (description != null && link.getComment() == null) {
             link.setComment(description);
+        }
+        if (br.containsHTML("\"DreifaltigkeitLiveMarker\"|\"isLive\":true")) {
+            /* E.g. https://www.welt.de/tv-programm-live-stream/ */
+            link.setFinalFileName(this.applyFilenameExtension("LIVESTREAMS_ARE_NOT_SUPPORTED_" + filenameBase, ext));
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Livestreams are not supported");
         }
         link.setFinalFileName(this.applyFilenameExtension(filenameBase, ext));
         if (StringUtils.isNotEmpty(dllink) && !StringUtils.containsIgnoreCase(dllink, ".m3u8")) {

@@ -473,38 +473,52 @@ public class GoogleHelper {
     private final String PROPERTY_HAS_SHOWN_ADDITIONAL_COOKIE_LOGIN_INFORMATION = "has_shown_additional_cookie_login_information";
 
     private void displayAdditionalCookieLoginInformation(final Account account) {
-        if (account.getBooleanProperty(PROPERTY_HAS_SHOWN_ADDITIONAL_COOKIE_LOGIN_INFORMATION, false) == false) {
-            final Thread thread = new Thread() {
-                public void run() {
-                    try {
-                        String message = "";
-                        final String title;
-                        if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                            title = "Google Login - wichtige Information zum Cookie Login";
-                            message += "! ! ! WICHTIGE INFORMATION ZUM GOOGLE COOKIE LOGIN ! ! !";
-                            message += "\r\nWir empfehlen, die Session/Cookies, die du gerade in JDownloader eingegeben hast nicht weiter im Browser zu verwenden.";
-                            message += "\r\nSolltest du diesen Hinweis missachten, werden deine Google Cookies in JDownloader höchstwahrscheinlich nach sehr kurzer Zeit ungültig.";
-                            message += "\r\nWir empfehlen, vor dem Export der Cookies eine neue Session zu eröffnen, die danach nicht mehr im Browser verwendet wird z.B. durch Login in einem Inkognitofenster oder in einem separaten Browserprofil.";
-                        } else {
-                            title = "Google Login - additional cookie login information";
-                            message += "! ! ! IMPORTANT INFORMATION ABOUT GOOGLE COOKIE LOGIN ! ! !";
-                            message += "\r\nWe recommend not to use the same Google session/cookies which you've just entered in JDownloader in your browser!";
-                            message += "\r\nIf you ignore this recommendation, the cookies in JDownloader may expire within a very short time.";
-                            message += "\r\nWe recommend creating a separate Google session in a private browser window or separate browser profile which you are not actively using afterwards!";
-                        }
-                        final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                        dialog.setTimeout(300 * 1000);
-                        final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                        ret.throwCloseExceptions();
-                    } catch (final Throwable e) {
-                        getLogger().log(e);
-                    }
-                };
-            };
-            thread.setDaemon(true);
-            thread.start();
-            account.setProperty(PROPERTY_HAS_SHOWN_ADDITIONAL_COOKIE_LOGIN_INFORMATION, true);
+        if (account.getBooleanProperty(PROPERTY_HAS_SHOWN_ADDITIONAL_COOKIE_LOGIN_INFORMATION, false)) {
+            return;
         }
+        final Thread thread = new Thread() {
+            public void run() {
+                try {
+                    String message = "";
+                    final String title;
+                    String language = System.getProperty("user.language").toLowerCase();
+                    if ("de".equals(language)) {
+                        title = "Google Login - wichtige Information zum Cookie Login";
+                        message += "! ! ! WICHTIGE INFORMATION ZUM GOOGLE COOKIE LOGIN ! ! !";
+                        message += "\r\nWir empfehlen, die Session/Cookies, die du gerade in JDownloader eingegeben hast nicht weiter im Browser zu verwenden.";
+                        message += "\r\nSolltest du diesen Hinweis missachten, werden deine Google Cookies in JDownloader höchstwahrscheinlich nach sehr kurzer Zeit ungültig.";
+                        message += "\r\nWir empfehlen, vor dem Export der Cookies eine neue Session zu eröffnen, die danach nicht mehr im Browser verwendet wird z.B. durch Login in einem Inkognitofenster oder in einem separaten Browserprofil.";
+                    } else if ("es".equals(language)) {
+                        title = "Google Login - información adicional de inicio de sesión con cookies";
+                        message += "! ! ! INFORMACIÓN IMPORTANTE SOBRE EL INICIO DE SESIÓN CON COOKIES DE GOOGLE ! ! !";
+                        message += "\r\n¡Recomendamos no usar la misma sesión/cookies de Google que acaba de ingresar en JDownloader en su navegador!";
+                        message += "\r\nSi ignora esta recomendación, las cookies en JDownloader pueden expirar en muy poco tiempo.";
+                        message += "\r\n¡Recomendamos crear una sesión separada de Google en una ventana privada o perfil separado que no use después!";
+                    } else if ("fr".equals(language)) {
+                        title = "Google Login - informations supplémentaires sur la connexion par cookies";
+                        message += "! ! ! INFORMATIONS IMPORTANTES SUR LA CONNEXION PAR COOKIES GOOGLE ! ! !";
+                        message += "\r\nNous recommandons de ne pas utiliser la même session/cookies Google que vous venez d'entrer dans JDownloader!";
+                        message += "\r\nSi vous ignorez cette recommandation, les cookies dans JDownloader peuvent expirer très rapidement.";
+                        message += "\r\nNous recommandons de créer une session Google séparée dans une fenêtre privée ou profil séparé que vous n'utilisez pas après!";
+                    } else {
+                        title = "Google Login - additional cookie login information";
+                        message += "! ! ! IMPORTANT INFORMATION ABOUT GOOGLE COOKIE LOGIN ! ! !";
+                        message += "\r\nWe recommend not to use the same Google session/cookies which you've just entered in JDownloader in your browser!";
+                        message += "\r\nIf you ignore this recommendation, the cookies in JDownloader may expire within a very short time.";
+                        message += "\r\nWe recommend creating a separate Google session in a private browser window or separate browser profile which you are not actively using afterwards!";
+                    }
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    dialog.setTimeout(300 * 1000);
+                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+                    ret.throwCloseExceptions();
+                } catch (final Throwable e) {
+                    getLogger().log(e);
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+        account.setProperty(PROPERTY_HAS_SHOWN_ADDITIONAL_COOKIE_LOGIN_INFORMATION, true);
     }
 
     public static void errorAccountInvalid(final Account account) throws AccountInvalidException {

@@ -29,6 +29,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -43,7 +44,6 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
-import jd.config.Property;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -65,11 +65,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50853 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50860 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -124,6 +123,41 @@ public class OneFichierCom extends PluginForHost {
     public OneFichierCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/en/register.pl");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private Browser prepareBrowserWebsite(final Browser br) {
+        br.setConnectTimeout(3 * 60 * 1000);
+        br.setReadTimeout(3 * 60 * 1000);
+        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.103 Safari/537.36");
+        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        br.getHeaders().put("Accept-Language", "en-us,en;q=0.5");
+        br.getHeaders().put("Pragma", null);
+        br.getHeaders().put("Cache-Control", null);
+        br.setCustomCharset("utf-8");
+        /* we want ENGLISH! */
+        br.setCookie(this.getHost(), "LG", "en");
+        br.setAllowedResponseCodes(new int[] { 403, 503 });
+        return br;
+    }
+
+    private Browser prepareBrowserAPI(final Browser br, final Account account) throws Exception {
+        if (br == null) {
+            return null;
+        }
+        br.setConnectTimeout(3 * 60 * 1000);
+        br.setReadTimeout(3 * 60 * 1000);
+        br.getHeaders().put("User-Agent", "JDownloader");
+        br.getHeaders().put("Content-Type", "application/json");
+        br.setAllowedResponseCodes(new int[] { 401, 403, 503 });
+        setPremiumAPIHeaders(br, account);
+        return br;
     }
 
     /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
@@ -411,7 +445,7 @@ public class OneFichierCom extends PluginForHost {
                 br.followConnection(true);
                 // link has expired... but it could be for any reason! dont care!
                 // clear saved final link
-                link.setProperty(PROPERTY_HOTLINK, Property.NULL);
+                link.removeProperty(PROPERTY_HOTLINK);
                 br = createNewBrowserInstance();
                 prepareBrowserWebsite(br);
             } else {
@@ -451,18 +485,14 @@ public class OneFichierCom extends PluginForHost {
         /* Not hotlinkable.. standard free link... */
         br.followConnection();
         dllink = null;
-        br.setFollowRedirects(false);
         boolean retried = false;
         int i = 0;
         while (true) {
             i++;
             if (i > 1) {
-                br.setFollowRedirects(true);
-                // no need to do this link twice as it's been done above.
                 br.getPage(contentURL);
-                br.setFollowRedirects(false);
             }
-            if (this.br.getHttpConnection().getResponseCode() == 404) {
+            if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             errorHandlingWebsite(link, account, br);
@@ -524,7 +554,6 @@ public class OneFichierCom extends PluginForHost {
                 break;
             }
         }
-        br.setFollowRedirects(true);
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume_free, maxchunks_free);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             logger.warning("The final dllink seems not to be a file!");
@@ -536,7 +565,7 @@ public class OneFichierCom extends PluginForHost {
         dl.startDownload();
     }
 
-    private static void errorHandlingWebsite(final DownloadLink link, final Account account, final Browser ibr) throws Exception {
+    private void errorHandlingWebsite(final DownloadLink link, final Account account, final Browser ibr) throws Exception {
         long responsecode = 200;
         if (ibr.getHttpConnection() != null) {
             responsecode = ibr.getHttpConnection().getResponseCode();
@@ -568,18 +597,14 @@ public class OneFichierCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Internal database error", 5 * 60 * 1000l);
         } else if (responsecode == 403) {
             if (ibr.containsHTML(">\\s*Premium status must not be used on professional services")) {
-                if (account != null) {
-                    throw new AccountUnavailableException("Premium status must not be used on professional services (VPN, proxies, ...). Use CDN credits", 60 * 60 * 1000l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
+                errorVPNUsed(account);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             if (ibr.containsHTML(">\\s*Premium status is only allowed to be used on residential private and dedicated")) {
-                if (account != null) {
-                    throw new AccountUnavailableException("Premium status is only allowed to be used on residential private and dedicated - internet connexion. Use CDN credits", 60 * 60 * 1000l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
+                errorVPNUsed(account);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 15 * 60 * 1000l);
         } else if (responsecode == 404) {
@@ -589,6 +614,14 @@ public class OneFichierCom extends PluginForHost {
         } else {
             ipBlockedErrorHandling(account, ibr);
         }
+    }
+
+    /** Call this whenever an account was attempted to be used with a VPN/proxy/datacenter IP. */
+    private void errorVPNUsed(final Account account) throws AccountUnavailableException {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.displayVPNWarning(account);
+        }
+        throw new AccountUnavailableException("VPN/proxy/datacenter IP not allowed", 5 * 60 * 1000l);
     }
 
     /**
@@ -673,22 +706,10 @@ public class OneFichierCom extends PluginForHost {
         br.setAllowedResponseCodes(new int[] { 403, 503 });
         loginWebsite(account, true);
         br.getPage("/console/abo.pl");
-        String accountStatus = null;
-        final String validUntil = br.getRegex("(?i)subscription is valid until\\s*<[^<]*>(\\d+-\\d+-\\d+)").getMatch(0);
+        final String validUntil = br.getRegex("subscription is valid until\\s*<[^<]*>(\\d+-\\d+-\\d+)").getMatch(0);
         if (validUntil != null) {
             final long validUntilTimestamp = TimeFormatter.getMilliSeconds(validUntil, "yyyy'-'MM'-'dd", Locale.FRANCE);
-            // if (validUntilTimestamp > 0) {
-            // setValidUntil(ai, validUntilTimestamp);
-            // }
-            // final boolean isPremium = br.containsHTML(">\\s*Premium\\s*(offer)?\\s*Account\\s*<");
-            // final boolean isAccess = br.containsHTML(">\\s*Access\\s*(offer)\\s*Account\\s*<");
-            final boolean isPremium = true;
             setValidUntil(ai, validUntilTimestamp);
-            if (isPremium) {
-                accountStatus = "Premium Account";
-            } else {
-                accountStatus = "Access Account";
-            }
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
@@ -698,35 +719,21 @@ public class OneFichierCom extends PluginForHost {
             account.setConcurrentUsePossible(false);
             final GetRequest get = new GetRequest("https://" + this.getHost() + "/en/console/params.pl");
             get.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            br.setFollowRedirects(true);
             br.getPage(get);
-            accountStatus = "Free Account";
         }
         ai.setUnlimitedTraffic();
         /* Credits are only relevant if usage of credits for downloads is enabled: https://1fichier.com/console/params.pl */
-        final String creditsStr = br.getRegex("(?)>\\s*Your account have ([^<>\"]*?) of[^<]*credits").getMatch(0);
+        final String creditsStr = br.getRegex(">\\s*Your account have ([^<>\"]*?) of[^<]*credits").getMatch(0);
         final boolean useOwnCredits = StringUtils.equalsIgnoreCase("checked", br.getRegex("<input\\s*type=\"checkbox\"\\s*checked=\"(.*?)\"[^>]*name=\"own_credit\"").getMatch(0));
         long creditsAsFilesize = 0;
         if (creditsStr != null) {
             creditsAsFilesize = SizeFormatter.getSize(creditsStr);
         }
-        if (creditsAsFilesize > 0) {
-            if (account.getType() == AccountType.FREE) {
-                ai.setTrafficLeft(creditsAsFilesize);
-                /* Display traffic but do not care about how much is actually left. */
-                ai.setSpecialTraffic(true);
-            }
-            if (useOwnCredits) {
-                accountStatus += " [Using credits]";
-                if (account.getType() == AccountType.FREE) {
-                    /* Treat Free accounts like a premium account if credits are used. */
-                    account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
-                }
-            } else {
-                accountStatus += " [NOT using credits]";
-            }
+        this.setCdnCreditsStatus(account, ai, creditsAsFilesize, useOwnCredits);
+        if (account.getType() == AccountType.FREE && creditsAsFilesize > 0) {
+            /* Display traffic but do not care about how much is actually left. */
+            ai.setSpecialTraffic(true);
         }
-        ai.setStatus(accountStatus);
         return ai;
     }
 
@@ -796,11 +803,9 @@ public class OneFichierCom extends PluginForHost {
             return ai;
         }
         this.handleErrorsAPI(entries, account);
-        final String mail = (String) entries.get("email");
-        if (!StringUtils.isEmpty(mail)) {
-            /* don't store the complete username for security purposes. */
-            final String shortuserName = "***" + mail.substring(3, mail.length());
-            account.setUser(shortuserName);
+        final String email = (String) entries.get("email");
+        if (!StringUtils.isEmpty(email) && !StringUtils.equals(account.getUser(), email)) {
+            account.setUser(email);
         }
         final String subscription_end = (String) entries.get("subscription_end");
         final Object available_credits_in_gigabyteO = entries.get("cdn");
@@ -812,24 +817,22 @@ public class OneFichierCom extends PluginForHost {
                 available_credits_in_gigabyte = Double.parseDouble(available_credits_in_gigabyteO.toString());
             }
         }
-        final long useOwnCredits = JavaScriptEngineFactory.toLong(entries.get("use_cdn"), 0);
+        final boolean useCDNCredits = JavaScriptEngineFactory.toLong(entries.get("use_cdn"), 0) == 1 ? true : false;
         long validuntil = 0;
         if (!StringUtils.isEmpty(subscription_end)) {
             validuntil = TimeFormatter.getMilliSeconds(subscription_end, "yyyy-MM-dd HH:mm:ss", Locale.FRANCE);
         }
-        String accountStatus;
         if (validuntil > System.currentTimeMillis()) {
             /* Premium */
             account.setType(AccountType.PREMIUM);
-            accountStatus = "Premium Account";
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
             setValidUntil(ai, validuntil);
             ai.setUnlimitedTraffic();
         } else {
             /* Free --> 2019-07-18: API Keys are only available for premium users so this should never happen! */
+            ai.setExpired(true);
             account.setType(AccountType.FREE);
-            accountStatus = "Free Account [DL not possible in API mode]";
             account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
             account.setConcurrentUsePossible(false);
             /*
@@ -837,27 +840,34 @@ public class OneFichierCom extends PluginForHost {
              */
             ai.setTrafficLeft(0);
         }
-        /* 2019-04-04: Credits are only relevant for free accounts according to website: https://1fichier.com/console/params.pl */
-        String creditsStatus = "";
-        if (available_credits_in_gigabyte > 0) {
-            final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
-            final long available_credits_in_bytes = (long) available_credits_in_gigabyte;
-            final String available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, available_credits_in_bytes);
-            creditsStatus = available_credits_human_readable + " CDN credits available | Used: ";
-            if (useOwnCredits == 1) {
-                creditsStatus += "No";
-                if (account.getType() == AccountType.FREE) {
-                    /* Treat Free accounts like a premium account if credits are used. */
-                    account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
-                }
-                ai.setTrafficLeft(available_credits_in_bytes);
-            } else {
-                creditsStatus += "Yes";
-            }
-            accountStatus += creditsStatus;
+        final long available_credits_in_bytes = (long) available_credits_in_gigabyte;
+        if (AccountType.FREE.equals(account.getType()) && (available_credits_in_gigabyte <= 0 || !useCDNCredits)) {
+            /* Free accounts cannot be used for normal downloading via API Key */
+            ai.setExpired(true);
+            throw new AccountInvalidException("Free accounts cannot be used for normal downloading via API (only for CDN credits downloading)");
         }
-        ai.setStatus(accountStatus);
+        setCdnCreditsStatus(account, ai, available_credits_in_bytes, useCDNCredits);
         return ai;
+    }
+
+    /** Sets CDN credit status and account status text */
+    private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes, final boolean useCDNCredits) {
+        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+        final String available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, creditsInBytes);
+        String cdnCreditsStatus = "CDN credits: " + available_credits_human_readable + " | Used: ";
+        if (AccountType.FREE.equals(account.getType()) && useCDNCredits) {
+            cdnCreditsStatus += "Yes";
+            if (account.getType() == AccountType.FREE) {
+                /* Treat Free accounts like a premium account if credits are used. */
+                account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
+            }
+            ai.setTrafficLeft(creditsInBytes);
+            ai.setTrafficRefill(false);
+        } else {
+            cdnCreditsStatus += "No";
+        }
+        final String accountStatus = account.getType().getLabel() + " " + cdnCreditsStatus;
+        ai.setStatus(accountStatus);
     }
 
     private Map<String, Object> parseAPIResponse(final Account account) throws PluginException {
@@ -888,8 +898,10 @@ public class OneFichierCom extends PluginForHost {
     private Map<String, Object> handleErrorsAPI(final Map<String, Object> entries, final Account account) throws PluginException {
         final Object statusO = entries.get("status");
         if (statusO == null) {
+            /* No error */
             return entries;
         } else if (!"KO".equalsIgnoreCase((String) statusO)) {
+            /* No error */
             return entries;
         }
         final String message = (String) entries.get("message");
@@ -911,21 +923,20 @@ public class OneFichierCom extends PluginForHost {
             errorInvalidAPIKey(account);
         } else if (message.matches("(?i)Owner locked\\s*#\\d+")) {
             /* 2021-01-29 */
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Account banned: " + message, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            throw new AccountInvalidException("Account banned: " + message);
         } else if (message.matches("(?i)IP Locked\\s*#\\d+")) {
             throw new AccountUnavailableException(message, 60 * 60 * 1000l);
         } else if (message.matches("(?i).*Must be a customer.*")) {
             /* 2020-06-09: E.g. {"message":"Must be a customer (Premium, Access) #200","status":"KO"} */
             /* Free account (most likely expired premium) apikey entered by user --> API can only be used by premium users */
-            // showAPIFreeAccountLoginFailureInformation();
-            final AccountInfo ai = new AccountInfo();
-            ai.setExpired(true);
-            account.setAccountInfo(ai);
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Premium expired: Only premium users can use the 1fichier API", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            throw new AccountInvalidException("Premium expired: Only premium users can use the 1fichier API");
         } else if (isAPIErrorPassword(message)) {
             /* 2021-02-10: This will usually be handled outside of this errorhandling! */
-            if (this.getDownloadLink().getDownloadPassword() != null) {
+            if (this.getDownloadLink() != null && this.getDownloadLink().getDownloadPassword() != null) {
                 this.getDownloadLink().setDownloadPassword(null);
+                if (lastSessionPassword.get() != null && lastSessionPassword.get().equals(this.getDownloadLink().getDownloadPassword())) {
+                    lastSessionPassword.set(null);
+                }
             } else {
                 lastSessionPassword.set(null);
             }
@@ -937,6 +948,8 @@ public class OneFichierCom extends PluginForHost {
             }
         } else if (message.matches("(?i).*Resource not allowed #\\d+")) {
             errorAccessControlLimit(this.getDownloadLink());
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (message.matches("(?i).*Resource not found #\\d+")) {
             /* Usually goes along with http response 404 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -946,7 +959,7 @@ public class OneFichierCom extends PluginForHost {
         } else {
             /* Unknown/unhandled error */
             logger.warning("Handling unknown API error: " + message);
-            if (this.getDownloadLink() == null) {
+            if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
                 /* Account error */
                 throw new AccountUnavailableException(message, 5 * 60 * 1000l);
             } else {
@@ -979,54 +992,9 @@ public class OneFichierCom extends PluginForHost {
         sb.append("\r\nYou can find your API Key here: 1fichier.com/console/params.pl");
         sb.append("\r\nIf you bought a 'premium key'/'Voucher'/'Activation key' from a reseller, you first need to create a 1fichier account and redeem that code here: 1fichier.com/console/vu.pl");
         sb.append("\r\nPlease keep in mind that API Keys are only available for premium customers.");
-        sb.append("\r\nInformation for 1fichier.com FREE-account users:");
-        sb.append("\r\nIf you do not own a premium- but only a free account, Go to Settings -> Plugins -> 1fichier.com -> 'Use premium API' -> Disable this -> Now try to login again, this time with username & password.");
+        sb.append("\r\nInformation for 1fichier FREE-account users:");
+        sb.append("\r\nTo use free accounts in JD, Go to Settings -> Plugins -> 1fichier.com -> 'Use premium API' -> Disable this -> Now try to login again, this time with your e-mail & password.");
         throw new AccountInvalidException(sb.toString());
-    }
-
-    /**
-     * 2020-06-10: This message was designed to be displayed whenever a premium account which was used in API mode is not premium anymore.
-     * Because free accounts of this host are pretty much useless and we do not want to encourage users to use the website mode, this has
-     * only been used in one revision for a short time.
-     */
-    @Deprecated
-    private Thread showAPIFreeAccountLoginFailureInformation() {
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = "1fichier.com - Free Account Login";
-                        message += "Hallo liebe(r) 1fichier NutzerIn\r\n";
-                        message += "Du hast gerade versucht, einen kostenlosen 1fichier Account im API Modus zu verwenden oder dein Account war bis vor kurzem ein Premium Account und ist nun abgelaufen.\r\n";
-                        message += "Im API Modus ist die Verwendung eines kostenlosen 1fichier Accounts nicht möglich.\r\n";
-                        message += "Falls du dennoch einen solchen Account in JDownloader verwenden möchtest, beachte bitte die folgende Anleitung:\r\n";
-                        message += "1. Deaktiviere die 2-Faktor-Authentifizierung deines 1fichier Accounts - diese wird von JD nicht unterstützt!\r\n";
-                        message += "2. DEAKTIVIERE die folgende Einstellung: Einstellungen --> Plugins --> 1fichier.com --> \"Use premium API?\"\r\n";
-                        message += "3. Jetzt kannst du deinen kostenlosen 1fichier Account mit E-Mail und Passwort eingeben.\r\n";
-                    } else {
-                        title = "1fichier.com - Free Account Login";
-                        message += "Hello dear 1fichier user\r\n";
-                        message += "You've just tried to add a free 1fichier account to JDownloader in API mode or your former premikum account has expired and is now a free account.\r\n";
-                        message += "Using a 1fichier free account in API mode is impossible.\r\n";
-                        message += "If you're planning to use your free 1fichier account in JDownloader nonetheless, please follow these instructions:\r\n";
-                        message += "1. If enabled, deactivate the 2-factor-authentication in your 1fichier account - JD does not support this.\r\n";
-                        message += "2. DEACTIVATE the following setting: Settings --> Plugins --> 1fichier.com --> \"Use premium API?\"\r\n";
-                        message += "3. Now you can add your 1fichier free account via E-Mail and password.\r\n";
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(3 * 60 * 1000);
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
     }
 
     /** Checks whether we're logged in via website. */
@@ -1073,11 +1041,6 @@ public class OneFichierCom extends PluginForHost {
             logger.info("Performing full website login");
             final String username = account.getUser();
             final String password = account.getPass();
-            if (username == null || !username.matches(".+@.+")) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "You need to use Email as username!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else if (password == null) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "No password given!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
             final UrlQuery query = new UrlQuery();
             query.add("mail", Encoding.urlEncode(username));
             query.add("pass", Encoding.urlEncode(password));
@@ -1106,25 +1069,20 @@ public class OneFichierCom extends PluginForHost {
                 }
             }
             if (!isLoggedinWebsite(this.br)) {
-                final String errorTooManyLoginAttempts = br.getRegex("(?i)>(More than \\d+ login try per \\d+ minutes is not allowed)").getMatch(0);
+                final String errorTooManyLoginAttempts = br.getRegex(">\\s*(More than \\d+ login try per \\d+ minutes is not allowed)").getMatch(0);
                 if (errorTooManyLoginAttempts != null) {
                     throw new AccountUnavailableException(errorTooManyLoginAttempts, 1 * 60 * 1000l);
                 }
                 if (br.containsHTML("following many identification errors")) {
                     if (br.containsHTML("Your account will be unlock")) {
-                        throw new AccountUnavailableException("Your account will be unlocked within 1 hour", 60 * 60 * 1000l);
+                        throw new AccountUnavailableException("Your account will be unlocked within 1 hour", 10 * 60 * 1000l);
                     } else if (br.containsHTML("your IP address") && br.containsHTML("is temporarily locked")) {
-                        throw new AccountUnavailableException("For security reasons, following many identification errors, your IP address is temporarily locked.", 60 * 60 * 1000l);
+                        throw new AccountUnavailableException("For security reasons, following many identification errors, your IP address is temporarily locked.", 15 * 60 * 1000l);
                     } else {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                 }
-                logger.info("Username/Password also invalid via site login or user has 2FA login enabled!");
-                if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername/Passwort oder Zwei-Faktor-Authentifizierung aktiviert!\r\nFalls du die Zwei-Faktor-Authentifizierung aktiviert hast, kannst du diese deaktivieren und es erneut versuchen.\r\nPremium Benutzer können die Zwei-Faktor-Authentifizierung aktiviert lassen und es per API Login erneut versuchen.\r\nErklärung des Logins per API (nur premium Benutzer):\r\n1. Login per API in den JD Einstellungen aktivieren: Einstellungen -> Plugins -> 1fichier.com -> Use Premium API\r\n2. Deinen API Key von der 1fichier Webseite kopieren: 1fichier.com/console/params.pl\r\n3. Erneut versuchen, deinen 1fichier Account in JD hinzuzufügen und dabei den API Key eingeben.\r\nFalls du myjdownloader verwendest, gib deinen API Key in das Benutzername- & Passwort Feld ein.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password or 2-factor-authentication enabled!\r\nIf you have 2-factor-authentication enabled, you have to disable it and try again.\r\nPremium users can leave 2FA login enabled and try again via API login:\r\nHow to login in JD via API key (premium users only):\r\n1. Enable API Key login for JD via Settings -> Plugins -> 1fichier.com -> Use Premium API\r\n2. Get your API Key from the following webpage: 1fichier.com/console/params.pl\r\n3. Open this add-account-dialog again and enter your API key to add your account to JD.\r\nIn case you are using myjdownloader, enter your API Key in both the username- and password field.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
+                throw new AccountInvalidException();
             }
             setBasicAuthHeader(br, account);
             account.saveCookies(br.getCookies(br.getHost()), "");
@@ -1133,7 +1091,7 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.1fichier.com/en/cgu.html";
+        return "https://www." + getHost() + "/en/cgu.html";
     }
 
     @Override
@@ -1200,7 +1158,6 @@ public class OneFichierCom extends PluginForHost {
                 } else {
                     dllink = dllink.replaceFirst("https://", "http://");
                 }
-                br.setFollowRedirects(true);
                 link.setProperty(PROPERTY_PREMLINK, dllink);
                 dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume_account_premium, maxChunks);
                 if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -1221,7 +1178,7 @@ public class OneFichierCom extends PluginForHost {
          */
         final boolean checkFileInfoBeforeDownloadAttempt = false;
         if (checkFileInfoBeforeDownloadAttempt) {
-            requestFileInformationAPI(this.br, link, account);
+            requestFileInformationAPI(br, link, account);
         }
         setPremiumAPIHeaders(br, account);
         /* Do NOT trust pwProtected as this is obtained via website or old mass-linkcheck API!! */
@@ -1239,17 +1196,16 @@ public class OneFichierCom extends PluginForHost {
                     }
                 }
             }
-            /**
-             * TODO: Check if/when we need additional json POST parameters: inline, restrict_ip, no_ssl, folder_id, sharing_user
-             */
             /** Description of optional parameters: cdn=0/1 - use download-credits, */
-            performAPIRequest(API_BASE + "/download/get_token.cgi", String.format("{\"url\":\"%s\",\"pass\":\"%s\"}", this.getContentURL(link), passCode));
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("url", this.getContentURL(link));
+            postdata.put("pass", link.getDownloadPassword());
+            postdata.put("no_ssl", PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled() == false ? 1 : 0);
+            performAPIRequest(API_BASE + "/download/get_token.cgi", JSonStorage.serializeToJson(postdata));
             // TODO: Make use of this parsed json response down below!
             final Map<String, Object> entries = handleErrorsAPI(account);
-            /**
-             * 2021-02-10: This will ask for a password for all kinds of access limited files. They will have to update their API to fix
-             * this. Example self uploaded file, only downloadable from afghanistan: https://1fichier.com/?uczre58xge6pif2d9n6g
-             */
+            /* 2019-04-04: Downloadlink is officially only valid for 5 minutes */
+            dllink = entries.get("url").toString();
             if (passCode != null) {
                 lastSessionPassword.set(passCode);
                 link.setDownloadPassword(passCode);
@@ -1258,9 +1214,6 @@ public class OneFichierCom extends PluginForHost {
                 link.setPasswordProtected(false);
             }
         }
-        /* 2019-04-04: Downloadlink is officially only valid for 5 minutes */
-        /* TODO: Obtain this value from parsed json, see Map "entries". */
-        dllink = PluginJSonUtils.getJson(br, "url");
         if (StringUtils.isEmpty(dllink)) {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadurl");
@@ -1271,51 +1224,62 @@ public class OneFichierCom extends PluginForHost {
     private String getDllinkPremiumWebsite(final DownloadLink link, final Account account) throws Exception {
         String dllink = null;
         loginWebsite(account, false);
+        final boolean isFollowingRedirects = br.isFollowingRedirects();
         br.setFollowRedirects(false);
-        br.getPage(this.getContentURL(link));
-        // error checking, offline links can happen here.
-        errorHandlingWebsite(link, account, br);
-        dllink = br.getRedirectLocation();
-        if (this.getDownloadPasswordForm() != null) {
-            handleDownloadPasswordWebsite(link);
-            /*
-             * The users' 'direct download' setting has no effect on the password handling so we should always get a redirect to the final
-             * downloadlink after having entered the correct download password (for premium users).
-             */
+        try {
+            br.getPage(this.getContentURL(link));
+            // error checking, offline links can happen here.
+            errorHandlingWebsite(link, account, br);
             dllink = br.getRedirectLocation();
-            if (dllink == null) {
-                dllink = br.getRegex(regex_dllink_middle).getMatch(1);
+            if (this.getDownloadPasswordForm() != null) {
+                handleDownloadPasswordWebsite(link);
+                /*
+                 * The users' 'direct download' setting has no effect on the password handling so we should always get a redirect to the
+                 * final downloadlink after having entered the correct download password (for premium users).
+                 */
+                dllink = br.getRedirectLocation();
                 if (dllink == null) {
-                    logger.warning("After successful password handling: Final downloadlink 'dllink' is null");
-                    this.handleErrorsLastResortWebsite(link, account);
+                    dllink = br.getRegex(regex_dllink_middle).getMatch(1);
+                    if (dllink == null) {
+                        logger.warning("After successful password handling: Final downloadlink 'dllink' is null");
+                        this.handleErrorsLastResortWebsite(link, account);
+                    }
                 }
             }
-        }
-        ipBlockedErrorHandling(account, br);
-        if (dllink == null) {
-            /* The link is always SSL - based on user setting it will redirect to either https or http. */
-            String postData = "did=0&";
-            postData += getSSLFormValue();
-            br.postPage(getContentURLWebsite(link), postData);
-            dllink = br.getRedirectLocation();
+            ipBlockedErrorHandling(account, br);
             if (dllink == null) {
-                if (br.containsHTML("\">Warning \\! Without premium status, you can download only")) {
-                    logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else if (br.containsHTML(">\\s*You can use your account only for downloading from") || br.containsHTML(">\\s*Our services are not compatible with massively shared internet access") || br.containsHTML(">\\s*Be carrefull? to not use simultaneously your IPv4 and IPv6 IP")) {
-                    logger.warning("Your using account on multiple IP addresses at once");
-                    throw new AccountUnavailableException("Account been used on another Internet connection", 10 * 60 * 1000l);
+                /* The link is always SSL - based on user setting it will redirect to either https or http. */
+                String postData = "did=0&";
+                /* Returns postPage key + data based on the users' SSL preference. */
+                if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
+                    // logger.info("User prefers download with SSL");
+                    postData += "dlssl=SSL+Download";
                 } else {
-                    logger.warning("Final downloadlink 'dllink' is null");
-                    this.handleErrorsLastResortWebsite(link, account);
+                    logger.info("User prefers download without SSL");
+                    postData += "dl=Download";
+                }
+                br.postPage(getContentURLWebsite(link), postData);
+                dllink = br.getRedirectLocation();
+                if (dllink == null) {
+                    if (br.containsHTML("\">Warning \\! Without premium status, you can download only")) {
+                        logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
+                        throw new AccountInvalidException("Account is no premium anymore");
+                    } else if (br.containsHTML(">\\s*You can use your account only for downloading from") || br.containsHTML(">\\s*Our services are not compatible with massively shared internet access") || br.containsHTML(">\\s*Be carrefull? to not use simultaneously your IPv4 and IPv6 IP")) {
+                        throw new AccountUnavailableException("You are trying to use this account on multiple IP addresses at once", 10 * 60 * 1000l);
+                    } else {
+                        logger.warning("Final downloadlink 'dllink' is null");
+                        this.handleErrorsLastResortWebsite(link, account);
+                    }
                 }
             }
+        } finally {
+            br.setFollowRedirects(isFollowingRedirects);
         }
         return dllink;
     }
 
-    private void performAPIRequest(final String url, final String json_params) throws IOException {
-        PostRequest downloadReq = br.createJSonPostRequest(url, json_params);
+    private void performAPIRequest(final String url, final String json_string) throws IOException {
+        final PostRequest downloadReq = br.createJSonPostRequest(url, json_string);
         downloadReq.setContentType("application/json");
         br.openRequestConnection(downloadReq);
         br.loadConnection(null);
@@ -1458,19 +1422,6 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
-    /* Returns postPage key + data based on the users' SSL preference. */
-    private String getSSLFormValue() {
-        String formdata;
-        if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
-            logger.info("User prefers download with SSL");
-            formdata = "dlssl=SSL+Download";
-        } else {
-            logger.info("User prefers download without SSL");
-            formdata = "dl=Download";
-        }
-        return formdata;
-    }
-
     /** Ends up in PluginException(LinkStatus.ERROR_PLUGIN_DEFECT). */
     private void handleErrorsLastResortWebsite(final DownloadLink link, final Account account) throws PluginException {
         if (account != null && !this.isLoggedinWebsite(this.br)) {
@@ -1487,34 +1438,87 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
-    private void prepareBrowserWebsite(final Browser br) {
-        if (br == null) {
+    private final String PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING = "has_shown_vpn_login_warning";
+
+    private void displayVPNWarning(final Account account) {
+        if (account == null) {
+            throw new IllegalArgumentException();
+        }
+        if (account.getBooleanProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING, false)) {
+            /* Message has already been displayed for this account */
             return;
         }
-        br.setConnectTimeout(3 * 60 * 1000);
-        br.setReadTimeout(3 * 60 * 1000);
-        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.103 Safari/537.36");
-        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        br.getHeaders().put("Accept-Language", "en-us,en;q=0.5");
-        br.getHeaders().put("Pragma", null);
-        br.getHeaders().put("Cache-Control", null);
-        br.setCustomCharset("utf-8");
-        /* we want ENGLISH! */
-        br.setCookie(this.getHost(), "LG", "en");
-        br.setAllowedResponseCodes(new int[] { 403, 503 });
-    }
-
-    public static Browser prepareBrowserAPI(final Browser br, final Account account) throws Exception {
-        if (br == null) {
-            return null;
-        }
-        br.setConnectTimeout(3 * 60 * 1000);
-        br.setReadTimeout(3 * 60 * 1000);
-        br.getHeaders().put("User-Agent", "JDownloader");
-        br.getHeaders().put("Content-Type", "application/json");
-        br.setAllowedResponseCodes(new int[] { 401, 403, 503 });
-        setPremiumAPIHeaders(br, account);
-        return br;
+        final Thread thread = new Thread() {
+            public void run() {
+                try {
+                    String message = "";
+                    final String title;
+                    String language = System.getProperty("user.language").toLowerCase();
+                    if ("de".equals(language)) {
+                        title = "VPN/Proxy oder Rechenzentrum-IP erkannt!";
+                        message += "Anmeldung fehlgeschlagen :(";
+                        message += "\r\nEs scheint, dass Sie eine VPN/Proxy oder Rechenzentrum-IP verwenden, die laut den Nutzungsbedingungen von 1fichier nicht für Premium-Nutzer erlaubt ist";
+                        message += "\r\nWas kann dagegen getan werden?";
+                        message += "\r\n1. Prüfen Sie, ob Sie sich über die 1fichier-Website anmelden und herunterladen können.\r\nWenn Sie eine Fehlermeldung wie \"Must have CDN\" erhalten, wurde Ihre IP aus einem bestimmten Grund markiert.";
+                        message += "\r\n2. Stellen Sie sicher, dass Sie eine normale Heim-IP verwenden, deaktivieren Sie alle Proxys/VPNs und versuchen Sie es erneut.";
+                        message += "\r\n3. Wenn Sie bewusst einen VPN/Proxy/Rechenzentrum-IP verwenden, müssen Sie CDN-Guthaben kaufen und zum Herunterladen verwenden, siehe '1fichier.com/tarifs.html' -> Scrollen Sie nach unten zu 'CDN Angebot'";
+                        message += "\r\n";
+                        message += "\r\nWenn das Problem weiterhin besteht:";
+                        message += "\r\nWenn Sie denken, dass dies ein Fehler ist, kontaktieren Sie den 1fichier Support: 1fichier.com/contact.html";
+                        message += "\r\nDies ist kein JDownloader-Fehler, sondern eine serverseitige Fehlermeldung, die wir Ihnen hier einfach weiterleiten.";
+                        message += "\r\nWeitere Informationen zu diesem Thema: https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                    } else if ("es".equals(language)) {
+                        title = "¡VPN/proxy o IP de centro de datos detectada!";
+                        message += "Inicio de sesión fallido :(";
+                        message += "\r\nParece que está usando una VPN/proxy o IP de centro de datos que los usuarios premium no pueden usar según los términos de servicio de 1fichier";
+                        message += "\r\n¿Qué se puede hacer al respecto?";
+                        message += "\r\n1. Compruebe si puede iniciar sesión y descargar a través del sitio web de 1fichier.\r\nSi recibe un mensaje de error similar a \"Must have CDN\", su IP ha sido marcada por algún motivo.";
+                        message += "\r\n2. Asegúrese de usar una IP doméstica normal, desactive cualquier proxy/VPN e intente nuevamente.";
+                        message += "\r\n3. Si está usando conscientemente una VPN/proxy/IP de centro de datos, debe comprar créditos CDN y usarlos para descargar, vea '1fichier.com/tarifs.html' -> Desplácese hacia abajo hasta 'Oferta CDN'";
+                        message += "\r\n";
+                        message += "\r\nSi el problema no desaparece:";
+                        message += "\r\nSi cree que esto es un error, contacte al soporte de 1fichier: 1fichier.com/contact.html";
+                        message += "\r\nEsto no es un error de JDownloader sino un mensaje de error del servidor que simplemente le reenviamos aquí.";
+                        message += "\r\nMás información sobre este tema: https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                    } else if ("fr".equals(language)) {
+                        title = "VPN/proxy ou IP de centre de données détecté !";
+                        message += "Échec de connexion :(";
+                        message += "\r\nIl semble que vous utilisez un VPN/proxy ou une IP de centre de données que les utilisateurs premium ne sont pas autorisés à utiliser selon les conditions d'utilisation de 1fichier";
+                        message += "\r\nQue peut-on faire à ce sujet ?";
+                        message += "\r\n1. Vérifiez si vous pouvez vous connecter et télécharger via le site web 1fichier.\r\nSi vous recevez un message d'erreur similaire à \"Must have CDN\", votre IP a été signalée pour une raison quelconque.";
+                        message += "\r\n2. Assurez-vous d'utiliser une IP domestique régulière, désactivez tout proxy/VPN et réessayez.";
+                        message += "\r\n3. Si vous utilisez sciemment un VPN/proxy/IP de centre de données, vous devez acheter des crédits CDN et les utiliser pour télécharger, voir '1fichier.com/tarifs.html' -> Faites défiler jusqu'à 'Offre CDN'";
+                        message += "\r\n";
+                        message += "\r\nSi le problème ne disparaît pas :";
+                        message += "\r\nSi vous pensez qu'il s'agit d'une erreur, contactez le support de 1fichier : 1fichier.com/contact.html";
+                        message += "\r\nCe n'est pas un bug de JDownloader mais un message d'erreur côté serveur que nous vous transmettons simplement ici.";
+                        message += "\r\nPlus d'informations sur ce sujet : https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                    } else {
+                        title = "VPN/proxy or datacenter IP detected!";
+                        message += "Login failed :(";
+                        message += "\r\nIt looks like you are using a VPN/proxy or datacenter IP which is premium users are not allowed to use according to the terms of service of 1fichier";
+                        message += "\r\nWhat can be done about this?";
+                        message += "\r\n1. Check if you can login and download via the 1fichier website.\r\nIf you are getting an error message similar to \"Must have CDN\", your IP was flagged for some reason.";
+                        message += "\r\n2. Ensure that you are using a regular home IP, disable any proxy/VPN and try again.";
+                        message += "\r\n3. If you are knowingly using a VPN/proxy/datacenter IP, you need to purchase CDN credits and use them for downloading, see '1fichier.com/tarifs.html' -> Scroll down to 'CDN Offer'";
+                        message += "\r\n";
+                        message += "\r\nIf the problem does not disappear:";
+                        message += "\r\nIf you think this is a mistake, contact the 1fichier support: 1fichier.com/contact.html";
+                        message += "\r\nThis is not a JDownloader bug but a server side error message which we are simply forwarding to you here.";
+                        message += "\r\nMore information about this topic: https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                    }
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    dialog.setTimeout(300 * 1000);
+                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+                    ret.throwCloseExceptions();
+                } catch (final Throwable e) {
+                    getLogger().log(e);
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+        account.setProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING, true);
     }
 
     @Override

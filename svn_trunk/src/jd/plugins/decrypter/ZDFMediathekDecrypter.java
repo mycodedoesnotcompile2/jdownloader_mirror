@@ -62,7 +62,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 50852 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 50861 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -406,8 +406,11 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         } else {
             contenturl = param.getCryptedUrl();
         }
-        final String videoContentIDFromURL = new Regex(contenturl, "/([\\w-]+)[^/]*$").getMatch(0);
-        String videoContentID = null;
+        String sophoraID_safe = this.getSophoraIDFromURL_safe(contenturl);
+        if (sophoraID_safe != null) {
+            /* We know that this is a single video so we can skip the steps down below. */
+            return crawlZdfVideoViaSophoraID(param, sophoraID_safe);
+        }
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -415,95 +418,75 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             /* E.g. https://www.zdf.de/3sat/politik-und-gesellschaft/die-schweizer-alpen-3-100.html */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String seriesSlug = new Regex(contenturl, "https?://[^/]+/(?:filme|serien)/([\\w-]+)").getMatch(0);
-        if (seriesSlug != null) {
+        sophoraID_safe = this.getSophoraIDFromURL_safe(br.getURL());
+        if (sophoraID_safe != null) {
+            /* We know that this is a single video so we can skip the steps down below. */
+            return crawlZdfVideoViaSophoraID(param, sophoraID_safe);
+        }
+        final Regex seriesURLRegex = new Regex(br.getURL(), "https://[^/]+/([\\w-]+)/([\\w-]+)[^/]*");
+        final String seriesSlug = seriesURLRegex.getMatch(1);
+        final String html_unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+        final String seriesHash = new Regex(html_unescaped, "\"__typename\":\"Season\",\"id\":\"([^\"]+)").getMatch(0);
+        if (seriesSlug != null && seriesHash != null) {
             /* Crawl all episodes of a series */
-            final String html_unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
-            final String seriesHash = new Regex(html_unescaped, "\"__typename\":\"Season\",\"id\":\"([^\"]+)").getMatch(0);
             final String seasonStr = UrlQuery.parse(contenturl).get("staffel");
             final Integer season = seasonStr != null ? Integer.parseInt(seasonStr) : null;
-            return this.crawlZdfSeries(seriesSlug, seriesHash, season);
+            return this.crawlZdfSeries(param, seriesSlug, seriesHash, season);
         }
-        final String[] embeddedVideos = br.getRegex("/embed/\\?mediaID=(/[^<>\"']+)").getColumn(0);
-        if (embeddedVideos != null && embeddedVideos.length > 0) {
-            /*
-             * Check for embedded video items e.g.:
-             * https://www.zdf.de/nachrichten/heute-sendungen/tafeln-reduzierung-lebensmittel-ausgabe-video-100.html
-             */
-            final HashSet<String> sophoraIDs = new HashSet<String>();
-            for (final String url : embeddedVideos) {
-                final String[] urlparts = url.split("/");
-                final String lastPart = urlparts[urlparts.length - 1];
-                if (lastPart.matches("[a-z0-9\\-_]+")) {
-                    sophoraIDs.add(lastPart);
-                    videoContentID = lastPart;
+        String sophoraID = new Regex(html_unescaped, "\"__typename\":\"Video\",\"id\":\"[^\"]+\",\"canonical\":\"([\\w-]+)").getMatch(0);
+        if (sophoraID == null) {
+            final String[] embeddedVideos = br.getRegex("/embed/\\?mediaID=(/[^<>\"']+)").getColumn(0);
+            if (embeddedVideos != null && embeddedVideos.length > 0) {
+                /*
+                 * Check for embedded video items e.g.:
+                 * https://www.zdf.de/nachrichten/heute-sendungen/tafeln-reduzierung-lebensmittel-ausgabe-video-100.html
+                 */
+                final HashSet<String> sophoraIDs = new HashSet<String>();
+                for (final String url : embeddedVideos) {
+                    final String[] urlparts = url.split("/");
+                    final String lastPart = urlparts[urlparts.length - 1];
+                    if (lastPart.matches("[a-z0-9\\-_]+")) {
+                        sophoraIDs.add(lastPart);
+                        sophoraID = lastPart;
+                    }
+                }
+                if (sophoraIDs.size() > 1) {
+                    logger.warning("Website contains multiple video embedIDs -> Crawling only last video: " + sophoraID);
                 }
             }
-            if (sophoraIDs.size() > 1) {
-                logger.warning("Website contains multiple video embedIDs -> Crawling only last video: " + videoContentID);
+            if (sophoraID == null) {
+                // TODO: 2025-03-19: Check if this is still needed
+                sophoraID = br.getRegex("\"embed_content\"\\s*:\\s*\"(/.*?)\"").getMatch(0);
+                if (sophoraID == null) {
+                    sophoraID = br.getRegex("embed_content\\s*:\\s*'([^\"\\']+)").getMatch(0);
+                }
+            }
+            if (sophoraID == null) {
+                /* Try to obtain ID from older style links */
+                final String videoContentIDFromURL = new Regex(contenturl, "/([\\w-]+)[^/]*$").getMatch(0);
+                sophoraID = videoContentIDFromURL;
             }
         }
-        if (videoContentID == null) {
-            // TODO: 2025-03-19: Check if this is still needed
-            videoContentID = br.getRegex("\"embed_content\"\\s*:\\s*\"(/.*?)\"").getMatch(0);
-            if (videoContentID == null) {
-                videoContentID = br.getRegex("embed_content\\s*:\\s*'([^\"\\']+)").getMatch(0);
-            }
-        }
-        if (videoContentID == null) {
-            videoContentID = videoContentIDFromURL;
-        }
-        if (videoContentID == null) {
+        if (sophoraID == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String apitoken = br.getRegex("\"apiToken\"\\s*:\\s*\"([^\"\\']+)").getMatch(0);
-        if (apitoken == null) {
-            apitoken = br.getRegex("apiToken\\s*:\\s*'([^\"\\']+)").getMatch(0);
+        return crawlZdfVideoViaSophoraID(param, sophoraID);
+    }
+
+    /**
+     * Returns sophora ID from URL. <br>
+     * Only returns something if we know for sure that the result is a sophoraID.
+     */
+    private String getSophoraIDFromURL_safe(final String url) {
+        return new Regex(url, "(?i)/play/([\\w-]+)/([\\w-]+)/([\\w-]+)").getMatch(2);
+    }
+
+    private ArrayList<DownloadLink> crawlZdfVideoViaSophoraID(final CryptedLink param, final String sophoraID) throws Exception {
+        if (StringUtils.isEmpty(sophoraID)) {
+            throw new IllegalArgumentException();
         }
-        if (apitoken == null) {
-            /* 2024-12-16: Static fallback */
-            apitoken = "20c238b5345eb428d01ae5c748c5076f033dfcc7";
-        }
-        /* E.g. zdf.de content */
-        String api_base = br.getRegex("apiService\\s*:\\s*'(https?://[^<>\"\\']+)").getMatch(0);
-        if (api_base == null) {
-            /* 2024-12-16 */
-            api_base = "https://api.zdf.de";
-        }
-        final String profileStatic = "player-3";
-        final boolean useStaticProfile = true;
-        String profile = null;
-        if (useStaticProfile) {
-            profile = profileStatic;
-        } else {
-            String config = br.getRegex("\"config\"\\s*:\\s*\"(https?://.*?)\"").getMatch(0);
-            if (config == null) {
-                config = br.getRegex("player\\s*:\\s*\\{[^\\}]*js\\s*:\\s*'(https?://[^\"\\']+)").getMatch(0);
-            }
-            if (config == null) {
-                config = "https://ngp.zdf.de/configs/zdf/zdf2016/configuration.json";
-                // config = "https://ngp.zdf.de/miniplayer/embed/configuration.json";
-            }
-            profile = br.getRegex("\\.json\\?profile=([^\"]+)\"").getMatch(0);
-            if (config != null) {
-                final Browser brc = br.cloneBrowser();
-                brc.getPage(config);
-                String profileTmp = brc.getRegex("\"apiProfile\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-                if (profileTmp == null) {
-                    profileTmp = brc.getRegex("apiProfile\\s*:\\s*(?:\"|')([^\"\\']+)").getMatch(0);
-                }
-                if (profileTmp == null) {
-                    profileTmp = brc.getRegex("DEFAULT_API_PROFILE\\s*=\\s*(?:\"|')([^\"\\']+)").getMatch(0);
-                }
-                if (profileTmp != null) {
-                    profile = profileTmp;
-                }
-            }
-            if (profile == null) {
-                profile = profileStatic;
-            }
-        }
-        final String apiAccessURL = api_base + "/content/documents/" + videoContentID + ".json?profile=" + profile;
+        final String apitoken = "20c238b5345eb428d01ae5c748c5076f033dfcc7";
+        final String apiAccessURL = "https://api.zdf.de/content/documents/" + sophoraID + ".json?profile=player-3";
         final GetRequest request = br.createGetRequest(apiAccessURL);
         request.getHeaders().put("Api-Auth", "Bearer " + apitoken);
         br.getPage(request);
@@ -518,7 +501,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
      * https://www.zdf.de/filme/collection-index-page-ard-collection-ard-dxjuomfyzdpzag93oji0ytqxodqzy2q5mtlmyjg-762?staffel=2025 <br>
      * https://www.zdf.de/serien/hacks-104
      */
-    private ArrayList<DownloadLink> crawlZdfSeries(final String seriesSlug, final String seriesHash, final Integer season) throws Exception {
+    private ArrayList<DownloadLink> crawlZdfSeries(final CryptedLink param, final String seriesSlug, final String seriesHash, final Integer season) throws Exception {
         logger.info("Crawling series " + seriesSlug + " | Season: " + season);
         if (seriesSlug == null) {
             throw new IllegalArgumentException();
@@ -545,11 +528,22 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             final Map<String, Object> episodes = (Map<String, Object>) season_node.get("episodes");
             final List<Map<String, Object>> episodes_nodes = (List<Map<String, Object>>) episodes.get("nodes");
             final Map<String, Object> episodes_pageInfo = (Map<String, Object>) episodes.get("pageInfo");
+            int episodes_index = 0;
             for (final Map<String, Object> episode_node : episodes_nodes) {
-                final String url = episode_node.get("sharingUrl").toString();
-                final DownloadLink link = this.createDownloadlink(url);
-                ret.add(link);
-                distribute(link);
+                final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(episode_node, "tracking/piano/video");
+                final String sophoraID = video.get("av_content_id").toString();
+                // final String url = episode_node.get("sharingUrl").toString();
+                logger.info("Crawling episode " + (episodes_index + 1) + "/" + episodes_nodes.size() + " | " + sophoraID);
+                final ArrayList<DownloadLink> episodeResults = this.crawlZdfVideoViaSophoraID(param, sophoraID);
+                ret.addAll(episodeResults);
+                distribute(episodeResults);
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
+                episodes_index++;
+            }
+            if (this.isAbort()) {
+                throw new InterruptedException();
             }
         }
         return ret;
@@ -591,6 +585,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             streamsJsonURL = streamsJsonURL.replace("{playerId}", "android_native_5");
         }
         String title = (String) entries.get("title");
+        final String currentVideoType = (String) entries.get("currentVideoType");
         final String description = (String) entries.get("leadParagraph");
         final String editorialDate = (String) entries.get("editorialDate");
         final Object tvStationo = entries.get("tvService");
@@ -608,7 +603,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                 break findSeriesInfo;
             }
             final Number episodeDuration = (Number) seriesMetadata.get("episodeDuration");
-            if (episodeDuration == null || episodeDuration.intValue() == 0) {
+            final Object seriesTotalEpisodeNumber = seriesMetadata.get("seriesTotalEpisodeNumber");
+            if ((episodeDuration == null || episodeDuration.intValue() == 0) && seriesTotalEpisodeNumber == null) {
                 /* Not a series, example: https://kurz.zdf.de/Rxpnz/ */
                 break findSeriesInfo;
             }

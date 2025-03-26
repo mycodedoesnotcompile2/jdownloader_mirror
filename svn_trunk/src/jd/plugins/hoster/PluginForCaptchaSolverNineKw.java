@@ -18,6 +18,8 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
+import org.jdownloader.plugins.components.config.CaptchaSolverNinekwConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -32,7 +34,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 2Captcha captcha solving service (https://2captcha.com/).
  */
-@HostPlugin(revision = "$Revision: 50839 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50863 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -139,9 +141,6 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             throw new AccountInvalidException(error);
         }
         final int errorcode = Integer.parseInt(errorNumber);
-        if (errorcode == 1 || errorcode == 2) {
-            throw new AccountInvalidException(error);
-        }
         if (errorcode == 1 || errorcode == 2 || errorcode == 3 || errorcode == 4 || errorcode == 5 || errorcode == 11 || errorcode == 26 || errorcode == 30 || errorcode == 31 || errorcode == 32) {
             throw new AccountInvalidException(error);
         } else {
@@ -152,39 +151,39 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
 
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
-        final UrlQuery query = new UrlQuery();
-        query.appendEncoded("action", "usercaptchaupload");
+        final UrlQuery q = new UrlQuery();
+        q.appendEncoded("action", "usercaptchaupload");
         final Challenge<?> captchachallenge = job.getChallenge();
         final Map<String, Object> task = new HashMap<String, Object>(); // APIv2
         if (captchachallenge instanceof RecaptchaV2Challenge) {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) captchachallenge;
-            query.appendEncoded("data-sitekey", challenge.getSiteKey());
-            query.appendEncoded("oldsource", challenge.getTypeID() + "");
-            query.appendEncoded("isInvisible", challenge.isInvisible() == true ? "1" : "0");
+            q.appendEncoded("data-sitekey", challenge.getSiteKey());
+            q.appendEncoded("oldsource", challenge.getTypeID() + "");
+            q.appendEncoded("isInvisible", challenge.isInvisible() == true ? "1" : "0");
             final Map<String, Object> v3action = challenge.getV3Action();
             if (v3action != null) {
-                query.appendEncoded("pageurl", challenge.getSiteUrl());
-                query.appendEncoded("captchachoice", "recaptchav3");
-                query.appendEncoded("actionname", (String) v3action.get("action"));
-                query.appendEncoded("min_score", "0.3");// minimal score
+                q.appendEncoded("pageurl", challenge.getSiteUrl());
+                q.appendEncoded("captchachoice", "recaptchav3");
+                q.appendEncoded("actionname", (String) v3action.get("action"));
+                q.appendEncoded("min_score", "0.3");// minimal score
             } else {
                 // if (options.isSiteDomain()) {
                 // query.appendEncoded("pageurl", rcChallenge.getSiteDomain());
                 // } else {
                 // query.appendEncoded("pageurl", rcChallenge.getSiteUrl());
                 // }
-                query.appendEncoded("pageurl", challenge.getSiteUrl());
-                query.appendEncoded("captchachoice", "recaptchav2");
+                q.appendEncoded("pageurl", challenge.getSiteUrl());
+                q.appendEncoded("captchachoice", "recaptchav2");
             }
-            query.appendEncoded("securetoken", challenge.getSecureToken());
-            query.appendEncoded("interactive", "1");
+            q.appendEncoded("securetoken", challenge.getSecureToken());
+            q.appendEncoded("interactive", "1");
         } else if (captchachallenge instanceof HCaptchaChallenge) {
             final HCaptchaChallenge challenge = (HCaptchaChallenge) captchachallenge;
-            query.appendEncoded("data-sitekey", challenge.getSiteKey());
-            query.appendEncoded("pageurl", challenge.getSiteUrl());
-            query.appendEncoded("oldsource", "hcaptcha");
-            query.appendEncoded("captchachoice", "hcaptcha");
-            query.appendEncoded("interactive", "1");
+            q.appendEncoded("data-sitekey", challenge.getSiteKey());
+            q.appendEncoded("pageurl", challenge.getSiteUrl());
+            q.appendEncoded("oldsource", "hcaptcha");
+            q.appendEncoded("captchachoice", "hcaptcha");
+            q.appendEncoded("interactive", "1");
         } else if (captchachallenge instanceof CutCaptchaChallenge) {
             /* CutCaptcha: https://2captcha.com/api-docs/cutcaptcha */
             final CutCaptchaChallenge challenge = (CutCaptchaChallenge) captchachallenge;
@@ -195,40 +194,44 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         } else if (captchachallenge instanceof ClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
-            query.appendEncoded("mouse", "1");
-            query.appendEncoded("base64", "1");
-            query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            q.appendEncoded("mouse", "1");
+            q.appendEncoded("base64", "1");
+            q.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
         } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-            query.appendEncoded("multimouse", "1");
-            query.appendEncoded("base64", "1");
-            query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            q.appendEncoded("multimouse", "1");
+            q.appendEncoded("base64", "1");
+            q.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
         } else if (captchachallenge instanceof ImageCaptchaChallenge) {
             /* Image captcha: https://2captcha.com/api-docs/normal-captcha */
             final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge<String>) job.getChallenge();
-            query.appendEncoded("base64", "1");
-            query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            q.appendEncoded("base64", "1");
+            q.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
-        query.appendEncoded("maxtimeout", Math.min(60, captchachallenge.getTimeout()) + "");
+        q.appendEncoded("maxtimeout", Math.min(60, captchachallenge.getTimeout()) + "");
         if (captchachallenge.getExplain() != null) {
-            query.appendEncoded("textinstructions", captchachallenge.getExplain());
+            q.appendEncoded("textinstructions", captchachallenge.getExplain());
         }
         try {
-            final Map<String, Object> uploadresp = this.callAPI(query, account);
+            final Map<String, Object> uploadresp = this.callAPI(q, account);
             // TODO: Add captcha check loop
         } catch (IOException e) {
             e.printStackTrace();
         }
-        // qi.appendEncoded("captchaperhour", options.getCph() + "");
-        // qi.appendEncoded("captchapermin", options.getCpm() + "");
-        // qi.appendEncoded("prio", options.getPriothing() + "");
-        // qi.appendEncoded("selfsolve", options.isSelfsolve() + "");
-        // qi.appendEncoded("confirm", options.isConfirm() + "");
-        // qi.appendEncoded("maxtimeout", options.getTimeoutthing() + "");
-        // qi.addAll(options.getMoreoptions().list());
-        // qi.appendEncoded("oldsource", getChallenge(job).getTypeID() + "");
+        final CaptchaSolverNinekwConfig cfg = PluginJsonConfig.get(CaptchaSolverNinekwConfig.class);
+        q.appendEncoded("captchaperhour", cfg.getHour() + "");
+        q.appendEncoded("captchapermin", cfg.getMinute() + "");
+        q.appendEncoded("prio", cfg.getPrio() + "");
+        q.appendEncoded("selfsolve", cfg.isSelfsolve() + "");
+        q.appendEncoded("confirm", cfg.isConfirm() + "");
+        // q.appendEncoded("maxtimeout", cfg.tt + "");
+    }
+
+    @Override
+    public Class<? extends CaptchaSolverNinekwConfig> getConfigInterface() {
+        return CaptchaSolverNinekwConfig.class;
     }
 }
