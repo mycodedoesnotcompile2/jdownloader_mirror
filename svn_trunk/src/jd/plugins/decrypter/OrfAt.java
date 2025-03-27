@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -40,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 50862 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50866 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -667,6 +668,17 @@ public class OrfAt extends PluginForDecrypt {
         if (isCrawlGaplessOnly && numberofGaplessItems == 0) {
             logger.info("User wants gapless only but gapless is not available for this item");
         }
+        if (ret.isEmpty()) {
+            /* Hm no results -> Check if item has been deleted */
+            final String killdate = (String) entries.get("killdate");
+            if (!StringUtils.isEmpty(killdate)) {
+                final long delete_date_millis = TimeFormatter.getMilliSeconds(killdate, "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ENGLISH);
+                if (delete_date_millis < System.currentTimeMillis()) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         /**
          * Add more properties which are the same for all results. </br>
          * It is important that all items run through this loop!
@@ -701,11 +713,11 @@ public class OrfAt extends PluginForDecrypt {
         final String json = br.getRegex("id=\"__NUXT_DATA__\"[^>]*>(\\[[^>]+)<").getMatch(0);
         if (json != null) {
             /* New 2025-03-25 */
-            final String targetPositionStr = br.getRegex("\"encrypted_id\":(\\d+)").getMatch(0);
+            final String encrypted_id_index_str = br.getRegex("\"encrypted_id\":(\\d+)").getMatch(0);
             final List<Object> objects = (List<Object>) restoreFromString(json, TypeRef.OBJECT);
-            if (targetPositionStr != null) {
+            if (encrypted_id_index_str != null) {
                 /* Get ID by known position */
-                encryptedID = objects.get(Integer.parseInt(targetPositionStr)).toString();
+                encryptedID = objects.get(Integer.parseInt(encrypted_id_index_str)).toString();
             } else {
                 /* Fallback: Search ID by pattern */
                 for (final Object object : objects) {
@@ -719,19 +731,10 @@ public class OrfAt extends PluginForDecrypt {
                     }
                 }
             }
-            if (encryptedID != null) {
-                return crawlOrfmediathekNewEncryptedID(encryptedID, contenturl);
-            }
-        }
-        /* Old way */
-        final String videoSource = br.getRegex("data-ssr=\"true\"[^>]*>(.+)</script>").getMatch(0);
-        final String videoDurationStr = new Regex(videoSource, "duration=(\\d+)").getMatch(0);
-        if (videoDurationStr != null) {
-            encryptedID = new Regex(videoSource, "\"([^\"]+)\"," + videoDurationStr).getMatch(0);
         }
         if (encryptedID == null) {
-            /* Lazy attempt */
-            encryptedID = new Regex(videoSource, "\"([A-Za-z0-9]{36})\"").getMatch(0);
+            /* Last resort fallback */
+            encryptedID = br.getRegex("\"([A-Za-z0-9]{36})\"").getMatch(0);
         }
         if (encryptedID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

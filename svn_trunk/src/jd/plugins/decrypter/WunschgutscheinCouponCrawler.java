@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.WunschgutscheinCouponDownload;
 
-@DecrypterPlugin(revision = "$Revision: 50862 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50867 $", interfaceVersion = 3, names = {}, urls = {})
 public class WunschgutscheinCouponCrawler extends PluginForDecrypt {
     public WunschgutscheinCouponCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,22 +114,29 @@ public class WunschgutscheinCouponCrawler extends PluginForDecrypt {
         for (final Map<String, Object> merchantCode : merchantCodes) {
             index++;
             final String url = (String) merchantCode.get("link");
-            final DownloadLink result = this.createDownloadlink(contenturl);
-            result.setDefaultPlugin(hosterplugin);
-            result.setHost(this.getHost());
-            if (url != null) {
-                result.setProperty(WunschgutscheinCouponDownload.PROPERTY_DOWNLOADLINK, url);
+            if (url == null || WunschgutscheinCouponDownload.isSelfhostedDownloadableURL(url)) {
+                final DownloadLink result = this.createDownloadlink(contenturl);
+                result.setDefaultPlugin(hosterplugin);
+                result.setHost(this.getHost());
+                if (url != null) {
+                    result.setProperty(WunschgutscheinCouponDownload.PROPERTY_DOWNLOADLINK, url);
+                }
+                result.setProperty(WunschgutscheinCouponDownload.PROPERTY_VALUE_IN_CENT, merchantCode.get("valueInCent"));
+                result.setProperty(WunschgutscheinCouponDownload.PROPERTY_CODE, merchantCode.get("code"));
+                result.setProperty(WunschgutscheinCouponDownload.PROPERTY_PIN, merchantCode.get("pin"));
+                result.setProperty(WunschgutscheinCouponDownload.PROPERTY_SERIAL_NUMBER, merchantCode.get("serialNumber"));
+                result.setProperty(WunschgutscheinCouponDownload.PROPERTY_INDEX, index);
+                result.setAvailable(true);
+                ret.add(result);
+            } else {
+                /* Externally hosted voucher e.g. ecard.cadooz.com */
+                final DownloadLink result = this.createDownloadlink(url);
+                ret.add(result);
             }
-            result.setProperty(WunschgutscheinCouponDownload.PROPERTY_VALUE_IN_CENT, merchantCode.get("valueInCent"));
-            result.setProperty(WunschgutscheinCouponDownload.PROPERTY_CODE, merchantCode.get("code"));
-            result.setProperty(WunschgutscheinCouponDownload.PROPERTY_PIN, merchantCode.get("pin"));
-            result.setProperty(WunschgutscheinCouponDownload.PROPERTY_SERIAL_NUMBER, merchantCode.get("serialNumber"));
-            result.setProperty(WunschgutscheinCouponDownload.PROPERTY_INDEX, index);
-            result.setAvailable(true);
-            ret.add(result);
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(entries.get("shopId") + "_" + entries.get("valueInCent") + "_" + redeem_id);
+        fp.setPackageKey("wunschgutschein://redeemhash/" + redeem_id);
         for (final DownloadLink result : ret) {
             result.setContentUrl(contenturl);
             result.setProperty(WunschgutscheinCouponDownload.PROPERTY_REDEEM_URL, contenturl);

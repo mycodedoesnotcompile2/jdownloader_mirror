@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 49742 $", interfaceVersion = 3, names = { "urlgalleries.net" }, urls = { "https?://(?:[\\w\\-]+\\.)?urlgalleries\\.net/[\\w\\-]+.+" })
+@DecrypterPlugin(revision = "$Revision: 50867 $", interfaceVersion = 3, names = { "urlgalleries.net" }, urls = { "https?://(?:[\\w\\-]+\\.)?urlgalleries\\.net/[\\w\\-]+.+" })
 public class RlGalleriesNt extends PluginForDecrypt {
     private static String agent = null;
 
@@ -142,6 +142,15 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 if (isOffline(br)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
+                if (br.containsHTML("Continue to the image")) {
+                    /* 2025-03-26: Single image */
+                    final String finallink = br.getRegex("window\\.location\\.href = '(http?://[^']+)").getMatch(0);
+                    if (finallink == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    ret.add(this.createDownloadlink(finallink));
+                    return ret;
+                }
                 String title = br.getRegex("border='0' /></a></div>(?:\\s*<h\\d+[^>]*>\\s*)?(.*?)(?:\\s*</h\\d+>\\s*)?</td></tr><tr>").getMatch(0);
                 if (title == null) {
                     title = br.getRegex("<title>([^<]*?)</title>").getMatch(0);
@@ -229,18 +238,19 @@ public class RlGalleriesNt extends PluginForDecrypt {
                 }
                 br.getPage(redirect);
             } while (counter <= 5);
-            if (isOffline(br) || br.containsHTML("/not_found_adult\\.php")) {
+            if (isOffline(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML("/not_found_adult\\.php")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            String finallink = null;
             if (redirect != null) {
-                finallink = redirect;
-            } else {
-                finallink = br.getRegex("linkDestUrl\\s*=\\s*\\'(http[^<>\"\\']+)\\'").getMatch(0);
-                if (finallink == null) {
-                    /* 2023-02-17 */
-                    finallink = br.getRegex("externalUrl\\s*=\\s*(?:\\'|\")(http[^<>\"\\']+)").getMatch(0);
-                }
+                ret.add(this.createDownloadlink(redirect));
+                return ret;
+            }
+            String finallink = br.getRegex("linkDestUrl\\s*=\\s*\\'(http[^<>\"\\']+)\\'").getMatch(0);
+            if (finallink == null) {
+                /* 2023-02-17 */
+                finallink = br.getRegex("externalUrl\\s*=\\s*(?:\\'|\")(http[^<>\"\\']+)").getMatch(0);
             }
             if (finallink == null) {
                 /* Invalid link or plugin broken */

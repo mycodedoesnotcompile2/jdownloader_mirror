@@ -4,8 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -16,20 +19,27 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 45927 $", interfaceVersion = 2, names = { "livestream.com" }, urls = { "https?://(www\\.)?livestream\\.com/[^<>\"]+/events/\\d+/?$" })
+@DecrypterPlugin(revision = "$Revision: 50866 $", interfaceVersion = 2, names = { "livestream.com" }, urls = { "https?://(www\\.)?livestream\\.com/[^<>\"]+/events/\\d+/?$" })
 public class LiveStreamCom extends PluginForDecrypt {
     public LiveStreamCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    public ArrayList<DownloadLink> decryptIt(CryptedLink parameter, ProgressController progress) throws Exception {
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
-        br.getPage(parameter.getCryptedUrl());
+        return br;
+    }
+
+    @Override
+    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
+        br.getPage(param.getCryptedUrl());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final String title = br.getRegex("<title>\\s*(.*?)\\s*(?:on\\s*Livestream)?\\s*</title>").getMatch(0);
-        final String eventsID = new Regex(parameter.getCryptedUrl(), "/events/(\\d+)").getMatch(0);
+        final String eventsID = new Regex(param.getCryptedUrl(), "/events/(\\d+)").getMatch(0);
         final String accountID = br.getRegex("/accounts/(\\d+)/events/" + eventsID).getMatch(0);
         if (accountID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -70,7 +80,7 @@ public class LiveStreamCom extends PluginForDecrypt {
                 }
                 final String caption = (String) entryData.get("caption");
                 if (entryID != -1 && caption != null) {
-                    final DownloadLink link = createDownloadlink(parameter + "//videos/" + entryID);
+                    final DownloadLink link = createDownloadlink(param + "//videos/" + entryID);
                     link.setName(caption + ".mp4");
                     link.setAvailable(true);
                     ret.add(link);

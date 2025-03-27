@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.AccountFilter;
@@ -41,13 +44,18 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.OneFichierCom;
 import jd.utils.JDUtilities;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@DecrypterPlugin(revision = "$Revision: 50825 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50875 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierComFolder extends PluginForDecrypt {
     public OneFichierComFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    private Browser prepareBrowserWebsite(final Browser br) {
+        return OneFichierCom.prepareBrowserWebsite(br);
+    }
+
+    private Browser prepareBrowserAPI(final Browser br, final Account account) throws Exception {
+        return OneFichierCom.prepareBrowserAPI(br, account);
     }
 
     @Override
@@ -73,57 +81,73 @@ public class OneFichierComFolder extends PluginForDecrypt {
         return new String[] { host + "/(?:(?:[a-z]{2})/)?dir/([A-Za-z0-9]+)" };
     }
 
-    private ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         Account account = null;
-        List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true).setAccountTypes(AccountType.PREMIUM).setMaxResultsNum(1));
-        if (!filteredAccounts.isEmpty()) {
-            account = filteredAccounts.get(0);
-        }
         /**
          * 2019-04-05: Folder support via API does not work (serverside) as it requires us to have the internal folder-IDs which we do not
-         * have! </br> Basically their folder API call is only for internal folders of the current user -> Not useful for us! See also:
+         * have! </br>
+         * Basically their folder API call is only for internal folders of the current user -> Not useful for us! See also:
          * https://1fichier.com/api.html
          */
         final boolean internal_allow_api_usage_in_crawler = false;
+        if (internal_allow_api_usage_in_crawler) {
+            List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true).setAccountTypes(AccountType.PREMIUM).setMaxResultsNum(1));
+            if (!filteredAccounts.isEmpty()) {
+                account = filteredAccounts.get(0);
+            }
+        }
         if (OneFichierCom.canUseAPIForPremiumDownloads(account) && internal_allow_api_usage_in_crawler) {
             /* Use premium API */
-            crawlAPI(param, account);
+            return crawlAPI(param, account);
         } else {
             /* Use website */
-            crawlWebsite(param);
+            return crawlWebsite(param);
         }
-        return decryptedLinks;
     }
 
-    private void crawlAPI(final CryptedLink param, final Account account) throws Exception {
-        // final String folderID = new Regex(param.toString(), this.getSupportedLinks()).getMatch(0);
-        OneFichierCom.setPremiumAPIHeaders(this.br, account);
+    private ArrayList<DownloadLink> crawlAPI(final CryptedLink param, final Account account) throws Exception {
+        if (param == null) {
+            throw new IllegalArgumentException();
+        } else if (account == null) {
+            throw new IllegalArgumentException();
+        }
+        final String folderID = new Regex(param.toString(), this.getSupportedLinks()).getMatch(0);
+        if (folderID == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        prepareBrowserAPI(this.br, account);
         final PostRequest downloadReq = br.createJSonPostRequest(OneFichierCom.API_BASE + "/file/ls.cgi", "");
         downloadReq.setContentType("application/json");
         br.openRequestConnection(downloadReq);
         br.loadConnection(null);
+        // TODO: Unfinished code
+        return null;
     }
 
-    private void crawlWebsite(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlWebsite(final CryptedLink param) throws Exception {
+        if (param == null) {
+            throw new IllegalArgumentException();
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        final String folderURL = "https://" + this.getHost() + "/dir/" + folderID + "?lg=en";
-        prepareBrowser(br);
+        final String folderURLWebsite = "https://" + this.getHost() + "/dir/" + folderID + "?lg=en";
+        final String folderURLWebsiteJSON = "https://" + this.getHost() + "/dir/" + folderID + "?json=1";
+        prepareBrowserWebsite(br);
         br.setLoadLimit(Integer.MAX_VALUE);
         final Browser jsonBR = br.cloneBrowser();
-        jsonBR.getPage(folderURL + "?json=1");
+        jsonBR.getPage(folderURLWebsiteJSON);
         if (jsonBR.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Access folder without API just to find foldername ... */
-        br.getPage(folderURL);
-        /* We prefer English but let's be prepared to parse both versions of their website, english and french. */
-        final String fpName = br.getRegex(">(?:Shared folder|Dossier partagé)\\s*(.*?)</").getMatch(0);
+        br.getPage(folderURLWebsite);
+        /* We prefer English but let's be prepared to parse both versions of their website, English and French. */
+        final String title = br.getRegex(">(?:Shared folder|Dossier partagé)\\s*(.*?)</").getMatch(0);
         // password handling
-        final String password = handlePassword(param, folderURL);
-        if (password == null && "application/json; charset=utf-8".equals(jsonBR.getHttpConnection().getContentType())) {
-            final List<Object> ressourcelist = restoreFromString(jsonBR.toString(), TypeRef.LIST);
+        if ("application/json; charset=utf-8".equals(jsonBR.getHttpConnection().getContentType()) && jsonBR.getRequest().getHtmlCode().startsWith("[")) {
+            /* json response -> Folder is not password protected */
+            logger.info("Processing json response");
+            final List<Object> ressourcelist = restoreFromString(jsonBR.getRequest().getHtmlCode(), TypeRef.LIST);
             for (final Object fileO : ressourcelist) {
                 final Map<String, Object> fileInfo = (Map<String, Object>) fileO;
                 final String filename = (String) fileInfo.get("filename");
@@ -134,21 +158,19 @@ public class OneFichierComFolder extends PluginForDecrypt {
                 final DownloadLink dl = createDownloadlink(url);
                 dl.setFinalFileName(filename);
                 dl.setVerifiedFileSize(filesize);
-                if (password != null) {
-                    dl.setDownloadPassword(password);
-                }
-                dl.setAvailable(true);
                 if (pwProtected == 1) {
                     dl.setPasswordProtected(true);
                 }
                 if (accessControlLimitedLink == 1) {
                     dl.setProperty(OneFichierCom.PROPERTY_ACL_ACCESS_CONTROL_LIMIT, true);
                 }
-                decryptedLinks.add(dl);
+                dl.setAvailable(true);
+                ret.add(dl);
             }
         } else {
-            // webmode
-            final String[][] linkInfo = getLinkInfo();
+            /* Parse data from html */
+            final String password = handlePasswordWebsite(param, folderURLWebsite);
+            final String[][] linkInfo = br.getRegex("<a href=(\"|')(" + JDUtilities.getPluginForHost("1fichier.com").getSupportedLinks() + ")\\1[^>]*>([^\r\n\t]+)</a>\\s*</td>\\s*<td[^>]*>([^\r\n\t]+)</td>").getMatches();
             if (linkInfo == null || linkInfo.length == 0) {
                 throw new DecrypterException("Plugin broken");
             }
@@ -160,42 +182,38 @@ public class OneFichierComFolder extends PluginForDecrypt {
                     dl.setDownloadPassword(password);
                 }
                 dl.setAvailable(true);
-                decryptedLinks.add(dl);
+                ret.add(dl);
             }
         }
-        if (fpName != null) {
+        if (title != null) {
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(fpName);
-            fp.addLinks(decryptedLinks);
+            fp.setName(title);
+            fp.addLinks(ret);
         }
+        return ret;
     }
 
-    private final String[][] getLinkInfo() {
-        // some reason the e=1 reference now spews html not deliminated results.
-        // final String[][] linkInfo = br.getRegex("(https?://[a-z0-9\\-]+\\..*?);([^;]+);([0-9]+)").getMatches();
-        final String[][] linkInfo = br.getRegex("<a href=(\"|')(" + JDUtilities.getPluginForHost("1fichier.com").getSupportedLinks() + ")\\1[^>]*>([^\r\n\t]+)</a>\\s*</td>\\s*<td[^>]*>([^\r\n\t]+)</td>").getMatches();
-        return linkInfo;
-    }
-
-    private final String handlePassword(final CryptedLink param, final String parameter) throws Exception {
-        if (browserContainsFolderPasswordForm(this.br)) {
-            /* First try last crawler link password if available */
-            String passCode = param.getDecrypterPassword();
-            final int repeat = 3;
-            for (int i = 0; i <= repeat; i++) {
-                if (passCode == null) {
-                    passCode = getUserInput(null, param);
-                }
-                br.postPage(parameter + "?json=1", "pass=" + Encoding.urlEncode(passCode));
-                if (browserContainsFolderPasswordForm(this.br)) {
-                    if (i + 1 >= repeat) {
-                        throw new DecrypterException(DecrypterException.PASSWORD);
-                    }
-                    passCode = null;
-                    continue;
-                }
-                return passCode;
+    private final String handlePasswordWebsite(final CryptedLink param, final String parameter) throws Exception {
+        if (!browserContainsFolderPasswordForm(this.br)) {
+            /* Item is not password protected */
+            return null;
+        }
+        /* First try last crawler link password if available */
+        String passCode = param.getDecrypterPassword();
+        final int repeat = 3;
+        for (int i = 0; i <= repeat; i++) {
+            if (passCode == null) {
+                passCode = getUserInput(null, param);
             }
+            br.postPage(parameter + "?json=1", "pass=" + Encoding.urlEncode(passCode));
+            if (browserContainsFolderPasswordForm(this.br)) {
+                if (i + 1 >= repeat) {
+                    throw new DecrypterException(DecrypterException.PASSWORD);
+                }
+                passCode = null;
+                continue;
+            }
+            return passCode;
         }
         return null;
     }
@@ -205,22 +223,7 @@ public class OneFichierComFolder extends PluginForDecrypt {
         return pwform != null && this.canHandle(pwform.getAction());
     }
 
-    private void prepareBrowser(final Browser br) {
-        if (br == null) {
-            return;
-        }
-        br.getHeaders().put("User-Agent", "JDownloader");
-        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        br.getHeaders().put("Accept-Language", "en-us,en;q=0.5");
-        br.getHeaders().put("Pragma", null);
-        br.getHeaders().put("Cache-Control", null);
-        br.setCustomCharset("UTF-8");
-        br.setFollowRedirects(true);
-        // we want ENGLISH!
-        br.setCookie(this.getHost(), "LG", "en");
-    }
-
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

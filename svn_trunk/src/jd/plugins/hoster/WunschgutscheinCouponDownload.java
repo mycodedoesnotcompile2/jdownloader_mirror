@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50862 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50867 $", interfaceVersion = 3, names = {}, urls = {})
 public class WunschgutscheinCouponDownload extends PluginForHost {
     public WunschgutscheinCouponDownload(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,7 +135,7 @@ public class WunschgutscheinCouponDownload extends PluginForHost {
         final String redeem_id = link.getStringProperty(PROPERTY_REDEEM_ID);
         final int index = link.getIntegerProperty(PROPERTY_INDEX, 0);
         final int index_max = link.getIntegerProperty(PROPERTY_INDEX_MAX, 0);
-        String title = link.getStringProperty(PROPERTY_SHOP_ID) + "_" + redeem_id + link.getStringProperty(PROPERTY_VALUE_IN_CENT);
+        String title = link.getStringProperty(PROPERTY_SHOP_ID) + "_" + redeem_id + link.getIntegerProperty(PROPERTY_VALUE_IN_CENT) / 100;
         title += "_" + link.getStringProperty(PROPERTY_VALUE_IN_CENT);
         if (index_max > 0) {
             title += "_" + index;
@@ -145,7 +145,7 @@ public class WunschgutscheinCouponDownload extends PluginForHost {
         } else {
             link.setFinalFileName(title + ".txt");
         }
-        if (!isDownloadablePDF(link)) {
+        if (!isSelfhostedDownloadableItem(link)) {
             try {
                 link.setDownloadSize(this.getTextToWrite(link).getBytes("UTF-8").length);
             } catch (UnsupportedEncodingException e) {
@@ -154,12 +154,19 @@ public class WunschgutscheinCouponDownload extends PluginForHost {
         }
     }
 
-    private boolean isDownloadablePDF(final DownloadLink link) {
+    private boolean isSelfhostedDownloadableItem(final DownloadLink link) {
         final String downloadurl = link.getStringProperty(PROPERTY_DOWNLOADLINK);
         if (downloadurl == null) {
             return false;
         }
-        if (downloadurl.matches("(?i)https?://api\\.wunschgutschein\\.(at|de)/v2/redeem/merchant-code/pdf/([a-f0-9]{32})/(\\d+)")) {
+        return isSelfhostedDownloadableURL(downloadurl);
+    }
+
+    public static boolean isSelfhostedDownloadableURL(final String url) {
+        if (url == null) {
+            return false;
+        }
+        if (url.matches("(?i)https?://api\\.wunschgutschein\\.(at|de)/v2/redeem/merchant-code/pdf/([a-f0-9]{32})/(\\d+)")) {
             return true;
         } else {
             return false;
@@ -173,7 +180,8 @@ public class WunschgutscheinCouponDownload extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        if (isDownloadablePDF(link)) {
+        if (isSelfhostedDownloadableItem(link)) {
+            /* Download PDF file */
             final String pdf_downloadlink = link.getStringProperty(PROPERTY_DOWNLOADLINK);
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, pdf_downloadlink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             if (dl.getConnection().getResponseCode() == 404) {
@@ -182,8 +190,8 @@ public class WunschgutscheinCouponDownload extends PluginForHost {
             }
             this.handleConnectionErrors(br, dl.getConnection());
         } else {
-            final String text = getTextToWrite(link);
             /* Write text to file */
+            final String text = getTextToWrite(link);
             dl = new TextDownloader(this, link, text);
         }
         dl.startDownload();

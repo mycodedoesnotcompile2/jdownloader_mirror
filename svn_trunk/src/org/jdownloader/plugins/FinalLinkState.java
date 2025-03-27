@@ -78,7 +78,7 @@ public enum FinalLinkState {
         case FINISHED_SHA256:
         case FINISHED_SHA384:
         case FINISHED_SHA512:
-        case FAILED_WHIRLPOOL:
+        case FINISHED_WHIRLPOOL:
             return true;
         default:
             return false;

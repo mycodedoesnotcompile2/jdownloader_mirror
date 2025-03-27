@@ -76,9 +76,9 @@ public class DownloadControllerEventPublisher implements EventPublisher, Downloa
     private final AtomicLong                                 backEndChangeID         = new AtomicLong(-1);
     private final AtomicLong                                 contentChangesCounter   = new AtomicLong(-1);
     private final Queue                                      queue                   = new Queue("DownloadControllerEventPublisher") {
-                                                                                         public void killQueue() {
-                                                                                         };
-                                                                                     };
+        public void killQueue() {
+        };
+    };
     static {
         EVENT_ID_LIST = new ArrayList<String>();
         for (BASIC_EVENT t : BASIC_EVENT.values()) {
@@ -653,28 +653,6 @@ public class DownloadControllerEventPublisher implements EventPublisher, Downloa
         }
     }
 
-    @Override
-    public void onEventsChannelUpdate(Subscriber subscriber) {
-        final ChannelCollector ret = getChannelCollector(subscriber.getSubscriptionID());
-        if (ret != null) {
-            ret.updateSubscriptions();
-            boolean execute = false;
-            for (final ChannelCollector collector : collectors) {
-                if (collector.hasIntervalSubscriptions()) {
-                    execute = true;
-                }
-            }
-            final boolean finalExecute = execute;
-            queue.add(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected Void run() throws RuntimeException {
-                    updateExecuter(finalExecute);
-                    return null;
-                }
-            });
-        }
-    }
-
     private void updateExecuter(boolean b) {
         synchronized (this) {
             if (b) {
@@ -794,9 +772,11 @@ public class DownloadControllerEventPublisher implements EventPublisher, Downloa
     @Override
     public void onEventChannelOpened(Subscriber s) {
         if (s != null) {
-            final ChannelCollector ret = getChannelCollector(s.getSubscriptionID());
-            if (ret == null) {
-                collectors.add(new ChannelCollector(s));
+            ChannelCollector collector = getChannelCollector(s.getSubscriptionID());
+            if (collector == null) {
+                collector = new ChannelCollector(s);
+                collectors.add(collector);
+                updateChannelCollector(collector);
             }
         }
     }
@@ -804,11 +784,40 @@ public class DownloadControllerEventPublisher implements EventPublisher, Downloa
     @Override
     public void onEventChannelClosed(Subscriber s) {
         if (s != null) {
-            final ChannelCollector ret = getChannelCollector(s.getSubscriptionID());
-            if (ret != null) {
-                collectors.remove(ret);
+            final ChannelCollector collector = getChannelCollector(s.getSubscriptionID());
+            if (collector != null) {
+                if (collectors.remove(collector)) {
+                    updateChannelCollector(collector);
+                }
             }
         }
+    }
+
+    private void updateChannelCollector(final ChannelCollector collector) {
+        if (collector != null) {
+            collector.updateSubscriptions();
+            boolean execute = false;
+            for (final ChannelCollector collectorEntry : collectors) {
+                if (collectorEntry.hasIntervalSubscriptions()) {
+                    execute = true;
+                    break;
+                }
+            }
+            final boolean finalExecute = execute;
+            queue.add(new QueueAction<Void, RuntimeException>() {
+                @Override
+                protected Void run() throws RuntimeException {
+                    updateExecuter(finalExecute);
+                    return null;
+                }
+            });
+        }
+    }
+
+    @Override
+    public void onEventsChannelUpdate(Subscriber subscriber) {
+        final ChannelCollector collector = getChannelCollector(subscriber.getSubscriptionID());
+        updateChannelCollector(collector);
     }
 
     @Override

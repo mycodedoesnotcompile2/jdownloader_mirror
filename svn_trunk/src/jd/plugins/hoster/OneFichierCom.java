@@ -68,28 +68,23 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50860 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50876 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
-    private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
-    private final String         PROPERTY_PREMLINK                 = "premLink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
     public static final String   PROPERTY_ACL_ACCESS_CONTROL_LIMIT = "acl_access_control_limit";
     /** 2019-04-04: Documentation: https://1fichier.com/api.html */
     public static final String   API_BASE                          = "https://api.1fichier.com/v1";
-    /*
-     * Max total connections for premium = 30 (RE: admin, updated 07.03.2019) --> See also their FAQ: https://1fichier.com/hlp.html#dllent
-     */
-    private static final boolean resume_account_premium            = true;
-    /* 2015-07-10: According to admin, resume in free mode is not possible anymore. On attempt this will lead to 404 server error! */
-    private static final int     maxchunks_free                    = 1;
-    private static final boolean resume_free                       = true;
-    /*
-     * Settings for hotlinks - basically such links are created by premium users so free users can download them without limits (same limits
-     * as premium users).
-     */
     private static final boolean resume_free_hotlink               = true;
-    private static final int     maxchunks_free_hotlink            = -3;
+
+    public String getDirectlinkproperty(final Account account) {
+        if (account == null) {
+            /* no account, yes we can expect captcha */
+            return "freeLink";
+        } else {
+            return "account_ " + account.getType() + "_directurl";
+        }
+    }
 
     @Override
     public String[] siteSupportedNames() {
@@ -132,7 +127,7 @@ public class OneFichierCom extends PluginForHost {
         return br;
     }
 
-    private Browser prepareBrowserWebsite(final Browser br) {
+    public static Browser prepareBrowserWebsite(final Browser br) {
         br.setConnectTimeout(3 * 60 * 1000);
         br.setReadTimeout(3 * 60 * 1000);
         br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.103 Safari/537.36");
@@ -141,16 +136,12 @@ public class OneFichierCom extends PluginForHost {
         br.getHeaders().put("Pragma", null);
         br.getHeaders().put("Cache-Control", null);
         br.setCustomCharset("utf-8");
-        /* we want ENGLISH! */
-        br.setCookie(this.getHost(), "LG", "en");
+        br.setCookie("1fichier.com", "LG", "en");
         br.setAllowedResponseCodes(new int[] { 403, 503 });
         return br;
     }
 
-    private Browser prepareBrowserAPI(final Browser br, final Account account) throws Exception {
-        if (br == null) {
-            return null;
-        }
+    public static Browser prepareBrowserAPI(final Browser br, final Account account) throws Exception {
         br.setConnectTimeout(3 * 60 * 1000);
         br.setReadTimeout(3 * 60 * 1000);
         br.getHeaders().put("User-Agent", "JDownloader");
@@ -158,6 +149,16 @@ public class OneFichierCom extends PluginForHost {
         br.setAllowedResponseCodes(new int[] { 401, 403, 503 });
         setPremiumAPIHeaders(br, account);
         return br;
+    }
+
+    /** Required to authenticate via API. Wrapper for setPremiumAPIHeaders(String). */
+    private static void setPremiumAPIHeaders(final Browser br, final Account account) throws PluginException {
+        final String apiKey = account.getPass();
+        if (apiKey == null || !looksLikeValidAPIKeySTATIC(apiKey)) {
+            errorInvalidAPIKey(account);
+        } else {
+            setPremiumAPIHeaders(br, apiKey);
+        }
     }
 
     /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
@@ -182,8 +183,41 @@ public class OneFichierCom extends PluginForHost {
         Browser.setRequestIntervalLimitGlobal("api.1fichier.com", true, cfg.getGlobalRequestIntervalLimitAPI1fichierComMilliseconds());
     }
 
-    private String correctProtocol(final String input) {
-        return input.replaceFirst("(?i)http://", "https://");
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        if (account != null && AccountType.PREMIUM.equals(account.getType())) {
+            /*
+             * Max total connections for premium = 30 (RE: admin, updated 07.03.2019) --> See also their FAQ:
+             * https://1fichier.com/hlp.html#dllent
+             */
+            /* Premium download */
+            int maxChunks = PluginJsonConfig.get(OneFichierConfigInterface.class).getMaxPremiumChunks();
+            if (maxChunks == 1) {
+                maxChunks = 1;
+            } else if (maxChunks < 1 || maxChunks >= 20) {
+                maxChunks = 0;
+            } else {
+                maxChunks = -maxChunks;
+            }
+            return maxChunks;
+        } else if (link.hasProperty(PROPERTY_HOTLINK)) {
+            return -3;
+        } else {
+            return 1;
+        }
+    }
+
+    private String getDirecturlWithPreferredProtocol(String url) {
+        if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
+            url = url.replaceFirst("(?i)http://", "https://");
+        } else {
+            url = url.replaceFirst("(?i)https://", "http://");
+        }
+        return url;
     }
 
     private String getContentURL(final DownloadLink link) {
@@ -206,7 +240,7 @@ public class OneFichierCom extends PluginForHost {
     private String getContentURLWebsite(final DownloadLink link) {
         String contentURL = this.getContentURL(link);
         if (contentURL.contains("?") && !contentURL.contains("&")) {
-            /* 2021-07-27: Another attempt to force English language as only setting the cookie may not be enough. */
+            /* Attempt to force English language as only setting the cookie may not be enough. */
             contentURL += "&lg=en";
         }
         return contentURL;
@@ -258,17 +292,12 @@ public class OneFichierCom extends PluginForHost {
         }
         final Account account;
         if (preferSingleLinkcheckViaAPI() && urls.length == 1 && (account = AccountController.getInstance().getValidAccount(this.getHost())) != null && allowSingleFileAPILinkcheck(urls[0], account)) {
-            /* Trigger fallback to single linkcheck */
-            // requestFileInformationAPI(br, urls[0], account);
-            /* Trigger single linkcheck */
+            /* Returning false triggers fallback to single linkcheck */
+            logger.info("Special handling for single password protected links: Returning false here to trigger single linkcheck via API");
             return false;
         }
         try {
-            final Browser br = createNewBrowserInstance();
             prepareBrowserWebsite(br);
-            br.getHeaders().put("User-Agent", "");
-            br.getHeaders().put("Accept", "");
-            br.getHeaders().put("Accept-Language", "");
             br.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();
             final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
@@ -290,16 +319,15 @@ public class OneFichierCom extends PluginForHost {
                     sb.append(Encoding.urlEncode(this.getContentURL(link)));
                     sb.append("&");
                 }
-                // remove last &
+                // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is serverside deprecated but we're still using it because: </br>
+                 * This method is server side deprecated but we're still using it because: </br>
                  * 1. It is still working. </br>
                  * 2. It is the only method that can be used to check multiple items with one request.
                  */
-                br.postPageRaw(correctProtocol("http://" + this.getHost() + "/check_links.pl"), sb.toString());
+                br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
-                    // final String addedLink = dllink.getDownloadURL();
                     final String file_id = this.getFID(link);
                     /* Set fallback-filename */
                     if (!link.isNameSet()) {
@@ -364,9 +392,7 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /**
-     * 2022-12-10: Do not use this as it will cause IP-blocks!!
-     */
-    /**
+     * 2022-12-10: Do not use this as it will cause IP-blocks!! <br>
      * Checks single URLs via API.
      *
      * @throws Exception
@@ -384,18 +410,20 @@ public class OneFichierCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (errorMsg != null && errorMsg.matches("(?i).*Resource not allowed.*")) {
             /* 2020-01-30: e.g. {"status":"KO","message":"Resource not allowed #631"} */
-            /*
+            /**
              * Password-protected or private file: No information given at all but we know that file is online. Example reasons: file is not
-             * allowed to be downloaded in current country, by current user, file is private, file is password protected.
+             * allowed to be downloaded in current country, by current user, file is private, file is password protected. <br>
+             * If we already know that file file is password protected, we now also know that it is not access control limited :)
              */
-            link.setProperty(PROPERTY_ACL_ACCESS_CONTROL_LIMIT, true);
-            /* Else all is fine - URL is online but we might not be able to download it. */
+            if (!link.isPasswordProtected()) {
+                link.setProperty(PROPERTY_ACL_ACCESS_CONTROL_LIMIT, true);
+            }
+            /* File is online but we might not be able to download it. */
             return AvailableStatus.TRUE;
         }
         this.handleErrorsAPI(entries, account);
         link.removeProperty(PROPERTY_ACL_ACCESS_CONTROL_LIMIT);
-        final short passwordProtected = ((Number) entries.get("pass")).shortValue();
-        if (passwordProtected == 1) {
+        if (((Number) entries.get("pass")).shortValue() == 1) {
             link.setPasswordProtected(true);
         } else {
             link.setPasswordProtected(false);
@@ -406,7 +434,6 @@ public class OneFichierCom extends PluginForHost {
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }
-        /* 2020-01-30: We cannot work with this checksum (512 bit "Whirlpool" checksum). */
         final String checksum = (String) entries.get("checksum");
         if (checksum != null) {
             link.setHashInfo(HashInfo.parse(checksum, TYPE.WHIRLPOOL));
@@ -417,7 +444,7 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     protected int getMaxSimultanDownload(final DownloadLink link, final Account account) {
-        if (account == null && (link != null && link.getProperty(PROPERTY_HOTLINK, null) != null)) {
+        if (account == null && (link != null && link.hasProperty(PROPERTY_HOTLINK))) {
             return Integer.MAX_VALUE;
         } else {
             return super.getMaxSimultanDownload(link, account);
@@ -426,182 +453,168 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        /* Do not perform availablecheck here to save requests */
-        // requestFileInformation(link);
-        if (false && checkShowFreeDialog(getHost())) {
+        if (checkShowFreeDialog(getHost())) {
             showFreeDialog(getHost());
         }
-        doFree(null, link);
+        handleDownloadWebsite(link, null);
     }
 
-    private String regex_dllink_middle = "align:middle\">\\s+<a href=(\"|')(https?://[a-zA-Z0-9_\\-]+\\.(1fichier|desfichiers)\\.com/[a-zA-Z0-9]+.*?)\\1";
-
-    public void doFree(final Account account, final DownloadLink link) throws Exception, PluginException {
-        /* The following code will cover saved hotlinks */
-        String dllink = link.getStringProperty(PROPERTY_HOTLINK);
-        if (dllink != null) {
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume_free_hotlink, maxchunks_free_hotlink);
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                br.followConnection(true);
-                // link has expired... but it could be for any reason! dont care!
-                // clear saved final link
-                link.removeProperty(PROPERTY_HOTLINK);
-                br = createNewBrowserInstance();
-                prepareBrowserWebsite(br);
-            } else {
-                /* resume download */
-                logger.info("Hotlink download active");
-                link.setProperty(PROPERTY_HOTLINK, dllink);
-                dl.startDownload();
-                return;
-            }
+    private boolean isPasswordProtectedFileWebsite(final Browser br) throws Exception {
+        final Form ret = br.getFormbyKey("pass");
+        if (ret != null && this.canHandle(ret.getAction())) {
+            return true;
+        } else {
+            return false;
         }
+    }
+
+    public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception, PluginException {
         /* retry/resume of cached free link! */
-        dllink = link.getStringProperty(PROPERTY_FREELINK);
-        if (dllink != null) {
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume_free, maxchunks_free);
+        final String directurlproperty = getDirectlinkproperty(account);
+        String storedDirecturl = link.getStringProperty(directurlproperty);
+        if (storedDirecturl != null) {
+            storedDirecturl = this.getDirecturlWithPreferredProtocol(storedDirecturl);
+            logger.info("Attempting to download stored directurl: " + storedDirecturl);
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, storedDirecturl, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
                 /* resume download */
-                link.setProperty(PROPERTY_FREELINK, dllink);
+                link.setProperty(directurlproperty, storedDirecturl);
                 dl.startDownload();
                 return;
-            } else {
-                br.followConnection(true);
-                /* link has expired... but it could be for any reason! dont care! */
-                /* Clear saved final link */
-                link.removeProperty(PROPERTY_FREELINK);
-                br.clearAll();
-                prepareBrowserWebsite(br);
             }
+            logger.info("Stored directurl is invalid");
+            br.followConnection(true);
+            link.removeProperty(directurlproperty);
         }
-        final String contentURL = getContentURLWebsite(link);
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, resume_free_hotlink, maxchunks_free_hotlink);
+        final String contentURL = this.getDirecturlWithPreferredProtocol(getContentURLWebsite(link));
+        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, resume_free_hotlink, this.getMaxChunks(link, account));
         if (this.looksLikeDownloadableContent(dl.getConnection())) {
-            /* Hotlink or user is using CDN credits for downloading */
-            link.setProperty(PROPERTY_HOTLINK, dl.getConnection().getURL().toString());
+            link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
+            if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
+                /* Link is direct-downloadable without premium account -> Hotlink which means another user is paying for the traffic. */
+                logger.info("Link is hotlink");
+                link.setProperty(PROPERTY_HOTLINK, true);
+            }
             dl.startDownload();
             return;
         }
-        /* Not hotlinkable.. standard free link... */
+        logger.info("Link is not a hotlink or premium user has direct downloads disabled (Website -> /console/params.pl -> Force download Menu -> Enabled)");
+        link.removeProperty(PROPERTY_HOTLINK);
         br.followConnection();
-        dllink = null;
-        boolean retried = false;
-        int i = 0;
-        while (true) {
-            i++;
-            if (i > 1) {
-                br.getPage(contentURL);
+        /* 404 error here means the file is offline */
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        errorHandlingWebsite(link, account, br);
+        synchronized (lastSessionPassword) {
+            final Form form = br.getForm(0);
+            String passCode = link.getDownloadPassword();
+            boolean isPasswordProtected = false;
+            if (isPasswordProtectedFileWebsite(br)) {
+                logger.info("Handling password protected link...");
+                isPasswordProtected = true;
+                link.setPasswordProtected(true);
+                /** Try passwords in this order: 1. DownloadLink stored password, 2. Last used password, 3. Ask user */
+                if (passCode == null) {
+                    if (lastSessionPassword.get() != null) {
+                        passCode = lastSessionPassword.get();
+                    } else {
+                        passCode = getUserInput("Password?", link);
+                    }
+                }
+                form.put("pass", Encoding.urlEncode(passCode));
+                /*
+                 * Set pw protected flag so in case this downloadlink is ever tried to be downloaded via API, we already know that it is
+                 * password protected!
+                 */
+                link.setPasswordProtected(true);
             }
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            /* Remove form fields we don't want. */
+            form.remove("save");
+            form.put("did", "1");
+            if (!PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
+                form.put("dl_no_ssl", "on");
+            }
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, form, this.isResumeable(link, account), this.getMaxChunks(link, account));
+            if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                if (isPasswordProtected) {
+                    logger.info("User entered valid download password: " + passCode);
+                    /* Save download-password */
+                    lastSessionPassword.set(passCode);
+                    link.setDownloadPassword(passCode);
+                }
+                dl.startDownload();
+                return;
+            }
+            br.followConnection();
+            if (isPasswordProtectedFileWebsite(br)) {
+                this.errorWrongPassword(link);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             errorHandlingWebsite(link, account, br);
-            if (this.getDownloadPasswordForm() != null) {
-                handleDownloadPasswordWebsite(link);
-                dllink = br.getRedirectLocation();
-                if (dllink == null) {
-                    dllink = br.getRegex(regex_dllink_middle).getMatch(1);
-                    if (dllink == null) {
-                        logger.warning("Failed to find final downloadlink after password handling success");
-                        this.handleErrorsLastResortWebsite(link, account);
-                    }
-                }
-                logger.info("Successfully went through the password handling");
-                break;
-            } else {
-                // base > submit:Free Download > submit:Show the download link + t:35140198 == link
-                final Browser br2 = br.cloneBrowser();
-                br2.getHeaders().put("Content-Type", "application/x-www-form-urlencoded");
-                sleep(2000, link);
-                br2.postPageRaw(br.getURL(), "");
-                errorHandlingWebsite(link, account, br2);
-                dllink = br2.getRedirectLocation();
-                if (dllink == null) {
-                    dllink = br2.getRegex(regex_dllink_middle).getMatch(1);
-                }
-                if (dllink == null) {
-                    final Form a2 = br2.getForm(0);
-                    if (a2 == null) {
-                        this.handleErrorsLastResortWebsite(link, account);
-                    }
-                    a2.remove("save");
-                    final Browser br3 = br.cloneBrowser();
-                    br3.getHeaders().put("Content-Type", "application/x-www-form-urlencoded");
-                    sleep(2000, link);
-                    br3.submitForm(a2);
-                    errorHandlingWebsite(link, account, br3);
-                    if (dllink == null) {
-                        dllink = br3.getRedirectLocation();
-                    }
-                    if (dllink == null) {
-                        dllink = br3.getRegex("<a href=\"([^<>\"]*?)\"[^<>]*?>\\s*Click here to download").getMatch(0);
-                    }
-                    if (dllink == null) {
-                        dllink = br3.getRegex("window\\.location\\s*=\\s*('|\")(https?://[a-zA-Z0-9_\\-]+\\.(1fichier|desfichiers)\\.com/[a-zA-Z0-9]+/.*?)\\1").getMatch(1);
-                    }
-                    if (dllink == null) {
-                        String wait = br3.getRegex("var count = (\\d+);").getMatch(0);
-                        if (wait != null && retried == false) {
-                            retried = true;
-                            sleep(1000 * Long.parseLong(wait), link);
-                            continue;
-                        }
-                        this.handleErrorsLastResortWebsite(link, account);
-                    }
-                }
-            }
-            if (dllink != null) {
-                break;
+            if (isPasswordProtected) {
+                logger.info("User entered valid download password: " + passCode);
+                /* Save download-password */
+                lastSessionPassword.set(passCode);
+                link.setDownloadPassword(passCode);
             }
         }
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume_free, maxchunks_free);
+        String dllink = br.getRegex("align:middle\">\\s+<a href=(\"|')(https?://[a-zA-Z0-9_\\-]+\\.(1fichier|desfichiers)\\.com/[a-zA-Z0-9]+.*?)\\1").getMatch(1);
+        if (dllink == null) {
+            dllink = br.getRegex("<a href=\"([^\"]*?)\"[^<]*>\\s*Click here to download").getMatch(0);
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        dllink = this.getDirecturlWithPreferredProtocol(dllink);
+        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             logger.warning("The final dllink seems not to be a file!");
             br.followConnection(true);
             errorHandlingWebsite(link, account, br);
             this.handleErrorsLastResortWebsite(link, account);
         }
-        link.setProperty(PROPERTY_FREELINK, dllink);
+        link.setProperty(directurlproperty, dllink);
         dl.startDownload();
     }
 
-    private void errorHandlingWebsite(final DownloadLink link, final Account account, final Browser ibr) throws Exception {
-        long responsecode = 200;
-        if (ibr.getHttpConnection() != null) {
-            responsecode = ibr.getHttpConnection().getResponseCode();
-        }
-        if (ibr.containsHTML(">\\s*File not found")) {
+    private void errorHandlingWebsite(final DownloadLink link, final Account account, final Browser br) throws Exception {
+        final int responsecode = br.getHttpConnection().getResponseCode();
+        if (br.containsHTML(">\\s*File not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (ibr.containsHTML(">\\s*Software error:<")) {
+        } else if (br.containsHTML(">\\s*Software error:<")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Software error'", 10 * 60 * 1000l);
-        } else if (ibr.containsHTML(">\\s*Connexion à la base de données impossible<|>Can\\'t connect DB")) {
+        } else if (br.containsHTML(">\\s*Connexion à la base de données impossible<|>Can\\'t connect DB")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Internal database error", 5 * 60 * 1000l);
-        } else if (ibr.containsHTML("not possible to free unregistered users")) {
+        } else if (br.containsHTML("not possible to free unregistered users")) {
             throw new AccountRequiredException();
-        } else if (ibr.containsHTML("Your account will be unlock")) {
+        } else if (br.containsHTML("Your account will be unlock")) {
             if (account != null) {
                 throw new AccountUnavailableException("Locked for security reasons", 60 * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "IP blocked for security reasons", 60 * 60 * 1000l);
             }
-        } else if (ibr.containsHTML(">\\s*Access to this file is protected|>\\s*This file is protected")) {
+        } else if (br.containsHTML(">\\s*Access to this file is protected|>\\s*This file is protected")) {
             /* Access restricted by IP / only registered users / only premium users / only owner */
-            if (ibr.containsHTML(">\\s*The owner of this file has reserved access to the subscribers of our services")) {
+            if (br.containsHTML(">\\s*The owner of this file has reserved access to the subscribers of our services")) {
                 throw new AccountRequiredException();
             } else {
                 errorAccessControlLimit(link);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-        } else if (ibr.containsHTML(">\\s*Your requests are too fast")) {
+        } else if (br.containsHTML(">\\s*Your requests are too fast")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Rate limit reached", 30 * 1000l);
-        } else if (ibr.getURL().contains("/?c=DB")) {
+        } else if (br.getURL().contains("/?c=DB")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Internal database error", 5 * 60 * 1000l);
         } else if (responsecode == 403) {
-            if (ibr.containsHTML(">\\s*Premium status must not be used on professional services")) {
+            if (br.containsHTML(">\\s*Premium status must not be used on professional services")) {
                 errorVPNUsed(account);
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            if (ibr.containsHTML(">\\s*Premium status is only allowed to be used on residential private and dedicated")) {
+            if (br.containsHTML(">\\s*Premium status is only allowed to be used on residential private and dedicated")) {
                 errorVPNUsed(account);
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -609,36 +622,15 @@ public class OneFichierCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 15 * 60 * 1000l);
         } else if (responsecode == 404) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 30 * 60 * 1000l);
-        } else if (ibr.getHttpConnection().getResponseCode() == 503 && ibr.containsHTML(">\\s*Our services are in maintenance\\.\\s*Please come back after")) {
+        } else if (br.getHttpConnection().getResponseCode() == 503 && br.containsHTML(">\\s*Our services are in maintenance\\.\\s*Please come back after")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Hoster is in maintenance mode!", 20 * 60 * 1000l);
-        } else {
-            ipBlockedErrorHandling(account, ibr);
+        } else if (br.containsHTML(">\\s*You can use your account only for downloading from") || br.containsHTML(">\\s*Our services are not compatible with massively shared internet access") || br.containsHTML(">\\s*Be carrefull? to not use simultaneously your IPv4 and IPv6 IP")) {
+            throw new AccountUnavailableException("You are trying to use this account on multiple IP addresses at once", 10 * 60 * 1000l);
+        } else if (br.containsHTML("\">Warning \\! Without premium status, you can download only")) {
+            logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
+            throw new AccountInvalidException("Account is no premium anymore");
         }
-    }
-
-    /** Call this whenever an account was attempted to be used with a VPN/proxy/datacenter IP. */
-    private void errorVPNUsed(final Account account) throws AccountUnavailableException {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.displayVPNWarning(account);
-        }
-        throw new AccountUnavailableException("VPN/proxy/datacenter IP not allowed", 5 * 60 * 1000l);
-    }
-
-    /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br>
-     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
-     *
-     * @throws PluginException
-     */
-    private static void errorAccessControlLimit(final DownloadLink link) throws PluginException {
-        if (link != null) {
-            link.setProperty(PROPERTY_ACL_ACCESS_CONTROL_LIMIT, true);
-        }
-        throw new PluginException(LinkStatus.ERROR_FATAL, "Access to this file has been restricted");
-    }
-
-    /** Contains all errorhandling for IP related limits/errormessages. */
-    private static void ipBlockedErrorHandling(final Account account, final Browser br) throws PluginException {
+        /* Check for blocked IP */
         String waittimeMinutesStr = br.getRegex("you must wait (at least|up to)\\s*(\\d+)\\s*minutes between each downloads").getMatch(1);
         if (waittimeMinutesStr == null) {
             waittimeMinutesStr = br.getRegex(">\\s*You must wait\\s*(\\d+)\\s*minutes").getMatch(0);
@@ -661,7 +653,6 @@ public class OneFichierCom extends PluginForHost {
         isBlocked |= br.containsHTML("Without premium status, you can download only one file at a time");
         isBlocked |= br.containsHTML("Without Premium, you can only download one file at a time");
         isBlocked |= br.containsHTML("Without Premium, you must wait between downloads");
-        // jdlog://3278035891641 jdlog://7543779150841
         isBlocked |= br.containsHTML("Warning ! Without subscription, you can only download one file at|<span style=\"color:red\">Warning\\s*!\\s*</span>\\s*<br/>Without subscription, you can only download one file at a time\\.\\.\\.");
         isBlocked |= br.containsHTML(">\\s*Votre adresse IP ouvre trop de connexions vers le serveur");
         if (isBlocked) {
@@ -692,6 +683,27 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
+    /** Call this whenever an account was attempted to be used with a VPN/proxy/datacenter IP. */
+    private void errorVPNUsed(final Account account) throws AccountUnavailableException {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.displayVPNWarning(account);
+        }
+        throw new AccountUnavailableException("VPN/proxy/datacenter IP not allowed", 5 * 60 * 1000l);
+    }
+
+    /**
+     * Access restricted by IP / only registered users / only premium users / only owner. </br>
+     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
+     *
+     * @throws PluginException
+     */
+    private static void errorAccessControlLimit(final DownloadLink link) throws PluginException {
+        if (link != null) {
+            link.setProperty(PROPERTY_ACL_ACCESS_CONTROL_LIMIT, true);
+        }
+        throw new PluginException(LinkStatus.ERROR_FATAL, "Access to this file has been restricted");
+    }
+
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         if (canUseAPI(account)) {
@@ -703,7 +715,6 @@ public class OneFichierCom extends PluginForHost {
 
     public AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        br.setAllowedResponseCodes(new int[] { 403, 503 });
         loginWebsite(account, true);
         br.getPage("/console/abo.pl");
         final String validUntil = br.getRegex("subscription is valid until\\s*<[^<]*>(\\d+-\\d+-\\d+)").getMatch(0);
@@ -723,14 +734,17 @@ public class OneFichierCom extends PluginForHost {
         }
         ai.setUnlimitedTraffic();
         /* Credits are only relevant if usage of credits for downloads is enabled: https://1fichier.com/console/params.pl */
-        final String creditsStr = br.getRegex(">\\s*Your account have ([^<>\"]*?) of[^<]*credits").getMatch(0);
+        br.getPage("/console/cdn.pl");
+        final String creditsGBStr = br.getRegex(">\\s*Your account have ([0-9.]+ GB) of CDN").getMatch(0);
         final boolean useOwnCredits = StringUtils.equalsIgnoreCase("checked", br.getRegex("<input\\s*type=\"checkbox\"\\s*checked=\"(.*?)\"[^>]*name=\"own_credit\"").getMatch(0));
-        long creditsAsFilesize = 0;
-        if (creditsStr != null) {
-            creditsAsFilesize = SizeFormatter.getSize(creditsStr);
+        long creditsAsBytes = 0;
+        if (creditsGBStr != null) {
+            creditsAsBytes = SizeFormatter.getSize(creditsGBStr);
+        } else {
+            logger.warning("Failed to find CDN credits");
         }
-        this.setCdnCreditsStatus(account, ai, creditsAsFilesize, useOwnCredits);
-        if (account.getType() == AccountType.FREE && creditsAsFilesize > 0) {
+        this.setCdnCreditsStatus(account, ai, creditsAsBytes, useOwnCredits);
+        if (account.getType() == AccountType.FREE && creditsAsBytes > 0) {
             /* Display traffic but do not care about how much is actually left. */
             ai.setSpecialTraffic(true);
         }
@@ -761,20 +775,23 @@ public class OneFichierCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> entries = this.parseAPIResponse(account);
         final String apierror = (String) entries.get("message");
-        final boolean apiTempBlocked = !StringUtils.isEmpty(apierror) && apierror.matches("(?i)Flood detected: (User|IP) Locked.*?");
+        final boolean apiTempBlocked = apierror != null && apierror.matches("(?i)Flood detected: (User|User APK|IP) Locked.*?");
         if (apiTempBlocked) {
             AccountType type = null;
             if (account.lastUpdateTime() > 0) {
                 logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
-                // /* Return last accountInfo if available */
-                // if (account.getAccountInfo() != null) {
-                // logger.info("Returning last accountInfo");
-                // ai = account.getAccountInfo();
-                // ai.setStatus("Premium account (can't display more detailed info at this moment)");
-                // return ai;
-                // }
                 final AccountType oldAccountType = account.getType();
                 if (oldAccountType != null && oldAccountType != AccountType.UNKNOWN) {
+                    final AccountInfo existing = account.getAccountInfo();
+                    if (existing != null) {
+                        /* return previously set AccountInfo */
+                        final long lastValidUntil = existing.getLastValidUntil();
+                        if (lastValidUntil > 0) {
+                            /* keep previously set valid until date */
+                            existing.setValidUntil(lastValidUntil);
+                        }
+                        return existing;
+                    }
                     type = oldAccountType;
                 }
             } else {
@@ -785,10 +802,11 @@ public class OneFichierCom extends PluginForHost {
                 logger.info("Cannot get account details because of API limits and account has never been checked before --> Adding account without info");
             }
             if (type == null) {
+                /* If in doubt, treat account as premium. */
                 type = AccountType.PREMIUM;
             }
             account.setType(type);
-            ai.setStatus(type.getLabel() + " | Can't display more detailed info at this moment due to 'API flood' -> Try account-check again later, downloads are not affected by this message!");
+            ai.setStatus(type.getLabel() + " | Try account-check again later, downloads are not affected by this message!");
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
             if (type == AccountType.PREMIUM) {
@@ -809,12 +827,12 @@ public class OneFichierCom extends PluginForHost {
         }
         final String subscription_end = (String) entries.get("subscription_end");
         final Object available_credits_in_gigabyteO = entries.get("cdn");
-        double available_credits_in_gigabyte = 0;
+        long creditsAsBytes = 0;
         if (available_credits_in_gigabyteO != null) {
             if (available_credits_in_gigabyteO instanceof Number) {
-                available_credits_in_gigabyte = ((Number) available_credits_in_gigabyteO).doubleValue();
+                creditsAsBytes = (long) ((Number) available_credits_in_gigabyteO).doubleValue() * 1024 * 1024 * 1024;
             } else {
-                available_credits_in_gigabyte = Double.parseDouble(available_credits_in_gigabyteO.toString());
+                creditsAsBytes = (long) Double.parseDouble(available_credits_in_gigabyteO.toString()) * 1024 * 1024 * 1024;
             }
         }
         final boolean useCDNCredits = JavaScriptEngineFactory.toLong(entries.get("use_cdn"), 0) == 1 ? true : false;
@@ -840,22 +858,21 @@ public class OneFichierCom extends PluginForHost {
              */
             ai.setTrafficLeft(0);
         }
-        final long available_credits_in_bytes = (long) available_credits_in_gigabyte;
-        if (AccountType.FREE.equals(account.getType()) && (available_credits_in_gigabyte <= 0 || !useCDNCredits)) {
+        if (AccountType.FREE.equals(account.getType()) && (creditsAsBytes <= 0 || !useCDNCredits)) {
             /* Free accounts cannot be used for normal downloading via API Key */
             ai.setExpired(true);
             throw new AccountInvalidException("Free accounts cannot be used for normal downloading via API (only for CDN credits downloading)");
         }
-        setCdnCreditsStatus(account, ai, available_credits_in_bytes, useCDNCredits);
+        setCdnCreditsStatus(account, ai, creditsAsBytes, useCDNCredits);
         return ai;
     }
 
     /** Sets CDN credit status and account status text */
-    private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes, final boolean useCDNCredits) {
+    private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes, final boolean useCDNCreditsEnabled) {
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         final String available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, creditsInBytes);
         String cdnCreditsStatus = "CDN credits: " + available_credits_human_readable + " | Used: ";
-        if (AccountType.FREE.equals(account.getType()) && useCDNCredits) {
+        if (AccountType.FREE.equals(account.getType()) && useCDNCreditsEnabled) {
             cdnCreditsStatus += "Yes";
             if (account.getType() == AccountType.FREE) {
                 /* Treat Free accounts like a premium account if credits are used. */
@@ -931,21 +948,9 @@ public class OneFichierCom extends PluginForHost {
             /* Free account (most likely expired premium) apikey entered by user --> API can only be used by premium users */
             throw new AccountInvalidException("Premium expired: Only premium users can use the 1fichier API");
         } else if (isAPIErrorPassword(message)) {
-            /* 2021-02-10: This will usually be handled outside of this errorhandling! */
-            if (this.getDownloadLink() != null && this.getDownloadLink().getDownloadPassword() != null) {
-                this.getDownloadLink().setDownloadPassword(null);
-                if (lastSessionPassword.get() != null && lastSessionPassword.get().equals(this.getDownloadLink().getDownloadPassword())) {
-                    lastSessionPassword.set(null);
-                }
-            } else {
-                lastSessionPassword.set(null);
-            }
-            if (this.getDownloadLink().isPasswordProtected()) {
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Password wrong!");
-            } else {
-                this.getDownloadLink().setPasswordProtected(true);
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Password required!");
-            }
+            this.errorWrongPassword(this.getDownloadLink());
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (message.matches("(?i).*Resource not allowed #\\d+")) {
             errorAccessControlLimit(this.getDownloadLink());
             /* This code should never be reached */
@@ -978,6 +983,26 @@ public class OneFichierCom extends PluginForHost {
             return true;
         } else {
             return false;
+        }
+    }
+
+    private void errorWrongPassword(final DownloadLink link) throws PluginException {
+        if (lastSessionPassword.get() != null) {
+            if (lastSessionPassword.get().equals(link.getDownloadPassword())) {
+                link.setDownloadPassword(null);
+            }
+            lastSessionPassword.set(null);
+        } else {
+            if (link.getDownloadPassword() != null && link.getDownloadPassword().equals(lastSessionPassword.get())) {
+                lastSessionPassword.set(null);
+            }
+            link.setDownloadPassword(null);
+        }
+        if (link.isPasswordProtected()) {
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Password wrong!");
+        } else {
+            link.setPasswordProtected(true);
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Password required!");
         }
     }
 
@@ -1090,21 +1115,6 @@ public class OneFichierCom extends PluginForHost {
     }
 
     @Override
-    public String getAGBLink() {
-        return "https://www." + getHost() + "/en/cgu.html";
-    }
-
-    @Override
-    public int getMaxSimultanFreeDownloadNum() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxSimultanPremiumDownloadNum() {
-        return 10;
-    }
-
-    @Override
     protected long getStartIntervall(final DownloadLink link, final Account account) {
         if (account == null || !AccountType.PREMIUM.equals(account.getType()) || link == null) {
             return super.getStartIntervall(link, account);
@@ -1122,52 +1132,42 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        if (AccountType.FREE.equals(account.getType())) {
+        if (canUseAPIForPremiumDownloads(account)) {
+            final String directurlproperty = getDirectlinkproperty(account);
+            String storedDirecturl = link.getStringProperty(directurlproperty);
+            if (storedDirecturl != null) {
+                storedDirecturl = this.getDirecturlWithPreferredProtocol(storedDirecturl);
+                logger.info("Trying to re-use stored directurl: " + storedDirecturl);
+                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, storedDirecturl, this.isResumeable(link, account), this.getMaxChunks(link, account));
+                if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                    logger.info("Re-using stored directurl");
+                    dl.startDownload();
+                    return;
+                }
+                logger.info("Stored directurl is invalid");
+                br.followConnection();
+                link.removeProperty(directurlproperty);
+            }
+            String dllink = getDllinkPremiumAPI(link, account);
+            if (StringUtils.isEmpty(dllink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            dllink = this.getDirecturlWithPreferredProtocol(dllink);
+            link.setProperty(directurlproperty, dllink);
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                logger.warning("The final dllink seems not to be a file!");
+                br.followConnection(true);
+                errorHandlingWebsite(link, account, br);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 5 * 60 * 1000l);
+            }
+            dl.startDownload();
+        } else {
             /**
              * Website mode is required for free account downloads
              */
             loginWebsite(account, false);
-            doFree(account, link);
-            return;
-        } else {
-            int maxChunks = PluginJsonConfig.get(OneFichierConfigInterface.class).getMaxPremiumChunks();
-            if (maxChunks == 1) {
-                maxChunks = 1;
-            } else if (maxChunks < 1 || maxChunks >= 20) {
-                maxChunks = 0;
-            } else {
-                maxChunks = -maxChunks;
-            }
-            logger.info("Max Chunks:" + maxChunks);
-            if (!this.attemptStoredDownloadurlDownload(link, PROPERTY_PREMLINK, resume_account_premium, maxChunks)) {
-                /**
-                 * 2021-02-11: Don't do availablecheck in premium mode to reduce requests. </br>
-                 * According to their admin, using the public availablecheck call just before downloading via API can be troublesome
-                 */
-                String dllink;
-                if (canUseAPIForPremiumDownloads(account)) {
-                    dllink = getDllinkPremiumAPI(link, account);
-                } else {
-                    dllink = getDllinkPremiumWebsite(link, account);
-                }
-                if (StringUtils.isEmpty(dllink)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
-                    dllink = dllink.replace("http://", "https://");
-                } else {
-                    dllink = dllink.replaceFirst("https://", "http://");
-                }
-                link.setProperty(PROPERTY_PREMLINK, dllink);
-                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume_account_premium, maxChunks);
-                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                    logger.warning("The final dllink seems not to be a file!");
-                    br.followConnection(true);
-                    errorHandlingWebsite(link, account, br);
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 5 * 60 * 1000l);
-                }
-            }
-            dl.startDownload();
+            handleDownloadWebsite(link, account);
         }
     }
 
@@ -1176,7 +1176,11 @@ public class OneFichierCom extends PluginForHost {
          * 2019-04-05: At the moment there are no benefits for us when using this. </br>
          * 2021-01-29: Removed this because if login is blocked because of "flood control" this won't work either!
          */
-        final boolean checkFileInfoBeforeDownloadAttempt = false;
+        boolean checkFileInfoBeforeDownloadAttempt = false;
+        final boolean dev_mode_check_via_api = true;
+        if (dev_mode_check_via_api && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            checkFileInfoBeforeDownloadAttempt = true;
+        }
         if (checkFileInfoBeforeDownloadAttempt) {
             requestFileInformationAPI(br, link, account);
         }
@@ -1187,22 +1191,19 @@ public class OneFichierCom extends PluginForHost {
             String passCode = link.getDownloadPassword();
             /* Check if we already know that this file is password protected ... */
             /** Try passwords in this order: 1. DownloadLink stored password, 2. Last used password, 3. Ask user */
-            if (link.isPasswordProtected()) {
-                if (passCode == null) {
-                    if (lastSessionPassword.get() != null) {
-                        passCode = lastSessionPassword.get();
-                    } else {
-                        passCode = getUserInput("Password?", link);
-                    }
+            if (link.isPasswordProtected() && passCode == null) {
+                if (lastSessionPassword.get() != null) {
+                    passCode = lastSessionPassword.get();
+                } else {
+                    passCode = getUserInput("Password?", link);
                 }
             }
             /** Description of optional parameters: cdn=0/1 - use download-credits, */
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("url", this.getContentURL(link));
-            postdata.put("pass", link.getDownloadPassword());
+            postdata.put("pass", passCode);
             postdata.put("no_ssl", PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled() == false ? 1 : 0);
             performAPIRequest(API_BASE + "/download/get_token.cgi", JSonStorage.serializeToJson(postdata));
-            // TODO: Make use of this parsed json response down below!
             final Map<String, Object> entries = handleErrorsAPI(account);
             /* 2019-04-04: Downloadlink is officially only valid for 5 minutes */
             dllink = entries.get("url").toString();
@@ -1221,108 +1222,11 @@ public class OneFichierCom extends PluginForHost {
         return dllink;
     }
 
-    private String getDllinkPremiumWebsite(final DownloadLink link, final Account account) throws Exception {
-        String dllink = null;
-        loginWebsite(account, false);
-        final boolean isFollowingRedirects = br.isFollowingRedirects();
-        br.setFollowRedirects(false);
-        try {
-            br.getPage(this.getContentURL(link));
-            // error checking, offline links can happen here.
-            errorHandlingWebsite(link, account, br);
-            dllink = br.getRedirectLocation();
-            if (this.getDownloadPasswordForm() != null) {
-                handleDownloadPasswordWebsite(link);
-                /*
-                 * The users' 'direct download' setting has no effect on the password handling so we should always get a redirect to the
-                 * final downloadlink after having entered the correct download password (for premium users).
-                 */
-                dllink = br.getRedirectLocation();
-                if (dllink == null) {
-                    dllink = br.getRegex(regex_dllink_middle).getMatch(1);
-                    if (dllink == null) {
-                        logger.warning("After successful password handling: Final downloadlink 'dllink' is null");
-                        this.handleErrorsLastResortWebsite(link, account);
-                    }
-                }
-            }
-            ipBlockedErrorHandling(account, br);
-            if (dllink == null) {
-                /* The link is always SSL - based on user setting it will redirect to either https or http. */
-                String postData = "did=0&";
-                /* Returns postPage key + data based on the users' SSL preference. */
-                if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
-                    // logger.info("User prefers download with SSL");
-                    postData += "dlssl=SSL+Download";
-                } else {
-                    logger.info("User prefers download without SSL");
-                    postData += "dl=Download";
-                }
-                br.postPage(getContentURLWebsite(link), postData);
-                dllink = br.getRedirectLocation();
-                if (dllink == null) {
-                    if (br.containsHTML("\">Warning \\! Without premium status, you can download only")) {
-                        logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
-                        throw new AccountInvalidException("Account is no premium anymore");
-                    } else if (br.containsHTML(">\\s*You can use your account only for downloading from") || br.containsHTML(">\\s*Our services are not compatible with massively shared internet access") || br.containsHTML(">\\s*Be carrefull? to not use simultaneously your IPv4 and IPv6 IP")) {
-                        throw new AccountUnavailableException("You are trying to use this account on multiple IP addresses at once", 10 * 60 * 1000l);
-                    } else {
-                        logger.warning("Final downloadlink 'dllink' is null");
-                        this.handleErrorsLastResortWebsite(link, account);
-                    }
-                }
-            }
-        } finally {
-            br.setFollowRedirects(isFollowingRedirects);
-        }
-        return dllink;
-    }
-
     private void performAPIRequest(final String url, final String json_string) throws IOException {
         final PostRequest downloadReq = br.createJSonPostRequest(url, json_string);
         downloadReq.setContentType("application/json");
         br.openRequestConnection(downloadReq);
         br.loadConnection(null);
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String property, final boolean resume, final int maxchunks) throws Exception {
-        String url = link.getStringProperty(property);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
-            url = url.replaceFirst("(?i)http://", "https://");
-        } else {
-            url = url.replaceFirst("(?i)https://", "http://");
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, resume, maxchunks);
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            link.removeProperty(property);
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
-        }
-    }
-
-    /** Required to authenticate via API. Wrapper for setPremiumAPIHeaders(String). */
-    public static void setPremiumAPIHeaders(final Browser br, final Account account) throws PluginException {
-        final String apiKey = account.getPass();
-        if (apiKey == null || !looksLikeValidAPIKeySTATIC(apiKey)) {
-            errorInvalidAPIKey(account);
-        } else {
-            setPremiumAPIHeaders(br, apiKey);
-        }
     }
 
     public static boolean canUseAPI(final Account account) {
@@ -1360,58 +1264,9 @@ public class OneFichierCom extends PluginForHost {
 
     private static AtomicReference<String> lastSessionPassword = new AtomicReference<String>(null);
 
-    private Form getDownloadPasswordForm() throws Exception {
-        final Form ret = br.getFormbyKey("pass");
-        if (ret != null && this.canHandle(ret.getAction())) {
-            return ret;
-        } else {
-            return null;
-        }
-    }
-
     @Override
     public Class<OneFichierConfigInterface> getConfigInterface() {
         return OneFichierConfigInterface.class;
-    }
-
-    private void handleDownloadPasswordWebsite(final DownloadLink link) throws Exception {
-        synchronized (lastSessionPassword) {
-            logger.info("Handling supposedly password protected link...");
-            final Form pwform = getDownloadPasswordForm();
-            /** Try passwords in this order: 1. DownloadLink stored password, 2. Last used password, 3. Ask user */
-            boolean usedLastPassword = false;
-            String passCode = link.getDownloadPassword();
-            if (passCode == null) {
-                if (lastSessionPassword.get() != null) {
-                    usedLastPassword = true;
-                    passCode = lastSessionPassword.get();
-                } else {
-                    passCode = getUserInput("Password?", link);
-                }
-            }
-            pwform.put("pass", Encoding.urlEncode(passCode));
-            /*
-             * Set pw protected flag so in case this downloadlink is ever tried to be downloaded via API, we already know that it is
-             * password protected!
-             */
-            link.setPasswordProtected(true);
-            /** That is a multi purpose Form containing some default fields which we don't want or and to correct. */
-            pwform.remove("save");
-            pwform.put("did", "1");
-            br.submitForm(pwform);
-            if (getDownloadPasswordForm() != null) {
-                if (usedLastPassword) {
-                    lastSessionPassword.set(null);
-                } else {
-                    link.setDownloadPassword(null);
-                }
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Password wrong!");
-            } else {
-                /* Save download-password */
-                lastSessionPassword.set(passCode);
-                link.setDownloadPassword(passCode);
-            }
-        }
     }
 
     private boolean isaccessControlLimited(final DownloadLink link) {
@@ -1435,6 +1290,36 @@ public class OneFichierCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Access to this file has been restricted");
         } else {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://www." + getHost() + "/en/cgu.html";
+    }
+
+    @Override
+    public int getMaxSimultanFreeDownloadNum() {
+        return 1;
+    }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return 10;
+    }
+
+    @Override
+    public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
+        final String directlinkproperty = getDirectlinkproperty(account);
+        final String dllink = link.getStringProperty(directlinkproperty, null);
+        /*
+         * E.g. account doesn't have enough traffic left but we still got a stored directurl from a previous downloadstart --> Allow
+         * download attempt anyways as we can be quite sure that it will still be valid.
+         */
+        if (StringUtils.isNotEmpty(dllink)) {
+            return true;
+        } else {
+            return super.enoughTrafficFor(link, account);
         }
     }
 

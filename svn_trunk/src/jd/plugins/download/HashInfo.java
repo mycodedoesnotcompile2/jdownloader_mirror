@@ -88,11 +88,11 @@ public class HashInfo {
     }
 
     public static HashInfo parse(final String hash) {
-        return parse(hash, null, true, false);
+        return parse(hash, null);
     }
 
     public static HashInfo parse(final String hash, TYPE type) {
-        return parse(hash, null, true, false);
+        return parse(hash, type, true, false);
     }
 
     public static HashInfo parse(final String hash, boolean isTrustWorthy, boolean isForced) {
@@ -109,7 +109,7 @@ public class HashInfo {
                 if (hashInfos[0] != null) {
                     requestedType = TYPE.valueOf(hashInfos[0].replace("-", ""));
                 } else {
-                    requestedType = TYPE.valueOf(hashInfos[0].replace("-", ""));
+                    requestedType = TYPE.valueOf(hashInfos[1].replace("-", ""));
                 }
                 hash = hashInfos[2];
             } catch (IllegalArgumentException e) {

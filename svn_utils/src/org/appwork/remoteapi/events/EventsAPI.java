@@ -99,12 +99,11 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
                     subscriber.setSubscriptions(newSubscriptions.toArray(new Pattern[] {}));
                 }
             }
-            final SubscriptionResponse ret = new SubscriptionResponse(subscriber);
             try {
                 localEventSender.fireEvent(new LocalEventsAPIEvent(this, LocalEventsAPIEvent.Type.CHANNEL_UPDATE, subscriber));
             } catch (final Throwable e) {
             }
-            return ret;
+            return new SubscriptionResponse(subscriber);
         }
     }
 
@@ -152,12 +151,11 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
             subscriber.setMaxKeepalive(maxkeepalive);
             subscriber.setPollTimeout(polltimeout);
             subscriber.notifyListener();
-            final SubscriptionResponse ret = new SubscriptionResponse(subscriber);
             try {
                 localEventSender.fireEvent(new LocalEventsAPIEvent(this, LocalEventsAPIEvent.Type.CHANNEL_UPDATE, subscriber));
             } catch (final Throwable e) {
             }
-            return ret;
+            return new SubscriptionResponse(subscriber);
         }
     }
 
@@ -165,8 +163,7 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
     public SubscriptionResponse getsubscription(final long subscriptionid) {
         final Subscriber subscriber = getSubscriber(subscriptionid);
         if (subscriber != null) {
-            final SubscriptionResponse ret = new SubscriptionResponse(subscriber);
-            return ret;
+            return new SubscriptionResponse(subscriber);
         } else {
             return new SubscriptionResponse();
         }
@@ -179,8 +176,7 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
             return new SubscriptionStatusResponse();
         } else {
             subscriber.keepAlive();
-            final SubscriptionStatusResponse ret = new SubscriptionStatusResponse(subscriber);
-            return ret;
+            return new SubscriptionStatusResponse(subscriber);
         }
     }
 
@@ -296,12 +292,11 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
                     subscriber.setSubscriptions(newSubscriptions.toArray(new Pattern[] {}));
                 }
             }
-            final SubscriptionResponse ret = new SubscriptionResponse(subscriber);
             try {
                 localEventSender.fireEvent(new LocalEventsAPIEvent(this, LocalEventsAPIEvent.Type.CHANNEL_UPDATE, subscriber));
             } catch (final Throwable e) {
             }
-            return ret;
+            return new SubscriptionResponse(subscriber);
         }
     }
 
@@ -328,13 +323,19 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
                 }
                 subscriber.setSubscriptions(newSubscriptions.toArray(new Pattern[] {}));
             }
-            final SubscriptionResponse ret = new SubscriptionResponse(subscriber);
             try {
                 localEventSender.fireEvent(new LocalEventsAPIEvent(this, LocalEventsAPIEvent.Type.CHANNEL_UPDATE, subscriber));
             } catch (final Throwable e) {
             }
-            return ret;
+            return new SubscriptionResponse(subscriber);
         }
+    }
+
+    @Override
+    public SubscriptionResponse subscribe(final String[] subscriptions, final String[] exclusions) {
+        final Subscriber subscriber = new Subscriber(convertToPatternArray(subscriptions), convertToPatternArray(exclusions));
+        addSubscriber(subscriber);
+        return new SubscriptionResponse(subscriber);
     }
 
     public boolean addSubscriber(Subscriber subscriber) {
@@ -365,19 +366,6 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
         return false;
     }
 
-    @Override
-    public SubscriptionResponse subscribe(final String[] subscriptions, final String[] exclusions) {
-        final Subscriber subscriber = new Subscriber(convertToPatternArray(subscriptions), convertToPatternArray(exclusions));
-        this.subscribers.add(subscriber);
-        this.subscribersCleanupThread();
-        final SubscriptionResponse ret = new SubscriptionResponse(subscriber);
-        try {
-            localEventSender.fireEvent(new LocalEventsAPIEvent(this, LocalEventsAPIEvent.Type.CHANNEL_OPENED, subscriber));
-        } catch (final Throwable e) {
-        }
-        return ret;
-    }
-
     /*
      * starts a cleanupThread (if needed) to remove subscribers that are no longer alive
      *
@@ -401,15 +389,7 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
                                 while (it.hasNext()) {
                                     final Subscriber subscriber = it.next();
                                     if (!subscriber.isAlive() || subscriber.isExpired()) {
-                                        if (subscribers.remove(subscriber)) {
-                                            subscriber.kill();
-                                            subscriber.notifyListener();
-                                            try {
-                                                localEventSender.fireEvent(new LocalEventsAPIEvent(EventsAPI.this, LocalEventsAPIEvent.Type.CHANNEL_CLOSED, subscriber));
-                                            } catch (final Throwable e) {
-                                                e.printStackTrace();
-                                            }
-                                        }
+                                        removeSubscriber(subscriber);
                                     }
                                 }
                                 synchronized (EventsAPI.this.subscribersCleanupLock) {
@@ -447,16 +427,11 @@ public class EventsAPI implements EventsAPIInterface, RemoteAPIEventsSender {
     @Override
     public SubscriptionResponse unsubscribe(final long subscriptionid) {
         final Subscriber subscriber = getSubscriber(subscriptionid);
-        if (subscriber != null && subscribers.remove(subscriber)) {
-            subscriber.kill();
-            subscriber.notifyListener();
-            try {
-                localEventSender.fireEvent(new LocalEventsAPIEvent(this, LocalEventsAPIEvent.Type.CHANNEL_CLOSED, subscriber));
-            } catch (final Throwable e) {
-            }
+        if (removeSubscriber(subscriber)) {
             return new SubscriptionResponse(subscriber);
+        } else {
+            return new SubscriptionResponse();
         }
-        return new SubscriptionResponse();
     }
 
     public static final String getEventID(EventObject eventObject) {
