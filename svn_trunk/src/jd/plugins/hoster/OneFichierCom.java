@@ -31,7 +31,6 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
@@ -47,12 +46,10 @@ import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
-import jd.http.requests.GetRequest;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
-import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -68,7 +65,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50876 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50877 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_HOTLINK                  = "hotlink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
@@ -714,10 +711,16 @@ public class OneFichierCom extends PluginForHost {
     }
 
     public AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         loginWebsite(account, true);
-        br.getPage("/console/abo.pl");
-        final String validUntil = br.getRegex("subscription is valid until\\s*<[^<]*>(\\d+-\\d+-\\d+)").getMatch(0);
+        final AccountInfo ai = new AccountInfo();
+        if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/console/abo.pl")) {
+            br.getPage("/console/abo.pl");
+        }
+        String validUntil = br.getRegex("subscription is valid until\\s*<[^>]*>(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        if (validUntil == null) {
+            /* Wider attempt */
+            validUntil = br.getRegex("(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        }
         if (validUntil != null) {
             final long validUntilTimestamp = TimeFormatter.getMilliSeconds(validUntil, "yyyy'-'MM'-'dd", Locale.FRANCE);
             setValidUntil(ai, validUntilTimestamp);
@@ -728,23 +731,36 @@ public class OneFichierCom extends PluginForHost {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
             account.setConcurrentUsePossible(false);
-            final GetRequest get = new GetRequest("https://" + this.getHost() + "/en/console/params.pl");
-            get.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            br.getPage(get);
         }
         ai.setUnlimitedTraffic();
         /* Credits are only relevant if usage of credits for downloads is enabled: https://1fichier.com/console/params.pl */
-        br.getPage("/console/cdn.pl");
-        final String creditsGBStr = br.getRegex(">\\s*Your account have ([0-9.]+ GB) of CDN").getMatch(0);
-        final boolean useOwnCredits = StringUtils.equalsIgnoreCase("checked", br.getRegex("<input\\s*type=\"checkbox\"\\s*checked=\"(.*?)\"[^>]*name=\"own_credit\"").getMatch(0));
-        long creditsAsBytes = 0;
-        if (creditsGBStr != null) {
-            creditsAsBytes = SizeFormatter.getSize(creditsGBStr);
+        br.getPage("/console/params.pl");
+        final boolean allowUseOwnCredits;
+        if (StringUtils.equalsIgnoreCase("checked", br.getRegex("<input\\s*type=\"checkbox\"\\s*checked=\"(.*?)\"[^>]*name=\"own_credit\"").getMatch(0))) {
+            logger.info("User has enabled usage of CDN credits");
+            allowUseOwnCredits = true;
         } else {
-            logger.warning("Failed to find CDN credits");
+            logger.info("User has disabled usage of CDN credits");
+            allowUseOwnCredits = false;
         }
-        this.setCdnCreditsStatus(account, ai, creditsAsBytes, useOwnCredits);
-        if (account.getType() == AccountType.FREE && creditsAsBytes > 0) {
+        /*
+         * Page "/console/cdn.pl" also contains the current value of CDN credits but doesn't contain the information about the CDN credits
+         * usage boolean setting.
+         */
+        // br.getPage("/console/cdn.pl");
+        String creditsGBStr = br.getRegex("Your account have ([0-9.]+) GB of").getMatch(0);
+        if (creditsGBStr == null) {
+            /* French version */
+            creditsGBStr = br.getRegex("compte a ([0-9.]+) Go de crédits").getMatch(0);
+        }
+        long creditsAsBytes = -1;
+        if (creditsGBStr != null) {
+            creditsAsBytes = (long) Double.parseDouble(creditsGBStr) * 1024 * 1024 * 1024;
+        } else {
+            logger.warning("Failed to find CDN credits value");
+        }
+        this.setCdnCreditsStatus(account, ai, creditsAsBytes, allowUseOwnCredits);
+        if (account.getType() == AccountType.FREE && allowUseOwnCredits && creditsAsBytes > 0) {
             /* Display traffic but do not care about how much is actually left. */
             ai.setSpecialTraffic(true);
         }
@@ -827,7 +843,7 @@ public class OneFichierCom extends PluginForHost {
         }
         final String subscription_end = (String) entries.get("subscription_end");
         final Object available_credits_in_gigabyteO = entries.get("cdn");
-        long creditsAsBytes = 0;
+        long creditsAsBytes = -1;
         if (available_credits_in_gigabyteO != null) {
             if (available_credits_in_gigabyteO instanceof Number) {
                 creditsAsBytes = (long) ((Number) available_credits_in_gigabyteO).doubleValue() * 1024 * 1024 * 1024;
@@ -868,11 +884,17 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /** Sets CDN credit status and account status text */
-    private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes, final boolean useCDNCreditsEnabled) {
+    private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes, final boolean allowUseCDNCreditsEnabled) {
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
-        final String available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, creditsInBytes);
+        final String available_credits_human_readable;
+        if (creditsInBytes == -1) {
+            /* Credits number is not known */
+            available_credits_human_readable = "N/A";
+        } else {
+            available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, creditsInBytes);
+        }
         String cdnCreditsStatus = "CDN credits: " + available_credits_human_readable + " | Used: ";
-        if (AccountType.FREE.equals(account.getType()) && useCDNCreditsEnabled) {
+        if (AccountType.FREE.equals(account.getType()) && Boolean.TRUE.equals(allowUseCDNCreditsEnabled)) {
             cdnCreditsStatus += "Yes";
             if (account.getType() == AccountType.FREE) {
                 /* Treat Free accounts like a premium account if credits are used. */
@@ -1044,6 +1066,7 @@ public class OneFichierCom extends PluginForHost {
             /* Load cookies */
             prepareBrowserWebsite(br);
             final Cookies cookies = account.loadCookies("");
+            final String pathAccountOverview = "/console/abo.pl";
             if (cookies != null) {
                 logger.info("Attempting cookie login");
                 br.setCookies(cookies);
@@ -1052,7 +1075,7 @@ public class OneFichierCom extends PluginForHost {
                     /* Do not validate cookies */
                     return;
                 }
-                br.getPage("https://" + this.getHost() + "/console/index.pl");
+                br.getPage("https://" + this.getHost() + pathAccountOverview);
                 if (isLoggedinWebsite(br)) {
                     logger.info("Cookie login successful");
                     account.saveCookies(br.getCookies(getHost()), "");
@@ -1060,57 +1083,79 @@ public class OneFichierCom extends PluginForHost {
                 } else {
                     logger.info("Cookie login failed");
                     br.clearCookies(null);
-                    this.prepareBrowserWebsite(this.br);
+                    prepareBrowserWebsite(this.br);
                 }
             }
             logger.info("Performing full website login");
+            br.getPage("https://" + getHost() + "/login.pl");
             final String username = account.getUser();
             final String password = account.getPass();
             final UrlQuery query = new UrlQuery();
-            query.add("mail", Encoding.urlEncode(username));
-            query.add("pass", Encoding.urlEncode(password));
-            query.add("lt", "on"); // long term session
-            query.add("other", "on"); // set cookies also on other 1fichier domains
-            query.add("valider", "ok");
-            br.postPage("https://" + this.getHost() + "/login.pl", query);
-            Form twoFAForm = null;
-            final String formKey2FA = "tfa";
-            final Form[] forms = br.getForms();
-            for (final Form form : forms) {
-                final InputField twoFAField = form.getInputField(formKey2FA);
-                if (twoFAField != null) {
-                    twoFAForm = form;
-                    break;
+            query.appendEncoded("mail", username);
+            query.appendEncoded("pass", password);
+            /* Now add the "Advanced options" parameters */
+            /* do not purge older sessions by no adding the param down below */
+            // query.appendEncoded("purge", "on");
+            query.appendEncoded("lt", "on"); // long term session
+            query.appendEncoded("other", "on"); // set cookies also on other 1fichier domains
+            query.appendEncoded("valider", "OK");
+            br.postPage("/login.pl", query);
+            if (!isLoggedinWebsite(this.br)) {
+                logger.info("We are not yet logged in -> Looking for 2FA login form");
+                final Form[] forms = br.getForms();
+                if (forms == null || forms.length == 0) {
+                    /* No 2FA form found -> Account looks to be invalid */
+                    errorNotLoggedIn(account);
+                    /* Thi code should never be reached */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-            }
-            if (!isLoggedinWebsite(this.br) && twoFAForm != null) {
+                Form twoFAForm = null;
+                final String formKey2FA = "tfa";
+                for (final Form form : forms) {
+                    if (form.hasInputFieldByName(formKey2FA)) {
+                        logger.info("Found 2FA login form");
+                        twoFAForm = form;
+                        break;
+                    }
+                }
+                if (twoFAForm == null) {
+                    /* No 2FA form found -> Account looks to be invalid */
+                    errorNotLoggedIn(account);
+                    /* Thi code should never be reached */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 logger.info("2FA code required");
                 final String twoFACode = this.getTwoFACode(account, "\\d{6}");
                 logger.info("Submitting 2FA code");
                 twoFAForm.put(formKey2FA, twoFACode);
                 br.submitForm(twoFAForm);
-                if (!isLoggedinWebsite(this.br)) {
+                if (!isLoggedinWebsite(br)) {
+                    /* Still not logged in -> User must have entered invalid 2FA code */
                     throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
                 }
             }
             if (!isLoggedinWebsite(this.br)) {
-                final String errorTooManyLoginAttempts = br.getRegex(">\\s*(More than \\d+ login try per \\d+ minutes is not allowed)").getMatch(0);
-                if (errorTooManyLoginAttempts != null) {
-                    throw new AccountUnavailableException(errorTooManyLoginAttempts, 1 * 60 * 1000l);
-                }
-                if (br.containsHTML("following many identification errors")) {
-                    if (br.containsHTML("Your account will be unlock")) {
-                        throw new AccountUnavailableException("Your account will be unlocked within 1 hour", 10 * 60 * 1000l);
-                    } else if (br.containsHTML("your IP address") && br.containsHTML("is temporarily locked")) {
-                        throw new AccountUnavailableException("For security reasons, following many identification errors, your IP address is temporarily locked.", 15 * 60 * 1000l);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                }
-                throw new AccountInvalidException();
+                errorNotLoggedIn(account);
+                /* Thi code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             setBasicAuthHeader(br, account);
             account.saveCookies(br.getCookies(br.getHost()), "");
+        }
+    }
+
+    /** Call this if login failed for no specific reason. */
+    private void errorNotLoggedIn(final Account account) throws PluginException {
+        final String errorTooManyLoginAttempts = br.getRegex(">\\s*(More than \\d+ login try per \\d+ minutes is not allowed)").getMatch(0);
+        if (errorTooManyLoginAttempts != null) {
+            throw new AccountUnavailableException(errorTooManyLoginAttempts, 1 * 60 * 1000l);
+        }
+        if (br.containsHTML("Your account will be unlock")) {
+            throw new AccountUnavailableException("Your account will be unlocked within 1 hour", 10 * 60 * 1000l);
+        } else if (br.containsHTML("your IP address") && br.containsHTML("is temporarily locked")) {
+            throw new AccountUnavailableException("For security reasons, following many identification errors, your IP address is temporarily locked.", 15 * 60 * 1000l);
+        } else {
+            throw new AccountInvalidException();
         }
     }
 

@@ -173,7 +173,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             return null;
         }
         final abstractPluginForCaptchaSolver plugin = getNewPluginInstance(getLazyP());
-        return new PluginChallengeSolver<T>(account, plugin, /* TODO */null);
+        final PluginForCaptchaSolverSolverService dummyService = new PluginForCaptchaSolverSolverService();
+        return new PluginChallengeSolver<T>(plugin, account, /* TODO */dummyService);
     }
 
     /**
@@ -189,8 +190,6 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         }
     }
 
-    public abstract String getBuyPremiumUrl();
-
     /**
      * Returns the features supported by this plugin.
      *
@@ -201,6 +200,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
+    public abstract String getBuyPremiumUrl();
+
     /**
      * Reports a captcha as invalid.
      *
@@ -208,7 +209,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The captcha response to report as invalid
      * @return true if the report was successfully sent, false otherwise
      */
-    public abstract boolean setInvalid(final AbstractResponse<?> response);
+    public abstract boolean setInvalid(final AbstractResponse<?> response, final Account account) throws Exception;
 
     /**
      * Reports a captcha as valid.
@@ -217,13 +218,18 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The captcha response to report as valid
      * @return true if the report was successfully sent, false otherwise
      */
-    public abstract boolean setValid(final AbstractResponse<?> response);
-    // public boolean setUnused(AbstractResponse<?> response) {
-    // return false;
-    // }
+    public abstract boolean setValid(final AbstractResponse<?> response, final Account account) throws Exception;
+
+    public boolean setUnused(final AbstractResponse<?> response, final Account account) throws Exception {
+        return false;
+    }
 
     /**
-     * Returns the list of captcha types supported by this solver.
+     * Returns the list of captcha types supported by this solver. <br>
+     * Important: If a solver supports all reCaptcha captcha types, return RECAPTCHA_V2, RECAPTCHA_V2_ENTERPRISE AND RECAPTCHA_V2_INVISIBLE
+     * !
+     *
+     *
      *
      * @return List of supported captcha types
      */

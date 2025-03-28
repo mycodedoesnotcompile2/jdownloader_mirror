@@ -850,36 +850,49 @@ public class IconIO {
      * @return
      */
     public static Image replaceColor(BufferedImage image, final Color search, final int tollerance, final Color replace, final boolean keepBrightness) {
-        final int a1 = search.getAlpha();
-        final int r1 = search.getRed();
-        final int g1 = search.getGreen();
-        final int b1 = search.getBlue();
-        final ImageFilter filter = new RGBImageFilter() {
-            @Override
-            public final int filterRGB(final int x, final int y, final int rgb) {
-                final int a = (rgb >> 24) & 0xff;
-                final int r = (rgb >> 16) & 0xff;
-                final int g = (rgb >> 8) & 0xff;
-                final int b = (rgb >> 0) & 0xff;
-                // System.out.println(Long.toHexString(new Color(r, g, b, a).getRGB()));
-                // System.out.println(a);
-                if (r == 0 && b == 0 && g == 0) {
-                    //
-                }
-                if (Math.abs(r - r1) <= tollerance && Math.abs(g - g1) <= tollerance && Math.abs(b - b1) <= tollerance && Math.abs(a - a1) <= tollerance) {
-                    if (!keepBrightness) {
-                        return replace.getRGB();
-                    }
-                    final double brightness = ((r + g + b) / 3) / (double) 255;
-                    Color nc = new Color((int) (replace.getRed() * brightness), (int) (replace.getGreen() * brightness), (int) (replace.getBlue() * brightness), (int) (replace.getAlpha() * brightness));
+        if (search == null) {
+            final ImageFilter filter = new RGBImageFilter() {
+                @Override
+                public final int filterRGB(final int x, final int y, final int rgb) {
+                    final int a = (rgb >> 24) & 0xff;
+                    final int r = (rgb >> 16) & 0xff;
+                    final int g = (rgb >> 8) & 0xff;
+                    final int b = (rgb >> 0) & 0xff;
+                    final double brightness = !keepBrightness ? 1 : (0.299 * r + 0.578 * g + 0.114 * b);
+                    Color nc = new Color((int) (replace.getRed() * brightness), (int) (replace.getGreen() * brightness), (int) (replace.getBlue() * brightness), (replace.getAlpha() * a) / 255);
                     return nc.getRGB();
                 }
-                return rgb;
-            }
-        };
-        final ImageProducer ip = new FilteredImageSource(image.getSource(), filter);
-        final Image img = Toolkit.getDefaultToolkit().createImage(ip);
-        return img;
+            };
+            final ImageProducer ip = new FilteredImageSource(image.getSource(), filter);
+            final Image img = Toolkit.getDefaultToolkit().createImage(ip);
+            return img;
+        } else {
+            final int a1 = search.getAlpha();
+            final int r1 = search.getRed();
+            final int g1 = search.getGreen();
+            final int b1 = search.getBlue();
+            final ImageFilter filter = new RGBImageFilter() {
+                @Override
+                public final int filterRGB(final int x, final int y, final int rgb) {
+                    final int a = (rgb >> 24) & 0xff;
+                    final int r = (rgb >> 16) & 0xff;
+                    final int g = (rgb >> 8) & 0xff;
+                    final int b = (rgb >> 0) & 0xff;
+                    if (Math.abs(r - r1) <= tollerance && Math.abs(g - g1) <= tollerance && Math.abs(b - b1) <= tollerance && Math.abs(a - a1) <= tollerance) {
+                        if (!keepBrightness) {
+                            return replace.getRGB();
+                        }
+                        final double brightness = (0.299 * r + 0.578 * g + 0.114 * b) / 255d;
+                        Color nc = new Color((int) (replace.getRed() * brightness), (int) (replace.getGreen() * brightness), (int) (replace.getBlue() * brightness), replace.getAlpha() * a / 255);
+                        return nc.getRGB();
+                    }
+                    return rgb;
+                }
+            };
+            final ImageProducer ip = new FilteredImageSource(image.getSource(), filter);
+            final Image img = Toolkit.getDefaultToolkit().createImage(ip);
+            return img;
+        }
     }
 
     /**
@@ -1067,6 +1080,17 @@ public class IconIO {
         g.drawImage(image, 0, 0, null);
         g.dispose();
         ImageProvider.writeImage(jpg, "jpg", bos);
+        bos.close();
+        return bos.toByteArray();
+    }
+
+    public static byte[] toPngBytes(Image image) throws IOException {
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        final BufferedImage jpg = createEmptyImage(image.getWidth(null), image.getHeight(null), BufferedImage.TYPE_INT_ARGB, Transparency.TRANSLUCENT);
+        final Graphics g = jpg.getGraphics();
+        g.drawImage(image, 0, 0, null);
+        g.dispose();
+        ImageProvider.writeImage(jpg, "png", bos);
         bos.close();
         return bos.toByteArray();
     }

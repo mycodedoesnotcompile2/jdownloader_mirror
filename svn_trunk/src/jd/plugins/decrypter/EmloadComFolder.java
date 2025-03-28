@@ -23,6 +23,7 @@ import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
@@ -36,11 +37,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.EmloadCom;
 
-@DecrypterPlugin(revision = "$Revision: 50398 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50881 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EmloadCom.class })
 public class EmloadComFolder extends antiDDoSForDecrypt {
     public EmloadComFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -66,7 +74,7 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         final Account aa = AccountController.getInstance().getValidAccount(this.getHost());
         if (aa != null) {
             logger.info("Account available, logging in ...");
@@ -75,7 +83,7 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
                 ((EmloadCom) plugin).login(br, null, false);
             }
         }
-        getPage(parameter);
+        getPage(contenturl);
         /* Keep this errorhandling although, if an account is available, we should be logged in at this stage! */
         if (br.containsHTML(">\\s*This link only for premium")) {
             throw new AccountRequiredException();
@@ -86,7 +94,7 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
         } else if (br.containsHTML(">\\s*This could be due to the following reasons")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String title = br.getRegex("<h2>Folder :([^<>\"]+): \\d+ Files </h2>").getMatch(0);
+        String title = br.getRegex("<h2>Folder\\s*:([^<>\"]+): \\d+ Files\\s*</h2>").getMatch(0);
         if (title == null) {
             title = br.getRegex("<h2 class=\"name wordwrap s18 b font\"[^>]*>([^<]+)</h2>").getMatch(0);
         }

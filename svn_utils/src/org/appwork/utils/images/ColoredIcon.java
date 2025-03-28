@@ -40,6 +40,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Paint;
+import java.awt.Transparency;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,6 +53,7 @@ import java.util.Set;
 
 import javax.swing.Icon;
 
+import org.appwork.resources.HighDPIIcon;
 import org.appwork.utils.swing.Graphics2DProxy;
 
 /**
@@ -60,6 +63,9 @@ import org.appwork.utils.swing.Graphics2DProxy;
  */
 public class ColoredIcon extends AbstractIconPipe {
     private HashMap<ColorLookup, Color> colorMap;
+    private BufferedImage               cache;
+    private double                      cachedScaleY;
+    private double                      cachedScaleX;
 
     public ColoredIcon(Icon icon) {
         super(icon);
@@ -81,8 +87,13 @@ public class ColoredIcon extends AbstractIconPipe {
         private boolean keepBrightness = true;
 
         /**
+         *
+         *
          * @param search
          * @param tollerance2
+         * @param keepBrightness
+         *            if set to true, black will stay black, and white will stay white. all colors in between will have a brigtness variant
+         *            of the target color
          */
         public ColorLookup(Color search, int tollerance2, boolean keepBrightness) {
             this.color = search;
@@ -145,6 +156,12 @@ public class ColoredIcon extends AbstractIconPipe {
          */
         @Override
         protected Image beforeImageDraw(Image img) {
+            // TODO:
+            // if there is no inner HighDPI Icon in the Pipe, this might be a MultiResImage.
+            // in this case we have options:
+            // 1. do NOT convert to toBufferedImage image here, and add multiresimage support to replaceColor
+            // 2. search and use the best variant here, and applay replace Color only to this variant.
+            // DebugMode.breakIf(MultiResolutionImageHelper.isInstanceOf(img));
             Image ret = img;
             for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
                 ret = IconIO.replaceColor(IconIO.toBufferedImage(ret), es.getKey().color, es.getKey().tollerance, es.getValue(), es.getKey().keepBrightness);
@@ -199,7 +216,28 @@ public class ColoredIcon extends AbstractIconPipe {
 
     @Override
     public void paintIcon(Component c, Graphics g, int x, int y, List<Icon> parents) {
-        paintDelegate(c, new Graphics2DProxyImpl((Graphics2D) g, this), x, y, parents);
+        AffineTransform transform = ((Graphics2D) g).getTransform();
+        if (cache == null || cachedScaleX != transform.getScaleX() || cachedScaleY != transform.getScaleY()) {
+            cache = IconIO.createEmptyImage((int) Math.round(getIconWidth() * transform.getScaleX()), (int) Math.round(getIconHeight() * transform.getScaleY()), BufferedImage.TYPE_INT_ARGB, Transparency.TRANSLUCENT);
+            cachedScaleX = transform.getScaleX();
+            cachedScaleY = transform.getScaleY();
+            Graphics2D g2 = cache.createGraphics();
+            g2.scale(cachedScaleX, cachedScaleY);
+            paintDelegate(c, new Graphics2DProxyImpl(g2, this), 0, 0, parents);
+            g2.dispose();
+        }
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.scale(1d / transform.getScaleX(), 1d / transform.getScaleY());
+        new HighDPIIcon(cache).paintIcon(c, g2, (int) (x * cachedScaleX), (int) (y * cachedScaleY), parents);
+        g2.dispose();
+    }
+
+    /**
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "Colored Icon: " + getDelegate() + " " + getIconWidth() + ":" + getIconHeight();
     }
 
     /**
@@ -208,10 +246,11 @@ public class ColoredIcon extends AbstractIconPipe {
      */
     public Color modifyColor(Color c) {
         Color replacement = null;
-        final int a1 = c == null ? 0 : c.getAlpha();
-        final int r1 = c == null ? 0 : c.getRed();
-        final int g1 = c == null ? 0 : c.getGreen();
-        final int b1 = c == null ? 0 : c.getBlue();
+        int rgb = c.getRGB();
+        final int a = (rgb >> 24) & 0xff;
+        final int r = (rgb >> 16) & 0xff;
+        final int g = (rgb >> 8) & 0xff;
+        final int b = (rgb >> 0) & 0xff;
         for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
             if (es.getKey().color == null) {
                 if (c == null || c.getAlpha() == 0) {
@@ -219,13 +258,21 @@ public class ColoredIcon extends AbstractIconPipe {
                 }
                 continue;
             }
-            int rgb = es.getKey().color.getRGB();
-            final int a = (rgb >> 24) & 0xff;
-            final int r = (rgb >> 16) & 0xff;
-            final int g = (rgb >> 8) & 0xff;
-            final int b = (rgb >> 0) & 0xff;
-            if (Math.abs(r - r1) <= es.getKey().tollerance && Math.abs(g - g1) <= es.getKey().tollerance && Math.abs(b - b1) <= es.getKey().tollerance && Math.abs(a - a1) <= es.getKey().tollerance) {
-                replacement = es.getValue();
+            Color replace = es.getValue();
+            Color search = es.getKey().color;
+            final int a1 = search.getAlpha();
+            final int r1 = search.getRed();
+            final int g1 = search.getGreen();
+            final int b1 = search.getBlue();
+            int tollerance = es.getKey().tollerance;
+            boolean keepBrightness = es.getKey().keepBrightness;
+            if (Math.abs(r - r1) <= tollerance && Math.abs(g - g1) <= tollerance && Math.abs(b - b1) <= tollerance && Math.abs(a - a1) <= tollerance) {
+                if (!keepBrightness) {
+                    return replace;
+                }
+                final double brightness = (0.299 * r + 0.578 * g + 0.114 * b) / 255d;
+                Color nc = new Color((int) (replace.getRed() * brightness), (int) (replace.getGreen() * brightness), (int) (replace.getBlue() * brightness), replace.getAlpha() * a / 255);
+                return nc;
             }
             if (replacement == null) {
                 replacement = colorMap.get(null);

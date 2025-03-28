@@ -830,11 +830,47 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "version":"2025.64.0 b5aa82bff01b7f9ebd61ab118a224ad8ca57bf43"
+    },
+    {
+      "changes":"2025.65.0 9146b3759249ffccf979205721ab282c44959fee\t: Add oninferno.net (#2402)\r\n2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7\t: Add deus-canvas.com to PSL (#2405)",
+      "date":"2025-03-10T10:24:20.311+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a2c9acebd761842cd27f3213cea7fe606b284ee7d36bc70d6f1f9f6a55f5e78e"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7"
+    },
+    {
+      "changes":"2025.70.0 3dc28d7389f45a20dfca36284b84fae9d472c01c\t: Update pro.typeform.com contact (#2404)\r\n2025.71.0 b85018227bf5620427fc719c80fd652d52fd945f\t: Add ai.kr, io.kr, it.kr, me.kr (#2407)\r\n2025.73.0 b47586e8b40785602d1b540e67eef2f297ef794d\t: Update public_suffix_list.dat (#2403)\r\n2025.73.1 aa7c5d89f72eec0d8ed0a13d14792a338bbedf91\t: add inbrowser.link and inbrowser.dev (#2413)",
+      "date":"2025-03-14T14:58:32.223+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"5a9dd4a949d891752a814420f039c9819f9f8c42fa3f2e3f0d04e365d45675bb"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.73.1 aa7c5d89f72eec0d8ed0a13d14792a338bbedf91"
     }
   ],
   "installed":{
-    "changes":"2025.65.0 9146b3759249ffccf979205721ab282c44959fee\t: Add oninferno.net (#2402)\r\n2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7\t: Add deus-canvas.com to PSL (#2405)",
-    "date":"2025-03-10T10:24:20.311+01:00",
+    "changes":"2025.76.0 7b9b3a0dff84cff9da97d8cab1b67ecc37e6f88d\t: Add devinapps.com (#2412)\r\n2025.76.1 32eb47d07246e98122c64c866ce0a33f09fc49ff\t: Add dpdns.org (#2414)\r\n2025.77.0 2c960dac3d39ba521eb5db9da192968f5be0aded\t: Remove `router.management` (#2409)",
+    "date":"2025-03-19T08:30:17.215+01:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -939,7 +975,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a2c9acebd761842cd27f3213cea7fe606b284ee7d36bc70d6f1f9f6a55f5e78e"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"67567d9849ba4ff4f3ca65fb54e978ae310f8f9228c2d5c5ef23a2dabcbc7feb"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -949,7 +985,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2025.65.1 76dbfcab5c3f0b1ac4e78ebeb6273a8b4db74ab7"
+    "version":"2025.77.0 2c960dac3d39ba521eb5db9da192968f5be0aded"
   },
   "minJRE":null,
   "provider":"github-clone",

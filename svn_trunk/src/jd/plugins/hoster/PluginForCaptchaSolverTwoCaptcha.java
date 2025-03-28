@@ -12,7 +12,7 @@ import jd.plugins.HostPlugin;
 /**
  * Plugin for 2Captcha captcha solving service (https://2captcha.com/).
  */
-@HostPlugin(revision = "$Revision: 50838 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50878 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -28,17 +28,14 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         return "https://2captcha.com?from=15779444";
     }
 
-    /**
-     * Returns the list of captcha types supported by this solver.
-     *
-     * @return List of supported captcha types
-     */
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.MULTI_CLICK_CAPTCHA);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         types.add(CAPTCHA_TYPE.KEY_CAPTCHA);

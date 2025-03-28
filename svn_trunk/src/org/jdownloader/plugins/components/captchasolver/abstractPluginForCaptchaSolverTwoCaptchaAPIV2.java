@@ -226,18 +226,16 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     }
 
     @Override
-    public boolean setInvalid(AbstractResponse<?> response) {
-        return sendCaptchaFeedback(response, false);
+    public boolean setInvalid(AbstractResponse<?> response, Account account) {
+        return sendCaptchaFeedback(response, account, false);
     }
 
     @Override
-    public boolean setValid(AbstractResponse<?> response) {
-        return sendCaptchaFeedback(response, true);
+    public boolean setValid(AbstractResponse<?> response, Account account) {
+        return sendCaptchaFeedback(response, account, true);
     }
 
-    private final boolean sendCaptchaFeedback(final AbstractResponse<?> response, final boolean positiveFeedback) {
-        // TODO: Add Account as parameter
-        final Account account = this.getCurrentAccount();
+    private final boolean sendCaptchaFeedback(final AbstractResponse<?> response, Account account, final boolean positiveFeedback) {
         final TwoCaptchaResponse twocaptcharesponse = (TwoCaptchaResponse) response;
         final String captchaID = twocaptcharesponse.getCaptchaID();
         try {

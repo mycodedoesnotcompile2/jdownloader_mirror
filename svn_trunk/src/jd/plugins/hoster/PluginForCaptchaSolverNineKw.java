@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 2Captcha captcha solving service (https://2captcha.com/).
  */
-@HostPlugin(revision = "$Revision: 50863 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50878 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -94,12 +94,12 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     @Override
-    public boolean setInvalid(AbstractResponse<?> response) {
+    public boolean setInvalid(AbstractResponse<?> response, Account account) {
         return false;
     }
 
     @Override
-    public boolean setValid(AbstractResponse<?> response) {
+    public boolean setValid(AbstractResponse<?> response, Account account) {
         return false;
     }
 

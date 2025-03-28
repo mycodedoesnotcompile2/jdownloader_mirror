@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50859 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50881 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZoomUs extends PluginForHost {
     public ZoomUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -221,8 +221,13 @@ public class ZoomUs extends PluginForHost {
         if (StringUtils.equalsIgnoreCase(componentName, "vanity-url-check")) {
             if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 // TODO: Finish implementation
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                /* 2025-03-27: Treat such items as offline in stable for now. */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+            /**
+             * UNFINISHED/DEV-ONLY code!! <br>
+             * In browser, a redirect happens and then the "/play/info/" is called again with another fileID.
+             */
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("accessLevel", "");
             query.appendEncoded("vanityURL", result2.get("vanityURL").toString());

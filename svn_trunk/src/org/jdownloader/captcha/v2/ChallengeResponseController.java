@@ -8,12 +8,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
-
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
@@ -54,6 +48,12 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
@@ -120,32 +120,33 @@ public class ChallengeResponseController {
     private final AtomicBoolean init = new AtomicBoolean(false);
 
     public void init() {
-        if (init.compareAndSet(false, true)) {
-            addSolver(JACSolver.getInstance());
-            addSolver(DeathByCaptchaSolver.getInstance());
-            addSolver(ImageTyperzCaptchaSolver.getInstance());
-            addSolver(CheapCaptchaSolver.getInstance());
-            addSolver(TwoCaptchaSolver.getInstance());
-            addSolver(AntiCaptchaComSolver.getInstance());
-            addSolver(EndCaptchaSolver.getInstance());
-            addSolver(Captcha9kwSolver.getInstance());
-            addSolver(Captcha9kwSolverClick.getInstance());
-            addSolver(Captcha9kwSolverMultiClick.getInstance());
-            addSolver(Captcha9kwSolverPuzzle.getInstance());
-            if (!Application.isHeadless()) {
-                addSolver(DialogBasicCaptchaSolver.getInstance());
-                addSolver(DialogClickCaptchaSolver.getInstance());
-                addSolver(DialogMultiClickCaptchaSolver.getInstance());
-                addSolver(BrowserSolver.getInstance());
-                addSolver(OAuthDialogSolver.getInstance());
-            }
-            addSolver(AccountOAuthSolver.getInstance());
-            addSolver(KeyCaptchaJACSolver.getInstance());
-            if (!Application.isHeadless()) {
-                addSolver(KeyCaptchaDialogSolver.getInstance());
-            }
-            addSolver(CaptchaAPISolver.getInstance());
+        if (!init.compareAndSet(false, true)) {
+            return;
         }
+        addSolver(JACSolver.getInstance());
+        addSolver(DeathByCaptchaSolver.getInstance());
+        addSolver(ImageTyperzCaptchaSolver.getInstance());
+        addSolver(CheapCaptchaSolver.getInstance());
+        addSolver(TwoCaptchaSolver.getInstance());
+        addSolver(AntiCaptchaComSolver.getInstance());
+        addSolver(EndCaptchaSolver.getInstance());
+        addSolver(Captcha9kwSolver.getInstance());
+        addSolver(Captcha9kwSolverClick.getInstance());
+        addSolver(Captcha9kwSolverMultiClick.getInstance());
+        addSolver(Captcha9kwSolverPuzzle.getInstance());
+        if (!Application.isHeadless()) {
+            addSolver(DialogBasicCaptchaSolver.getInstance());
+            addSolver(DialogClickCaptchaSolver.getInstance());
+            addSolver(DialogMultiClickCaptchaSolver.getInstance());
+            addSolver(BrowserSolver.getInstance());
+            addSolver(OAuthDialogSolver.getInstance());
+        }
+        addSolver(AccountOAuthSolver.getInstance());
+        addSolver(KeyCaptchaJACSolver.getInstance());
+        if (!Application.isHeadless()) {
+            addSolver(KeyCaptchaDialogSolver.getInstance());
+        }
+        addSolver(CaptchaAPISolver.getInstance());
     }
 
     public List<ChallengeSolver<?>> listSolvers() {
@@ -326,17 +327,24 @@ public class ChallengeResponseController {
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             final AccountFilter af = new AccountFilter().setEnabled(true).setValid(true).setFeature(FEATURE.CAPTCHA_SOLVER);
             final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
-            for (Account solverAccount : solverAccounts) {
+            final HashSet<String> unavailableSolverDomains = new HashSet<String>();
+            for (final Account solverAccount : solverAccounts) {
                 try {
                     final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
                     final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
-                    if (solver != null) {
-                        ret.add(solver);
+                    if (solver == null) {
+                        /* E.g. solver cannot handle challenge it gets presented */
+                        unavailableSolverDomains.add(solverAccount.getHoster());
+                        continue;
                     }
+                    unavailableSolverDomains.remove(solverAccount.getHoster());
+                    ret.add(solver);
                 } catch (final Throwable e) {
                     logger.log(e);
+                    unavailableSolverDomains.add(solverAccount.getHoster());
                 }
             }
+            logger.info("Solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
         }
         return ret;
     }

@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50731 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50881 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -1129,13 +1129,13 @@ public class InstaGramCom extends PluginForHost {
     }
 
     @Override
-    public Class<? extends InstagramConfig> getConfigInterface() {
-        return InstagramConfig.class;
+    public int getMaxSimultanPremiumDownloadNum() {
+        return this.getMaxSimultanFreeDownloadNum();
     }
 
     @Override
-    public int getMaxSimultanPremiumDownloadNum() {
-        return this.getMaxSimultanFreeDownloadNum();
+    public Class<? extends InstagramConfig> getConfigInterface() {
+        return InstagramConfig.class;
     }
 
     @Override
