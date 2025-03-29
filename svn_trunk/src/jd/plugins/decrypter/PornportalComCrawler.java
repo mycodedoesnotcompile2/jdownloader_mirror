@@ -54,7 +54,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50400 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50885 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -118,6 +118,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
         return crawlContentAPI(hostPlugin, contentID, acc, PluginJsonConfig.get(PornportalComConfig.class));
     }
 
+    @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
     }
@@ -168,6 +169,17 @@ public class PornportalComCrawler extends PluginForDecrypt {
             } else if (StringUtils.isEmpty(itemID)) {
                 /* Skip invalid objects */
                 continue;
+            }
+            String actorsCommaSeparated = null;
+            final List<Map<String, Object>> actors = (List<Map<String, Object>>) clipinfo.get("actors");
+            if (actors != null && actors.size() > 0) {
+                actorsCommaSeparated = "";
+                for (final Map<String, Object> actor : actors) {
+                    if (actorsCommaSeparated.length() > 0) {
+                        actorsCommaSeparated += ",";
+                    }
+                    actorsCommaSeparated += actor.get("name");
+                }
             }
             String title = (String) clipinfo.get("title");
             String description = (String) clipinfo.get("description");
@@ -290,6 +302,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
                 dl.setProperty(PornportalCom.PROPERTY_VIDEO_QUALITY, qualityIdentifier);
                 dl.setProperty(PornportalCom.PROPERTY_VIDEO_STREAM_TYPE, streamType);
                 dl.setProperty(PornportalCom.PROPERTY_directurl, downloadurl);
+                dl.setProperty(PornportalCom.PROPERTY_ACTORS_COMMA_SEPARATED, actorsCommaSeparated);
                 if (filesize > 0) {
                     dl.setDownloadSize(filesize);
                 }

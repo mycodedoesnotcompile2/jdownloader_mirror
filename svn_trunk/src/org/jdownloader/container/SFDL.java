@@ -13,6 +13,16 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.xml.parsers.DocumentBuilder;
 
+import jd.controlling.linkcrawler.ArchiveInfo;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.parser.Regex;
+import jd.plugins.ContainerStatus;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
+import jd.plugins.PluginException;
+import jd.plugins.PluginsC;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
@@ -25,16 +35,6 @@ import org.jdownloader.plugins.components.containers.ContainerConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
-import jd.controlling.linkcrawler.ArchiveInfo;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.parser.Regex;
-import jd.plugins.ContainerStatus;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
-import jd.plugins.PluginException;
-import jd.plugins.PluginsC;
-
 public class SFDL extends PluginsC {
     /* Documentation: https://github.com/n0ix/SFDL.NET/wiki/How-it-Works-(SFDL-File-documentation) */
     public SFDL() {
@@ -46,10 +46,9 @@ public class SFDL extends PluginsC {
     }
 
     /**
-     * Filename scheme containing a title and file-password. </br>
-     * This is typically used for Usenet/NZB container files but I had implemented it for testing password protected .sfdl containers when
-     * the password dialog wasn't implemented yet. </br>
-     * I decided to just leave this feature inside as it's already working fine and it might be useful for some users.
+     * Filename scheme containing a title and file-password. </br> This is typically used for Usenet/NZB container files but I had
+     * implemented it for testing password protected .sfdl containers when the password dialog wasn't implemented yet. </br> I decided to
+     * just leave this feature inside as it's already working fine and it might be useful for some users.
      */
     private static final Pattern        PATTERN_COMMON_FILENAME_SCHEME_WITH_PASSWORD = Pattern.compile("^([^\\{]+)\\{\\{(.*?)\\}\\}\\.sfdl$", Pattern.CASE_INSENSITIVE);
     private static final Object         PWLOCK                                       = new Object();
@@ -178,21 +177,10 @@ public class SFDL extends PluginsC {
                 final NodeList downloadFiles = document.getElementsByTagName("BulkFolderPath");
                 logger.info("Found " + downloadFiles.getLength() + " FTP folders");
                 for (int i = 0; i < downloadFiles.getLength(); i++) {
-                    String ftpFolderPath = downloadFiles.item(i).getTextContent();
-                    if (sdfl_Encrypted) {
-                        ftpFolderPath = decrypt(ftpFolderPath, validpassword);
-                    }
-                    String ftpurl = "ftp://";
-                    if (sfdl_AuthRequired) {
-                        ftpurl += sfdl_Username;
-                        if (sfdl_Password != null) {
-                            ftpurl += ":" + sfdl_Password;
-                        }
-                    }
-                    ftpurl += "@" + sfdl_Host + ":" + sfdl_Port;
-                    ftpurl += ftpFolderPath;
+                    final String ftpFolderPath = downloadFiles.item(i).getTextContent();
+                    final String ftpurl = getURL(ftpFolderPath, sdfl_Encrypted, validpassword, sfdl_AuthRequired, sfdl_Username, sfdl_Password, sfdl_Host, sfdl_Port);
                     logger.info("Result: " + ftpurl);
-                    final DownloadLink ftpfolder = new DownloadLink(null, null, "FTP", ftpurl, true);
+                    final DownloadLink ftpfolder = new DownloadLink(null, null, "ftp", ftpurl, true);
                     ret.add(ftpfolder);
                 }
             } else {
@@ -201,19 +189,8 @@ public class SFDL extends PluginsC {
                 final NodeList fileSizes = document.getElementsByTagName("FileSize");
                 logger.info("Found " + downloadFiles.getLength() + " FTP files");
                 for (int i = 0; i < downloadFiles.getLength(); i++) {
-                    String ftpFilePath = downloadFiles.item(i).getTextContent();
-                    if (sdfl_Encrypted) {
-                        ftpFilePath = decrypt(ftpFilePath, validpassword);
-                    }
-                    String ftpurl = "ftp://" + sfdl_Username;
-                    if (sfdl_AuthRequired) {
-                        ftpurl += sfdl_Username;
-                        if (sfdl_Password != null) {
-                            ftpurl += ":" + sfdl_Password;
-                        }
-                    }
-                    ftpurl += "@" + sfdl_Host + ":" + sfdl_Port;
-                    ftpurl += ftpFilePath;
+                    final String ftpFilePath = downloadFiles.item(i).getTextContent();
+                    final String ftpurl = getURL(ftpFilePath, sdfl_Encrypted, validpassword, sfdl_AuthRequired, sfdl_Username, sfdl_Password, sfdl_Host, sfdl_Port);
                     logger.info("Result: " + ftpurl);
                     final DownloadLink ftpfile = new DownloadLink(jd.plugins.hoster.Ftp.createURLForThisPlugin(ftpurl), true);
                     if (fileSizes.getLength() == downloadFiles.getLength()) {
@@ -245,6 +222,30 @@ public class SFDL extends PluginsC {
             cs.setStatus(ContainerStatus.STATUS_FAILED);
             return cs;
         }
+    }
+
+    protected String getURL(String ftpFilePath, boolean sdfl_Encrypted, final String decryptPassword, boolean sfdl_AuthRequired, String sfdl_Username, String sfdl_Password, String sfdl_Host, int sfdl_Port) {
+        if (sdfl_Encrypted) {
+            ftpFilePath = decrypt(ftpFilePath, decryptPassword);
+        }
+        ftpFilePath = ftpFilePath.replaceAll(" ", "%20");
+        String ret = "ftp://";
+        if (sfdl_AuthRequired) {
+            if (sfdl_Username == null) {
+                sfdl_Username = "anonymous";
+            }
+            ret += sfdl_Username;
+            if (sfdl_Password != null) {
+                ret += ":" + sfdl_Password;
+            }
+            ret += "@";
+        }
+        ret += sfdl_Host;
+        if (sfdl_Port != 21) {
+            ret += ":" + sfdl_Port;
+        }
+        ret += ftpFilePath;
+        return ret;
     }
 
     /** Adds valid SFDL container password to list of container passwords. */
@@ -304,7 +305,7 @@ public class SFDL extends PluginsC {
             if (decrypted.length < 17) {
                 return null;
             } else {
-                byte[] return_byte = Arrays.copyOfRange(decrypted, 16, decrypted.length);
+                final byte[] return_byte = Arrays.copyOfRange(decrypted, 16, decrypted.length);
                 return new String(return_byte, "UTF-8");
             }
         } catch (Exception e) {

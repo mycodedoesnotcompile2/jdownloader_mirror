@@ -65,14 +65,14 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50877 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50884 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
-    private final String         PROPERTY_HOTLINK                  = "hotlink";
+    private final String       PROPERTY_HOTLINK                  = "hotlink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
-    public static final String   PROPERTY_ACL_ACCESS_CONTROL_LIMIT = "acl_access_control_limit";
+    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT = "acl_access_control_limit";
     /** 2019-04-04: Documentation: https://1fichier.com/api.html */
-    public static final String   API_BASE                          = "https://api.1fichier.com/v1";
-    private static final boolean resume_free_hotlink               = true;
+    public static final String API_BASE                          = "https://api.1fichier.com/v1";
+    private final boolean      allowFreeAccountDownloadsViaAPI   = false;
 
     public String getDirectlinkproperty(final Account account) {
         if (account == null) {
@@ -484,7 +484,7 @@ public class OneFichierCom extends PluginForHost {
             link.removeProperty(directurlproperty);
         }
         final String contentURL = this.getDirecturlWithPreferredProtocol(getContentURLWebsite(link));
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, resume_free_hotlink, this.getMaxChunks(link, account));
+        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (this.looksLikeDownloadableContent(dl.getConnection())) {
             link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
             if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
@@ -797,6 +797,12 @@ public class OneFichierCom extends PluginForHost {
             if (account.lastUpdateTime() > 0) {
                 logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
                 final AccountType oldAccountType = account.getType();
+                if (AccountType.FREE.equals(oldAccountType) && !allowFreeAccountDownloadsViaAPI) {
+                    // ai.setExpired(true);
+                    errorPremiumNeededForAPIDownloading(account);
+                    /* This code should never be reached */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 if (oldAccountType != null && oldAccountType != AccountType.UNKNOWN) {
                     final AccountInfo existing = account.getAccountInfo();
                     if (existing != null) {
@@ -842,6 +848,7 @@ public class OneFichierCom extends PluginForHost {
             account.setUser(email);
         }
         final String subscription_end = (String) entries.get("subscription_end");
+        final int accountType = Integer.parseInt(entries.get("offer").toString()); // 0=Free, 1=Premium, 2=Access
         final Object available_credits_in_gigabyteO = entries.get("cdn");
         long creditsAsBytes = -1;
         if (available_credits_in_gigabyteO != null) {
@@ -852,28 +859,33 @@ public class OneFichierCom extends PluginForHost {
             }
         }
         final boolean useCDNCredits = JavaScriptEngineFactory.toLong(entries.get("use_cdn"), 0) == 1 ? true : false;
-        long validuntil = 0;
-        if (!StringUtils.isEmpty(subscription_end)) {
-            validuntil = TimeFormatter.getMilliSeconds(subscription_end, "yyyy-MM-dd HH:mm:ss", Locale.FRANCE);
-        }
-        if (validuntil > System.currentTimeMillis()) {
+        if (accountType == 0) {
+            /* Free --> 2019-07-18: API Keys are only available for premium users so this should never happen! */
+            account.setType(AccountType.FREE);
+            account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
+            if (!allowFreeAccountDownloadsViaAPI) {
+                // ai.setExpired(true);
+                errorPremiumNeededForAPIDownloading(account);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        } else {
+            /* Premium or "Access" account */
+            long validuntil = 0;
+            if (!StringUtils.isEmpty(subscription_end)) {
+                validuntil = TimeFormatter.getMilliSeconds(subscription_end, "yyyy-MM-dd HH:mm:ss", Locale.FRANCE);
+            }
             /* Premium */
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
-            account.setConcurrentUsePossible(true);
             setValidUntil(ai, validuntil);
             ai.setUnlimitedTraffic();
-        } else {
-            /* Free --> 2019-07-18: API Keys are only available for premium users so this should never happen! */
-            ai.setExpired(true);
-            account.setType(AccountType.FREE);
-            account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
-            account.setConcurrentUsePossible(false);
-            /*
-             * Free accounts cannot be used for downloading in API mode [unless they got CDN credits and they are in use, see down below].
-             */
-            ai.setTrafficLeft(0);
         }
+        account.setConcurrentUsePossible(true);
+        /*
+         * The check down below is not really needed but if free accounts were to be allowed to perform CDN downloads via API, the check
+         * would make sense to catch free accounts that are out of CDN points and thus out of traffic.
+         */
         if (AccountType.FREE.equals(account.getType()) && (creditsAsBytes <= 0 || !useCDNCredits)) {
             /* Free accounts cannot be used for normal downloading via API Key */
             ai.setExpired(true);
@@ -967,8 +979,10 @@ public class OneFichierCom extends PluginForHost {
             throw new AccountUnavailableException(message, 60 * 60 * 1000l);
         } else if (message.matches("(?i).*Must be a customer.*")) {
             /* 2020-06-09: E.g. {"message":"Must be a customer (Premium, Access) #200","status":"KO"} */
-            /* Free account (most likely expired premium) apikey entered by user --> API can only be used by premium users */
-            throw new AccountInvalidException("Premium expired: Only premium users can use the 1fichier API");
+            /* Free account api key entered by user --> API can only be used by premium users */
+            errorPremiumNeededForAPIDownloading(account);
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (isAPIErrorPassword(message)) {
             this.errorWrongPassword(this.getDownloadLink());
             /* This code should never be reached */
@@ -1006,6 +1020,10 @@ public class OneFichierCom extends PluginForHost {
         } else {
             return false;
         }
+    }
+
+    private void errorPremiumNeededForAPIDownloading(final Account account) throws AccountInvalidException {
+        throw new AccountInvalidException("Only premium users can use the 1fichier API for downloading!");
     }
 
     private void errorWrongPassword(final DownloadLink link) throws PluginException {

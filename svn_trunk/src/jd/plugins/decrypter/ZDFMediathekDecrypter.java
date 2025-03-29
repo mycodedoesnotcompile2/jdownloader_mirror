@@ -62,7 +62,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 50861 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 50890 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -475,10 +475,19 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
 
     /**
      * Returns sophora ID from URL. <br>
+     * Works with urls rom the "new" zdfmediathek (march 2025). <br>
      * Only returns something if we know for sure that the result is a sophoraID.
      */
     private String getSophoraIDFromURL_safe(final String url) {
-        return new Regex(url, "(?i)/play/([\\w-]+)/([\\w-]+)/([\\w-]+)").getMatch(2);
+        String sophoraID = new Regex(url, "(?i)/play/([\\w-]+)/([\\w-]+)/([\\w-]+)").getMatch(2);
+        if (sophoraID != null) {
+            return sophoraID;
+        }
+        sophoraID = new Regex(url, "(?i)/video/([\\w-]+)/([\\w-]+)/([\\w-]+)").getMatch(2);
+        if (sophoraID != null) {
+            return sophoraID;
+        }
+        return null;
     }
 
     private ArrayList<DownloadLink> crawlZdfVideoViaSophoraID(final CryptedLink param, final String sophoraID) throws Exception {

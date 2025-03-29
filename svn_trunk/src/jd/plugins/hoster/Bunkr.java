@@ -26,16 +26,18 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 50757 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50891 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -323,7 +325,7 @@ public class Bunkr extends PluginForHost {
                 return AvailableStatus.TRUE;
             }
         } else if (new Regex(link.getPluginPatternMatcher(), PATH_FUID_NUMBERS).patternFind()) {
-            crawlFileInfoInternalFuid(link, contenturl, isDownload);
+            crawlFileInfoInternalFuid(link, contenturl, null, isDownload);
             officialDownloadurl = link.getStringProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
             if (!isDownload) {
                 return AvailableStatus.TRUE;
@@ -509,7 +511,8 @@ public class Bunkr extends PluginForHost {
         final String nextStepURL = br.getRegex("(https?://get\\.[^/]+/file/\\d+)").getMatch(0);
         String directurl = null;
         if (nextStepURL != null) {
-            crawlFileInfoInternalFuid(link, nextStepURL, isDownload);
+            final String slug = br.getRegex("var jsSlug = '([^']+)").getMatch(0);
+            crawlFileInfoInternalFuid(link, nextStepURL, slug, isDownload);
             directurl = link.getStringProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
         }
         if (directurl == null) {
@@ -571,7 +574,7 @@ public class Bunkr extends PluginForHost {
     }
 
     /** For links like this: https://get.bunkrr.su/file/123456... */
-    private void crawlFileInfoInternalFuid(final DownloadLink link, final String contenturl, final boolean isDownload) throws PluginException, IOException {
+    private void crawlFileInfoInternalFuid(final DownloadLink link, final String contenturl, final String slug, final boolean isDownload) throws PluginException, IOException {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -603,11 +606,19 @@ public class Bunkr extends PluginForHost {
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("Content-Type", "application/json");
         /* Same request also works with the other fileID ([A-Za-z0-9]{8}) as parameter "slug" on current browser domain. */
-        brc.postPageRaw("https://get.bunkrr.su/api/_001", "{\"id\":\"" + internalFileID + "\"}");
+        if (slug != null && false) {
+            /* 2025-03-28: new, for vs = videostream? other method still working */
+            brc.getHeaders().put("Origin", "https://bunkr.si");
+            final String jsonSlug = PluginJSonUtils.escape(slug);
+            brc.postPageRaw("https://bunkr.si/api/vs", "{\"slug\":\"" + jsonSlug + "\"}");
+        } else {
+            /* 2025-03-28: Still working fine */
+            brc.postPageRaw("https://get.bunkrr.su/api/_001", "{\"id\":\"" + internalFileID + "\"}");
+        }
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final Number timestamp = (Number) entries.get("timestamp");
-        final String url = entries.get("url").toString();
-        String directurl = null;
+        String url = entries.get("url").toString();
+        String directurl;
         if (Boolean.TRUE.equals(entries.get("encrypted"))) {
             directurl = decryptData(url, timestamp.longValue());
         } else {
@@ -622,14 +633,14 @@ public class Bunkr extends PluginForHost {
 
     /** See https://get.bunkrr.su/js/src.enc.js */
     public static String decryptData(final String encryptedBase64, final long timestamp) throws UnsupportedEncodingException {
-        byte[] encryptedBytes = Encoding.Base64Decode(encryptedBase64).getBytes();
-        String secretKey = "SECRET_KEY_" + (timestamp / 3600);
+        final byte[] encryptedBytes = Base64.decode(encryptedBase64);
+        final String secretKey = "SECRET_KEY_" + (timestamp / 3600);
         return xorDecrypt(encryptedBytes, secretKey);
     }
 
     private static String xorDecrypt(final byte[] data, final String key) throws UnsupportedEncodingException {
-        byte[] keyBytes = key.getBytes("UTF-8");
-        byte[] result = new byte[data.length];
+        final byte[] keyBytes = key.getBytes("UTF-8");
+        final byte[] result = new byte[data.length];
         for (int i = 0; i < data.length; i++) {
             result[i] = (byte) (data[i] ^ keyBytes[i % keyBytes.length]);
         }

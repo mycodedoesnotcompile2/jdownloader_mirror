@@ -15,7 +15,7 @@ import org.appwork.utils.parser.UrlQuery;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.requests.GetRequest;
-import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
@@ -28,7 +28,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GofileIo;
 
-@DecrypterPlugin(revision = "$Revision: 50882 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 50885 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -41,9 +41,9 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         final String token = GofileIo.getAndSetGuestToken(this, brc);
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final UrlQuery query = new UrlQuery();
-        query.add("contentId", folderID);
-        query.add("token", Encoding.urlEncode(token));
-        query.add("wt", GofileIo.getWebsiteToken(this, br));
+        query.appendEncoded("contentId", folderID);
+        query.appendEncoded("token", token);
+        query.appendEncoded("wt", GofileIo.getWebsiteToken(this, br));
         String passCode = param.getDecrypterPassword();
         boolean passwordCorrect = true;
         boolean passwordRequired = false;
@@ -171,5 +171,10 @@ public class GoFileIoCrawler extends PluginForDecrypt {
     public int getMaxConcurrentProcessingInstances() {
         /* 2024-01-26: Try to prevent running into rate-limit. */
         return 1;
+    }
+
+    @Override
+    public boolean hasCaptcha(CryptedLink link, Account acc) {
+        return false;
     }
 }

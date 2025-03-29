@@ -249,131 +249,192 @@ public class LinknameCleaner {
     public static String cleanPackagename(final String packageName, boolean allowCleanup) {
         String ret = replaceCharactersByMap(packageName, PACKAGENAME_REPLACEMAP);
         /* if enabled, replace dots and _ with spaces and do further clean ups */
-        if (ret != null && org.jdownloader.settings.staticreferences.CFG_GENERAL.CLEAN_UP_PACKAGENAMES.isEnabled()) {
-            // still wanted by users, so please do not simply remove this
+        if (ret != null && allowCleanup && org.jdownloader.settings.staticreferences.CFG_GENERAL.CLEAN_UP_PACKAGENAMES.isEnabled()) {
             // TODO: maybe add own cleanup replace map that does this via pattern/replace or add those to package name replace map
-            // TODO: Review this to avoid double-spaces caused by this cleanup, see:
-            // https://board.jdownloader.org/showpost.php?p=536087&postcount=37
-            final StringBuilder sb = new StringBuilder();
-            char[] cs = ret.toCharArray();
-            char lastChar = 'a';
-            for (int i = 0; i < cs.length; i++) {
-                switch (cs[i]) {
-                case '_':
-                case '.':
-                    if (lastChar != ' ') {
+            // Replace dots and underscores with spaces while avoiding double spaces
+            // Handle special characters like dots and underscores while preventing double spaces
+            StringBuilder sb = new StringBuilder();
+            boolean lastWasSpace = false;
+            for (int i = 0; i < ret.length(); i++) {
+                char c = ret.charAt(i);
+                if (c == '_' || c == '.') {
+                    // Only add a space if the previous character wasn't a space
+                    // and the next character isn't a space (to handle periods followed by spaces)
+                    if (!lastWasSpace && (i + 1 >= ret.length() || ret.charAt(i + 1) != ' ')) {
                         sb.append(' ');
+                        lastWasSpace = true;
                     }
-                    lastChar = ' ';
-                    break;
-                default:
-                    lastChar = cs[i];
-                    sb.append(cs[i]);
+                    // Skip the separator character
+                } else if (c == ' ') {
+                    // Only add spaces if the previous character wasn't a space
+                    if (!lastWasSpace) {
+                        sb.append(c);
+                        lastWasSpace = true;
+                    }
+                } else {
+                    // Regular character, add it
+                    sb.append(c);
+                    lastWasSpace = false;
                 }
             }
-            ret = sb.toString();
+            ret = sb.toString().trim();
         }
         ret = CrossSystem.alleviatePathParts(ret, false);
         return ret;
     }
 
-    /** Derives package name out of given filename. */
-    public static String derivePackagenameFromFilename(String name) {
-        boolean extensionStilExists = true;
-        String before = name;
-        {
-            /* Remove known archive file-extensions */
-            /** remove rar extensions */
-            for (Pattern Pat : rarPats) {
-                name = getNameMatch(name, Pat);
-                if (!before.equals(name)) {
-                    extensionStilExists = false;
+    /**
+     * Derives a package name from a filename by removing known archive extensions and other file extensions.
+     *
+     * @param filename
+     *            The original filename to process
+     * @return The derived package name
+     */
+    public static String derivePackagenameFromFilename(final String filename) {
+        if (StringUtils.isEmpty(filename)) {
+            return null;
+        }
+        String name = filename;
+        boolean hasKnownExtension = false;
+        // Step 1: Remove known archive file extensions
+        ExtensionRemovalResult result = removeKnownArchiveExtensions(name);
+        name = result.processedName;
+        hasKnownExtension = result.extensionFound;
+        // Step 2: Remove "part" patterns
+        String tmpName = cutNameMatch(name, pat13);
+        if (tmpName.length() > 3) {
+            name = tmpName;
+        }
+        // Step 3: Remove other file extensions based on settings
+        name = removeOtherFileExtensions(name, hasKnownExtension);
+        // Step 4: Remove trailing separators (., -, _)
+        name = removeTrailingSeparators(name);
+        return name;
+    }
+
+    /**
+     * Helper class to return multiple values from extension removal operations
+     */
+    private static class ExtensionRemovalResult {
+        public final String  processedName;
+        public final boolean extensionFound;
+
+        public ExtensionRemovalResult(String processedName, boolean extensionFound) {
+            this.processedName = processedName;
+            this.extensionFound = extensionFound;
+        }
+    }
+
+    /**
+     * Removes known archive extensions from a filename
+     *
+     * @param name
+     *            The filename to process
+     * @return Result containing the processed name and whether an extension was found
+     */
+    private static ExtensionRemovalResult removeKnownArchiveExtensions(String name) {
+        // Check RAR extensions
+        ExtensionRemovalResult result = checkPatternList(name, rarPats);
+        if (result.extensionFound) {
+            return result;
+        }
+        // Check ZIP extensions
+        result = checkPatternList(name, zipPats);
+        if (result.extensionFound) {
+            return result;
+        }
+        // Check ISZ extensions
+        result = checkPatternList(name, iszPats);
+        if (result.extensionFound) {
+            return result;
+        }
+        // Check XtremSplit extension
+        String processed = getNameMatch(name, pat17);
+        if (!name.equals(processed)) {
+            return new ExtensionRemovalResult(processed, true);
+        }
+        // Check FFSJ extensions
+        if (ffsjPats != null) {
+            for (Pattern pattern : ffsjPats) {
+                processed = getNameMatch(name, pattern);
+                if (!name.equalsIgnoreCase(processed)) {
+                    return new ExtensionRemovalResult(processed, true);
+                }
+            }
+        }
+        return new ExtensionRemovalResult(name, false);
+    }
+
+    /**
+     * Checks a filename against a list of patterns and returns the first match
+     *
+     * @param name
+     *            The filename to check
+     * @param patterns
+     *            Array of patterns to check against
+     * @return Result containing the processed name and whether a match was found
+     */
+    private static ExtensionRemovalResult checkPatternList(String name, Pattern[] patterns) {
+        for (Pattern pattern : patterns) {
+            String processed = getNameMatch(name, pattern);
+            if (!name.equals(processed)) {
+                return new ExtensionRemovalResult(processed, true);
+            }
+        }
+        return new ExtensionRemovalResult(name, false);
+    }
+
+    /**
+     * Removes other file extensions based on extension settings
+     *
+     * @param name
+     *            The filename to process
+     * @param hasKnownExtension
+     *            Whether a known extension was already found and removed
+     * @return The filename with extensions removed
+     */
+    private static String removeOtherFileExtensions(String name, boolean hasKnownExtension) {
+        final EXTENSION_SETTINGS extensionSettings = EXTENSION_SETTINGS.REMOVE_ALL;
+        if (EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) || EXTENSION_SETTINGS.REMOVE_KNOWN.equals(extensionSettings)) {
+            while (true) {
+                final int lastPoint = name.lastIndexOf(".");
+                if (lastPoint <= 0) {
                     break;
                 }
-            }
-            if (extensionStilExists) {
-                /**
-                 * remove 7zip/zip and merge extensions
-                 */
-                before = name;
-                for (Pattern Pat : zipPats) {
-                    name = getNameMatch(name, Pat);
-                    if (!before.equals(name)) {
-                        extensionStilExists = false;
-                        break;
-                    }
+                final String ext = name.substring(lastPoint + 1);
+                final int extLength = ext.length();
+                final ExtensionsFilterInterface knownExt = CompiledFiletypeFilter.getExtensionsFilterInterface(ext);
+                // Case 1: Known extension (not archive number)
+                if (knownExt != null && !ArchiveExtensions.NUM.equals(knownExt)) {
+                    name = name.substring(0, lastPoint);
+                    continue;
                 }
-            }
-            if (extensionStilExists) {
-                /**
-                 * remove isz extensions
-                 */
-                before = name;
-                for (Pattern Pat : iszPats) {
-                    name = getNameMatch(name, Pat);
-                    if (!before.equals(name)) {
-                        extensionStilExists = false;
-                        break;
-                    }
-                }
-            }
-            if (extensionStilExists) {
-                before = name;
-                /* xtremsplit */
-                name = getNameMatch(name, pat17);
-                if (!before.equals(name)) {
-                    extensionStilExists = false;
-                }
-            }
-            if (extensionStilExists && ffsjPats != null) {
-                /**
-                 * FFSJ splitted files
-                 *
-                 */
-                before = name;
-                for (Pattern Pat : ffsjPats) {
-                    name = getNameMatch(name, Pat);
-                    if (!before.equalsIgnoreCase(name)) {
-                        extensionStilExists = false;
-                        break;
-                    }
-                }
-            }
-        }
-        String tmpname = cutNameMatch(name, pat13);
-        if (tmpname.length() > 3) {
-            name = tmpname;
-        }
-        /* Remove other file extensions */
-        /* TODO: If needed, move this into a separate function and call it "filenameExtensionRemover" or similar. */
-        {
-            final EXTENSION_SETTINGS extensionSettings = EXTENSION_SETTINGS.REMOVE_ALL;
-            if (EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) || EXTENSION_SETTINGS.REMOVE_KNOWN.equals(extensionSettings)) {
-                while (true) {
-                    final int lastPoint = name.lastIndexOf(".");
-                    if (lastPoint <= 0) {
-                        break;
-                    }
-                    final int extLength = (name.length() - (lastPoint + 1));
-                    final String ext = name.substring(lastPoint + 1);
-                    final ExtensionsFilterInterface knownExt = CompiledFiletypeFilter.getExtensionsFilterInterface(ext);
-                    if (knownExt != null && !ArchiveExtensions.NUM.equals(knownExt)) {
-                        /* make sure to cut off only known extensions */
+                // Case 2: Short alphanumeric extension (only if REMOVE_ALL is set)
+                if (extLength <= 4 && EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) && ext.matches("^[0-9a-zA-z]+$")) {
+                    if (!hasKnownExtension) {
+                        // Only remove if we haven't found a known extension yet
                         name = name.substring(0, lastPoint);
-                    } else if (extLength <= 4 && EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) && ext.matches("^[0-9a-zA-z]+$")) {
-                        /* make sure to cut off only known extensions */
-                        if (extensionStilExists) {
-                            name = name.substring(0, lastPoint);
-                        } else {
-                            break;
-                        }
+                        continue;
                     } else {
+                        // Otherwise stop processing (preserve remaining extension)
                         break;
                     }
                 }
+                // Case 3: Unknown/unhandled extension type
+                break;
             }
         }
-        /* Remove ending ., - , _ */
+        return name;
+    }
+
+    /**
+     * Removes trailing separator characters from a filename
+     *
+     * @param name
+     *            The filename to process
+     * @return The filename with trailing separators removed
+     */
+    private static String removeTrailingSeparators(String name) {
         int removeIndex = -1;
         for (int i = name.length() - 1; i >= 0; i--) {
             final char c = name.charAt(i);

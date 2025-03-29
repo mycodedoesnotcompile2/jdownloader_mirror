@@ -33,6 +33,7 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -40,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50881 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50885 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZoomUs extends PluginForHost {
     public ZoomUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,170 +92,176 @@ public class ZoomUs extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    /** See also: https://github.com/Battleman/zoomdl */
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
-    }
-
-    public AvailableStatus requestFileInformation(final DownloadLink link, final boolean handleDownloadPassword) throws Exception {
+        /** See also: https://github.com/Battleman/zoomdl */
         final String ext = ".mp4";
         if (!link.isNameSet()) {
             link.setName(this.getFID(link) + ext);
         }
-        this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final String errorFromHTML = br.getRegex("class=\"error-message\"[^>]*>(.*?)<").getMatch(0);
-        if (errorFromHTML != null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        String meetingID = br.getRegex("meeting_id\\s*:\\s*\"([^\"]+)\"").getMatch(0);
-        if (meetingID == null) {
-            meetingID = br.getRegex("meetingID\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
-        }
-        String fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
-        String topic = null;
-        String displayFileName = null;
-        if (fileId == null) {
-            if (meetingID == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            Map<String, Object> entries = accessPlayShareOnfo(br, meetingID);
-            Map<String, Object> result = (Map<String, Object>) entries.get("result");
-            final String componentName = result.get("componentName").toString();
-            if (!Boolean.TRUE.equals(result.get("canPlayFromShare"))) {
-                /* Usually password protected item */
-                if (!componentName.equals("need-password")) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final String action = result.get("action").toString();
-                final String useWhichPasswd = result.get("useWhichPasswd").toString();
-                final String sharelevel = result.get("sharelevel").toString();
-                final UrlQuery query = new UrlQuery();
-                query.add("action", action);
-                query.add("sharelevel", sharelevel);
-                query.add("useWhichPasswd", useWhichPasswd);
-                query.add("clusterId", result.get("clusterId").toString());
-                query.add("componentName", componentName);
-                query.add("meetingId", Encoding.urlEncode(meetingID));
-                query.add("originRequestUrl", Encoding.urlEncode(link.getPluginPatternMatcher()));
-                br.getPage("/rec/component-page?" + query.toString());
-                if (!passwordRequired(br)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                /* Do not ask user for password during availablecheck. */
-                link.setPasswordProtected(true);
-                if (!handleDownloadPassword) {
-                    /* Do not ask user for password here but at least find file title if possible. */
-                    logger.info("Trying to find title of password protected item");
-                    final Form prepwform = new Form();
-                    prepwform.setAction("/nws/recording/1.0/validate-context");
-                    prepwform.setMethod(MethodType.POST);
-                    prepwform.put("meetingId", Encoding.urlEncode(meetingID));
-                    prepwform.put("fileId", "");
-                    prepwform.put("useWhichPasswd", Encoding.urlEncode(useWhichPasswd));
-                    prepwform.put("sharelevel", Encoding.urlEncode(sharelevel));
-                    final Browser br2 = br.cloneBrowser();
-                    br2.submitForm(prepwform);
-                    final Map<String, Object> entries3 = restoreFromString(br2.getRequest().getHtmlCode(), TypeRef.MAP);
-                    final Map<String, Object> result3 = (Map<String, Object>) entries3.get("result");
-                    if (result3 != null) {
-                        topic = (String) result3.get("topic");
-                        if (!StringUtils.isEmpty(topic)) {
-                            link.setName(topic + ext);
-                        }
-                    }
-                    return AvailableStatus.TRUE;
-                }
-                String passCode = link.getDownloadPassword();
-                if (passCode == null) {
-                    passCode = getUserInput("Password?", link);
-                }
-                final Form pwform = new Form();
-                pwform.setAction("/nws/recording/1.0/validate-meeting-passwd");
-                pwform.setMethod(MethodType.POST);
-                pwform.put("id", Encoding.urlEncode(meetingID));
-                pwform.put("passwd", Encoding.urlEncode(passCode));
-                pwform.put("action", action);
-                String recaptchaV2Response = "";
-                if (this.requiresCaptcha(br)) {
-                    final String reCaptchaSiteKey = br.getRegex("var gRecaptchaVisible\\s*=\\s*\"([^\"]+)").getMatch(0);
-                    if (reCaptchaSiteKey == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaSiteKey).getToken();
-                }
-                pwform.put("recaptcha", Encoding.urlEncode(recaptchaV2Response));
-                br.submitForm(pwform);
-                final Map<String, Object> entries5 = checkErrorsWebAPI(br);
-                /* Correct password! Item should now be downloadable. */
-                link.setDownloadPassword(passCode);
-                // br.getPage(link.getPluginPatternMatcher());
-                entries = accessPlayShareOnfo(br, meetingID);
-                result = (Map<String, Object>) entries.get("result");
-            }
-            final String redirectUrl = result.get("redirectUrl").toString();
-            if (StringUtils.isEmpty(redirectUrl)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            br.getPage(redirectUrl);
-            fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
-            if (fileId == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-        }
-        final String originRequestUrl = link.getPluginPatternMatcher();
-        final UrlQuery query0 = new UrlQuery();
-        query0.appendEncoded("canPlayFromShare", "true");
-        query0.appendEncoded("from", "share_recording_detail");
-        query0.appendEncoded("continueMode", "true");
-        query0.appendEncoded("componentName", "rec-play");
-        query0.appendEncoded("originRequestUrl", originRequestUrl);
-        br.getPage("/nws/recording/1.0/play/info/" + fileId + "?" + query0.toString());
-        final Map<String, Object> entries2 = checkErrorsWebAPI(br);
-        final Map<String, Object> result2 = (Map<String, Object>) entries2.get("result");
-        final String componentName = (String) result2.get("componentName");
-        if (StringUtils.equalsIgnoreCase(componentName, "vanity-url-check")) {
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                // TODO: Finish implementation
-                /* 2025-03-27: Treat such items as offline in stable for now. */
+        final PluginEnvironment env = this.getPluginEnvironment();
+        try {
+            this.setBrowserExclusive();
+            br.setFollowRedirects(true);
+            br.getPage(link.getPluginPatternMatcher());
+            if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            /**
-             * UNFINISHED/DEV-ONLY code!! <br>
-             * In browser, a redirect happens and then the "/play/info/" is called again with another fileID.
-             */
-            final UrlQuery query = new UrlQuery();
-            query.appendEncoded("accessLevel", "");
-            query.appendEncoded("vanityURL", result2.get("vanityURL").toString());
-            query.appendEncoded("emid", result2.get("emid").toString());
-            query.appendEncoded("componentName", "vanity-url-check");
-            query.appendEncoded("meetingId", result2.get("emid").toString());
-            query.appendEncoded("originRequestUrl", originRequestUrl);
-            br.getPage("https://" + result2.get("vanityURL") + "/rec/component-page?" + query.toString());
-        }
-        link.setProperty(PROPERTY_DIRECTURL, result2.get("viewMp4Url"));
-        final Map<String, Object> meet = (Map<String, Object>) result2.get("meet");
-        if (meet == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        topic = (String) meet.get("topic");
-        final Map<String, Object> recording = (Map<String, Object>) result2.get("recording");
-        displayFileName = (String) recording.get("displayFileName");
-        final String fileSizeInMB = (String) recording.get("fileSizeInMB");
-        if (fileSizeInMB != null) {
-            link.setDownloadSize(SizeFormatter.getSize(fileSizeInMB));
-        }
-        if (topic != null && displayFileName != null) {
-            link.setFinalFileName(topic + " - " + displayFileName + ext);
-        } else if (displayFileName != null) {
-            link.setFinalFileName(displayFileName + ext);
-        } else if (topic != null) {
-            link.setFinalFileName(topic + ext);
+            final String errorFromHTML = br.getRegex("class=\"error-message\"[^>]*>(.*?)<").getMatch(0);
+            if (errorFromHTML != null) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            String meetingID = br.getRegex("meeting_id\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+            if (meetingID == null) {
+                meetingID = br.getRegex("meetingID\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
+            }
+            String fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
+            String topic = null;
+            String displayFileName = null;
+            if (fileId == null) {
+                if (meetingID == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                Map<String, Object> entries = accessPlayShareOnfo(br, meetingID);
+                Map<String, Object> result = (Map<String, Object>) entries.get("result");
+                final String componentName = result.get("componentName").toString();
+                if (!Boolean.TRUE.equals(result.get("canPlayFromShare"))) {
+                    /* Usually password protected item */
+                    if (!componentName.equals("need-password")) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    final String action = result.get("action").toString();
+                    final String useWhichPasswd = result.get("useWhichPasswd").toString();
+                    final String sharelevel = result.get("sharelevel").toString();
+                    final UrlQuery query = new UrlQuery();
+                    query.add("action", action);
+                    query.add("sharelevel", sharelevel);
+                    query.add("useWhichPasswd", useWhichPasswd);
+                    query.add("clusterId", result.get("clusterId").toString());
+                    query.add("componentName", componentName);
+                    query.add("meetingId", Encoding.urlEncode(meetingID));
+                    query.add("originRequestUrl", Encoding.urlEncode(link.getPluginPatternMatcher()));
+                    br.getPage("/rec/component-page?" + query.toString());
+                    if (!passwordRequired(br)) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    /* Do not ask user for password during availablecheck. */
+                    link.setPasswordProtected(true);
+                    if (env != PluginEnvironment.DOWNLOAD) {
+                        /* Do not ask user for password here but at least find file title if possible. */
+                        logger.info("Trying to find title of password protected item");
+                        final Form prepwform = new Form();
+                        prepwform.setAction("/nws/recording/1.0/validate-context");
+                        prepwform.setMethod(MethodType.POST);
+                        prepwform.put("meetingId", Encoding.urlEncode(meetingID));
+                        prepwform.put("fileId", "");
+                        prepwform.put("useWhichPasswd", Encoding.urlEncode(useWhichPasswd));
+                        prepwform.put("sharelevel", Encoding.urlEncode(sharelevel));
+                        final Browser br2 = br.cloneBrowser();
+                        br2.submitForm(prepwform);
+                        final Map<String, Object> entries3 = restoreFromString(br2.getRequest().getHtmlCode(), TypeRef.MAP);
+                        final Map<String, Object> result3 = (Map<String, Object>) entries3.get("result");
+                        if (result3 != null) {
+                            topic = (String) result3.get("topic");
+                            if (!StringUtils.isEmpty(topic)) {
+                                link.setName(topic + ext);
+                            }
+                        }
+                        return AvailableStatus.TRUE;
+                    }
+                    String passCode = link.getDownloadPassword();
+                    if (passCode == null) {
+                        passCode = getUserInput("Password?", link);
+                    }
+                    final Form pwform = new Form();
+                    pwform.setAction("/nws/recording/1.0/validate-meeting-passwd");
+                    pwform.setMethod(MethodType.POST);
+                    pwform.put("id", Encoding.urlEncode(meetingID));
+                    pwform.put("passwd", Encoding.urlEncode(passCode));
+                    pwform.put("action", action);
+                    String recaptchaV2Response = "";
+                    if (this.requiresCaptcha(br)) {
+                        final String reCaptchaSiteKey = br.getRegex("var gRecaptchaVisible\\s*=\\s*\"([^\"]+)").getMatch(0);
+                        if (reCaptchaSiteKey == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaSiteKey).getToken();
+                    }
+                    pwform.put("recaptcha", Encoding.urlEncode(recaptchaV2Response));
+                    br.submitForm(pwform);
+                    final Map<String, Object> entries5 = checkErrorsWebAPI(br);
+                    /* Correct password! Item should now be downloadable. */
+                    link.setDownloadPassword(passCode);
+                    // br.getPage(link.getPluginPatternMatcher());
+                    entries = accessPlayShareOnfo(br, meetingID);
+                    result = (Map<String, Object>) entries.get("result");
+                }
+                final String redirectUrl = result.get("redirectUrl").toString();
+                if (StringUtils.isEmpty(redirectUrl)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                br.getPage(redirectUrl);
+                fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
+                if (fileId == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
+            final String originRequestUrl = link.getPluginPatternMatcher();
+            final UrlQuery query0 = new UrlQuery();
+            query0.appendEncoded("canPlayFromShare", "true");
+            query0.appendEncoded("from", "share_recording_detail");
+            query0.appendEncoded("continueMode", "true");
+            query0.appendEncoded("componentName", "rec-play");
+            query0.appendEncoded("originRequestUrl", originRequestUrl);
+            br.getPage("/nws/recording/1.0/play/info/" + fileId + "?" + query0.toString());
+            final Map<String, Object> entries2 = checkErrorsWebAPI(br);
+            final Map<String, Object> result2 = (Map<String, Object>) entries2.get("result");
+            final String componentName = (String) result2.get("componentName");
+            if (StringUtils.equalsIgnoreCase(componentName, "vanity-url-check")) {
+                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    // TODO: Finish implementation
+                    /* 2025-03-27: Treat such items as offline in stable for now. */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                /**
+                 * UNFINISHED/DEV-ONLY code!! <br>
+                 * In browser, a redirect happens and then the "/play/info/" is called again with another fileID.
+                 */
+                final UrlQuery query = new UrlQuery();
+                query.appendEncoded("accessLevel", "");
+                query.appendEncoded("vanityURL", result2.get("vanityURL").toString());
+                query.appendEncoded("emid", result2.get("emid").toString());
+                query.appendEncoded("componentName", "vanity-url-check");
+                query.appendEncoded("meetingId", result2.get("emid").toString());
+                query.appendEncoded("originRequestUrl", originRequestUrl);
+                br.getPage("https://" + result2.get("vanityURL") + "/rec/component-page?" + query.toString());
+            }
+            link.setProperty(PROPERTY_DIRECTURL, result2.get("viewMp4Url"));
+            final Map<String, Object> meet = (Map<String, Object>) result2.get("meet");
+            if (meet == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            topic = (String) meet.get("topic");
+            final Map<String, Object> recording = (Map<String, Object>) result2.get("recording");
+            displayFileName = (String) recording.get("displayFileName");
+            final String fileSizeInMB = (String) recording.get("fileSizeInMB");
+            if (fileSizeInMB != null) {
+                link.setDownloadSize(SizeFormatter.getSize(fileSizeInMB));
+            }
+            if (topic != null && displayFileName != null) {
+                link.setFinalFileName(topic + " - " + displayFileName + ext);
+            } else if (displayFileName != null) {
+                link.setFinalFileName(displayFileName + ext);
+            } else if (topic != null) {
+                link.setFinalFileName(topic + ext);
+            }
+        } catch (final AccountRequiredException ae) {
+            if (env == PluginEnvironment.LINK_CHECK) {
+                /* We know that the item is online but video cannot be downloaded. */
+                return AvailableStatus.TRUE;
+            } else {
+                throw ae;
+            }
         }
         return AvailableStatus.TRUE;
     }
@@ -285,27 +292,32 @@ public class ZoomUs extends PluginForHost {
             }
         }
         final Map<String, Object> result = (Map<String, Object>) entries.get("result");
-        if (result != null) {
-            final String componentName = (String) result.get("componentName");
-            if (StringUtils.equalsIgnoreCase(componentName, "play-forbidden")) {
-                /**
-                 * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","message":"Diese Aufzeichnung ist
-                 * abgelaufen.","redirectUrl":"/rec/component-page","componentName":"play-forbidden","meetingId":"REDACTED","needRedirect":true}}
-                 */
-                /*
-                 * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","redirectUrl":"/rec/component-page",
-                 * "componentName":"play-forbidden","meetingId":
-                 * "t4PioJBgTixwd8D5YQJZKh06iVF0wFJs3DZ0YMFpRako760l-KqrIodqNyLS2kqM.6XJax0XtQFFEXjUD","needRedirect":true}}
-                 */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
+        if (result == null) {
+            /* No error */
+            return entries;
         }
+        final String componentName = (String) result.get("componentName");
+        if (StringUtils.equalsIgnoreCase(componentName, "play-forbidden")) {
+            /**
+             * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","message":"Diese Aufzeichnung ist
+             * abgelaufen.","redirectUrl":"/rec/component-page","componentName":"play-forbidden","meetingId":"REDACTED","needRedirect":true}}
+             */
+            /*
+             * E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":{"accessLevel":"","redirectUrl":"/rec/component-page",
+             * "componentName":"play-forbidden","meetingId": "REDACTED","needRedirect":true}}
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (Boolean.FALSE.equals(result.get("hasValidToken"))) {
+            /* Permission / registration required to view video/webinar. */
+            throw new AccountRequiredException();
+        }
+        /* No error */
         return entries;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         final String dllink = link.getStringProperty(PROPERTY_DIRECTURL);
         if (StringUtils.isEmpty(dllink)) {
             throwExceptionOnCaptcha(br);

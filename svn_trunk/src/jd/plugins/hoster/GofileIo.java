@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,20 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.net.HTTPHeader;
-import org.jdownloader.plugins.components.config.GofileIoConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -65,14 +52,34 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.GoFileIoCrawler;
 
-@HostPlugin(revision = "$Revision: 50883 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.net.HTTPHeader;
+import org.jdownloader.plugins.components.config.GofileIoConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50891 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            enablePremium("https://" + getHost() + "/premium");
-        }
+        enablePremium("https://" + getHost() + "/premium");
     }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private static final String COOKIE_ACCOUNT_TOKEN = "accountToken";
 
     @Override
     public FEATURE[] getFeatures() {
@@ -86,7 +93,7 @@ public class GofileIo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://gofile.io/";
+        return "https://" + getHost() + "/";
     }
 
     @Override
@@ -96,91 +103,6 @@ public class GofileIo extends PluginForHost {
 
     private String getAPIBase() {
         return "https://api.gofile.io";
-    }
-
-    @Override
-    public AccountInfo fetchAccountInfo(Account account) throws Exception {
-        final GetRequest request = new GetRequest("https://api.gofile.io/accounts/website");
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + account.getPass());
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + getHost());
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
-        br.getPage(request);
-        final Map<String, Object> response = restoreFromString(request.getHtmlCode(), TypeRef.MAP);
-        final String status = (String) response.get("status");
-        if (!"ok".equals(status) || request.getHttpConnection().getResponseCode() != 200) {
-            if ("error-wrongToken".equals(status)) {
-                throw new AccountInvalidException("API/Account Token invalid");
-            }
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final AccountInfo ai = new AccountInfo();
-        final Map<String, Object> data = (Map<String, Object>) response.get("data");
-        final String email = (String) data.get("email");
-        if (StringUtils.isNotEmpty(email)) {
-            account.setUser(email);
-        }
-        final String tier = (String) data.get("tier");
-        if ("guest".equals(tier)) {
-            account.setType(AccountType.FREE);
-            ai.setStatus("Guest Account");
-            return ai;
-        } else if ("premium".equals(tier)) {
-            account.setType(AccountType.PREMIUM);
-            ai.setStatus("Premium Account");
-        } else {
-            throw new AccountInvalidException("Unsupported tier:" + tier);
-        }
-        final Number trafficMax = (Number) data.get("subscriptionLimitDirectTraffic");
-        if (trafficMax != null) {
-            ai.setTrafficMax(trafficMax.longValue());
-            final Map<String, Object> statsCurrent = (Map<String, Object>) data.get("statsCurrent");
-            final Number trafficUsedToday = statsCurrent != null ? (Number) statsCurrent.get("trafficWebDownloaded") : null;
-            long trafficUsed = 0;
-            if (trafficUsedToday != null) {
-                trafficUsed += trafficUsedToday.longValue();
-            }
-            final Map<String, Object> statsHistory = (Map<String, Object>) data.get("statsHistory");
-            if (statsHistory != null) {
-                Map.Entry<String, Object> yearEntry = null;
-                for (Entry<String, Object> historyEntry : statsHistory.entrySet()) {
-                    if (yearEntry == null || Integer.parseInt(historyEntry.getKey()) > Integer.parseInt(yearEntry.getKey())) {
-                        yearEntry = historyEntry;
-                    }
-                }
-                if (yearEntry != null) {
-                    final Map<String, Object> year = (Map<String, Object>) yearEntry.getValue();
-                    Map.Entry<String, Object> monthEntry = null;
-                    for (Entry<String, Object> yearHistoryEntry : year.entrySet()) {
-                        if (monthEntry == null || Integer.parseInt(yearHistoryEntry.getKey()) > Integer.parseInt(monthEntry.getKey())) {
-                            monthEntry = yearHistoryEntry;
-                        }
-                    }
-                    if (monthEntry != null) {
-                        final Map<String, Object> month = (Map<String, Object>) monthEntry.getValue();
-                        for (Entry<String, Object> dayEntry : month.entrySet()) {
-                            final Map<String, Object> day = (Map<String, Object>) dayEntry.getValue();
-                            final Number trafficWebDownloaded = (Number) day.get("trafficWebDownloaded");
-                            if (trafficWebDownloaded != null) {
-                                trafficUsed += trafficWebDownloaded.longValue();
-                            }
-                        }
-                    }
-                }
-            }
-            ai.setTrafficLeft(trafficMax.longValue() - trafficUsed);
-        }
-        final String premiumType = (String) data.get("premiumType");
-        final Number subscriptionEndDate = (Number) data.get("subscriptionEndDate");
-        if ("subscription".equals(premiumType)) {
-            if (subscriptionEndDate != null && 9999999999l == subscriptionEndDate.longValue()) {
-                ai.setValidUntil(-1);
-            } else {
-                throw new AccountInvalidException("Unsupported subscriptionEndDate:" + subscriptionEndDate);
-            }
-        } else {
-            throw new AccountInvalidException("Unsupported premiumType:" + premiumType);
-        }
-        return ai;
     }
 
     private String getFolderIDFromURL(final DownloadLink link) {
@@ -197,7 +119,6 @@ public class GofileIo extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final int           FREE_MAXCHUNKS                  = -2;
     private static final String        PROPERTY_DANGEROUS_FILE         = "dangerous_file";
     private static final String        PROPERTY_DIRECTURL              = "directurl";
     private static final String        PROPERTY_INTERNAL_FILEID        = "internal_fileid";
@@ -211,14 +132,14 @@ public class GofileIo extends PluginForHost {
         return true;
     }
 
-    /**
-     * TODO: Implement official API once available: https://gofile.io/?t=api . The "API" used here is only their website.
-     *
-     * @throws Exception
-     */
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        /* 2025-03-28: Looks to be the same limit for free and premium users. */
+        return -3;
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return this.requestFileInformation(link, null, false);
+        return this.requestFileInformation(link, null);
     }
 
     protected static AtomicReference<String> GUEST_TOKEN             = new AtomicReference<String>();
@@ -328,7 +249,7 @@ public class GofileIo extends PluginForHost {
                 GUEST_TOKEN.set(token);
                 TOKEN_TIMESTAMP.set(Time.systemIndependentCurrentJVMTimeMillis());
             }
-            br.setCookie(plugin.getHost(), "accountToken", token);
+            br.setCookie(plugin.getHost(), COOKIE_ACCOUNT_TOKEN, token);
             return token;
         }
     }
@@ -347,17 +268,16 @@ public class GofileIo extends PluginForHost {
         }
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         if (account != null) {
-            // TODO: login
+            this.setLoginCookiesAPI(br, account);
         } else {
             /* 2021-11-30: Token cookie is even needed to check directURLs! */
             getAndSetGuestToken(this, br);
         }
         final boolean allowDirecturlLinkcheck = true;
-        if (allowDirecturlLinkcheck && this.checkDirectLink(link, PROPERTY_DIRECTURL) != null) {
+        if (allowDirecturlLinkcheck && this.checkDirectLink(link, account) != null) {
             logger.info("Availablecheck via directurl complete");
             return AvailableStatus.TRUE;
         }
@@ -392,39 +312,43 @@ public class GofileIo extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    private String checkDirectLink(final DownloadLink link, final String property) {
-        String dllink = link.getStringProperty(property);
-        if (dllink != null) {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
+    private String checkDirectLink(final DownloadLink link, final Account account) {
+        String dllink = link.getStringProperty(PROPERTY_DIRECTURL);
+        if (dllink == null) {
+            return null;
+        }
+        URLConnectionAdapter con = null;
+        try {
+            final Browser br2 = br.cloneBrowser();
+            /* HEAD request is only possible for anonymous/GUEST users. */
+            if (account != null) {
+                con = br2.openGetConnection(dllink);
+            } else {
                 con = br2.openHeadConnection(dllink);
-                if (!this.looksLikeDownloadableContent(con)) {
-                    throw new IOException();
-                }
-                if (con.getCompleteContentLength() > 0) {
-                    if (con.isContentDecoded()) {
-                        link.setDownloadSize(con.getCompleteContentLength());
-                    } else {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                }
-                final String serverFilename = getFileNameFromConnection(con);
-                if (serverFilename != null) {
-                    link.setFinalFileName(serverFilename);
-                }
-                return dllink;
-            } catch (final Exception e) {
-                logger.log(e);
-                return null;
-            } finally {
-                if (con != null) {
-                    con.disconnect();
+            }
+            if (!this.looksLikeDownloadableContent(con)) {
+                throw new IOException();
+            }
+            if (con.getCompleteContentLength() > 0) {
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
             }
+            final String serverFilename = getFileNameFromConnection(con);
+            if (serverFilename != null) {
+                link.setFinalFileName(serverFilename);
+            }
+            return dllink;
+        } catch (final Exception e) {
+            logger.log(e);
+            return null;
+        } finally {
+            if (con != null) {
+                con.disconnect();
+            }
         }
-        return null;
     }
 
     public static void parseFileInfo(final DownloadLink link, final Map<String, Object> entry) {
@@ -478,27 +402,39 @@ public class GofileIo extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        requestFileInformation(link, account, true);
+        requestFileInformation(link, account);
         final boolean isDangerousFile = link.getBooleanProperty(PROPERTY_DANGEROUS_FILE, false);
         final String directurl = link.getStringProperty(PROPERTY_DIRECTURL, null);
         if (isDangerousFile && !PluginJsonConfig.get(GofileIoConfig.class).isAllowMaliciousFileDownload()) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "This file was flagged as to contain malicious software by " + this.getHost() + "! You can allow download of such files via plugin settings.");
+            throw new PluginException(LinkStatus.ERROR_FATAL, "This file was flagged as to contain malicious software! You can allow download of such files in the plugin settings.");
         } else if (StringUtils.isEmpty(directurl)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, this.isResumeable(link, null), FREE_MAXCHUNKS);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (br.containsHTML("Monthly download limit exceeded")) {
                 // Monthly download limit exceeded (2462.99GB/1000GB per 30 days). Please upgrade to premium for higher download limits.
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Monthly download limit exceeded", TimeUnit.DAYS.toMillis(1));
+                final String msgForUser;
+                if (br.getRequest().getHtmlCode().length() <= 200) {
+                    /* Error message is plain html code */
+                    msgForUser = br.getRequest().getHtmlCode().trim();
+                } else {
+                    msgForUser = "Monthly download limit exceeded";
+                }
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msgForUser, TimeUnit.DAYS.toMillis(1));
             } else if (br.containsHTML("Server is currently overloaded.\\s*Premium accounts have priority access.\\s*Please upgrade or retry later.")) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server is currently overloaded. Premium accounts have priority access. Please upgrade or retry later.", 30 * 60 * 1000l);
             } else if (br.getURL().matches("(?i)https?://[^/]+/d/[a-f0-9\\-]+")) {
                 /* Redirect to main/folder URL -> Most likely directurl expired */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error: Directurl expired?", 3 * 60 * 1000l);
             } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (br.getRequest().getHtmlCode().length() <= 200) {
+                    /* Looks like plaintext error response -> Display to user */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown error: " + br.getRequest().getHtmlCode());
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
         }
         /* Add a download slot */
@@ -510,6 +446,12 @@ public class GofileIo extends PluginForHost {
             /* Remove download slot */
             controlMaxFreeDownloads(account, link, -1);
         }
+    }
+
+    @Override
+    public boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
+        /* 2021-07-05: Override to allow 0-byte-files. */
+        return urlConnection != null && (urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206) && urlConnection.isContentDisposition();
     }
 
     protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {
@@ -524,14 +466,118 @@ public class GofileIo extends PluginForHost {
     }
 
     @Override
-    public boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
-        /* 2021-07-05: Override to allow 0-byte-files. */
-        return urlConnection != null && (urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206) && urlConnection.isContentDisposition();
+    public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+        return false;
+    }
+
+    // private void setLoginHeadersAPI(final Browser br, final Account account) {
+    // br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + account.getPass());
+    // br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + getHost());
+    // br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
+    // setLoginCookiesAPI(br, account);
+    // }
+
+    private void setLoginCookiesAPI(final Browser br, final Account account) {
+        br.setCookie(getHost(), COOKIE_ACCOUNT_TOKEN, account.getPass());
     }
 
     @Override
-    public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
-        return false;
+    public AccountInfo fetchAccountInfo(Account account) throws Exception {
+        final GetRequest request = new GetRequest(getAPIBase() + "/accounts/website");
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + account.getPass());
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + getHost());
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
+        br.getPage(request);
+        final Map<String, Object> data = this.handleAPIErrors(account, null);
+        final AccountInfo ai = new AccountInfo();
+        final Number createTime = (Number) data.get("createTime");
+        final Number usedSpaceBytes = (Number) data.get("storage");
+        final Number trafficMaxBytes = (Number) data.get("subscriptionLimitDirectTraffic");
+        final String email = (String) data.get("email");
+        if (createTime != null) {
+            ai.setCreateTime(createTime.longValue() * 1000);
+        }
+        if (StringUtils.isNotEmpty(email)) {
+            account.setUser(email);
+        }
+        if (usedSpaceBytes != null) {
+            ai.setUsedSpace(usedSpaceBytes.longValue());
+        }
+        final String tier = (String) data.get("tier");
+        if ("guest".equals(tier)) {
+            account.setType(AccountType.FREE);
+            account.setMaxSimultanDownloads(1);
+            ai.setStatus("Guest Account");
+            return ai;
+        } else if ("premium".equals(tier)) {
+            account.setType(AccountType.PREMIUM);
+        } else {
+            throw new AccountInvalidException("Unsupported tier:" + tier);
+        }
+        if (trafficMaxBytes != null) {
+            ai.setTrafficMax(trafficMaxBytes.longValue());
+            final Map<String, Object> statsCurrent = (Map<String, Object>) data.get("statsCurrent");
+            final Number trafficUsedToday = statsCurrent != null ? (Number) statsCurrent.get("trafficWebDownloaded") : null;
+            long trafficUsed = 0;
+            if (trafficUsedToday != null) {
+                trafficUsed += trafficUsedToday.longValue();
+            }
+            final Map<String, Object> statsHistory = (Map<String, Object>) data.get("statsHistory");
+            sumHistoryTraffic: if (statsHistory != null) {
+                Map.Entry<String, Object> yearEntry = null;
+                for (Entry<String, Object> historyEntry : statsHistory.entrySet()) {
+                    if (yearEntry == null || Integer.parseInt(historyEntry.getKey()) > Integer.parseInt(yearEntry.getKey())) {
+                        yearEntry = historyEntry;
+                    }
+                }
+                if (yearEntry == null) {
+                    break sumHistoryTraffic;
+                }
+                final Map<String, Object> year = (Map<String, Object>) yearEntry.getValue();
+                Map.Entry<String, Object> monthEntry = null;
+                for (Entry<String, Object> yearHistoryEntry : year.entrySet()) {
+                    if (monthEntry == null || Integer.parseInt(yearHistoryEntry.getKey()) > Integer.parseInt(monthEntry.getKey())) {
+                        monthEntry = yearHistoryEntry;
+                    }
+                }
+                if (monthEntry == null) {
+                    break sumHistoryTraffic;
+                }
+                final Map<String, Object> month = (Map<String, Object>) monthEntry.getValue();
+                for (Entry<String, Object> dayEntry : month.entrySet()) {
+                    final Map<String, Object> day = (Map<String, Object>) dayEntry.getValue();
+                    final Number trafficWebDownloaded = (Number) day.get("trafficWebDownloaded");
+                    if (trafficWebDownloaded != null) {
+                        trafficUsed += trafficWebDownloaded.longValue();
+                    }
+                }
+            }
+            ai.setTrafficLeft(trafficMaxBytes.longValue() - trafficUsed);
+        }
+        final String premiumType = (String) data.get("premiumType");
+        final String subscriptionProvider = (String) data.get("subscriptionProvider");
+        final Number subscriptionEndDate = (Number) data.get("subscriptionEndDate");
+        if ("credit".equals(premiumType)) {
+            final Number credit = (Number) data.get("credit");
+            final Number creditTrafficRate = (Number) data.get("creditTrafficRate");
+            final String currency = data.get("currency").toString();
+            ai.setAccountBalance(credit.doubleValue(), Currency.getInstance(currency));
+            ai.setStatus("Credits Premium Account: Balance " + credit + " " + currency);
+            ai.setTrafficLeft((long) (credit.doubleValue() / creditTrafficRate.doubleValue() * (1000 * 1000 * 1000 * 1000l)));
+            ai.setValidUntil(-1);
+            ai.setTrafficRefill(false);
+        } else if ("subscription".equals(premiumType) && subscriptionEndDate != null) {
+            ai.setStatus("Premium(" + subscriptionProvider + ") Account");
+            if (9999999999l == subscriptionEndDate.longValue()) {
+                /* No expire date */
+                ai.setValidUntil(-1);
+            } else {
+                ai.setValidUntil(subscriptionEndDate.longValue() * 1000);
+            }
+        } else {
+            throw new AccountInvalidException("Unsupported premiumType:" + premiumType);
+        }
+        return ai;
     }
 
     private Map<String, Object> handleAPIErrors(final Account account, final DownloadLink link) throws Exception {
@@ -576,6 +622,11 @@ public class GofileIo extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return freeRunning.get() + 1;
+    }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
     }
 
     @Override
