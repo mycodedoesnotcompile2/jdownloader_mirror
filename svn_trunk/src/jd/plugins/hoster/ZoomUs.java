@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50885 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50893 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZoomUs extends PluginForHost {
     public ZoomUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,7 +118,22 @@ public class ZoomUs extends PluginForHost {
             String fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
             String topic = null;
             String displayFileName = null;
-            if (fileId == null) {
+            Map<String, Object> recordingInfo = null;
+            Map<String, Object> recordingInfoResult = null;
+            if (fileId != null) {
+                recordingInfo = this.accessRecordingOnfo(br, fileId, link);
+                recordingInfoResult = (Map<String, Object>) recordingInfo.get("result");
+                final String componentName = (String) recordingInfoResult.get("componentName");
+                if (StringUtils.equalsIgnoreCase(componentName, "need-password")) {
+                    link.setPasswordProtected(true);
+                } else {
+                    link.setPasswordProtected(false);
+                }
+                if (meetingID == null) {
+                    meetingID = (String) recordingInfoResult.get("meetingId");
+                }
+            }
+            if (fileId == null || link.isPasswordProtected()) {
                 if (meetingID == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -130,6 +145,7 @@ public class ZoomUs extends PluginForHost {
                     if (!componentName.equals("need-password")) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
+                    link.setPasswordProtected(true);
                     final String action = result.get("action").toString();
                     final String useWhichPasswd = result.get("useWhichPasswd").toString();
                     final String sharelevel = result.get("sharelevel").toString();
@@ -146,7 +162,6 @@ public class ZoomUs extends PluginForHost {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     /* Do not ask user for password during availablecheck. */
-                    link.setPasswordProtected(true);
                     if (env != PluginEnvironment.DOWNLOAD) {
                         /* Do not ask user for password here but at least find file title if possible. */
                         logger.info("Trying to find title of password protected item");
@@ -189,8 +204,9 @@ public class ZoomUs extends PluginForHost {
                     }
                     pwform.put("recaptcha", Encoding.urlEncode(recaptchaV2Response));
                     br.submitForm(pwform);
-                    final Map<String, Object> entries5 = checkErrorsWebAPI(br);
+                    checkErrorsWebAPI(br);
                     /* Correct password! Item should now be downloadable. */
+                    logger.info("Correct download password was provided: " + passCode);
                     link.setDownloadPassword(passCode);
                     // br.getPage(link.getPluginPatternMatcher());
                     entries = accessPlayShareOnfo(br, meetingID);
@@ -201,22 +217,19 @@ public class ZoomUs extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 br.getPage(redirectUrl);
-                fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
                 if (fileId == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    fileId = br.getRegex("fileId\\s*:\\s*(?:\"|\\')([^\"\\']+)").getMatch(0);
+                    if (fileId == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                 }
             }
-            final String originRequestUrl = link.getPluginPatternMatcher();
-            final UrlQuery query0 = new UrlQuery();
-            query0.appendEncoded("canPlayFromShare", "true");
-            query0.appendEncoded("from", "share_recording_detail");
-            query0.appendEncoded("continueMode", "true");
-            query0.appendEncoded("componentName", "rec-play");
-            query0.appendEncoded("originRequestUrl", originRequestUrl);
-            br.getPage("/nws/recording/1.0/play/info/" + fileId + "?" + query0.toString());
-            final Map<String, Object> entries2 = checkErrorsWebAPI(br);
-            final Map<String, Object> result2 = (Map<String, Object>) entries2.get("result");
-            final String componentName = (String) result2.get("componentName");
+            if (link.isPasswordProtected()) {
+                /* Obtain recording info if we haven't already done that. */
+                recordingInfo = this.accessRecordingOnfo(br, fileId, link);
+                recordingInfoResult = (Map<String, Object>) recordingInfo.get("result");
+            }
+            final String componentName = (String) recordingInfoResult.get("componentName");
             if (StringUtils.equalsIgnoreCase(componentName, "vanity-url-check")) {
                 if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                     // TODO: Finish implementation
@@ -229,20 +242,20 @@ public class ZoomUs extends PluginForHost {
                  */
                 final UrlQuery query = new UrlQuery();
                 query.appendEncoded("accessLevel", "");
-                query.appendEncoded("vanityURL", result2.get("vanityURL").toString());
-                query.appendEncoded("emid", result2.get("emid").toString());
+                query.appendEncoded("vanityURL", recordingInfoResult.get("vanityURL").toString());
+                query.appendEncoded("emid", recordingInfoResult.get("emid").toString());
                 query.appendEncoded("componentName", "vanity-url-check");
-                query.appendEncoded("meetingId", result2.get("emid").toString());
-                query.appendEncoded("originRequestUrl", originRequestUrl);
-                br.getPage("https://" + result2.get("vanityURL") + "/rec/component-page?" + query.toString());
+                query.appendEncoded("meetingId", recordingInfoResult.get("emid").toString());
+                query.appendEncoded("originRequestUrl", link.getPluginPatternMatcher());
+                br.getPage("https://" + recordingInfoResult.get("vanityURL") + "/rec/component-page?" + query.toString());
             }
-            link.setProperty(PROPERTY_DIRECTURL, result2.get("viewMp4Url"));
-            final Map<String, Object> meet = (Map<String, Object>) result2.get("meet");
+            link.setProperty(PROPERTY_DIRECTURL, recordingInfoResult.get("viewMp4Url"));
+            final Map<String, Object> meet = (Map<String, Object>) recordingInfoResult.get("meet");
             if (meet == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             topic = (String) meet.get("topic");
-            final Map<String, Object> recording = (Map<String, Object>) result2.get("recording");
+            final Map<String, Object> recording = (Map<String, Object>) recordingInfoResult.get("recording");
             displayFileName = (String) recording.get("displayFileName");
             final String fileSizeInMB = (String) recording.get("fileSizeInMB");
             if (fileSizeInMB != null) {
@@ -264,6 +277,18 @@ public class ZoomUs extends PluginForHost {
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    private Map<String, Object> accessRecordingOnfo(final Browser br, final String fileId, final DownloadLink link) throws IOException, PluginException {
+        final String originRequestUrl = link.getPluginPatternMatcher();
+        final UrlQuery query0 = new UrlQuery();
+        query0.appendEncoded("canPlayFromShare", "true");
+        query0.appendEncoded("from", "share_recording_detail");
+        query0.appendEncoded("continueMode", "true");
+        query0.appendEncoded("componentName", "rec-play");
+        query0.appendEncoded("originRequestUrl", originRequestUrl);
+        br.getPage("/nws/recording/1.0/play/info/" + fileId + "?" + query0.toString());
+        return checkErrorsWebAPI(br);
     }
 
     private Map<String, Object> accessPlayShareOnfo(final Browser br, final String meetingID) throws IOException, PluginException {
@@ -291,7 +316,12 @@ public class ZoomUs extends PluginForHost {
                 }
             }
         }
-        final Map<String, Object> result = (Map<String, Object>) entries.get("result");
+        final Object resultO = entries.get("result");
+        if (!(resultO instanceof Map)) {
+            /* E.g. {"status":true,"errorCode":0,"errorMessage":null,"result":"viewdetailpage"} */
+            return entries;
+        }
+        final Map<String, Object> result = (Map<String, Object>) resultO;
         if (result == null) {
             /* No error */
             return entries;

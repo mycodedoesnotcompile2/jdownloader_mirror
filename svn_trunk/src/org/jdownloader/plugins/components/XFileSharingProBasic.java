@@ -87,7 +87,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50880 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50900 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -873,14 +873,24 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      *         false: Link is downloadable for all users.
      */
     private boolean isPremiumOnlyURL(final Browser br) {
-        if (br == null || br.getURL() == null) {
+        final String url = br != null ? br.getURL() : null;
+        if (url == null) {
             return false;
-        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/?op=login&redirect=")) {
+        } else if (StringUtils.containsIgnoreCase(url, "/?op=login&redirect=")) {
             return true;
-        } else if (br.getURL().matches("(?i).*/login\\?redirect=.*")) {
+        } else if (url.matches("(?i).*/login\\?redirect=.*")) {
             /* 2023-11-15 e.g. rapidbytez.com, EzvnNet, TerabytezOrg */
             return true;
         } else {
+            final String[] supports_precise_expire_date = this.supportsPreciseExpireDate();
+            if (supports_precise_expire_date != null) {
+                /* 2025-03-31 eg subyshare, redirects to /?op=payments with blocked? VPN */
+                for (final String page : supports_precise_expire_date) {
+                    if (StringUtils.containsIgnoreCase(url, page)) {
+                        return true;
+                    }
+                }
+            }
             return false;
         }
     }

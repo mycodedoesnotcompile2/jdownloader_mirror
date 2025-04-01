@@ -27,18 +27,6 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-import org.jdownloader.plugins.components.config.HitomiLaConfig;
-import org.jdownloader.plugins.components.config.HitomiLaConfig.PreferredImageFormat;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.FunctionObject;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -55,12 +43,24 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.jdownloader.plugins.components.config.HitomiLaConfig;
+import org.jdownloader.plugins.components.config.HitomiLaConfig.PreferredImageFormat;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.FunctionObject;
+
 /**
  *
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 49597 $", interfaceVersion = 3, names = { "hitomi.la" }, urls = { "https?://(?:www\\.)?hitomi\\.la/(?:galleries/\\d+\\.html|reader/\\d+\\.html|[^/]+/.*?-\\d+\\.html)" })
+@DecrypterPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = { "hitomi.la" }, urls = { "https?://(?:www\\.)?hitomi\\.la/(?:galleries/\\d+\\.html|reader/\\d+\\.html|[^/]+/.*?-\\d+\\.html)" })
 public class HitomiLa extends antiDDoSForDecrypt {
     public HitomiLa(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,7 @@ public class HitomiLa extends antiDDoSForDecrypt {
             // retval = subdomain_from_galleryid(g) + retval;
             String js = br.getRegex("src\\s*=\\s*\"([^\"]+" + gallery_id + "\\.js)\"").getMatch(0);
             if (js == null) {
-                js = br.getURL("//ltn.hitomi.la/galleries/" + gallery_id + ".js").toExternalForm();
+                js = br.getURL("//ltn.gold-usergeneratedcontent.net/galleries/" + gallery_id + ".js").toExternalForm();
             }
             if (js == null) {
                 logger.info("Seems like this is no downloadable/supported content");
@@ -172,9 +172,9 @@ public class HitomiLa extends antiDDoSForDecrypt {
         final long hasavif = JavaScriptEngineFactory.toLong(picInfo.get("hasavif"), 0);
         final PreferredImageFormat preferredFormat = PluginJsonConfig.get(HitomiLaConfig.class).getPreferredImageFormat();
         if (haswebp == 1 && (preferredFormat == PreferredImageFormat.WEBP || hasavif == 0)) {
-            url = url_from_url_from_hash(gallery_id, picInfo, "webp", null, "a");
+            url = url_from_url_from_hash(gallery_id, picInfo, "webp", null, null/* "w" */);
         } else if (hasavif == 1) {
-            url = url_from_url_from_hash(gallery_id, picInfo, "avif", null, "a");
+            url = url_from_url_from_hash(gallery_id, picInfo, "avif", null, null/* "a" */);
         } else {
             url = url_from_url_from_hash(gallery_id, picInfo, null, null, null);
         }
@@ -234,7 +234,7 @@ public class HitomiLa extends antiDDoSForDecrypt {
     /* 2020-02-10: Thx to forum user "damo" - See also: https://board.jdownloader.org/showpost.php?p=457258&postcount=16 */
     /* ####################################################################################################################### */
     public static final Pattern SUBDOMAIN_FROM_URL_PATTERN  = Pattern.compile("/[0-9a-f]/([0-9a-f]{2})/");
-    public static final Pattern URL_FROM_URL_PATTERN        = Pattern.compile("//..?\\.hitomi\\.la/");
+    public static final Pattern URL_FROM_URL_PATTERN        = Pattern.compile("//..?\\.(hitomi\\.la|gold-usergeneratedcontent\\.net)/");
     public static final Pattern FULL_PATH_FROM_HASH_PATTERN = Pattern.compile("^.*(..)(.)$");
 
     private String subdomain_from_galleryid(int g, int number_of_frontends) {
@@ -249,14 +249,10 @@ public class HitomiLa extends antiDDoSForDecrypt {
         return ret;
     }
 
-    private String subdomain_from_url(String url, String base) throws Exception {
+    private String subdomain_from_url(String url, String base, String dir) throws Exception {
         initEngine();
         try {
-            if (base != null) {
-                engine.eval("var result=subdomain_from_url('" + url + "','" + base + "');");
-            } else {
-                engine.eval("var result=subdomain_from_url('" + url + "');");
-            }
+            engine.eval("var result=subdomain_from_url('" + url + "',undefined,'" + dir + "');");
             final String result = engine.get("result").toString();
             return result;
         } catch (final Exception e) {
@@ -267,14 +263,15 @@ public class HitomiLa extends antiDDoSForDecrypt {
         }
     }
 
-    private String url_from_url(String url, String base) throws Exception {
-        return URL_FROM_URL_PATTERN.matcher(url).replaceAll("//" + subdomain_from_url(url, base) + ".hitomi.la/");
+    private String url_from_url(String url, String base, String dir) throws Exception {
+        final String ret = URL_FROM_URL_PATTERN.matcher(url).replaceAll("//" + subdomain_from_url(url, base, dir) + ".gold-usergeneratedcontent.net/");
+        return ret;
     }
 
     protected String fetchGG(Browser br) throws IOException {
         final Browser brc = br.cloneBrowser();
         brc.setFollowRedirects(true);
-        String gg = brc.getPage("https://ltn.hitomi.la/gg.js");
+        String gg = brc.getPage("https://ltn.gold-usergeneratedcontent.net/gg.js");
         gg = gg.replaceFirst("('use strict';\\s*)", "var ");
         return gg;
     }
@@ -283,7 +280,7 @@ public class HitomiLa extends antiDDoSForDecrypt {
         if (engine == null) {
             Browser brc = br.cloneBrowser();
             brc.setFollowRedirects(true);
-            brc.getPage("https://ltn.hitomi.la/common.js");
+            brc.getPage("https://ltn.gold-usergeneratedcontent.net/common.js");
             String js = brc.getRegex("(var gg.*?)function\\s*show_loading").getMatch(0);
             if (js == null) {
                 js = brc.getRegex("(function subdom.*?)function\\s*show_loading").getMatch(0);
@@ -338,15 +335,19 @@ public class HitomiLa extends antiDDoSForDecrypt {
 
     private String url_from_hash(String galleryid, Map<String, String> image, String dir, String ext) throws Exception {
         ext = isNotBlank(ext) ? ext : (isNotBlank(dir) ? dir : last(image.get("name").split("\\.")));
-        dir = isNotBlank(dir) ? dir : "images";
-        return "https://a.hitomi.la/" + dir + '/' + full_path_from_hash(image.get("hash")) + '.' + ext;
+        if ("webp".equals(dir) || "avif".equals(dir)) {
+            dir = "";
+        } else {
+            dir = isNotBlank(dir) ? dir + "/" : "images/";
+        }
+        return "https://a.gold-usergeneratedcontent.net/" + dir + full_path_from_hash(image.get("hash")) + '.' + ext;
     }
 
     private String url_from_url_from_hash(String galleryid, Map<String, String> image, String dir, String ext, String base) throws Exception {
         if ("tn".equals(base)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        return url_from_url(url_from_hash(galleryid, image, dir, ext), base);
+        return url_from_url(url_from_hash(galleryid, image, dir, ext), base, dir);
     }
 
     boolean isNotBlank(String str) {

@@ -58,7 +58,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50775 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50892 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -775,16 +775,8 @@ public class MediafireCom extends PluginForHost {
     }
 
     private void handleNonAPIErrors(final DownloadLink link, final Browser br) throws PluginException, IOException {
-        // Some errors are only provided if isFollowingRedirects==true. As this isn't always the case throughout the plugin, lets grab the
-        // redirect page so we can use .containsHTML
-        final Browser brc = br.cloneBrowser();
-        if (!brc.isFollowingRedirects()) {
-            if (brc.getRedirectLocation() != null) {
-                brc.getPage(brc.getRedirectLocation());
-            }
-        }
         // error checking below!
-        final String errorcodeStr = UrlQuery.parse(brc.getURL()).get("errno");
+        final String errorcodeStr = UrlQuery.parse(br.getURL()).get("errno");
         if (errorcodeStr != null && errorcodeStr.matches("\\d+")) {
             switch (Integer.parseInt(errorcodeStr)) {
             case 320:
@@ -817,19 +809,22 @@ public class MediafireCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown errorcode: " + errorcodeStr);
             }
         }
-        if (brc.containsHTML("class=\"error\\-title\">Temporarily Unavailable</p>")) {
+        if (br.containsHTML("class=\"error\\-title\">\\s*Temporarily Unavailable\\s*</p>")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "This file is temporarily unavailable!", 30 * 60 * 1000l);
-        } else if (brc.containsHTML("class=\"error-title\">This download is currently unavailable<")) {
+        } else if (br.containsHTML("class=\"error-title\">This download is currently unavailable<")) {
             // jdlog://7235652095341
-            final String time = brc.getRegex("(?i)we will retry your download again in (\\d+) seconds\\.<").getMatch(0);
+            final String time = br.getRegex("we will retry your download again in (\\d+) seconds\\.<").getMatch(0);
             long t = ((time != null ? Long.parseLong(time) : 60) * 1000l) + 2;
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "This file is temporarily unavailable!", t);
         }
-    }
-
-    @Override
-    public String getDescription() {
-        return "JDownloader's mediafire.com plugin helps downloading files from mediafire.com.";
+        final String ipLimitReachedWaitSecondsStr = br.getRegex("var limitReachedTTL = (\\d+);").getMatch(0);
+        if (ipLimitReachedWaitSecondsStr != null) {
+            /**
+             * E.g.
+             * <h2 class="MFUltraDialog-heading">Download Threshold Exceeded<span id="count_down"></span></h2>
+             */
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Downloadlimit reached", Long.parseLong(ipLimitReachedWaitSecondsStr) * 1000);
+        }
     }
 
     private void setConfigElements() {

@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import jd.config.Property;
 import jd.controlling.AccountController;
@@ -249,10 +250,10 @@ public class Account extends Property {
         this.concurrentUsePossible = concurrentUsePossible;
     }
 
-    private transient volatile long tmpDisabledTimeout = -1;
+    private final AtomicLong tmpDisabledTimeout = new AtomicLong(-1);
 
     public long getTmpDisabledTimeout() {
-        return Math.max(-1, tmpDisabledTimeout);
+        return Math.max(-1, tmpDisabledTimeout.get());
     }
 
     private transient UniqueAlltimeID id            = new UniqueAlltimeID();
@@ -533,7 +534,7 @@ public class Account extends Property {
         if (error == null) {
             errorString = null;
         }
-        if (getError() != error || !StringUtils.equals(this.errorString, errorString)) {
+        if (getError() != error || !StringUtils.equals(this.getErrorString(), errorString)) {
             if (AccountError.TEMP_DISABLED.equals(error)) {
                 final long timeout;
                 if (setTimeout <= 0) {
@@ -639,16 +640,23 @@ public class Account extends Property {
     }
 
     public void setTmpDisabledTimeout(long tmpDisabledTimeout) {
-        this.tmpDisabledTimeout = tmpDisabledTimeout;
+        this.tmpDisabledTimeout.set(tmpDisabledTimeout);
     }
 
     public AccountError getError() {
         final AccountError error = this.error;
         if (AccountError.TEMP_DISABLED.equals(error)) {
-            final long disabledTimeStamp = getTmpDisabledTimeout();
-            if (disabledTimeStamp < 0 || System.currentTimeMillis() >= disabledTimeStamp) {
-                // do not change error via setError here,we don't want a get method to throw events
-                setTmpDisabledTimeout(-1);
+            final Long disabledTimeStamp = getTmpDisabledTimeout();
+            if (disabledTimeStamp.longValue() < 0) {
+                return null;
+            } else if (System.currentTimeMillis() >= disabledTimeStamp.longValue()) {
+                if (tmpDisabledTimeout.compareAndSet(disabledTimeStamp, -1)) {
+                    new Thread() {
+                        public void run() {
+                            notifyUpdate(AccountProperty.Property.ERROR, null);
+                        };
+                    }.start();
+                }
                 return null;
             }
         }

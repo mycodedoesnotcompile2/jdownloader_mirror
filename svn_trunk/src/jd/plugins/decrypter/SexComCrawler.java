@@ -22,10 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -42,7 +38,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexComCrawler extends PornEmbedParser {
     public SexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,12 +77,13 @@ public class SexComCrawler extends PornEmbedParser {
     private static final String PATTERN_RELATIVE_USER            = "(?i)/user/([a-z0-9\\-]+)/([a-z0-9\\-]+)/";
     private static final String PATTERN_RELATIVE_PIN             = "(?i)/pin/\\d+(-[a-z0-9\\-]+)?/";
     private static final String PATTERN_RELATIVE_PICTURE         = "(?i)/picture/\\d+/?";
+    private static final String PATTERN_RELATIVE_GIFS            = "(?i)/(?:[a-z]{2}/)?gifs/\\d+/?";
     private static final String PATTERN_RELATIVE_SHORT           = "(?i)/(?:[a-z]{2}/)?shorts/(?:creator/)?(([\\w\\-]+)/video/([\\w\\-]+))";
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_RELATIVE_SHORT + "|" + PATTERN_RELATIVE_USER + "|" + PATTERN_RELATIVE_PIN + "|" + PATTERN_RELATIVE_PICTURE + "|" + PATTERN_RELATIVE_EXTERN_REDIRECT + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_RELATIVE_SHORT + "|" + PATTERN_RELATIVE_USER + "|" + PATTERN_RELATIVE_PIN + "|" + PATTERN_RELATIVE_PICTURE + "|" + PATTERN_RELATIVE_GIFS + "|" + PATTERN_RELATIVE_EXTERN_REDIRECT + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -191,9 +192,9 @@ public class SexComCrawler extends PornEmbedParser {
             fp.setPackageKey("sex_com_shorts://" + shortspath);
             fp.addLinks(ret);
             return ret;
-        } else if (new Regex(br.getURL(), PATTERN_RELATIVE_PIN).patternFind()) {
+        } else if (new Regex(br.getURL(), PATTERN_RELATIVE_PIN).patternFind() || new Regex(br.getURL(), PATTERN_RELATIVE_GIFS).patternFind()) {
             /* "PIN" item */
-            title = br.getRegex("<title>\\s*([^<>\"]*?)\\s*(?:\\|\\s*Sex Videos and Pictures\\s*\\|\\s*Sex\\.com)?\\s*</title>").getMatch(0);
+            title = br.getRegex("<title>\\s*([^<>\"]*?)\\s*(?:\\|?\\s*(Sex Videos and Pictures|Gif)\\s*\\|\\s*Sex\\.com)?\\s*</title>").getMatch(0);
             if (title == null || title.length() <= 2) {
                 title = br.getRegex("addthis:title=\"([^<>\"]*?)\"").getMatch(0);
             }
@@ -218,6 +219,10 @@ public class SexComCrawler extends PornEmbedParser {
                 return ret;
             }
             externID = br.getRegex("<link rel=\"image_src\" href=\"(http[^<>\"]*?)\"").getMatch(0);
+            if (externID == null) {
+                // For .gif images
+                externID = br.getRegex("<link rel=\"preload\" as=\"image\" href=\"(http[^<>\"]*?\\.gif)\"").getMatch(0);
+            }
             // For .gif images
             if (externID == null) {
                 externID = br.getRegex("<div class=\"image_frame\"[^<>]*>\\s*(?:<[^<>]*>)?\\s*<img alt=[^<>]*?src=\"(https?://[^<>\"]*?)\"").getMatch(0);

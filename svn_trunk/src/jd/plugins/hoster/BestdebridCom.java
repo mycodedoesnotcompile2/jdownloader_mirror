@@ -47,7 +47,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 50812 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
 public class BestdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://bestdebrid.com/api/v1";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("bestdebrid.com");
@@ -64,7 +64,8 @@ public class BestdebridCom extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
+        /* 2025-31-03: requested by admin, api support for max chunks/resume will be added soon */
+        return 1;
     }
 
     @SuppressWarnings("deprecation")

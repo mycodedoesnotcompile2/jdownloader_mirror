@@ -63,7 +63,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GeneralSettings;
 
-@DecrypterPlugin(revision = "$Revision: 50705 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50900 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaNz.class })
 public class MegaNzFolder extends PluginForDecrypt {
     private static AtomicLong CS = new AtomicLong(System.currentTimeMillis());
@@ -221,6 +221,8 @@ public class MegaNzFolder extends PluginForDecrypt {
             return toString(((JSonValue) object).getValue());
         } else if (object instanceof String) {
             return (String) object;
+        } else if (object instanceof CharSequence) {
+            return object.toString();
         } else if (object instanceof ByteArrayWrapper) {
             return ((ByteArrayWrapper) object).toString(UTF8);
         } else {
@@ -324,9 +326,9 @@ public class MegaNzFolder extends PluginForDecrypt {
                         }
                     } else {
                         con = br.openRequestConnection(br.createJSonPostRequest("https://g.api.mega.co.nz/cs?id=" + CS.incrementAndGet() + "&n=" + folderID
-                        /*
-                         * + "&domain=meganz
-                         */, "[{\"a\":\"f\",\"c\":\"1\",\"r\":\"1\",\"ca\":1}]"));// ca=1
+                                /*
+                                 * + "&domain=meganz
+                                 */, "[{\"a\":\"f\",\"c\":\"1\",\"r\":\"1\",\"ca\":1}]"));// ca=1
                         // ->
                         // !nocache,
                         // commands.cpp
@@ -477,34 +479,41 @@ public class MegaNzFolder extends PluginForDecrypt {
                     if (isAbort()) {
                         throw new InterruptedException();
                     }
-                    final String encryptedNodeKey = new Regex(toString(parsedNode.remove("k")), ":([^:]*?)$").getMatch(0);
-                    if (encryptedNodeKey == null) {
+                    final String encryptedNodeKeys[] = new Regex(toString(parsedNode.remove("k")), ":([^:]+)(?:$|/)").getColumn(0);
+                    if (encryptedNodeKeys == null || encryptedNodeKeys.length == 0) {
                         it.remove();
                         logger.info("NodeKey missing:" + JSonStorage.toString(parsedNode));
                         continue;
                     }
-                    boolean success = false;
-                    int password_tries = 0;
                     String nodeKey = null;
-                    password: while (!this.isAbort() && password_tries <= 3) {
-                        if (password_tries > 0 || !isValidFolderDecryptionKey(folderMasterKey)) {
-                            folderMasterKey = getUserInput("Decryption key", param);
-                        }
-                        try {
-                            nodeKey = decryptNodeKey(encryptedNodeKey, folderMasterKey);
-                            success = true;
-                            break password;
-                        } catch (final InvalidKeyException e) {
-                            password_tries++;
-                            if (!InvalidOrMissingDecryptionKeyAction.ASK.equals(config.getInvalidOrMissingDecryptionKeyAction().getAction())) {
+                    String nodeAttr = null;
+                    final String encryptedNodeAttr = toString(parsedNode.remove("a"));
+                    for (final String encryptedNodeKey : encryptedNodeKeys) {
+                        boolean success = false;
+                        int password_tries = 0;
+                        password: while (!this.isAbort() && password_tries <= 3) {
+                            if (password_tries > 0 || !isValidFolderDecryptionKey(folderMasterKey)) {
+                                folderMasterKey = getUserInput("Decryption key", param);
+                            }
+                            try {
+                                nodeKey = decryptNodeKey(encryptedNodeKey, folderMasterKey);
+                                success = true;
                                 break password;
+                            } catch (final InvalidKeyException e) {
+                                password_tries++;
+                                if (!InvalidOrMissingDecryptionKeyAction.ASK.equals(config.getInvalidOrMissingDecryptionKeyAction().getAction())) {
+                                    break password;
+                                }
                             }
                         }
+                        if (!success) {
+                            throw new DecrypterException(DecrypterException.PASSWORD);
+                        }
+                        nodeAttr = decrypt(encryptedNodeAttr, nodeKey);
+                        if (nodeAttr != null) {
+                            break;
+                        }
                     }
-                    if (!success) {
-                        throw new DecrypterException(DecrypterException.PASSWORD);
-                    }
-                    final String nodeAttr = decrypt(toString(parsedNode.remove("a")), nodeKey);
                     if (nodeAttr == null) {
                         it.remove();
                         logger.info("NodeAttr missing:" + JSonStorage.toString(parsedNode));
@@ -555,19 +564,19 @@ public class MegaNzFolder extends PluginForDecrypt {
 
         /*
          * p = parent node (ID)
-         * 
+         *
          * s = size
-         * 
+         *
          * t = type (0=file, 1=folder, 2=root, 3=inbox, 4=trash
-         * 
+         *
          * ts = timestamp
-         * 
+         *
          * h = node (ID)
-         * 
+         *
          * u = owner
-         * 
+         *
          * a = attribute (contains name)
-         * 
+         *
          * k = node key
          */
         final PluginForHost megaplugin = this.getNewPluginForHostInstance(getHost());

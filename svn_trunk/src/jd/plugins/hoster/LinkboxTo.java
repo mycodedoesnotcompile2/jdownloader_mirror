@@ -35,6 +35,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -42,12 +43,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50892 $", interfaceVersion = 3, names = {}, urls = {})
 public class LinkboxTo extends PluginForHost {
     public LinkboxTo(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/signup");
     }
+
+    public static final String   PROPERTY_DIRECTURL              = "directlink";
+    private static final String  PROPERTY_ACCOUNT_TOKEN          = "token";
+    /* 2025-03-31: For downloading, an account is needed. */
+    private static final boolean ALLOW_DOWNLOADS_WITHOUT_ACCOUNT = false;
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -91,13 +97,10 @@ public class LinkboxTo extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:(?:www|[a-z]{2})\\.)?" + buildHostsPatternPart(domains) + "/file/([a-z0-9]+)");
+            ret.add("https?://(?:(?:www|[a-z]{2})\\.)?" + buildHostsPatternPart(domains) + "/(?:file|f-detail)/([a-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
-
-    public static final String  PROPERTY_DIRECTURL     = "directlink";
-    private static final String PROPERTY_ACCOUNT_TOKEN = "token";
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -185,6 +188,9 @@ public class LinkboxTo extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
+        if (!ALLOW_DOWNLOADS_WITHOUT_ACCOUNT) {
+            throw new AccountRequiredException();
+        }
         handleDownload(link, null);
     }
 
@@ -224,7 +230,7 @@ public class LinkboxTo extends PluginForHost {
                 }
             }
             preDownloadErrorCheck(dl.getConnection());
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
     }
@@ -351,6 +357,15 @@ public class LinkboxTo extends PluginForHost {
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
         /* 2022-12-20: No captchas needed at all. */
         return false;
+    }
+
+    @Override
+    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
+        if (!ALLOW_DOWNLOADS_WITHOUT_ACCOUNT && account == null) {
+            /* Without account its not possible to download any link from this host. */
+            return false;
+        }
+        return super.canHandle(link, account);
     }
 
     @Override

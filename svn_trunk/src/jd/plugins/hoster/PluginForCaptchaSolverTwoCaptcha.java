@@ -12,7 +12,7 @@ import jd.plugins.HostPlugin;
 /**
  * Plugin for 2Captcha captcha solving service (https://2captcha.com/).
  */
-@HostPlugin(revision = "$Revision: 50878 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50898 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -39,6 +39,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
+        types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         return types;
     }
 

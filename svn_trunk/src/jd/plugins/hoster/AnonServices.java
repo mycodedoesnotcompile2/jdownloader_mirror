@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50526 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50894 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonServices extends PluginForHost {
     public AnonServices(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,7 +123,7 @@ public class AnonServices extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
+        return 1;
     }
 
     @Override

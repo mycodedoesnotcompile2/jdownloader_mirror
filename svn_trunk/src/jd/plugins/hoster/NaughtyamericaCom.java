@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.NaughtyamericaComCrawler;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
+@HostPlugin(revision = "$Revision: 50893 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
 public class NaughtyamericaCom extends PluginForHost {
     public NaughtyamericaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -296,19 +296,18 @@ public class NaughtyamericaCom extends PluginForHost {
                     logger.info("Cookie login successful");
                     account.saveCookies(br.getCookies(account.getHoster()), "");
                     return;
-                } else {
-                    logger.info("Cookie login failed");
-                    account.clearCookies("");
-                    if (userCookies != null) {
-                        if (account.hasEverBeenValid()) {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                        } else {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                        }
+                }
+                logger.info("Cookie login failed");
+                account.clearCookies("");
+                if (userCookies != null) {
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                     } else {
-                        /* Full login required */
-                        br.clearAll();
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                     }
+                } else {
+                    /* Full login required */
+                    br.clearAll();
                 }
             }
             if (allowCookieLoginOnly) {
@@ -319,7 +318,7 @@ public class NaughtyamericaCom extends PluginForHost {
             br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster() + "/");
             br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster() + "/login");
             final Regex httpRedirect = br.getRegex("http-equiv=\"refresh\" content=\"(\\d+);\\s*url=(/[^<>\"]+)\"");
-            if (httpRedirect.matches()) {
+            if (httpRedirect.patternFind()) {
                 /* 2019-01-21: Hmm leads to HTTP/1.1 405 Not Allowed */
                 /*
                  * <meta http-equiv="refresh" content="10; url=/distil_r_captcha.html?requestId=<requestId>c&httpReferrer=%2Flogin" />
@@ -338,7 +337,11 @@ public class NaughtyamericaCom extends PluginForHost {
                 loginform = br.getForm(0);
             }
             if (loginform == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (br.containsHTML("AwsWafIntegration")) {
+                    throw new AccountInvalidException("Anti bot protection blocked login, try cookie login");
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
             loginform.put("dest", "");
             loginform.put("username", Encoding.urlEncode(account.getUser()));

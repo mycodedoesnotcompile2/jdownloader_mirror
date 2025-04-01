@@ -65,7 +65,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50891 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -455,13 +455,14 @@ public class GofileIo extends PluginForHost {
     }
 
     protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {
-        if (account == null) {
-            synchronized (freeRunning) {
-                final int before = freeRunning.get();
-                final int after = before + num;
-                freeRunning.set(after);
-                logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
-            }
+        if (account != null) {
+            return;
+        }
+        synchronized (freeRunning) {
+            final int before = freeRunning.get();
+            final int after = before + num;
+            freeRunning.set(after);
+            logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
         }
     }
 
@@ -505,6 +506,7 @@ public class GofileIo extends PluginForHost {
         }
         final String tier = (String) data.get("tier");
         if ("guest".equals(tier)) {
+            // standard -> expired premium
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(1);
             ai.setStatus("Guest Account");
@@ -566,6 +568,7 @@ public class GofileIo extends PluginForHost {
             ai.setTrafficLeft((long) (credit.doubleValue() / creditTrafficRate.doubleValue() * (1000 * 1000 * 1000 * 1000l)));
             ai.setValidUntil(-1);
             ai.setTrafficRefill(false);
+            // add support for expire/valid until calculation
         } else if ("subscription".equals(premiumType) && subscriptionEndDate != null) {
             ai.setStatus("Premium(" + subscriptionProvider + ") Account");
             if (9999999999l == subscriptionEndDate.longValue()) {
@@ -574,6 +577,7 @@ public class GofileIo extends PluginForHost {
             } else {
                 ai.setValidUntil(subscriptionEndDate.longValue() * 1000);
             }
+            ai.setTrafficRefill(true);
         } else {
             throw new AccountInvalidException("Unsupported premiumType:" + premiumType);
         }

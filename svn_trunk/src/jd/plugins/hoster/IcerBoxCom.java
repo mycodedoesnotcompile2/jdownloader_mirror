@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50741 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+@HostPlugin(revision = "$Revision: 50897 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends PluginForHost {
     private final String        baseURL                   = "https://icerbox.com";
     private final String        apiURL                    = "https://icerbox.com/api/v1";
@@ -431,10 +431,10 @@ public class IcerBoxCom extends PluginForHost {
     }
 
     protected String getDownloadModeDirectlinkProperty(final Account account) {
-        if (AccountType.PREMIUM.equals(account.getType())) {
+        if (account != null && AccountType.PREMIUM.equals(account.getType())) {
             /* Premium account */
             return "premlink";
-        } else if (AccountType.FREE.equals(account.getType())) {
+        } else if (account != null && AccountType.FREE.equals(account.getType())) {
             return "freelink2";
         } else {
             /* Free(anonymous) and unknown account type */

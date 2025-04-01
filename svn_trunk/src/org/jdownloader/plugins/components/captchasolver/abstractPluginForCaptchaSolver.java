@@ -8,6 +8,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaCategoryChallenge;
@@ -113,6 +114,12 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             @Override
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof KeyCaptchaPuzzleChallenge || c instanceof KeyCaptchaCategoryChallenge;
+            }
+        },
+        CLOUDFLARE_TURNSTILE {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                return c instanceof CloudflareTurnstileChallenge;
             }
         };
 

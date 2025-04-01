@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.LinkboxTo;
 
-@DecrypterPlugin(revision = "$Revision: 48710 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50892 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { LinkboxTo.class })
 public class LinkboxToCrawler extends PluginForDecrypt {
     public LinkboxToCrawler(PluginWrapper wrapper) {
@@ -203,7 +203,7 @@ public class LinkboxToCrawler extends PluginForDecrypt {
     }
 
     public static String createFolderURL(final String folderType, final String folderID, final String subfolderID) {
-        String url = "https://www.sharezweb.com/a/" + folderType + "/" + folderID;
+        String url = "https://www.linkbox.to/a/" + folderType + "/" + folderID;
         if (subfolderID != null) {
             url += "?pid=" + subfolderID;
         }
@@ -211,6 +211,6 @@ public class LinkboxToCrawler extends PluginForDecrypt {
     }
 
     public static String createFileURL(final String fileID) {
-        return "https://www.sharezweb.com/file/" + fileID;
+        return "https://www.linkbox.to/f-detail/" + fileID;
     }
 }
