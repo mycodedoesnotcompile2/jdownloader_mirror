@@ -31,6 +31,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
@@ -42,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50706 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50908 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +52,8 @@ public class SubyShareCom extends XFileSharingProBasic {
         this.setStartIntervall(10 * 1000l);
     }
 
-    private final String PROPERTY_FAKE_OFFLINE_STATUS = "fake_offline_status";
+    private final String  PROPERTY_FAKE_OFFLINE_STATUS             = "fake_offline_status";
+    private final boolean ALLOW_OLD_GEO_BLOCK_DETECTION_WORKAROUND = false;
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
@@ -90,6 +92,8 @@ public class SubyShareCom extends XFileSharingProBasic {
             if (e.getLinkStatus() != LinkStatus.ERROR_FILE_NOT_FOUND) {
                 /* Some other Exception happened -> Forward it */
                 throw e;
+            } else if (!ALLOW_OLD_GEO_BLOCK_DETECTION_WORKAROUND) {
+                throw e;
             }
             /* Check if the file is really offline */
             logger.info("Looks like file is offline --> Checking if it really is");
@@ -104,11 +108,11 @@ public class SubyShareCom extends XFileSharingProBasic {
     }
 
     public String regexFilenameAbuse(final Browser br) {
-        String filename = super.regexFilenameAbuse(br);
-        if (filename == null) {
-            filename = br.getRegex("(?i)>\\s*Filename\\s*</label>\\s*<[^>]*>\\s*<p class=\"form-control-static\"[^>]*>([^<]+)<").getMatch(0);
+        final String betterFilename = br.getRegex(">\\s*Filename\\s*</label>\\s*<[^>]*>\\s*<p class=\"form-control-static\"[^>]*>([^<]+)<").getMatch(0);
+        if (betterFilename != null) {
+            return betterFilename;
         }
-        return filename;
+        return super.regexFilenameAbuse(br);
     }
 
     @Override
@@ -156,14 +160,14 @@ public class SubyShareCom extends XFileSharingProBasic {
 
     @Override
     protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, correctedBR, link, account, checkAll);
         /* 2019-07-08: Special */
+        final String msg_vpn_blocked = "Dedicated servers/VPS/RDP/VPN/Tor/Proxies/Socks blocked by subyshare";
+        final long time_vpn_blocked = 5 * 60 * 1000l;
         if (new Regex(correctedBR, "(?i)Sorry\\s*,\\s*we do not support downloading from Dedicated servers|Please download from your PC without using any above services|If this is our mistake\\s*,\\s*please contact").patternFind()) {
-            final String errormsg = "VPN download prohibited by this filehost";
             if (account != null) {
-                throw new AccountUnavailableException(errormsg, 15 * 60 * 1000l);
+                throw new AccountUnavailableException(msg_vpn_blocked, time_vpn_blocked);
             } else {
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, errormsg);
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, msg_vpn_blocked, time_vpn_blocked);
             }
         } else if (new Regex(correctedBR, "(?i)>\\s*The owner of this file blocked you to download it").patternFind()) {
             /*
@@ -180,10 +184,21 @@ public class SubyShareCom extends XFileSharingProBasic {
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Traffic limit reached", 5 * 60 * 1000);
             }
+        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/?op=payments")) {
+            /**
+             * 2025-04-01: Usually a redirect to "/?op=payments" means that a file is downloadable for premium users only. <br>
+             * However in this case it means that the user got blocked for using a non allowed IP such as a public VPN IP.
+             */
+            if (account != null) {
+                throw new AccountUnavailableException(msg_vpn_blocked, time_vpn_blocked);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, msg_vpn_blocked, time_vpn_blocked);
+            }
         }
         if (link != null && link.hasProperty(PROPERTY_FAKE_OFFLINE_STATUS)) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "URL is referer protected or offline");
         }
+        super.checkErrors(br, correctedBR, link, account, checkAll);
     }
 
     @Override
@@ -199,9 +214,12 @@ public class SubyShareCom extends XFileSharingProBasic {
 
     @Override
     public void handleCaptcha(final DownloadLink link, final Browser br, final Form captchaForm) throws Exception {
-        /*
-         * 2019-07-08: Special for two reasons: 1. Upper handling won't find the '/captchas/' URL. 2. These captchas are special: 6 digits
-         * instead of 4 and colored (orange instead of black) - thus our standard XFS captcha-mathod won't be able to recognize them!
+        /**
+         * Their captchas differ from the XFS default captcha type. <br>
+         * This avoids upper handling trying to auto recognize these captchas. <br>
+         * 1. Upper handling won't find the '/captchas/' URL.<br>
+         * 2. These captchas are special: 6 digits instead of XFS default captchas (4) and they are colored (orange instead of black) - thus
+         * our standard XFS captcha-mathod won't be able to recognize them.
          */
         if (StringUtils.containsIgnoreCase(getCorrectBR(br), "/captchas/")) {
             logger.info("Detected captcha method \"Standard captcha\" for this host");
@@ -270,7 +288,7 @@ public class SubyShareCom extends XFileSharingProBasic {
         } else if (!form.hasInputFieldByName("b")) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        String calcChallenge = br.getRegex("(?i)Verify\\s*:\\s*</span>\\s*<strong>([0-9\\-\\+\\*x ]+)=\\?</strong>").getMatch(0);
+        String calcChallenge = br.getRegex("Verify\\s*:\\s*</span>\\s*<strong>([0-9\\-\\+\\*x ]+)=\\?</strong>").getMatch(0);
         calcChallenge = calcChallenge.trim().toLowerCase(Locale.ENGLISH);
         /* E.g. "3 x 3" -> "3 * 3" */
         calcChallenge = calcChallenge.replace("x", "*");
@@ -302,7 +320,29 @@ public class SubyShareCom extends XFileSharingProBasic {
 
     @Override
     protected boolean supports_availablecheck_filename_abuse() {
-        /* Set this to false to avoid it being called multiple times. */
+        /* 2025-04-01: Disabled because website doesn't support it. */
         return false;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_alt() {
+        /* 2025-04-01: Disabled because website doesn't support it. */
+        return false;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filesize_html() {
+        /* 2025-04-01: Disabled to avoid upper code finding wrong filesize results. */
+        return false;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilesize = br.getRegex("<span class=\"label label-warning\"[^>]*>([^<]+)</span>").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = Encoding.htmlDecode(betterFilesize).trim();
+        }
+        return fileInfo;
     }
 }

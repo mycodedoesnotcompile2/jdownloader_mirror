@@ -111,6 +111,7 @@ public enum YoutubeITAG {
     // Handy/Portrait Format https://www.youtube.com/watch?v=kiZse2vZXfw
     DASH_VIDEO_ITAG315_VP9_1920P_60FPS(315, StreamContainer.DASH_VIDEO, VideoResolution.P_1920, VideoCodec.VP9, VideoFrameRate.FPS_60),
     DASH_VIDEO_ITAG315_VP9_2160P_60FPS(315, StreamContainer.DASH_VIDEO, VideoResolution.P_2160, VideoCodec.VP9, VideoFrameRate.FPS_60),
+    DASH_VIDEO_VP9_1080P_PREMIUM(356, StreamContainer.DASH_VIDEO, VideoResolution.P_1080, VideoCodec.VP9, VideoFrameRate.FPS_30),
     // HDR
     // bitrate 20mb
     DASH_VIDEO_VP9_2160P_60FPS(337, StreamContainer.DASH_VIDEO, VideoResolution.P_2160, VideoCodec.VP9_HDR, VideoFrameRate.FPS_60),

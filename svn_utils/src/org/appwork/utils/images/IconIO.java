@@ -366,7 +366,7 @@ public class IconIO {
         return createEmptyImage(w, h, -1, -1);
     }
 
-    private static BufferedImage createEmptyImage(int width, int height, Image deriveFrom) {
+    public static BufferedImage createEmptyImage(int width, int height, Image deriveFrom) {
         int imageType = BufferedImage.TYPE_INT_ARGB;
         int transparency = Transparency.TRANSLUCENT;
         if (deriveFrom instanceof BufferedImage) {
@@ -396,7 +396,7 @@ public class IconIO {
         if (transparency < 0) {
             transparency = Transparency.TRANSLUCENT;
         }
-        BufferedImage newImage;
+        final BufferedImage newImage;
         if (org.appwork.utils.Application.isHeadless()) {
             newImage = new BufferedImage(width, height, imageType);
         } else {

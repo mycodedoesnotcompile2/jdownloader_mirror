@@ -651,7 +651,12 @@ public class Account extends Property {
                 return null;
             } else if (System.currentTimeMillis() >= disabledTimeStamp.longValue()) {
                 if (tmpDisabledTimeout.compareAndSet(disabledTimeStamp, -1)) {
-                    new Thread() {
+                    // workaround to avoid deadlock, get method should not cause change of internal state
+                    new Thread("notifyUpdate:" + getUser()) {
+                        {
+                            setDaemon(true);
+                        }
+
                         public void run() {
                             notifyUpdate(AccountProperty.Property.ERROR, null);
                         };

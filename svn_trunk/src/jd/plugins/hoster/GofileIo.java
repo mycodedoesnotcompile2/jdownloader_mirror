@@ -65,7 +65,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50911 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -506,13 +506,19 @@ public class GofileIo extends PluginForHost {
         }
         final String tier = (String) data.get("tier");
         if ("guest".equals(tier)) {
-            // standard -> expired premium
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(1);
             ai.setStatus("Guest Account");
             return ai;
         } else if ("premium".equals(tier)) {
             account.setType(AccountType.PREMIUM);
+            account.setMaxSimultanDownloads(-1);
+        } else if ("standard".equals(tier)) {
+            // standard -> expired premium
+            account.setType(AccountType.FREE);
+            account.setMaxSimultanDownloads(1);
+            ai.setStatus("Standard(expired premium) Account");
+            return ai;
         } else {
             throw new AccountInvalidException("Unsupported tier:" + tier);
         }
@@ -572,7 +578,7 @@ public class GofileIo extends PluginForHost {
         } else if ("subscription".equals(premiumType) && subscriptionEndDate != null) {
             ai.setStatus("Premium(" + subscriptionProvider + ") Account");
             if (9999999999l == subscriptionEndDate.longValue()) {
-                /* No expire date */
+                /* No expire date, eg subscriptionProvider=patreon */
                 ai.setValidUntil(-1);
             } else {
                 ai.setValidUntil(subscriptionEndDate.longValue() * 1000);
@@ -593,9 +599,9 @@ public class GofileIo extends PluginForHost {
             final String msg = "Invalid API response";
             final long wait = 1 * 60 * 1000;
             if (link != null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, wait);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, wait, ignore);
             } else {
-                throw new AccountUnavailableException(msg, wait);
+                throw new AccountUnavailableException(ignore, msg, wait);
             }
         }
         final Map<String, Object> data = (Map<String, Object>) entries.get("data");

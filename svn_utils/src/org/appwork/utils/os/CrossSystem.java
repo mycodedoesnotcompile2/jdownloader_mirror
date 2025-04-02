@@ -169,9 +169,13 @@ public class CrossSystem {
         KALILINUX_2024_2(OSFamily.LINUX, "2024\\.2"),
         KALILINUX_2024_3(OSFamily.LINUX, "2024\\.3"),
         KALILINUX_2024_4(OSFamily.LINUX, "2024\\.4"),
+        KALILINUX_2025_1(OSFamily.LINUX, "2025\\.1"),
+        KALILINUX_2025_2(OSFamily.LINUX, "2025\\.2"),
+        KALILINUX_2025_3(OSFamily.LINUX, "2025\\.3"),
+        KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
-         * 
+         *
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -188,7 +192,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         * 
+         *
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -201,9 +205,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         * 
+         *
          * https://wiki.ubuntu.com/Releases
-         * 
+         *
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -554,7 +558,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         * 
+         *
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");

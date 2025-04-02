@@ -35,8 +35,6 @@ package org.appwork.utils.ImageProvider;
 
 import java.awt.Color;
 import java.awt.Composite;
-import java.awt.Font;
-import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
@@ -49,14 +47,11 @@ import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -75,7 +70,6 @@ import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.URLStream;
 import org.appwork.utils.images.DisabledIcon;
 import org.appwork.utils.images.IconIO;
 
@@ -166,57 +160,6 @@ public class ImageProvider {
     }
 
     /**
-     * Creates a dummy Icon
-     *
-     * @param string
-     * @param i
-     * @param j
-     * @return
-     */
-    public static BufferedImage createIcon(final String string, final int width, final int height) {
-        final int w = Math.max(1, width);
-        final int h = Math.max(1, height);
-        final BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        final Graphics2D g = image.createGraphics();
-        int size = 1 + width / string.length();
-        try {
-            try {
-                final String fontName = getDrawFontName();
-                g.setFont(new Font(fontName, Font.BOLD, size));
-                final FontMetrics fontMetrics = g.getFontMetrics();// check for missing fonts/headless java
-                g.setColor(Color.WHITE);
-                g.fillRect(0, 0, w - 1, h - 1);
-                g.draw3DRect(0, 0, w - 1, h - 1, true);
-                g.setColor(Color.BLACK);
-                // find max font size
-                int ww = 0;
-                int hh = 0;
-                while (size > 0) {
-                    size--;
-                    g.setFont(new Font(fontName, Font.BOLD, size));
-                    ww = fontMetrics.stringWidth(string);
-                    hh = fontMetrics.getAscent();
-                    if (ww < w - 4 && hh < h - 2) {
-                        break;
-                    }
-                }
-                g.drawString(string, (w - ww) / 2, hh + (h - hh) / 2);
-                return image;
-            } catch (Throwable e) {
-                if (isBuggyFontEnvironment(e)) {
-                    g.setColor(Color.RED);
-                    g.fillRect(0, 0, w - 1, h - 1);
-                    return image;
-                } else {
-                    throw new RuntimeException(e);
-                }
-            }
-        } finally {
-            g.dispose();
-        }
-    }
-
-    /**
      * this creates a new BufferedImage from an existing Image. Is used for dereferencing the sourceImage in scaled Images created with
      * image.getScaledInstance, which always keeps a reference to its original image
      *
@@ -224,61 +167,12 @@ public class ImageProvider {
      * @return
      * @throws IOException
      */
-    public static Image dereferenceImage(final Image image) throws IOException {
-        final BufferedImage bu = new BufferedImage(image.getWidth(null), image.getHeight(null), BufferedImage.TYPE_INT_ARGB);
+    private static Image dereferenceImage(final Image image) throws IOException {
+        final BufferedImage bu = IconIO.createEmptyImage(image.getHeight(null), image.getWidth(null), image);
         final Graphics g = bu.getGraphics();
         g.drawImage(image, 0, 0, null);
         g.dispose();
         return bu;
-    }
-
-    /**
-     *
-     * @param name
-     *            to the png file
-     * @param createDummy
-     *            TODO
-     * @return
-     * @throws IOException
-     */
-    public static BufferedImage getBufferedImage(final String name, final boolean createDummy) throws IOException {
-        return ImageProvider.getBufferedImage(name, createDummy, true);
-    }
-
-    public static BufferedImage getBufferedImage(final String name, final boolean createDummy, final boolean putIntoCache) throws IOException {
-        synchronized (ImageProvider.LOCK) {
-            if (ImageProvider.IMAGE_CACHE.containsKey(name)) {
-                final MinTimeWeakReference<BufferedImage> cache = ImageProvider.IMAGE_CACHE.get(name);
-                if (cache.get() != null) {
-                    return cache.get();
-                }
-            }
-            final URL absolutePath = Application.getRessourceURL("images/" + name + ".png");
-            try {
-                org.appwork.loggingv3.LogV3.info("Init Image: " + name + ": " + absolutePath);
-                final BufferedImage image = ImageProvider.read(absolutePath);
-                if (putIntoCache) {
-                    if (image.getHeight() * image.getWidth() > 100 * 100) {
-                        // org.appwork.loggingv3.LogV3.log(new Throwable("BIG IMAGE IN CACHE: " +
-                        // name));
-                    }
-                    ImageProvider.IMAGE_CACHE.put(name, new MinTimeWeakReference<BufferedImage>(image, ImageProvider.MIN_LIFETIME, name, ImageProvider.IMAGE_CACHE_CLEANUP));
-                }
-                return image;
-            } catch (final IOException e) {
-                org.appwork.loggingv3.LogV3.severe("Could not Init Image: " + absolutePath);
-                if (createDummy) {
-                    org.appwork.loggingv3.LogV3.log(e);
-                    return ImageProvider.createIcon(name.toUpperCase(Locale.ENGLISH), 48, 48);
-                } else {
-                    throw e;
-                }
-            } catch (final Throwable e) {
-                org.appwork.loggingv3.LogV3.severe("Could not Init Image: " + absolutePath);
-                org.appwork.loggingv3.LogV3.log(e);
-                return ImageProvider.createIcon(name.toUpperCase(Locale.ENGLISH), 48, 48);
-            }
-        }
     }
 
     public static boolean isBuggyFontEnvironment(final Throwable throwable) {
@@ -329,69 +223,6 @@ public class ImageProvider {
         return null;
     }
 
-    /**
-     * @param string
-     * @param i
-     * @param j
-     * @return
-     */
-    public static ImageIcon getImageIcon(final String name, final int x, final int y) {
-        try {
-            return ImageProvider.getImageIcon(name, x, y, true);
-        } catch (final IOException e) {
-            // can not happen. true creates a dummyicon in case of io errors
-            org.appwork.loggingv3.LogV3.log(e);
-            return null;
-        }
-    }
-
-    /**
-     * Loads the image, scales it to the desired size and returns it as an imageicon
-     *
-     * @param name
-     * @param width
-     * @param height
-     * @param createDummy
-     *            TODO
-     * @return
-     * @throws IOException
-     */
-    public static ImageIcon getImageIcon(final String name, final int width, final int height, final boolean createDummy) throws IOException {
-        return ImageProvider.getImageIcon(name, width, height, createDummy, true);
-    }
-
-    public static ImageIcon getImageIcon(final String name, int width, int height, final boolean createDummy, final boolean putIntoCache) throws IOException {
-        synchronized (ImageProvider.LOCK) {
-            final StringBuilder SB = new StringBuilder();
-            SB.append(name);
-            SB.append('_');
-            SB.append(width);
-            SB.append('_');
-            SB.append(height);
-            String key;
-            if (ImageProvider.IMAGEICON_CACHE.containsKey(key = SB.toString())) {
-                final MinTimeWeakReference<ImageIcon> cache = ImageProvider.IMAGEICON_CACHE.get(key);
-                if (cache.get() != null) {
-                    return cache.get();
-                }
-            }
-            final BufferedImage image = ImageProvider.getBufferedImage(name, createDummy, putIntoCache);
-            final double faktor = Math.max((double) image.getWidth(null) / width, (double) image.getHeight(null) / height);
-            width = (int) (image.getWidth(null) / faktor);
-            height = (int) (image.getHeight(null) / faktor);
-            /**
-             * WARNING: getScaledInstance will return a scaled image, BUT keeps a reference to original unscaled image
-             */
-            final Image scaledWithFuckingReference = image.getScaledInstance(width, height, Image.SCALE_SMOOTH);
-            final Image referencelessVersion = ImageProvider.dereferenceImage(scaledWithFuckingReference);
-            final ImageIcon imageicon = new ImageIcon(referencelessVersion);
-            if (putIntoCache) {
-                ImageProvider.IMAGEICON_CACHE.put(key, new MinTimeWeakReference<ImageIcon>(imageicon, ImageProvider.MIN_LIFETIME, key, ImageProvider.IMAGEICON_CACHE_CLEANUP));
-            }
-            return imageicon;
-        }
-    }
-
     public static void writeImage(RenderedImage im, String formatName, File file) throws IOException {
         if (!ImageIO.write(im, formatName, file)) {
             throw new IOException("no appropriate " + formatName + " writer found!");
@@ -401,16 +232,6 @@ public class ImageProvider {
     public static void writeImage(RenderedImage im, String formatName, OutputStream output) throws IOException {
         if (!ImageIO.write(im, formatName, output)) {
             throw new IOException("no appropriate " + formatName + " writer found!");
-        }
-    }
-
-    public static ImageIcon getImageIconUnCached(final String name, final int x, final int y) {
-        try {
-            return ImageProvider.getImageIcon(name, x, y, true, false);
-        } catch (final IOException e) {
-            // can not happen. true creates a dummyicon in case of io errors
-            org.appwork.loggingv3.LogV3.log(e);
-            return null;
         }
     }
 
@@ -579,48 +400,6 @@ public class ImageProvider {
     }
 
     /**
-     * @param absolutePath
-     * @return
-     * @throws IOException
-     */
-    private static BufferedImage read(final URL absolutePath) throws IOException {
-        if (absolutePath == null) {
-            throw new IllegalArgumentException("input == null!");
-        }
-        InputStream is = null;
-        BufferedImage bi = null;
-        try {
-            is = URLStream.openStream(absolutePath);
-            if (is == null) {
-                throw new IIOException("Can't create an ImageInputStream!");
-            }
-            bi = ImageIO.read(is);
-        } finally {
-            try {
-                if (is != null) {
-                    is.close();
-                }
-            } catch (final Throwable e) {
-            }
-        }
-        return bi;
-    }
-
-    /**
-     * @param scaleBufferedImage
-     * @param width
-     * @param height
-     * @return
-     */
-    public static Image resizeWorkSpace(final Image scaleBufferedImage, final int width, final int height) {
-        final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        final Graphics2D g = image.createGraphics();
-        g.drawImage(scaleBufferedImage, (width - scaleBufferedImage.getWidth(null)) / 2, (height - scaleBufferedImage.getHeight(null)) / 2, null);
-        g.dispose();
-        return image;
-    }
-
-    /**
      * Scales a buffered Image to the given size. This method is NOT cached. so take care to cache it externally if you use it frequently
      *
      * @param img
@@ -679,7 +458,7 @@ public class ImageProvider {
         } else {
             final Image dest;
             if (ReflectionUtils.isInstanceOf("sun.awt.image.ToolkitImage", img.getImage())) {
-                dest = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+                dest = IconIO.createEmptyImage(w, h);
                 final Graphics2D g2 = ((BufferedImage) dest).createGraphics();
                 g2.drawImage(img.getImage(), 0, 0, null);
                 g2.dispose();
@@ -698,7 +477,7 @@ public class ImageProvider {
         } else {
             final int w = icon.getIconWidth();
             final int h = icon.getIconHeight();
-            final BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            final BufferedImage image = IconIO.createEmptyImage(w, h);
             final Graphics2D g = image.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             // g.setColor(Color.RED);

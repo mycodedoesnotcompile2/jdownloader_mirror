@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47473 $", interfaceVersion = 2, names = { "wikifortio.com" }, urls = { "https?://(?:www\\.)?wikifortio\\.com/\\d+/" })
+@HostPlugin(revision = "$Revision: 50903 $", interfaceVersion = 2, names = { "wikifortio.com" }, urls = { "https?://(?:www\\.)?wikifortio\\.com/\\d+/" })
 public class WikiFortioCom extends PluginForHost {
     public WikiFortioCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -37,7 +37,7 @@ public class WikiFortioCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.wikifortio.com/contact/";
+        return "http://www." + getHost() + "/contact/";
     }
 
     @Override
@@ -84,7 +84,7 @@ public class WikiFortioCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

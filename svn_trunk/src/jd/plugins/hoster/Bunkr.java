@@ -37,7 +37,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 50891 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50906 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -463,6 +463,11 @@ public class Bunkr extends PluginForHost {
             br.getPage(singleFileURL);
         }
         handleResponsecodeErrors(br.getHttpConnection());
+        String album = br.getRegex(">\\s*More files in this\\s*<a[^>]*href\\s*=\\s*\"(\\.\\./a/[^\"]*)\"").getMatch(0);
+        if (album != null && link.getContainerUrl() == null) {
+            album = br.getURL(album).toExternalForm();
+            link.setContainerUrl(album);
+        }
         final String filenameFromURL = Plugin.getFileNameFromURL(br._getURL());
         String filenameFromHTML = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
         if (filenameFromHTML == null) {

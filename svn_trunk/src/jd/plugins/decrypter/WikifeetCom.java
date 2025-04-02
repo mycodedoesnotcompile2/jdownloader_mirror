@@ -19,14 +19,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.WikifeetComConfig;
 import org.jdownloader.plugins.components.config.WikifeetComConfig.AlbumPackagenameScheme;
 import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -37,67 +39,127 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 46351 $", interfaceVersion = 3, names = { "wikifeet.com" }, urls = { "https?://(?!pics|thumbs\\.)(?:\\w+\\.)?wikifeetx?\\.com/(?!celebs|dating|feetoftheyear|videos|upload|rules)[^/]+" })
+@DecrypterPlugin(revision = "$Revision: 50905 $", interfaceVersion = 3, names = {}, urls = {})
 public class WikifeetCom extends PluginForDecrypt {
     public WikifeetCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "wikifeet.com", "wikifeetx.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?!pics|thumbs\\.)(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?!celebs|dating|feetoftheyear|videos|upload|rules)([\\w-]+).*");
+        }
+        return ret.toArray(new String[0]);
     }
 
     // public static final String type_pic = "https?://(?:\\w+\\.)?pics\\.wikifeetx?\\.com";
     public static final String type_wikifeet = "https?://(?:\\w+\\.)?wikifeetx?\\.com/[^/]+";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
-        this.br.getPage(param.getCryptedUrl());
+        final String gallery_id = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        final String image_id = new Regex(param.getCryptedUrl(), "pid=(\\d+)").getMatch(0);
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getRequest().getHtmlCode().length() <= 100) {
-            /* Empty page */
+            /* Blank page -> Item is offline */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (!param.getCryptedUrl().matches(type_wikifeet)) {
             /* Unsupported URL --> Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String gData = this.br.getRegex("messanger\\['gdata'\\] = (\\[[\\s\\S]*?);").getMatch(0);
-        if (gData == null) {
+        final String json = this.br.getRegex("tdata = (\\{.+\\});").getMatch(0);
+        if (json == null) {
             /* Not an image gallery */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
         // final String contentID = br.getRegex("messanger\\.cid = (\\d+);").getMatch(0);
-        String modelName = this.br.getRegex("messanger\\.cfname = '(.*?)';").getMatch(0);
+        String modelName = (String) entries.get("cname");
+        if (modelName == null) {
+            modelName = br.getRegex("messanger\\.cfname = '(.*?)';").getMatch(0);
+        }
         if (modelName == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         modelName = Encoding.htmlDecode(modelName).trim();
-        final List<Object> data = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(gData);
-        if (data.size() == 0) {
-            return decryptedLinks;
+        final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("gallery");
+        if (data.isEmpty()) {
+            logger.info("Gallery contains zero elements");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        for (final Object entry : data) {
-            final Map<String, Object> entryMap = (Map<String, Object>) entry;
-            if (entryMap.containsKey("pid")) {
-                final String pid = String.valueOf(entryMap.get("pid"));
-                final String dlurl = "directhttp://https://pics.wikifeet.com/" + modelName + "-Feet-" + pid + ".jpg";
-                final DownloadLink dl = this.createDownloadlink(dlurl);
-                final String finalFilename = modelName + "_" + pid + ".jpg";
-                dl.setFinalFileName(finalFilename);
-                dl.setProperty(DirectHTTP.FIXNAME, finalFilename);
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        boolean foundTargetImage = false;
+        for (final Map<String, Object> imagemap : data) {
+            final Object removedO = imagemap.get("removed");
+            final String pid = imagemap.get("pid").toString();
+            final String directurl = "https://pics.wikifeet.com/" + pid + ".jpg";
+            final DownloadLink dl = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
+            final String finalFilename = modelName + "_" + pid + ".jpg";
+            dl.setFinalFileName(finalFilename);
+            dl.setProperty(DirectHTTP.FIXNAME, finalFilename);
+            dl.setContentUrl("https://" + br.getHost() + "/" + gallery_id + "#pid=" + pid);
+            dl.setLinkID(this.getHost() + "://image/" + pid);
+            if (removedO != null && removedO.toString().equals("1")) {
+                dl.setAvailable(false);
+            } else {
                 dl.setAvailable(true);
-                decryptedLinks.add(dl);
+            }
+            ret.add(dl);
+            if (image_id != null && pid.equals(image_id)) {
+                /* User wants specific image only */
+                ret.clear();
+                ret.add(dl);
+                foundTargetImage = true;
+                break;
             }
         }
-        String shoesize = br.getRegex("(?i)Shoe Size\\s*:\\s*<span[^>]*>([^<]+)<a").getMatch(0);
-        if (shoesize != null) {
-            shoesize = Encoding.htmlDecode(shoesize).trim();
+        if (image_id != null && !foundTargetImage) {
+            logger.info("Failed to find target image with id " + image_id + " | Returning all images instead");
         }
-        String birthplace = br.getRegex("(?i)Birthplace\\s*:\\s*<span[^>]*>([^<]+)<a").getMatch(0);
-        if (birthplace != null) {
+        final Object shoesizeO = entries.get("ssize");
+        String shoesize = shoesizeO != null ? shoesizeO.toString() : null;
+        String birthplace = (String) entries.get("bplace");
+        if (birthplace == null) {
+            birthplace = br.getRegex("Birthplace\\s*:\\s*<span[^>]*>([^<]+)<a").getMatch(0);
+        }
+        if (!StringUtils.isEmpty(birthplace)) {
             birthplace = Encoding.htmlDecode(birthplace).trim();
         }
-        String birthdate = br.getRegex("(?i)Birth Date\\s*:\\s*<span[^>]*>([^<]+)<a").getMatch(0);
-        if (birthdate != null) {
+        String birthdate = (String) entries.get("bdate");
+        if (birthdate == null) {
+            birthdate = br.getRegex("Birth Date\\s*:\\s*<span[^>]*>([^<]+)<a").getMatch(0);
+        }
+        if (!StringUtils.isEmpty(birthdate)) {
             birthdate = Encoding.htmlDecode(birthdate).trim();
         }
         final String imdbURL = br.getRegex("(http?://(?:www\\.)?imdb\\.com/name/nm\\d+)").getMatch(0);
@@ -117,8 +179,8 @@ public class WikifeetCom extends PluginForDecrypt {
         packagename = packagename.replace("*imdb_url*", imdbURL != null ? imdbURL : "");
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(packagename);
-        fp.addLinks(decryptedLinks);
-        return decryptedLinks;
+        fp.addLinks(ret);
+        return ret;
     }
 
     @Override

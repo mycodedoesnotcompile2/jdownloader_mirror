@@ -66,15 +66,17 @@ public class NewTheme extends Theme {
 
     @Override
     public Icon getDisabledIcon(JComponent component, Icon input) {
+        final Icon ret = super.getDisabledIcon(component, input);
         if (input instanceof IDIcon) {
-            return new IdentifierWrapperIcon(super.getDisabledIcon(component, input), ((IDIcon) input).getIdentifier().getKey());
+            return new IdentifierWrapperIcon(ret, ((IDIcon) input).getIdentifier().getKey());
         }
-        return super.getDisabledIcon(component, input);
+        return ret;
     }
 
     @Override
     public Icon getIcon(String relativePath, int size) {
-        if ("compress".equals(relativePath)) {
+        if ("compress".equals(relativePath) || "archive".equals(relativePath)) {
+            /* Fallback for older values see https://board.jdownloader.org/showthread.php?t=97243 */
             relativePath = IconKey.ICON_EXTRACT;
         }
         Icon ret = super.getIcon(relativePath, size);

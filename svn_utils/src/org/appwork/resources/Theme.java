@@ -284,11 +284,15 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @return
      */
     private BufferedImage createNotAvailableImage(int width, int height) {
-        width = Math.max(width, 32);
-        height = Math.max(height, 32);
-        BufferedImage ret = IconIO.createEmptyImage(width, height);
+        if (width <= 0) {
+            width = 32;
+        }
+        if (height <= 0) {
+            height = 32;
+        }
+        final BufferedImage ret = IconIO.createEmptyImage(width, height);
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            Graphics2D g = (Graphics2D) ret.getGraphics();
+            final Graphics2D g = (Graphics2D) ret.getGraphics();
             g.setColor(Color.RED);
             g.fillRect(0, 0, width, height);
             g.dispose();

@@ -10,6 +10,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import javax.swing.JToggleButton;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.ListSelectionEvent;
@@ -398,8 +400,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         this.iconKey = iconKey;
         if (iconKey != null) {
             btnIcon.setIcon(NewTheme.I().getIcon(iconKey, 16));
+            btnIcon.setToolTipText("icon:" + iconKey + " (rightclick to reset)");
         } else {
             btnIcon.setIcon(new AbstractIcon(IconKey.ICON_HELP, 16));
+            btnIcon.setToolTipText("no icon set");
         }
     }
 
@@ -487,6 +491,31 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
                 });
                 p.add(list);
                 p.show(btnIcon, 0, btnIcon.getHeight());
+            }
+        });
+        btnIcon.addMouseListener(new MouseListener() {
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    ConditionDialog.this.setIconKey(null);
+                }
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+            }
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
             }
         });
         panel.add(btnIcon, "height 22!,width 22!");
