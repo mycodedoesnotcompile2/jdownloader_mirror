@@ -32,29 +32,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNodeVisitor;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
-import jd.plugins.components.UserAgents.BrowserName;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -102,7 +80,30 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 50726 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNodeVisitor;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
+import jd.plugins.components.UserAgents.BrowserName;
+
+@DecrypterPlugin(revision = "$Revision: 50915 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -342,13 +343,13 @@ public class TbCmV2 extends PluginForDecrypt {
         /**
          * 2024-07-05 e.g.
          * https://www.google.com/url?sa=t&source=web&rct=j&opi=123456&url=https://www.youtube.com/watch%3Fv%3DREDACTED&ved=REDACTED
-         * &usg=REDACTED </br> We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are
-         * [a-z0-9_-]
+         * &usg=REDACTED </br>
+         * We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are [a-z0-9_-]
          */
         cleanedurl = Encoding.htmlDecode(cleanedurl);
         videoID = getVideoIDFromUrl(cleanedurl);
         // for watch_videos, found within youtube.com music
-        final String video_ids_comma_separated = new Regex(cleanedurl, "video_ids=([a-zA-Z0-9\\-_,]+)").getMatch(0);
+        final String video_ids_comma_separated = new Regex(cleanedurl, "(?i)video_ids=([a-zA-Z0-9\\-_,]+)").getMatch(0);
         if (video_ids_comma_separated != null) {
             // first uid in array is the video the user copy url on.
             videoID = new Regex(video_ids_comma_separated, "(" + VIDEO_ID_PATTERN + ")").getMatch(0);
@@ -356,6 +357,13 @@ public class TbCmV2 extends PluginForDecrypt {
         playlistID = getListIDFromUrl(cleanedurl);
         userName = getUsernameFromUrl(cleanedurl);
         channelID = getChannelIDFromUrl(cleanedurl);
+        final Pattern pattern_channel_legacyurl_2 = Pattern.compile("https?://[^/]+/c/([^/]+).*", Pattern.CASE_INSENSITIVE);
+        final Regex legacyurl = new Regex(cleanedurl, "(?i)https?://[^/]+/user/([^/]+).*");
+        final Regex legacyurl2 = new Regex(cleanedurl, pattern_channel_legacyurl_2);
+        if (new Regex(cleanedurl, pattern_channel_legacyurl_2).patternFind() && getChannelTabNameFromURL(cleanedurl) == null) {
+            /* Small workaround because "/c/<username>$" URLs would lead to zero results. */
+            cleanedurl = "https://www.youtube.com/c/" + this.userName + "/videos";
+        }
         helper = new YoutubeHelper(br, getLogger());
         br.setFollowRedirects(true);
         if (helper.isConsentCookieRequired()) {
@@ -542,8 +550,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     return ret;
                 }
                 final String channelTabName = getChannelTabNameFromURL(cleanedurl);
-                final Regex legacyurl = new Regex(cleanedurl, "(?i)https?://[^/]+/user/([^/]+).*");
-                if (legacyurl.patternFind()) {
+                if (legacyurl.patternFind() || legacyurl2.patternFind()) {
                     /* Workaround / legacy handling for such old URLs. */
                     // TODO: Maybe add check/errorhandling for offline/invalid channels
                     /*
@@ -557,18 +564,21 @@ public class TbCmV2 extends PluginForDecrypt {
                     final Map<String, Object> root = helper.getYtInitialData();
                     final Map<String, Object> channelMetadataRenderer = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "metadata/channelMetadataRenderer");
                     final String vanityChannelUrl = channelMetadataRenderer.get("vanityChannelUrl").toString();
-                    final String confirmedRealUsername = new Regex(vanityChannelUrl, "@([^/]+)").getMatch(0);
-                    if (confirmedRealUsername == null) {
+                    final String externalId = channelMetadataRenderer.get("externalId").toString();
+                    if (vanityChannelUrl == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    if (confirmedRealUsername.equals(this.userName)) {
+                    final String confirmedRealUsername = new Regex(vanityChannelUrl, "@([^/]+)").getMatch(0);
+                    if (confirmedRealUsername == null) {
+                        logger.info("Looks like this channel does not have any @username username -> Continue with: " + br.getURL());
+                    } else if (confirmedRealUsername.equals(this.userName)) {
                         logger.info("Username has not changed and remains: " + this.userName);
                     } else {
                         logger.info("Username has changed! Old: " + this.userName + " | New: " + confirmedRealUsername);
                         this.userName = confirmedRealUsername;
                     }
-                    /* Grab additional information now that we've already opened the page. */
-                    this.channelID = channelMetadataRenderer.get("externalId").toString();
+                    /* Grab and set additional information now that we've already opened the page. */
+                    this.channelID = externalId;
                 }
                 if (cfg.getProfileCrawlMode() == ProfileCrawlMode.PLAYLIST && StringUtils.isEmpty(playlistID)) {
                     /* Crawl profile as playlist -> Look for playlistID of default profile playlist "Uploads b <username>". */
@@ -706,6 +716,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 throw ie;
             } catch (final Exception e) {
                 if (videoID != null) {
+                    /* Last resort fallback */
                     logger.info("Playlist handling failed -> Processing single videoID from URL as fallback");
                     videoIdsToAdd.add(new org.jdownloader.plugins.components.youtube.YoutubeClipData(videoID));
                 } else {
@@ -731,7 +742,15 @@ public class TbCmV2 extends PluginForDecrypt {
         final boolean isCrawlDupeCheckEnabled = cfg.isCrawlDupeCheckEnabled();
         final Set<String> videoIDsdupeCheck = new HashSet<String>();
         int videoidindex = -1;
+        String lastVideoFailedErrorMessage = null;
         for (final YoutubeClipData crawledvid : videoIdsToAdd) {
+            if (this.isAbort()) {
+                /**
+                 * IMPORTANT: DO NOT MOVE THIS CHECK ANYWHERE ELSE!! <br>
+                 * Otherwise abort may never happen when all video items run into errors!
+                 */
+                throw new InterruptedException("Aborted!");
+            }
             videoidindex++;
             logger.info("Processing item " + videoidindex + "/" + videoIdsToAdd.size() + " | VideoID: " + crawledvid);
             String mainVideoDupeID = crawledvid.videoID;
@@ -749,6 +768,14 @@ public class TbCmV2 extends PluginForDecrypt {
             }
             YoutubeClipData vid = crawledvid;
             try {
+                /*
+                 * Check for error message which will make all videos fail e.g. "" to speed up crawl process for items that would fail
+                 * either way.
+                 */
+                // TODO: Define single video error messages that are allowed to make all following video items fail instantly
+                if (lastVideoFailedErrorMessage != null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    throw new Exception(lastVideoFailedErrorMessage);
+                }
                 // make sure that we reload the video
                 final boolean hasCache = ClipDataCache.hasCache(helper, crawledvid.videoID);
                 try {
@@ -764,24 +791,22 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             } catch (final Exception e) {
                 logger.log(e);
-                String emsg = null;
+                String errormessage = null;
                 try {
-                    emsg = e.getMessage().toString();
+                    errormessage = e.getMessage().toString();
                 } catch (NullPointerException npe) {
                     // e.message can be null...
                 }
-                if (emsg != null && StringUtils.isEmpty(vid.error)) {
-                    vid.error = emsg;
+                if (errormessage != null && StringUtils.isEmpty(vid.error)) {
+                    vid.error = errormessage;
+                    lastVideoFailedErrorMessage = errormessage;
                 }
-                ret.add(createOfflinelink(YoutubeHelper.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
+                final DownloadLink offlineVideo = createOfflinelink(YoutubeHelper.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error);
+                if (channelOrPlaylistPackage != null) {
+                    offlineVideo._setFilePackage(channelOrPlaylistPackage);
+                }
+                ret.add(offlineVideo);
                 continue;
-            }
-            // TODO: Check if this can be removed
-            if (vid.streams == null || StringUtils.isNotEmpty(vid.error)) {
-                ret.add(createOfflinelink(YoutubeHelper.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
-                if (vid.streams == null) {
-                    continue;
-                }
             }
             final List<AbstractVariant> enabledVariants = new ArrayList<AbstractVariant>(AbstractVariant.listVariants());
             final HashSet<VariantGroup> enabledVariantGroups = new HashSet<VariantGroup>();
@@ -876,8 +901,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
             vid.bestVideoItag = bestVideoResolution;
-            List<VariantInfo> subtitles = enabledVariantGroups.contains(VariantGroup.SUBTITLES) ? vid.findSubtitleVariants() : new ArrayList<VariantInfo>();
-            ArrayList<VariantInfo> descriptions = enabledVariantGroups.contains(VariantGroup.DESCRIPTION) ? vid.findDescriptionVariant() : new ArrayList<VariantInfo>();
+            final List<VariantInfo> subtitles = enabledVariantGroups.contains(VariantGroup.SUBTITLES) ? vid.findSubtitleVariants() : new ArrayList<VariantInfo>();
+            final ArrayList<VariantInfo> descriptions = enabledVariantGroups.contains(VariantGroup.DESCRIPTION) ? vid.findDescriptionVariant() : new ArrayList<VariantInfo>();
             if (subtitles != null) {
                 foundVariants.addAll(subtitles);
             }
@@ -986,10 +1011,6 @@ public class TbCmV2 extends PluginForDecrypt {
                         }
                         last = cur;
                     }
-                    // for (final Iterator<VariantInfo> it = linkVariants.iterator(); it.hasNext();) {
-                    // VariantInfo cur = it.next();
-                    // System.out.println(cur.getVariant().getBaseVariant() + "\t" + cur.getVariant().getQualityRating());
-                    // }
                     if (linkVariants.size() == 0) {
                         continue;
                     }
@@ -1065,9 +1086,6 @@ public class TbCmV2 extends PluginForDecrypt {
                     final DownloadLink lnk = createLink(new YoutubeVariantCollection(), vi, lst, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
                     ret.add(lnk);
                 }
-            }
-            if (this.isAbort()) {
-                throw new InterruptedException("Aborted!");
             }
         }
         return ret;
@@ -1427,8 +1445,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
             /**
-             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br> Only mind this
-             * errormessage if we can't find any content.
+             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br>
+             * Only mind this errormessage if we can't find any content.
              */
             alerts = (List<Map<String, Object>>) rootMap.get("alerts");
             errorOrWarningMessage = null;
@@ -1470,8 +1488,9 @@ public class TbCmV2 extends PluginForDecrypt {
                 putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_DESCRIPTION, playlistDescription);
             }
             /**
-             * Find extra information about channel </br> Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT
-             * ui does not display the total number of shorts of a user.
+             * Find extra information about channel </br>
+             * Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT ui does not display the total number of
+             * shorts of a user.
              */
             String videosCountText = findNumberOfVideosText(rootMap);
             final Map<String, Object> channelHeaderRenderer = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "header/c4TabbedHeaderRenderer");
@@ -1618,8 +1637,9 @@ public class TbCmV2 extends PluginForDecrypt {
                     if (alerts != null && alerts.size() > 0) {
                         /**
                          * 2023-08-03: E.g. playlist with 700 videos but 680 of them are hidden/unavailable which means first pagination
-                         * attempt will fail. </br> Even via website this seems to be and edge case as the loading icon will never disappear
-                         * and no error is displayed.
+                         * attempt will fail. </br>
+                         * Even via website this seems to be and edge case as the loading icon will never disappear and no error is
+                         * displayed.
                          */
                         logger.info("Pagination failed -> Possible reason: " + errorOrWarningMessage);
                     } else {

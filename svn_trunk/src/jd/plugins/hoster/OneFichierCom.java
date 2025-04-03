@@ -65,7 +65,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50907 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50912 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS  = "use_cdn_credits";
     private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT  = "is_gold_account";
@@ -333,7 +333,7 @@ public class OneFichierCom extends PluginForHost {
                         /* Set weak filename */
                         link.setName(file_id);
                     }
-                    final String file_id_string = new Regex(br.getRequest().getHtmlCode(), Pattern.compile("(" + file_id + "[^\r\n]+)", Pattern.MULTILINE)).getMatch(0);
+                    final String file_id_string = new Regex(br.getRequest().getHtmlCode(), Pattern.compile("(" + file_id + ".+)", Pattern.MULTILINE)).getMatch(0);
                     if (file_id_string == null) {
                         /* This should not happen but let's treat such links as offline */
                         logger.warning("Failed to find fileID information for fileID: " + file_id);

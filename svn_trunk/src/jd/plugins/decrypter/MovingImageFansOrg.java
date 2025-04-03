@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50777 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50912 $", interfaceVersion = 3, names = {}, urls = {})
 public class MovingImageFansOrg extends PluginForDecrypt {
     public MovingImageFansOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class MovingImageFansOrg extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filmfans.org", "serienfans.org" });
+        ret.add(new String[] { "filmfans.org", "serienfans.org", "serienfreaks.org" });
         return ret;
     }
 

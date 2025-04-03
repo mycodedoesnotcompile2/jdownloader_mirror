@@ -53,19 +53,19 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.Bunkr;
 
-@DecrypterPlugin(revision = "$Revision: 50563 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50914 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     /** DEVELOPER: When changing this, do not forget to update the domain also in BunkrConfig.class!!! */
-    public final static String MAIN_BUNKR_DOMAIN = "bunkrr.su";
+    public final static String MAIN_BUNKR_DOMAIN = "bunkr.si";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { MAIN_BUNKR_DOMAIN, "bunkr.su", "bunkr.si", "bunkr.ru", "bunkr.is", "bunkr.la", "bunkrr.ru", "bunkr.sk", "bunkr.black", "bunkr.cat", "bunkr.media", "bunkr.ac", "bunkr.ws", "bunkr.red", "bunkr.site", "bunkr.black", "bunkrrr.org", "bunkr.fi", "bunkr.ci", "bunkr.ax", "bunkr.ac", "bunkr.se", "bunkr.es", "bunkr.ps", "bunkr.pk", "bunkr.ph", "bunkr.cr" });
+        ret.add(new String[] { MAIN_BUNKR_DOMAIN, "bunkrr.su", "bunkr.su", "bunkr.si", "bunkr.ru", "bunkr.is", "bunkr.la", "bunkrr.ru", "bunkr.sk", "bunkr.black", "bunkr.cat", "bunkr.media", "bunkr.ac", "bunkr.ws", "bunkr.red", "bunkr.site", "bunkr.black", "bunkrrr.org", "bunkr.fi", "bunkr.ci", "bunkr.ax", "bunkr.ac", "bunkr.se", "bunkr.es", "bunkr.ps", "bunkr.pk", "bunkr.ph", "bunkr.cr" });
         return ret;
     }
 
@@ -75,7 +75,7 @@ public class BunkrAlbum extends PluginForDecrypt {
      * 2023-08-08: Example still working as CDN domain: bunkr.ru, bunkr.is
      */
     public static List<String> getDeadDomains() {
-        return Arrays.asList(new String[] { "bunkr.su", "bunkr.ru", "bunkr.is", "bunkr.la" });
+        return Arrays.asList(new String[] { "bunkr.su", "bunkr.ru", "bunkr.is", "bunkr.la", "bunkr.se" });
     }
 
     public static String[] getAnnotationNames() {
