@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50412 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50919 $", interfaceVersion = 3, names = {}, urls = {})
 public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
     public TaiwebsComBr0wsersCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,7 +79,7 @@ public class TaiwebsComBr0wsersCom extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Regex urlinfo = new Regex(param.getCryptedUrl(), this.getSupportedLinks());
-        final String urlSlug = urlinfo.getMatch(0);
+        // final String urlSlug = urlinfo.getMatch(0);
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("Origin", "https://br0wsers.com");
         brc.getHeaders().put("Referer", param.getCryptedUrl());

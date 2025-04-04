@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49159 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornktuBe extends KernelVideoSharingComV2 {
     public PornktuBe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -86,16 +86,6 @@ public class PornktuBe extends KernelVideoSharingComV2 {
     public String rewriteHost(final String host) {
         /* 2022-07-26: Main domain has changed frequently. */
         return this.rewriteHost(getPluginDomains(), host);
-    }
-
-    @Override
-    protected void getPage(final String page) throws Exception {
-        /** 2020-11-05: Special: Website may answer with 404 along with a redirect on first request. */
-        getPage(br, page);
-        final String redirect = br.getRegex("http-equiv=\"Refresh\" content=\"0; URL=(http[^<>\"]+)").getMatch(0);
-        if (redirect != null) {
-            this.getPage(redirect);
-        }
     }
 
     @Override

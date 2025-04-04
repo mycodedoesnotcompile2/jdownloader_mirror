@@ -17,7 +17,7 @@ public class DecrypterRetryException extends Exception {
         GEO(_JDT.T.decrypter_unavailable_geo()),
         IP(_JDT.T.decrypter_unavailable_ip()),
         UNSUPPORTED_LIVESTREAM(_JDT.T.decrypter_unavailable_unsupported_livestream()),
-        UNSUPPORTED_CAPTCHA_CLOUDFLARE_TURNSTILE(_JDT.T.decrypter_unavailable_unsupported_captcha_cloudflare_turnstile()),
+        UNSUPPORTED_DRM("DRM"),
         BLOCKED_BY(_JDT.T.decrypter_unavailable_blocked_by());
 
         private final String exp;
@@ -56,8 +56,9 @@ public class DecrypterRetryException extends Exception {
             return _JDT.T.decrypter_unavailable_ip_description();
         } else if (this.reason == RetryReason.UNSUPPORTED_LIVESTREAM) {
             return _JDT.T.decrypter_unavailable_unsupported_livestream();
-        } else if (this.reason == RetryReason.UNSUPPORTED_CAPTCHA_CLOUDFLARE_TURNSTILE) {
-            return _JDT.T.decrypter_unavailable_unsupported_captcha_cloudflare_turnstile();
+        } else if (this.reason == RetryReason.UNSUPPORTED_DRM) {
+            // TODO: Add translation
+            return "Unsupported DRM protected content";
         } else {
             return null;
         }

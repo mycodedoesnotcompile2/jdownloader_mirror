@@ -41,7 +41,6 @@ import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfig.PreferredStreamQuality;
 import org.jdownloader.plugins.components.hls.HlsContainer;
@@ -75,10 +74,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50741 $", interfaceVersion = 3, names = {}, urls = {})
-public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
+public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -515,7 +515,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         } else {
             embedHandling: if (isEmbedURL(contenturl)) {
                 /* Embed URL */
-                getPage(contenturl);
+                br.getPage(contenturl);
                 /* in case there is http<->https or url format redirect */
                 br.followRedirect();
                 if (br.getHttpConnection().getResponseCode() == 403) {
@@ -618,7 +618,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 }
             } else {
                 /* Normal URL */
-                getPage(contenturl);
+                br.getPage(contenturl);
                 /* in case there is http<->https or url format redirect */
                 br.followRedirect();
                 if (isOfflineWebsite(this.br)) {
@@ -704,7 +704,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 brc.setAllowedResponseCodes(new int[] { 405 });
                 // In case the link redirects to the finallink -
                 // brc.getHeaders().put("Accept-Encoding", "identity");
-                con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(dllink));
+                con = brc.openHeadConnection(dllink);
                 if (this.looksLikeHLS(con)) {
                     logger.info("Got HLS stream instead of progressive video");
                     return AvailableStatus.TRUE;
@@ -712,7 +712,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 final String workaroundURL = getHttpServerErrorWorkaroundURL(con);
                 if (workaroundURL != null && !this.looksLikeDownloadableContent(con)) {
                     con.disconnect();
-                    con = openAntiDDoSRequestConnection(brc, brc.createGetRequest(workaroundURL));
+                    con = brc.openGetConnection(workaroundURL);
                 }
                 this.handleConnectionErrors(brc, con);
                 if (con.isContentDecoded()) {
@@ -863,7 +863,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 /* Only check directurl during availablecheck, not if user has started downloading. */
                 URLConnectionAdapter con = null;
                 try {
-                    con = openAntiDDoSRequestConnection(br, br.createHeadRequest(dllink));
+                    con = br.openHeadConnection(dllink);
                     this.handleConnectionErrors(br, con);
                     if (con.isContentDecoded()) {
                         link.setDownloadSize(con.getCompleteContentLength());
@@ -1110,7 +1110,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                     brc.setRequest(br.getRequest());
                 } else {
                     /* Access hls master */
-                    getPage(brc, this.dllink);
+                    brc.getPage(this.dllink);
                 }
                 if (!looksLikeHLS(brc.getHttpConnection())) {
                     handleConnectionErrors(brc, brc.getHttpConnection());
@@ -1260,7 +1260,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             }
             /* 2020-11-04: Login-URL that fits most of all websites (example): https://www.porngem.com/login-required/ */
             logger.info("Performing full login");
-            getPage(getProtocol() + this.appendWWWIfRequired(this.getHost()) + "/login/");
+            br.getPage(getProtocol() + this.appendWWWIfRequired(this.getHost()) + "/login/");
             /*
              * 2017-01-21: This request will usually return a json with some information about the account.
              */
@@ -1272,7 +1272,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 loginform.setMethod(MethodType.POST);
             }
             fillWebsiteLoginForm(br, loginform, account);
-            this.submitForm(loginform);
+            br.submitForm(loginform);
             if (!isLoggedIN(br)) {
                 throw new AccountInvalidException();
             }
@@ -1287,7 +1287,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
 
     /** Validates login state of given browser instance. */
     private boolean checkLogin(final Browser br) throws Exception {
-        getPage(br, getProtocol() + this.appendWWWIfRequired(this.getHost()) + "/");
+        br.getPage(getProtocol() + this.appendWWWIfRequired(this.getHost()) + "/");
         if (isLoggedIN(br)) {
             return true;
         } else {
@@ -1807,7 +1807,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             final Browser brc = br.cloneBrowser();
             brc.setFollowRedirects(true);
             brc.setAllowedResponseCodes(new int[] { 405 });
-            con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(downloadurl));
+            con = brc.openHeadConnection(downloadurl);
             if (this.looksLikeHLS(con)) {
                 brc.followConnection();
                 logger.info("Found HLS stream instead of expected progressive video stream download");
@@ -1818,7 +1818,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             if (!this.looksLikeDownloadableContent(con) && (workaroundURL = getHttpServerErrorWorkaroundURL(con)) != null) {
                 brc.followConnection(true);
                 /* Try again */
-                con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(workaroundURL));
+                con = brc.openHeadConnection(workaroundURL);
             }
             if (this.looksLikeDownloadableContent(con)) {
                 /* Success */

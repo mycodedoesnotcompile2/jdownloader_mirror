@@ -103,7 +103,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@DecrypterPlugin(revision = "$Revision: 50915 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50919 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -192,18 +192,22 @@ public class TbCmV2 extends PluginForDecrypt {
 
     public static String getVideoIDFromUrl(final String url) {
         String vuid = new Regex(url, "(?i)v=" + VIDEO_ID_PATTERN).getMatch(0);
-        if (vuid == null) {
-            vuid = new Regex(url, "(?i)/v/" + VIDEO_ID_PATTERN).getMatch(0);
-            if (vuid == null) {
-                vuid = new Regex(url, "(?i)/shorts/" + VIDEO_ID_PATTERN).getMatch(0);
-                if (vuid == null) {
-                    vuid = new Regex(url, "(?i)/embed/(?!videoseries\\?)" + VIDEO_ID_PATTERN).getMatch(0);
-                    if (vuid == null) {
-                        vuid = new Regex(url, "(?i)/live/" + VIDEO_ID_PATTERN).getMatch(0);
-                    }
-                }
-            }
+        if (vuid != null) {
+            return vuid;
         }
+        vuid = new Regex(url, "(?i)/v/" + VIDEO_ID_PATTERN).getMatch(0);
+        if (vuid != null) {
+            return vuid;
+        }
+        vuid = new Regex(url, "(?i)/shorts/" + VIDEO_ID_PATTERN).getMatch(0);
+        if (vuid != null) {
+            return vuid;
+        }
+        vuid = new Regex(url, "(?i)/embed/(?!videoseries\\?)" + VIDEO_ID_PATTERN).getMatch(0);
+        if (vuid != null) {
+            return vuid;
+        }
+        vuid = new Regex(url, "(?i)/live/" + VIDEO_ID_PATTERN).getMatch(0);
         return vuid;
     }
 
@@ -213,12 +217,14 @@ public class TbCmV2 extends PluginForDecrypt {
 
     private String getUsernameFromUrl(final String url) {
         String userName = new Regex(url, "(?i)/user/([^/\\?#]+)").getMatch(0);
-        if (userName == null) {
-            userName = new Regex(url, "(?i)https?://[^/]+/@([^/\\?#]+)").getMatch(0);
-            if (userName == null) {
-                userName = new Regex(url, "(?i)https?://[^/]+/c/([^/\\?#]+)").getMatch(0);
-            }
+        if (userName != null) {
+            return userName;
         }
+        userName = new Regex(url, "(?i)https?://[^/]+/@([^/\\?#]+)").getMatch(0);
+        if (userName != null) {
+            return userName;
+        }
+        userName = new Regex(url, "(?i)https?://[^/]+/c/([^/\\?#]+)").getMatch(0);
         return userName;
     }
 
@@ -769,11 +775,10 @@ public class TbCmV2 extends PluginForDecrypt {
             YoutubeClipData vid = crawledvid;
             try {
                 /*
-                 * Check for error message which will make all videos fail e.g. "" to speed up crawl process for items that would fail
-                 * either way.
+                 * Check for error message which will make all videos fail e.g. "Sign in to confirm you’re not a bot" to massively speed up
+                 * crawl process for items that would fail either way.
                  */
-                // TODO: Define single video error messages that are allowed to make all following video items fail instantly
-                if (lastVideoFailedErrorMessage != null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                if (lastVideoFailedErrorMessage != null && lastVideoFailedErrorMessage.matches("(?i)Sign in to confirm.*")) {
                     throw new Exception(lastVideoFailedErrorMessage);
                 }
                 // make sure that we reload the video
@@ -799,8 +804,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
                 if (errormessage != null && StringUtils.isEmpty(vid.error)) {
                     vid.error = errormessage;
-                    lastVideoFailedErrorMessage = errormessage;
                 }
+                lastVideoFailedErrorMessage = vid.error;
                 final DownloadLink offlineVideo = createOfflinelink(YoutubeHelper.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error);
                 if (channelOrPlaylistPackage != null) {
                     offlineVideo._setFilePackage(channelOrPlaylistPackage);

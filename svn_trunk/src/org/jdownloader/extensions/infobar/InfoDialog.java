@@ -18,12 +18,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JWindow;
 
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.components.JDProgressBar;
-import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
-import jd.nutils.Formatter;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
 import org.appwork.shutdown.ShutdownRequest;
@@ -45,6 +39,12 @@ import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.images.AbstractIcon;
+
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.components.JDProgressBar;
+import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
+import jd.nutils.Formatter;
+import net.miginfocom.swing.MigLayout;
 
 public class InfoDialog extends JWindow implements ActionListener, MouseListener, MouseMotionListener, GenericConfigEventListener<Integer>, WindowListener {
     private static final long               serialVersionUID = 4715904261105562064L;
@@ -137,13 +137,13 @@ public class InfoDialog extends JWindow implements ActionListener, MouseListener
         lblHelp.setHorizontalTextPosition(JLabel.LEADING);
         lblHelp.setHorizontalAlignment(JLabel.CENTER);
         lblHelp.setToolTipText(T.T.jd_plugins_optional_infobar_InfoDialog_help_tooltip2());
-        final JPanel panel = new JPanel(new MigLayout("ins 6, wrap 1", "[grow,fill,250]"));
+        final JPanel panel = new JPanel(new MigLayout("ins 6, wrap 1", "[grow,fill,300]"));
         Color background = getBackground();
         if (background == null) {
             background = new Color(255, 255, 255);
         }
         panel.setBorder(BorderFactory.createLineBorder(background.darker().darker()));
-        panel.add(speedmeter = new SpeedMeterPanel(false, true), "h 30!");
+        panel.add(speedmeter = new SpeedMeterPanel(false, true), "h 32!");
         panel.add(lblProgress, "split 2");
         panel.add(lblETA);
         panel.add(prgTotal);

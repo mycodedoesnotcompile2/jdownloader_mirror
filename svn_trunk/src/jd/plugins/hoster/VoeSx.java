@@ -56,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50819 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50923 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -187,10 +187,10 @@ public class VoeSx extends XFileSharingProBasic {
         String altSourceB64 = br.getRegex("let wc0 = '([^\\']+)").getMatch(0);
         if (altSourceB64 == null) {
             /* 2024-02-23 */
-            altSourceB64 = br.getRegex("let [^=]+ = '(ey[^\\']+)").getMatch(0);
+            altSourceB64 = br.getRegex("let [^=]+\\s*=\\s*'(ey[^\\']+)").getMatch(0);
             if (altSourceB64 == null) {
                 /* 2024-02-26 */
-                altSourceB64 = br.getRegex("let [a-f0-9]+ = '([^\\']+)").getMatch(0);
+                altSourceB64 = br.getRegex("let [a-f0-9]+\\s*=\\s*'([^\\']+)").getMatch(0);
                 if (altSourceB64 == null) {
                     /* 2024-11-29 */
                     altSourceB64 = br.getRegex("(?i)(\"|')hls\\1\\s*:\\s*(\"|')([^\"']+)").getMatch(2);
@@ -210,8 +210,12 @@ public class VoeSx extends XFileSharingProBasic {
             hlsMaster = result;
         } else {
             /* Assume that result is json */
-            final Map<String, Object> entries = restoreFromString(result, TypeRef.MAP);
-            hlsMaster = (String) entries.get("file");
+            try {
+                final Map<String, Object> entries = restoreFromString(result, TypeRef.MAP);
+                hlsMaster = (String) entries.get("file");
+            } catch (Exception e) {
+                logger.log(e);
+            }
         }
         if (hlsMaster != null) {
             return hlsMaster;

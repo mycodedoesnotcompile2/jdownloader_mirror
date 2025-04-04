@@ -30,7 +30,7 @@ import jd.plugins.PluginForDecrypt;
 
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 45506 $", interfaceVersion = 3, names = { "coub.com" }, urls = { "https?://(?:www\\.)?coub\\.com/(?!(view|embed))[^/]+" })
+@DecrypterPlugin(revision = "$Revision: 50921 $", interfaceVersion = 3, names = { "coub.com" }, urls = { "https?://(?:www\\.)?coub\\.com/(?!(view|embed))[^/]+" })
 public class CoubComDecrypter extends PluginForDecrypt {
     public CoubComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class CoubComDecrypter extends PluginForDecrypt {
                 logger.info("Decryption aborted by user");
                 break;
             }
-            this.br.getPage("http://coub.com/api/v2/timeline/channel/" + lid + "?per_page=" + max_entries_per_page + "&permalink=" + lid + "&order_by=newest&page=" + page);
+            this.br.getPage("https://coub.com/api/v2/timeline/channel/" + lid + "?per_page=" + max_entries_per_page + "&permalink=" + lid + "&order_by=newest&page=" + page);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 decryptedLinks.add(this.createOfflinelink(parameter));
                 return decryptedLinks;

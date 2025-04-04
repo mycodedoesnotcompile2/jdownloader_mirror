@@ -390,10 +390,10 @@ public class IconIO {
      * @return
      */
     public static BufferedImage createEmptyImage(int width, int height, int imageType, int transparency) {
-        if (imageType < 0) {
+        if (imageType <= 0) {
             imageType = BufferedImage.TYPE_INT_ARGB;
         }
-        if (transparency < 0) {
+        if (transparency <= 0) {
             transparency = Transparency.TRANSLUCENT;
         }
         final BufferedImage newImage;

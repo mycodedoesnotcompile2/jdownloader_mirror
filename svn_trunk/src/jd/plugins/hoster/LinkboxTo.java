@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -43,7 +38,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50892 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50921 $", interfaceVersion = 3, names = {}, urls = {})
 public class LinkboxTo extends PluginForHost {
     public LinkboxTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,7 +133,14 @@ public class LinkboxTo extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        String ret = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        // e=>{if(!e||e.startsWith("fp"))return"";const t=e.slice(0,e.length-1);e.slice(e.length-1);return window.atob(t)}
+        if (ret == null || ret.startsWith("fp")) {
+            return ret;
+        }
+        ret = ret.substring(0, ret.length() - 1);
+        ret = Base64.decodeToString(ret);
+        return ret;
     }
 
     private String getWebapiBase() {
@@ -141,9 +149,9 @@ public class LinkboxTo extends PluginForHost {
 
     public static UrlQuery getBaseQuery() {
         final UrlQuery query = new UrlQuery();
-        query.add("platform", "web");
-        query.add("pf", "web");
-        query.add("lan", "en");
+        query.appendEncoded("platform", "web");
+        query.appendEncoded("pf", "web");
+        query.appendEncoded("lan", "en");
         return query;
     }
 
@@ -160,15 +168,18 @@ public class LinkboxTo extends PluginForHost {
         }
         final String token = account != null ? account.getStringProperty(PROPERTY_ACCOUNT_TOKEN) : "";
         final UrlQuery query = getBaseQuery();
-        query.add("itemId", fid);
-        query.add("needUser", "1");
-        query.add("needTpInfo", "1");
-        query.add("token", token);
-        br.getPage(getWebapiBase() + "/file/detail?" + query.toString());
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        query.appendEncoded("itemId", fid);
+        query.appendEncoded("needUser", "1");
+        query.appendEncoded("needTpInfo", "1");
+        query.appendEncoded("token", token);
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("Accept", "application/json, text/plain, */*");
+        brc.getHeaders().put("Referer", "https://www.linkbox.cloud/f-detail/" + fid);
+        brc.getPage(getWebapiBase() + "/file/detail?" + query.toString());
+        if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> data = (Map<String, Object>) entries.get("data");
         /* E.g. when invalid fileID is used: {"data":null,"status":1} */
         if (data == null) {
@@ -277,7 +288,7 @@ public class LinkboxTo extends PluginForHost {
             final String storedToken = account.getStringProperty(PROPERTY_ACCOUNT_TOKEN);
             if (cookies != null && storedToken != null) {
                 logger.info("Attempting cookie login");
-                br.setCookies(this.getHost(), cookies);
+                br.setCookies(cookies);
                 if (!force) {
                     /* Don't validate cookies */
                     return null;
@@ -299,18 +310,19 @@ public class LinkboxTo extends PluginForHost {
             }
             logger.info("Performing full login");
             final UrlQuery query = getBaseQuery();
-            query.add("email", Encoding.urlEncode(account.getUser()));
-            query.add("pwd", Encoding.urlEncode(account.getPass()));
-            br.getHeaders().put("Referer", "https://www." + this.getHost() + "/email");
+            query.appendEncoded("email", account.getUser());
+            query.appendEncoded("pwd", account.getPass());
+            br.getHeaders().put("Referer", "https://www." + getHost() + "/email");
             br.getPage(this.getWebapiBase() + "/user/login_email?" + query.toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final int status = ((Number) entries.get("status")).intValue();
             if (status != 1) {
+                final String msg = (String) entries.get("msg");
                 /* E.g.: {"msg":"LoginEmailNoAccount","status":50001} */
                 /* {"msg":"LoginEmailErrAccount","status":50002} */
                 // 5001 = Invalid email
                 // 5002 = Invalid password
-                throw new AccountInvalidException();
+                throw new AccountInvalidException(msg);
             }
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             final String token = (String) data.get("token");
@@ -331,10 +343,18 @@ public class LinkboxTo extends PluginForHost {
         if (account.loadUserCookies() != null && email != null) {
             account.setUser(email);
         }
+        final Number spaceUsedBytes = (Number) userInfo.get("size_curr");
+        if (spaceUsedBytes != null) {
+            ai.setUsedSpace(spaceUsedBytes.longValue());
+        }
         final long vip_end = ((Number) userInfo.get("vip_end")).longValue();
-        ai.setValidUntil(vip_end * 1000, br);
-        /* As long as the account is not expired, it is considered to be a premium account. */
-        account.setType(AccountType.PREMIUM);
+        if (vip_end > System.currentTimeMillis()) {
+            ai.setValidUntil(vip_end * 1000, br);
+            /* As long as the account is not expired, it is considered to be a premium account. */
+            account.setType(AccountType.PREMIUM);
+        } else {
+            account.setType(AccountType.FREE);
+        }
         return ai;
     }
 

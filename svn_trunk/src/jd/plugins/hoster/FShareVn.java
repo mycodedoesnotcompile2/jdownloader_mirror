@@ -69,7 +69,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
+@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
 public class FShareVn extends PluginForHost {
     private final String         SERVERERROR                            = "Tài nguyên bạn yêu cầu không tìm thấy";
     private final String         IPBLOCKED                              = "<li>Tài khoản của bạn thuộc GUEST nên chỉ tải xuống";
@@ -513,8 +513,6 @@ public class FShareVn extends PluginForHost {
     public static Browser prepBrowserWebsite(final Browser br) throws IOException {
         /* Sometime the page is extremely slow! */
         br.setReadTimeout(120 * 1000);
-        // br.getHeaders().put("User-Agent", jd.plugins.hoster.MediafireCom.stringUserAgent());
-        /* 2021-07-02: Do not user random User-Agent anymore. */
         br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
         br.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
         br.getHeaders().put("Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.7");

@@ -46,6 +46,7 @@ import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
+import java.text.NumberFormat;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -67,31 +68,23 @@ import org.appwork.utils.swing.graph.Limiter;
  *
  */
 abstract public class Graph extends JPanel implements ToolTipHandler {
-
     private static final long                         serialVersionUID = 6943108941655020136L;
     private volatile int                              valueIndex;
-
     private transient NullsafeAtomicReference<Thread> fetcherThread    = new NullsafeAtomicReference<Thread>(null);
     private int                                       interval         = 1000;
-
     private final Object                              LOCK             = new Object();
-
     private Color                                     currentColorTop;
     private Color                                     currentColorBottom;
-
     protected volatile long                           average;
     protected volatile long                           all;
     protected volatile int                            value;
     protected long[]                                  averageCache;
     protected long[]                                  cache;
-
     private Color                                     averageColor     = new Color(0x333333);
     private Color                                     averageTextColor = new Color(0);
     private int                                       capacity         = 0;
     private Color                                     textColor        = new Color(0);
-
     private Font                                      textFont;
-
     private Limiter[]                                 limiter;
     private TooltipTextDelegateFactory                tooltipFactory;
     private boolean                                   antiAliasing     = false;
@@ -120,7 +113,6 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
      * @return
      */
     protected String createTooltipText() {
-
         return this.getAverageSpeedString() + "  " + this.getSpeedString();
     }
 
@@ -140,6 +132,10 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
         }
     }
 
+    protected NumberFormat getNumberFormat() {
+        return NumberFormat.getInstance();
+    }
+
     /**
      * @return
      */
@@ -148,7 +144,7 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
         if (all <= 0) {
             return null;
         } else {
-            return _AWU.T.AppWorkUtils_Graph_getAverageSpeedString2(SizeFormatter.formatBytes(this.average / all));
+            return _AWU.T.AppWorkUtils_Graph_getAverageSpeedString2(SizeFormatter.formatBytes(getNumberFormat(), this.average / all));
         }
     }
 
@@ -194,11 +190,11 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
     /**
      * @return
      */
-    public String getSpeedString() {        
+    public String getSpeedString() {
         if (this.all <= 0) {
             return null;
         }
-        return _AWU.T.AppWorkUtils_Graph_getSpeedString(SizeFormatter.formatBytes(this.value));
+        return _AWU.T.AppWorkUtils_Graph_getSpeedString(SizeFormatter.formatBytes(getNumberFormat(), this.value));
     }
 
     /**
@@ -240,7 +236,7 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
     }
 
     @Override
-    public boolean isTooltipWithoutFocusEnabled() {        
+    public boolean isTooltipWithoutFocusEnabled() {
         return true;
     }
 
@@ -497,13 +493,11 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
             }
             this.valueIndex = 0;
             thread = new Thread("Speedmeter updater") {
-
                 @Override
                 public void run() {
                     Timer painter = null;
                     try {
                         painter = new Timer(Graph.this.getInterval(), new ActionListener() {
-
                             public void actionPerformed(final ActionEvent e) {
                                 synchronized (Graph.this.LOCK) {
                                     Graph.this.setToolTipText(Graph.this.createTooltipText());
@@ -548,7 +542,6 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
                             }
                         }
                         new EDTRunner() {
-
                             @Override
                             protected void runInEDT() {
                                 Graph.this.repaint();
@@ -578,5 +571,4 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
     public boolean updateTooltip(final ExtTooltip activeToolTip, final MouseEvent e) {
         return false;
     }
-
 }

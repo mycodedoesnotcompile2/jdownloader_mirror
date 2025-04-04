@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
 public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
     public MulherespeladasvipCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +134,7 @@ public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
                     logger.info("Trust cookies without check");
                     return;
                 }
-                getPage(getProtocol() + this.getHost() + "/");
+                br.getPage(getProtocol() + this.getHost() + "/");
                 if (isLoggedIN(br)) {
                     logger.info("Cookie login successful");
                     account.saveCookies(this.br.getCookies(this.getHost()), "");
@@ -147,7 +147,7 @@ public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
             }
             /* 2020-11-04: Login-URL that fits most of all websites (example): https://www.porngem.com/login-required/ */
             logger.info("Performing full login");
-            getPage(getProtocol() + this.getHost() + "/videos/login/");
+            br.getPage(getProtocol() + this.getHost() + "/videos/login/");
             final Form loginform = br.getFormbyActionRegex(".*/login.*");
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -155,7 +155,7 @@ public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
             loginform.put("remember_me", "1");
             loginform.put("username", Encoding.urlEncode(account.getUser()));
             loginform.put("pass", Encoding.urlEncode(account.getPass()));
-            this.submitForm(loginform);
+            br.submitForm(loginform);
             if (!isLoggedIN(br)) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }

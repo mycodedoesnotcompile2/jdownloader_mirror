@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
 import jd.PluginWrapper;
@@ -30,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThisvidCom extends KernelVideoSharingComV2 {
     public ThisvidCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +83,7 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
                     logger.info("Trust cookies without check");
                     return;
                 }
-                getPage("https://" + this.getHost() + "/");
+                br.getPage("https://" + this.getHost() + "/");
                 if (isLoggedIN(br)) {
                     logger.info("Cookie login successful");
                     account.saveCookies(this.br.getCookies(this.getHost()), "");
@@ -94,7 +95,7 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
                 }
             }
             br.clearCookies(this.getHost());
-            getPage("https://" + this.getHost() + "/login.php");
+            br.getPage("https://" + this.getHost() + "/login.php");
             final Form loginform = br.getFormbyProperty("id", "logon_form");
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -106,7 +107,7 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
             if (captchaURL != null) {
                 final String code = this.getCaptchaCode(captchaURL, this.getDownloadLink());
                 loginform.put("code", Encoding.urlEncode(code));
-            } else if (containsRecaptchaV2Class(loginform)) {
+            } else if (AbstractRecaptchaV2.containsRecaptchaV2Class(loginform)) {
                 final String rcKey = br.getRegex("data-recaptcha-key=\"([^\"]+)\"").getMatch(0);
                 final String token;
                 if (rcKey != null) {
@@ -116,7 +117,7 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
                 }
                 loginform.put("g-recaptcha-response", Encoding.urlEncode(token));
             }
-            this.submitForm(loginform);
+            br.submitForm(loginform);
             if (!isLoggedIN(br)) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }

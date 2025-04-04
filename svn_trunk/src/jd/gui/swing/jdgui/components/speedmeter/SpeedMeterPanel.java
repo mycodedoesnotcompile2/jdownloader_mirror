@@ -15,7 +15,8 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.gui.swing.jdgui.components.speedmeter;
 
-import jd.controlling.downloadcontroller.DownloadWatchDog;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -30,16 +31,25 @@ import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+
 public class SpeedMeterPanel extends Graph {
     private static final long     serialVersionUID = 5571694800446993879L;
     private final Limiter         speedLimiter;
     private final GeneralSettings config;
+    private final DecimalFormat   decimalFormat;
+
+    @Override
+    protected NumberFormat getNumberFormat() {
+        return decimalFormat;
+    }
 
     public SpeedMeterPanel(boolean contextMenu, boolean start) {
         super();
         final int fps = Math.max(1, CFG_GUI.CFG.getSpeedMeterFramesPerSecond());
         this.setCapacity((CFG_GUI.CFG.getSpeedMeterTimeFrame() * fps) / 1000);
         this.setInterval(1000 / fps);
+        decimalFormat = new DecimalFormat("0.00");
         setCurrentColorTop(LAFOptions.getInstance().getColorForSpeedmeterCurrentTop());
         setCurrentColorBottom(LAFOptions.getInstance().getColorForSpeedmeterCurrentBottom());
         setAverageColor(LAFOptions.getInstance().getColorForSpeedMeterAverage());
@@ -48,7 +58,7 @@ public class SpeedMeterPanel extends Graph {
         setOpaque(false);
         speedLimiter = new Limiter(LAFOptions.getInstance().getColorForSpeedmeterLimiterTop(), LAFOptions.getInstance().getColorForSpeedmeterLimiterBottom()) {
             public String getString() {
-                return _GUI.T.SpeedMeterPanel_getString_limited(SizeFormatter.formatBytes(speedLimiter.getValue()));
+                return _GUI.T.SpeedMeterPanel_getString_limited(SizeFormatter.formatBytes(decimalFormat, speedLimiter.getValue()));
             };
         };
         config = JsonConfig.create(GeneralSettings.class);
@@ -87,8 +97,9 @@ public class SpeedMeterPanel extends Graph {
     }
 
     protected String createTooltipText() {
-        if (config.isDownloadSpeedLimitEnabled() && config.getDownloadSpeedLimit() > 0) {
-            return getAverageSpeedString() + "  " + getSpeedString() + "\r\n" + _GUI.T.SpeedMeterPanel_createTooltipText_(SizeFormatter.formatBytes(config.getDownloadSpeedLimit()));
+        int limit = -1;
+        if (config.isDownloadSpeedLimitEnabled() && (limit = config.getDownloadSpeedLimit()) > 0) {
+            return getAverageSpeedString() + "  " + getSpeedString() + "\r\n" + _GUI.T.SpeedMeterPanel_createTooltipText_(SizeFormatter.formatBytes(decimalFormat, limit));
         } else {
             return getAverageSpeedString() + "  " + getSpeedString();
         }

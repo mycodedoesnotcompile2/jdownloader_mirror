@@ -191,9 +191,6 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Livestreams are not supported." })
     String decrypter_unavailable_unsupported_livestream();
 
-    @Default(lngs = { "en" }, values = { "Captcha 'Cloudflare Turnstile' is not supported." })
-    String decrypter_unavailable_unsupported_captcha_cloudflare_turnstile();
-
     @Default(lngs = { "en" }, values = { "Blocked by" })
     String decrypter_unavailable_blocked_by();
 
@@ -666,9 +663,6 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "How to use the Connection Manager: \r\nYou can add several proxies or gateways to this list. Use the filter option to enable or disable a proxy for a certain domain only. For Free Downloads, JDownloader will try to use all available proxies simultanous. For Premium Downloads, the first available Proxy will be used." })
     String gui_settings_proxy_description_new();
 
-    // TODO Remove unused code found by UCDetector
-    // @Default(lngs = { "en" }, values = { "No Gateway or Proxy found." })
-    // String plugins_errors_proxy_connection_nogateway();
     @Default(lngs = { "en" }, values = { "No Gateway or Proxy found." })
     String AccountController_updateAccountInfo_no_gateway();
 
