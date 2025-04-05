@@ -38,7 +38,6 @@ import jd.config.ConfigEntry;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -60,7 +59,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50926 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -117,6 +116,10 @@ public class MediafireCom extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
     }
 
+    private String getContentURL(final DownloadLink link) {
+        return link.getPluginPatternMatcher().replaceFirst("(?)http://", "https://");
+    }
+
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
         return true;
@@ -138,26 +141,10 @@ public class MediafireCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null, false);
+        return requestFileInformation(link, null);
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        checkViaDirectlink: if (!isDownload) {
-            final String directurlproperty = getDirecturlProperty(link, account);
-            final String storedDirecturl = link.getStringProperty(directurlproperty);
-            if (storedDirecturl == null) {
-                break checkViaDirectlink;
-            }
-            try {
-                this.basicLinkCheck(br, br.createHeadRequest(storedDirecturl), link, null, null);
-                return AvailableStatus.TRUE;
-            } catch (final Throwable e) {
-                logger.log(e);
-                logger.info("direct URL failed");
-                /* Do not try the same directurl again later. */
-                link.removeProperty(directurlproperty);
-            }
-        }
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         if (!checkLinks(new DownloadLink[] { link }, account) || !link.isAvailabilityStatusChecked()) {
             link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
         } else if (!link.isAvailable()) {
@@ -293,106 +280,127 @@ public class MediafireCom extends PluginForHost {
         final String storedDirecturl = link.getStringProperty(directurlproperty);
         String finalDownloadurl = null;
         if (storedDirecturl != null) {
+            /* Download of previously stored directurl */
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             finalDownloadurl = storedDirecturl;
+        } else if (account != null && AccountType.PREMIUM.equals(account.getType())) {
+            /* Premium download */
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("link_type", "direct_download");
+            query.appendEncoded("quick_key", this.getFUID(link));
+            final Map<String, Object> resp = apiCommand(link, account, "file/get_links.php", query);
+            final Map<String, Object> linkmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp, "links/{0}");
+            finalDownloadurl = (String) linkmap.get("direct_download");
+            if (StringUtils.isEmpty(finalDownloadurl)) {
+                /* Check for errors */
+                // {"response":{"action":"file\/get_links","links":[{"quickkey":"removed","error":"User lacks
+                // permissions"}],"result":"Success","current_api_version":"1.5"}}
+                if (StringUtils.equalsIgnoreCase(PluginJSonUtils.getJson(br, "error"), "User lacks permissions")) {
+                    throw new AccountRequiredException("Incorrect account been used to download this file");
+                } else {
+                    /* This should never happen */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
         } else {
-            if (account != null && account.getType() == AccountType.PREMIUM) {
-                final UrlQuery query = new UrlQuery();
-                query.appendEncoded("link_type", "direct_download");
-                query.appendEncoded("quick_key", this.getFUID(link));
-                final Map<String, Object> resp = apiCommand(link, account, "file/get_links.php", query);
-                final Map<String, Object> linkmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp, "links/{0}");
-                finalDownloadurl = (String) linkmap.get("direct_download");
-                if (StringUtils.isEmpty(finalDownloadurl)) {
-                    /* Check for errors */
-                    // {"response":{"action":"file\/get_links","links":[{"quickkey":"removed","error":"User lacks
-                    // permissions"}],"result":"Success","current_api_version":"1.5"}}
-                    if (StringUtils.equalsIgnoreCase(PluginJSonUtils.getJson(br, "error"), "User lacks permissions")) {
-                        throw new AccountRequiredException("Incorrect account been used to download this file");
+            /* Free download */
+            requestFileInformation(link, account);
+            if (link.hasProperty(PROPERTY_PRIVATE_FILE)) {
+                throw new AccountRequiredException("Private file: Only downloadable for users with permission and owner");
+            }
+            final String contenturl = this.getContentURL(link);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, contenturl, this.isResumeable(link, account), this.getMaxChunks(account));
+            if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                logger.info("Found hotlinked item");
+                dl.startDownload();
+                return;
+            }
+            dl = null;
+            br.followConnection();
+            if (this.getIPLimitReachedSecondsStr(br) != null) {
+                /* IP limit sits on combination of IP + User-Agent (+ maybe cookies) */
+                logger.info("Detected IP limit -> Trying to avoid it");
+                int i = 0;
+                final int imax = 5;
+                boolean success = false;
+                limitAvoidanceLoop: do {
+                    logger.info("Trying to avoid IP limit round " + i + "/" + imax);
+                    if (account == null) {
+                        br.clearCookies(null);
                     } else {
-                        /* This should never happen */
+                        /* If we got a free account we do not want to clear cookies, only change User-Agent. */
+                    }
+                    final String randomUserAgent = UserAgents.stringUserAgent();
+                    br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, randomUserAgent);
+                    this.sleep(2000, link);
+                    br.getPage(contenturl);
+                    i++;
+                    if (this.getIPLimitReachedSecondsStr(br) == null) {
+                        logger.info("Successfully avoided limit");
+                        success = true;
+                        break limitAvoidanceLoop;
+                    }
+                } while (!this.isAbort() && imax <= 5);
+                if (!success) {
+                    logger.info("Failed to avoid limit -> Exception will happen down below in errorhandling");
+                }
+            }
+            int trycounter = -1;
+            Form captchaForm = getCaptchaForm(br);
+            if (captchaForm != null) {
+                boolean captchSuccess = false;
+                do {
+                    trycounter++;
+                    logger.info("CaptchaForm loop number: " + trycounter);
+                    handleNonAPIErrors(link, br);
+                    if (captchaForm.containsHTML("g-recaptcha-response")) {
+                        /* If user does not want to solve captchas, the following code will trigger an exception. */
+                        handleReconnectBehaviorOnCaptcha(account);
+                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                        captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                        br.submitForm(captchaForm);
+                    } else if (captchaForm.containsHTML("for=\"customCaptchaCheckbox\"")) {
+                        /* Mediafire custom checkbox "captcha" */
+                        /* If user does not want to solve captchas, the following code will trigger an exception. */
+                        handleReconnectBehaviorOnCaptcha(account);
+                        captchaForm.put("mf_captcha_response", "1");
+                        br.submitForm(captchaForm);
+                    } else {
+                        logger.warning("Unknown/Unsupported captcha type required");
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                }
-            } else {
-                requestFileInformation(link, account, true);
-                if (link.hasProperty(PROPERTY_PRIVATE_FILE)) {
-                    throw new AccountRequiredException("Private file: Only downloadable for users with permission and owner");
-                }
-                /* First check if we got a direct-downloadable URL. */
-                URLConnectionAdapter con = null;
-                try {
-                    con = br.openGetConnection(link.getPluginPatternMatcher());
-                    if (this.looksLikeDownloadableContent(con)) {
-                        finalDownloadurl = con.getURL().toExternalForm();
+                    captchaForm = getCaptchaForm(br);
+                    if (getCaptchaForm(br) != null) {
+                        logger.info("Wrong captcha");
+                        continue;
                     } else {
-                        br.followConnection(true);
+                        captchSuccess = true;
+                        break;
                     }
-                } finally {
-                    try {
-                        con.disconnect();
-                    } catch (Throwable e) {
-                    }
+                } while (trycounter <= 3 && finalDownloadurl == null);
+                if (!captchSuccess) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
+            }
+            this.handlePW(link);
+            finalDownloadurl = br.getRegex("kNO\\s*=\\s*\"(https?://.*?)\"").getMatch(0);
+            logger.info("Kno= " + finalDownloadurl);
+            if (finalDownloadurl == null) {
+                /* pw protected files can directly redirect to download */
+                finalDownloadurl = br.getRedirectLocation();
+            }
+            if (finalDownloadurl == null) {
+                finalDownloadurl = br.getRegex("href\\s*=\\s*\"(https?://[^\"]+)\"\\s*id\\s*=\\s*\"downloadButton\"").getMatch(0);
                 if (finalDownloadurl == null) {
-                    int trycounter = -1;
-                    Form captchaForm = getCaptchaForm(br);
-                    if (captchaForm != null) {
-                        boolean captchSuccess = false;
-                        do {
-                            trycounter++;
-                            logger.info("CaptchaForm loop number: " + trycounter);
-                            handleNonAPIErrors(link, br);
-                            if (captchaForm.containsHTML("g-recaptcha-response")) {
-                                /* If user does not want to solve captchas, the following code will trigger an exception. */
-                                handleReconnectBehaviorOnCaptcha(account);
-                                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                                captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                                br.submitForm(captchaForm);
-                            } else if (captchaForm.containsHTML("for=\"customCaptchaCheckbox\"")) {
-                                /* Mediafire custom checkbox "captcha" */
-                                /* If user does not want to solve captchas, the following code will trigger an exception. */
-                                handleReconnectBehaviorOnCaptcha(account);
-                                captchaForm.put("mf_captcha_response", "1");
-                                br.submitForm(captchaForm);
-                            } else {
-                                logger.warning("Unknown/Unsupported captcha type required");
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                            }
-                            captchaForm = getCaptchaForm(br);
-                            if (getCaptchaForm(br) != null) {
-                                logger.info("Wrong captcha");
-                                continue;
-                            } else {
-                                captchSuccess = true;
-                                break;
-                            }
-                        } while (trycounter <= 3 && finalDownloadurl == null);
-                        if (!captchSuccess) {
-                            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                        }
-                    }
-                    this.handlePW(link);
-                    finalDownloadurl = br.getRegex("kNO\\s*=\\s*\"(https?://.*?)\"").getMatch(0);
-                    logger.info("Kno= " + finalDownloadurl);
-                    if (finalDownloadurl == null) {
-                        /* pw protected files can directly redirect to download */
-                        finalDownloadurl = br.getRedirectLocation();
-                    }
-                    if (finalDownloadurl == null) {
-                        finalDownloadurl = br.getRegex("href\\s*=\\s*\"(https?://[^\"]+)\"\\s*id\\s*=\\s*\"downloadButton\"").getMatch(0);
-                        if (finalDownloadurl == null) {
-                            finalDownloadurl = br.getRegex("(" + MediafireComFolder.TYPE_DIRECT + ")").getMatch(0);
-                        }
-                    }
+                    finalDownloadurl = br.getRegex("(" + MediafireComFolder.TYPE_DIRECT + ")").getMatch(0);
                 }
             }
-            if (StringUtils.isEmpty(finalDownloadurl)) {
-                this.handleNonAPIErrors(link, br);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            link.setProperty(directurlproperty, finalDownloadurl);
         }
+        if (StringUtils.isEmpty(finalDownloadurl)) {
+            this.handleNonAPIErrors(link, br);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        link.setProperty(directurlproperty, finalDownloadurl);
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, finalDownloadurl, this.isResumeable(link, account), this.getMaxChunks(account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -845,13 +853,12 @@ public class MediafireCom extends PluginForHost {
         }
         if (br.containsHTML("class=\"error\\-title\">\\s*Temporarily Unavailable\\s*</p>")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "This file is temporarily unavailable!", 30 * 60 * 1000l);
-        } else if (br.containsHTML("class=\"error-title\">This download is currently unavailable\\s*<")) {
-            // jdlog://7235652095341
+        } else if (br.containsHTML("class=\"error-title\"[^>]*>\\s*This download is currently unavailable\\s*<")) {
             final String time = br.getRegex("we will retry your download again in (\\d+) seconds\\.?\\s*<").getMatch(0);
             long t = ((time != null ? Long.parseLong(time) : 60) * 1000l) + 2;
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "This file is temporarily unavailable!", t);
         }
-        final String ipLimitReachedWaitSecondsStr = br.getRegex("var limitReachedTTL = (\\d+);").getMatch(0);
+        final String ipLimitReachedWaitSecondsStr = getIPLimitReachedSecondsStr(br);
         if (ipLimitReachedWaitSecondsStr != null) {
             /**
              * E.g.
@@ -859,6 +866,10 @@ public class MediafireCom extends PluginForHost {
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Downloadlimit reached", Long.parseLong(ipLimitReachedWaitSecondsStr) * 1000);
         }
+    }
+
+    private String getIPLimitReachedSecondsStr(final Browser br) {
+        return br.getRegex("var limitReachedTTL = (\\d+);").getMatch(0);
     }
 
     private void setConfigElements() {

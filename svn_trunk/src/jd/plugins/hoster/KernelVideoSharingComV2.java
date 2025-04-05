@@ -77,7 +77,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50924 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -215,6 +215,13 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             return null;
         }
         return this.getProtocol() + appendWWWIfRequired(host) + "/videos/" + urlSlug + "/";
+    }
+
+    protected String generateContentURLDefaultVideoPatternWithoutFileID(final String host, final String fuid, final String urlSlug) {
+        if (host == null || fuid == null || urlSlug == null) {
+            return null;
+        }
+        return this.getProtocol() + appendWWWIfRequired(host) + "/video/" + urlSlug + "/";
     }
 
     /**

@@ -38,6 +38,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -104,22 +120,6 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
-
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
 public class YoutubeHelper {
     static {
@@ -1598,44 +1598,54 @@ public class YoutubeHelper {
             all = (String) jsCache.get(resultCacheKey + "all");
             descrambler = (String) jsCache.get(resultCacheKey + "descrambler");
             des = (String) jsCache.get(resultCacheKey + "des");
-            if (descrambler == null) {
-                if (descrambler == null) {
-                    descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
-                    if (descrambler == null) {
-                        descrambler = new Regex(ensurePlayerSource(), "(?:^|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
-                        if (descrambler == null) {
-                            descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
-                            if (descrambler == null) {
-                                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\])\\)").getMatch(0);
-                                if (descrambler == null) {
-                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                                }
-                            }
-                        }
-                    }
+            find: if (descrambler == null) {
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)&&\\(\\1\\s*=\\s*([a-zA-Z0-9_$]{2,})\\(decodeURIComponent\\(\\1\\)\\)").getMatch(1);
+                if (descrambler != null) {
+                    break find;
                 }
-                logger.info("FunctionName:" + descrambler);
-                final String func = "(?<!\\.)" + Pattern.quote(descrambler) + "\\s*=\\s*function\\(([^)]+)\\)\\{(.+?return.*?)\\};";
-                des = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
-                all = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
-                logger.info("Function:" + all);
-                if (all == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
+                if (descrambler != null) {
+                    break find;
                 }
-                final String requiredObjectName = new Regex(des, "([\\w\\d\\$]+)\\.([\\w\\d]{2})\\(").getMatch(0);
-                if (requiredObjectName != null) {
-                    final String requiredObject = new Regex(ensurePlayerSource(), Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
-                    if (requiredObject == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Missing object:" + requiredObject);
-                    }
-                    all += requiredObject;
+                descrambler = new Regex(ensurePlayerSource(), "(?:^|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
                 }
-                all += ";";
-                logger.info("Complete Function:" + all);
-                jsCache.put(resultCacheKey + "all", all);
-                jsCache.put(resultCacheKey + "descrambler", descrambler);
-                jsCache.put(resultCacheKey + "des", des);
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
+                }
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\])\\)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
+                }
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{[^=]+=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\]|\\2\\.)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            logger.info("FunctionName:" + descrambler);
+            final String func = "(?<!\\.)" + Pattern.quote(descrambler) + "\\s*=\\s*function\\(([^)]+)\\)\\{(.+?return.*?)\\};";
+            des = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
+            all = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
+            logger.info("Function:" + all);
+            if (all == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String requiredObjectName = new Regex(des, "([\\w\\d\\$]+)\\.([\\w\\d]{2})\\(").getMatch(0);
+            if (requiredObjectName != null) {
+                final String requiredObject = new Regex(ensurePlayerSource(), Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
+                if (requiredObject == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Missing object:" + requiredObject);
+                }
+                all += requiredObject;
+            }
+            all += ";";
+            logger.info("Complete Function:" + all);
+            jsCache.put(resultCacheKey + "all", all);
+            jsCache.put(resultCacheKey + "descrambler", descrambler);
+            jsCache.put(resultCacheKey + "des", des);
         }
         while (true) {
             final JSShutterDelegate jsShutter = new JSShutterDelegate() {
@@ -1658,6 +1668,9 @@ public class YoutubeHelper {
                         throw new ScriptException(result);
                     } else if (result.equals(sig)) {
                         throw new Exception("Invalid result(unchanged):" + result);
+                    }
+                    synchronized (jsCache) {
+                        jsCache.put(resultCacheKey + "all", all);
                     }
                     logger.info("sig1(" + vid.videoID + "," + playerID + "):" + sig + "->" + result);
                     return result;

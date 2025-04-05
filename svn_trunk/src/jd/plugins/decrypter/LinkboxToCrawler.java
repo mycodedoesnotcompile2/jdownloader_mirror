@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.LinkboxTo;
 
-@DecrypterPlugin(revision = "$Revision: 50892 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50927 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { LinkboxTo.class })
 public class LinkboxToCrawler extends PluginForDecrypt {
     public LinkboxToCrawler(PluginWrapper wrapper) {
@@ -87,26 +87,26 @@ public class LinkboxToCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final int maxItemsPerPage = 50;
         final UrlQuery query = LinkboxTo.getBaseQuery();
-        query.add("sortField", "name");
-        query.add("sortAsc", "1");
-        query.add("pageSize", Integer.toString(maxItemsPerPage));
+        query.appendEncoded("sortField", "name");
+        query.appendEncoded("sortAsc", "1");
+        query.appendEncoded("pageSize", Integer.toString(maxItemsPerPage));
         // query.add("token", "");
-        query.add("shareToken", folderID);
-        query.add("needTpInfo", "1");
+        query.appendEncoded("shareToken", folderID);
+        query.appendEncoded("needTpInfo", "1");
         if (folderType.equals("d")) {
             /* 2024-02-19 */
-            query.add("scene", "comList");
+            query.appendEncoded("scene", "comList");
         } else if (folderType.equals("f")) {
             /* Rare type of folder containing a single item. */
-            query.add("scene", "singleItem");
+            query.appendEncoded("scene", "singleItem");
         } else {
             /* Type s */
-            query.add("scene", "singleGroup");
+            query.appendEncoded("scene", "singleGroup");
         }
         if (subfolderID != null) {
-            query.add("pid", subfolderID);
+            query.appendEncoded("pid", subfolderID);
         } else {
-            query.add("pid", "0");
+            query.appendEncoded("pid", "0");
         }
         // query.add("name", "");
         final HashSet<String> dupes = new HashSet<String>();
@@ -178,7 +178,7 @@ public class LinkboxToCrawler extends PluginForDecrypt {
                     }
                     numberofNewItemsOnCurrentPage++;
                     link = this.createDownloadlink(createFileURL(fileID));
-                    LinkboxTo.parseFileInfoAndSetFilename(link, null, ressource);
+                    LinkboxTo.parseFileInfoAndSetFilename(this, link, null, ressource);
                     if (!StringUtils.isEmpty(path)) {
                         link.setRelativeDownloadFolderPath(path);
                     }

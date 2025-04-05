@@ -17,6 +17,8 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -41,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50582 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
+@HostPlugin(revision = "$Revision: 50931 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,11 +82,11 @@ public class MySpassDe extends PluginForHost {
     private static final AtomicLong              timestampCDNRefreshed   = new AtomicLong(0);
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException, InterruptedException {
         return requestFileInformation(link, false);
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
+    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException, InterruptedException {
         dllink = null;
         final String ext = ".mp4";
         this.setBrowserExclusive();
@@ -94,29 +96,51 @@ public class MySpassDe extends PluginForHost {
             link.setName(fid + ext);
         }
         synchronized (token) {
-            if (token.get() == null || System.currentTimeMillis() - timestampTokenRefreshed.get() > 30 * 60 * 1000) {
-                logger.info("Obtaining fresh token");
+            if (token.get() == null || System.currentTimeMillis() - timestampTokenRefreshed.get() > 30 * 60 * 1000 || (isDownload && (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000))) {
+                logger.info("Obtaining fresh token and/or cdn value");
+                String freshToken = null;
+                String freshCDN = null;
                 final Browser brc = br.cloneBrowser();
                 brc.getPage(link.getPluginPatternMatcher());
-                String jsurl = brc.getRegex("(/_next/static/chunks/pages/_app-[a-f0-9]+\\.js)").getMatch(0);
-                if (jsurl == null) {
-                    /* Fallback 2025-02-06 */
-                    logger.warning("Failed to find jsurl #1 -> Fallback");
-                    jsurl = "/_next/static/chunks/pages/_app-8acb33d78ad917d1.js";
+                final String[] jsurls = brc.getRegex("\"([^\"]+[0-f0-9]+\\.js)").getColumn(0);
+                if (jsurls == null || jsurls.length == 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                brc.getPage(jsurl);
-                final String freshToken = brc.getRegex("Bearer ([a-f0-9]{256})").getMatch(0);
+                final HashSet<String> jsurlsunique = new HashSet<String>(Arrays.asList(jsurls));
+                int i = 0;
+                for (final String jsurl : jsurlsunique) {
+                    brc.getPage(jsurl);
+                    if (freshCDN == null) {
+                        freshCDN = brc.getRegex("uri:\\s*`(https?://[^/,]*?)\\$").getMatch(0);
+                    }
+                    if (freshToken == null) {
+                        freshToken = brc.getRegex("Bearer ([a-f0-9]{256})").getMatch(0);
+                    }
+                    if (freshCDN != null && freshToken != null) {
+                        break;
+                    } else if (freshToken != null && !isDownload) {
+                        /* During linkcheck, having only a fresh token is okay -> CDN uri is only needed for downloading */
+                        break;
+                    }
+                    logger.info("Failed to find required data in js[" + i + "] -> " + jsurl);
+                    i++;
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
+                }
+                if (freshCDN != null) {
+                    logger.info("Found new CDN uri: " + freshCDN);
+                    cdn.set(freshCDN);
+                    timestampCDNRefreshed.set(System.currentTimeMillis());
+                }
+                if (freshToken != null) {
+                    logger.info("Found new token: " + freshToken);
+                    token.set(freshToken);
+                    timestampTokenRefreshed.set(System.currentTimeMillis());
+                }
                 if (freshToken == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                token.set(freshToken);
-                timestampTokenRefreshed.set(System.currentTimeMillis());
-                String freshCDN = brc.getRegex("uri:`(https?://[^/]+)\\$").getMatch(0);
-                if (freshCDN == null) {
-                    logger.warning("Failed to find CDN -> Using static fallback");
-                    freshCDN = "https://cms-myspass.vanilla-ott.com/api/videos/"; // 2024-10-07
-                }
-                cdn.set(freshCDN);
             }
         }
         final Browser brv = br.cloneBrowser();
@@ -163,37 +187,14 @@ public class MySpassDe extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
-        if (dllink == null) {
+        if (cdn.get() == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (this.dllink.startsWith("/")) {
-            synchronized (cdn) {
-                findCdnServer: if (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000) {
-                    logger.info("Obtaining fresh cdn value");
-                    final Browser brc = br.cloneBrowser();
-                    brc.getPage(link.getPluginPatternMatcher());
-                    String[] jsurls = brc.getRegex("(/_next/static/chunks/\\d+-[0-f0-9]+\\.js)").getColumn(0);
-                    if (jsurls == null || jsurls.length == 0) {
-                        jsurls = brc.getRegex("(/_next/static/chunks/pages/player-[a-f0-9]+\\.js)").getColumn(0);
-                    }
-                    if (jsurls == null || jsurls.length == 0) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    int i = 0;
-                    for (final String jsurl : jsurls) {
-                        brc.getPage(jsurl);
-                        final String freshCDN = brc.getRegex("uri:`(https?://[^/,]*?)\\$").getMatch(0);
-                        if (freshCDN != null) {
-                            cdn.set(freshCDN);
-                            timestampCDNRefreshed.set(System.currentTimeMillis());
-                            break findCdnServer;
-                        }
-                        logger.info("Failed to find cdn in js[" + i + "] -> " + jsurl);
-                        i++;
-                    }
-                }
-            }
-            this.dllink = cdn.get() + this.dllink;
+        if (dllink != null && dllink.startsWith("/")) {
+            dllink = cdn.get() + dllink;
+        }
+        if (dllink == null || !dllink.startsWith("http")) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (dllink.contains(".m3u8")) {
             br.getPage(dllink);

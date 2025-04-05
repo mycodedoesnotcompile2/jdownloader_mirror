@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50905 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50931 $", interfaceVersion = 3, names = {}, urls = {})
 public class WikifeetCom extends PluginForDecrypt {
     public WikifeetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,7 +75,7 @@ public class WikifeetCom extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?!pics|thumbs\\.)(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?!celebs|dating|feetoftheyear|videos|upload|rules)([\\w-]+).*");
+            ret.add("https?://(?!pics|thumbs\\.)(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?!photos|videos|privacy|upload|rules)([\\w-]+).*");
         }
         return ret.toArray(new String[0]);
     }
@@ -146,21 +146,33 @@ public class WikifeetCom extends PluginForDecrypt {
         if (image_id != null && !foundTargetImage) {
             logger.info("Failed to find target image with id " + image_id + " | Returning all images instead");
         }
+        final String fallbackValue = "[ Not set ]"; // Same as website
         final Object shoesizeO = entries.get("ssize");
         String shoesize = shoesizeO != null ? shoesizeO.toString() : null;
+        if (shoesizeO != null) {
+            shoesize = shoesizeO.toString();
+        } else {
+            shoesize = fallbackValue;
+        }
         String birthplace = (String) entries.get("bplace");
         if (birthplace == null) {
             birthplace = br.getRegex("Birthplace\\s*:\\s*<span[^>]*>([^<]+)<a").getMatch(0);
         }
         if (!StringUtils.isEmpty(birthplace)) {
             birthplace = Encoding.htmlDecode(birthplace).trim();
+        } else {
+            birthplace = fallbackValue;
         }
         String birthdate = (String) entries.get("bdate");
-        if (birthdate == null) {
-            birthdate = br.getRegex("Birth Date\\s*:\\s*<span[^>]*>([^<]+)<a").getMatch(0);
-        }
-        if (!StringUtils.isEmpty(birthdate)) {
+        if (birthdate != null) {
             birthdate = Encoding.htmlDecode(birthdate).trim();
+            /* Get same value which website displaye (yyyy-MM-dd) */
+            final String dateUntilDay = new Regex(birthdate, "(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+            if (dateUntilDay != null) {
+                birthdate = dateUntilDay;
+            }
+        } else {
+            birthdate = fallbackValue;
         }
         final String imdbURL = br.getRegex("(http?://(?:www\\.)?imdb\\.com/name/nm\\d+)").getMatch(0);
         /* Generate packagename */

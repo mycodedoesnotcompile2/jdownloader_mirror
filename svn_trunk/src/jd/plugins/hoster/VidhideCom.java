@@ -22,10 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -35,10 +31,13 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50793 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50930 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +79,7 @@ public class VidhideCom extends XFileSharingProBasic {
     public Browser createNewBrowserInstance() {
         // final download URLs are signed with IP but download servers only support IPv4 -> signature containing IPv6 will fail on IPv4
         // Server
-        final Browser ret = new PluginBrowser<VidhideCom>(this);
+        final Browser ret = super.createNewBrowserInstance();
         ret.setIPVersion(IPVERSION.IPV4_ONLY);
         return ret;
     }

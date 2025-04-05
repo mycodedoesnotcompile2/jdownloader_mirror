@@ -464,13 +464,12 @@ abstract public class ZeveraCore extends UseNet {
             final double d = fair_use_usedO.doubleValue();
             final int fairUsagePercentUsed = (int) (d * 100.0);
             final int fairUsagePercentLeft = 100 - fairUsagePercentUsed;
+            if (fairUsagePercentUsed >= 100 && !boosterWorkaroundActive) {
+                throw new AccountUnavailableException("Fair use limit reached", 5 * 60 * 1000l);
+            }
             String statustext = String.format("Premium | Fair-Use Status: %d%% left", fairUsagePercentLeft);
             if (boosterWorkaroundActive) {
                 statustext += " | Unlimited Traffic Booster workaround enabled";
-            } else {
-                if (fairUsagePercentUsed >= 100) {
-                    throw new AccountUnavailableException("Fair use limit reached", 5 * 60 * 1000l);
-                }
             }
             ai.setStatus(statustext);
             ai.setValidUntil(premium_untilO.longValue() * 1000, br);
@@ -1007,6 +1006,8 @@ abstract public class ZeveraCore extends UseNet {
                 throw new AccountInvalidException();
             } else if (message.matches("(?i).*Not logged in.*")) {
                 throw new AccountInvalidException();
+            } else if (message.matches("(?i).*Fair use limit reached.*")) {
+                throw new AccountUnavailableException(message, 5 * 60 * 1000l);
             } else if (message.matches("(?i).*content not in cache.*")) {
                 /* 2019-02-19: Not all errors have an errortype given */
                 /* E.g. {"status":"error","message":"content not in cache"} */

@@ -24,19 +24,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideo;
-import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
-import org.jdownloader.plugins.components.config.XFSConfigVideo.PreferredDownloadQuality;
-import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -56,7 +43,20 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50923 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideo;
+import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
+import org.jdownloader.plugins.components.config.XFSConfigVideo.PreferredDownloadQuality;
+import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 50934 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -184,13 +184,13 @@ public class VoeSx extends XFileSharingProBasic {
         if (hlsMaster != null) {
             return hlsMaster;
         }
-        String altSourceB64 = br.getRegex("let wc0 = '([^\\']+)").getMatch(0);
+        String altSourceB64 = br.getRegex("(?:var|let|const)\\s*wc0\\s*=\\s*'([^\\']+)").getMatch(0);
         if (altSourceB64 == null) {
             /* 2024-02-23 */
-            altSourceB64 = br.getRegex("let [^=]+\\s*=\\s*'(ey[^\\']+)").getMatch(0);
+            altSourceB64 = br.getRegex("(?:var|let|const)\\s*[^=]+\\s*=\\s*'(ey[^\\']+)").getMatch(0);
             if (altSourceB64 == null) {
                 /* 2024-02-26 */
-                altSourceB64 = br.getRegex("let [a-f0-9]+\\s*=\\s*'([^\\']+)").getMatch(0);
+                altSourceB64 = br.getRegex("(?:var|let|const)\\s*[a-f0-9]+\\s*=\\s*'([^\\']+)").getMatch(0);
                 if (altSourceB64 == null) {
                     /* 2024-11-29 */
                     altSourceB64 = br.getRegex("(?i)(\"|')hls\\1\\s*:\\s*(\"|')([^\"']+)").getMatch(2);
@@ -212,7 +212,17 @@ public class VoeSx extends XFileSharingProBasic {
             /* Assume that result is json */
             try {
                 final Map<String, Object> entries = restoreFromString(result, TypeRef.MAP);
+                final List<Map<String, Object>> fallbacks = (List<Map<String, Object>>) entries.get("fallbacks");
+                if (fallbacks != null && fallbacks.size() == 1) {
+                    final String mp4 = (String) fallbacks.get(0).get("file");
+                    if (mp4 != null) {
+                        // return mp4;
+                    }
+                }
                 hlsMaster = (String) entries.get("file");
+                if (hlsMaster == null) {
+                    hlsMaster = (String) entries.get("source");
+                }
             } catch (Exception e) {
                 logger.log(e);
             }
