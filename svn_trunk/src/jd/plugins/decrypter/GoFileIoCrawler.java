@@ -3,14 +3,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Hash;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.parser.UrlQuery;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -25,10 +19,18 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GofileIo;
 
-@DecrypterPlugin(revision = "$Revision: 50885 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Hash;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 50937 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -37,13 +39,50 @@ public class GoFileIoCrawler extends PluginForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        return decryptIt(param, progress, null);
+    }
+
+    protected static AtomicReference<String> WEBSITE_TOKEN           = new AtomicReference<String>();
+    protected static AtomicLong              WEBSITE_TOKEN_TIMESTAMP = new AtomicLong(-1);
+    protected final static long              WEBSITE_TOKEN_EXPIRE    = 30 * 60 * 1000l;
+
+    public String getWebsiteToken(final Browser br) throws Exception {
+        synchronized (WEBSITE_TOKEN) {
+            String token = WEBSITE_TOKEN.get();
+            if (!StringUtils.isEmpty(token) && Time.systemIndependentCurrentJVMTimeMillis() - WEBSITE_TOKEN_TIMESTAMP.get() < WEBSITE_TOKEN_EXPIRE) {
+                return token;
+            } else {
+                final Browser brc = br.cloneBrowser();
+                final GetRequest req = brc.createGetRequest("https://" + getHost() + "/dist/js/global.js");
+                GofileIo.getPage(this, brc, req);
+                token = brc.getRegex("websiteToken\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
+                if (token == null) {
+                    /* 2024-01-26 / 2024-12-03 */
+                    token = brc.getRegex("(?:fetchData|appdata)\\.wt\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
+                    if (token == null) {
+                        /* 2024-03-11 */
+                        token = brc.getRegex("wt\\s*:\\s*\"([^\"]+)").getMatch(0);
+                    }
+                }
+                if (StringUtils.isEmpty(token)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                WEBSITE_TOKEN.set(token);
+                WEBSITE_TOKEN_TIMESTAMP.set(Time.systemIndependentCurrentJVMTimeMillis());
+                return token;
+            }
+        }
+    }
+
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress, Account account) throws Exception {
         final Browser brc = br.cloneBrowser();
-        final String token = GofileIo.getAndSetGuestToken(this, brc);
+        final GofileIo hosterplugin = (GofileIo) this.getNewPluginForHostInstance(this.getHost());
+        final String token = hosterplugin.getAndSetToken(this, brc, account);
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("contentId", folderID);
         query.appendEncoded("token", token);
-        query.appendEncoded("wt", GofileIo.getWebsiteToken(this, br));
+        query.appendEncoded("wt", getWebsiteToken(br));
         String passCode = param.getDecrypterPassword();
         boolean passwordCorrect = true;
         boolean passwordRequired = false;
@@ -59,6 +98,9 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 query.addAndReplace("password", Hash.getSHA256(passCode));
             }
             final GetRequest req = br.createGetRequest("https://api." + this.getHost() + "/contents/" + folderID + "?" + query.toString());
+            if (account != null) {
+                req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
+            }
             req.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + this.getHost()));
             req.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_REFERER, "https://" + this.getHost()));
             GofileIo.getPage(this, brc, req);
@@ -96,7 +138,7 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         } else if (!Boolean.TRUE.equals(response_data.get("canAccess"))) {
             throw new AccountRequiredException("Private link");
         }
-        PluginForHost hosterplugin = null;
+
         String currentFolderName = response_data.get("name").toString();
         String path = this.getAdoptedCloudFolderStructure();
         if (path == null && (currentFolderName.matches("^quickUpload_.+") || currentFolderName.equals(folderID) || currentFolderName.equals("root"))) {
@@ -131,12 +173,8 @@ public class GoFileIoCrawler extends PluginForDecrypt {
             if (type.equalsIgnoreCase("file")) {
                 final String fileID = item.getKey();
                 final String url = "https://" + getHost() + "/?c=" + folderID + "#file=" + fileID;
-                if (hosterplugin == null) {
-                    /* Init hosterplugin */
-                    hosterplugin = this.getNewPluginForHostInstance(this.getHost());
-                }
                 final DownloadLink file = new DownloadLink(hosterplugin, null, this.getHost(), url, true);
-                GofileIo.parseFileInfo(file, entry);
+                hosterplugin.parseFileInfo(file, account, entry);
                 file.setProperty(GofileIo.PROPERTY_PARENT_FOLDER_SHORT_ID, parentFolderShortID);
                 file.setAvailable(true);
                 if (passCode != null) {

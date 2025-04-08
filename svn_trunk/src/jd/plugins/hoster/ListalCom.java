@@ -34,7 +34,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50785 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50935 $", interfaceVersion = 3, names = {}, urls = {})
 public class ListalCom extends PluginForHost {
     public ListalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,7 +123,7 @@ public class ListalCom extends PluginForHost {
                 link.setFinalFileName(filename);
             }
             if (!link.isSizeSet()) {
-                basicLinkCheck(br, br.createHeadRequest(dllink), link, null, null, null);
+                basicLinkCheck(br, br.createHeadRequest(dllink), link, null, null, (FILENAME_SOURCE[]) null);
             }
         }
         return AvailableStatus.TRUE;

@@ -68,7 +68,7 @@ public class NewTheme extends Theme {
     public Icon getDisabledIcon(JComponent component, Icon input) {
         final Icon ret = super.getDisabledIcon(component, input);
         if (input instanceof IDIcon) {
-            return new IdentifierWrapperIcon(ret, ((IDIcon) input).getIdentifier().getKey());
+            return new IdentifierWrapperIcon(ret, ((IDIcon) input).getIdentifier().getKey() + "_disabled");
         }
         return ret;
     }
