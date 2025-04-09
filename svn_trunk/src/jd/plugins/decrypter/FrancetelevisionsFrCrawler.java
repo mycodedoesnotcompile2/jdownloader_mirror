@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 50919 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50939 $", interfaceVersion = 2, names = {}, urls = {})
 public class FrancetelevisionsFrCrawler extends PluginForDecrypt {
     /**
      * Returns the annotations names array
@@ -132,16 +132,12 @@ public class FrancetelevisionsFrCrawler extends PluginForDecrypt {
             if (code == 2009) {
                 throw new DecrypterRetryException(RetryReason.GEO);
             } else if (code == 2015 || code == 2017) {
-                /* DRM, TODO: Change to RetryReason.UNSUPPORTED_DRM */
-                // throw new DecrypterRetryException(RetryReason.UNSUPPORTED_DRM);
-                throw new DecrypterRetryException(RetryReason.UNSUPPORTED_LIVESTREAM);
+                throw new DecrypterRetryException(RetryReason.UNSUPPORTED_DRM);
             }
         }
         if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /* 2025-04-03: All HLS streams are AES-128 encrypted */
-            /* DRM, TODO: Change to RetryReason.UNSUPPORTED_DRM */
-            // throw new DecrypterRetryException(RetryReason.UNSUPPORTED_DRM);
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new DecrypterRetryException(RetryReason.UNSUPPORTED_DRM);
         }
         final Map<String, Object> video = (Map<String, Object>) entries.get("video");
         final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");

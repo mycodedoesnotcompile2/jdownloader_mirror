@@ -54,7 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50755 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50939 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -470,18 +470,18 @@ public class BoxbitApp extends PluginForHost {
             /* All possible error-keys go along with http response 422 except "busy_worker" --> 429 */
             final List<String> errors = (List<String>) entries.get("errors");
             for (final String error : errors) {
-                if (error.equals("subscription_not_active ")) {
+                if (error.equalsIgnoreCase("subscription_not_active")) {
                     /* Account doesn't have any paid subscription package */
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, message, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else if (error.equals("unsupported_filehost") || error.equals("user_missing_filehost") || error.equals("filehost_unavailable") || error.equals("filehost_links_quota_exceeded") || error.equals("filehost_traffic_quota_exceeded")) {
+                } else if (error.equalsIgnoreCase("unsupported_filehost") || error.equalsIgnoreCase("user_missing_filehost") || error.equalsIgnoreCase("filehost_unavailable") || error.equalsIgnoreCase("filehost_links_quota_exceeded") || error.equalsIgnoreCase("filehost_traffic_quota_exceeded")) {
                     /* Errors that immediately temporarily disable a host */
                     mhm.putError(account, link, 5 * 60 * 1000l, message);
-                } else if (error.equals("wrong_password")) {
+                } else if (error.equalsIgnoreCase("wrong_password")) {
                     /* Missing or wrong password */
                     link.setPasswordProtected(true); // Enable this so next time we'll ask the user to enter the password
                     link.setDownloadPassword(null);
                     throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-                } else if (error.equals("file_not_found")) {
+                } else if (error.equalsIgnoreCase("file_not_found")) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     /*

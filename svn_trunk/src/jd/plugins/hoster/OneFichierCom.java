@@ -65,16 +65,17 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50936 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50940 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
-    private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS  = "use_cdn_credits";
-    private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT  = "is_gold_account";
-    private final String       PROPERTY_HOTLINK                  = "hotlink";
+    private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS   = "use_cdn_credits";
+    private final String       PROPERTY_ACCOUNT_CDN_CREDITS_BYTES = "cdn_credits_bytes";
+    private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT   = "is_gold_account";
+    private final String       PROPERTY_HOTLINK                   = "hotlink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
-    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT = "acl_access_control_limit";
+    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT  = "acl_access_control_limit";
     /** 2019-04-04: Documentation: https://1fichier.com/api.html */
-    public static final String API_BASE                          = "https://api.1fichier.com/v1";
-    private final boolean      allowFreeAccountDownloadsViaAPI   = false;
+    public static final String API_BASE                           = "https://api.1fichier.com/v1";
+    private final boolean      allowFreeAccountDownloadsViaAPI    = false;
 
     @Override
     public String[] siteSupportedNames() {
@@ -766,15 +767,12 @@ public class OneFichierCom extends PluginForHost {
         ai.setUnlimitedTraffic();
         /* Credits are only relevant if usage of credits for downloads is enabled: https://1fichier.com/console/params.pl */
         br.getPage("/console/params.pl");
-        final boolean allowUseOwnCredits;
         final String cdnCreditCheckedStatus = br.getRegex("<input\\s*type=\"checkbox\"\\s*checked=\"([^\"]+)\"[^>]*name=\"own_credit\"").getMatch(0);
         if (StringUtils.equalsIgnoreCase("checked", cdnCreditCheckedStatus)) {
             logger.info("User has enabled usage of CDN credits");
-            allowUseOwnCredits = true;
             account.setProperty(PROPERTY_ACCOUNT_USE_CDN_CREDITS, true);
         } else {
             logger.info("User has disabled usage of CDN credits");
-            allowUseOwnCredits = false;
             account.removeProperty(PROPERTY_ACCOUNT_USE_CDN_CREDITS);
         }
         /*
@@ -793,15 +791,7 @@ public class OneFichierCom extends PluginForHost {
         } else {
             logger.warning("Failed to find CDN credits value");
         }
-        /* Check if CDN credits are required */
-        br.getPage("/network.html");
-        final boolean cdnCreditsUsageEnforced;
-        if (br.containsHTML(">\\s*VPN detected|>\\s*Requires the use of CDN credits or")) {
-            cdnCreditsUsageEnforced = true;
-        } else {
-            cdnCreditsUsageEnforced = false;
-        }
-        this.setCdnCreditsStatus(account, ai, creditsAsBytes, cdnCreditsUsageEnforced);
+        this.setCdnCreditsStatus(account, ai, creditsAsBytes);
         return ai;
     }
 
@@ -831,12 +821,12 @@ public class OneFichierCom extends PluginForHost {
         final String apierror = (String) entries.get("message");
         final boolean apiTempBlocked = apierror != null && apierror.matches("(?i)Flood detected: (User|User APK|IP) Locked.*?");
         if (apiTempBlocked) {
+            final long cachedCdnCreditsBytes = account.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, -1);
             AccountType type = null;
             if (account.lastUpdateTime() > 0) {
                 logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
                 final AccountType oldAccountType = account.getType();
                 if (AccountType.FREE.equals(oldAccountType) && !allowFreeAccountDownloadsViaAPI) {
-                    // ai.setExpired(true);
                     errorPremiumNeededForAPIDownloading(account);
                     /* This code should never be reached */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -850,6 +840,7 @@ public class OneFichierCom extends PluginForHost {
                             /* keep previously set valid until date */
                             existing.setValidUntil(lastValidUntil);
                         }
+                        setCdnCreditsStatus(account, existing, cachedCdnCreditsBytes);
                         return existing;
                     }
                     type = oldAccountType;
@@ -878,6 +869,7 @@ public class OneFichierCom extends PluginForHost {
                  */
                 ai.setTrafficLeft(0);
             }
+            setCdnCreditsStatus(account, ai, cachedCdnCreditsBytes);
             return ai;
         }
         this.handleErrorsAPI(entries, account);
@@ -907,7 +899,6 @@ public class OneFichierCom extends PluginForHost {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
             if (!allowFreeAccountDownloadsViaAPI) {
-                // ai.setExpired(true);
                 errorPremiumNeededForAPIDownloading(account);
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -931,7 +922,7 @@ public class OneFichierCom extends PluginForHost {
             account.removeProperty(PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT);
         }
         account.setConcurrentUsePossible(true);
-        setCdnCreditsStatus(account, ai, creditsAsBytes, null);
+        setCdnCreditsStatus(account, ai, creditsAsBytes);
         return ai;
     }
 
@@ -939,6 +930,11 @@ public class OneFichierCom extends PluginForHost {
         return account.hasProperty(PROPERTY_ACCOUNT_USE_CDN_CREDITS);
     }
 
+    /**
+     * Returns true if account is a gold account. <br>
+     * Gold accounts are allowed to download via VPN or datacenter IPs without the need of CDN credits. <br>
+     * See: https://1fichier.com/tarifs.html
+     */
     private boolean isGoldAccount(final Account account) {
         if (AccountType.PREMIUM == account.getType() && account.hasProperty(PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT)) {
             return true;
@@ -951,13 +947,28 @@ public class OneFichierCom extends PluginForHost {
      * Sets CDN credit status and account status text
      *
      * @throws PluginException
+     * @throws IOException
      */
-    private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes, final Boolean cdnCreditsUsageEnforced) throws PluginException {
-        if (!this.isGoldAccount(account) && Boolean.TRUE.equals(cdnCreditsUsageEnforced) && creditsInBytes <= 0) {
-            /* CDN credits are needed for downloading but user has no CDN credits. */
-            errorVPNUsed(account);
-            /* This code should never be reached */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes) throws PluginException, IOException {
+        account.setProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, creditsInBytes);
+        Boolean cdnCreditsUsageEnforced = null;
+        if (!this.isGoldAccount(account)) {
+            /* Check if CDN credits are required */
+            logger.info("Checking for forced CDN credits usage");
+            br.getPage("https://" + getHost() + "/network.html");
+            if (br.containsHTML(">\\s*VPN detected|>\\s*Requires the use of CDN credits or")) {
+                logger.info("CDN credits usage is forced");
+                cdnCreditsUsageEnforced = true;
+            } else {
+                logger.info("CDN credits usage is not forced");
+                cdnCreditsUsageEnforced = false;
+            }
+            if (Boolean.TRUE.equals(cdnCreditsUsageEnforced) && creditsInBytes <= 0) {
+                /* CDN credits are needed for downloading but user has no CDN credits. */
+                errorVPNUsed(account);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         final String available_credits_human_readable;

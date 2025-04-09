@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -64,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 50942 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -143,7 +144,9 @@ public class ArchiveOrg extends PluginForHost {
     public static final String                            FILETYPE_VIDEO                                  = "video";
     private final String                                  PROPERTY_ACCOUNT_TIMESTAMP_BORROW_LIMIT_REACHED = "timestamp_borrow_limit_reached";
     private static HashMap<String, ArchiveOrgLendingInfo> bookBorrowSessions                              = new HashMap<String, ArchiveOrgLendingInfo>();
+    private static HashSet<String>                        encryptedBookIDs                                = new HashSet<String>();
     private static final String                           ERRORMSG_FILE_NOT_DOWNLOADABLE                  = "The item is not available due to issues with the item's content.";
+    private static final String                           ERRORMSG_CRYPTED_BOOK_PAGE_NOT_SUPPORTED        = "Encrypted book pages are not supported";
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -369,10 +372,26 @@ public class ArchiveOrg extends PluginForHost {
 
     private void connectionErrorhandling(final URLConnectionAdapter con, final DownloadLink link, final Account account, final ArchiveOrgLendingInfo oldLendingInfo) throws Exception {
         final boolean isBook = this.isBook(link);
-        if (isBook && con.getURL().toString().contains("preview-unavailable.png")) {
-            // https://archive.org/bookreader/static/preview-unavailable.png
-            /* This page of a book is only available when book is borrowed by user. */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Book preview unavailable");
+        if (isBook) {
+            final String bookID = this.getBookID(link);
+            if (con.getURL().toString().contains("preview-unavailable.png")) {
+                // https://archive.org/bookreader/static/preview-unavailable.png
+                /* This page of a book is only available when book is borrowed by user. */
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Book preview unavailable");
+            }
+            final String xo = con.getRequest().getResponseHeader("X-Obfuscate");
+            if (xo != null) {
+                /* 2025-04-07: Encrypted book page -> Do not download item since user would not be able to open the image file anyways. */
+                /* See https://svn.jdownloader.org/issues/90565 */
+                synchronized (encryptedBookIDs) {
+                    /*
+                     * Mark book as encrypted so that other pages of this book can be skipped faster without the need to do a full download
+                     * attempt.
+                     */
+                    encryptedBookIDs.add(bookID);
+                }
+                throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMSG_CRYPTED_BOOK_PAGE_NOT_SUPPORTED);
+            }
         }
         if (!this.looksLikeDownloadableContent(con, link)) {
             if (isBook) {
@@ -393,10 +412,9 @@ public class ArchiveOrg extends PluginForHost {
                             throw new PluginException(LinkStatus.ERROR_RETRY, "Retry after auto re-loan of current download candidate");
                         }
                     }
-                } else {
-                    /* Unknown reason of failure */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 3 * 60 * 1000l);
                 }
+                /* Unknown reason of failure */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 3 * 60 * 1000l);
             }
             br.followConnection(true);
             if (con.getResponseCode() == 401) {
@@ -496,6 +514,10 @@ public class ArchiveOrg extends PluginForHost {
         requestFileInformation(link, account, true);
         checkCachedFileNotDownloadable(link);
         ArchiveOrgLendingInfo lendingInfoForBeforeDownload = null;
+        final String bookID = this.getBookID(link);
+        if (bookID != null && encryptedBookIDs.contains(bookID)) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMSG_CRYPTED_BOOK_PAGE_NOT_SUPPORTED);
+        }
         if (account != null) {
             this.login(account, false);
             lendingInfoForBeforeDownload = this.getLendingInfo(link, account);
@@ -522,7 +544,6 @@ public class ArchiveOrg extends PluginForHost {
                     if (lendingInfoForAfterDownload != null) {
                         lendingInfoForAfterDownload.setBookPageDownloadStatus(this.getBookPageIndexNumber(link), true);
                         if (lendingInfoForAfterDownload.looksLikeBookDownloadIsComplete()) {
-                            final String bookID = this.getBookID(link);
                             try {
                                 logger.info("Returning book " + bookID);
                                 final UrlQuery query = new UrlQuery();
@@ -957,6 +978,10 @@ public class ArchiveOrg extends PluginForHost {
                     lendingInfo.setBookPageDownloadStatus(this.getBookPageIndexNumber(link), false);
                 }
             }
+        }
+        final String bookID = this.getBookID(link);
+        if (bookID != null) {
+            encryptedBookIDs.remove(bookID);
         }
     }
 

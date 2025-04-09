@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50841 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50941 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XvideosCore extends PluginForHost {
     public XvideosCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -498,48 +498,61 @@ public abstract class XvideosCore extends PluginForHost {
                  * If official download was >= HLS/stream download it would make sense to prefer this over stream download.
                  */
                 String videoURL = null;
-                if (account != null) {
-                    /* When logged-in, official downloadlinks can be available */
+                final String xvideosRedError = "Paid account or direct purchase required to access xvideos.red content";
+                officialVideoDownload: if (account != null) {
+                    /* When logged-in (free or premium account!), official downloadlinks can be available */
+                    if (isPremiumOnlyLink(link) && !AccountType.PREMIUM.equals(account.getType())) {
+                        logger.info("Premium content without premium account -> Download will only be possibly if user has done a direct purchase of this specific video");
+                    }
                     logger.info("Looking for official download ...");
                     final Browser brc = br.cloneBrowser();
                     brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
                     brc.getHeaders().put("x-Requested-With", "XMLHttpRequest");
-                    brc.getPage(this.br.getURL("/video-download/" + videoID + "/"));
-                    if (brc.getURL().contains(videoID)) {
-                        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.toString());
-                        String bestQualityDownloadurl = null;
-                        String bestQualityString = null;
-                        String preferredQualityDownloadurl = null;
-                        final String preferredQualityStr = getPreferredOfficialDownloadQualityStr();
-                        final String[] qualities = getOfficialDownloadQualitiesSorted();
-                        for (final String qualityStrTmp : qualities) {
-                            final String downloadURLTmp = (String) entries.get(qualityStrTmp);
-                            if (!StringUtils.isEmpty(downloadURLTmp)) {
-                                if (bestQualityDownloadurl == null) {
-                                    bestQualityDownloadurl = downloadURLTmp;
-                                    bestQualityString = qualityStrTmp;
-                                }
-                                if (StringUtils.equals(qualityStrTmp, preferredQualityStr)) {
-                                    preferredQualityDownloadurl = downloadURLTmp;
-                                    break;
-                                }
-                            }
-                        }
-                        if (preferredQualityDownloadurl != null) {
-                            logger.info("Using user selected quality: " + preferredQualityStr);
-                            videoURL = preferredQualityDownloadurl;
-                        } else if (bestQualityDownloadurl != null) {
-                            logger.info("Using best quality: " + bestQualityString);
-                            videoURL = bestQualityDownloadurl;
-                        } else {
-                            logger.warning("Failed to find any official downloads -> json has changed?");
-                        }
-                    } else {
+                    brc.getPage(br.getURL("/video-download/" + videoID + "/"));
+                    Map<String, Object> entries = null;
+                    try {
+                        entries = JavaScriptEngineFactory.jsonToJavaMap(brc.getRequest().getHtmlCode());
+                    } catch (final Throwable e) {
+                        logger.log(e);
+                        logger.warning("Official video download handling failed due to exception");
+                        break officialVideoDownload;
+                    }
+                    final String error = (String) entries.get("ERROR");
+                    if (error != null) {
                         /*
-                         * Either user has a free account or something with the login went wrong. All premium users should be able to
-                         * download via download button!
+                         * E.g. user has free account and did not buy this single video ("direct purchase") -> User has no rights to access
+                         * this content.
                          */
-                        logger.info("No official video download possible");
+                        logger.info("Official video download impossible because: " + error);
+                        break officialVideoDownload;
+                    }
+                    String bestQualityDownloadurl = null;
+                    String bestQualityString = null;
+                    String preferredQualityDownloadurl = null;
+                    final String preferredQualityStr = getPreferredOfficialDownloadQualityStr();
+                    final String[] qualities = getOfficialDownloadQualitiesSorted();
+                    for (final String qualityStrTmp : qualities) {
+                        final String downloadURLTmp = (String) entries.get(qualityStrTmp);
+                        if (!StringUtils.isEmpty(downloadURLTmp)) {
+                            continue;
+                        }
+                        if (bestQualityDownloadurl == null) {
+                            bestQualityDownloadurl = downloadURLTmp;
+                            bestQualityString = qualityStrTmp;
+                        }
+                        if (StringUtils.equals(qualityStrTmp, preferredQualityStr)) {
+                            preferredQualityDownloadurl = downloadURLTmp;
+                            break;
+                        }
+                    }
+                    if (preferredQualityDownloadurl != null) {
+                        logger.info("Using user selected quality: " + preferredQualityStr);
+                        videoURL = preferredQualityDownloadurl;
+                    } else if (bestQualityDownloadurl != null) {
+                        logger.info("Using best quality: " + bestQualityString);
+                        videoURL = bestQualityDownloadurl;
+                    } else {
+                        logger.warning("Failed to find any official downloads -> json has changed?");
                     }
                     if (StringUtils.isEmpty(videoURL)) {
                         logger.info("Failed to find any official downloadlink");
@@ -578,7 +591,11 @@ public abstract class XvideosCore extends PluginForHost {
                     link.setProperty(PROPERTY_LAST_USED_DIRECTURL, videoURL);
                 }
                 if (StringUtils.isEmpty(videoURL)) {
-                    throw new AccountRequiredException();
+                    if (isPremiumOnlyLink(link) && (account == null || !AccountType.PREMIUM.equals(account.getType()))) {
+                        throw new AccountRequiredException(xvideosRedError);
+                    } else {
+                        throw new AccountRequiredException();
+                    }
                 } else if (lowQualityBlockDetected) {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Low quality block active", 60 * 60 * 1000l);
                 } else if (isDownload) {
@@ -592,6 +609,14 @@ public abstract class XvideosCore extends PluginForHost {
             /* Catch this exception if it happens during linkcheck */
         }
         return AvailableStatus.TRUE;
+    }
+
+    /**
+     * Returns true if link is an xvideos.red link. <br>
+     * All xvideos.red content requires either a premium account or a single content purchase.
+     */
+    private boolean isPremiumOnlyLink(final DownloadLink link) {
+        return StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "xvideos.red/");
     }
 
     private String getVideoFlv(final Browser br) {
@@ -824,7 +849,7 @@ public abstract class XvideosCore extends PluginForHost {
                     br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
                     br.getPage("https://www." + this.getHost() + "/");
                     br.postPage("/account/signinform", "");
-                    Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                    final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
                     final String formHTML1 = (String) entries.get("form");
                     if (!StringUtils.isEmpty(formHTML1)) {
                         br.getRequest().setHtmlCode(formHTML1);
@@ -844,7 +869,7 @@ public abstract class XvideosCore extends PluginForHost {
                 if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform.getHtmlCode()) || loginform.hasInputFieldByName(Encoding.urlEncode("signin-form[hidden_captcha]"))) {
                     final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
                     final String recaptchaV2Response = rc2.getToken();
-                    /* 2021-10-01: psp: Captchas can be easily triggered by using a VPN. Last time I've used a Japan VPN. */
+                    /* 2021-10-01: Captchas can be easily triggered by using a VPN. Last time I've used a Japan VPN. */
                     if (rc2.getType() == TYPE.INVISIBLE) {
                         loginform.put(Encoding.urlEncode("signin-form[hidden_captcha]"), Encoding.urlEncode(recaptchaV2Response));
                     } else {
@@ -854,7 +879,7 @@ public abstract class XvideosCore extends PluginForHost {
                 br.submitForm(loginform);
                 Map<String, Object> ajaxLoginResponse = null;
                 if (useAjaxLogin) {
-                    ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                    ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
                     final String formHTML2 = (String) ajaxLoginResponse.get("form");
                     if (!StringUtils.isEmpty(formHTML2)) {
                         /* 2FA login */
@@ -865,8 +890,8 @@ public abstract class XvideosCore extends PluginForHost {
                 final Form unknownBrowserForm = br.getFormbyProperty("id", "unknown-browser-form");
                 final Form totpAuthForm = br.getFormbyProperty("id", "totp-auth");
                 if (unknownBrowserForm != null) {
+                    /* TODO: 2025-04-08: Remove this old handling */
                     /* 2FA login via mail --> xvideos.com security feature, not selected by user! */
-                    /* TODO: Test this or wait for user-feedback */
                     final DownloadLink dl_dummy;
                     if (this.getDownloadLink() != null) {
                         dl_dummy = this.getDownloadLink();
@@ -884,14 +909,27 @@ public abstract class XvideosCore extends PluginForHost {
                             throw new AccountUnavailableException("\r\nInvalid 2-factor-authentication code format!", 1 * 60 * 1000l);
                         }
                     }
-                    logger.info("Submitting 2FA mail code");
                     unknownBrowserForm.put(Encoding.urlEncode("unknown-browser-form[code]"), twoFACode);
+                    logger.info("Submitting 2FA code: " + twoFACode);
                     br.submitForm(unknownBrowserForm);
                     if (useAjaxLogin) {
-                        ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                        ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
                     }
                 } else if (totpAuthForm != null) {
                     /* TOTP login -> 2FA login which user has enabled via opt-in in his account. */
+                    /*
+                     * First check for captcha because OTP code may expire very fast so we need to send it immediately after the user enters
+                     * it.
+                     */
+                    if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(totpAuthForm.getHtmlCode()) || totpAuthForm.hasInputFieldByName(Encoding.urlEncode("totp-auth[hidden_captcha]"))) {
+                        final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
+                        final String recaptchaV2Response = rc2.getToken();
+                        /* 2025-04-08: Captchas can be easily triggered by trying multiple times. */
+                        if (rc2.getType() == TYPE.INVISIBLE) {
+                            // totpAuthForm.put(Encoding.urlEncode("signin-form[hidden_captcha]"), Encoding.urlEncode(recaptchaV2Response));
+                        }
+                        totpAuthForm.put(Encoding.urlEncode("g-recaptcha-response"), Encoding.urlEncode(recaptchaV2Response));
+                    }
                     final DownloadLink dl_dummy;
                     if (this.getDownloadLink() != null) {
                         dl_dummy = this.getDownloadLink();
@@ -907,10 +945,16 @@ public abstract class XvideosCore extends PluginForHost {
                     // totpAuthForm.put(Encoding.urlEncode("totp-auth[post_referer]"), Encoding.urlEncode("https://de.xvideos.com/"));
                     br.submitForm(totpAuthForm);
                     if (useAjaxLogin) {
-                        ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                        ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
                     }
                 }
+                String loginFailureText = null;
                 if (useAjaxLogin) {
+                    /*
+                     * If error message always equals "The CAPTCHA is not valid. Please try again." after multiple tries, this can mean that
+                     * login via current IP is temporarily blocked.
+                     */
+                    loginFailureText = new Regex(ajaxLoginResponse, "class=\"form-error-list\">\\s*<li>([^<]+)<").getMatch(0);
                     final String premium_redirect = (String) ajaxLoginResponse.get("premium_redirect");
                     final String redirect_domain = (String) ajaxLoginResponse.get("redirect_domain");
                     /*
@@ -928,7 +972,10 @@ public abstract class XvideosCore extends PluginForHost {
                     }
                 }
                 if (!isLoggedin(br)) {
-                    final String loginFailureText = new Regex(PluginJSonUtils.unescape(br.getRequest().getHtmlCode()), "class=\"help-block error-block\">([^<]+)</span>").getMatch(0);
+                    final String html = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+                    if (loginFailureText == null) {
+                        loginFailureText = new Regex(html, "class=\"help-block error-block\">([^<]+)</span>").getMatch(0);
+                    }
                     if (loginFailureText != null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         throw new AccountInvalidException(Encoding.htmlDecode(loginFailureText).trim());
                     } else if (unknownBrowserForm != null) {
@@ -1063,14 +1110,13 @@ public abstract class XvideosCore extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        // login(account, false);
         requestFileInformation(link, account, true);
         handleDownload(link, account);
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
