@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50604 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50944 $", interfaceVersion = 3, names = {}, urls = {})
 public class RumbleCom extends PluginForDecrypt {
     public RumbleCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,8 +77,8 @@ public class RumbleCom extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_EMBED        = "https?://[^/]+/embedJS/([a-z0-9]+)";
-    private static final String TYPE_NORMAL       = "https?://[^/]+/([^/]+)\\.html";
+    private static final String TYPE_EMBED        = "(?i)https?://[^/]+/embedJS/([a-z0-9]+)";
+    private static final String TYPE_NORMAL       = "(?i)https?://[^/]+/([^/]+)\\.html";
     private final String        PROPERTY_USERNAME = "username";
     private final String        PROPERTY_TITLE    = "title";
     private final String        PROPERTY_WIDTH    = "width";
@@ -129,8 +129,9 @@ public class RumbleCom extends PluginForDecrypt {
         final int generalHeight = ((Number) root.get("h")).intValue();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(baseTitle);
-        final Map<String, Object> videoInfo = (Map<String, Object>) root.get("ua");
-        final Iterator<Entry<String, Object>> streamingTypeIterator = videoInfo.entrySet().iterator();
+        final Map<String, Object> root_ua = (Map<String, Object>) root.get("ua");
+        final Map<String, Object> root_ua_tar = (Map<String, Object>) root_ua.get("tar");
+        final Iterator<Entry<String, Object>> streamingTypeIterator = root_ua_tar.entrySet().iterator();
         final QualitySelectionMode mode = cfg.getQualitySelectionMode();
         int bestQualityHeight = 0;
         long bestQualityFilesize = 0;
@@ -145,12 +146,7 @@ public class RumbleCom extends PluginForDecrypt {
             final List<Map<String, Object>> qualityInfoArray;
             if (entry.getValue() instanceof Map) {
                 qualityInfoArray = new ArrayList<Map<String, Object>>();
-                final Map<String, Object> streamingQualities = (Map<String, Object>) entry.getValue();
-                final Iterator<Entry<String, Object>> streamingQualityIterator = streamingQualities.entrySet().iterator();
-                while (streamingQualityIterator.hasNext()) {
-                    final Entry<String, Object> streamingQualityEntry = streamingQualityIterator.next();
-                    qualityInfoArray.add((Map<String, Object>) streamingQualityEntry.getValue());
-                }
+                qualityInfoArray.add((Map<String, Object>) entry.getValue());
             } else {
                 qualityInfoArray = (List<Map<String, Object>>) entry.getValue();
             }

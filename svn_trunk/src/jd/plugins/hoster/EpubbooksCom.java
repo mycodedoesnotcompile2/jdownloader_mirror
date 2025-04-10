@@ -37,11 +37,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "epubbooks.com" }, urls = { "https?://(?:www\\.)?epubbooks\\.com/downloads/(\\d+)" })
+@HostPlugin(revision = "$Revision: 50944 $", interfaceVersion = 3, names = { "epubbooks.com" }, urls = { "https?://(?:www\\.)?epubbooks\\.com/downloads/(\\d+)" })
 public class EpubbooksCom extends PluginForHost {
     public EpubbooksCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.epubbooks.com/sign_up");
+        this.enablePremium("https://www." + getHost() + "/sign_up");
     }
 
     @Override
@@ -53,7 +53,7 @@ public class EpubbooksCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.epubbooks.com/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
     /* Connection stuff */
@@ -69,6 +69,15 @@ public class EpubbooksCom extends PluginForHost {
         } else {
             return super.getLinkID(link);
         }
+    }
+
+    @Override
+    public String getPluginContentURL(final DownloadLink link) {
+        final String mainlink = link.getStringProperty("mainlink");
+        if (mainlink != null) {
+            return mainlink;
+        }
+        return super.getPluginContentURL(link);
     }
 
     private String getFID(final DownloadLink link) {

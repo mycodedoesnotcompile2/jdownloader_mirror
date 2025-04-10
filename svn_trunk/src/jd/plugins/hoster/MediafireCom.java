@@ -59,7 +59,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50926 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50943 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -340,7 +340,7 @@ public class MediafireCom extends PluginForHost {
                         success = true;
                         break limitAvoidanceLoop;
                     }
-                } while (!this.isAbort() && imax <= 5);
+                } while (!this.isAbort() && i <= imax);
                 if (!success) {
                     logger.info("Failed to avoid limit -> Exception will happen down below in errorhandling");
                 }

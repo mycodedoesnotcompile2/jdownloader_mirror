@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 50942 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 50943 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -373,6 +373,7 @@ public class ArchiveOrg extends PluginForHost {
     private void connectionErrorhandling(final URLConnectionAdapter con, final DownloadLink link, final Account account, final ArchiveOrgLendingInfo oldLendingInfo) throws Exception {
         final boolean isBook = this.isBook(link);
         if (isBook) {
+            /* Check for URL- and header based problems */
             final String bookID = this.getBookID(link);
             if (con.getURL().toString().contains("preview-unavailable.png")) {
                 // https://archive.org/bookreader/static/preview-unavailable.png

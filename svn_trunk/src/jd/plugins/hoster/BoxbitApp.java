@@ -42,6 +42,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -54,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50939 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50943 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -62,9 +63,7 @@ public class BoxbitApp extends PluginForHost {
      */
     private static final String          API_BASE                         = "https://api.boxbit.app";
     private static MultiHosterManagement mhm                              = new MultiHosterManagement("boxbit.app");
-    private static final int             defaultMAXDOWNLOADS              = -1;
     private static final int             defaultMAXCHUNKS                 = 1;
-    private static final boolean         defaultRESUME                    = true;
     private static final String          PROPERTY_userid                  = "userid";
     private static final String          PROPERTY_logintoken              = "token";
     private static final String          PROPERTY_logintoken_valid_until  = "token_valid_until";
@@ -78,6 +77,11 @@ public class BoxbitApp extends PluginForHost {
     }
 
     @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+    }
+
+    @Override
     public String getAGBLink() {
         return "https://" + getHost() + "/";
     }
@@ -85,10 +89,10 @@ public class BoxbitApp extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
         br.setCookiesExclusive(true);
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "application/json");
-        br.setFollowRedirects(true);
         br.setAllowedResponseCodes(new int[] { 422, 429 });
         return br;
     }
@@ -112,8 +116,14 @@ public class BoxbitApp extends PluginForHost {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException, IOException {
         if (!link.isNameSet()) {
+            /* Set weak filename */
             final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
             final String fid = urlinfo.getMatch(0);
             final String filenameFromURL = urlinfo.getMatch(2);
@@ -188,15 +198,20 @@ public class BoxbitApp extends PluginForHost {
         if (account != null) {
             this.setLoginHeader(br, account);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), defaultRESUME, this.getMaxChunks(link));
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), this.getMaxChunks(link));
         this.handleConnectionErrors(br, dl.getConnection());
         parseAndSetMaxChunksLimitFromHeader(link, dl.getConnection());
         dl.startDownload();
     }
 
-    private void handleDL(final Account account, final DownloadLink link) throws Exception {
+    private void handleMultihosterFileDownload(final Account account, final DownloadLink link) throws Exception {
         final String directlinkproperty = this.getHost() + PROPERTY_DOWNLOADLINK_directlink;
-        if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
+        final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        final String dllink;
+        if (storedDirecturl != null) {
+            logger.info("Trying to re-use stored directurl: " + storedDirecturl);
+            dllink = storedDirecturl;
+        } else {
             this.loginAPI(account, false);
             String passCode = link.getDownloadPassword();
             if (link.isPasswordProtected() && passCode == null) {
@@ -214,48 +229,35 @@ public class BoxbitApp extends PluginForHost {
                 link.setDownloadPassword(passCode);
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String dllink = (String) entries.get("link");
+            dllink = (String) entries.get("link");
             if (StringUtils.isEmpty(dllink)) {
                 /* This should never happen */
                 mhm.handleErrorGeneric(account, link, "dllinknull", 50, 5 * 60 * 1000l);
             }
             link.setProperty(PROPERTY_DOWNLOADLINK_maxchunks, entries.get("max_chunks"));
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, defaultRESUME, this.getMaxChunks(link));
-            link.setProperty(this.getHost() + PROPERTY_DOWNLOADLINK_directlink, dl.getConnection().getURL().toString());
+        }
+        final int maxChunks = this.getMaxChunks(link);
+        logger.info("maxChunks: " + maxChunks);
+        try {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), maxChunks);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 /* 2021-09-07: Don't jump into errorhandling here as we typically won't get a json response here. */
                 // handleErrors(this.br, account, link);
                 mhm.handleErrorGeneric(account, link, "Unknown download error", 50, 5 * 60 * 1000l);
             }
-        } else {
-            logger.info("Re-using stored directurl");
+        } catch (final Exception e) {
+            if (storedDirecturl != null) {
+                link.removeProperty(directlinkproperty);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
+            } else {
+                throw e;
+            }
+        }
+        if (storedDirecturl == null) {
+            link.setProperty(this.getHost() + PROPERTY_DOWNLOADLINK_directlink, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty) throws Exception {
-        final String url = link.getStringProperty(directlinkproperty);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, defaultRESUME, getMaxChunks(link));
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
-        }
     }
 
     private int getMaxChunks(final DownloadLink link) {
@@ -267,13 +269,8 @@ public class BoxbitApp extends PluginForHost {
     }
 
     @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
-    }
-
-    @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        handleDL(account, link);
+        handleMultihosterFileDownload(account, link);
     }
 
     @Override
@@ -343,14 +340,13 @@ public class BoxbitApp extends PluginForHost {
     private void setAccountInfo(final Account account, final AccountInfo ai, final AccountType type) {
         if (type == AccountType.PREMIUM) {
             account.setType(AccountType.PREMIUM);
-            account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
         } else {
             account.setType(type);
-            account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
             /* Free accounts cannot be used for downloading */
             ai.setTrafficLeft(0);
             ai.setExpired(true);
         }
+        account.setMaxSimultanDownloads(Integer.MAX_VALUE);
     }
 
     private Map<String, Object> loginAPI(final Account account, final boolean forceAuthCheck) throws IOException, PluginException, InterruptedException {
@@ -461,18 +457,22 @@ public class BoxbitApp extends PluginForHost {
                 throw new AccountUnavailableException(msg, 60 * 1000);
             }
         }
+        final String message = (String) entries.get("message");
         if (br.getHttpConnection().getResponseCode() == 401) {
             /* Authentication failure */
-            final String message = (String) entries.get("message");
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, message, PluginException.VALUE_ID_PREMIUM_DISABLE);
-        } else if (br.getHttpConnection().getResponseCode() == 422 || br.getHttpConnection().getResponseCode() == 429) {
-            final String message = (String) entries.get("message");
-            /* All possible error-keys go along with http response 422 except "busy_worker" --> 429 */
-            final List<String> errors = (List<String>) entries.get("errors");
+            throw new AccountInvalidException(message);
+        }
+        /* All possible error-keys go along with http response 422 except "busy_worker" --> 429 */
+        final List<String> errors = (List<String>) entries.get("errors");
+        if (errors == null || errors.isEmpty()) {
+            /* No error */
+            return entries;
+        }
+        if (errors != null && errors.size() > 0) {
             for (final String error : errors) {
                 if (error.equalsIgnoreCase("subscription_not_active")) {
                     /* Account doesn't have any paid subscription package */
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, message, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    throw new AccountInvalidException(message);
                 } else if (error.equalsIgnoreCase("unsupported_filehost") || error.equalsIgnoreCase("user_missing_filehost") || error.equalsIgnoreCase("filehost_unavailable") || error.equalsIgnoreCase("filehost_links_quota_exceeded") || error.equalsIgnoreCase("filehost_traffic_quota_exceeded")) {
                     /* Errors that immediately temporarily disable a host */
                     mhm.putError(account, link, 5 * 60 * 1000l, message);
@@ -493,10 +493,9 @@ public class BoxbitApp extends PluginForHost {
             /* They also got "file_not_found" but we still don't trust such errors when multihosts return them! */
             /* No known error? Handle as generic one. */
             mhm.handleErrorGeneric(account, link, message, 50);
-        } else {
-            /* No error */
         }
-        return entries;
+        /* Unreachable code */
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     @Override
@@ -517,6 +516,7 @@ public class BoxbitApp extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        /* No captchas required for downloads over this plugin. */
         return false;
     }
 }

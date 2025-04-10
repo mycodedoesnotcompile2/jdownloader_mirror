@@ -19,16 +19,19 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.Cookies;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -37,6 +40,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -44,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50941 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50945 $", interfaceVersion = 3, names = {}, urls = {})
 public class WrzutaNet extends PluginForHost {
     public WrzutaNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,6 +56,8 @@ public class WrzutaNet extends PluginForHost {
             this.enablePremium("https://" + getHost() + "/premium");
         }
     }
+
+    private final String API_BASE = "https://api.wrzuta.net/apiJD2";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -134,6 +140,15 @@ public class WrzutaNet extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        final boolean useAPI = true;
+        if (useAPI) {
+            return this.requestFileInformationAPI(link, null);
+        } else {
+            return this.requestFileInformationWebsite(link, null);
+        }
+    }
+
+    private AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws IOException, PluginException {
         if (!link.isNameSet()) {
             final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
             final String fileID = urlinfo.getMatch(0);
@@ -152,7 +167,7 @@ public class WrzutaNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex(">([^<]+)</h6>").getMatch(0);
-        String filesize = br.getRegex("Rozmiar:\\s*</span>\\s*<span[^>]*>([^<]+)<").getMatch(0);
+        String filesize = br.getRegex("Rozmiar:?\\s*</span>\\s*<span[^>]*>([^<]+)<").getMatch(0);
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename.trim()));
         } else {
@@ -166,9 +181,46 @@ public class WrzutaNet extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    private AvailableStatus requestFileInformationAPI(final DownloadLink link, final Account account) throws IOException, PluginException {
+        if (!link.isNameSet()) {
+            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+            final String fileID = urlinfo.getMatch(0);
+            final String filenameFromURL = urlinfo.getMatch(2);
+            if (filenameFromURL != null) {
+                link.setName(Encoding.htmlDecode(filenameFromURL));
+            } else {
+                link.setName(fileID);
+            }
+        }
+        br.getPage(API_BASE + "/link.php?link=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> entries = checkErrorsAPI(link, account);
+        final String status = entries.get("status").toString();
+        if (!status.equalsIgnoreCase("ok")) {
+            /* {"status":"Not found"} */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String filename = null; // TODO
+        String filesizeStr = entries.get("size").toString();
+        if (filename != null) {
+            link.setName(Encoding.htmlDecode(filename.trim()));
+        } else {
+            logger.warning("Failed to find filename");
+        }
+        if (!StringUtils.isEmpty(filesizeStr)) {
+            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+        } else {
+            logger.warning("Failed to find filesize");
+        }
+        return AvailableStatus.TRUE;
+    }
+
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        requestFileInformation(link);
         handleDownload(link, null);
     }
 
@@ -179,10 +231,16 @@ public class WrzutaNet extends PluginForHost {
         if (storedDirecturl != null) {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dlreq = br.createGetRequest(storedDirecturl);
+        } else if (account != null && AccountType.PREMIUM.equals(account.getType())) {
+            final Map<String, Object> dlmap = this.loginAndGetDirectDownloadlink(account, link);
+            // final Number download_rate = (Number) dlmap.get("download_rate");
+            final String dllink = dlmap.get("download_link").toString();
+            dlreq = br.createGetRequest(dllink);
         } else {
             // TODO: Implement premium account support
             /* TODO: Implement [audio-] stream download as this can be used to skip the captcha */
             // final String streamDownloadurl = br.getRegex("src=\"(https?://[^\"]+)\" type=\"audio/mp3\"").getMatch(0);
+            requestFileInformationWebsite(link, account);
             final Form dlform = br.getFormbyKey("download_file");
             if (dlform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -226,72 +284,80 @@ public class WrzutaNet extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private boolean login(final Account account, final boolean force) throws Exception {
+    private Map<String, Object> loginAndGetDirectDownloadlink(final Account account, final DownloadLink link) throws Exception {
         synchronized (account) {
-            br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
-            final Cookies cookies = account.loadCookies("");
-            if (cookies != null) {
-                logger.info("Attempting cookie login");
-                br.setCookies(cookies);
-                if (!force) {
-                    /* Don't validate cookies */
-                    return false;
-                }
-                br.getPage("https://" + this.getHost() + "/");
-                if (this.isLoggedin(br)) {
-                    logger.info("Cookie login successful");
-                    /* Refresh cookie timestamp */
-                    account.saveCookies(br.getCookies(br.getHost()), "");
-                    return true;
-                } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(null);
-                }
-            }
             logger.info("Performing full login");
-            br.getPage("https://" + this.getHost() + "/login.php");
-            final Form loginform = br.getFormbyProperty("name", "login");
-            if (loginform == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("login", account.getUser());
+            query.appendEncoded("password", account.getPass());
+            if (link != null) {
+                query.appendEncoded("link", link.getPluginPatternMatcher());
             }
-            loginform.put("username", Encoding.urlEncode(account.getUser()));
-            loginform.put("password", Encoding.urlEncode(account.getPass()));
-            br.postPage("", "email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
-            if (!isLoggedin(br)) {
-                throw new AccountInvalidException();
-            }
-            account.saveCookies(br.getCookies(br.getHost()), "");
-            return true;
+            br.postPage(this.API_BASE + "/jd2.php", query);
+            return checkErrorsAPI(link, account);
         }
     }
 
-    private boolean isLoggedin(final Browser br) {
-        return br.containsHTML("/logout");
+    protected Map<String, Object> checkErrorsAPI(final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        final long defaultWaitAccount = 3 * 60 * 1000;
+        final long defaultWaitLink = 3 * 60 * 1000;
+        Map<String, Object> entries = null;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException e) {
+            logger.log(e);
+            final String errormessage = "Invalid API response";
+            if (link == null) {
+                throw new AccountUnavailableException(errormessage, defaultWaitAccount);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormessage, defaultWaitLink);
+            }
+        }
+        final Boolean success = (Boolean) entries.get("success");
+        if (Boolean.TRUE.equals(success)) {
+            /* No error */
+            return entries;
+        }
+        String errormsg = (String) entries.get("message");
+        if (errormsg == null) {
+            /* Linkcheck */
+            errormsg = (String) entries.get("status");
+        }
+        if (errormsg == null || errormsg.equalsIgnoreCase("ok")) {
+            /* No error */
+            return entries;
+        }
+        if (errormsg.equalsIgnoreCase("Not found")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (errormsg.equalsIgnoreCase("Login ERROR")) {
+            throw new AccountInvalidException();
+        } else {
+            logger.info("Unknown API error: " + errormsg);
+            if (link == null) {
+                throw new AccountUnavailableException(errormsg, defaultWaitAccount);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, defaultWaitLink);
+            }
+        }
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        login(account, true);
-        String space = br.getRegex("").getMatch(0);
-        if (space != null) {
-            ai.setUsedSpace(space.trim());
-        }
-        ai.setUnlimitedTraffic();
-        if (br.containsHTML("")) {
-            account.setType(AccountType.FREE);
-            /* free accounts can still have captcha */
-            account.setConcurrentUsePossible(false);
-        } else {
-            final String expire = br.getRegex("").getMatch(0);
-            if (expire == null) {
-                throw new AccountInvalidException();
-            } else {
-                ai.setValidUntil(TimeFormatter.getMilliSeconds(expire, "dd MMMM yyyy", Locale.ENGLISH));
-            }
+        final Map<String, Object> userinfo = loginAndGetDirectDownloadlink(account, null);
+        final String premium_date_expire = (String) userinfo.get("premium_date_expire");
+        if (premium_date_expire != null) {
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(premium_date_expire, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH));
             account.setType(AccountType.PREMIUM);
-            account.setConcurrentUsePossible(true);
+        } else {
+            account.setType(AccountType.FREE);
+        }
+        final String transfer_leftStr = (String) userinfo.get("transfer_left");
+        if (transfer_leftStr != null) {
+            ai.setTrafficLeft(SizeFormatter.getSize(transfer_leftStr));
+        } else {
+            ai.setUnlimitedTraffic();
         }
         return ai;
     }
