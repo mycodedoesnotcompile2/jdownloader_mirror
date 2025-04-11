@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50803 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50949 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -165,7 +165,7 @@ public class DebridLinkCom extends PluginForHost {
         if (!StringUtils.isEmpty(registerDate)) {
             ac.setCreateTime(TimeFormatter.getMilliSeconds(registerDate, "yyyy-MM-dd", Locale.ENGLISH));
         }
-        ac.setAccountBalance(((Number) entries.get("pts")).doubleValue());
+        ac.setAccountBalance(((Number) entries.get("pts")).doubleValue()); // "Fidelity Points"
         /* Update list of supported hosts */
         /* https://debrid-link.com/api_doc/v2/downloader-regex */
         br.getPage(this.getApiBase() + "/downloader/hosts?keys=status%2CisFree%2Cname%2Cdomains");

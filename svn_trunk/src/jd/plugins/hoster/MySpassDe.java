@@ -17,11 +17,15 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -43,23 +47,53 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50931 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
+@HostPlugin(revision = "$Revision: 50946 $", interfaceVersion = 3, names = {}, urls = {})
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
         setConfigElements();
     }
 
+    private String                               dllink                  = null;
+    private static final AtomicReference<String> token                   = new AtomicReference<String>(null);
+    private static final AtomicReference<String> cdn                     = new AtomicReference<String>(null);
+    private static final AtomicLong              timestampTokenRefreshed = new AtomicLong(0);
+    private static final AtomicLong              timestampCDNRefreshed   = new AtomicLong(0);
+    private static final Pattern                 PATH_OLD                = Pattern.compile("/player\\?video=(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern                 PATH_NEW                = Pattern.compile("/player/([a-z0-9-]+)/(\\d+)", Pattern.CASE_INSENSITIVE); // 2025-04-10
+
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
-    private String dllink = null;
-
     @Override
     public String getAGBLink() {
         return "https://www." + getHost() + "/myspass/kontakt/";
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "myspass.de" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATH_OLD.pattern() + "|" + PATH_NEW.pattern() + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -73,13 +107,41 @@ public class MySpassDe extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "(\\d+)/?$").getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), PATH_NEW).getMatch(1);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATH_OLD).getMatch(0);
+        return fid;
     }
 
-    private static final AtomicReference<String> token                   = new AtomicReference<String>(null);
-    private static final AtomicReference<String> cdn                     = new AtomicReference<String>(null);
-    private static final AtomicLong              timestampTokenRefreshed = new AtomicLong(0);
-    private static final AtomicLong              timestampCDNRefreshed   = new AtomicLong(0);
+    private String getTitleFromURL(final DownloadLink link) {
+        String title = new Regex(link.getPluginPatternMatcher(), PATH_NEW).getMatch(1);
+        if (title != null) {
+            title = title.replace("-", " ").trim();
+            return title;
+        }
+        return null;
+    }
+
+    @Override
+    public String getPluginContentURL(DownloadLink link) {
+        return getWorkingContentURL(link);
+    }
+
+    private String getWorkingContentURL(final DownloadLink link) {
+        if (new Regex(link.getPluginPatternMatcher(), PATH_NEW).patternFind()) {
+            /* URL we got already is a "new" one -> Return without changing it. */
+            return link.getPluginPatternMatcher();
+        } else {
+            /* We got an old URL -> Make new one out of it */
+            return generateContentURL(this.getFID(link));
+        }
+    }
+
+    private static String generateContentURL(final String content_id) {
+        return "https://www.myspass.de/player/" + new Random().nextInt(10000) + "/" + content_id;
+    }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException, InterruptedException {
@@ -93,7 +155,12 @@ public class MySpassDe extends PluginForHost {
         br.setFollowRedirects(true);
         final String fid = this.getFID(link);
         if (!link.isNameSet()) {
-            link.setName(fid + ext);
+            final String titleFromURL = this.getTitleFromURL(link);
+            if (titleFromURL != null) {
+                link.setName(titleFromURL + ext);
+            } else {
+                link.setName(fid + ext);
+            }
         }
         synchronized (token) {
             if (token.get() == null || System.currentTimeMillis() - timestampTokenRefreshed.get() > 30 * 60 * 1000 || (isDownload && (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000))) {
@@ -101,7 +168,7 @@ public class MySpassDe extends PluginForHost {
                 String freshToken = null;
                 String freshCDN = null;
                 final Browser brc = br.cloneBrowser();
-                brc.getPage(link.getPluginPatternMatcher());
+                brc.getPage(getWorkingContentURL(link));
                 final String[] jsurls = brc.getRegex("\"([^\"]+[0-f0-9]+\\.js)").getColumn(0);
                 if (jsurls == null || jsurls.length == 0) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -160,9 +227,16 @@ public class MySpassDe extends PluginForHost {
         title = title.replaceFirst("\\(Folge \\d+\\)", "");
         final String unique_name = (String) attr.get("unique_name"); // can be null
         final String description = (String) attr.get("teaser_text");
-        this.dllink = (String) attr.get("video_url");
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
+        }
+        final String video_url = (String) attr.get("video_url");
+        if (video_url != null) {
+            if (StringUtils.startsWithCaseInsensitive(video_url, "http")) {
+                dllink = video_url;
+            } else if (video_url.startsWith("/") && cdn.get() != null) {
+                dllink = cdn.get() + video_url;
+            }
         }
         final String format = (String) JavaScriptEngineFactory.walkJson(attr, "format/data/attributes/name");
         String filename = format;
@@ -187,13 +261,10 @@ public class MySpassDe extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
-        if (cdn.get() == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        if (dllink != null && dllink.startsWith("/")) {
-            dllink = cdn.get() + dllink;
-        }
-        if (dllink == null || !dllink.startsWith("http")) {
+        if (dllink == null) {
+            if (cdn.get() == null) {
+                logger.warning("Failed to find final downloadurl because failed to find cdn url");
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (dllink.contains(".m3u8")) {

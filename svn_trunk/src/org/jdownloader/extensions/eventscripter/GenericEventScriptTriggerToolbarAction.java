@@ -39,7 +39,7 @@ public class GenericEventScriptTriggerToolbarAction extends AbstractToolBarActio
 
     @Override
     protected String createTooltip() {
-        return null;
+        return T.T.title() + ":" + getName();
     }
 
 }

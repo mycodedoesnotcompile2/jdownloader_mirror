@@ -23,7 +23,6 @@ import java.util.Map;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -48,13 +47,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50945 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50947 $", interfaceVersion = 3, names = {}, urls = {})
 public class WrzutaNet extends PluginForHost {
     public WrzutaNet(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://" + getHost() + "/premium");
-        }
+        this.enablePremium("https://" + getHost() + "/premium");
     }
 
     private final String API_BASE = "https://api.wrzuta.net/apiJD2";
@@ -120,7 +117,7 @@ public class WrzutaNet extends PluginForHost {
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return false;
+            return true;
         }
     }
 
@@ -140,11 +137,15 @@ public class WrzutaNet extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        return requestFileInformation(link, null);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws IOException, PluginException {
         final boolean useAPI = true;
         if (useAPI) {
-            return this.requestFileInformationAPI(link, null);
+            return this.requestFileInformationAPI(link, account);
         } else {
-            return this.requestFileInformationWebsite(link, null);
+            return this.requestFileInformationWebsite(link, account);
         }
     }
 
@@ -237,7 +238,6 @@ public class WrzutaNet extends PluginForHost {
             final String dllink = dlmap.get("download_link").toString();
             dlreq = br.createGetRequest(dllink);
         } else {
-            // TODO: Implement premium account support
             /* TODO: Implement [audio-] stream download as this can be used to skip the captcha */
             // final String streamDownloadurl = br.getRegex("src=\"(https?://[^\"]+)\" type=\"audio/mp3\"").getMatch(0);
             requestFileInformationWebsite(link, account);
@@ -252,19 +252,7 @@ public class WrzutaNet extends PluginForHost {
         }
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlreq, this.isResumeable(link, null), this.getMaxChunks(link, null));
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                if (dl.getConnection().getResponseCode() == 403) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-                } else if (dl.getConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-                }
-                try {
-                    br.followConnection(true);
-                } catch (final IOException e) {
-                    logger.log(e);
-                }
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            this.handleConnectionErrors(br, dl.getConnection());
         } catch (final Exception e) {
             if (storedDirecturl != null) {
                 link.removeProperty(directlinkproperty);
@@ -348,7 +336,7 @@ public class WrzutaNet extends PluginForHost {
         final Map<String, Object> userinfo = loginAndGetDirectDownloadlink(account, null);
         final String premium_date_expire = (String) userinfo.get("premium_date_expire");
         if (premium_date_expire != null) {
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(premium_date_expire, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH));
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(premium_date_expire, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
             account.setType(AccountType.PREMIUM);
         } else {
             account.setType(AccountType.FREE);
@@ -374,15 +362,10 @@ public class WrzutaNet extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
-        if (acc == null) {
-            /* no account, yes we can expect captcha */
-            return true;
-        } else if (acc.getType() == AccountType.FREE) {
-            /* Free accounts can have captchas */
-            return true;
-        } else {
-            /* Premium accounts do not have captchas */
+        if (acc != null && acc.getType() == AccountType.PREMIUM) {
             return false;
+        } else {
+            return true;
         }
     }
 }

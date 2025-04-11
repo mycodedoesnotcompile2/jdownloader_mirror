@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.swing.Icon;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -46,7 +48,12 @@ import org.jdownloader.captcha.v2.challenge.oauth.AccountLoginOAuthChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.ConditionalSkipReason;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.CustomConditionalSkipReasonMessageIcon;
 import org.jdownloader.plugins.components.realDebridCom.RealDebridComConfig;
 import org.jdownloader.plugins.components.realDebridCom.api.Error;
 import org.jdownloader.plugins.components.realDebridCom.api.json.CheckLinkResponse;
@@ -67,6 +74,7 @@ import jd.config.ConfigContainer;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
 import jd.controlling.captcha.SkipException;
+import jd.controlling.packagecontroller.AbstractNode;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
@@ -90,13 +98,25 @@ import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50802 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 50947 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
-    private static final String CLIENT_SECRET_KEY = "client_secret";
-    private static final String CLIENT_ID_KEY     = "client_id";
-    private static final String CLIENT_SECRET     = "CLIENT_SECRET";
-    private static final String TOKEN             = "TOKEN";
-    private static final String AUTHORIZATION     = "Authorization";
+    private static final String          CLIENT_SECRET_KEY           = "client_secret";
+    private static final String          CLIENT_ID_KEY               = "client_id";
+    private static final String          CLIENT_SECRET               = "CLIENT_SECRET";
+    private static final String          TOKEN                       = "TOKEN";
+    private static final String          AUTHORIZATION               = "Authorization";
+    private static MultiHosterManagement mhm                         = new MultiHosterManagement("real-debrid.com");
+    /* API Docs: https://api.real-debrid.com/ */
+    private static final String          API_BASE                    = "https://api.real-debrid.com";
+    private static final String          CLIENT_ID                   = "NJ26PAPGHWGZY";
+    private static AtomicInteger         MAX_DOWNLOADS               = new AtomicInteger(Integer.MAX_VALUE);
+    private static AtomicInteger         RUNNING_DOWNLOADS           = new AtomicInteger(0);
+    private final String                 mName                       = "real-debrid.com";
+    private final String                 mProt                       = "https://";
+    private Browser                      apiBrowser;
+    private TokenResponse                currentToken                = null;
+    private static final String          PROPERTY_INFRINGING_FILE    = "INFRINGING_FILE_TS";
+    public static final String           TEXT_ERRROR_INFRINGING_FILE = "Infringing file: Not downloadable via Real-Debrid";
 
     private static class APIException extends Exception {
         private final URLConnectionAdapter connection;
@@ -117,17 +137,6 @@ public class RealDebridCom extends PluginForHost {
             return error;
         }
     }
-
-    private static MultiHosterManagement mhm                      = new MultiHosterManagement("real-debrid.com");
-    private static final String          API                      = "https://api.real-debrid.com";
-    private static final String          CLIENT_ID                = "NJ26PAPGHWGZY";
-    private static AtomicInteger         MAX_DOWNLOADS            = new AtomicInteger(Integer.MAX_VALUE);
-    private static AtomicInteger         RUNNING_DOWNLOADS        = new AtomicInteger(0);
-    private final String                 mName                    = "real-debrid.com";
-    private final String                 mProt                    = "https://";
-    private Browser                      apiBrowser;
-    private TokenResponse                currentToken             = null;
-    private static final String          PROPERTY_INFRINGING_FILE = "INFRINGING_FILE_TS";
 
     public RealDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -159,6 +168,14 @@ public class RealDebridCom extends PluginForHost {
         br.setAllowedResponseCodes(new int[] { 504 });
         br.setFollowRedirects(true);
         return br;
+    }
+
+    /**
+     * Returns true if this file cannot be downloaded via Real-Debrid because it has been marked as "infringing file". <br>
+     * See API docs error 35.
+     */
+    private boolean isInfringingFile(final DownloadLink link) {
+        return link.hasProperty(PROPERTY_INFRINGING_FILE);
     }
 
     @Override
@@ -207,7 +224,7 @@ public class RealDebridCom extends PluginForHost {
         ensureAPIBrowser();
         TokenResponse token = login(account, false);
         try {
-            final T ret = callRestAPIInternal(token, "https://api.real-debrid.com/rest/1.0" + method, query, type);
+            final T ret = callRestAPIInternal(token, API_BASE + "/rest/1.0" + method, query, type);
             this.currentToken = token;
             return ret;
         } catch (final APIException e) {
@@ -217,7 +234,7 @@ public class RealDebridCom extends PluginForHost {
                 try {
                     // refresh Token
                     token = login(account, true);
-                    final T ret = callRestAPIInternal(token, "https://api.real-debrid.com/rest/1.0" + method, query, type);
+                    final T ret = callRestAPIInternal(token, API_BASE + "/rest/1.0" + method, query, type);
                     this.currentToken = token;
                     return ret;
                 } catch (final APIException e2) {
@@ -270,9 +287,8 @@ public class RealDebridCom extends PluginForHost {
 
     @Override
     public boolean canHandle(DownloadLink link, Account account) throws Exception {
-        if (link.hasProperty(PROPERTY_INFRINGING_FILE)) {
-            // blocked because file is infringing file
-            return false;
+        if (isInfringingFile(link)) {
+            throw new ConditionalSkipReasonException(new InfringingFileSkipReason(account));
         } else if (isDirectRealDebridDirectUrl(link)) {
             // generated links do not require an account to download
             return true;
@@ -451,12 +467,10 @@ public class RealDebridCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        showMessage(link, "Task 1: Check URL validity!");
         final AvailableStatus status = requestFileInformation(link);
         if (AvailableStatus.UNCHECKABLE.equals(status)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, 60 * 1000l);
         }
-        showMessage(link, "Task 2: Download begins!");
         handleDL(null, link, link.getPluginPatternMatcher(), null);
     }
 
@@ -464,7 +478,7 @@ public class RealDebridCom extends PluginForHost {
         if (account == null) {
             return AvailableStatus.UNCHECKABLE;
         } else if (isDirectRealDebridDirectUrl(link)) {
-            /* Developer mistake */
+            /* Developer mistake, this should never happen! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String dllink = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
@@ -511,8 +525,11 @@ public class RealDebridCom extends PluginForHost {
 
     /** no override to keep plugin compatible to old stable */
     public void handleMultiHost(final int startTaskIndex, final DownloadLink link, final Account account) throws Exception {
+        showMessage(link, "Task " + (startTaskIndex + 1) + ": Generating Link");
+        if (isInfringingFile(link)) {
+            throw new ConditionalSkipReasonException(new InfringingFileSkipReason(account));
+        }
         try {
-            showMessage(link, "Task " + (startTaskIndex + 1) + ": Generating Link");
             /* request Download */
             final String dllink = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
             String downloadPassword = link.getDownloadPassword();
@@ -567,7 +584,7 @@ public class RealDebridCom extends PluginForHost {
             switch (e.getError()) {
             case INFRINGING_FILE:
                 link.setProperty(PROPERTY_INFRINGING_FILE, Time.timestamp());
-                throw new PluginException(LinkStatus.ERROR_RETRY, e.getMessage(), e);
+                throw new PluginException(LinkStatus.ERROR_RETRY, TEXT_ERRROR_INFRINGING_FILE, e);
             case FILE_UNAVAILABLE:
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, _JDT.T.downloadlink_status_error_hoster_temp_unavailable(), 10 * 60 * 1000l, e);
             case UNSUPPORTED_HOSTER:
@@ -609,281 +626,277 @@ public class RealDebridCom extends PluginForHost {
     }
 
     public ClientSecret checkCredentials(final CodeResponse code) throws Exception {
-        return callRestAPIInternal(null, API + "/oauth/v2/device/credentials?client_id=" + Encoding.urlEncode(CLIENT_ID) + "&code=" + Encoding.urlEncode(code.getDevice_code()), null, ClientSecret.TYPE);
+        return callRestAPIInternal(null, API_BASE + "/oauth/v2/device/credentials?client_id=" + Encoding.urlEncode(CLIENT_ID) + "&code=" + Encoding.urlEncode(code.getDevice_code()), null, ClientSecret.TYPE);
     }
 
     private TokenResponse login(Account account, boolean force) throws PluginException, IOException, APIException, InterruptedException {
         synchronized (account) {
-            try {
-                // first try to use the stored token
-                String tokenJSon = account.getStringProperty(TOKEN);
-                if (!force) {
-                    if (StringUtils.isNotEmpty(tokenJSon)) {
-                        final TokenResponse existingToken = restoreFromString(tokenJSon, new TypeRef<TokenResponse>(TokenResponse.class) {
-                        });
-                        // ensure that the token is at elast 5 minutes valid
-                        final long expireTime = existingToken.getExpires_in() * 1000 + existingToken.getCreateTime();
-                        final long now = System.currentTimeMillis();
-                        if (!existingToken.isRefresh() && (expireTime - 5 * 60 * 1000l) > now) {
-                            existingToken._setVerified(false);
-                            return existingToken;
-                        }
+            // first try to use the stored token
+            String tokenJSon = account.getStringProperty(TOKEN);
+            if (!force) {
+                if (StringUtils.isNotEmpty(tokenJSon)) {
+                    final TokenResponse existingToken = restoreFromString(tokenJSon, new TypeRef<TokenResponse>(TokenResponse.class) {
+                    });
+                    // ensure that the token is at elast 5 minutes valid
+                    final long expireTime = existingToken.getExpires_in() * 1000 + existingToken.getCreateTime();
+                    final long now = System.currentTimeMillis();
+                    if (!existingToken.isRefresh() && (expireTime - 5 * 60 * 1000l) > now) {
+                        existingToken._setVerified(false);
+                        return existingToken;
                     }
                 }
-                // token invalid, forcerefresh active or token expired.
-                // Try to refresh the token
-                tokenJSon = account.getStringProperty(TOKEN);
-                final String clientSecretJson = account.getStringProperty(CLIENT_SECRET);
-                if (StringUtils.isNotEmpty(tokenJSon) && StringUtils.isNotEmpty(clientSecretJson)) {
-                    final TokenResponse existingToken = restoreFromString(tokenJSon, TokenResponse.TYPE);
-                    final ClientSecret clientSecret = restoreFromString(clientSecretJson, ClientSecret.TYPE);
-                    final String tokenResponseJson = br.postPage(API + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", existingToken.getRefresh_token(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
-                    this.checkErrorsWebsite(br);
-                    final TokenResponse newToken = restoreFromString(tokenResponseJson, TokenResponse.TYPE);
-                    if (newToken.validate()) {
-                        tokenJSon = JSonStorage.serializeToJson(newToken);
-                        account.setProperty(TOKEN, tokenJSon);
-                        newToken._setVerified(true);
-                        return newToken;
-                    }
-                }
-                // Could not refresh the token. login using username and password
-                br.setCookiesExclusive(true);
-                br.clearCookies(API);
-                final Browser autoSolveBr = br.cloneBrowser();
-                final String responseJson = br.getPage(API + "/oauth/v2/device/code?client_id=" + CLIENT_ID + "&new_credentials=yes");
+            }
+            // token invalid, forcerefresh active or token expired.
+            // Try to refresh the token
+            tokenJSon = account.getStringProperty(TOKEN);
+            final String clientSecretJson = account.getStringProperty(CLIENT_SECRET);
+            if (StringUtils.isNotEmpty(tokenJSon) && StringUtils.isNotEmpty(clientSecretJson)) {
+                final TokenResponse existingToken = restoreFromString(tokenJSon, TokenResponse.TYPE);
+                final ClientSecret clientSecret = restoreFromString(clientSecretJson, ClientSecret.TYPE);
+                final String tokenResponseJson = br.postPage(API_BASE + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", existingToken.getRefresh_token(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
                 this.checkErrorsWebsite(br);
-                final CodeResponse code = restoreFromString(responseJson, new TypeRef<CodeResponse>(CodeResponse.class) {
-                });
-                ensureAPIBrowser();
-                final AtomicReference<ClientSecret> clientSecretResult = new AtomicReference<ClientSecret>(null);
-                final AtomicBoolean loginsInvalid = new AtomicBoolean(false);
-                final AccountLoginOAuthChallenge challenge = new AccountLoginOAuthChallenge(getHost(), null, account, code.getDirect_verification_url()) {
-                    private volatile long lastValidation = -1;
+                final TokenResponse newToken = restoreFromString(tokenResponseJson, TokenResponse.TYPE);
+                if (newToken.validate()) {
+                    tokenJSon = JSonStorage.serializeToJson(newToken);
+                    account.setProperty(TOKEN, tokenJSon);
+                    newToken._setVerified(true);
+                    return newToken;
+                }
+            }
+            // Could not refresh the token. login using username and password
+            br.setCookiesExclusive(true);
+            br.clearCookies(API_BASE);
+            final Browser autoSolveBr = br.cloneBrowser();
+            final String responseJson = br.getPage(API_BASE + "/oauth/v2/device/code?client_id=" + CLIENT_ID + "&new_credentials=yes");
+            this.checkErrorsWebsite(br);
+            final CodeResponse code = restoreFromString(responseJson, new TypeRef<CodeResponse>(CodeResponse.class) {
+            });
+            ensureAPIBrowser();
+            final AtomicReference<ClientSecret> clientSecretResult = new AtomicReference<ClientSecret>(null);
+            final AtomicBoolean loginsInvalid = new AtomicBoolean(false);
+            final AccountLoginOAuthChallenge challenge = new AccountLoginOAuthChallenge(getHost(), null, account, code.getDirect_verification_url()) {
+                private volatile long lastValidation = -1;
 
-                    @Override
-                    public Plugin getPlugin() {
-                        return RealDebridCom.this;
-                    }
+                @Override
+                public Plugin getPlugin() {
+                    return RealDebridCom.this;
+                }
 
-                    @Override
-                    public void poll(SolverJob<Boolean> job) {
-                        if (Time.systemIndependentCurrentJVMTimeMillis() - lastValidation >= code.getInterval() * 1000) {
-                            lastValidation = Time.systemIndependentCurrentJVMTimeMillis();
-                            try {
-                                final ClientSecret clientSecret = checkCredentials(code);
-                                if (clientSecret != null) {
-                                    clientSecretResult.set(clientSecret);
-                                    job.addAnswer(new AbstractResponse<Boolean>(this, ChallengeSolver.EXTERN, 100, true));
-                                }
-                            } catch (Throwable e) {
-                                logger.log(e);
-                            }
-                        }
-                    }
-
-                    private final boolean isInvalid(Browser br) {
-                        // Website no longer shows this information? 10.09.2020
-                        return br.containsHTML("Your login informations are incorrect") || (Application.isHeadless() && br.containsHTML("The validity period of your password has been exceeded"));
-                    }
-
-                    private final boolean isAllowed(Browser br) {
-                        return br.containsHTML("Application allowed, you can close this page");
-                    }
-
-                    private final boolean is2FARequired(String html) {
-                        return is2FAEmailRequired(html) || is2FAAppRequired(html);
-                    }
-
-                    private final boolean is2FAEmailRequired(String html) {
-                        return StringUtils.contains(html, "A temporary code has been sent to your email address and is required");
-                    }
-
-                    private final boolean is2FAAppRequired(String html) {
-                        return StringUtils.contains(html, "A temporary code from Two-Factor app is required");
-                    }
-
-                    private final Boolean check(SolverJob<Boolean> job, Browser br) throws Exception {
-                        if (isInvalid(autoSolveBr)) {
-                            loginsInvalid.set(true);
-                            job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
-                            return false;
-                        } else if (isAllowed(autoSolveBr)) {
+                @Override
+                public void poll(SolverJob<Boolean> job) {
+                    if (Time.systemIndependentCurrentJVMTimeMillis() - lastValidation >= code.getInterval() * 1000) {
+                        lastValidation = Time.systemIndependentCurrentJVMTimeMillis();
+                        try {
                             final ClientSecret clientSecret = checkCredentials(code);
                             if (clientSecret != null) {
                                 clientSecretResult.set(clientSecret);
-                                job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, true));
-                                return true;
-                            } else {
-                                logger.info("No ClientSecret?!");
+                                job.addAnswer(new AbstractResponse<Boolean>(this, ChallengeSolver.EXTERN, 100, true));
                             }
+                        } catch (Throwable e) {
+                            logger.log(e);
                         }
-                        return null;
                     }
+                }
 
-                    protected Form getLoginForm(Browser br) throws PluginException {
-                        final Form loginForm = br.getFormbyActionRegex("/authorize\\?.+");
-                        if (loginForm == null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                private final boolean isInvalid(Browser br) {
+                    // Website no longer shows this information? 10.09.2020
+                    return br.containsHTML("Your login informations are incorrect") || (Application.isHeadless() && br.containsHTML("The validity period of your password has been exceeded"));
+                }
+
+                private final boolean isAllowed(Browser br) {
+                    return br.containsHTML("Application allowed, you can close this page");
+                }
+
+                private final boolean is2FARequired(String html) {
+                    return is2FAEmailRequired(html) || is2FAAppRequired(html);
+                }
+
+                private final boolean is2FAEmailRequired(String html) {
+                    return StringUtils.contains(html, "A temporary code has been sent to your email address and is required");
+                }
+
+                private final boolean is2FAAppRequired(String html) {
+                    return StringUtils.contains(html, "A temporary code from Two-Factor app is required");
+                }
+
+                private final Boolean check(SolverJob<Boolean> job, Browser br) throws Exception {
+                    if (isInvalid(autoSolveBr)) {
+                        loginsInvalid.set(true);
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                        return false;
+                    } else if (isAllowed(autoSolveBr)) {
+                        final ClientSecret clientSecret = checkCredentials(code);
+                        if (clientSecret != null) {
+                            clientSecretResult.set(clientSecret);
+                            job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, true));
+                            return true;
                         } else {
-                            return loginForm;
+                            logger.info("No ClientSecret?!");
                         }
                     }
+                    return null;
+                }
 
-                    protected Form handleLoginForm(Browser br, Form loginForm) throws PluginException, InterruptedException, DialogClosedException, DialogCanceledException {
-                        if (loginForm.containsHTML("g-recaptcha")) {
-                            logger.info("Login requires Recaptcha");
-                            final DownloadLink dummyLink = new DownloadLink(RealDebridCom.this, "Account:" + getAccount().getUser(), getHost(), "https://real-debrid.com", true);
-                            RealDebridCom.this.setDownloadLink(dummyLink);
-                            final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(RealDebridCom.this, br).getToken();
-                            loginForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                        }
-                        loginForm.getInputField("p").setValue(Encoding.urlEncode(getAccount().getPass()));
-                        loginForm.getInputField("u").setValue(Encoding.urlEncode(getAccount().getUser()));
-                        if (is2FARequired(loginForm.getHtmlCode())) {
-                            logger.info("2fa required");
-                            if (Application.isHeadless() || !BrowserSolverService.getInstance().isOpenBrowserSupported()) {
-                                String text = loginForm.getRegex(">\\s*(A temporary.*?)\\s*</").getMatch(0);
-                                if (StringUtils.isEmpty(text)) {
-                                    if (is2FAEmailRequired(loginForm.getHtmlCode())) {
-                                        text = "A temporary code has been sent to your email address and is required to complete the login:";
-                                    } else if (is2FAAppRequired(loginForm.getHtmlCode())) {
-                                        text = "A temporary code from Two-Factor app is required to complete the login:";
-                                    } else {
-                                        text = "Please enter 2FA code to complete the login:";
-                                    }
-                                }
-                                final InputDialog mfaDialog = new InputDialog(UIOManager.LOGIC_COUNTDOWN, "Account is 2fa protected!", text, null, null, _GUI.T.lit_continue(), null);
-                                mfaDialog.setTimeout(5 * 60 * 1000);
-                                final InputDialogInterface handler = UIOManager.I().show(InputDialogInterface.class, mfaDialog);
-                                handler.throwCloseExceptions();
-                                loginForm.getInputField("pa").setValue(Encoding.urlEncode(mfaDialog.getText()));
-                            } else {
-                                logger.info("Skip autoSolveChallenge: 2fa required");
-                                return null;
-                            }
-                        }
+                protected Form getLoginForm(Browser br) throws PluginException {
+                    final Form loginForm = br.getFormbyActionRegex("/authorize\\?.+");
+                    if (loginForm == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    } else {
                         return loginForm;
                     }
+                }
 
-                    private Boolean handleLoginForm(SolverJob<Boolean> job, Browser br) throws Exception {
-                        Form loginForm = handleLoginForm(br, getLoginForm(br));
+                protected Form handleLoginForm(Browser br, Form loginForm) throws PluginException, InterruptedException, DialogClosedException, DialogCanceledException {
+                    if (loginForm.containsHTML("g-recaptcha")) {
+                        logger.info("Login requires Recaptcha");
+                        final DownloadLink dummyLink = new DownloadLink(RealDebridCom.this, "Account:" + getAccount().getUser(), getHost(), "https://real-debrid.com", true);
+                        RealDebridCom.this.setDownloadLink(dummyLink);
+                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(RealDebridCom.this, br).getToken();
+                        loginForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                    }
+                    loginForm.getInputField("p").setValue(Encoding.urlEncode(getAccount().getPass()));
+                    loginForm.getInputField("u").setValue(Encoding.urlEncode(getAccount().getUser()));
+                    if (is2FARequired(loginForm.getHtmlCode())) {
+                        logger.info("2fa required");
+                        if (Application.isHeadless() || !BrowserSolverService.getInstance().isOpenBrowserSupported()) {
+                            String text = loginForm.getRegex(">\\s*(A temporary.*?)\\s*</").getMatch(0);
+                            if (StringUtils.isEmpty(text)) {
+                                if (is2FAEmailRequired(loginForm.getHtmlCode())) {
+                                    text = "A temporary code has been sent to your email address and is required to complete the login:";
+                                } else if (is2FAAppRequired(loginForm.getHtmlCode())) {
+                                    text = "A temporary code from Two-Factor app is required to complete the login:";
+                                } else {
+                                    text = "Please enter 2FA code to complete the login:";
+                                }
+                            }
+                            final InputDialog mfaDialog = new InputDialog(UIOManager.LOGIC_COUNTDOWN, "Account is 2fa protected!", text, null, null, _GUI.T.lit_continue(), null);
+                            mfaDialog.setTimeout(5 * 60 * 1000);
+                            final InputDialogInterface handler = UIOManager.I().show(InputDialogInterface.class, mfaDialog);
+                            handler.throwCloseExceptions();
+                            loginForm.getInputField("pa").setValue(Encoding.urlEncode(mfaDialog.getText()));
+                        } else {
+                            logger.info("Skip autoSolveChallenge: 2fa required");
+                            return null;
+                        }
+                    }
+                    return loginForm;
+                }
+
+                private Boolean handleLoginForm(SolverJob<Boolean> job, Browser br) throws Exception {
+                    Form loginForm = handleLoginForm(br, getLoginForm(br));
+                    if (loginForm == null) {
+                        return Boolean.FALSE;
+                    }
+                    br.submitForm(loginForm);
+                    Boolean result = check(job, br);
+                    if (result != null) {
+                        return result;
+                    } else if (is2FARequired(br.toString())) {
+                        loginForm = handleLoginForm(br, getLoginForm(br));
                         if (loginForm == null) {
                             return Boolean.FALSE;
                         }
                         br.submitForm(loginForm);
-                        Boolean result = check(job, br);
+                        result = check(job, br);
                         if (result != null) {
                             return result;
-                        } else if (is2FARequired(br.toString())) {
-                            loginForm = handleLoginForm(br, getLoginForm(br));
-                            if (loginForm == null) {
-                                return Boolean.FALSE;
-                            }
-                            br.submitForm(loginForm);
-                            result = check(job, br);
-                            if (result != null) {
-                                return result;
-                            }
                         }
-                        return null;
                     }
+                    return null;
+                }
 
-                    private final boolean handleAutoSolveChallenge(SolverJob<Boolean> job) {
-                        try {
-                            final Account acc = getAccount();
-                            if (!StringUtils.isAllNotEmpty(acc.getUser(), acc.getPass())) {
-                                logger.info("Skip autoSolveChallenge: user/pass is missing");
-                                return false;
-                            }
-                            final String verificationUrl = getUrl();
-                            autoSolveBr.clearCookies(verificationUrl);
-                            autoSolveBr.getPage(verificationUrl);
-                            for (int index = 0; index < 3; index++) {
-                                // (0)no captcha, (1)captcha, (2) maybe another captcha
-                                final Boolean result = handleLoginForm(job, autoSolveBr);
-                                if (result != null) {
-                                    return result.booleanValue();
-                                } else {
-                                    final Form allow = autoSolveBr.getFormBySubmitvalue("Allow");
-                                    if (allow != null) {
-                                        allow.setPreferredSubmit("Allow");
-                                        autoSolveBr.submitForm(allow);
-                                        final ClientSecret clientSecret = checkCredentials(code);
-                                        if (clientSecret != null) {
-                                            clientSecretResult.set(clientSecret);
-                                            job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, true));
-                                            return true;
-                                        } else {
-                                            logger.info("No ClientSecret?!");
-                                            return false;
-                                        }
+                private final boolean handleAutoSolveChallenge(SolverJob<Boolean> job) {
+                    try {
+                        final Account acc = getAccount();
+                        if (!StringUtils.isAllNotEmpty(acc.getUser(), acc.getPass())) {
+                            logger.info("Skip autoSolveChallenge: user/pass is missing");
+                            return false;
+                        }
+                        final String verificationUrl = getUrl();
+                        autoSolveBr.clearCookies(verificationUrl);
+                        autoSolveBr.getPage(verificationUrl);
+                        for (int index = 0; index < 3; index++) {
+                            // (0)no captcha, (1)captcha, (2) maybe another captcha
+                            final Boolean result = handleLoginForm(job, autoSolveBr);
+                            if (result != null) {
+                                return result.booleanValue();
+                            } else {
+                                final Form allow = autoSolveBr.getFormBySubmitvalue("Allow");
+                                if (allow != null) {
+                                    allow.setPreferredSubmit("Allow");
+                                    autoSolveBr.submitForm(allow);
+                                    final ClientSecret clientSecret = checkCredentials(code);
+                                    if (clientSecret != null) {
+                                        clientSecretResult.set(clientSecret);
+                                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, true));
+                                        return true;
+                                    } else {
+                                        logger.info("No ClientSecret?!");
+                                        return false;
                                     }
                                 }
                             }
-                        } catch (CaptchaException e) {
-                            logger.log(e);
-                            job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
-                        } catch (PluginException e) {
-                            logger.log(e);
-                            job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
-                        } catch (InterruptedException e) {
-                            logger.log(e);
-                            job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
-                        } catch (Throwable e) {
-                            logger.log(e);
                         }
-                        return false;
+                    } catch (CaptchaException e) {
+                        logger.log(e);
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                    } catch (PluginException e) {
+                        logger.log(e);
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                    } catch (InterruptedException e) {
+                        logger.log(e);
+                        job.addAnswer(new AbstractResponse<Boolean>(this, this, 100, false));
+                    } catch (Throwable e) {
+                        logger.log(e);
                     }
+                    return false;
+                }
 
-                    @Override
-                    public boolean autoSolveChallenge(SolverJob<Boolean> job) {
-                        final boolean ret = handleAutoSolveChallenge(job);
-                        logger.info("autoSolveChallenge:" + ret);
-                        return ret;
-                    }
-                };
-                challenge.setTimeout(5 * 60 * 1000);
-                try {
-                    ChallengeResponseController.getInstance().handle(challenge);
-                } catch (SkipException e) {
-                    logger.log(e);
+                @Override
+                public boolean autoSolveChallenge(SolverJob<Boolean> job) {
+                    final boolean ret = handleAutoSolveChallenge(job);
+                    logger.info("autoSolveChallenge:" + ret);
+                    return ret;
                 }
-                final ClientSecret clientSecret = clientSecretResult.get();
-                if (clientSecret == null) {
-                    if (loginsInvalid.get()) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Your login informations are incorrect", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "OAuth Failed", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
-                final String tokenResponseJson = br.postPage(API + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", code.getDevice_code(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
-                this.checkErrorsWebsite(br);
-                final TokenResponse newToken = restoreFromString(tokenResponseJson, new TypeRef<TokenResponse>(TokenResponse.class) {
-                });
-                if (newToken.validate()) {
-                    final UserResponse user = callRestAPIInternal(newToken, "https://api.real-debrid.com/rest/1.0" + "/user", null, UserResponse.TYPE);
-                    if (StringUtils.isEmpty(account.getUser())) {
-                        if (StringUtils.isNotEmpty(user.getUsername())) {
-                            account.setUser(user.getUsername());
-                        } else {
-                            account.setUser(user.getEmail());
-                        }
-                    }
-                    if (!StringUtils.equalsIgnoreCase(account.getUser(), user.getEmail()) && !StringUtils.equalsIgnoreCase(account.getUser(), user.getUsername())) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "User Mismatch. You try to add the account " + account.getUser() + "\r\nBut in your browser you are logged in as " + user.getUsername() + "\r\nPlease make sure that there is no username mismatch!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        tokenJSon = JSonStorage.serializeToJson(newToken);
-                        account.setProperty(TOKEN, JSonStorage.serializeToJson(newToken));
-                        account.setProperty(CLIENT_SECRET, JSonStorage.serializeToJson(clientSecret));
-                        newToken._setVerified(true);
-                        return newToken;
-                    }
+            };
+            challenge.setTimeout(5 * 60 * 1000);
+            try {
+                ChallengeResponseController.getInstance().handle(challenge);
+            } catch (SkipException e) {
+                logger.log(e);
+            }
+            final ClientSecret clientSecret = clientSecretResult.get();
+            if (clientSecret == null) {
+                if (loginsInvalid.get()) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "Your login informations are incorrect", PluginException.VALUE_ID_PREMIUM_DISABLE);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "Unknown Error", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "OAuth Failed", PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
-            } catch (PluginException e) {
-                throw e;
+            }
+            final String tokenResponseJson = br.postPage(API_BASE + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", code.getDevice_code(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
+            this.checkErrorsWebsite(br);
+            final TokenResponse newToken = restoreFromString(tokenResponseJson, new TypeRef<TokenResponse>(TokenResponse.class) {
+            });
+            if (newToken.validate()) {
+                final UserResponse user = callRestAPIInternal(newToken, API_BASE + "/rest/1.0" + "/user", null, UserResponse.TYPE);
+                if (StringUtils.isEmpty(account.getUser())) {
+                    if (StringUtils.isNotEmpty(user.getUsername())) {
+                        account.setUser(user.getUsername());
+                    } else {
+                        account.setUser(user.getEmail());
+                    }
+                }
+                if (!StringUtils.equalsIgnoreCase(account.getUser(), user.getEmail()) && !StringUtils.equalsIgnoreCase(account.getUser(), user.getUsername())) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "User Mismatch. You try to add the account " + account.getUser() + "\r\nBut in your browser you are logged in as " + user.getUsername() + "\r\nPlease make sure that there is no username mismatch!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                } else {
+                    tokenJSon = JSonStorage.serializeToJson(newToken);
+                    account.setProperty(TOKEN, JSonStorage.serializeToJson(newToken));
+                    account.setProperty(CLIENT_SECRET, JSonStorage.serializeToJson(clientSecret));
+                    newToken._setVerified(true);
+                    return newToken;
+                }
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Unknown Error", PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
         }
     }
@@ -930,5 +943,55 @@ public class RealDebridCom extends PluginForHost {
 
     private void showMessage(DownloadLink link, String message) {
         link.getLinkStatus().setStatusText(message);
+    }
+
+    public class InfringingFileSkipReason implements ConditionalSkipReason {
+        private final Account account;
+        private final Icon    icon;
+
+        public Icon getIcon() {
+            return icon;
+        }
+
+        public InfringingFileSkipReason(Account account) {
+            this.account = account;
+            icon = new AbstractIcon(IconKey.ICON_WARNING, 16);
+        }
+
+        public Account getAccount() {
+            return account;
+        }
+
+        @Override
+        public String toString() {
+            return "InfringingFileSkipReason(Account:" + getAccount() + "|" + getMessage(this, null) + ")";
+        }
+
+        @Override
+        public boolean isConditionReached() {
+            return getAccount().isEnabled() == false || getAccount().isValid() == false || getAccount().getAccountController() == null;
+        }
+
+        @Override
+        public String getMessage(Object requestor, AbstractNode node) {
+            if (requestor instanceof CustomConditionalSkipReasonMessageIcon) {
+                return ((CustomConditionalSkipReasonMessageIcon) requestor).getMessage(this, node);
+            } else {
+                return RealDebridCom.TEXT_ERRROR_INFRINGING_FILE;
+            }
+        }
+
+        @Override
+        public Icon getIcon(Object requestor, AbstractNode node) {
+            if (requestor instanceof CustomConditionalSkipReasonMessageIcon) {
+                return ((CustomConditionalSkipReasonMessageIcon) requestor).getIcon(this, node);
+            } else {
+                return getIcon();
+            }
+        }
+
+        @Override
+        public void finalize(DownloadLink link) {
+        }
     }
 }

@@ -36,7 +36,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49928 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https://(?:www\\.)?myspass\\.de/details\\?.+" })
+@DecrypterPlugin(revision = "$Revision: 50946 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https://(?:www\\.)?myspass\\.de/details\\?.+" })
 public class MySpassDeCrawler extends PluginForDecrypt {
     public MySpassDeCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,8 @@ public class MySpassDeCrawler extends PluginForDecrypt {
             return ret;
         }
         if (true) {
-            /* Not (yet) supported */
+            /* Not (yet) supported since website was changed to new layout */
+            // TODO: Either delete this crawler plugin or make it work again if it's still needed.
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Old code down below */

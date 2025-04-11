@@ -40,6 +40,7 @@ import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
 import org.appwork.storage.simplejson.ParserException;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
 import org.jdownloader.logging.LogController;
@@ -983,6 +984,75 @@ public class JavaScriptEngineFactory {
 
     public static Map<String, Object> jsonToJavaMap(String string) throws Exception {
         return (Map<String, Object>) jsonToJavaObject(string);
+    }
+
+    public static Object convertJavaScriptToJava(Object param) {
+        if (param == null) {
+            return null;
+        } else if (param instanceof Boolean) {
+            return param;
+        } else if (param instanceof CharSequence) {
+            return param.toString();
+        } else if (param instanceof Number) {
+            // Javascript Double can store 2^53-1 Integer without loss of precision <-> UniqueID
+            return param;
+        } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeArray", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeArray", param)) {
+            final List<Object> na = (List<Object>) param;
+            final int length = na.size();
+            final Object[] elem = new Object[length];
+            for (int i = 0; i < length; i++) {
+                elem[i] = convertJavaScriptToJava(na.get(i));
+            }
+            return elem;
+        } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeObject", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeObject", param)) {
+            final Map<Object, Object> no = (Map<Object, Object>) param;
+            final Map<Object, Object> elem = new HashMap<Object, Object>();
+            for (Entry<Object, Object> entry : no.entrySet()) {
+                elem.put(convertJavaScriptToJava(entry.getKey()), convertJavaScriptToJava(entry.getValue()));
+            }
+            return elem;
+        } else {
+            System.out.println("TODO:" + param);
+            return param;
+        }
+    }
+
+    public static Object[] convertJavaScriptToJava(Object... parameters) {
+        if (parameters == null) {
+            return null;
+        }
+        final List<Object> ret = new ArrayList<Object>();
+        for (Object param : parameters) {
+            if (param == null) {
+                ret.add(null);
+            } else if (param instanceof Boolean) {
+                ret.add(param);
+            } else if (param instanceof CharSequence) {
+                ret.add(param.toString());
+            } else if (param instanceof Number) {
+                // Javascript Double can store 2^53-1 Integer without loss of precision <-> UniqueID
+                ret.add(param);
+            } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeArray", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeArray", param)) {
+                final List<Object> na = (List<Object>) param;
+                final int length = na.size();
+                final Object[] elem = new Object[length];
+                for (int i = 0; i < length; i++) {
+                    elem[i] = convertJavaScriptToJava(na.get(i));
+                }
+                ret.add(elem);
+            } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeObject", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeObject", param)) {
+                final Map<Object, Object> no = (Map<Object, Object>) param;
+                final Map<Object, Object> elem = new HashMap<Object, Object>();
+                for (Entry<Object, Object> entry : no.entrySet()) {
+                    elem.put(convertJavaScriptToJava(entry.getKey()), convertJavaScriptToJava(entry.getValue()));
+                }
+                ret.add(elem);
+            } else {
+                System.out.println("TODO:" + param);
+                ret.add(param);
+            }
+        }
+        return ret.toArray(new Object[0]);
     }
 
     public static Object jsonToJavaObject(String string) throws Exception {

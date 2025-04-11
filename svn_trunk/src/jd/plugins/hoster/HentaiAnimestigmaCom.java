@@ -27,7 +27,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49594 $", interfaceVersion = 2, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?.*#hentai\\.animestigma\\.com-direct" })
+@HostPlugin(revision = "$Revision: 50949 $", interfaceVersion = 2, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?.*#hentai\\.animestigma\\.com-direct" })
 public class HentaiAnimestigmaCom extends antiDDoSForHost {
     public HentaiAnimestigmaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class HentaiAnimestigmaCom extends antiDDoSForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://hentaidude.com/";
+        return "https://hentai.animestigma.com/";
     }
 
     @Override

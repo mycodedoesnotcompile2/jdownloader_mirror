@@ -1,19 +1,20 @@
 package org.jdownloader.settings;
 
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
-import org.appwork.storage.Storable;
-import org.appwork.utils.StringUtils;
 
 import jd.plugins.Account;
 import jd.plugins.Account.AccountError;
 import jd.plugins.AccountInfo;
 import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHostData;
+
+import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
+import org.appwork.storage.Storable;
+import org.appwork.utils.StringUtils;
 
 public class AccountData implements Storable {
     // Variables
@@ -41,6 +42,15 @@ public class AccountData implements Storable {
     private boolean                 concurrentUsePossible = true;
     private boolean                 trafficRefill         = true;
     private double                  accountBalance;
+    private String                  accountBalanceCurrency;
+
+    public String getAccountBalanceCurrency() {
+        return accountBalanceCurrency;
+    }
+
+    public void setAccountBalanceCurrency(String accountBalanceCurrency) {
+        this.accountBalanceCurrency = accountBalanceCurrency;
+    }
 
     // Constructor
     public AccountData(/* Storable */) {
@@ -277,7 +287,9 @@ public class AccountData implements Storable {
             ret.trafficUnlimited = ai.isUnlimitedTraffic();
             ret.specialtraffic = ai.isSpecialTraffic();
             ret.statusString = ai.getStatus();
-            ret.accountBalance = ai.getAccountBalance(); // Added this line to store account balance
+            ret.accountBalance = ai.getAccountBalance();
+            final Currency currency = ai.getCurrency();
+            ret.accountBalanceCurrency = currency != null ? currency.getCurrencyCode() : null;
             ret.infoSupportedhostlist = MultiHostHostData.createFromMultiHostHostList(ai.getMultiHostSupportV2());
         }
         ret.concurrentUsePossible = a.isConcurrentUsePossible();
@@ -287,6 +299,18 @@ public class AccountData implements Storable {
         ret.password = a.getPass();
         ret.user = a.getUser();
         return ret;
+    }
+
+    private Currency _getCurrency() {
+        final String currencyCode = getAccountBalanceCurrency();
+        if (currencyCode == null) {
+            return null;
+        }
+        try {
+            return Currency.getInstance(currencyCode);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public Account toAccount() {
@@ -302,7 +326,7 @@ public class AccountData implements Storable {
             ai.setValidUntil(validUntil);
             ai.setStatus(statusString);
             ai.setTrafficRefill(trafficRefill);
-            ai.setAccountBalance(accountBalance);
+            ai.setAccountBalance(accountBalance, this._getCurrency());
             if (trafficUnlimited) {
                 ai.setUnlimitedTraffic();
             }
