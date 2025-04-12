@@ -74,7 +74,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 50708 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 50955 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -668,9 +668,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
              * Most of all objects will contain an array with 2 items --> Books always have two viewable pages. </br>
              * Exception = First page --> Cover
              */
-            final List<Object> pagesO = (List<Object>) imageO;
-            for (final Object pageO : pagesO) {
-                final Map<String, Object> bookpage = (Map<String, Object>) pageO;
+            final List<Map<String, Object>> bookpages = (List<Map<String, Object>>) imageO;
+            for (final Map<String, Object> bookpage : bookpages) {
                 /* When this starts at 0 this means the book has a cover else this will start at 1 -> No cover. */
                 final int archiveOrgPageIndex = ((Number) bookpage.get("leafNum")).intValue();
                 final String url = bookpage.get("uri").toString();
@@ -733,6 +732,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         /* Now we know how many pages the book has -> Set additional information and filename. */
         final int padLength = StringUtils.getPadLength(internalPageIndex);
         for (final DownloadLink result : ret) {
+            result.setProperty(ArchiveOrg.PROPERTY_BOOK_PAGE_MAX, internalPageIndex);
             final int thispage = result.getIntegerProperty(ArchiveOrg.PROPERTY_BOOK_PAGE_INTERNAL_INDEX, 0);
             /* Set filename */
             result.setFinalFileName(StringUtils.formatByPadLength(padLength, thispage) + "_" + title + ".jpg");

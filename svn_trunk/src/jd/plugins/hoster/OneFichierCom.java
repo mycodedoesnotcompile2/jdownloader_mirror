@@ -25,23 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -65,7 +48,24 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 50940 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 50959 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS   = "use_cdn_credits";
     private final String       PROPERTY_ACCOUNT_CDN_CREDITS_BYTES = "cdn_credits_bytes";
@@ -278,6 +278,12 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
+    /**
+     * Returns true if we allow upper handling to check this link via API. <br>
+     * This is mostly used for password protected links if we have the [correct] download password because the API is returning filename and
+     * filesize while website and old mass-linkcheck does not provide this information. <br>
+     * The official linkcheck API is very rate limited though so we should really only use it if needed.
+     */
     private boolean allowSingleFileAPILinkcheck(final DownloadLink link, final Account account) {
         if (isaccessControlLimited(link) && !link.isSizeSet() && link.getDownloadPassword() != null && canUseAPI(account)) {
             return true;
@@ -299,9 +305,8 @@ public class OneFichierCom extends PluginForHost {
         }
         try {
             prepareBrowserWebsite(br);
-            br.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();
-            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            final List<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
             while (true) {
                 links.clear();
@@ -323,9 +328,8 @@ public class OneFichierCom extends PluginForHost {
                 // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is server side deprecated but we're still using it because: </br>
-                 * 1. It is still working. </br>
-                 * 2. It is the only method that can be used to check multiple items with one request.
+                 * This method is server side deprecated but we're still using it because: </br> 1. It is still working. </br> 2. It is the
+                 * only method that can be used to check multiple items with one request.
                  */
                 br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
@@ -497,6 +501,9 @@ public class OneFichierCom extends PluginForHost {
     }
 
     public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception, PluginException {
+        if (account != null) {
+            this.loginWebsite(account, false);
+        }
         /* retry/resume of cached free link! */
         final String directurlproperty = getDirectlinkproperty(account);
         String storedDirecturl = link.getStringProperty(directurlproperty);
@@ -536,21 +543,18 @@ public class OneFichierCom extends PluginForHost {
         errorHandlingWebsite(link, account, br);
         final Form form = br.getForm(0);
         String passCode = link.getDownloadPassword();
-        boolean isPasswordProtected = false;
         if (isPasswordProtectedFileWebsite(br)) {
             logger.info("Handling password protected link...");
-            isPasswordProtected = true;
+            /*
+             * Set pw protected flag so in case this downloadlink is ever tried to be downloaded via API, we already know that it is
+             * password protected!
+             */
             link.setPasswordProtected(true);
             /** Try passwords in this order: 1. DownloadLink stored password, 2. Last used password, 3. Ask user */
             if (passCode == null) {
                 passCode = getUserInput("Password?", link);
             }
             form.put("pass", Encoding.urlEncode(passCode));
-            /*
-             * Set pw protected flag so in case this downloadlink is ever tried to be downloaded via API, we already know that it is
-             * password protected!
-             */
-            link.setPasswordProtected(true);
         }
         /* Remove form fields we don't want. */
         form.remove("save");
@@ -560,7 +564,7 @@ public class OneFichierCom extends PluginForHost {
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, form, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (this.looksLikeDownloadableContent(dl.getConnection())) {
-            if (isPasswordProtected) {
+            if (link.isPasswordProtected()) {
                 logger.info("User entered valid download password: " + passCode);
                 /* Save download-password */
                 link.setDownloadPassword(passCode);
@@ -575,7 +579,7 @@ public class OneFichierCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         errorHandlingWebsite(link, account, br);
-        if (isPasswordProtected) {
+        if (link.isPasswordProtected()) {
             logger.info("User entered valid download password: " + passCode);
             /* Save download-password */
             link.setDownloadPassword(passCode);
@@ -714,8 +718,8 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br>
-     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
+     * Access restricted by IP / only registered users / only premium users / only owner. </br> See here for all possible reasons (login
+     * required): https://1fichier.com/console/acl.pl
      *
      * @throws PluginException
      */
@@ -953,7 +957,10 @@ public class OneFichierCom extends PluginForHost {
         account.setProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, creditsInBytes);
         Boolean cdnCreditsUsageEnforced = null;
         if (!this.isGoldAccount(account)) {
-            /* Check if CDN credits are required */
+            /**
+             * Check if CDN credits are required <br>
+             * For gold accounts this is not needed since they do not have any VPN limitations.
+             */
             logger.info("Checking for forced CDN credits usage");
             br.getPage("https://" + getHost() + "/network.html");
             if (br.containsHTML(">\\s*VPN detected|>\\s*Requires the use of CDN credits or")) {
@@ -978,11 +985,11 @@ public class OneFichierCom extends PluginForHost {
         } else {
             available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, creditsInBytes);
         }
-        String cdnCreditsStatus = "CDN credits: " + available_credits_human_readable + " | Used: ";
+        String cdnCreditsStatusText = "CDN credits: " + available_credits_human_readable + " | Used: ";
         if ((AccountType.FREE.equals(account.getType()) && this.isUsingCDNCredits(account)) || Boolean.TRUE.equals(cdnCreditsUsageEnforced)) {
-            cdnCreditsStatus += "Yes";
+            cdnCreditsStatusText += "Yes";
             if (Boolean.TRUE.equals(cdnCreditsUsageEnforced)) {
-                cdnCreditsStatus += " (forced)";
+                cdnCreditsStatusText += " (forced)";
             }
             if (account.getType() == AccountType.FREE) {
                 /* Treat Free accounts like a premium account if credits are used. */
@@ -996,7 +1003,7 @@ public class OneFichierCom extends PluginForHost {
              */
             ai.setSpecialTraffic(true);
         } else {
-            cdnCreditsStatus += "No";
+            cdnCreditsStatusText += "No";
         }
         final String accountTypeText;
         if (this.isGoldAccount(account)) {
@@ -1004,8 +1011,7 @@ public class OneFichierCom extends PluginForHost {
         } else {
             accountTypeText = account.getType().getLabel();
         }
-        final String accountStatus = accountTypeText + " " + cdnCreditsStatus;
-        ai.setStatus(accountStatus);
+        ai.setStatus(accountTypeText + " " + cdnCreditsStatusText);
     }
 
     private Map<String, Object> parseAPIResponse(final Account account) throws PluginException {
@@ -1028,13 +1034,6 @@ public class OneFichierCom extends PluginForHost {
      */
     private Map<String, Object> handleErrorsAPI(final Account account) throws PluginException {
         final Map<String, Object> entries = parseAPIResponse(account);
-        final Object statusO = entries.get("status");
-        if (statusO == null) {
-            return entries;
-        } else if (!"KO".equalsIgnoreCase((String) statusO)) {
-            /* No error */
-            return entries;
-        }
         return handleErrorsAPI(entries, account);
     }
 
@@ -1328,17 +1327,16 @@ public class OneFichierCom extends PluginForHost {
             dl.startDownload();
         } else {
             /**
-             * Website mode is required for free account downloads
+             * Website mode is required for free (anonymous) and free account downloads
              */
-            loginWebsite(account, false);
             handleDownloadWebsite(link, account);
         }
     }
 
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
-         * 2019-04-05: At the moment there are no benefits for us when using this. </br>
-         * 2021-01-29: Removed this because if login is blocked because of "flood control" this won't work either!
+         * 2019-04-05: At the moment there are no benefits for us when using this. </br> 2021-01-29: Removed this because if login is
+         * blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
         final boolean dev_mode_check_via_api = false;
@@ -1439,7 +1437,7 @@ public class OneFichierCom extends PluginForHost {
         } else if (this.isaccessControlLimited(link)) {
             // throw new PluginException(LinkStatus.ERROR_FATAL, "This link is private. You're not authorized to download it!");
             /*
-             * 2021-02-10: Not sure - seems like thi could be multiple reasons: registered only, premium only, IP/country only or private
+             * 2021-02-10: Not sure - seems like this could be multiple reasons: registered only, premium only, IP/country only or private
              * file --> Owner only. See https://1fichier.com/console/acl.pl
              */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Access to this file has been restricted");
@@ -1489,9 +1487,12 @@ public class OneFichierCom extends PluginForHost {
         if (account == null) {
             throw new IllegalArgumentException();
         }
-        if (account.getBooleanProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING, false)) {
-            /* Message has already been displayed for this account */
-            return;
+        synchronized (account) {
+            if (account.hasProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING)) {
+                /* Message has already been displayed for this account */
+                return;
+            }
+            account.setProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING, System.currentTimeMillis());
         }
         final Thread thread = new Thread() {
             public void run() {
@@ -1563,7 +1564,6 @@ public class OneFichierCom extends PluginForHost {
         };
         thread.setDaemon(true);
         thread.start();
-        account.setProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING, true);
     }
 
     @Override

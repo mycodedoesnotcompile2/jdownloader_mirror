@@ -8,17 +8,21 @@ import org.appwork.utils.Time;
 import jd.http.Cookies;
 
 public class ArchiveOrgLendingInfo {
-    private Cookies              cookies   = null;
-    private Long                 timestamp = null;
-    private final List<BookPage> bookPages = new ArrayList<BookPage>();
+    private Cookies              cookies         = null;
+    private Long                 timestampLoaned = null;
+    private final long           timestampCreated;
+    private final List<BookPage> bookPages       = new ArrayList<BookPage>();
 
     public ArchiveOrgLendingInfo(final Cookies cookies) {
         this.cookies = cookies;
-        this.updateTimestamp();
+        if (cookies != null) {
+            setCookies(cookies);
+        }
+        timestampCreated = Time.systemIndependentCurrentJVMTimeMillis();
     }
 
-    public void updateTimestamp() {
-        this.timestamp = Time.systemIndependentCurrentJVMTimeMillis();
+    private void updateLoanTimestamp() {
+        this.timestampLoaned = Time.systemIndependentCurrentJVMTimeMillis();
     }
 
     public Cookies getCookies() {
@@ -27,13 +31,25 @@ public class ArchiveOrgLendingInfo {
 
     public void setCookies(final Cookies cookies) {
         this.cookies = cookies;
+        /* Assume that book has been loaned */
+        this.updateLoanTimestamp();
     }
 
-    /** Returns whether or not this session is considered valid. */
+    /** Returns whether or not this session is considered valid or worth keeping. */
     public synchronized boolean isValid() {
-        if (this.timestamp == null) {
+        if (isLoanSessionActive()) {
+            /* Active loan session */
+            return true;
+        } else if (Time.systemIndependentCurrentJVMTimeMillis() - this.timestampCreated < 10 * 60 * 60 * 1000) {
+            return true;
+        } else {
             return false;
-        } else if (Time.systemIndependentCurrentJVMTimeMillis() - this.timestamp.longValue() < 60 * 60 * 1000) {
+        }
+    }
+
+    public synchronized boolean isLoanSessionActive() {
+        if (this.timestampLoaned != null && Time.systemIndependentCurrentJVMTimeMillis() - this.timestampLoaned.longValue() < 60 * 60 * 1000) {
+            /* Active loan session */
             return true;
         } else {
             return false;
@@ -42,17 +58,16 @@ public class ArchiveOrgLendingInfo {
 
     /** If this returns null, loan is allowed immediately. */
     public synchronized Long getTimeUntilNextLoanAllowed() {
-        if (this.timestamp == null) {
+        if (this.timestampLoaned == null) {
             return null;
+        }
+        final long timePassedSinceLastLoan = Time.systemIndependentCurrentJVMTimeMillis() - this.timestampLoaned.longValue();
+        final long maxLoanTimeframeMillis = 5 * 60 * 1000;
+        if (timePassedSinceLastLoan < maxLoanTimeframeMillis) {
+            /* Book has been loaned within the last 5 minutes -> Wait at least 5 minutes between loaning. */
+            return maxLoanTimeframeMillis - timePassedSinceLastLoan;
         } else {
-            final long timePassedSinceLastLoan = Time.systemIndependentCurrentJVMTimeMillis() - this.timestamp.longValue();
-            final long maxLoanTimeframeMillis = 5 * 60 * 1000;
-            if (timePassedSinceLastLoan < maxLoanTimeframeMillis) {
-                /* Book has been loaned within the last 5 minutes -> Wait at least 5 minutes between loaning. */
-                return maxLoanTimeframeMillis - timePassedSinceLastLoan;
-            } else {
-                return null;
-            }
+            return null;
         }
     }
 
@@ -119,6 +134,25 @@ public class ArchiveOrgLendingInfo {
         }
         /* All pages have been downloaded --> Download of book is complete */
         return true;
+    }
+
+    public synchronized int getTotalNumberofPages() {
+        if (bookPages == null) {
+            return 0;
+        } else {
+            return bookPages.size();
+        }
+    }
+
+    public synchronized int getNumberOfDownloadedPages() {
+        int num = 0;
+        for (final BookPage page : this.bookPages) {
+            if (page.isDownloaded()) {
+                /* At least one page has not been downloaded --> Download of book is not complete. */
+                num++;
+            }
+        }
+        return num;
     }
 }
 

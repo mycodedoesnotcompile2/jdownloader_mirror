@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,25 +99,63 @@ import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50947 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 50954 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
-    private static final String          CLIENT_SECRET_KEY           = "client_secret";
-    private static final String          CLIENT_ID_KEY               = "client_id";
-    private static final String          CLIENT_SECRET               = "CLIENT_SECRET";
-    private static final String          TOKEN                       = "TOKEN";
-    private static final String          AUTHORIZATION               = "Authorization";
-    private static MultiHosterManagement mhm                         = new MultiHosterManagement("real-debrid.com");
+    private static final String          CLIENT_SECRET_KEY        = "client_secret";
+    private static final String          CLIENT_ID_KEY            = "client_id";
+    private static final String          CLIENT_SECRET            = "CLIENT_SECRET";
+    private static final String          TOKEN                    = "TOKEN";
+    private static final String          AUTHORIZATION            = "Authorization";
+    private static MultiHosterManagement mhm                      = new MultiHosterManagement("real-debrid.com");
     /* API Docs: https://api.real-debrid.com/ */
-    private static final String          API_BASE                    = "https://api.real-debrid.com";
-    private static final String          CLIENT_ID                   = "NJ26PAPGHWGZY";
-    private static AtomicInteger         MAX_DOWNLOADS               = new AtomicInteger(Integer.MAX_VALUE);
-    private static AtomicInteger         RUNNING_DOWNLOADS           = new AtomicInteger(0);
-    private final String                 mName                       = "real-debrid.com";
-    private final String                 mProt                       = "https://";
+    private static final String          API_BASE                 = "https://api.real-debrid.com";
+    private static final String          CLIENT_ID                = "NJ26PAPGHWGZY";
+    private static AtomicInteger         MAX_DOWNLOADS            = new AtomicInteger(Integer.MAX_VALUE);
+    private static AtomicInteger         RUNNING_DOWNLOADS        = new AtomicInteger(0);
+    private final String                 mName                    = "real-debrid.com";
+    private final String                 mProt                    = "https://";
     private Browser                      apiBrowser;
-    private TokenResponse                currentToken                = null;
-    private static final String          PROPERTY_INFRINGING_FILE    = "INFRINGING_FILE_TS";
-    public static final String           TEXT_ERRROR_INFRINGING_FILE = "Infringing file: Not downloadable via Real-Debrid";
+    private TokenResponse                currentToken             = null;
+    private static final String          PROPERTY_INFRINGING_FILE = "INFRINGING_FILE_TS";
+
+    /**
+     * Returns a localized error message for files that cannot be downloaded via Real-Debrid
+     *
+     * @return Localized error message string
+     */
+    private static String getInfringingFileErrorMessage() {
+        // Create a HashMap with language codes as keys and translated messages as values
+        final Map<String, String> errorMessages = new HashMap<String, String>();
+        // Populate the map with translations
+        errorMessages.put("de", "Infringing file: Nicht über Real-Debrid herunterladbar");
+        errorMessages.put("es", "Infringing file: No se puede descargar a través de Real-Debrid");
+        errorMessages.put("fr", "Infringing file: Non téléchargeable via Real-Debrid");
+        errorMessages.put("it", "Infringing file: Non scaricabile tramite Real-Debrid");
+        errorMessages.put("pt", "Infringing file: Não é possível baixar via Real-Debrid");
+        errorMessages.put("ru", "Infringing file: Не скачивается через Real-Debrid");
+        errorMessages.put("nl", "Infringing file: Niet downloadbaar via Real-Debrid");
+        errorMessages.put("pl", "Infringing file: Nie można pobrać przez Real-Debrid");
+        errorMessages.put("ja", "Infringing file: Real-Debrid経由でダウンロードできません");
+        errorMessages.put("zh", "Infringing file: 无法通过Real-Debrid下载");
+        errorMessages.put("tr", "Infringing file: Real-Debrid üzerinden indirilemiyor");
+        errorMessages.put("ar", "Infringing file: غير قابل للتنزيل عبر Real-Debrid");
+        errorMessages.put("ko", "Infringing file: Real-Debrid를 통해 다운로드할 수 없음");
+        errorMessages.put("sv", "Infringing file: Kan inte laddas ner via Real-Debrid");
+        errorMessages.put("fi", "Infringing file: Ei ladattavissa Real-Debridin kautta");
+        errorMessages.put("no", "Infringing file: Ikke nedlastbar via Real-Debrid");
+        errorMessages.put("da", "Infringing file: Kan ikke downloades via Real-Debrid");
+        errorMessages.put("cs", "Infringing file: Nelze stáhnout přes Real-Debrid");
+        errorMessages.put("hu", "Infringing file: Nem tölthető le Real-Debrid-en keresztül");
+        errorMessages.put("ro", "Infringing file: Nu poate fi descărcat prin Real-Debrid");
+        // Get the user's language
+        String language = System.getProperty("user.language").toLowerCase();
+        // Get the corresponding error message or default to English if language not found
+        String errorMessage = errorMessages.get(language);
+        if (errorMessage == null) {
+            errorMessage = "Infringing file: Not downloadable via Real-Debrid";
+        }
+        return errorMessage;
+    }
 
     private static class APIException extends Exception {
         private final URLConnectionAdapter connection;
@@ -584,7 +623,7 @@ public class RealDebridCom extends PluginForHost {
             switch (e.getError()) {
             case INFRINGING_FILE:
                 link.setProperty(PROPERTY_INFRINGING_FILE, Time.timestamp());
-                throw new PluginException(LinkStatus.ERROR_RETRY, TEXT_ERRROR_INFRINGING_FILE, e);
+                throw new PluginException(LinkStatus.ERROR_RETRY, getInfringingFileErrorMessage(), e);
             case FILE_UNAVAILABLE:
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, _JDT.T.downloadlink_status_error_hoster_temp_unavailable(), 10 * 60 * 1000l, e);
             case UNSUPPORTED_HOSTER:
@@ -977,7 +1016,7 @@ public class RealDebridCom extends PluginForHost {
             if (requestor instanceof CustomConditionalSkipReasonMessageIcon) {
                 return ((CustomConditionalSkipReasonMessageIcon) requestor).getMessage(this, node);
             } else {
-                return RealDebridCom.TEXT_ERRROR_INFRINGING_FILE;
+                return RealDebridCom.getInfringingFileErrorMessage();
             }
         }
 

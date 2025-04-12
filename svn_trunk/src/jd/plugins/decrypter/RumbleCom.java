@@ -47,7 +47,7 @@ import org.jdownloader.plugins.components.config.RumbleComConfig.QualitySelectio
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 50951 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50962 $", interfaceVersion = 3, names = {}, urls = {})
 public class RumbleCom extends PluginForDecrypt {
     public RumbleCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -243,6 +243,7 @@ public class RumbleCom extends PluginForDecrypt {
         if (mode == QualitySelectionMode.SELECTED_ONLY && selectedQuality.size() > 0) {
             /* Same resolution can exist multiple times with different bitrates -> Prefer last -> Best */
             ret.clear();
+            /* TODO: only return best */
             ret.addAll(selectedQuality);
             return ret;
         }
@@ -315,7 +316,6 @@ public class RumbleCom extends PluginForDecrypt {
                 bestMap.put(format, dl);
             }
         }
-
         final DownloadLink worst = worstMap.get(format);
         if (worst == null || height < worst.getIntegerProperty(PROPERTY_HEIGHT, -1)) {
             worstMap.put(format, dl);
@@ -353,7 +353,7 @@ public class RumbleCom extends PluginForDecrypt {
             return 2160;
         default:
             /* Should never happen */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + quality);
         }
     }
 

@@ -22,14 +22,18 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.config.SubConfiguration;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50369 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50958 $", interfaceVersion = 3, names = {}, urls = {})
 public class ClicknuploadOrg extends XFileSharingProBasic {
     public ClicknuploadOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -46,7 +50,7 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "clicknupload.click", "clicknupload.link", "clicknupload.red", "clicknupload.to", "clicknupload.cc", "clicknupload.co", "clicknupload.org", "clicknupload.com", "clicknupload.me", "clicknupload.club", "clicknupload.online", "clicknupload.download", "clicknupload.vip", "clickndownload.org", "clickndownload.space", "clicknupload.space", "clickndownload.click", "clickndownload.link", "clicknupload.site", "clicknupload.xyz", "clicknupload.one", "clicknupload.name", "clickndownload.site" });
+        ret.add(new String[] { "clicknupload.click", "clicknupload.link", "clicknupload.red", "clicknupload.to", "clicknupload.cc", "clicknupload.co", "clicknupload.org", "clicknupload.com", "clicknupload.me", "clicknupload.club", "clicknupload.online", "clicknupload.download", "clicknupload.vip", "clicknupload.site", "clicknupload.xyz", "clicknupload.one", "clicknupload.name", "clicknupload.space", "clickndownload.org", "clickndownload.space", "clickndownload.click", "clickndownload.link", "clickndownload.site", "clickndownload.online" });
         return ret;
     }
 
@@ -127,7 +131,7 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
                 final String existingFilename = fileInfo[0];
                 try {
                     submitForm(brc, download1);
-                    scanInfo(fileInfo);
+                    scanInfo(brc.getRequest().getHtmlCode(), fileInfo);
                 } finally {
                     if (existingFilename != null) {
                         // nice/full filename already parsed from fname in scaninfo
@@ -138,6 +142,7 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
         } catch (Exception e) {
             logger.log(e);
         }
+        // super.processFileInfo(fileInfo, altbr, link);
     }
 
     @Override
@@ -167,5 +172,58 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
     protected boolean enableAccountApiOnlyMode() {
         // return DebugMode.TRUE_IN_IDE_ELSE_FALSE;
         return false;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        // final String betterFilename = new Regex(html, "<title>Download ([^<]+)</title>").getMatch(0);
+        // if (betterFilename != null) {
+        // fileInfo[0] = betterFilename;
+        // }
+        final String betterFilesize = new Regex(html, ">\\s*size\\s*</span>\\s*<span>([^<]+)</span>").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
+        }
+        return fileInfo;
+    }
+
+    @Override
+    protected String getFnameViaAbuseLink(final Browser br, final DownloadLink link) throws Exception {
+        final String url = getMainPage() + "/?op=report_file&id=" + this.getFUIDFromURL(link);
+        /* 2025-04-11: Referer required otherwise this request may fail */
+        boolean success = false;
+        for (int i = 0; i <= 3; i++) {
+            logger.info("Attempt " + (i + 1) + "/3");
+            getPage(br, url, false);
+            if (StringUtils.containsIgnoreCase(br.getURL(), "op=report_file")) {
+                success = true;
+                break;
+            }
+        }
+        if (!success) {
+            logger.warning("Special handling failed");
+            return null;
+        }
+        /*
+         * 2019-07-10: ONLY "No such file" as response might always be wrong and should be treated as a failure! Example: xvideosharing.com
+         */
+        if (br.containsHTML(">\\s*No such file\\s*<")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String filename = regexFilenameAbuse(br);
+        if (filename != null) {
+            logger.info("Successfully found filename via report_file: " + filename);
+            return filename;
+        } else {
+            logger.info("Failed to find filename via report_file");
+            final boolean fnameViaAbuseUnsupported = br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500 || !br.getURL().contains("report_file") || br.getRequest().getHtmlCode().trim().equalsIgnoreCase("No such file");
+            if (fnameViaAbuseUnsupported) {
+                logger.info("Seems like report_file availablecheck seems not to be supported by this host");
+                final SubConfiguration config = this.getPluginConfig();
+                config.setProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, System.currentTimeMillis());
+                config.setProperty(PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION, getPluginVersionHash());
+            }
+            return null;
+        }
     }
 }
