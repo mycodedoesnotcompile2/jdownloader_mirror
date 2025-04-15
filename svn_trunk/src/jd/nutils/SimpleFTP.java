@@ -53,8 +53,6 @@ import java.util.List;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
 
-import jd.plugins.Plugin;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -72,6 +70,8 @@ import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
+
+import jd.plugins.Plugin;
 
 /**
  * SimpleFTP is a simple package that implements a Java FTP client. With SimpleFTP, you can connect to an FTP server and upload multiple
@@ -139,6 +139,7 @@ public abstract class SimpleFTP {
                 return URLDecoder.decode(string, "UTF-8").getBytes("UTF-8");
             }
         };
+
         public abstract String fromBytes(final byte[] bytes) throws IOException;
 
         public abstract byte[] toBytes(final String string) throws IOException;
@@ -161,6 +162,7 @@ public abstract class SimpleFTP {
         // AUTH_TLS_P("AUTH TLS-P"),
         // AUTH_SSL("AUTH SSL"),
         UTF8;
+
         private final String cmd;
 
         private FEATURE() {
@@ -763,6 +765,7 @@ public abstract class SimpleFTP {
         // Request denied for policy reasons.
         // command is disabled.
         FAILED_534;
+
         public int code() {
             return Integer.parseInt(name().substring(name().indexOf("_") + 1));
         }
@@ -1206,11 +1209,15 @@ public abstract class SimpleFTP {
         }
 
         public final String getFullPath() {
-            if (getCwd().endsWith("/")) {
-                return getCwd() + getName();
-            } else {
-                return getCwd() + "/" + getName();
+            String ret = getCwd();
+            if (!ret.endsWith("/")) {
+                ret += "/";
             }
+            ret += getName();
+            if (isDir() && !ret.endsWith("/")) {
+                ret += "/";
+            }
+            return ret;
         }
 
         @Override

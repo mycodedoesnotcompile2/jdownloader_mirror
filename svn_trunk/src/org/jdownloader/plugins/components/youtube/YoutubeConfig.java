@@ -397,6 +397,34 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     void setProcessPlaylistItemsInReverseOrder(boolean b);
 
+    public static enum PlaylistDupeDetectionMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto";
+            }
+        },
+        ALLOW_PLAYLIST_AND_SINGLE_VIDEO {
+            @Override
+            public String getLabel() {
+                return "Allow single video and same video as part of playlist";
+            }
+        },
+        AVOID_DUPLICATES {
+            @Override
+            public String getLabel() {
+                return "Use global duplicate detection: Avoid duplicates";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Controls duplicate detection behavior for videos added as part of a playlist")
+    @DefaultEnumValue("AUTO")
+    YoutubeConfig.PlaylistDupeDetectionMode getPlaylistDupeDetectionMode();
+
+    void setPlaylistDupeDetectionMode(YoutubeConfig.PlaylistDupeDetectionMode mode);
+
     @AboutConfig
     @DefaultFactory(DefaultConvertSubtitleVariantMode.class)
     YoutubeConfig.SubtitleVariantMode getSubtitleVariantMode();
@@ -670,6 +698,7 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("If enabled, crawler will avoid video items that already exist in the linkgrabber at a very early stage. This can speed up processing of added YT video links.")
     boolean isCrawlDupeCheckEnabled();
 
     void setCrawlDupeCheckEnabled(boolean b);

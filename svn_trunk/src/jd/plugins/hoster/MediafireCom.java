@@ -59,7 +59,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50943 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 50966 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -321,7 +321,7 @@ public class MediafireCom extends PluginForHost {
                 /* IP limit sits on combination of IP + User-Agent (+ maybe cookies) */
                 logger.info("Detected IP limit -> Trying to avoid it");
                 int i = 0;
-                final int imax = 5;
+                final int imax = 10;
                 boolean success = false;
                 limitAvoidanceLoop: do {
                     logger.info("Trying to avoid IP limit round " + i + "/" + imax);
@@ -348,6 +348,7 @@ public class MediafireCom extends PluginForHost {
             int trycounter = -1;
             Form captchaForm = getCaptchaForm(br);
             if (captchaForm != null) {
+                logger.info("Captcha needed");
                 boolean captchSuccess = false;
                 do {
                     trycounter++;

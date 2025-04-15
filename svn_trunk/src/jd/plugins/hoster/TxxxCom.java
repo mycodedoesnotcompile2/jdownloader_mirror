@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47135 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50964 $", interfaceVersion = 3, names = {}, urls = {})
 public class TxxxCom extends KernelVideoSharingComV2 {
     public TxxxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -29,7 +29,7 @@ public class TxxxCom extends KernelVideoSharingComV2 {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "txxx.com", "tubecup.com", "videotxxx.com", "txxx.tube", "txxxporn.tube" });
+        ret.add(new String[] { "txxx.com", "txxx.me", "tubecup.com", "videotxxx.com", "txxx.tube", "txxxporn.tube" });
         return ret;
     }
 

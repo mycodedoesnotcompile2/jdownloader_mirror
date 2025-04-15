@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50963 $", interfaceVersion = 2, names = {}, urls = {})
 public class CompuPasteCom extends PluginForDecrypt {
     public CompuPasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,7 +123,11 @@ public class CompuPasteCom extends PluginForDecrypt {
             title = Encoding.htmlDecode(title).trim();
         }
         final String htmlToCrawlLinksFrom;
-        final String pasteText = br.getRegex("class\\s*=\\s*\"tab_content\"[^>]*>\\s*(.*?)\"wp-pagenavi\"\\s*>").getMatch(0);
+        String pasteText = br.getRegex("class\\s*=\\s*\"tab_content\"[^>]*>\\s*(.*?)\"wp-pagenavi\"\\s*>").getMatch(0);
+        if (pasteText == null) {
+            /* 2025-04-14: pfree.gatonplayseries.com */
+            pasteText = br.getRegex("class\\s*=\\s*\"tab_content\"[^>]*>\\s*(.*?)>\\s*Reportar\\s*</a>").getMatch(0);
+        }
         if (pasteText != null) {
             htmlToCrawlLinksFrom = pasteText;
         } else {

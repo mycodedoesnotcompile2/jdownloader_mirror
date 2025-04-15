@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50605 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50970 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -363,6 +363,15 @@ public class StreamwishCom extends XFileSharingProBasic {
         if (errorsMisc != null) {
             throw new PluginException(LinkStatus.ERROR_FATAL, Encoding.htmlDecode(errorsMisc).trim());
         }
+    }
+
+    @Override
+    protected String getDllinkVideohost(final DownloadLink link, final Account account, final Browser br, final String src) {
+        final String dllink = new Regex(src, "\"hls2\":\"(http[^\"]+)").getMatch(0);
+        if (dllink != null) {
+            return dllink;
+        }
+        return super.getDllinkVideohost(link, account, br, src);
     }
 
     @Override

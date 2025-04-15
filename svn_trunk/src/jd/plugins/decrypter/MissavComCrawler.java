@@ -29,7 +29,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MissavCom;
 
-@DecrypterPlugin(revision = "$Revision: 50430 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50963 $", interfaceVersion = 3, names = {}, urls = {})
 public class MissavComCrawler extends PluginForDecrypt {
     public MissavComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,6 +47,12 @@ public class MissavComCrawler extends PluginForDecrypt {
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "missav.ws", "missav.com" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("missav.com");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

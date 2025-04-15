@@ -87,6 +87,7 @@ import org.jdownloader.plugins.components.youtube.ClipDataCache;
 import org.jdownloader.plugins.components.youtube.StreamCollection;
 import org.jdownloader.plugins.components.youtube.YoutubeClipData;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig;
+import org.jdownloader.plugins.components.youtube.YoutubeConfig.PlaylistDupeDetectionMode;
 import org.jdownloader.plugins.components.youtube.YoutubeFinalLinkResource;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 import org.jdownloader.plugins.components.youtube.YoutubeHostPluginInterface;
@@ -155,7 +156,7 @@ import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.ChunkRange;
 
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 50970 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -179,7 +180,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
      */
     @Override
     public String getAGBLink() {
-        return "http://youtube.com/t/terms";
+        return "https://youtube.com/t/terms";
     }
 
     @Override
@@ -211,12 +212,11 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
     }
 
     @Override
-    public String getLinkID(DownloadLink link) {
+    public String getLinkID(final DownloadLink link) {
         final String linkID = link.getSetLinkID();
         if (linkID != null) {
-            // TODO: maybe add setting for this
             final String playlistID = link.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID);
-            if (playlistID != null) {
+            if (playlistID != null && enablePlaylistSpecialDupeCheck()) {
                 return linkID + "#playlist=" + playlistID;
             }
             return linkID;
@@ -2926,6 +2926,19 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
 
     public boolean onLinkCrawlerDupeFilterEnabled(CrawledLink existingLink, CrawledLink newLink) {
         return false;
+    }
+
+    /**
+     * If this returns true, single videos and videos added in playlist context will be treated as different items.<br>
+     * This means that the same video can be added once as a single video and unlimited number of more times as part of playlists.
+     */
+    public static boolean enablePlaylistSpecialDupeCheck() {
+        final PlaylistDupeDetectionMode mode = PluginJsonConfig.get(YoutubeConfig.class).getPlaylistDupeDetectionMode();
+        if (mode == PlaylistDupeDetectionMode.AUTO || mode == PlaylistDupeDetectionMode.ALLOW_PLAYLIST_AND_SINGLE_VIDEO) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override

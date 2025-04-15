@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 50831 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50966 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -958,7 +958,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 if (singleTweetID != null) {
                     /* Fail-safe */
                     if (tweetResults.size() > 1 && !thisAllTweetIDs.contains(singleTweetID)) {
-                        logger.info("Single Tweet filter: Skipping the following results because they do not contain the item we are looking for: " + tweetResults);
+                        logger.info("Single Tweet filter: Skipping some results because they do not contain the item we are looking for");
                         continue;
                     }
                 } else if (allowSkipRetweets && !PluginJsonConfig.get(TwitterConfigInterface.class).isCrawlRetweetsV2() && thisRetweetResults != null) {
@@ -1098,6 +1098,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     final String mediaIDStr = media.get("id_str").toString();
                     final String keyForMap = mediaType + "_" + mediaIDStr;
                     if (mediaResultMap.containsKey(keyForMap)) {
+                        /* Skip media items that we've already crawled */
                         continue;
                     }
                     final DownloadLink dl;
@@ -1135,11 +1136,20 @@ public class TwitterComCrawler extends PluginForDecrypt {
                         }
                         dl.setProperty(PROPERTY_VIDEO_DIRECT_URLS_ARE_AVAILABLE_VIA_API_EXTENDED_ENTITY, true);
                         videoIndex++;
+                        /* Add video thumbnail if possible */
+                        final String photoURL = (String) media.get("media_url_https");
+                        if (photoURL != null) {
+                            final DownloadLink thumbnail = this.createDownloadlink(photoURL);
+                            thumbnail.setProperty(PROPERTY_TYPE, TYPE_PHOTO);
+                            thumbnail.setProperty(TwitterCom.PROPERTY_DIRECTURL, photoURL);
+                            thumbnail.setAvailable(true);
+                            /* Add to list of results. If user does not want thumbnail, this result will be removed down below. */
+                            mediaResultMap.put(mediaTypePhoto + "_" + mediaIDStr, thumbnail);
+                        } else {
+                            /* This should never happen */
+                            logger.warning("Found video item without thumbnail | MediaID: " + mediaIDStr);
+                        }
                     } else if (mediaType.equals(mediaTypePhoto)) {
-                        // if (!cfg.isCrawlVideoThumbnail() && foundVideos.contains(tweetID)) {
-                        // // do not grab video thumbnail
-                        // continue;
-                        // }
                         String photoURL = (String) media.get("media_url"); /* Also available as "media_url_https" */
                         if (StringUtils.isEmpty(photoURL)) {
                             photoURL = (String) media.get("media_url_https");

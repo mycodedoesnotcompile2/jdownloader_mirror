@@ -4450,7 +4450,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "If Link equals Play-List or Channel-List or User-List" })
     String YoutubeDashConfigPanel_YoutubeDashConfigPanel_if_link_equals_playlist();
 
-    @Default(lngs = { "en" }, values = { "Profile crawl mode" })
+    @Default(lngs = { "en" }, values = { "Channel/Profile crawl mode" })
     String YoutubeDashConfigPanel_YoutubeDashConfigPanel_ProfileCrawlMode();
 
     @Default(lngs = { "en" }, values = { "Channel/Playlist crawler max items limit [-1 = no limit, 0 = disable crawler]" })
@@ -4462,8 +4462,11 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Channel/Playlist crawler group mode" })
     String YoutubeDashConfigPanel_YoutubeDashConfigPanel_ChannelPlaylistCrawlerPackagingMode();
 
-    @Default(lngs = { "en" }, values = { "Process crawled playlist items in reverse order (only applies if no crawl limit is set or playlist contains less items than set crawl limit!)?" })
+    @Default(lngs = { "en" }, values = { "Playlist items: Process in reverse order [only applies if no crawl limit is set or playlist contains less items than set crawl limit]?" })
     String YoutubeDashConfigPanel_YoutubeDashConfigPanel_ProcessPlaylistItemsInReverseOrder();
+
+    @Default(lngs = { "en" }, values = { "Playlist items: Duplicate detection mode" })
+    String YoutubeDashConfigPanel_YoutubeDashConfigPanel_PlaylistVideosDuplicateDetectionMode();
 
     @Default(lngs = { "en" }, values = { "Explanation of the available tags:" })
     String YoutubeDashConfigPanel_YoutubeDashConfigPanel_tags();

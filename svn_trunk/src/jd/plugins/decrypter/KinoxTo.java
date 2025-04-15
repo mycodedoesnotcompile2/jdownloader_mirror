@@ -21,8 +21,9 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -37,19 +38,23 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48344 $", interfaceVersion = 3, names = {}, urls = {})
-public class KinoxTo extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 50967 $", interfaceVersion = 3, names = {}, urls = {})
+public class KinoxTo extends PluginForDecrypt {
     public KinoxTo(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    private static final Pattern TYPE_SERIES       = Pattern.compile("/Stream/[A-Za-z0-9\\-_]+\\.html", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_SINGLE_VIDEO = Pattern.compile("/(\\d+)-([\\w-]+)\\.html", Pattern.CASE_INSENSITIVE);
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         final String[] names = new String[] { "kinox", "kinoy", "kinoz", "kinos" };
-        final String[] tlds = new String[] { "ai", "af", "am", "click", "cloud", "club", "digital", "direct", "express", "fun", "fyi", "gratis", "gs", "gy", "io", "li", "lol", "me", "mobi", "ms", "nu", "pe", "party", "pub", "sg", "si", "space", "sx", "to", "tube", "tv", "wtf" };
+        final String[] tlds = new String[] { "ai", "af", "am", "click", "cloud", "club", "digital", "direct", "express", "fun", "fyi", "gratis", "gs", "gy", "io", "li", "lol", "me", "mobi", "ms", "nu", "pe", "party", "pub", "sg", "si", "space", "sx", "to", "tube", "tv", "wtf", "tel" };
         final String[] stringarray = new String[names.length * tlds.length];
         int index = 0;
         for (final String name : names) {
@@ -74,7 +79,7 @@ public class KinoxTo extends antiDDoSForDecrypt {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:[w0-9]*\\.)?" + buildHostsPatternPart(domains) + "/Stream/[A-Za-z0-9\\-_]+\\.html");
+            ret.add("https?://(?:[w0-9]*\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_SERIES.pattern() + "|" + TYPE_SINGLE_VIDEO.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -83,71 +88,96 @@ public class KinoxTo extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
-        br.setFollowRedirects(true);
-        getPage(parameter);
-        if (br.getHttpConnection().getResponseCode() == 404 || br.getRedirectLocation() != null && br.getRedirectLocation().contains("Error-404")) {
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String url_name = new Regex(parameter, "kino\\w\\.\\w+/Stream/([A-Za-z0-9\\-_]+)\\.html").getMatch(0);
-        addr_id = this.br.getRegex("Addr=([^<>\"\\&]*?)&").getMatch(0);
-        final String series_id = this.br.getRegex("SeriesID=(\\d+)").getMatch(0);
-        String fpName = br.getRegex("<h1><span style=\"display: inline-block\">([^<>\"]*?)</span>").getMatch(0);
-        fpName = Encoding.htmlDecode(fpName.trim());
-        if (fpName == null) {
-            fpName = url_name;
-        }
-        if (addr_id == null) {
-            addr_id = url_name;
-        }
-        Browser br2 = br.cloneBrowser();
-        br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        if (this.br.containsHTML("id=\"SeasonSelection\"")) {
-            if (series_id == null) {
+        final Regex singlevideoregex = new Regex(br._getURL().getPath(), TYPE_SINGLE_VIDEO);
+        if (singlevideoregex.patternFind()) {
+            final String video_id = singlevideoregex.getMatch(0);
+            final String url_slug = singlevideoregex.getMatch(1);
+            String title = url_slug.replace("-", " ").trim();
+            /* Fix title */
+            title = title.replace("kostenlos auf deutsch", "").trim();
+            final String[] urls = br.getRegex("data-link=\"([^\"]+)").getColumn(0);
+            if (urls == null || urls.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            /* Crawl all Seasons | Episodes | Mirrors of a Series */
-            final String[][] season_info_all = br2.getRegex("value=\"\\d+\" rel=\"([0-9,]+)\"[^>]*?>Staffel (\\d+)</option>").getMatches();
-            int firstSeason = 0;
-            int firstEpisode = 0;
-            if (param.getSource() instanceof CrawledLink) {
-                CrawledLink crawledLink = (CrawledLink) param.getSource();
-                // TODO: Please show dialog here!
-                // firstSeason = crawledLink.getFirstSeason();
-                // firstEpisode = crawledLink.getFirstEpisode();
-            }
-            for (final String[] season : season_info_all) {
-                final String season_number = season[1];
-                int season_number_int = Integer.parseInt(season_number);
-                if (season_number_int < firstSeason) {
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(title);
+            fp.setPackageKey("kinox://movie/" + video_id);
+            for (String url : urls) {
+                url = br.getURL(url).toExternalForm();
+                if (StringUtils.containsIgnoreCase(url, "youtube.com/")) {
+                    /* Do not include trailer */
                     continue;
                 }
-                final String[] season_episodes = season[0].split(",");
-                for (final String episode : season_episodes) {
-                    if (this.isAbort()) {
-                        getLogger().info("Decryption aborted by user");
-                        return ret;
-                    }
-                    if ((season_number_int == firstSeason) && (Integer.parseInt(episode) < firstEpisode)) {
-                        continue;
-                    }
-                    /* Crawl Season --> Find episodes */
-                    br2 = br.cloneBrowser();
-                    br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                    getPage(br2, "/aGET/MirrorByEpisode/?Addr=" + addr_id + "&SeriesID=" + series_id + "&Season=" + season_number + "&Episode=" + episode);
-                    /* Crawl Episode --> Find mirrors */
-                    crawlMirrors(param, ret, br2, fpName, season_number, episode);
-                }
+                final DownloadLink link = this.createDownloadlink(url);
+                link._setFilePackage(fp);
+                ret.add(link);
             }
         } else {
-            /* Crawl all Mirrors of a movie */
-            crawlMirrors(param, ret, br2, fpName, null, null);
+            addr_id = br.getRegex("Addr=([^<>\"\\&]*?)&").getMatch(0);
+            final String url_name = new Regex(contenturl, "kino\\w\\.\\w+/Stream/([A-Za-z0-9\\-_]+)\\.html").getMatch(0);
+            final String series_id = br.getRegex("SeriesID=(\\d+)").getMatch(0);
+            String fpName = br.getRegex("<h1><span style=\"display: inline-block\">([^<>\"]*?)</span>").getMatch(0);
+            fpName = Encoding.htmlDecode(fpName.trim());
+            if (fpName == null) {
+                fpName = url_name;
+            }
+            if (addr_id == null) {
+                addr_id = url_name;
+            }
+            Browser br2 = br.cloneBrowser();
+            br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            if (br.containsHTML("id=\"SeasonSelection\"")) {
+                if (series_id == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                /* Crawl all Seasons | Episodes | Mirrors of a Series */
+                final String[][] season_info_all = br2.getRegex("value=\"\\d+\" rel=\"([0-9,]+)\"[^>]*?>Staffel (\\d+)</option>").getMatches();
+                int firstSeason = 0;
+                int firstEpisode = 0;
+                if (param.getSource() instanceof CrawledLink) {
+                    CrawledLink crawledLink = (CrawledLink) param.getSource();
+                    // TODO: Please display dialog here!
+                    // firstSeason = crawledLink.getFirstSeason();
+                    // firstEpisode = crawledLink.getFirstEpisode();
+                }
+                for (final String[] season : season_info_all) {
+                    final String season_number = season[1];
+                    int season_number_int = Integer.parseInt(season_number);
+                    if (season_number_int < firstSeason) {
+                        continue;
+                    }
+                    final String[] season_episodes = season[0].split(",");
+                    for (final String episode : season_episodes) {
+                        if (this.isAbort()) {
+                            getLogger().info("Decryption aborted by user");
+                            return ret;
+                        }
+                        if ((season_number_int == firstSeason) && (Integer.parseInt(episode) < firstEpisode)) {
+                            continue;
+                        }
+                        /* Crawl Season --> Find episodes */
+                        br2 = br.cloneBrowser();
+                        br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                        br2.getPage("/aGET/MirrorByEpisode/?Addr=" + addr_id + "&SeriesID=" + series_id + "&Season=" + season_number + "&Episode=" + episode);
+                        /* Crawl Episode --> Find mirrors */
+                        crawlMirrors(param, ret, br2, fpName, season_number, episode);
+                    }
+                }
+            } else {
+                /* Crawl all Mirrors of a movie */
+                crawlMirrors(param, ret, br2, fpName, null, null);
+            }
         }
         return ret;
     }
 
-    private void crawlMirrors(CryptedLink param, List<DownloadLink> decryptedLinks, Browser br2, String fpName, final String season_number, final String episode) throws Exception {
-        final String[] mirrors = br2.getRegex("(<li id=\"Hoster_\\d+\".*?</div></li>)").getColumn(0);
+    private void crawlMirrors(final CryptedLink param, final List<DownloadLink> ret, Browser br2, String fpName, final String season_number, final String episode) throws Exception {
+        final String[] mirrors = br2.getRegex("(<li id=\"Hoster_\\d+\".*?</div>\\s*</li>)").getColumn(0);
         if (mirrors == null || mirrors.length == 0) {
             getLogger().info("No mirrors found.");
             // throw new DecrypterException("Decrypter broken"); // Link doesn't always exist
@@ -189,10 +219,10 @@ public class KinoxTo extends antiDDoSForDecrypt {
             final Browser br3 = br.cloneBrowser();
             br3.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             try {
-                getPage(br3, geturl);
+                br3.getPage(geturl);
             } catch (IOException e) {
                 sleep(2000, param);
-                getPage(br3, geturl);
+                br3.getPage(geturl);
             }
             String finallink = PluginJSonUtils.getJson(br3, "Stream");
             if (finallink == null) {
@@ -207,7 +237,7 @@ public class KinoxTo extends antiDDoSForDecrypt {
                 dl.setProperty("fallback_filename", fpName + ".mp4");
             }
             fp.add(dl);
-            decryptedLinks.add(dl);
+            ret.add(dl);
             distribute(dl);
         }
     }

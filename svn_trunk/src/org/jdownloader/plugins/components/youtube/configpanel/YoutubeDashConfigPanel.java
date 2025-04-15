@@ -39,6 +39,7 @@ import org.jdownloader.plugins.components.youtube.YoutubeConfig.ChannelCrawlerSo
 import org.jdownloader.plugins.components.youtube.YoutubeConfig.ChannelPlaylistCrawlerPackagingMode;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig.IfUrlisAPlaylistAction;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig.IfUrlisAVideoAndPlaylistAction;
+import org.jdownloader.plugins.components.youtube.YoutubeConfig.PlaylistDupeDetectionMode;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig.ProfileCrawlMode;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
@@ -140,6 +141,7 @@ public class YoutubeDashConfigPanel extends PluginConfigPanelNG {
         addPair(_GUI.T.YoutubeDashConfigPanel_YoutubeDashConfigPanel_ChannelCrawlerPreferredSortMode(), null, null, new ComboBox<ChannelCrawlerSortMode>(cf._getStorageHandler().getKeyHandler("ChannelCrawlerPreferredSortMode", KeyHandler.class), ChannelCrawlerSortMode.values(), null));
         addPair(_GUI.T.YoutubeDashConfigPanel_YoutubeDashConfigPanel_ChannelPlaylistCrawlerPackagingMode(), null, null, new ComboBox<ChannelPlaylistCrawlerPackagingMode>(cf._getStorageHandler().getKeyHandler("ChannelPlaylistCrawlerPackagingMode", KeyHandler.class), ChannelPlaylistCrawlerPackagingMode.values(), null));
         addPair(_GUI.T.YoutubeDashConfigPanel_YoutubeDashConfigPanel_ProcessPlaylistItemsInReverseOrder(), null, new Checkbox(cf._getStorageHandler().getKeyHandler("ProcessPlaylistItemsInReverseOrder", BooleanKeyHandler.class)));
+        addPair(_GUI.T.YoutubeDashConfigPanel_YoutubeDashConfigPanel_PlaylistVideosDuplicateDetectionMode(), null, null, new ComboBox<PlaylistDupeDetectionMode>(cf._getStorageHandler().getKeyHandler("PlaylistDupeDetectionMode", KeyHandler.class), PlaylistDupeDetectionMode.values(), null));
         // VariantBase[] variants = VariantBase.values();
         // Comparator<VariantBase> comp = new Comparator<VariantBase>() {
         //

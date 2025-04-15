@@ -12,6 +12,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.config.WeakHashSet;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.HTTPProxyException;
+import org.jdownloader.auth.AuthenticationController;
+import org.jdownloader.auth.AuthenticationInfo;
+import org.jdownloader.auth.AuthenticationInfo.Type;
+import org.jdownloader.auth.Login;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -34,19 +46,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.WeakHashSet;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyException;
-import org.jdownloader.auth.AuthenticationController;
-import org.jdownloader.auth.AuthenticationInfo;
-import org.jdownloader.auth.AuthenticationInfo.Type;
-import org.jdownloader.auth.Login;
-import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 49261 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
+@DecrypterPlugin(revision = "$Revision: 50971 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
 public class Ftp extends PluginForDecrypt {
     private static Map<String, Integer>     LIMITS = new HashMap<String, Integer>();
     private static Map<String, Set<Thread>> LOCKS  = new HashMap<String, Set<Thread>>();
@@ -319,12 +319,21 @@ public class Ftp extends PluginForDecrypt {
                         if (nameString != null) {
                             packageName = nameString;
                         }
+                        int maxDepth = 0;
+                        if (url.getRef() != null) {
+                            final String maxDepthString = new Regex(url.getRef(), "max_depth=(-?\\d+)").getMatch(0);
+                            if (maxDepthString != null) {
+                                maxDepth = Integer.parseInt(maxDepthString);
+                            }
+                        }
                         for (final SimpleFTPListEntry entry : entries) {
                             final DownloadLink linkFile = entry.isLink() ? checkLinkFile(ftp, entry) : null;
                             if (linkFile != null) {
                                 ret.add(linkFile);
                             } else if (entry.isFile()) {
                                 ret.add(createDirectFile(entry));
+                            } else if (entry.isDir() && (maxDepth == -1 || maxDepth > 0)) {
+                                ret.add(createFolder(entry, maxDepth));
                             }
                         }
                     }
@@ -381,6 +390,17 @@ public class Ftp extends PluginForDecrypt {
     protected DownloadLink createDownloadlink(String link, boolean urlDecode) {
         // do not URLDecode but keep original name
         return new DownloadLink(null, null, getHost(), link.replace("ftp://", "ftpviajd://"), true);
+    }
+
+    private DownloadLink createFolder(SimpleFTPListEntry entry, int maxDepth) throws IOException {
+        if (!entry.isDir()) {
+            return null;
+        }
+        if (maxDepth != -1) {
+            maxDepth = Math.max(0, maxDepth - 1);
+        }
+        final String link = entry.getURL().toExternalForm() + ((maxDepth == -1 || maxDepth > 0) ? ("#max_depth=" + maxDepth) : "");
+        return new DownloadLink(null, null, getHost(), link, true);
     }
 
     private DownloadLink createDirectFile(SimpleFTPListEntry entry) throws IOException {

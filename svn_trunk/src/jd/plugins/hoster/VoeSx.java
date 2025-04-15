@@ -62,7 +62,7 @@ import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50950 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50969 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -189,94 +189,100 @@ public class VoeSx extends XFileSharingProBasic {
                 return null;
             }
             engine.eval("var result = _0x43551c(\"" + input + "\");");
-            Object result = engine.get("result");
-            String resultAsString = JSonStorage.toString(result);
-            final Map<String, Object> entries = restoreFromString(resultAsString, TypeRef.MAP);
-            final List<Map<String, Object>> fallbacks = (List<Map<String, Object>>) entries.get("fallbacks");
-            if (fallbacks != null && fallbacks.size() == 1) {
-                final String mp4 = (String) fallbacks.get(0).get("file");
-                if (mp4 != null) {
-                    // return mp4;
-                }
-            }
-            String hlsMaster = (String) entries.get("file");
-            if (hlsMaster == null) {
-                hlsMaster = (String) entries.get("source");
-            }
-            return hlsMaster;
+            final Object result = engine.get("result");
+            final String resultAsString = JSonStorage.toString(result);
+            return parseMap(resultAsString);
         } catch (Exception e) {
             logger.log(e);
             return null;
         }
     }
 
+    private String parseMap(String jsonMap) {
+        final Map<String, Object> entries = restoreFromString(jsonMap, TypeRef.MAP);
+        final List<Map<String, Object>> fallbacks = (List<Map<String, Object>>) entries.get("fallbacks");
+        if (fallbacks != null && fallbacks.size() == 1) {
+            final String mp4 = (String) fallbacks.get(0).get("file");
+            if (mp4 != null) {
+                // return mp4;
+            }
+        }
+        String hlsMaster = (String) entries.get("file");
+        if (hlsMaster == null) {
+            hlsMaster = (String) entries.get("source");
+        }
+        return hlsMaster;
+    }
+
     @Override
     protected String getDllinkVideohost(DownloadLink link, Account account, Browser br, final String src) {
-        final String jsResult = getDllinkVideohostJavaScript(link, account, br, src);
-        if (jsResult != null) {
-            return jsResult;
-        }
-        final String mp4Master = new Regex(src, "(?i)(\"|')mp4\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
-        if (mp4Master != null) {
-            return mp4Master;
-        }
-        String hlsMaster = new Regex(src, "(?i)(\"|')hls\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
-        if (hlsMaster == null) {
-            /* 2023-11-21 */
-            hlsMaster = new Regex(src, "(?i)\"(https?://[^/]+/engine/hls[^\"]+)").getMatch(0);
-        }
-        if (hlsMaster != null) {
-            return hlsMaster;
-        }
-        String altSourceB64 = br.getRegex("(?:var|let|const)\\s*wc0\\s*=\\s*'([^\\']+)").getMatch(0);
-        if (altSourceB64 == null) {
-            /* 2024-02-23 */
-            altSourceB64 = br.getRegex("(?:var|let|const)\\s*[^=]+\\s*=\\s*'(ey[^\\']+)").getMatch(0);
-            if (altSourceB64 == null) {
-                /* 2024-02-26 */
-                altSourceB64 = br.getRegex("(?:var|let|const)\\s*[a-f0-9]+\\s*=\\s*'([^\\']+)").getMatch(0);
-                if (altSourceB64 == null) {
-                    /* 2024-11-29 */
-                    altSourceB64 = br.getRegex("(?i)(\"|')hls\\1\\s*:\\s*(\"|')([^\"']+)").getMatch(2);
-                }
+        {
+            final String jsResult = getDllinkVideohostJavaScript(link, account, br, src);
+            if (jsResult != null) {
+                return jsResult;
             }
         }
-        if (altSourceB64 == null) {
-            return null;
+        {
+            final String mp4Master = new Regex(src, "(?i)(\"|')mp4\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
+            if (mp4Master != null) {
+                return mp4Master;
+            }
         }
-        String result = Encoding.Base64Decode(altSourceB64);
-        if (result.startsWith("}")) {
-            /* 2024-02-26 */
-            result = new StringBuilder(result).reverse().toString();
+        {
+            String hlsMaster = new Regex(src, "(?i)(\"|')hls\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
+            if (hlsMaster == null) {
+                /* 2023-11-21 */
+                hlsMaster = new Regex(src, "(?i)\"(https?://[^/]+/engine/hls[^\"]+)").getMatch(0);
+            }
+            if (hlsMaster != null) {
+                return hlsMaster;
+            }
         }
-        if (StringUtils.startsWithCaseInsensitive(result, "http")) {
-            /* Result is url */
-            hlsMaster = result;
-        } else {
-            /* Assume that result is json */
-            try {
-                final Map<String, Object> entries = restoreFromString(result, TypeRef.MAP);
-                final List<Map<String, Object>> fallbacks = (List<Map<String, Object>>) entries.get("fallbacks");
-                if (fallbacks != null && fallbacks.size() == 1) {
-                    final String mp4 = (String) fallbacks.get(0).get("file");
-                    if (mp4 != null) {
-                        // return mp4;
+        {
+            final String hlsMasterB64 = br.getRegex("'hls'\\s*:\\s*'(aHR0[^']+)").getMatch(0);
+            if (hlsMasterB64 != null) {
+                final String ret = Encoding.Base64Decode(hlsMasterB64);
+                return ret;
+            }
+        }
+        {
+            String altSourceB64 = br.getRegex("(?:var|let|const)\\s*wc0\\s*=\\s*'([^\\']+)").getMatch(0);
+            if (altSourceB64 == null) {
+                /* 2024-02-23 */
+                altSourceB64 = br.getRegex("(?:var|let|const)\\s*[^=]+\\s*=\\s*'(ey[^\\']+)").getMatch(0);
+                if (altSourceB64 == null) {
+                    /* 2024-02-26 */
+                    altSourceB64 = br.getRegex("(?:var|let|const)\\s*[a-f0-9]+\\s*=\\s*'([^\\']+)").getMatch(0);
+                    if (altSourceB64 == null) {
+                        /* 2024-11-29 */
+                        altSourceB64 = br.getRegex("(?i)(\"|')hls\\1\\s*:\\s*(\"|')([^\"']+)").getMatch(2);
                     }
                 }
-                hlsMaster = (String) entries.get("file");
-                if (hlsMaster == null) {
-                    hlsMaster = (String) entries.get("source");
+            }
+            if (altSourceB64 != null) {
+                String input = Encoding.Base64Decode(altSourceB64);
+                if (input.startsWith("}")) {
+                    /* 2024-02-26 */
+                    input = new StringBuilder(input).reverse().toString();
                 }
-            } catch (Exception e) {
-                logger.log(e);
+                if (StringUtils.startsWithCaseInsensitive(input, "http")) {
+                    /* Result is url */
+                    return input;
+                } else {
+                    /* Assume that result is json */
+                    try {
+                        final String ret = parseMap(input);
+                        if (ret != null) {
+                            return ret;
+                        }
+                    } catch (Exception e) {
+                        logger.log(e);
+                    }
+                }
             }
         }
-        if (hlsMaster != null) {
-            return hlsMaster;
-        } else {
-            /* Fallback */
-            return super.getDllinkVideohost(link, account, br, src);
-        }
+        /* Fallback */
+        return super.getDllinkVideohost(link, account, br, src);
     }
 
     @Override

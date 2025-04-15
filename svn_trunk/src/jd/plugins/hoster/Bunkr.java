@@ -37,7 +37,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 50921 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50969 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -585,12 +585,13 @@ public class Bunkr extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Check some more filename sources */
-        String filenameFromHTML = br.getRegex("var ogname = \"([^\"]+)\"").getMatch(0);
+        String filenameFromHTML = br.getRegex("var ogname = \"([^\"]+)\"").getMatch(0);// javascript
         if (filenameFromHTML == null) {
-            filenameFromHTML = br.getRegex("<title>Download ([^<]+)</title>").getMatch(0);
+            filenameFromHTML = br.getRegex("<title>Download ([^<]+)</title>").getMatch(0);// html
         }
         if (filenameFromHTML != null) {
-            filenameFromHTML = Encoding.htmlDecode(filenameFromHTML).trim();
+            filenameFromHTML = PluginJSonUtils.unescape(filenameFromHTML);// for javascript
+            filenameFromHTML = Encoding.htmlDecode(filenameFromHTML).trim(); // for html
             setFilename(link, filenameFromHTML, false, true);
         } else {
             logger.warning("Failed to find filename");

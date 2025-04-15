@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -33,11 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
-@HostPlugin(revision = "$Revision: 47474 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50967 $", interfaceVersion = 3, names = {}, urls = {})
 public class DluploadCom extends PluginForHost {
     public DluploadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,8 +45,15 @@ public class DluploadCom extends PluginForHost {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "https://dlupload.com/TermsServices";
+        return "https://" + getHost() + "/TermsServices";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -57,7 +64,6 @@ public class DluploadCom extends PluginForHost {
          * "dlupload.com". Just don't modify the domain of the user added URLs!!
          */
         ret.add(new String[] { "dlupload.com", "khabarbabal.online", "dlsharefile.com" });
-        // ret.add(new String[] { "khabarbabal.online", "dlupload.com" });
         return ret;
     }
 
@@ -73,7 +79,7 @@ public class DluploadCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:Download/)?file/([A-Za-z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:Download/)?file(?:Detail)?/([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -111,7 +117,6 @@ public class DluploadCom extends PluginForHost {
             link.setName(this.getFID(link));
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -133,6 +138,8 @@ public class DluploadCom extends PluginForHost {
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -181,7 +188,7 @@ public class DluploadCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
     }

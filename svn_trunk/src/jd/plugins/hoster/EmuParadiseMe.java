@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/(roms/roms\\.php\\?gid=\\d+|roms/get-download\\.php\\?gid=\\d+|[^<>/]+/[^<>/]+/\\d+)" })
+@HostPlugin(revision = "$Revision: 50970 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/(roms/roms\\.php\\?gid=\\d+|roms/get-download\\.php\\?gid=\\d+|[^<>/]+/[^<>/]+/\\d+)" })
 public class EmuParadiseMe extends PluginForHost {
     public EmuParadiseMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,19 +106,18 @@ public class EmuParadiseMe extends PluginForHost {
     private String getFID(final DownloadLink link) {
         if (link.getPluginPatternMatcher() == null) {
             return null;
+        }
+        if (link.getPluginPatternMatcher().matches(TYPE_NORMAL)) {
+            return new Regex(link.getPluginPatternMatcher(), TYPE_NORMAL).getMatch(0);
+        } else if (link.getPluginPatternMatcher().matches(TYPE_GID)) {
+            return new Regex(link.getPluginPatternMatcher(), TYPE_GID).getMatch(0);
+        } else if (link.getPluginPatternMatcher().matches(TYPE_GID_DOWNLOAD)) {
+            return new Regex(link.getPluginPatternMatcher(), TYPE_GID_DOWNLOAD).getMatch(0);
+        } else if (link.getPluginPatternMatcher().matches(TYPE_SEMICOLON_DOWNLOAD)) {
+            return new Regex(link.getPluginPatternMatcher(), TYPE_SEMICOLON_DOWNLOAD).getMatch(0);
         } else {
-            if (link.getPluginPatternMatcher().matches(TYPE_NORMAL)) {
-                return new Regex(link.getPluginPatternMatcher(), TYPE_NORMAL).getMatch(0);
-            } else if (link.getPluginPatternMatcher().matches(TYPE_GID)) {
-                return new Regex(link.getPluginPatternMatcher(), TYPE_GID).getMatch(0);
-            } else if (link.getPluginPatternMatcher().matches(TYPE_GID_DOWNLOAD)) {
-                return new Regex(link.getPluginPatternMatcher(), TYPE_GID_DOWNLOAD).getMatch(0);
-            } else if (link.getPluginPatternMatcher().matches(TYPE_SEMICOLON_DOWNLOAD)) {
-                return new Regex(link.getPluginPatternMatcher(), TYPE_SEMICOLON_DOWNLOAD).getMatch(0);
-            } else {
-                /* This should never happen */
-                return null;
-            }
+            /* This should never happen */
+            return null;
         }
     }
 
@@ -136,8 +135,13 @@ public class EmuParadiseMe extends PluginForHost {
         br.setFollowRedirects(true);
         prepBrowser(this.br);
         setCookies();
-        /* This should redirect to TYPE_NORMAL. */
-        br.getPage("https://www." + this.getHost() + "/roms/roms.php?gid=" + fid);
+        if (link.getPluginPatternMatcher().matches(TYPE_NORMAL)) {
+            /* Link is already in our target-format -> Use the link that the user added */
+            br.getPage(link.getPluginPatternMatcher());
+        } else {
+            /* This should redirect to TYPE_NORMAL. */
+            br.getPage("https://www." + this.getHost() + "/roms/roms.php?gid=" + fid);
+        }
         if (isOffline()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -156,11 +160,6 @@ public class EmuParadiseMe extends PluginForHost {
             filename = result.getMatch(0);
             filesize = result.getMatch(1);
         } else {
-            if (!br.containsHTML("id=\"Download\"")) {
-                link.setAvailable(false);
-                return;
-            }
-            link.setAvailable(true);
             filename = br.getRegex("itemprop=\"name\">([^<>\"]*?)<br>").getMatch(0);
             if (filename == null) {
                 filename = br.getRegex("\"name\"\\s*:\\s*\"(.*?)\"").getMatch(0);
@@ -210,7 +209,7 @@ public class EmuParadiseMe extends PluginForHost {
     public void setCookies() {
         synchronized (LOCK) {
             /* Re-uses saved cookies to avoid captchas */
-            final Object ret = this.getPluginConfig().getProperty("cookies", null);
+            final Object ret = this.getPluginConfig().getProperty("cookies");
             if (ret != null && ret instanceof Map) {
                 final Map<String, String> cookies = (Map<String, String>) ret;
                 for (final Map.Entry<String, String> cookieEntry : cookies.entrySet()) {
@@ -284,6 +283,10 @@ public class EmuParadiseMe extends PluginForHost {
         setDownloadServerCookie();
         /* Without this the directlink won't be accepted! */
         br.getHeaders().put("Referer", br.getURL());
+        if (dllink == null) {
+            /* Example: https://www.emuparadise.me/Atari_Jaguar_Emulators/Android/50 */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Item is not downloadable anymore?");
+        }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume, maxchunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
@@ -310,17 +313,25 @@ public class EmuParadiseMe extends PluginForHost {
         if (gid == null) {
             errorNoDownloadlinkAvailable();
         }
-        String dllink;
-        if (StringUtils.containsIgnoreCase(br.getURL(), "Sega_Dreamcast_ISOs")) {
-            /* Special case */
-            /* Download can be available in multiple versions (or is it only multiple archive types e.g. .7z and .zip?). */
-            final String[] downloadCandidates = br.getRegex("-download-\\d+\" title=\"Download ([^\"]+) ISO for Sega Dreamcast").getColumn(0);
-            if (downloadCandidates.length == 0) {
-                errorNoDownloadlinkAvailable();
+        String dllink = null;
+        final boolean allowOldWorkarounds = false;
+        if (allowOldWorkarounds) {
+            if (StringUtils.containsIgnoreCase(br.getURL(), "Sega_Dreamcast_ISOs")) {
+                /* Special case */
+                /* Download can be available in multiple versions (or is it only multiple archive types e.g. .7z and .zip?). */
+                final String[] downloadCandidates = br.getRegex("-download-\\d+\" title=\"Download ([^\"]+) ISO for Sega Dreamcast").getColumn(0);
+                if (downloadCandidates.length == 0) {
+                    errorNoDownloadlinkAvailable();
+                }
+                dllink = "http://50.7.92.186/happyUUKAm8913lJJnckLiePutyNak/Dreamcast/" + URLEncode.encodeURIComponent(downloadCandidates[0]);
+            } else {
+                dllink = "/roms/get-download.php?gid=" + gid + "&test=true";
             }
-            dllink = "http://50.7.92.186/happyUUKAm8913lJJnckLiePutyNak/Dreamcast/" + URLEncode.encodeURIComponent(downloadCandidates[0]);
-        } else {
-            dllink = "/roms/get-download.php?gid=" + gid + "&test=true";
+        }
+        final String directurlFromHTML = br.getRegex(">\\s*Download:?\\s*<a href=\"(/[^\"]+)\"").getMatch(0);
+        if (directurlFromHTML != null) {
+            /* 2025-04-14: New/current way */
+            return directurlFromHTML;
         }
         return dllink;
     }
