@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50967 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50972 $", interfaceVersion = 3, names = {}, urls = {})
 public class DluploadCom extends PluginForHost {
     public DluploadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +49,11 @@ public class DluploadCom extends PluginForHost {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public String getPluginContentURL(final DownloadLink link) {
+        return "https://" + getHost() + "/FileDetail/" + this.getFID(link);
     }
 
     @Override
@@ -65,6 +70,12 @@ public class DluploadCom extends PluginForHost {
          */
         ret.add(new String[] { "dlupload.com", "khabarbabal.online", "dlsharefile.com" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("khabarbabal.online");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -85,9 +96,8 @@ public class DluploadCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = false;
-    private static final int     FREE_MAXCHUNKS    = 1;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = false;
+    private static final int     FREE_MAXCHUNKS = 1;
 
     /* Tags: dlplatforms.com, dlupload.com, khabarbabal.online, dlslink.net, dlvisit.com */
     // private static final boolean ACCOUNT_FREE_RESUME = true;
@@ -117,7 +127,7 @@ public class DluploadCom extends PluginForHost {
             link.setName(this.getFID(link));
         }
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage(getPluginContentURL(link));
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("(?i)>\\s*Sorry, there's nothing at this address")) {
@@ -233,7 +243,7 @@ public class DluploadCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -50,6 +50,7 @@ import jd.utils.JDUtilities;
 import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.ExtJFrame;
+import org.appwork.swing.components.ExtJToggleButton;
 import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTHelper;
@@ -366,7 +367,7 @@ public final class TrayIconPopup extends ExtJFrame implements MouseListener {
             ((CustomizableAppAction) action).requestUpdate(this);
         }
         if (action.isToggle()) {
-            JToggleButton bt = new JToggleButton(action);
+            ExtJToggleButton bt = new ExtJToggleButton(action);
             bt.setOpaque(false);
             bt.setContentAreaFilled(false);
             bt.setBorderPainted(false);
@@ -389,7 +390,7 @@ public final class TrayIconPopup extends ExtJFrame implements MouseListener {
             return bt;
         } else {
             // we use a JToggleButton here, because JToggle buttons seem to have a different left icon gap the jbuttons
-            JToggleButton bt = new JToggleButton(action);
+            ExtJToggleButton bt = new ExtJToggleButton(action);
             bt.setOpaque(false);
             bt.setContentAreaFilled(false);
             bt.setBorderPainted(false);

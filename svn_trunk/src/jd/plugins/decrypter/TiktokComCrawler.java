@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 50842 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50972 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -822,6 +822,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             result.setProperty(TiktokCom.PROPERTY_USERNAME, username);
             result.setProperty(TiktokCom.PROPERTY_USER_ID, media.get("authorId"));
             result.setProperty(TiktokCom.PROPERTY_DATE, dateFormatted);
+            result.setProperty(TiktokCom.PROPERTY_AWEME_ITEM_ID, videoID);
             result.setProperty(TiktokCom.PROPERTY_COOKIES, cookies);
             TiktokCom.setLikeCount(result, (Number) stats.get("diggCount"));
             TiktokCom.setPlayCount(result, (Number) stats.get("playCount"));

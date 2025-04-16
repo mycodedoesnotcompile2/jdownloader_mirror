@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -103,7 +103,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
     private long             lastHidden  = 0;
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.MouseListener#mouseEntered(java.awt.event.MouseEvent)
      */
     private int              changeDelay = 500;
@@ -182,7 +182,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.swing.event.AWTEventListener#onAWTEventAfterDispatch(java .awt.AWTEvent)
      */
     @Override
@@ -210,7 +210,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.MouseListener#mouseClicked(java.awt.event.MouseEvent)
      */
     @Override
@@ -219,7 +219,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.MouseMotionListener#mouseDragged(java.awt.event.MouseEvent )
      */
     @Override
@@ -253,7 +253,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.MouseListener#mouseExited(java.awt.event.MouseEvent)
      */
     @Override
@@ -266,7 +266,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.MouseMotionListener#mouseMoved(java.awt.event.MouseEvent)
      */
     @Override
@@ -296,7 +296,6 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      * @param mousePosition2
      */
     private void restartDelayer(final JComponent ac, final Point mousePosition2) {
-        // System.out.println("restartDelayer");
         final int newDelayer = ((ToolTipHandler) ac).getTooltipDelay(new Point(mousePosition2.x, mousePosition2.y));
         if (newDelayer > 0 && newDelayer != delayer.getDelay()) {
             delayer.stop();
@@ -346,7 +345,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.beans.PropertyChangeListener#propertyChange(java.beans. PropertyChangeEvent)
      */
     @Override
@@ -581,7 +580,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.WindowFocusListener#windowGainedFocus(java.awt.event. WindowEvent)
      */
     @Override
@@ -590,7 +589,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.WindowFocusListener#windowLostFocus(java.awt.event.WindowEvent )
      */
     @Override
@@ -600,7 +599,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.MouseListener#mousePressed(java.awt.event.MouseEvent)
      */
     @Override
@@ -609,7 +608,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.awt.event.MouseListener#mouseReleased(java.awt.event.MouseEvent)
      */
     @Override

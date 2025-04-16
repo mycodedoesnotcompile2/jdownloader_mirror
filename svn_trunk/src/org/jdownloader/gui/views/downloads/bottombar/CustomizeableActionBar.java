@@ -17,7 +17,6 @@ import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JSeparator;
-import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -30,6 +29,7 @@ import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
+import org.appwork.swing.components.ExtJToggleButton;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.swing.EDTRunner;
@@ -156,7 +156,7 @@ public class CustomizeableActionBar extends MigPanel {
             bt = ((SelfComponentFactoryInterface) action).createComponent();
         } else if (action.isToggle()) {
             action.requestUpdate(this);
-            bt = new JToggleButton(action);
+            bt = new ExtJToggleButton(action);
         } else {
             action.requestUpdate(this);
             bt = new ExtButton(action);

@@ -148,9 +148,7 @@ public class PauseDownloadsAction extends AbstractToolBarAction implements Downl
 
             @Override
             protected void runInEDT() {
-
                 setTooltipText(_GUI.T.gui_menu_action_break2_desc(org.jdownloader.settings.staticreferences.CFG_GENERAL.PAUSE_SPEED.getValue() / 1024));
-
             }
         };
     }

@@ -118,13 +118,17 @@ public class ScriptEnvironment {
     public static void alert(Object... objects) {
         final Object[] args = JavaScriptEngineFactory.convertJavaScriptToJava(objects);
         String message = null;
-        try {
-            message = JSonStorage.serializeToJson(args != null && args.length == 1 ? args[0] : args);
-        } catch (Exception e1) {
+        if (args != null && args.length == 1 && args[0] instanceof String) {
+            message = args[0].toString();
+        } else {
             try {
-                message = format(toJson(args != null && args.length == 1 ? args[0] : args));
-            } catch (Exception e2) {
-                message = StringUtils.valueOfOrNull(args != null && args.length == 1 ? args[0] : args);
+                message = JSonStorage.serializeToJson(args != null && args.length == 1 ? args[0] : args);
+            } catch (Exception e1) {
+                try {
+                    message = format(toJson(args != null && args.length == 1 ? args[0] : args));
+                } catch (Exception e2) {
+                    message = StringUtils.valueOfOrNull(args != null && args.length == 1 ? args[0] : args);
+                }
             }
         }
         showMessageDialog(message);
@@ -1254,6 +1258,12 @@ public class ScriptEnvironment {
 
     private static void showMessageDialog(final String string) {
         final ScriptThread env = getScriptThread();
+        final int flags;
+        if (string != null && string.matches("<html>.+</html>")) {
+            flags = UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_LARGE | Dialog.STYLE_HTML;
+        } else {
+            flags = UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_LARGE;
+        }
         final String id = T.T.showMessageDialog_title(env.getScript().getName(), env.getScript().getEventTrigger().getLabel());
         new Thread(id) {
             {
@@ -1261,7 +1271,7 @@ public class ScriptEnvironment {
             }
 
             public void run() {
-                UIOManager.I().show(ConfirmDialogInterface.class, new ConfirmDialog(UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_LARGE, id, string, new AbstractIcon(IconKey.ICON_INFO, 32), null, null) {
+                UIOManager.I().show(ConfirmDialogInterface.class, new ConfirmDialog(flags, id, string, new AbstractIcon(IconKey.ICON_INFO, 32), null, null) {
                     @Override
                     protected int getPreferredWidth() {
                         return 600;

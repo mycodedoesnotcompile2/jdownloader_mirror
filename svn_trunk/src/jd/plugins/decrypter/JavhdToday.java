@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 49612 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50973 $", interfaceVersion = 2, names = {}, urls = {})
 public class JavhdToday extends PluginForDecrypt {
     public JavhdToday(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,7 @@ public class JavhdToday extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
         br.getPage(contenturl);
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)404 Not Found\\s*<|Page not found")) {
+        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("404 Not Found\\s*<|Page not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String urlSlug = new Regex(br.getURL(), "/([\\w-]+)/?$").getMatch(0);
@@ -101,10 +101,17 @@ public class JavhdToday extends PluginForDecrypt {
             distribute(result);
             ret.add(result);
         }
-        final ArrayList<String> mirrorsNoDupes = new ArrayList<String>();
-        final String[] mirrorurls = br.getRegex("(?i)(/[\\w\\-]+/\\?link=\\d+)").getColumn(0);
+        final String[] urls = br.getRegex("(/[\\w\\-]+/\\?link=\\d+)").getColumn(0);
+        if (urls == null || urls.length == 0) {
+            if (ret.size() > 0) {
+                return ret;
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
         /* Remove duplicates */
-        for (final String mirrorurl : mirrorurls) {
+        final ArrayList<String> mirrorsNoDupes = new ArrayList<String>();
+        for (final String mirrorurl : urls) {
             if (!mirrorsNoDupes.contains(mirrorurl)) {
                 mirrorsNoDupes.add(mirrorurl);
             }
@@ -128,6 +135,9 @@ public class JavhdToday extends PluginForDecrypt {
                 break;
             }
         }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         return ret;
     }
 
@@ -138,12 +148,19 @@ public class JavhdToday extends PluginForDecrypt {
         if (iframeRedirect != null) {
             br.getPage(iframeRedirect);
         }
-        /* 2021-02-17: javhd.today ticket 89512 */
         final String[] allExternalSources = br.getRegex("playEmbed\\('(https?://[^<>\"\\']+)'\\)").getColumn(0);
         if (allExternalSources.length > 0) {
             for (final String externalSource : allExternalSources) {
                 ret.add(this.createDownloadlink(externalSource));
             }
+        }
+        final String[] allExternalPlainLinks = br.getRegex("window\\.open\\('(https?://[^']+)").getColumn(0); // 2025-04-15
+        if (allExternalPlainLinks.length > 0) {
+            for (final String url : allExternalPlainLinks) {
+                ret.add(this.createDownloadlink(url));
+            }
+        }
+        if (ret.size() > 0) {
             return ret;
         }
         String fembed = br.getRegex("<iframe[^<>]*?src=\"([^<>]*?/v/.*?)\"").getMatch(0);

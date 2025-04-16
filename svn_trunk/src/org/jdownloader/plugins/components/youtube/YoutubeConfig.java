@@ -421,6 +421,8 @@ public interface YoutubeConfig extends PluginConfigInterface {
     @AboutConfig
     @DescriptionForConfigEntry("Controls duplicate detection behavior for videos added as part of a playlist")
     @DefaultEnumValue("AUTO")
+    @DefaultOnNull
+    @RequiresRestart("A JDownloader Restart is Required")
     YoutubeConfig.PlaylistDupeDetectionMode getPlaylistDupeDetectionMode();
 
     void setPlaylistDupeDetectionMode(YoutubeConfig.PlaylistDupeDetectionMode mode);

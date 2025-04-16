@@ -41,16 +41,31 @@ import javax.swing.JComponent;
 import javax.swing.JMenu;
 import javax.swing.JRootPane;
 import javax.swing.JSeparator;
-import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadLinkCandidate;
+import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
+import jd.gui.swing.components.SetIconInterface;
+import jd.gui.swing.components.SetLabelInterface;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.components.ExtButton;
+import org.appwork.swing.components.ExtJToggleButton;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.logging2.LogSource;
@@ -73,21 +88,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.downloadcontroller.DownloadLinkCandidate;
-import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
-import jd.gui.swing.components.SetIconInterface;
-import jd.gui.swing.components.SetLabelInterface;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.components.speedmeter.SpeedMeterPanel;
-import net.miginfocom.swing.MigLayout;
 
 public class MainToolBar extends JToolBar implements MouseListener, DownloadWatchdogListener, GenericConfigEventListener<Boolean> {
     private static final long          serialVersionUID = 922971719957349497L;
@@ -576,29 +576,26 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                     if (action instanceof AbstractToolBarAction) {
                         action.requestUpdate(MainToolBar.this);
                         bt = ((AbstractToolBarAction) action).createButton();
-                        if (bt != null) {
-                            add(bt, "width 32!,height 32!,hidemode 3");
-                        }
                     }
                     if (bt == null) {
                         if (action.isToggle()) {
                             action.requestUpdate(MainToolBar.this);
-                            bt = new JToggleButton(action);
+                            bt = new ExtJToggleButton(action);
                             Icon icon;
-                            bt.setIcon(icon = NewTheme.I().getCheckBoxImage(validateIconKey(action.getIconKey()), false, 24));
+                            final String iconKey = validateIconKey(action.getIconKey());
+                            bt.setIcon(icon = NewTheme.I().getCheckBoxImage(iconKey, false, 24));
                             bt.setRolloverIcon(icon);
-                            bt.setSelectedIcon(icon = NewTheme.I().getCheckBoxImage(action.getIconKey(), true, 24));
+                            bt.setSelectedIcon(icon = NewTheme.I().getCheckBoxImage(iconKey, true, 24));
                             bt.setRolloverSelectedIcon(icon);
-                            add(bt, "width 32!,height 32!,hidemode 3");
                             bt.setHideActionText(true);
                         } else {
                             action.requestUpdate(MainToolBar.this);
                             bt = new ExtButton(action);
                             bt.setIcon(NewTheme.I().getIcon(validateIconKey(action.getIconKey()), 24));
-                            add(bt, "width 32!,height 32!,hidemode 3");
                             bt.setHideActionText(true);
                         }
                     }
+                    add(bt, "width 32!,height 32!,hidemode 3");
                     action.addVisibilityPropertyChangeListener(bt);
                     bt.setVisible(action.isVisible());
                     last = menudata;
@@ -610,15 +607,6 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                     this.rootpane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(ks, action);
                     this.rootpane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ks, action);
                     this.rootpane.getActionMap().put(action, action);
-                    // final String shortCut = action.getShortCutString();
-                    // if (bt != null) {
-                    // if (StringUtils.isEmpty(action.getTooltipText())) {
-                    // bt.setToolTipText(shortCut != null ? " [" + shortCut + "]" : null);
-                    // } else {
-                    // bt.setToolTipText(action.getTooltipText() + (shortCut != null ? " [" + shortCut + "]" : ""));
-                    // }
-                    //
-                    // }
                 }
             } catch (Exception e) {
                 e.printStackTrace();

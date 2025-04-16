@@ -397,7 +397,7 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultIntValue(2000)
-    @SpinnerValidator(min = 50, max = 5000, step = 50)
+    @SpinnerValidator(min = 0, max = 5000, step = 50)
     @RequiresRestart("A JDownloader Restart is Required")
     int getTooltipDelay();
 

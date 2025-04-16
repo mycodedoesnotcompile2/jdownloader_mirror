@@ -16,6 +16,7 @@ import jd.gui.swing.jdgui.Flashable;
 import jd.gui.swing.jdgui.JDGui;
 
 import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.swing.components.ExtJToggleButton;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.toolbar.action.AbstractToolbarToggleAction;
@@ -65,7 +66,7 @@ public class ClipBoardToggleAction extends AbstractToolbarToggleAction implement
         if (bt != null) {
             return bt;
         }
-        bt = new JToggleButton(this);
+        bt = new ExtJToggleButton(this);
         bt.setIcon(iconNormal);
         bt.setRolloverIcon(iconNormal);
         bt.setSelectedIcon(iconSelected);

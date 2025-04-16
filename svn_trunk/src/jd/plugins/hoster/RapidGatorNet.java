@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50675 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50977 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1711,6 +1711,11 @@ public class RapidGatorNet extends PluginForHost {
             /*
              * 2020-03-11: Do not throw ERROR_IP_BLOCKED error here as this error will usually only show up for 30-60 seconds between
              * downloads or upon instant retry of an e.g. interrupted free download --> Reconnect is not required
+             */
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "You can't download more than one file within a certain time period in free mode", PluginJsonConfig.get(RapidGatorConfig.class).getWaitSecondsOnErrorYouCantDownloadMoreThanOneFile() * 1000l);
+        } else if (br.containsHTML("You can`t download not more than 1 file at a time in free mode\\.\\s*<|>\\s*The files of this publisher ")) {
+            /*
+             * 2025-04-15: A second slightly different form of above message
              */
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "You can't download more than one file within a certain time period in free mode", PluginJsonConfig.get(RapidGatorConfig.class).getWaitSecondsOnErrorYouCantDownloadMoreThanOneFile() * 1000l);
         } else if (isBuyFile(br, link, account)) {

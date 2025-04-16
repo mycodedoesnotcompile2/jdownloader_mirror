@@ -88,6 +88,7 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.plugins.components.google.GoogleHelper;
 import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.youtube.YoutubeConfig.PlaylistDupeDetectionMode;
 import org.jdownloader.plugins.components.youtube.YoutubeReplacer.DataOrigin;
 import org.jdownloader.plugins.components.youtube.YoutubeReplacer.DataSource;
 import org.jdownloader.plugins.components.youtube.itag.AudioType;
@@ -173,18 +174,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -1536,6 +1537,27 @@ public class YoutubeHelper {
         return output;
     }
 
+    /**
+     * If this returns true, single videos and videos added in playlist context will be treated as different items.<br>
+     * This means that the same video can be added once as a single video and unlimited number of more times as part of playlists.
+     */
+    private static Boolean enablePlaylistSpecialDupeCheck = null;
+
+    public static boolean enablePlaylistSpecialDupeCheck() {
+        final Boolean ret = enablePlaylistSpecialDupeCheck;
+        if (ret != null) {
+            return ret.booleanValue();
+        }
+        final PlaylistDupeDetectionMode mode = PluginJsonConfig.get(YoutubeConfig.class).getPlaylistDupeDetectionMode();
+        switch (mode) {
+        case AUTO:
+        case ALLOW_PLAYLIST_AND_SINGLE_VIDEO:
+            return enablePlaylistSpecialDupeCheck = true;
+        default:
+            return enablePlaylistSpecialDupeCheck = false;
+        }
+    }
+
     private String getPlayerID(String playerJS) {
         final String ret = new Regex(playerJS, "/player/([^/]+)/(?:tv-)?player(?:_|-)").getMatch(0);
         if (ret != null) {
@@ -1558,52 +1580,52 @@ public class YoutubeHelper {
             descrambler = (String) jsCache.get(resultCacheKey + "descrambler");
             if (descrambler == null) {
                 find: {
-                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)&&\\(\\1\\s*=\\s*([a-zA-Z0-9_$]{2,})\\(decodeURIComponent\\(\\1\\)\\)").getMatch(1);
-                    if (descrambler != null) {
-                        break find;
-                    }
-                    descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
-                    if (descrambler != null) {
-                        break find;
-                    }
-                    descrambler = new Regex(ensurePlayerSource(), "(?:^|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
-                    if (descrambler != null) {
-                        break find;
-                    }
-                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
-                    if (descrambler != null) {
-                        break find;
-                    }
-                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\])\\)").getMatch(0);
-                    if (descrambler != null) {
-                        break find;
-                    }
-                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{[^=]+=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\]|\\2\\.)").getMatch(0);
-                    if (descrambler != null) {
-                        break find;
-                    }
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)&&\\(\\1\\s*=\\s*([a-zA-Z0-9_$]{2,})\\(decodeURIComponent\\(\\1\\)\\)").getMatch(1);
+                if (descrambler != null) {
+                    break find;
                 }
-                logger.info("FunctionName:" + descrambler);
-                final String func = "(?<!\\.)" + Pattern.quote(descrambler) + "\\s*=\\s*function\\(([^)]+)\\)\\{(.+?return.*?)\\};";
-                final String des = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
-                all = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
-                logger.info("Function:" + all);
-                if (all == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
+                if (descrambler != null) {
+                    break find;
                 }
-                final String requiredObjectName = new Regex(des, "([\\w\\d\\$]+)\\.([\\w\\d]{2})\\(").getMatch(0);
-                if (requiredObjectName != null) {
-                    final String requiredObject = new Regex(ensurePlayerSource(), Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
-                    if (requiredObject == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Missing object:" + requiredObject);
-                    }
-                    all += requiredObject;
+                descrambler = new Regex(ensurePlayerSource(), "(?:^|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
                 }
-                all += ";";
-                logger.info("Complete Function:" + all);
-                jsCache.put(resultCacheKey + "all", all);
-                jsCache.put(resultCacheKey + "descrambler", descrambler);
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
+                }
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\])\\)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
+                }
+                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{[^=]+=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\]|\\2\\.)").getMatch(0);
+                if (descrambler != null) {
+                    break find;
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            logger.info("FunctionName:" + descrambler);
+            final String func = "(?<!\\.)" + Pattern.quote(descrambler) + "\\s*=\\s*function\\(([^)]+)\\)\\{(.+?return.*?)\\};";
+            final String des = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
+            all = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
+            logger.info("Function:" + all);
+            if (all == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String requiredObjectName = new Regex(des, "([\\w\\d\\$]+)\\.([\\w\\d]{2})\\(").getMatch(0);
+            if (requiredObjectName != null) {
+                final String requiredObject = new Regex(ensurePlayerSource(), Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
+                if (requiredObject == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Missing object:" + requiredObject);
+                }
+                all += requiredObject;
+            }
+            all += ";";
+            logger.info("Complete Function:" + all);
+            jsCache.put(resultCacheKey + "all", all);
+            jsCache.put(resultCacheKey + "descrambler", descrambler);
             }
         }
         while (true) {

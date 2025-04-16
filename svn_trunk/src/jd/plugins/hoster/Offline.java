@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 50966 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50973 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -204,6 +204,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "cloudcapcity.com" });
         ret.add(new String[] { "deimos.click", "phobos.click" });
         ret.add(new String[] { "demonvideo.top" });
+        ret.add(new String[] { "avgle.com", "avgle.io" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }
