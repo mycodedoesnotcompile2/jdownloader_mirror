@@ -42,9 +42,8 @@ import jd.plugins.components.PluginJSonUtils;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 48913 $", interfaceVersion = 2, names = { "animegg.org" }, urls = { "https?://(www\\.)?animegg\\.org/(?:embed/\\d+|[\\w\\-]+episode-\\d+)" })
+@HostPlugin(revision = "$Revision: 50981 $", interfaceVersion = 2, names = { "animegg.org" }, urls = { "https?://(?:www\\.)?animegg\\.org/(?:embed/\\d+|[\\w\\-]+episode-\\d+)" })
 public class AnimeggOrg extends PluginForHost {
-    // raztoki embed video player template.
     private String dllink = null;
 
     public AnimeggOrg(PluginWrapper wrapper) {
@@ -65,7 +64,7 @@ public class AnimeggOrg extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.animegg.org/";
+        return "https://www." + getHost() + "/";
     }
 
     @Override
@@ -75,12 +74,16 @@ public class AnimeggOrg extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        dllink = null;
         this.setBrowserExclusive();
+        final String extDefault = ".mp4";
         br.getPage(link.getPluginPatternMatcher());
         // not yet available. We can only say offline!
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("<img src=\"\\.\\./images/animegg-unavailable.jpg\" style=\"width: 100%\">")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*No  videos exist for this episode")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (!br.getURL().matches(".+/embed/\\d+")) {
@@ -103,13 +106,13 @@ public class AnimeggOrg extends PluginForHost {
                 index++;
             }
             if (brokenStreamSources == embedurls.length) {
-                /* All sources are brokn */
+                /* All sources are broken */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken video stream?");
             }
         }
         final String filename = br.getRegex("<meta property=\"og:title\" content=\"(.*?)\"").getMatch(0);
         // multiple qualities.
-        final String vidquals = br.getRegex("(?i)videoSources\\s*=\\s*(\\[.*?\\]);").getMatch(0);
+        final String vidquals = br.getRegex("videoSources\\s*=\\s*(\\[.*?\\]);").getMatch(0);
         final LinkedHashMap<Integer, String> results = new LinkedHashMap<Integer, String>();
         final String[] quals = PluginJSonUtils.getJsonResultsFromArray(vidquals);
         String bestQualityDownloadurl = null;
@@ -136,11 +139,18 @@ public class AnimeggOrg extends PluginForHost {
             dllink = bestQualityDownloadurl;
             chosenQuality = bestQuality;
         }
-        if (dllink == null || filename == null) {
+        if (filename != null) {
+            link.setFinalFileName(filename + extDefault);
+        }
+        if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         logger.info("Chosen quality: " + chosenQuality + "p");
-        dllink = Encoding.urlDecode(dllink, false);
+        dllink = Encoding.htmlOnlyDecode(dllink);
+        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+            /* Do not check for file size as download will be started shortly */
+            return AvailableStatus.TRUE;
+        }
         Browser br2 = br.cloneBrowser();
         // In case the link redirects to the finallink
         URLConnectionAdapter con = null;
@@ -149,17 +159,15 @@ public class AnimeggOrg extends PluginForHost {
             // only way to check for made up links... or offline is here
             if (con.getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (this.looksLikeDownloadableContent(con)) {
-                link.setFinalFileName(filename + ".mp4");
-                if (con.getCompleteContentLength() > 0) {
-                    if (con.isContentDecoded()) {
-                        link.setDownloadSize(con.getCompleteContentLength());
-                    } else {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                }
-            } else {
+            } else if (!this.looksLikeDownloadableContent(con)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (con.getCompleteContentLength() > 0) {
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
         } finally {
             try {

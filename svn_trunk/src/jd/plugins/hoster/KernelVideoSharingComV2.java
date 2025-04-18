@@ -77,7 +77,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50983 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1486,8 +1486,12 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 if (dllinkTmp == null && qualityTempStr == null) {
                     /* Skip invalid items */
                     continue;
-                } else if (qualityTempStr == null) {
-                    logger.info("Found item without qlaity indicator: " + dllinkTmp);
+                } else if (!isValidDirectURL(dllinkTmp)) {
+                    logger.info("Skipping invalid video URL: " + dllinkTmp);
+                    continue;
+                }
+                if (qualityTempStr == null) {
+                    logger.info("Found item without quality indicator: " + dllinkTmp);
                     if (uncryptedUrlWithoutQualityIndicator == null) {
                         uncryptedUrlWithoutQualityIndicator = dllinkTmp;
                     }
@@ -1865,6 +1869,9 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         } else if (StringUtils.containsIgnoreCase(url, "_trailer.mp4")) {
             /* 2020-11-04: E.g. privat-zapisi.biz! */
             // logger.info("Skipping invalid video URL (= trailer): " + url);
+            return false;
+        } else if (this.canHandle(url)) {
+            /* 2025-04-17: Important for embed URLs from anysex.com e.g. "/embed/121620" */
             return false;
         } else {
             return true;

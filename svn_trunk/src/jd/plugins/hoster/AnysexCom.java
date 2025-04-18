@@ -23,7 +23,7 @@ import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50983 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnysexCom extends KernelVideoSharingComV2 {
     public AnysexCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +47,15 @@ public class AnysexCom extends KernelVideoSharingComV2 {
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternOnlyNumbers(getPluginDomains());
+        return AnysexCom.buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/((?:embed/)?\\d+/?|video/\\d+/[\\w-]+/?)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override

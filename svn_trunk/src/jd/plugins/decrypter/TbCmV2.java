@@ -34,29 +34,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNodeVisitor;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
-import jd.plugins.components.UserAgents.BrowserName;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
@@ -103,7 +80,30 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 50974 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNodeVisitor;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
+import jd.plugins.components.UserAgents.BrowserName;
+
+@DecrypterPlugin(revision = "$Revision: 50982 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -230,7 +230,7 @@ public class TbCmV2 extends PluginForDecrypt {
 
     /** Returns supported tab names from URLs e.g. "shorts" or "videos". */
     private static String getChannelTabNameFromURL(final String url) {
-        final String ret = new Regex(url, "(?i)/(featured|videos|shorts|releases|playlists).*$").getMatch(0);
+        final String ret = new Regex(url, "(?i)/(featured|playlists|releases|shorts|streams|videos).*$").getMatch(0);
         if (ret != null) {
             return ret.toLowerCase(Locale.ENGLISH);
         } else {
@@ -349,8 +349,8 @@ public class TbCmV2 extends PluginForDecrypt {
         /**
          * 2024-07-05 e.g.
          * https://www.google.com/url?sa=t&source=web&rct=j&opi=123456&url=https://www.youtube.com/watch%3Fv%3DREDACTED&ved=REDACTED
-         * &usg=REDACTED </br> We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are
-         * [a-z0-9_-]
+         * &usg=REDACTED </br>
+         * We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are [a-z0-9_-]
          */
         cleanedurl = Encoding.htmlDecode(cleanedurl);
         videoID = getVideoIDFromUrl(cleanedurl);
@@ -433,12 +433,18 @@ public class TbCmV2 extends PluginForDecrypt {
                 if (playlistID != null) {
                     playlistHandlingHumanReadableTypeOfUrlToCrawl = "Playlist";
                     playlistHandlingHumanReadableTitle = "Playlist | " + playlistID;
+                } else if (userName != null && cfg.getProfileCrawlMode() == ProfileCrawlMode.PLAYLIST) {
+                    playlistHandlingHumanReadableTypeOfUrlToCrawl = "Playlist of channel uploads";
+                    playlistHandlingHumanReadableTitle = "Playlist | Uploads by " + userName;
                 } else if (userName != null && "shorts".equals(channelTabName)) {
                     playlistHandlingHumanReadableTypeOfUrlToCrawl = "Channel Shorts";
                     playlistHandlingHumanReadableTitle = "Channel | " + userName + " | Shorts";
                 } else if (userName != null && "releases".equals(channelTabName)) {
                     playlistHandlingHumanReadableTypeOfUrlToCrawl = "Channel Releases";
                     playlistHandlingHumanReadableTitle = "Channel | " + userName + " | Releases";
+                } else if (userName != null && "streams".equals(channelTabName)) {
+                    playlistHandlingHumanReadableTypeOfUrlToCrawl = "Channel Recorded Livestreams";
+                    playlistHandlingHumanReadableTitle = "Channel | " + userName + " | Recorded Livestreams";
                 } else if (userName != null) {
                     playlistHandlingHumanReadableTypeOfUrlToCrawl = "Channel";
                     playlistHandlingHumanReadableTitle = "Channel | " + userName;
@@ -587,7 +593,8 @@ public class TbCmV2 extends PluginForDecrypt {
                     this.channelID = externalId;
                 }
                 if (cfg.getProfileCrawlMode() == ProfileCrawlMode.PLAYLIST && StringUtils.isEmpty(playlistID)) {
-                    /* Crawl profile as playlist -> Look for playlistID of default profile playlist "Uploads b <username>". */
+                    /* Crawl profile as playlist -> Look for playlistID of default profile playlist "Uploads by <username>". */
+                    String usernameTextForBubbleNotification = null;
                     if (!StringUtils.isEmpty(userName)) {
                         /*
                          * the user channel parser only parses 1050 videos. this workaround finds the user channel playlist and parses this
@@ -618,6 +625,7 @@ public class TbCmV2 extends PluginForDecrypt {
                         }
                         /* channelID starts with "UC". We can build channel-playlist out of channel-ID. */
                         playlistID = "UU" + channelID.substring(2);
+                        usernameTextForBubbleNotification = this.userName;
                     } else if (!StringUtils.isEmpty(channelID)) {
                         /*
                          * you can not use this with /c or /channel based urls, it will pick up false positives. see
@@ -636,6 +644,10 @@ public class TbCmV2 extends PluginForDecrypt {
                             logger.info("Unable to find playlistID -> Crawler is broken or profile does not exist");
                             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                         }
+                        usernameTextForBubbleNotification = this.channelID;
+                    }
+                    if (usernameTextForBubbleNotification != null) {
+                        this.displayBubbleNotification("Channel/Profile will be crawled as playlist", "As wished per plugin settings, channel " + usernameTextForBubbleNotification + " will be crawled as playlist 'Uploads by <username>'.");
                     }
                 }
                 if (channelID != null) {
@@ -1451,8 +1463,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
             /**
-             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br> Only mind this
-             * errormessage if we can't find any content.
+             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br>
+             * Only mind this errormessage if we can't find any content.
              */
             alerts = (List<Map<String, Object>>) rootMap.get("alerts");
             errorOrWarningMessage = null;
@@ -1494,8 +1506,9 @@ public class TbCmV2 extends PluginForDecrypt {
                 putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_DESCRIPTION, playlistDescription);
             }
             /**
-             * Find extra information about channel </br> Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT
-             * ui does not display the total number of shorts of a user.
+             * Find extra information about channel </br>
+             * Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT ui does not display the total number of
+             * shorts of a user.
              */
             String videosCountText = findNumberOfVideosText(rootMap);
             final Map<String, Object> channelHeaderRenderer = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "header/c4TabbedHeaderRenderer");
@@ -1642,8 +1655,9 @@ public class TbCmV2 extends PluginForDecrypt {
                     if (alerts != null && alerts.size() > 0) {
                         /**
                          * 2023-08-03: E.g. playlist with 700 videos but 680 of them are hidden/unavailable which means first pagination
-                         * attempt will fail. </br> Even via website this seems to be and edge case as the loading icon will never disappear
-                         * and no error is displayed.
+                         * attempt will fail. </br>
+                         * Even via website this seems to be and edge case as the loading icon will never disappear and no error is
+                         * displayed.
                          */
                         logger.info("Pagination failed -> Possible reason: " + errorOrWarningMessage);
                     } else {

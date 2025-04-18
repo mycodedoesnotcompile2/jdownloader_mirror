@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50931 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50981 $", interfaceVersion = 3, names = {}, urls = {})
 public class WikifeetCom extends PluginForDecrypt {
     public WikifeetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,7 +109,8 @@ public class WikifeetCom extends PluginForDecrypt {
             modelName = br.getRegex("messanger\\.cfname = '(.*?)';").getMatch(0);
         }
         if (modelName == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* Invalid link e.g. https://wikifeet.com/Luz_Elena_Gonz%25C3%25A1lez */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         modelName = Encoding.htmlDecode(modelName).trim();
         final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("gallery");

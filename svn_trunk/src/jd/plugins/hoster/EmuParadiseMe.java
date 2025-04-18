@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50970 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/(roms/roms\\.php\\?gid=\\d+|roms/get-download\\.php\\?gid=\\d+|[^<>/]+/[^<>/]+/\\d+)" })
+@HostPlugin(revision = "$Revision: 50982 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/(roms/roms\\.php\\?gid=\\d+|roms/get-download\\.php\\?gid=\\d+|[^<>/]+/[^<>/]+/\\d+)" })
 public class EmuParadiseMe extends PluginForHost {
     public EmuParadiseMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class EmuParadiseMe extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.emuparadise.me/contact.php";
+        return "https://www." + getHost() + "/contact.php";
     }
 
     private static Object        LOCK                         = new Object();
@@ -160,19 +160,26 @@ public class EmuParadiseMe extends PluginForHost {
             filename = result.getMatch(0);
             filesize = result.getMatch(1);
         } else {
-            filename = br.getRegex("itemprop=\"name\">([^<>\"]*?)<br>").getMatch(0);
-            if (filename == null) {
-                filename = br.getRegex("\"name\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+            filename = br.getRegex("Download:\\s*<a[^>]*>([^<]+)</a>").getMatch(0);
+            filesize = br.getRegex(">Size:\\s*(\\d+[^<]+)<").getMatch(0);// 2025-04-17
+            if (filesize == null) {
+                filesize = br.getRegex("\\s*title=\"Download.*?\\((\\d+(?:\\.\\d+)?[KMG]{1}[B]{0,1})\\)").getMatch(0);
             }
-            filesize = br.getRegex("\\s*title=\"Download.*?\\((\\d+(?:\\.\\d+)?[KMG]{1}[B]{0,1})\\)").getMatch(0);
             if (filesize == null) {
                 filesize = br.getRegex("\\((\\d+(?:\\.\\d+)?[KMG]{1}[B]{0,1})\\)").getMatch(0);
             }
         }
         if (filename != null) {
-            link.setName(Encoding.htmlDecode(filename).trim() + ".zip");
+            filename = Encoding.htmlDecode(filename).trim();
+            filename = filename.trim();
+            filename = this.correctOrApplyFileNameExtension(filename, ".mp4", null);
+            link.setName(filename);
         }
         if (filesize != null) {
+            filesize = Encoding.htmlDecode(filesize).trim();
+            if (StringUtils.endsWithCaseInsensitive(filesize, "k")) {
+                filesize += "b";
+            }
             link.setDownloadSize(SizeFormatter.getSize(correctFilesize(filesize)));
         }
     }
@@ -195,6 +202,8 @@ public class EmuParadiseMe extends PluginForHost {
 
     public boolean isOffline() {
         if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.containsHTML(">\\s*Unforunately this file has been removed")) {
             return true;
         } else {
             return false;

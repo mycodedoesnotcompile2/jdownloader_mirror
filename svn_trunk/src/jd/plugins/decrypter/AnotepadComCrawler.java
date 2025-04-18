@@ -29,7 +29,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48201 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50982 $", interfaceVersion = 2, names = {}, urls = {})
 public class AnotepadComCrawler extends AbstractPastebinCrawler {
     public AnotepadComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,9 +82,13 @@ public class AnotepadComCrawler extends AbstractPastebinCrawler {
             /* Plaintext containing multiple links (?) */
             plaintxt = br.getRegex("<div class\\s*=\\s*\"plaintext[^\"]*\">([^<>]+)</div>").getMatch(0);
             if (plaintxt == null) {
-                final String plaintxtTmp = br.getRegex("<div class\\s*=\\s*\"note_content\">(.*?)class\\s*=\\s*\"sub-header\"").getMatch(0);
-                if (plaintxtTmp != null) {
-                    plaintxt = new Regex(plaintxtTmp, "<div class\\s*=\\s*\"richtext\">(.*?)</div>").getMatch(0);
+                final String plaintxtSource = br.getRegex("<div class\\s*=\\s*\"note_content\">(.*?)class\\s*=\\s*\"sub-header\"").getMatch(0);
+                if (plaintxtSource != null) {
+                    plaintxt = new Regex(plaintxtSource, "<div class\\s*=\\s*\"richtext\">(.*?)</div>").getMatch(0);
+                }
+                if (plaintxt == null) {
+                    /* Last resort */
+                    plaintxt = br.getRegex("<div class\\s*=\\s*\"richtext\">(.*?)</div>").getMatch(0);
                 }
             }
         }

@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50970 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50982 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class StreamwishCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com" });
+        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com", "streamhg.com", "hlsflex.com", "swiftplayers.com" });
         return ret;
     }
 
@@ -168,7 +168,11 @@ public class StreamwishCom extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFilename = br.getRegex("<h1 class=\"h5 mb-3\">([^<]+)</h1>").getMatch(0);
+        String betterFilename = br.getRegex("<h1 class=\"h5 mb-3\">([^<]+)</h1>").getMatch(0);
+        if (betterFilename == null) {
+            /* streamhg.com */
+            betterFilename = new Regex(html, "<h3[^>]*>\\s*Download ([^<]+)</h3>").getMatch(0);
+        }
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;
         }
@@ -222,6 +226,12 @@ public class StreamwishCom extends XFileSharingProBasic {
             logger.info("[FilesizeMode] Trying to find official video downloads");
         } else {
             logger.info("[DownloadMode] Trying to find official video downloads");
+        }
+        final String fuid = this.getFUIDFromURL(link);
+        final String download_button_url = br.getRegex("(/f/" + fuid + ")").getMatch(0);
+        if (download_button_url != null && !br.getURL().contains(download_button_url)) {
+            logger.info("Accessing download page: " + download_button_url);
+            this.getPage(br, download_button_url);
         }
         final String[] videourls = br.getRegex("(/f/[a-z0-9]{12}_[a-z]{1})").getColumn(0);
         final String[][] videoresolutionsAndFilesizes = br.getRegex(">\\s*(\\d+x\\d+),?\\s*(\\d+(\\.\\d{1,2})?,? [A-Za-z]{1,5})").getMatches();
@@ -340,10 +350,14 @@ public class StreamwishCom extends XFileSharingProBasic {
              * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
              */
             dllink = br.getRegex("<a href\\s*=\\s*\"(https?[^\"]+)\"[^>]*>\\s*Direct Download Link\\s*</a>").getMatch(0);
-        }
-        if (dllink == null) {
-            /* 2024-06-25 */
-            dllink = br.getRegex("href=\"(https?://[^\"]+)\" class=\"dwnl").getMatch(0);
+            if (dllink == null) {
+                /* 2024-06-25 */
+                dllink = br.getRegex("href=\"(https?://[^\"]+)\" class=\"dwnl").getMatch(0);
+                if (dllink == null) {
+                    /* 2025-04-17 */
+                    dllink = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*Download\\s*<").getMatch(0);
+                }
+            }
         }
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find dllink via official video download");
@@ -363,6 +377,11 @@ public class StreamwishCom extends XFileSharingProBasic {
         if (errorsMisc != null) {
             throw new PluginException(LinkStatus.ERROR_FATAL, Encoding.htmlDecode(errorsMisc).trim());
         }
+        final String errorsMisc2 = br.getRegex("<div class=\"text-danger text-center[^\"]*\"[^>]*>([^<]+)</div>").getMatch(0);
+        if (errorsMisc2 != null) {
+            /* E.g. error "Downloads disabled 620" */
+            throw new PluginException(LinkStatus.ERROR_FATAL, Encoding.htmlDecode(errorsMisc2).trim());
+        }
     }
 
     @Override
@@ -377,5 +396,11 @@ public class StreamwishCom extends XFileSharingProBasic {
     @Override
     protected boolean isVideohoster_enforce_video_filename() {
         return true;
+    }
+
+    @Override
+    public ArrayList<String> getCleanupHTMLRegexes() {
+        /* 2025-04-17: Required because otherwise, "display:none" elements are removed from html code in a wrong way. */
+        return null;
     }
 }
