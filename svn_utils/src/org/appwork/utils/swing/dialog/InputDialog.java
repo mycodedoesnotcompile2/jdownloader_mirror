@@ -143,6 +143,12 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
     public void keyTyped(final KeyEvent e) {
     }
 
+    protected void hyperlinkUpdate(final HyperlinkEvent e) {
+        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+            CrossSystem.openURL(e.getURL());
+        }
+    }
+
     @Override
     public JComponent layoutDialogContent() {
         final MigPanel contentpane = new MigPanel("ins 0,wrap 1", "[grow,fill]", "[][]");
@@ -165,9 +171,7 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
                 this.textField.setContentType("text/html");
                 this.textField.addHyperlinkListener(new HyperlinkListener() {
                     public void hyperlinkUpdate(final HyperlinkEvent e) {
-                        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                            CrossSystem.openURL(e.getURL());
-                        }
+                        InputDialog.this.hyperlinkUpdate(e);
                     }
                 });
             } else {
@@ -209,7 +213,7 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
     /**
      * @return
      */
-    protected JTextPane getLargeInputComponent() {        
+    protected JTextPane getLargeInputComponent() {
         return new JTextPane();
     }
 

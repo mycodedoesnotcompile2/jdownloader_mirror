@@ -13,6 +13,8 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.xml.parsers.DocumentBuilder;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
@@ -61,9 +63,10 @@ public class SFDL extends PluginsC {
             final DocumentBuilder documentBuilder = XML.newSecureFactory().newDocumentBuilder();
             /* Parse XML file */
             final Document document = documentBuilder.parse(sfdlFile);
-            final boolean sfdl_AuthRequired = getNode(document, "AuthRequired").equalsIgnoreCase("true");
-            final boolean sdfl_Encrypted = getNode(document, "Encrypted").equalsIgnoreCase("true");
-            final boolean sfdl_BulkFolderMode = getNode(document, "BulkFolderMode").equalsIgnoreCase("true");
+            final boolean sfdl_AuthRequired = Boolean.TRUE.equals(getObject(document, "AuthRequired"));
+            final boolean sdfl_Encrypted = Boolean.TRUE.equals(getObject(document, "Encrypted"));
+            final boolean sfdl_BulkFolderMode = Boolean.TRUE.equals(getObject(document, "BulkFolderMode"));
+            final Object maxDownloadThreads = getObject(document, "MaxDownloadThreads");
             String sfdl_Description = getNode(document, "Description");
             String sfdl_Uploader = getNode(document, "Uploader");
             String sfdl_Host = getNode(document, "Host");
@@ -170,7 +173,6 @@ public class SFDL extends PluginsC {
                     sfdl_FileSizeArray.add(Long.valueOf(fileSizes.item(i).getTextContent()).longValue());
                 }
             }
-            // TODO: Evaluate "MaxDownloadThreads" (?)
             /* TODO: Add check to determine if sfdl_Host is a valid ipv4 address(?) */
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
             if (sfdl_BulkFolderMode) {
@@ -211,6 +213,12 @@ public class SFDL extends PluginsC {
             }
             final ArrayList<CrawledLink> crawledLinks = new ArrayList<CrawledLink>(ret.size());
             for (final DownloadLink result : ret) {
+                if (maxDownloadThreads != null && maxDownloadThreads instanceof Number) {
+                    final Number num = (Number) maxDownloadThreads;
+                    if (num.intValue() >= 1) {
+                        result.setProperty("MAX_FTP_CONNECTIONS", maxDownloadThreads);
+                    }
+                }
                 final CrawledLink crawledLink = new CrawledLink(result);
                 if (archiveInfo != null) {
                     crawledLink.setArchiveInfo(archiveInfo);
@@ -321,10 +329,15 @@ public class SFDL extends PluginsC {
     private static String getNode(final Document document, final String node) {
         final NodeList chk = document.getElementsByTagName(node);
         if (chk.getLength() > 0) {
-            return new String(document.getElementsByTagName(node).item(0).getTextContent());
+            return new String(chk.item(0).getTextContent());
         } else {
             return null;
         }
+    }
+
+    private static Object getObject(final Document document, final String node) {
+        final String objectString = getNode(document, node);
+        return JSonStorage.restoreFromString(objectString, TypeRef.OBJECT);
     }
 
     @Override

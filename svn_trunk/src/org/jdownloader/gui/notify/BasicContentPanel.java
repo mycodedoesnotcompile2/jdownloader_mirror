@@ -7,12 +7,12 @@ import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import javax.swing.text.JTextComponent;
 
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.swing.components.ExtTextArea;
 import org.appwork.swing.components.ExtTextPane;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.SwingUtils;
-
-import net.miginfocom.swing.MigLayout;
 
 public class BasicContentPanel extends AbstractBubbleContentPanel {
     public BasicContentPanel(String text, Icon icon) {
@@ -22,6 +22,12 @@ public class BasicContentPanel extends AbstractBubbleContentPanel {
         SwingUtils.setOpaque(this, false);
     }
 
+    protected void hyperlinkUpdate(final HyperlinkEvent e) {
+        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+            CrossSystem.openURL(e.getURL());
+        }
+    }
+
     private Component getMessage(String text) {
         final JTextComponent ret;
         if (text.matches("^<html>.+")) {
@@ -29,9 +35,7 @@ public class BasicContentPanel extends AbstractBubbleContentPanel {
             textPane.setContentType("text/html");
             textPane.addHyperlinkListener(new HyperlinkListener() {
                 public void hyperlinkUpdate(final HyperlinkEvent e) {
-                    if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                        CrossSystem.openURL(e.getURL());
-                    }
+                    BasicContentPanel.this.hyperlinkUpdate(e);
                 }
             });
             textPane.setEditable(false);

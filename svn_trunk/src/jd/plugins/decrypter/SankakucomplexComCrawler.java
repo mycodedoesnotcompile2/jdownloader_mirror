@@ -26,7 +26,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.PostTagCrawlerCrawlMode;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -47,11 +47,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50504 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50986 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    /*
+     * 2025-04-22: Looks like API doesn't work anymore or at least it fails for a lot of items so for now let's always prefer website in
+     * auto mode.
+     */
+    private static final boolean ACCESS_MODE_AUTO_PREFER_API_MODE = false;
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -143,15 +149,15 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
-        final PostTagCrawlerCrawlMode mode = cfg.getPostTagCrawlerCrawlMode();
+        final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
          * Some items are only visible for logged in users and are never returned via API. </br>
          * For these reasons, website mode is preferred if user owns account && mode is set to AUTO.
          */
-        if (mode == PostTagCrawlerCrawlMode.WEBSITE || (mode == PostTagCrawlerCrawlMode.AUTO && account != null)) {
-            return crawlTagsPostsWebsite(param, tags, language);
-        } else {
+        if (mode == AccessMode.API || (mode == AccessMode.AUTO && (account != null || ACCESS_MODE_AUTO_PREFER_API_MODE))) {
             return crawlTagsPostsAPI(param, tags, language);
+        } else {
+            return crawlTagsPostsWebsite(param, tags, language);
         }
     }
 

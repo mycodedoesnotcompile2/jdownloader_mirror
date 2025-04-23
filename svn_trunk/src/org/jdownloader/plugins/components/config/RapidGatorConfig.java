@@ -85,10 +85,11 @@ public interface RapidGatorConfig extends PluginConfigInterface {
 
     /**
      * 2020-08-05: Resume in free mode is sometimes working, sometimes not. This setting allows users to disable resuming so they e.g.
-     * always get the "non resumable downloads active" warning when stopping their downloads.
+     * always get the "non resumable downloads active" warning when stopping their downloads. <br>
+     * 2025-04-22: Changed default to false since I've never seen resume working for free users within the last few years.
      */
     @AboutConfig
-    @DefaultBooleanValue(true)
+    @DefaultBooleanValue(false)
     @DescriptionForConfigEntry(text_EnableResumeFree)
     @DefaultOnNull()
     @Order(21)

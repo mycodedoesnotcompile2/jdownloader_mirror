@@ -2,15 +2,6 @@ package org.jdownloader.controlling.contextmenu;
 
 import java.awt.event.ActionEvent;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.EDTSelectionInfoCallback;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
@@ -20,8 +11,12 @@ import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
 
-public abstract class CustomizableSelectionAppAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableAppAction {
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.gui.swing.jdgui.interfaces.View;
 
+public abstract class CustomizableSelectionAppAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableAppAction {
     @SuppressWarnings("unchecked")
     @Deprecated
     protected SelectionInfo<PackageType, ChildrenType> getSelection() {
@@ -47,31 +42,9 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
     public static void getViewSelection(final SelectionInfoCallback callback, final SelectionType selectionType) {
         final View view = MainTabbedPane.getInstance().getSelectedView();
         if (view instanceof DownloadsView) {
-            DownloadsTable.getInstance().getSelectionInfo(new SelectionInfoCallback<FilePackage, DownloadLink>() {
-
-                @Override
-                public void onSelectionInfo(final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
-                    callback.onSelectionInfo(selectionInfo);
-                }
-
-                @Override
-                public boolean isCancelled() {
-                    return callback.isCancelled();
-                }
-            }, selectionType);
+            DownloadsTable.getInstance().getSelectionInfo(callback, selectionType);
         } else if (view instanceof LinkGrabberView) {
-            LinkGrabberTable.getInstance().getSelectionInfo(new SelectionInfoCallback<CrawledPackage, CrawledLink>() {
-
-                @Override
-                public void onSelectionInfo(final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
-                    callback.onSelectionInfo(selectionInfo);
-                }
-
-                @Override
-                public boolean isCancelled() {
-                    return callback.isCancelled();
-                }
-            }, selectionType);
+            LinkGrabberTable.getInstance().getSelectionInfo(callback, selectionType);
         }
     }
 
@@ -79,7 +52,6 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
     public void actionPerformed(final ActionEvent e) {
         final SelectionType selectionType = getSelectionType();
         getSelection(new EDTSelectionInfoCallback<PackageType, ChildrenType>() {
-
             @Override
             public void onSelectionInfo(final SelectionInfo<PackageType, ChildrenType> selectionInfo) {
                 onActionPerformed(e, selectionType, selectionInfo);
@@ -116,7 +88,6 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
 
             public void onSelectionInfo(org.jdownloader.gui.views.SelectionInfo<PackageType, ChildrenType> selectionInfo) {
                 onRequestUpdateSelection(requestor, selectionType, selectionInfo);
-
             };
         }, selectionType);
     }
@@ -130,5 +101,4 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
         final SelectionInfo<?, ?> selectionInfo = getSelection();
         return hasSelection(selectionInfo);
     }
-
 }

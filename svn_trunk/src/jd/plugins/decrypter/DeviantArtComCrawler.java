@@ -35,6 +35,7 @@ import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.parser.Regex;
+import jd.parser.html.HTMLParser;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
@@ -46,9 +47,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50661 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50988 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
     /**
      * @author raztoki, pspzockerscene
@@ -342,14 +344,18 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION, 1);
         final HashSet<String> dupes = new HashSet<String>();
         final List<String> allowedresults = new ArrayList<String>();
-        final String[] urls = br.getRegex("src=\"(https?://[^/]+/[^\"]+)\"[^>]*/></button>").getColumn(0);
+        String[] urls = br.getRegex("src=\"(https?://[^/]+/[^\"]+)\"[^>]*/></button>").getColumn(0);
+        if (urls == null || urls.length == 0) {
+            final String html_unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+            urls = HTMLParser.getHttpLinks(html_unescaped, br.getURL());
+        }
         if (urls != null && urls.length > 0) {
             for (final String url : urls) {
                 if (!dupes.add(url)) {
                     /* Skip duplicates */
                     continue;
                 }
-                if (url.contains("fit/w_150,h_150") && url.contains(".jpg") && url.contains("token=")) {
+                if (StringUtils.containsIgnoreCase(url, "fit/w_150,h_150") && StringUtils.containsIgnoreCase(url, ".jpg") && StringUtils.containsIgnoreCase(url, "token=")) {
                     allowedresults.add(url);
                 }
             }

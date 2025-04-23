@@ -50,14 +50,14 @@ import javax.swing.SwingConstants;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.resources.AWUTheme;
 import org.appwork.uio.ExceptionDialogInterface;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.os.CrossSystem;
-
-import net.miginfocom.swing.MigLayout;
 
 /**
  * @author thomas
@@ -134,6 +134,12 @@ public class ExceptionDialog extends AbstractDialog<Integer> implements Exceptio
         return this.exception;
     }
 
+    protected void hyperlinkUpdate(final HyperlinkEvent e) {
+        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+            CrossSystem.openURL(e.getURL());
+        }
+    }
+
     @Override
     public JComponent layoutDialogContent() {
         final JPanel cp = new JPanel(new MigLayout("ins 0,wrap 1", "[fill]", "[][]"));
@@ -150,9 +156,7 @@ public class ExceptionDialog extends AbstractDialog<Integer> implements Exceptio
             this.textField.setContentType("text/html");
             this.textField.addHyperlinkListener(new HyperlinkListener() {
                 public void hyperlinkUpdate(final HyperlinkEvent e) {
-                    if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                        CrossSystem.openURL(e.getURL());
-                    }
+                    ExceptionDialog.this.hyperlinkUpdate(e);
                 }
             });
         } else {
@@ -220,7 +224,7 @@ public class ExceptionDialog extends AbstractDialog<Integer> implements Exceptio
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.uio.ExceptionDialogInterface#getStacktrace()
      */
     @Override

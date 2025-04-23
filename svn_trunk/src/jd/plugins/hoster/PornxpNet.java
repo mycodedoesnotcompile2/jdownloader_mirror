@@ -19,6 +19,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.PornxpNetConfig;
+import org.jdownloader.plugins.components.config.PornxpNetConfig.VideoQuality;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -30,14 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.PornxpNetConfig;
-import org.jdownloader.plugins.components.config.PornxpNetConfig.VideoQuality;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50993 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornxpNet extends PluginForHost {
     public PornxpNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,7 @@ public class PornxpNet extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "pornxp.net", "pornxp.cc", "pornxp.org" });
+        ret.add(new String[] { "pornxp.net", "pornxp.cc", "pornxp.org", "pornxp.com" });
         return ret;
     }
 

@@ -52,6 +52,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
+import java.util.WeakHashMap;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
@@ -454,6 +455,31 @@ public abstract class SimpleFTP {
             }
         } else {
             return null;
+        }
+    }
+
+    protected static class FTP_SERVER {
+        protected final String host;
+        protected final int    port;
+
+        protected FTP_SERVER(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+    }
+
+    protected static final WeakHashMap<FTP_SERVER, Object> FTP_SERVER = new WeakHashMap<FTP_SERVER, Object>();
+
+    protected FTP_SERVER getCurrentServerConnections() throws IOException {
+        synchronized (FTP_SERVER) {
+            for (jd.nutils.SimpleFTP.FTP_SERVER entry : FTP_SERVER.keySet()) {
+                if (entry.port == port && StringUtils.equals(entry.host, host)) {
+                    return entry;
+                }
+            }
+            final FTP_SERVER ret = new FTP_SERVER(host, port);
+            FTP_SERVER.put(ret, new Object());
+            return ret;
         }
     }
 
@@ -971,6 +997,16 @@ public abstract class SimpleFTP {
         }
     }
 
+    /**
+     * You should try to avoid concurrent PASV commands (eg with help of synchronization) to the same server and ensure that each PASV
+     * follows a ftp connection to that InetSocketAddress
+     *
+     * Buggy? server implementations may return same InetSocketAddress for concurrent ftp connections until an actual connection has been
+     * made to that InetSocketAddress
+     *
+     * @return
+     * @throws IOException
+     */
     public InetSocketAddress pasv() throws IOException {
         sendLine("PASV");
         String response = readLines(new int[] { 227 }, "SimpleFTP could not request passive mode:");
@@ -1014,7 +1050,7 @@ public abstract class SimpleFTP {
         SocketStreamInterface dataSocket = null;
         try {
             final long resumeAmount = resumePosition;
-            dataSocket = createSocket(new InetSocketAddress(pasv.getHostName(), pasv.getPort()));
+            dataSocket = createSocket(pasv);
             dataSocket.getSocket().setSoTimeout(getReadTimeout(STATE.DOWNLOADING));
             sendLine("RETR " + filename);
             input = dataSocket.getInputStream();
@@ -1304,24 +1340,29 @@ public abstract class SimpleFTP {
      * @throws IOException
      */
     protected String[][] LIST() throws IOException {
-        InetSocketAddress pasv = pasv();
-        sendLine("LIST");
+        final jd.nutils.SimpleFTP.FTP_SERVER server = getCurrentServerConnections();
         SocketStreamInterface dataSocket = null;
         final StringBuilder sb = new StringBuilder();
-        try {
-            dataSocket = createSocket(new InetSocketAddress(pasv.getHostName(), pasv.getPort()));
-            readLines(new int[] { 125, 150 }, null);
-            final ENCODING encoding = getPathEncoding();
-            sb.append(encoding.fromBytes(IO.readStream(-1, dataSocket.getInputStream(), new ByteArrayOutputStream(), false)));
-        } catch (IOException e) {
-            if (e.getMessage().contains("550")) {
-                logger.log(e);
-                return null;
-            } else {
-                throw e;
+        synchronized (server) {
+            // ugly workaround, we synchronize on FTP_SERVER instanceof for current server, because buggy? server may return same PASV
+            // address for concurrent connections
+            final InetSocketAddress pasv = pasv();
+            sendLine("LIST");
+            try {
+                dataSocket = createSocket(pasv);
+                readLines(new int[] { 125, 150 }, null);
+                final ENCODING encoding = getPathEncoding();
+                sb.append(encoding.fromBytes(IO.readStream(-1, dataSocket.getInputStream(), new ByteArrayOutputStream(), false)));
+            } catch (IOException e) {
+                if (e.getMessage().contains("550")) {
+                    logger.log(e);
+                    return null;
+                } else {
+                    throw e;
+                }
+            } finally {
+                shutDownSocket(dataSocket);
             }
-        } finally {
-            shutDownSocket(dataSocket);
         }
         readLines(new int[] { 226 }, null);
         /* permission,type,user,group,size,date,filename */

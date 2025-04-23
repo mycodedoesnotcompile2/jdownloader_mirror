@@ -171,6 +171,12 @@ public class ConfirmDialog extends AbstractDialog<Integer> implements ConfirmDia
         return p;
     }
 
+    protected void hyperlinkUpdate(final HyperlinkEvent e) {
+        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+            CrossSystem.openURL(e.getURL());
+        }
+    }
+
     protected JTextComponent addMessageComponent(final MigPanel p) {
         JTextPane textField = new JTextPane() {
             private static final long serialVersionUID = 1L;
@@ -186,9 +192,7 @@ public class ConfirmDialog extends AbstractDialog<Integer> implements ConfirmDia
             textField.setContentType("text/html");
             textField.addHyperlinkListener(new HyperlinkListener() {
                 public void hyperlinkUpdate(final HyperlinkEvent e) {
-                    if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                        CrossSystem.openURL(e.getURL());
-                    }
+                    ConfirmDialog.this.hyperlinkUpdate(e);
                 }
             });
         } else {
@@ -215,7 +219,7 @@ public class ConfirmDialog extends AbstractDialog<Integer> implements ConfirmDia
     /**
      * @param textField
      */
-    protected void modifyTextPane(JTextPane textField) {        
+    protected void modifyTextPane(JTextPane textField) {
     }
 
     @Override

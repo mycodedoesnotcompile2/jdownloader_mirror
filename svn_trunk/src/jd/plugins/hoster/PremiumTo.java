@@ -68,9 +68,10 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 50993 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
     private final String PROPERTY_normalTraffic                                            = "normalTraffic";
     private final String PROPERTY_specialTraffic                                           = "specialTraffic";
@@ -699,9 +700,9 @@ public class PremiumTo extends UseNet {
             } catch (final JSonMapperException ignore) {
                 /* This should never happen. */
                 if (link != null) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l);
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l, ignore);
                 } else {
-                    throw new AccountUnavailableException("Invalid API response", 60 * 1000);
+                    throw new AccountUnavailableException(ignore, "Invalid API response", 60 * 1000);
                 }
             }
             final Number responsecodeO = (Number) entries.get("code");
@@ -758,6 +759,9 @@ public class PremiumTo extends UseNet {
             }
             return entries;
         } else {
+            if (br.containsHTML("Currently no available premium acccount for this filehost")) {
+                new MultiHosterManagement(getHost()).putError(account, link, 30 * 60 * 1000l, "Currently no available premium acccount for this filehost");
+            }
             /* TODO: Check if these ones still exist */
             if (br.getURL() != null && br.getURL().contains("storage.premium.to")) {
                 /* Now handle special Storage errors / statuscodes */

@@ -110,11 +110,11 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.swing.dialog.AbstractDialog#getRetValue()
      */
     @Override
-    protected Integer createReturnValue() {        
+    protected Integer createReturnValue() {
         return this.getReturnmask();
     }
 
@@ -137,6 +137,12 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
         super.dispose();
     }
 
+    protected void hyperlinkUpdate(final HyperlinkEvent e) {
+        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+            CrossSystem.openURL(e.getURL());
+        }
+    }
+
     protected void addMessageComponent(final MigPanel p) {
         textField = new JTextPane() {
             private static final long serialVersionUID = 1L;
@@ -152,9 +158,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
             textField.setContentType("text/html");
             textField.addHyperlinkListener(new HyperlinkListener() {
                 public void hyperlinkUpdate(final HyperlinkEvent e) {
-                    if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                        CrossSystem.openURL(e.getURL());
-                    }
+                    ProgressDialog.this.hyperlinkUpdate(e);
                 }
             });
         } else {
@@ -179,7 +183,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
     /**
      * @param textField2
      */
-    private void modifyTextPane(JTextPane textField2) {        
+    private void modifyTextPane(JTextPane textField2) {
     }
 
     /**
@@ -254,13 +258,13 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
     /**
      * @param p
      */
-    protected void extendLayout(JPanel p) {        
+    protected void extendLayout(JPanel p) {
     }
 
     /**
      * @return
      */
-    protected boolean isLabelEnabled() {        
+    protected boolean isLabelEnabled() {
         return false;
     }
 
@@ -297,17 +301,17 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.swing.dialog.ProgressInterface#getMessage()
      */
     @Override
-    public String getMessage() {        
+    public String getMessage() {
         return this.message;
     }
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.swing.dialog.ProgressInterface#getValue()
      */
     @Override

@@ -34,11 +34,6 @@ import javax.swing.text.DefaultEditorKit.CopyAction;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.TextAction;
 
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
-import jd.plugins.download.HashInfo;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -72,6 +67,11 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
+import jd.plugins.download.HashInfo;
+import net.miginfocom.swing.MigLayout;
 
 public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperties> extends MigPanel implements ActionListener, GenericConfigEventListener<Boolean> {
     protected final PseudoCombo<BooleanStatus>          autoExtract;
@@ -248,16 +248,7 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
                 // delayedSave();
             }
         };
-        downloadpassword.addFocusListener(new FocusListener() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                downloadpassword.selectAll();
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-            }
-        });
+        addSelectAllFocusListener(downloadpassword);
         downloadpassword.setHelpText(_GUI.T.AddLinksDialog_layoutDialogContent_password_tt());
         setListeners(downloadpassword);
         downloadpassword.setBorder(BorderFactory.createCompoundBorder(downloadpassword.getBorder(), BorderFactory.createEmptyBorder(2, 6, 1, 6)));
@@ -289,16 +280,7 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
             }
         };
         // downloadFrom.setEditable(false);
-        downloadFrom.addFocusListener(new FocusListener() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                downloadFrom.selectAll();
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-            }
-        });
+        addSelectAllFocusListener(downloadFrom);
         downloadFrom.setBorder(BorderFactory.createCompoundBorder(downloadFrom.getBorder(), BorderFactory.createEmptyBorder(2, 6, 1, 6)));
         checksum = new ExtTextField() {
             @Override
@@ -306,16 +288,7 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
                 // delayedSave();
             }
         };
-        checksum.addFocusListener(new FocusListener() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                checksum.selectAll();
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-            }
-        });
+        addSelectAllFocusListener(checksum);
         checksum.setHelpText(_GUI.T.AddLinksDialog_layoutDialogContent_checksum_tt());
         setListeners(checksum);
         checksum.setBorder(BorderFactory.createCompoundBorder(checksum.getBorder(), BorderFactory.createEmptyBorder(2, 6, 1, 6)));
@@ -333,16 +306,7 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
                 // delayedSave();
             }
         };
-        password.addFocusListener(new FocusListener() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                password.selectAll();
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-            }
-        });
+        addSelectAllFocusListener(password);
         setListeners(password);
         password.setHelpText(_GUI.T.AddLinksDialog_createExtracOptionsPanel_password());
         password.setBorder(BorderFactory.createCompoundBorder(password.getBorder(), BorderFactory.createEmptyBorder(2, 6, 1, 6)));
@@ -468,6 +432,27 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
         autoExtract.setEnabled(false);
         password.setEnabled(false);
         onHidden();
+    }
+
+    protected void addSelectAllFocusListener(final ExtTextField textField) {
+        textField.addFocusListener(new FocusListener() {
+            boolean focusLost = true;
+
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (focusLost) {
+                    focusLost = false;
+                    textField.selectAll();
+                }
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (!e.isTemporary() || e.getOppositeComponent() == null) {
+                    focusLost = true;
+                }
+            }
+        });
     }
 
     protected void onHidden() {

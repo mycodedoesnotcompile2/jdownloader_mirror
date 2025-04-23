@@ -350,13 +350,27 @@ public class FileColumn extends ExtTextColumn<AbstractNode> implements GenericCo
         }
     }
 
+    boolean hadFocusBefore = true;
+
     @Override
     public void focusLost(FocusEvent e) {
         super.focusLost(e);
+        if (!e.isTemporary() || e.getOppositeComponent() == null) {
+            hadFocusBefore = false;
+        }
+    }
+
+    @Override
+    public boolean stopCellEditing() {
+        return super.stopCellEditing();
     }
 
     @Override
     public void focusGained(final FocusEvent e) {
+        if (hadFocusBefore) {
+            return;
+        }
+        hadFocusBefore = true;
         final String txt = editorField.getText();
         final String withoutArchiveExtension = RenameDialog.removeArchiveExtension(null, txt);
         int point = -1;

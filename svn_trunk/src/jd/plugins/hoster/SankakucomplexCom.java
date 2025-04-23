@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -31,6 +32,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
@@ -54,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 50650 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50986 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,9 +83,10 @@ public class SankakucomplexCom extends PluginForHost {
         br.setCookie(host, "v", "0");
     }
 
-    private final boolean              allowUseAPI                           = true;
+    private static final boolean       ACCESS_MODE_AUTO_PREFER_API_MODE      = false;
     public static final String         PROPERTY_UPLOADER                     = "uploader";
     public static final String         PROPERTY_DIRECTURL                    = "directurl";
+    public static final String         PROPERTY_DIRECTURL_FILENAME           = "directurl_filename";
     public static final String         PROPERTY_BOOK_TITLE                   = "book_title";
     public static final String         PROPERTY_TAGS_COMMA_SEPARATED         = "tags_comma_separated";
     public static final String         PROPERTY_IS_PREMIUMONLY               = "is_premiumonly";
@@ -145,11 +148,23 @@ public class SankakucomplexCom extends PluginForHost {
         return "https://chan." + getHost() + "/posts/" + fileID;
     }
 
+    private boolean allowUseAPI(final Account account) {
+        final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
+        final AccessMode mode = cfg.getLinkcheckAccessMode();
+        if (mode == AccessMode.API) {
+            return true;
+        } else if (mode == AccessMode.API && ACCESS_MODE_AUTO_PREFER_API_MODE) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final AvailableStatus status = requestFileInformation(link, null);
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        if (status == AvailableStatus.TRUE && link.hasProperty(PROPERTY_IS_PREMIUMONLY) && allowUseAPI && !link.isSizeSet() && account != null) {
+        if (status == AvailableStatus.TRUE && link.hasProperty(PROPERTY_IS_PREMIUMONLY) && allowUseAPI(null) && !link.isSizeSet() && account != null) {
             /* Workaround for when some file information is missing when link leads to account-only content and is checked via API. */
             logger.info("Failed to find file size via API and item is only available via account while we have an account -> Checking status again via website in hope to obtain all information");
             return requestFileInformationWebsite(link, account, false);
@@ -166,7 +181,7 @@ public class SankakucomplexCom extends PluginForHost {
         } else {
             fileIDIsAPICompatible = true;
         }
-        if (allowUseAPI && fileIDIsAPICompatible) {
+        if (fileIDIsAPICompatible && allowUseAPI(account)) {
             return requestFileInformationAPI(link, account, false);
         } else {
             return requestFileInformationWebsite(link, account, false);
@@ -272,7 +287,7 @@ public class SankakucomplexCom extends PluginForHost {
             logger.warning("Failed to find publish date");
         }
         if (dllink != null) {
-            link.setProperty(PROPERTY_DIRECTURL, dllink);
+            this.storeDirecturl(link, dllink);
             if (!isDownload && !link.isSizeSet()) {
                 /* Obtain file size from header */
                 try {
@@ -373,7 +388,7 @@ public class SankakucomplexCom extends PluginForHost {
              */
             // link.setMD5Hash(md5hash);
         }
-        link.setProperty(PROPERTY_DIRECTURL, item.get("file_url"));
+        storeDirecturl(link, item.get("file_url").toString());
         link.setProperty(PROPERTY_SOURCE, item.get("source"));
         link.setAvailable(true);
         final String bookTitle = link.getStringProperty(PROPERTY_BOOK_TITLE);
@@ -391,6 +406,19 @@ public class SankakucomplexCom extends PluginForHost {
             final String dateFormatted = formatter.format(new Date(created_at_timestamp * 1000));
             link.setProperty(PROPERTY_DATE_PUBLISHED, dateFormatted);
         }
+    }
+
+    private static void storeDirecturl(final DownloadLink link, final String url) {
+        if (url == null) {
+            return;
+        }
+        try {
+            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(url));
+            link.setProperty(PROPERTY_DIRECTURL_FILENAME, filenameFromURL);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+        link.setProperty(PROPERTY_DIRECTURL, url);
     }
 
     @Override

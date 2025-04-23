@@ -3131,6 +3131,14 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public void extendMultiHostAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {
+        if (!acc.isEnabled()) {
+            /**
+             * Do not display detailed supported host information for disabled accounts because: <br>
+             * - Takes away a lot of space <br>
+             * - Supported host information may change frequently so chances are super high that the information we have is outdated
+             */
+            return;
+        }
         final AccountInfo ai = acc.getAccountInfo();
         if (ai == null) {
             return;

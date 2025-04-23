@@ -1773,7 +1773,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
      * Use with caution!! This does not remove/replace existing HashInfo items!
      */
     public void addHashInfo(final HashInfo hashInfo) {
-        // TODO: Implement "add" functionality
+        // TODO: Implement "add" functionality, see https://svn.jdownloader.org/issues/90472
         this.setHashInfo(hashInfo);
     }
 

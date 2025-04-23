@@ -323,7 +323,7 @@ public abstract class ExtTextColumn<E> extends ExtColumn<E> implements ActionLis
             // do not save edits on focus lost.
             setNoSet(true);
             try {
-                ExtTextColumn.this.stopCellEditing();
+                ExtTextColumn.this.cancelCellEditing();
             } finally {
                 setNoSet(false);
             }

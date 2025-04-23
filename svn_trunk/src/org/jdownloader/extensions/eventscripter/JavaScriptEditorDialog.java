@@ -13,13 +13,6 @@ import javax.swing.JEditorPane;
 import javax.swing.JScrollPane;
 import javax.swing.JToolBar;
 
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jsyntaxpane.syntaxkits.JavaSyntaxKit;
-import net.sourceforge.htmlunit.corejs.javascript.Context;
-import net.sourceforge.htmlunit.corejs.javascript.Script;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
-import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.IO;
@@ -35,6 +28,13 @@ import org.jdownloader.extensions.eventscripter.sandboxobjects.ScriptEnvironment
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JSHtmlUnitPermissionRestricter;
+
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jsyntaxpane.syntaxkits.JavaSyntaxKit;
+import net.sourceforge.htmlunit.corejs.javascript.Context;
+import net.sourceforge.htmlunit.corejs.javascript.Script;
+import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
+import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
 
 public class JavaScriptEditorDialog extends AbstractDialog<Object> {
     private static final String                   CLEANUP                  = "[^\\w\\d\\(\\)\\+\\-\\[\\]\\;\\,/\\\\]";
@@ -147,6 +147,7 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
             txt = T.T.emptyScript();
         }
         editor.setText(txt);
+        editor.setCaretPosition(0);
         // toolbar
         toolbar.add(new ExtButton(new AppAction() {
             {

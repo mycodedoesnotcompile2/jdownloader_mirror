@@ -28,8 +28,12 @@ public interface SankakucomplexComConfig extends PluginConfigInterface {
             return "Post tag crawler: Max page limit (-1 = no limit, 0 = disabled)";
         }
 
-        public String getPostTagCrawlerCrawlMode_label() {
-            return "Post tag crawler: Crawl mode";
+        public String getPostTagCrawlerAccessMode_label() {
+            return "Post tag crawler: Access mode";
+        }
+
+        public String getLinkcheckAccessMode_label() {
+            return "Linkcheck: Access mode";
         }
     }
 
@@ -56,7 +60,7 @@ public interface SankakucomplexComConfig extends PluginConfigInterface {
 
     void setPostTagCrawlerMaxPageLimit(int pages);
 
-    public static enum PostTagCrawlerCrawlMode implements LabelInterface {
+    public static enum AccessMode implements LabelInterface {
         AUTO {
             @Override
             public String getLabel() {
@@ -80,7 +84,14 @@ public interface SankakucomplexComConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("AUTO")
     @Order(120)
-    PostTagCrawlerCrawlMode getPostTagCrawlerCrawlMode();
+    AccessMode getPostTagCrawlerAccessMode();
 
-    void setPostTagCrawlerCrawlMode(final PostTagCrawlerCrawlMode mode);
+    void setPostTagCrawlerAccessMode(final AccessMode mode);
+
+    @AboutConfig
+    @DefaultEnumValue("AUTO")
+    @Order(130)
+    AccessMode getLinkcheckAccessMode();
+
+    void setLinkcheckAccessMode(final AccessMode mode);
 }

@@ -57,6 +57,12 @@ public class NewPasswordDialog extends AbstractDialog<String[]> implements NewPa
     protected void modifyTextPane(JTextPane textField) {
     }
 
+    protected void hyperlinkUpdate(final HyperlinkEvent e) {
+        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+            CrossSystem.openURL(e.getURL());
+        }
+    }
+
     protected void addMessageComponent(final MigPanel p) {
         JTextPane textField = new JTextPane() {
             private static final long serialVersionUID = 1L;
@@ -72,9 +78,7 @@ public class NewPasswordDialog extends AbstractDialog<String[]> implements NewPa
             textField.setContentType("text/html");
             textField.addHyperlinkListener(new HyperlinkListener() {
                 public void hyperlinkUpdate(final HyperlinkEvent e) {
-                    if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                        CrossSystem.openURL(e.getURL());
-                    }
+                    NewPasswordDialog.this.hyperlinkUpdate(e);
                 }
             });
         } else {
@@ -153,7 +157,7 @@ public class NewPasswordDialog extends AbstractDialog<String[]> implements NewPa
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.swing.dialog.LoginDialogInterface#getPassword()
      */
     @Override

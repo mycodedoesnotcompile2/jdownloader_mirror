@@ -745,6 +745,7 @@ public class BannerRotation implements Sponsor, AccountControllerListener {
                         });
                         getAllBanners().add(new AvailableBanner("ddownload.com"));
                         getAllBanners().add(new AvailableBanner("filejoker.net"));
+                        getAllBanners().add(new AvailableBanner("filer.net"));
                         updateDelayer.resetAndStart();
                         refreshThread.start();
                     }

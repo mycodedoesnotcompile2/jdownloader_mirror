@@ -18,18 +18,16 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.parser.UrlQuery;
-
-import com.formdev.flatlaf.util.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Request;
-import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
@@ -41,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.TorboxApp;
 
-@DecrypterPlugin(revision = "$Revision: 50982 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50997 $", interfaceVersion = 3, names = {}, urls = {})
 public class TorboxAppCrawler extends PluginForDecrypt {
     public TorboxAppCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,7 +75,7 @@ public class TorboxAppCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/download\\?id=\\d+&type=.+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/download\\?id=\\d+&type=(torrents|web_downloads|usenet_downloads).+");
         }
         return ret.toArray(new String[0]);
     }
@@ -100,42 +98,42 @@ public class TorboxAppCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         // TODO: Add functionality
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
-        final String dl_id = query.get("id");
+        // final String dl_id = query.get("id");
         final String dl_type = query.get("type");
-        final String dl_name = query.get("name");
+        // final String dl_name = query.get("name");
         List<Map<String, Object>> files = null;
         Map<String, Object> data = null;
         if (dl_type.equalsIgnoreCase("torrents")) {
             final Request req = br.createGetRequest(TorboxApp.API_BASE + "/torrents/mylist?" + query.toString());
             data = (Map<String, Object>) plugin.callAPI(br, req, account, null);
         } else if (dl_type.equalsIgnoreCase("web_downloads")) {
+            final Request req = br.createGetRequest(TorboxApp.API_BASE + "/webdl/mylist?" + query.toString());
+            data = (Map<String, Object>) plugin.callAPI(br, req, account, null);
         } else if (dl_type.equalsIgnoreCase("usenet_downloads")) {
+            final Request req = br.createGetRequest(TorboxApp.API_BASE + "/usenet/mylist?" + query.toString());
+            data = (Map<String, Object>) plugin.callAPI(br, req, account, null);
         } else {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported type");
         }
         files = (List<Map<String, Object>>) data.get("files");
         for (final Map<String, Object> file : files) {
+            final String filename = file.get("short_name").toString();
+            String path = file.get("name").toString();
+            /* Remove filename from path */
+            path = path.replaceFirst("/" + Pattern.quote(filename) + "$", "");
             final DownloadLink link = this.createDownloadlink("https://dummy.link.todo/" + file.get("name") + ".jdeatme");
-            link.setFinalFileName(file.get("name").toString());
+            link.setFinalFileName(filename);
             link.setVerifiedFileSize(((Number) file.get("size")).longValue());
             link.setAvailable(true);
             if (Boolean.TRUE.equals(file.get("infected"))) {
-                // TODO: Maybe store this information and avoid download of infected files
+                link.setProperty(TorboxApp.PROPERTY_IS_INFECTED, true);
             }
+            link.setRelativeDownloadFolderPath(path);
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(path);
+            link._setFilePackage(fp);
             ret.add(link);
         }
-        final String nameFromJson = (String) data.get("name");
-        final FilePackage fp = FilePackage.getInstance();
-        if (!StringUtils.isEmpty(dl_name)) {
-            fp.setName(Encoding.htmlDecode(dl_name).trim());
-        } else if (!StringUtils.isEmpty(nameFromJson)) {
-            /* Fallback 1 */
-            fp.setName(nameFromJson);
-        } else {
-            /* Fallback 2 */
-            fp.setName(dl_id);
-        }
-        fp.addLinks(ret);
         return ret;
     }
 

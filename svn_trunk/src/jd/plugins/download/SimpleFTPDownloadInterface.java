@@ -12,19 +12,6 @@ import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP;
-import jd.nutils.SimpleFTP.STATE;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Application;
@@ -41,6 +28,19 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP;
+import jd.nutils.SimpleFTP.STATE;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
 public class SimpleFTPDownloadInterface extends DownloadInterface {
     private final Downloadable                      downloadable;
@@ -170,7 +170,7 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
         SocketStreamInterface dataSocket = null;
         MeteredThrottledInputStream input = null;
         try {
-            dataSocket = simpleFTP.createSocket(new InetSocketAddress(pasv.getHostName(), pasv.getPort()));
+            dataSocket = simpleFTP.createSocket(pasv);
             dataSocket.getSocket().setSoTimeout(simpleFTP.getReadTimeout(STATE.DOWNLOADING));
             simpleFTP.sendLine("RETR " + filename);
             simpleFTP.readLines(new int[] { 150, 125 }, null);

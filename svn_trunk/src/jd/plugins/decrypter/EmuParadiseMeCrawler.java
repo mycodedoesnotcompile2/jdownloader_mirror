@@ -36,7 +36,7 @@ import jd.plugins.components.PluginJSonUtils;
 /**
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 50982 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/[^<>/]+/[^<>/]+/\\d{4,}" })
+@DecrypterPlugin(revision = "$Revision: 50987 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/[^<>/]+/[^<>/]+/\\d{4,}" })
 public class EmuParadiseMeCrawler extends PluginForDecrypt {
     public EmuParadiseMeCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +51,6 @@ public class EmuParadiseMeCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
         // set cross browser support
-        ((jd.plugins.hoster.EmuParadiseMe) plugin).prepBrowser(this.br);
         ((jd.plugins.hoster.EmuParadiseMe) plugin).setCookies();
         final String parameter = param.toString();
         br.setFollowRedirects(true);

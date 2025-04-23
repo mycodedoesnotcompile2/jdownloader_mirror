@@ -46,7 +46,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50971 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
+@DecrypterPlugin(revision = "$Revision: 50992 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
 public class Ftp extends PluginForDecrypt {
     private static Map<String, Integer>     LIMITS = new HashMap<String, Integer>();
     private static Map<String, Set<Thread>> LOCKS  = new HashMap<String, Set<Thread>>();
@@ -58,6 +58,12 @@ public class Ftp extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink cLink, ProgressController progress) throws Exception {
         final String lockHost = Browser.getHost(cLink.getCryptedUrl());
+        final DownloadLink downloadLink = cLink.getDownloadLink();
+        if (downloadLink != null && downloadLink.hasProperty(jd.plugins.hoster.Ftp.MAX_FTP_CONNECTIONS)) {
+            synchronized (LIMITS) {
+                LIMITS.put(lockHost, downloadLink.getIntegerProperty(jd.plugins.hoster.Ftp.MAX_FTP_CONNECTIONS, 1));
+            }
+        }
         final Set<Thread> hostLocks;
         synchronized (LOCKS) {
             Set<Thread> tmp = LOCKS.get(lockHost);
@@ -86,11 +92,16 @@ public class Ftp extends PluginForDecrypt {
                         }
                     }
                     synchronized (hostLocks) {
-                        if (isAbort() || retryCounter++ > 10) {
+                        if (isAbort()) {
                             throw new InterruptedException();
                         } else if (hostLocks.size() < maxConcurrent) {
                             hostLocks.add(thread);
                             break;
+                        } else if (hostLocks.size() == maxConcurrent) {
+                            hostLocks.wait(5000);
+                            if (retryCounter++ > 10) {
+                                throw new InterruptedException();
+                            }
                         } else if (hostLocks.size() > maxConcurrent) {
                             hostLocks.wait(5000);
                         }
@@ -115,7 +126,7 @@ public class Ftp extends PluginForDecrypt {
             } finally {
                 synchronized (hostLocks) {
                     hostLocks.remove(thread);
-                    hostLocks.notifyAll();
+                    hostLocks.notify();
                 }
             }
         }

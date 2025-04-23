@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50982 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50987 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -57,7 +57,12 @@ public class StreamwishCom extends XFileSharingProBasic {
         return ret;
     }
 
-    private static final String INTERNAL_DOWNLOAD_DOMAIN = "jwplayerhls.com";
+    /**
+     * Keep this updated, it needs to be a domain that: <br>
+     * - Works in browser - reCaptchaV3 works in browser (seems like website owner has not configured all domains he owns in his reCaptcha
+     * config)
+     */
+    private static final String INTERNAL_DOWNLOAD_DOMAIN = "hlsflex.com";
 
     @Override
     protected List<String> getDeadDomains() {

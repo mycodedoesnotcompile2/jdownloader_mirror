@@ -61,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50854 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50989 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -1000,10 +1000,18 @@ public class DeviantArtCom extends PluginForHost {
              */
             url = url.replaceAll("(/v1/fit/.*150\\.jpg)", "");
         }
-        final String token = link.getStringProperty(PROPERTY_IMAGE_TOKEN);
-        if (token != null) {
-            /* Put fresh token into existing URL to ensure that the URL will be valid. */
-            url = url.replaceAll("\\?token=.+", "?token=" + token);
+        /**
+         * 2025-04-22: Disabled this as it seems like this doesn't work anymore. <br>
+         * In case those direct URLs expire, we probably need to use the crawler to refresh them. <br>
+         * TODO: Remove this after 2025/09
+         */
+        final boolean refreshTokenInURL = false;
+        if (refreshTokenInURL) {
+            final String token = link.getStringProperty(PROPERTY_IMAGE_TOKEN);
+            if (token != null) {
+                /* Put fresh token into existing URL to ensure that the URL will be valid. */
+                url = url.replaceAll("\\?token=.+", "?token=" + token);
+            }
         }
         return url;
     }
