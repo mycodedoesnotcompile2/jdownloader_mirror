@@ -28,9 +28,8 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 47928 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = {}, urls = {})
 public class NfScRlCm extends PluginForDecrypt {
     public NfScRlCm(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,9 +65,8 @@ public class NfScRlCm extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(false);
-        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
         br.getPage(parameter);
         /* Error handling */
         if (br.getHttpConnection().getResponseCode() == 404) {

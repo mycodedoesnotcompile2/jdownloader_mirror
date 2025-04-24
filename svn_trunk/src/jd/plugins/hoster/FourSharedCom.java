@@ -43,10 +43,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.UserAgents;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?4shared(?:-china)?\\.com/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
+@HostPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?4shared(?:-china)?\\.com/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
 public class FourSharedCom extends PluginForHost {
     // DEV NOTES:
     // old versions of JDownloader can have troubles with Java7+ with HTTPS posts.
@@ -65,6 +64,16 @@ public class FourSharedCom extends PluginForHost {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", agent.get());
+        br.getHeaders().put("Accept-Language", "en-gb, en;q=0.8");
+        br.setCookie(this.getHost(), "4langcookie", "en");
+        br.setReadTimeout(3 * 60 * 1000);
+        return br;
+    }
+
+    @Override
     public String[] siteSupportedNames() {
         return new String[] { "4shared.com", "4shared-china.com", "4shared" };
     }
@@ -77,18 +86,6 @@ public class FourSharedCom extends PluginForHost {
     private static final String DOWNLOADSTREAMS              = "DOWNLOADSTREAMS";
     private static final String DOWNLOADSTREAMSERRORHANDLING = "DOWNLOADSTREAMSERRORHANDLING";
     private static final String NOCHUNKS                     = "NOCHUNKS";
-
-    private Browser prepBrowser(final Browser prepBr) {
-        if (agent.get() == null) {
-            /* we first have to load the plugin, before we can reference it */
-            agent.set(UserAgents.stringUserAgent());
-        }
-        prepBr.getHeaders().put("User-Agent", agent.get());
-        prepBr.getHeaders().put("Accept-Language", "en-gb, en;q=0.8");
-        prepBr.setCookie(this.getHost(), "4langcookie", "en");
-        br.setReadTimeout(3 * 60 * 1000);
-        return prepBr;
-    }
 
     @SuppressWarnings("deprecation")
     @Override
@@ -116,8 +113,7 @@ public class FourSharedCom extends PluginForHost {
             if (link.getDownloadURL().contains(".com/download")) {
                 boolean fixLink = true;
                 try {
-                    final Browser br = new Browser();
-                    prepBrowser(br);
+                    final Browser br = this.createNewBrowserInstance();
                     br.setFollowRedirects(false);
                     br.getPage(link.getDownloadURL());
                     final String newLink = br.getRedirectLocation();
@@ -517,7 +513,6 @@ public class FourSharedCom extends PluginForHost {
         synchronized (account) {
             try {
                 br.setCookiesExclusive(true);
-                prepBrowser(br);
                 final Cookies cookies = account.loadCookies("");
                 if (cookies != null) {
                     br.setCookies(cookies);
@@ -625,7 +620,6 @@ public class FourSharedCom extends PluginForHost {
         try {
             correctDownloadLink(link);
             setBrowserExclusive();
-            prepBrowser(br);
             // In case the link redirects to the finallink
             br.setFollowRedirects(true);
             URLConnectionAdapter con = null;

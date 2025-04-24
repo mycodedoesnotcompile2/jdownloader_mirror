@@ -1440,34 +1440,37 @@ public class YoutubeHelper {
             synchronized (jsCache) {
                 function = (String) jsCache.get(functionCacheKey);
                 if (function == null) {
-                    // String[][] func = new Regex(html5PlayerSource,
-                    // "(?x)(?:\\.get\\(\"n\"\\)\\)&&\\(b=|b=String\\.fromCharCode\\(110\\),c=a\\.get\\(b\\)\\)&&\\(c=)([a-zA-Z0-9$]+)(?:\\[(\\d+)\\])?\\([a-zA-Z0-9]\\)").getMatches();
-                    // since 2024-12-09
+                    find: {
+                    function = new Regex(ensurePlayerSource(), "(?s)[;\n](?:function\\s+|(?:var\\s+)?)([a-zA-Z0-9_$]+)\\s*(?:|=\\s*function\\s*)\\(([a-zA-Z0-9_$]+)\\)\\s*\\{(?:(?!\\}[;\n]).)+\\}\\s*catch\\(\\s*[a-zA-Z0-9_$]+\\s*\\)\\s*\\{\\s*return\\s+[a-zA-Z0-9_$]+\\[\\d+\\]\\s*\\+\\s*\\2\\s*\\}\\s*return\\s+[^}]+\\}[;\n]").getMatch(-1);
+                    if (function != null) {
+                        break find;
+                    }
                     function = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
                     if (function != null) {
-                        final String varName = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(1);
-                        function = function.replaceAll("if\\s*\\(typeof\\s*[^=]*+\\s*===\\s*(?:\\\"undefined\\\"|[^\\[\\(\\) ]+\\[\\d+\\])\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
+                        break find;
                     }
-                    if (function == null) {
-                        // since 2024-08-06
-                        function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
-                        if (function == null) {
-                            // since 2024-07-31
-                            function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
-                            if (function == null) {
-                                // since 2024-07
-                                function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
-                                if (function == null) {
-                                    // before 2024-07
-                                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
-                                }
-                            }
-                        }
-                    }
+                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
                     if (function != null) {
-                        jsCache.put(functionCacheKey, function);
+                        break find;
                     }
+                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
+                    if (function != null) {
+                        break find;
+                    }
+                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                    if (function != null) {
+                        break find;
+                    }
+                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                    if (function != null) {
+                        break find;
+                    }
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
+                }
+                final String varName = new Regex(function, "=function\\((\\w+)\\)").getMatch(0);
+                function = function.replaceAll("if\\s*\\(typeof\\s*[^=]*+\\s*===\\s*(?:\\\"undefined\\\"|[^\\[\\(\\) ]+\\[\\d+\\])\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
+                jsCache.put(functionCacheKey, function);
             }
         }
         if (cachedResult != null) {
@@ -1497,7 +1500,8 @@ public class YoutubeHelper {
                     for (final String additional : additionalMap.values()) {
                         engine.eval(additional);
                     }
-                    final String js = "var calculate" + function + " var result=calculate(\"" + input + "\")";
+                    boolean hasFunctionName = !function.matches("^[^\n]*=\\s*function");
+                    final String js = "var calculate" + (hasFunctionName ? "=" : "") + function + " var result=calculate(\"" + input + "\")";
                     engine.eval(js);
                     final String result = StringUtils.valueOfOrNull(engine.get("result"));
                     if (result != null) {

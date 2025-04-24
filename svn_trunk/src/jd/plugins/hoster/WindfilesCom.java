@@ -35,10 +35,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50997 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51000 $", interfaceVersion = 3, names = {}, urls = {})
 public class WindfilesCom extends PluginForHost {
     public WindfilesCom(PluginWrapper wrapper) {
         super(wrapper);
+        // this.enablePremium("https://" + getHost() + "/vip/get");
     }
 
     @Override
@@ -113,7 +114,7 @@ public class WindfilesCom extends PluginForHost {
         } else if (br.containsHTML(">\\s*分享不存在")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex(">\\s*文件名称</th>\\s*<th class=\"encn\"[^>]*>([^<]+)</th>").getMatch(0);
+        String filename = br.getRegex(">\\s*文件名称\\s*</th>\\s*<th class=\"encn\"[^>]*>([^<]+)</th>").getMatch(0);
         String filesize = br.getRegex("文件大小\\s*</th>\\s*<th>([^<]+)</th>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
@@ -166,7 +167,7 @@ public class WindfilesCom extends PluginForHost {
     /* See https://windfiles.com/static/js/notice.js?v=0.3.5 */
     public static String decodeString(String str) {
         try {
-            if (str == null || str.isEmpty()) {
+            if (StringUtils.isEmpty(str)) {
                 return "";
             }
             // Define the key for shifting

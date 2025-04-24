@@ -43,9 +43,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
-import jd.plugins.components.UserAgents.BrowserName;
 
-@HostPlugin(revision = "$Revision: 48448 $", interfaceVersion = 2, names = { "tropicshare.com" }, urls = { "https?://(?:www\\.)?tropicshare\\.com/files/(\\d+)" })
+@HostPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = { "tropicshare.com" }, urls = { "https?://(?:www\\.)?tropicshare\\.com/files/(\\d+)" })
 public class TropicShareCom extends PluginForHost {
     public TropicShareCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +60,7 @@ public class TropicShareCom extends PluginForHost {
 
     private void prepBR(final Browser br) {
         if (userAgent.get() == null) {
-            userAgent.set(UserAgents.stringUserAgent(BrowserName.Chrome));
+            userAgent.set(UserAgents.stringUserAgent());
         }
         br.getHeaders().put("User-Agent", userAgent.get());
     }

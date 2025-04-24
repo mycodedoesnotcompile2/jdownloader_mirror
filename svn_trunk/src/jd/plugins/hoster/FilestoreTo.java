@@ -45,9 +45,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
-import jd.plugins.components.UserAgents.BrowserName;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
 public class FilestoreTo extends PluginForHost {
     public FilestoreTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -115,7 +114,7 @@ public class FilestoreTo extends PluginForHost {
         if (agent.get() == null) {
             final String customUserAgent = PluginJsonConfig.get(FilestoreToConfig.class).getUserAgent();
             if (StringUtils.isEmpty(customUserAgent) || StringUtils.equalsIgnoreCase(customUserAgent, "JDDEFAULT")) {
-                agent.set(UserAgents.stringUserAgent(BrowserName.Chrome));
+                agent.set(UserAgents.stringUserAgent());
             } else {
                 agent.set(customUserAgent);
             }

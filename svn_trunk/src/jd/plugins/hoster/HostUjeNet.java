@@ -18,7 +18,6 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -35,9 +34,8 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 47988 $", interfaceVersion = 3, names = { "hostuje.net" }, urls = { "https?://[\\w\\.]*?hostuje\\.net/file\\.php\\?id=([a-zA-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51002 $", interfaceVersion = 3, names = { "hostuje.net" }, urls = { "https?://[\\w\\.]*?hostuje\\.net/file\\.php\\?id=([a-zA-Z0-9]+)" })
 public class HostUjeNet extends PluginForHost {
     public HostUjeNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,12 +43,12 @@ public class HostUjeNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://hostuje.net/regulamin.php";
+        return "https://" + getHost() + "/regulamin.php";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -67,19 +65,13 @@ public class HostUjeNet extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    private static AtomicReference<String> userAgent = new AtomicReference<String>();
-
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException, IOException {
         if (!link.isNameSet()) {
             link.setName(this.getFID(link));
         }
         this.setBrowserExclusive();
-        if (userAgent.get() == null) {
-            userAgent.set(UserAgents.stringUserAgent());
-        }
         br.setFollowRedirects(true);
-        br.getHeaders().put("User-Agent", userAgent.get());
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

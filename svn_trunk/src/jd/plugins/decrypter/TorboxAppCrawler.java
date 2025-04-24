@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.TorboxApp;
 
-@DecrypterPlugin(revision = "$Revision: 50997 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51005 $", interfaceVersion = 3, names = {}, urls = {})
 public class TorboxAppCrawler extends PluginForDecrypt {
     public TorboxAppCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,7 +98,7 @@ public class TorboxAppCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         // TODO: Add functionality
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
-        // final String dl_id = query.get("id");
+        final String dl_id = query.get("id");
         final String dl_type = query.get("type");
         // final String dl_name = query.get("name");
         List<Map<String, Object>> files = null;
@@ -122,12 +122,14 @@ public class TorboxAppCrawler extends PluginForDecrypt {
             /* Remove filename from path */
             path = path.replaceFirst("/" + Pattern.quote(filename) + "$", "");
             final DownloadLink link = this.createDownloadlink("https://dummy.link.todo/" + file.get("name") + ".jdeatme");
-            link.setFinalFileName(filename);
-            link.setVerifiedFileSize(((Number) file.get("size")).longValue());
-            link.setAvailable(true);
+            link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_TYPE, dl_type);
+            link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_FILE_ID, dl_id);
             if (Boolean.TRUE.equals(file.get("infected"))) {
                 link.setProperty(TorboxApp.PROPERTY_IS_INFECTED, true);
             }
+            link.setFinalFileName(filename);
+            link.setVerifiedFileSize(((Number) file.get("size")).longValue());
+            link.setAvailable(true);
             link.setRelativeDownloadFolderPath(path);
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(path);

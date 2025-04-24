@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.antiDDoSForHost;
@@ -35,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51005 $", interfaceVersion = 3, names = {}, urls = {})
 public class BrighteonCom extends antiDDoSForHost {
     public BrighteonCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,9 +115,9 @@ public class BrighteonCom extends antiDDoSForHost {
         if (json == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
-        final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "props/initialProps/pageProps/video");
-        final Map<String, Object> channel = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "props/initialProps/pageProps/channel");
+        final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+        final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "props/pageProps/video");
+        final Map<String, Object> channel = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "props/pageProps/channel");
         final String channelName = (String) channel.get("shortUrl");
         final String title = (String) video.get("name");
         final String description = (String) video.get("description");

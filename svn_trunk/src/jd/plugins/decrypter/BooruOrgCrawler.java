@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 50997 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51000 $", interfaceVersion = 3, names = {}, urls = {})
 public class BooruOrgCrawler extends PluginForDecrypt {
     public BooruOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,7 @@ public class BooruOrgCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (br.containsHTML(">\\s*Nobody here but us chickens|Check your blacklist")) {
-            /* E.g. https://gelbooru.com/index.php?page=post&s=list&tags=tag_that_doesnt_exist */
+            /* E.g. https://safebooru.org/index.php?page=post&s=list&tags=tag_that_doesnt_exist */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final UrlQuery query = UrlQuery.parse(contenturl);

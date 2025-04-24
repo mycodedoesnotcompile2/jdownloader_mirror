@@ -66,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 51000 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -1065,6 +1065,7 @@ public class SaveTv extends PluginForHost {
                 final Map<String, Object> recordFormat = (Map<String, Object>) entries.get("recordFormat");
                 final int thisFormatValue = ((Number) recordFormat.get("id")).intValue();
                 if (thisFormatValue != finalFormat) {
+                    /* Skip unwanted formats */
                     continue;
                 }
                 /**
@@ -2015,7 +2016,7 @@ public class SaveTv extends PluginForHost {
             /* Fallback - upper functions should now use formatID which user has selected in plugin settings. */
             return -1;
         }
-        final String format_from_url = new Regex(dl.getDownloadURL(), "preferformat=(\\d+)").getMatch(0);
+        final String format_from_url = new Regex(dl.getDownloadURL(), "(?i)preferformat=(\\d+)").getMatch(0);
         if (format_from_url == null) {
             /* Fallback - upper functions should now use formatID which user has selected in plugin settings. */
             return -1;
@@ -2666,7 +2667,7 @@ public class SaveTv extends PluginForHost {
 
     @Override
     public String getDescription() {
-        return "JDownloader's Save.tv Plugin vereinfacht das Downloaden aufgenommener Sendungen von save.tv. Es bietet viele Plugin Einstellungen.";
+        return "JDownloader's Save.tv Plugin vereinfacht das Herunterladen aufgenommener Sendungen von save.tv.";
     }
 
     private final static String  defaultCustomFilenameMovies                = "*quality* ¦ *videotitel* ¦ *produktionsjahr* ¦ *telecastid**endung*";
@@ -2996,7 +2997,10 @@ public class SaveTv extends PluginForHost {
 
     @Override
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        /* No not allow multihost plugins to handle items from this plugin. */
+        /*
+         * Do not allow multihost plugins to handle items from this plugin since every downloadlink is bound to the users' save.tv account
+         * so it is impossible for other users to access the same content via this contentID.
+         */
         return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

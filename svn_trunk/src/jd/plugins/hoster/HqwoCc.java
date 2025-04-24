@@ -19,9 +19,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -30,11 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 47482 $", interfaceVersion = 3, names = { "hqwo.cc" }, urls = { "https?://(?:www\\.)?hqwo\\.cc/player/([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 51000 $", interfaceVersion = 3, names = { "hqwo.cc" }, urls = { "https?://(?:www\\.)?hqwo\\.cc/player/([a-f0-9]{32})" })
 public class HqwoCc extends PluginForHost {
     public HqwoCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,14 +48,13 @@ public class HqwoCc extends PluginForHost {
     // protocol: no https
     // other:
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
 
     @Override
     public String getAGBLink() {
-        return "https://hqwo.cc/";
+        return "https://" + getHost();
     }
 
     @Override
@@ -76,10 +73,19 @@ public class HqwoCc extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            link.setName(getFID(link) + ".mp4");
-        }
         dllink = null;
+        /* E.g. items from hqporner.com */
+        final String title = link.getStringProperty("title");
+        final String filename;
+        final String extDefault = ".mp4";
+        if (title != null) {
+            filename = title + extDefault;
+        } else {
+            filename = getFID(link) + extDefault;
+        }
+        if (!link.isNameSet()) {
+            link.setName(filename);
+        }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
@@ -144,24 +150,11 @@ public class HqwoCc extends PluginForHost {
                 dllink = quality;
             }
         }
-        if (!StringUtils.isEmpty(dllink)) {
-            dllink = Encoding.htmlDecode(dllink);
-            URLConnectionAdapter con = null;
-            try {
-                con = br.openHeadConnection(dllink);
-                if (!this.looksLikeDownloadableContent(con)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Broken video?");
-                }
-                if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (final Throwable e) {
-                }
-            }
+        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+            /* Do not check for filesize as download will be started soon */
+            return AvailableStatus.TRUE;
         }
+        this.basicLinkCheck(br, br.createHeadRequest(this.dllink), link, filename, ".mp4");
         return AvailableStatus.TRUE;
     }
 
@@ -172,22 +165,13 @@ public class HqwoCc extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-        }
+        this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

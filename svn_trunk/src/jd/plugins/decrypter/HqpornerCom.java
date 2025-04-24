@@ -29,7 +29,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 45848 $", interfaceVersion = 3, names = { "hqporner.com", "hqpornerpro.com" }, urls = { "https?://(?:www\\.)?hqporner\\.com/hdporn/\\d+\\-([^/]+)\\.html", "https?://(?:www\\.)?hqpornerpro\\.com/([^/]+)" })
+@DecrypterPlugin(revision = "$Revision: 51000 $", interfaceVersion = 3, names = { "hqporner.com", "hqpornerpro.com" }, urls = { "https?://(?:\\w+\\.)?hqporner\\.com/hdporn/\\d+\\-([^/]+)\\.html", "https?://(?:\\w+\\.)?hqpornerpro\\.com/([^/]+)" })
 public class HqpornerCom extends PornEmbedParser {
     public HqpornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,7 @@ public class HqpornerCom extends PornEmbedParser {
     /* DEV NOTES */
     /* Porn_plugin */
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = super.decryptIt(param, progress);
+        final ArrayList<DownloadLink> ret = super.decryptIt(param, progress);
         final String titleFromURL = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0).replace("-", " ").trim();
         final String[][] parsedNames = br.getRegex("/actress/[^\"]+\"[^>]+>([^<>\"]+)</a>").getMatches();
         final StringBuilder names = new StringBuilder();
@@ -69,9 +69,9 @@ public class HqpornerCom extends PornEmbedParser {
             title = titleFromURL;
         }
         title = Encoding.htmlDecode(title).trim();
-        if (decryptedLinks.size() > 0) {
+        if (ret.size() > 0) {
             /* Most of all times we grab mydaddy.cc URLs which need some special properties. */
-            for (final DownloadLink link : decryptedLinks) {
+            for (final DownloadLink link : ret) {
                 /* Set special properties for madaddy.cc URLs */
                 final String host = Browser.getHost(link.getPluginPatternMatcher());
                 if (host.equals(jd.plugins.hoster.MydaddyCc.getPluginDomains().get(0)[0])) {
@@ -79,6 +79,9 @@ public class HqpornerCom extends PornEmbedParser {
                         link.setProperty(jd.plugins.hoster.MydaddyCc.PROPERTY_ACTRESS_NAME, accressName);
                     }
                     link.setProperty(jd.plugins.hoster.MydaddyCc.PROPERTY_CRAWLER_TITLE, title);
+                } else {
+                    /* E.g. hqwo.cc links which would otherwise get no meaningful title/filename. */
+                    link.setProperty("title", title);
                 }
             }
         } else {
@@ -109,9 +112,9 @@ public class HqpornerCom extends PornEmbedParser {
                 direct.setFinalFileName(title + ".mp4");
             }
             direct.setAvailable(true);
-            decryptedLinks.add(direct);
+            ret.add(direct);
         }
-        return decryptedLinks;
+        return ret;
     }
 
     @Override

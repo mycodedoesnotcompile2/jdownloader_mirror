@@ -15,9 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicReference;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -31,9 +29,8 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 47928 $", interfaceVersion = 2, names = { "otr-files.de" }, urls = { "https?://(www\\.)?otr\\-files\\.de/(index\\.php\\?option=com_content\\&task=view\\&id=\\d+\\&Itemid=\\d+\\&server=\\d+\\&f=[^<>\"\\']+\\.otrkey|\\?file=[^<>\"\\']+\\.otrkey)" })
+@HostPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = { "otr-files.de" }, urls = { "https?://(www\\.)?otr\\-files\\.de/(index\\.php\\?option=com_content\\&task=view\\&id=\\d+\\&Itemid=\\d+\\&server=\\d+\\&f=[^<>\"\\']+\\.otrkey|\\?file=[^<>\"\\']+\\.otrkey)" })
 public class OtrFilesDe extends PluginForHost {
     public OtrFilesDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,7 +41,7 @@ public class OtrFilesDe extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.otr-files.de/";
+        return "https://www.otr-files.de/";
     }
 
     @Override
@@ -53,7 +50,6 @@ public class OtrFilesDe extends PluginForHost {
         link.setName(new Regex(link.getDownloadURL(), "file=(.+)").getMatch(0));
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        prepareBrowser();
         br.getPage(link.getDownloadURL());
         if (!br.getURL().contains("?otr-files.de/index.php?option=")) {
             br.getPage(getOptionsLink());
@@ -119,15 +115,6 @@ public class OtrFilesDe extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return Encoding.htmlDecode(optlink);
-    }
-
-    private static AtomicReference<String> agent = new AtomicReference<String>(null);
-
-    private void prepareBrowser() throws IOException {
-        if (agent.get() == null) {
-            /* we first have to load the plugin, before we can reference it */
-            agent.set(UserAgents.stringUserAgent());
-        }
     }
 
     @Override
