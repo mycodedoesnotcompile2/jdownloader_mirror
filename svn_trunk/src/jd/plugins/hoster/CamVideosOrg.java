@@ -6,11 +6,11 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51007 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamVideosOrg extends KernelVideoSharingComV2 {
     public CamVideosOrg(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.camvideos.org/");
+        this.enablePremium("https://www." + getHost() + "/");
     }
 
     public static List<String[]> getPluginDomains() {

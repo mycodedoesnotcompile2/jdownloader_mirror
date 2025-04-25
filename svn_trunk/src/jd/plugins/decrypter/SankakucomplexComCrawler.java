@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50986 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51007 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -112,9 +112,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final Pattern TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_TAGS_BOOKS = Pattern.compile("/(([a-z]{2,3})/)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_TAGS_POSTS = Pattern.compile("/(([a-z]{2,3})/)?posts\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/?)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TAGS_BOOKS = Pattern.compile("/(([a-z]{2,3})/?)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TAGS_POSTS = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
     public static final String   API_BASE        = "https://capi-v2.sankakucomplex.com";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -152,9 +152,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
          * Some items are only visible for logged in users and are never returned via API. </br>
-         * For these reasons, website mode is preferred if user owns account && mode is set to AUTO.
+         * For this reason, some user may prefer website mode.
          */
-        if (mode == AccessMode.API || (mode == AccessMode.AUTO && (account != null || ACCESS_MODE_AUTO_PREFER_API_MODE))) {
+        if (mode == AccessMode.API || (mode == AccessMode.AUTO && ACCESS_MODE_AUTO_PREFER_API_MODE)) {
             return crawlTagsPostsAPI(param, tags, language);
         } else {
             return crawlTagsPostsWebsite(param, tags, language);

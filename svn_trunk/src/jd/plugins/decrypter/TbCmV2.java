@@ -101,9 +101,8 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 51002 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51007 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1303,13 +1302,6 @@ public class TbCmV2 extends PluginForDecrypt {
             throw new IllegalArgumentException();
         }
         helper.setPlaylistID(playlistID);
-        if (helper.getAccountLoggedIn() == null) {
-            /*
-             * Only set User-Agent if we're not logged in because login session can be bound to User-Agent and tinkering around with
-             * different User-Agents and the same cookies is just a bad idea!
-             */
-            br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
-        }
         br.getHeaders().put("Accept-Charset", null);
         String userOrPlaylistURL;
         String desiredChannelTab = null;
@@ -1387,6 +1379,9 @@ public class TbCmV2 extends PluginForDecrypt {
             }
             helper.parse(br);
             rootMap = helper.getYtInitialData();
+            if (rootMap == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             ytConfigData = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "responseContext/webResponseContextExtensionData/ytConfigData");
             final Map<String, Object> autoGeneratexYoutubeMixPlaylistProbe = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "contents/twoColumnWatchNextResults/playlist/playlist");
             if (autoGeneratexYoutubeMixPlaylistProbe != null && Boolean.TRUE.equals(autoGeneratexYoutubeMixPlaylistProbe.get("isInfinite"))) {

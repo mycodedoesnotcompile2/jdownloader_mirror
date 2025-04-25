@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import jd.parser.Regex;
+import org.appwork.utils.net.HTTPHeader;
 
 /**
  * Enhanced User-Agent generator that creates realistic browser headers Dynamically creates user agents instead of using static lists
@@ -36,8 +36,8 @@ public class UserAgents {
     public static final String[]  BROWSERS              = { BROWSER_CHROME, BROWSER_FIREFOX, BROWSER_SAFARI, BROWSER_EDGE };
     public static final String[]  BROWSERS_SUPPORT_CH   = { BROWSER_CHROME, BROWSER_EDGE };
     // Version ranges for browsers
-    private static final int[]    CHROME_VERSION_RANGE  = { 96, 115 };                                                                                                                                                                                                                                                                                         // min,
-                                                                                                                                                                                                                                                                                                                                                               // max
+    private static final int[]    CHROME_VERSION_RANGE  = { 96, 115 };                                                                                                                                                                                                                                            // min,
+    // max
     private static final int[]    FIREFOX_VERSION_RANGE = { 95, 115 };
     private static final int[]    SAFARI_VERSION_RANGE  = { 14, 17 };
     private static final int[]    EDGE_VERSION_RANGE    = { 96, 115 };
@@ -47,23 +47,23 @@ public class UserAgents {
     private static final String[] LINUX_VERSIONS        = { "X11; Linux x86_64", "X11; Ubuntu; Linux x86_64" };
     private static final String[] ANDROID_VERSIONS      = { "Linux; Android 13", "Linux; Android 12", "Linux; Android 11", "Linux; Android 10" };
     private static final String[] IOS_VERSIONS          = { "iPhone; CPU iPhone OS 16_5_1 like Mac OS X", "iPhone; CPU iPhone OS 16_4 like Mac OS X", "iPhone; CPU iPhone OS 15_7_1 like Mac OS X", "iPad; CPU OS 16_5_1 like Mac OS X", "iPad; CPU OS 16_4 like Mac OS X", "iPad; CPU OS 15_7_1 like Mac OS X" };
-    private static final String[] ANDROID_MOBILE_MODELS = { "SM-S918B", "SM-G991B",                                                                                                                                                                                                                                                                            // Samsung
-                                                                                                                                                                                                                                                                                                                                                               // S23,
-                                                                                                                                                                                                                                                                                                                                                               // S21
-            "Pixel 7 Pro", "Pixel 7",                                                                                                                                                                                                                                                                                                                          // Google
-                                                                                                                                                                                                                                                                                                                                                               // Pixels
-            "OnePlus 11", "OnePlus 10 Pro",                                                                                                                                                                                                                                                                                                                    // OnePlus
-            "Redmi Note 12 Pro", "Mi 13 Pro"                                                                                                                                                                                                                                                                                                                   // Xiaomi
-    };
-    private static final String[] ANDROID_TABLET_MODELS = { "SM-X910", "SM-X810",                                                                                                                                                                                                                                                                              // Samsung
-                                                                                                                                                                                                                                                                                                                                                               // Galaxy
-                                                                                                                                                                                                                                                                                                                                                               // Tab
-                                                                                                                                                                                                                                                                                                                                                               // S9
-            "SM-T870", "SM-T970",                                                                                                                                                                                                                                                                                                                              // Samsung
-                                                                                                                                                                                                                                                                                                                                                               // Galaxy
-                                                                                                                                                                                                                                                                                                                                                               // Tab
-                                                                                                                                                                                                                                                                                                                                                               // S7
-            "Lenovo TB-X606F", "HUAWEI MatePad" };
+    private static final String[] ANDROID_MOBILE_MODELS = { "SM-S918B", "SM-G991B", // Samsung
+            // S23,
+            // S21
+            "Pixel 7 Pro", "Pixel 7", // Google
+            // Pixels
+            "OnePlus 11", "OnePlus 10 Pro", // OnePlus
+            "Redmi Note 12 Pro", "Mi 13 Pro" // Xiaomi
+                                                        };
+    private static final String[] ANDROID_TABLET_MODELS = { "SM-X910", "SM-X810", // Samsung
+            // Galaxy
+            // Tab
+            // S9
+            "SM-T870", "SM-T970", // Samsung
+            // Galaxy
+            // Tab
+            // S7
+            "Lenovo TB-X606F", "HUAWEI MatePad"        };
 
     /**
      * Browser Names, this is used for defining stringUserAgent(BrowserName); Maintained for backward compatibility
@@ -143,6 +143,7 @@ public class UserAgents {
         private final String              userAgentString;
         private final Map<String, String> headers;
         private final Map<String, String> clientHints;
+        private final List<HTTPHeader>    httpHeaders;
 
         public UserAgent(String device, String platform, String browser, String userAgentString, Map<String, String> headers, Map<String, String> clientHints) {
             this.device = device;
@@ -151,6 +152,11 @@ public class UserAgents {
             this.userAgentString = userAgentString;
             this.headers = headers;
             this.clientHints = clientHints;
+            // Convert all headers to HTTPHeader objects
+            this.httpHeaders = new ArrayList<HTTPHeader>();
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                httpHeaders.add(new HTTPHeader(entry.getKey(), entry.getValue(), true));
+            }
         }
 
         public String getDevice() {
@@ -177,6 +183,15 @@ public class UserAgents {
             return clientHints;
         }
 
+        /**
+         * Returns a list of HTTPHeader objects representing all headers
+         *
+         * @return List of HTTPHeader objects with overwriteAllowed set to true
+         */
+        public List<HTTPHeader> getHTTPHeaders() {
+            return httpHeaders;
+        }
+
         @Override
         public String toString() {
             return userAgentString;
@@ -194,6 +209,7 @@ public class UserAgents {
         private final String              userAgent;
         private final Map<String, String> headers     = new HashMap<String, String>();
         private final Map<String, String> clientHints = new HashMap<String, String>();
+        private final List<HTTPHeader>    httpHeaders = new ArrayList<HTTPHeader>();
 
         public Generator(String device, String platform, String browser, Options options) {
             this.device = device;
@@ -205,6 +221,7 @@ public class UserAgents {
             if (supportsClientHints()) {
                 buildClientHints();
             }
+            buildHTTPHeaders();
         }
 
         private String buildUserAgentString() {
@@ -317,6 +334,13 @@ public class UserAgents {
             }
         }
 
+        private void buildHTTPHeaders() {
+            // Convert all headers to HTTPHeader objects
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                httpHeaders.add(new HTTPHeader(entry.getKey(), entry.getValue(), true));
+            }
+        }
+
         public String getUserAgent() {
             return userAgent;
         }
@@ -327,6 +351,15 @@ public class UserAgents {
 
         public Map<String, String> getClientHints() {
             return clientHints;
+        }
+
+        /**
+         * Returns a list of HTTPHeader objects representing all headers
+         *
+         * @return List of HTTPHeader objects with overwriteAllowed set to true
+         */
+        public List<HTTPHeader> getHTTPHeaders() {
+            return httpHeaders;
         }
     }
 
@@ -350,8 +383,32 @@ public class UserAgents {
         String device = selectDevice(options);
         String platform = selectPlatform(device, options);
         String browser = selectBrowser(platform, options);
-        final Generator generator = new Generator(device, platform, browser, options);
+        Generator generator = new Generator(device, platform, browser, options);
         return new UserAgent(device, platform, browser, generator.getUserAgent(), generator.getHeaders(), generator.getClientHints());
+    }
+
+    /**
+     * Generate a list of HTTPHeader objects for the user agent
+     *
+     * @return List of HTTPHeader objects with overwriteAllowed set to true
+     */
+    public static List<HTTPHeader> generateHTTPHeaders() {
+        return generateHTTPHeaders(new Options());
+    }
+
+    /**
+     * Generate a list of HTTPHeader objects for the user agent with custom options
+     *
+     * @param options
+     *            Configuration options for user agent generation
+     * @return List of HTTPHeader objects with overwriteAllowed set to true
+     */
+    public static List<HTTPHeader> generateHTTPHeaders(Options options) {
+        String device = selectDevice(options);
+        String platform = selectPlatform(device, options);
+        String browser = selectBrowser(platform, options);
+        Generator generator = new Generator(device, platform, browser, options);
+        return generator.getHTTPHeaders();
     }
 
     /**
@@ -396,36 +453,25 @@ public class UserAgents {
      * Returns a random User-Agent String Original method maintained for backward compatibility
      */
     public static String stringUserAgent() {
-        return randomUserAgent();
+        return stringUserAgent(null);
     }
 
     /**
      * Returns a random User-Agent String of BrowserName Original method maintained for backward compatibility
      */
     public static String stringUserAgent(BrowserName browser) {
-        if (browser == null) {
-            return stringUserAgent();
-        } else {
-            String ret = null;
-            int attempts = 0;
-            do {
-                ret = randomUserAgent();
-                attempts++;
-                // Prevent infinite loop by limiting attempts
-                if (attempts > 10) {
-                    // Force generate a specific browser type that matches the pattern
-                    if (browser == BrowserName.Chrome) {
-                        return randomUserAgent(BROWSER_CHROME);
-                    } else if (browser == BrowserName.Firefox) {
-                        return randomUserAgent(BROWSER_FIREFOX);
-                    } else if (browser == BrowserName.Safari) {
-                        return randomUserAgent(BROWSER_SAFARI);
-                    }
-                    break;
-                }
-            } while (!new Regex(ret, browser.getPattern()).patternFind());
-            return ret;
+        final Options options = new Options();
+        options.setPlatformTypes(PLATFORMS_DESKTOP);
+        if (browser != null) {
+            if (BrowserName.Chrome.equals(browser)) {
+                options.setBrowserTypes(new String[] { BROWSER_CHROME });
+            } else if (BrowserName.Firefox.equals(browser)) {
+                options.setBrowserTypes(new String[] { BROWSER_FIREFOX });
+            } else if (BrowserName.Safari.equals(browser)) {
+                options.setBrowserTypes(new String[] { BROWSER_SAFARI });
+            }
         }
+        return generate(options).getUserAgentString();
     }
 
     /**

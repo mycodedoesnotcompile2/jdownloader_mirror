@@ -68,7 +68,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51014 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1485,7 +1485,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             }
         }
         /* Check errors by URL structure */
-        if (br.getURL().matches("(?i)https?://[^/]+/register\\?f=.+")) {
+        if (br.getURL().matches("(?i)https?://[^/]+/register(\\.html)?\\?f=.+")) {
             throw new AccountRequiredException();
         }
         /* Check errirs inside HTML code */

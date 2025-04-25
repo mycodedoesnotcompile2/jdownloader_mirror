@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -30,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50761 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51011 $", interfaceVersion = 3, names = {}, urls = {})
 public class LulustreamCom extends XFileSharingProBasic {
     public LulustreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -188,7 +189,7 @@ public class LulustreamCom extends XFileSharingProBasic {
 
     @Override
     protected Boolean requiresCaptchaForOfficialVideoDownload() {
-        return Boolean.TRUE;
+        return Boolean.FALSE;
     }
 
     @Override
@@ -217,5 +218,25 @@ public class LulustreamCom extends XFileSharingProBasic {
             logger.log(e);
         }
         return super.getFUID(url, type);
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
+        final String ret = super.getDllink(link, account, br, src);
+        if (StringUtils.containsIgnoreCase(ret, ".m3u8")) {
+            /*
+             * 2025-04-24: Their HLS streams are DRM protected thus we cannot download them. Return null to signal upper handling to try to
+             * obtain official video downloadlink instead.
+             */
+            return null;
+        } else {
+            return ret;
+        }
+    }
+
+    @Override
+    protected boolean containsRecaptchaV2Class(String string) {
+        /* 2025-04-24: Workaround for upper handling returning wrong value here. */
+        return false;
     }
 }

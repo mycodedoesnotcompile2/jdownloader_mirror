@@ -54,7 +54,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51010 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     private String               dllink                                                = null;
     private static final String  PREMIUMONLY                                           = "(Aby pobrać ten plik, musisz być zalogowany lub wysłać jeden SMS\\.|Właściciel tego chomika udostępnia swój transfer, ale nie ma go już w wystarczającej|wymaga opłacenia kosztów transferu z serwerów Chomikuj\\.pl)";
@@ -335,13 +335,19 @@ public class ChoMikujPl extends antiDDoSForHost {
             }
         } catch (final Exception ep) {
             logger.info("Failed to get official downloadurl --> Checking if stream download is possible");
+            final boolean isVideo = isVideo(link);
+            final boolean isAudio = StringUtils.endsWithCaseInsensitive(link.getName(), ".mp3");
             if (!this.getPluginConfig().getBooleanProperty(FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, true)) {
                 logger.info("Stream download as fallback is not allowed --> Treat this as premiumonly content");
-                throw new AccountRequiredException();
+                if (isAudio || isVideo) {
+                    throw new AccountRequiredException("Account required and stream download is disabled. Enable stream download in plugin settings and you might be able to download this item.");
+                } else {
+                    throw new AccountRequiredException();
+                }
             }
             ep.printStackTrace();
-            /* Premium users can always download the original file */
-            if (isVideo(link) && !premium) {
+            /* Premium users can always download the original file except for accounts that do not have enough traffic */
+            if (isVideo) {
                 /* Download video stream (free download) */
                 logger.info("Attempting to download MP4 stream");
                 br.setFollowRedirects(true);
@@ -358,11 +364,10 @@ public class ChoMikujPl extends antiDDoSForHost {
                 } else {
                     /* Probably not free downloadable! */
                 }
-            } else if (link.getName().toLowerCase().endsWith(".mp3") && !premium) {
+            } else if (isAudio) {
                 /* Download mp3 stream */
                 logger.info("Attempting to download MP3 stream");
                 downloadurl = getDllinkMP3(link);
-                link.setFinalFileName(link.getName());
             } else {
                 logger.warning("Failed to find any download option --> Plugin broken or premiumonly content");
             }
@@ -842,7 +847,7 @@ public class ChoMikujPl extends antiDDoSForHost {
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.AVOIDPREMIUMMP3TRAFFICUSAGE, "Account download: Prefer download of stream versions of .mp3 files in account mode?\r\n<html><b>Avoids premium traffic usage for .mp3 files!</b></html>").setDefaultValue(false));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, "Free (anonymous) download: Allow fallback to stream download if real file is not downloadable without account?").setDefaultValue(true));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, "Allow fallback to stream download if original file is not downloadable without account?").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.DECRYPTFOLDERS, "Crawl subfolders in folders").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.IGNORE_TRAFFIC_LIMIT, "Ignore trafficlimit in account (e.g. useful to download self uploaded files or stream download in account mode)?").setDefaultValue(false));
     }

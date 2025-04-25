@@ -30,11 +30,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.decrypter.CamwhoresTvCrawler;
 
-@HostPlugin(revision = "$Revision: 49597 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51010 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoresTv extends KernelVideoSharingComV2 {
     public CamwhoresTv(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.camwhores.tv/");
+        this.enablePremium("https://www." + getHost() + "/");
     }
 
     /** Sync this between camwhores hoster + crawler plugins!! */
@@ -90,7 +90,7 @@ public class CamwhoresTv extends KernelVideoSharingComV2 {
     public static final boolean isOfflineStatic(final Browser br) {
         if (br.getHttpConnection().getResponseCode() == 404) {
             return true;
-        } else if (br.containsHTML("(?i)>\\s*404 / Page not found")) {
+        } else if (br.containsHTML(">\\s*404 / Page not found")) {
             return true;
         } else {
             return false;

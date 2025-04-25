@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.NaughtyamericaComCrawler;
 
-@HostPlugin(revision = "$Revision: 50893 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
+@HostPlugin(revision = "$Revision: 51007 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
 public class NaughtyamericaCom extends PluginForHost {
     public NaughtyamericaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,7 +121,6 @@ public class NaughtyamericaCom extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         /* 2022-03-17: This property should always exist but to keep compatibility to older plugin revisions we're not yet enforcing it. */
         final String crawlerForcedFilename = link.getStringProperty(PROPERTY_CRAWLER_FILENAME);
         if (crawlerForcedFilename != null) {
@@ -298,7 +297,6 @@ public class NaughtyamericaCom extends PluginForHost {
                     return;
                 }
                 logger.info("Cookie login failed");
-                account.clearCookies("");
                 if (userCookies != null) {
                     if (account.hasEverBeenValid()) {
                         throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
@@ -307,7 +305,8 @@ public class NaughtyamericaCom extends PluginForHost {
                     }
                 } else {
                     /* Full login required */
-                    br.clearAll();
+                    account.clearCookies("");
+                    br.clearCookies(null);
                 }
             }
             if (allowCookieLoginOnly) {

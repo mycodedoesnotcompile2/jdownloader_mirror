@@ -56,7 +56,7 @@ import org.jdownloader.plugins.components.config.ArteMediathekConfig.ThumbnailFi
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 49902 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51016 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,32 +98,33 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final String API_BASE                    = "https://api.arte.tv/api/opa/v3";
-    private final String        PROPERTY_VIDEO_ID           = "video_id";
-    private final String        PROPERTY_TITLE              = "title";
-    private final String        PROPERTY_SUBTITLE           = "subtitle";
-    private final String        PROPERTY_TITLE_AND_SUBTITLE = "title_and_subtitle";
-    private final String        PROPERTY_DATE               = "date";
-    private final String        PROPERTY_ORIGINAL_FILENAME  = "original_filename";
-    private final String        PROPERTY_AUDIO_CODE         = "audio_code";                                                             // ex
-                                                                                                                                         // versionCode
-                                                                                                                                         // e.g.
-                                                                                                                                         // VF,
-                                                                                                                                         // VF-STA,
-                                                                                                                                         // VA
-    private final String        PROPERTY_AUDIO_SHORT_LABEL  = "audioShortLabel";                                                        // e.g.
-                                                                                                                                         // DE,
-                                                                                                                                         // FR
-    private final String        PROPERTY_AUDIO_LABEL        = "audioLabel";                                                             // e.g.
-                                                                                                                                         // Deutsch,
-                                                                                                                                         // Französisch
-    private final String        PROPERTY_WIDTH              = "width";
-    private final String        PROPERTY_HEIGHT             = "height";
-    private final String        PROPERTY_BITRATE            = "bitrate";
-    private final String        PROPERTY_PLATFORM           = "platform";
-    private final String        PROPERTY_TYPE               = "type";
-    private final String        TYPE_NORMAL                 = "https?://[^/]+/([a-z]{2})/videos/(\\d+-\\d+-[A-Z]+)(/([a-z0-9\\-]+)/?)?";
-    private final String        TYPE_EMBED                  = "https?://[^/]+/embeds/([a-z]{2})/(\\d+-\\d+-[A-Z]+)";
+    private static final String API_BASE                         = "https://api.arte.tv/api/opa/v3";
+    private final String        PROPERTY_VIDEO_ID                = "video_id";
+    private final String        PROPERTY_TITLE                   = "title";
+    private final String        PROPERTY_SUBTITLE                = "subtitle";
+    private final String        PROPERTY_TITLE_AND_SUBTITLE      = "title_and_subtitle";
+    private final String        PROPERTY_DATE                    = "date";
+    private final String        PROPERTY_ORIGINAL_FILENAME       = "original_filename";
+    private final String        PROPERTY_ORIGINAL_AUDIO_LANGUAGE = "original_audio_language";
+    private final String        PROPERTY_AUDIO_CODE              = "audio_code";                                                             // ex
+    // versionCode
+    // e.g.
+    // VF,
+    // VF-STA,
+    // VA
+    private final String        PROPERTY_AUDIO_SHORT_LABEL       = "audioShortLabel";                                                        // e.g.
+    // DE,
+    // FR
+    private final String        PROPERTY_AUDIO_LABEL             = "audioLabel";                                                             // e.g.
+    // Deutsch,
+    // Französisch
+    private final String        PROPERTY_WIDTH                   = "width";
+    private final String        PROPERTY_HEIGHT                  = "height";
+    private final String        PROPERTY_BITRATE                 = "bitrate";
+    private final String        PROPERTY_PLATFORM                = "platform";
+    private final String        PROPERTY_TYPE                    = "type";
+    private final String        TYPE_NORMAL                      = "https?://[^/]+/([a-z]{2})/videos/(\\d+-\\d+-[A-Z]+)(/([a-z0-9\\-]+)/?)?";
+    private final String        TYPE_EMBED                       = "https?://[^/]+/embeds/([a-z]{2})/(\\d+-\\d+-[A-Z]+)";
 
     private static Browser prepBRAPI(final Browser br) {
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer Nzc1Yjc1ZjJkYjk1NWFhN2I2MWEwMmRlMzAzNjI5NmU3NWU3ODg4ODJjOWMxNTMxYzEzZGRjYjg2ZGE4MmIwOA");
@@ -253,12 +254,38 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         }
         /* First put each language + audio version in separate lists. */
         final Map<String, List<Map<String, Object>>> languagePacks = new HashMap<String, List<Map<String, Object>>>();
+        boolean hasOriginalVersion = false;
         for (final Map<String, Object> videoStream : videoStreams) {
             final String audioCode = videoStream.get("audioCode").toString();
+            if (VersionType.parse(audioCode) == VersionType.ORIGINAL) {
+                hasOriginalVersion = true;
+            }
             if (!languagePacks.containsKey(audioCode)) {
                 languagePacks.put(audioCode, new ArrayList<Map<String, Object>>());
             }
             languagePacks.get(audioCode).add(videoStream);
+        }
+        String originalVersionAudioLanguage = null;
+        if (hasOriginalVersion) {
+            // find audio language for Original version
+            Browser brc = createNewBrowserInstance();
+            brc.getHeaders().remove("Authorization");
+            final String playerConfigURL = String.format("https://api.arte.tv/api/player/v2/config/%s/%s", language, programId);
+            brc.getPage(playerConfigURL);
+            final Map<String, Object> player = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            final List<Map<String, Object>> streams = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(player, "data/attributes/streams");
+            streams: for (Map<String, Object> stream : streams) {
+                final List<Map<String, Object>> versions = (List<Map<String, Object>>) stream.get("versions");
+                if (versions != null) {
+                    for (Map<String, Object> version : versions) {
+                        if (VersionType.parse(StringUtils.valueOfOrNull(version.get("code"))) == VersionType.ORIGINAL) {
+                            originalVersionAudioLanguage = StringUtils.toUpperCaseOrNull((String) version.get("audioLanguage"), Locale.ROOT);
+                            break streams;
+                        }
+                    }
+                }
+            }
+            logger.info("Original version has audio language:" + originalVersionAudioLanguage);
         }
         final ArteMediathekConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         /* Build package name */
@@ -326,7 +353,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         for (final List<Map<String, Object>> videoStreamsByLanguage : languagePacks.values()) {
             for (final Map<String, Object> videoStream : videoStreamsByLanguage) {
                 final String audioCode = videoStream.get("audioCode").toString();
-                final VersionInfo versionInfo = parseVersionInfo(audioCode);
+                final VersionInfo versionInfo = parseVersionInfo(audioCode, originalVersionAudioLanguage);
                 existingLanguages.add(versionInfo.getAudioLanguage());
             }
         }
@@ -394,7 +421,10 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 link.setProperty(PROPERTY_AUDIO_LABEL, videoStream.get("audioLabel"));
                 link.setProperty(PROPERTY_PLATFORM, platform);
                 link.setProperty(PROPERTY_ORIGINAL_FILENAME, originalFilename);
-                final VersionInfo versionInfo = parseVersionInfo(audioCode);
+                final VersionInfo versionInfo = parseVersionInfo(audioCode, originalVersionAudioLanguage);
+                if (versionInfo.getVersionType() == VersionType.ORIGINAL) {
+                    link.setProperty(PROPERTY_ORIGINAL_AUDIO_LANGUAGE, originalVersionAudioLanguage);
+                }
                 /* Do not modify those linkIDs to try to keep backward compatibility! remove the -[A-Z] to be same as old vpi */
                 link.setContentUrl(param.getCryptedUrl());
                 link.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
@@ -579,7 +609,8 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         filename = filename.replace("*video_id*", link.getStringProperty(PROPERTY_VIDEO_ID));
         filename = filename.replace("*platform*", link.getStringProperty(PROPERTY_PLATFORM));
         filename = filename.replace("*date*", link.getStringProperty(PROPERTY_DATE));
-        filename = filename.replace("*shortlanguage*", link.getStringProperty(PROPERTY_AUDIO_SHORT_LABEL));
+        final String shortLanguage = link.getStringProperty(PROPERTY_ORIGINAL_AUDIO_LANGUAGE, link.getStringProperty(PROPERTY_AUDIO_SHORT_LABEL));
+        filename = filename.replace("*shortlanguage*", shortLanguage);
         filename = filename.replace("*language*", link.getStringProperty(PROPERTY_AUDIO_LABEL));
         filename = filename.replace("*width*", width);
         filename = filename.replace("*height*", height);
@@ -724,10 +755,10 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 /* E.g. "VFAUD" or "VAAUD" */
                 return AUDIO_DESCRIPTION;
             } else if (apiosCode.matches("[A-Z]+-ST(A|F)")) {
-                /* Forced subtitles e.g. parts of original film got foreign language -> Those parts are subtitled */
+                /* with partial subtitles in German | French */
                 return PARTIAL;
-            } else if (apiosCode.matches("[A-Z]+-STMA?.*?")) {
-                /* Subtitle for hearing impaired ppl */
+            } else if (apiosCode.matches("[A-Z]+-STM(A|F)?.*?")) {
+                /* with German | French subtitles for the deaf and hard-of-hearing */
                 return HEARING_IMPAIRED;
             } else if (apiosCode.matches("[A-Z]+-STE?.*?")) {
                 /* Normal subtitles */
@@ -745,25 +776,69 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         ORIGINAL_GERMAN,
         NON_ORIGINAL_FRANCAIS,
         NON_ORIGINAL_GERMAN,
-        FOREIGN;
+        FOREIGN,
+        UNKNOWN;
 
         private static VersionType parse(final String apiosCode) {
-            if (StringUtils.startsWithCaseInsensitive(apiosCode, "VOF")) {
-                return ORIGINAL_FRANCAIS;
-            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VOA")) {
-                return ORIGINAL_GERMAN;
-            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VA-") || StringUtils.equalsIgnoreCase(apiosCode, "VA")) {
-                return NON_ORIGINAL_GERMAN;
-            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VF-") || StringUtils.equalsIgnoreCase(apiosCode, "VF")) {
-                return NON_ORIGINAL_FRANCAIS;
-            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VO-") || StringUtils.equalsIgnoreCase(apiosCode, "VO")) {
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VO")) {
+                // Original version neither in French nor German, without subtitles
                 return ORIGINAL;
-            } else {
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VO-")) {
+                // Original version neither in French nor German, with subtitles
+                return ORIGINAL;
+            }
+
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VOF")) {
+                // Original version in French, without subtitles.
+                return ORIGINAL_FRANCAIS;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VOF-")) {
+                // Original version in French, with subtitles.
+                return ORIGINAL_FRANCAIS;
+            }
+
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VOA")) {
+                // Original version in German, without subtitles
+                return ORIGINAL_GERMAN;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VOA-")) {
+                // Original version in German, with subtitles
+                return ORIGINAL_GERMAN;
+            }
+
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VF")) {
+                // Non-original French version (Post-Synchro and/or Voice Over), without subtitles
+                return NON_ORIGINAL_FRANCAIS;
+            } else if (StringUtils.equalsIgnoreCase(apiosCode, "VFAUD")) {
+                // French version, with audio description
+                return NON_ORIGINAL_FRANCAIS;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VF-")) {
+                // Non-original French version (Post-Synchro and/or Voice Over), with subtitles
+                return NON_ORIGINAL_FRANCAIS;
+            }
+
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VA")) {
+                // Non-original German version (Post-Synchro and/or Voice Over),without subtitles
+                return NON_ORIGINAL_GERMAN;
+            } else if (StringUtils.equalsIgnoreCase(apiosCode, "VAAUD")) {
+                // German version, with audio description
+                return NON_ORIGINAL_GERMAN;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VA-")) {
+                // Non-original German version (Post-Synchro and/or Voice Over),with subtitles
+                return NON_ORIGINAL_GERMAN;
+            }
+
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VE")) {
+                // Foreign version, dubbed in a third language, neither in French nor German, without subtitles
+                return FOREIGN;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VE-")) {
+                // Foreign version, dubbed in a third language, neither in French nor German, with subtitles
                 return FOREIGN;
             }
+
+            return UNKNOWN;
         }
     }
 
+    /** see https://svn.jdownloader.org/issues/90569 **/
     public static interface VersionInfo {
         VersionType getVersionType();
 
@@ -788,11 +863,12 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         boolean isOriginalVersion();
     }
 
-    public static VersionInfo parseVersionInfo(final String apiosCode) {
+    public static VersionInfo parseVersionInfo(final String apiosCode, final String originalVersionAudioLanguage) {
         final SubtitleType subtitleType = SubtitleType.parse(apiosCode);
         final Language audioLanguage = parseAudioLanguage(apiosCode);
         final Language subtitleLanguage = parseSubtitleLanguage(apiosCode);
         final VersionType versionType = VersionType.parse(apiosCode);
+        final Language originalAudioLanguage = originalVersionAudioLanguage != null ? iso6391CodeToLanguageEnum(originalVersionAudioLanguage) : null;
         return new VersionInfo() {
             @Override
             public SubtitleType getSubtitleType() {
@@ -824,6 +900,8 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                     return Language.GERMAN;
                 } else if (versionType == VersionType.NON_ORIGINAL_GERMAN) {
                     return Language.GERMAN;
+                } else if (versionType == VersionType.ORIGINAL && originalAudioLanguage != null) {
+                    return originalAudioLanguage;
                 } else {
                     return Language.OTHER;
                 }

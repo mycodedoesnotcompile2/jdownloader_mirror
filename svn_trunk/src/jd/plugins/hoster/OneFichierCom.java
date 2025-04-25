@@ -25,6 +25,23 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -48,34 +65,21 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 50959 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51006 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
-    private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS   = "use_cdn_credits";
-    private final String       PROPERTY_ACCOUNT_CDN_CREDITS_BYTES = "cdn_credits_bytes";
-    private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT   = "is_gold_account";
-    private final String       PROPERTY_HOTLINK                   = "hotlink";
+    /* Account properties */
+    private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS             = "use_cdn_credits";
+    private final String       PROPERTY_ACCOUNT_CDN_CREDITS_BYTES           = "cdn_credits_bytes";
+    private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT             = "is_gold_account";
+    private final String       PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED      = "timestamp_vpn_detected";
+    private final String       PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING = "has_shown_vpn_login_warning";
+    /* DownloadLink properties */
+    private final String       PROPERTY_HOTLINK                             = "hotlink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
-    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT  = "acl_access_control_limit";
+    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT            = "acl_access_control_limit";
     /** 2019-04-04: Documentation: https://1fichier.com/api.html */
-    public static final String API_BASE                           = "https://api.1fichier.com/v1";
-    private final boolean      allowFreeAccountDownloadsViaAPI    = false;
+    public static final String API_BASE                                     = "https://api.1fichier.com/v1";
+    private final boolean      allowFreeAccountDownloadsViaAPI              = false;
 
     @Override
     public String[] siteSupportedNames() {
@@ -328,8 +332,9 @@ public class OneFichierCom extends PluginForHost {
                 // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is server side deprecated but we're still using it because: </br> 1. It is still working. </br> 2. It is the
-                 * only method that can be used to check multiple items with one request.
+                 * This method is server side deprecated but we're still using it because: </br>
+                 * 1. It is still working. </br>
+                 * 2. It is the only method that can be used to check multiple items with one request.
                  */
                 br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
@@ -637,13 +642,13 @@ public class OneFichierCom extends PluginForHost {
                 errorVPNUsed(account);
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            if (br.containsHTML(">\\s*Premium status is only allowed to be used on residential private and dedicated")) {
+            } else if (br.containsHTML(">\\s*Premium status is only allowed to be used on residential private and dedicated")) {
                 errorVPNUsed(account);
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 15 * 60 * 1000l);
             }
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 15 * 60 * 1000l);
         } else if (responsecode == 404) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 30 * 60 * 1000l);
         } else if (br.getHttpConnection().getResponseCode() == 503 && br.containsHTML(">\\s*Our services are in maintenance\\.\\s*Please come back after")) {
@@ -653,7 +658,7 @@ public class OneFichierCom extends PluginForHost {
         } else if (br.containsHTML("\">Warning \\! Without premium status, you can download only")) {
             logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
             throw new AccountInvalidException("Account is no premium anymore");
-        } else if (account != null && !this.isGoldAccount(account) && !this.isUsingCDNCredits(account) && br.containsHTML(">\\s*Usage of professional services is restricted and requires usage of CDN credits")) {
+        } else if (account != null && br.containsHTML(">\\s*Usage of professional services is restricted and requires usage of CDN credits") && !this.isUsingCDNCredits(account)) {
             errorVPNUsed(account);
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -711,15 +716,9 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
-    /** Call this whenever an account was attempted to be used with a VPN/proxy/datacenter IP. */
-    private void errorVPNUsed(final Account account) throws AccountUnavailableException {
-        this.displayVPNWarning(account);
-        throw new AccountUnavailableException("VPN/proxy/datacenter IP not allowed; CDN credits needed for downloading", 5 * 60 * 1000l);
-    }
-
     /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br> See here for all possible reasons (login
-     * required): https://1fichier.com/console/acl.pl
+     * Access restricted by IP / only registered users / only premium users / only owner. </br>
+     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
      *
      * @throws PluginException
      */
@@ -732,6 +731,8 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        /* Clear this property on every account check so it will get refreshed. */
+        account.removeProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED);
         if (canUseAPI(account)) {
             return fetchAccountInfoAPI(account);
         } else {
@@ -927,6 +928,10 @@ public class OneFichierCom extends PluginForHost {
         }
         account.setConcurrentUsePossible(true);
         setCdnCreditsStatus(account, ai, creditsAsBytes);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && this.isGoldAccount(account) && account.hasProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED)) {
+            /* TODO: Check if this handling is correct, then add a nicer error message dialog + translations. */
+            throw new AccountUnavailableException("Premium GOLD account + VPN can only be used in website mode", 5 * 60 * 1000l);
+        }
         return ai;
     }
 
@@ -956,26 +961,26 @@ public class OneFichierCom extends PluginForHost {
     private void setCdnCreditsStatus(final Account account, final AccountInfo ai, final long creditsInBytes) throws PluginException, IOException {
         account.setProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, creditsInBytes);
         Boolean cdnCreditsUsageEnforced = null;
-        if (!this.isGoldAccount(account)) {
-            /**
-             * Check if CDN credits are required <br>
-             * For gold accounts this is not needed since they do not have any VPN limitations.
-             */
-            logger.info("Checking for forced CDN credits usage");
-            br.getPage("https://" + getHost() + "/network.html");
-            if (br.containsHTML(">\\s*VPN detected|>\\s*Requires the use of CDN credits or")) {
-                logger.info("CDN credits usage is forced");
-                cdnCreditsUsageEnforced = true;
-            } else {
-                logger.info("CDN credits usage is not forced");
-                cdnCreditsUsageEnforced = false;
-            }
-            if (Boolean.TRUE.equals(cdnCreditsUsageEnforced) && creditsInBytes <= 0) {
-                /* CDN credits are needed for downloading but user has no CDN credits. */
-                errorVPNUsed(account);
-                /* This code should never be reached */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+        /**
+         * Check if CDN credits are required <br>
+         * For gold accounts this is not needed since they do not have any VPN limitations.
+         */
+        logger.info("Checking for forced CDN credits usage");
+        br.getPage("https://" + getHost() + "/network.html");
+        if (br.containsHTML(">\\s*VPN detected|>\\s*Requires the use of CDN credits or")) {
+            logger.info("CDN credits usage is forced");
+            account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED, System.currentTimeMillis());
+            cdnCreditsUsageEnforced = true;
+        } else {
+            logger.info("CDN credits usage is not forced");
+            account.removeProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED);
+            cdnCreditsUsageEnforced = false;
+        }
+        if (Boolean.TRUE.equals(cdnCreditsUsageEnforced) && creditsInBytes <= 0) {
+            /* CDN credits are needed for downloading but user has no CDN credits. */
+            errorVPNUsed(account);
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         final String available_credits_human_readable;
@@ -1088,6 +1093,10 @@ public class OneFichierCom extends PluginForHost {
         } else if (message.matches("(?i).*Only \\d+ locations? allowed at a time\\s*#\\d+")) {
             /* 2021-03-17: Tmp. account ban e.g. because of account sharing or user is just using it with too many IPs. */
             throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+        } else if (message.matches("(?i).*professional equipment, must have CDN.*")) {
+            errorVPNUsed(account);
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else {
             /* Unknown/unhandled error */
             logger.warning("Handling unknown API error: " + message);
@@ -1335,8 +1344,8 @@ public class OneFichierCom extends PluginForHost {
 
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
-         * 2019-04-05: At the moment there are no benefits for us when using this. </br> 2021-01-29: Removed this because if login is
-         * blocked because of "flood control" this won't work either!
+         * 2019-04-05: At the moment there are no benefits for us when using this. </br>
+         * 2021-01-29: Removed this because if login is blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
         final boolean dev_mode_check_via_api = false;
@@ -1481,19 +1490,24 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
-    private final String PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING = "has_shown_vpn_login_warning";
+    /** Call this whenever an account was attempted to be used with a VPN/proxy/datacenter IP. */
+    private void errorVPNUsed(final Account account) throws AccountUnavailableException {
+        this.displayVPNWarning(account);
+        throw new AccountUnavailableException("VPN/proxy/datacenter IP not allowed; CDN credits needed for downloading", 5 * 60 * 1000l);
+    }
 
     private void displayVPNWarning(final Account account) {
         if (account == null) {
             throw new IllegalArgumentException();
         }
         synchronized (account) {
-            if (account.hasProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING)) {
+            if (account.hasProperty(PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING)) {
                 /* Message has already been displayed for this account */
                 return;
             }
-            account.setProperty(PROPERTY_HAS_SHOWN_VPN_LOGIN_WARNING, System.currentTimeMillis());
+            account.setProperty(PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING, System.currentTimeMillis());
         }
+        /* TODO: Maybe add extra errorhandling for "Premium GOLD" account owners in API mode. */
         final Thread thread = new Thread() {
             public void run() {
                 try {

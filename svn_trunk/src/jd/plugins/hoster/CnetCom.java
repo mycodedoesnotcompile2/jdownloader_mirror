@@ -18,12 +18,14 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.html.HTMLParser;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -32,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "cnet.com" }, urls = { "https?://(?:www\\.)?download\\.cnet\\.com/([A-Za-z0-9\\-_]+)/([A-Za-z0-9\\-_]+)-(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 51011 $", interfaceVersion = 2, names = { "cnet.com" }, urls = { "https?://(?:www\\.)?download\\.cnet\\.com/([A-Za-z0-9\\-_]+)/([A-Za-z0-9\\-_]+)-(\\d+)\\.html" })
 public class CnetCom extends PluginForHost {
     public CnetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,11 +67,11 @@ public class CnetCom extends PluginForHost {
         link.setName(titleFromURL.replace("-", " ").trim() + " - " + subTitleFromURL.replace("-", " ").trim());
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        this.br.setAllowedResponseCodes(500);
+        br.setAllowedResponseCodes(500);
         br.getPage(link.getPluginPatternMatcher());
         if (br.containsHTML("(>Whoops\\! You broke the Internet\\!<|>No, really,  it looks like you clicked on a borked link)") || br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getURL().contains("/most-popular/")) {
+        } else if (!this.canHandle(br.getURL())) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;
@@ -93,25 +95,29 @@ public class CnetCom extends PluginForHost {
             if (brc.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Not downloadable (external download, see browser)");
             }
-            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.getRequest().getHtmlCode());
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             dllink = JavaScriptEngineFactory.walkJson(entries, "data/item/url").toString();
         } else {
             /* Try to get installer without adware */
-            String continueLink = null;
+            final String step1 = br.getRegex("(/download/[^/]+/[\\w-]+\\.html)\"").getMatch(0);
+            if (step1 != null) {
+                br.getPage(step1);
+            }
+            String step2 = null;
             String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
             for (final String url : urls) {
                 if (url.contains("internalDownload")) {
-                    continueLink = url;
+                    step2 = url;
                     break;
                 }
             }
-            if (continueLink == null) {
+            if (step2 == null) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Not downloadable (external download, see browser)");
             }
-            br.getPage(continueLink);
+            br.getPage(step2);
             urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
             for (final String url : urls) {
-                if (url.contains("internalDownload") && url.contains("token")) {
+                if ((StringUtils.containsIgnoreCase(url, "internalDownload") || StringUtils.containsIgnoreCase(url, "download-launch")) && StringUtils.containsIgnoreCase(url, "token=")) {
                     dllink = url;
                     break;
                 }
@@ -123,7 +129,7 @@ public class CnetCom extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
-            if (br.containsHTML("(?i)File not found")) {
+            if (br.containsHTML("File not found")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -131,7 +137,7 @@ public class CnetCom extends PluginForHost {
         }
         final String serverFilename = getFileNameFromConnection(dl.getConnection());
         if (!StringUtils.isEmpty(serverFilename)) {
-            link.setFinalFileName(serverFilename);
+            link.setFinalFileName(Encoding.htmlDecode(serverFilename).trim());
         }
         dl.startDownload();
     }
@@ -142,7 +148,7 @@ public class CnetCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
