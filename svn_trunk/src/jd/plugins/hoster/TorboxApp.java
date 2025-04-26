@@ -40,11 +40,11 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
+import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -55,14 +55,19 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51005 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51019 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
     public static final String           PROPERTY_IS_INFECTED                                     = "is_infected";
     public static final String           PROPERTY_DOWNLOAD_TYPE                                   = "download_type";
+    public static final String           PROPERTY_DOWNLOAD_ID                                     = "download_download_id";
     public static final String           PROPERTY_DOWNLOAD_FILE_ID                                = "download_file_id";
+    public static final String           PROPERTY_DOWNLOAD_FILE_INTERNAL_NAME                     = "download_file_internal_name";
+    public static final String           PROPERTY_DOWNLOAD_TYPE_torrents                          = "torrents";
+    public static final String           PROPERTY_DOWNLOAD_TYPE_web_downloads                     = "web_downloads";
+    public static final String           PROPERTY_DOWNLOAD_TYPE_usenet_downloads                  = "usenet_downloads";
     private final String                 PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP = "notifications_displayed_until_timestamp";
     private final String                 PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET                    = "max_downloads_usenet";
     private final String                 PROPERTY_ACCOUNT_USENET_USERNAME                         = "usenetU";
@@ -72,6 +77,11 @@ public class TorboxApp extends UseNet {
     public TorboxApp(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + this.getHost() + "/pricing");
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://" + this.getHost() + "/terms";
     }
 
     @Override
@@ -88,9 +98,25 @@ public class TorboxApp extends UseNet {
     }
 
     @Override
-    public String getAGBLink() {
-        return "https://" + this.getHost() + "/terms";
+    public String getPluginContentURL(final DownloadLink link) {
+        return "https://" + getHost() + "/download?id=" + link.getStringProperty(PROPERTY_DOWNLOAD_ID) + "&type=" + link.getStringProperty(PROPERTY_DOWNLOAD_TYPE) + "&name=" + Encoding.urlEncode(link.getStringProperty(PROPERTY_DOWNLOAD_FILE_INTERNAL_NAME, "PROPERTY_MISSING"));
     }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        return this.getHost() + "://type/" + link.getStringProperty(PROPERTY_DOWNLOAD_TYPE) + "/download_id/" + link.getStringProperty(PROPERTY_DOWNLOAD_ID) + "/file_id/" + link.getStringProperty(PROPERTY_DOWNLOAD_FILE_ID);
+    }
+    // public static String getDownloadTypeAPIPath(final String dl_type) {
+    // if (dl_type.equalsIgnoreCase("torrents")) {
+    // return "torrents";
+    // } else if (dl_type.equalsIgnoreCase("web_downloads")) {
+    // return "webdl";
+    // } else if (dl_type.equalsIgnoreCase("usenet_downloads")) {
+    // return "usenet";
+    // } else {
+    // throw new IllegalArgumentException();
+    // }
+    // }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -125,8 +151,46 @@ public class TorboxApp extends UseNet {
             super.handleMultiHost(link, account);
             return;
         } else {
-            /* This should never happen */
-            throw new AccountRequiredException();
+            /* Download selfhosted file */
+            // throw new AccountRequiredException();
+            final String file_id = link.getStringProperty(PROPERTY_DOWNLOAD_FILE_ID);
+            final String dl_type = link.getStringProperty(PROPERTY_DOWNLOAD_TYPE);
+            final String dl_id = link.getStringProperty(PROPERTY_DOWNLOAD_ID);
+            // final String dl_type_api_path = getDownloadTypeAPIPath(link.getStringProperty(PROPERTY_DOWNLOAD_TYPE));
+            final Request req_requestdl;
+            if (dl_type.equalsIgnoreCase("torrents")) {
+                final UrlQuery query_requestdl = new UrlQuery();
+                query_requestdl.appendEncoded("token", this.getApikey(account));
+                query_requestdl.appendEncoded("torrent_id", dl_id);
+                query_requestdl.appendEncoded("file_id", file_id);
+                query_requestdl.appendEncoded("zip", "false");
+                req_requestdl = br.createGetRequest(API_BASE + "/torrents/requestdl?" + query_requestdl.toString());
+            } else if (dl_type.equalsIgnoreCase("web_downloads")) {
+                final UrlQuery query_requestdl = new UrlQuery();
+                query_requestdl.appendEncoded("token", this.getApikey(account));
+                query_requestdl.appendEncoded("web_id", dl_id);
+                query_requestdl.appendEncoded("file_id", file_id);
+                query_requestdl.appendEncoded("zip", "false");
+                req_requestdl = br.createGetRequest(API_BASE + "/webdl/requestdl?" + query_requestdl.toString());
+            } else if (dl_type.equalsIgnoreCase("usenet_downloads")) {
+                final UrlQuery query_requestdl = new UrlQuery();
+                query_requestdl.appendEncoded("token", this.getApikey(account));
+                query_requestdl.appendEncoded("usenet_id", dl_id);
+                query_requestdl.appendEncoded("file_id", file_id);
+                query_requestdl.appendEncoded("zip", "false");
+                req_requestdl = br.createGetRequest(API_BASE + "/usenet/requestdl?" + query_requestdl.toString());
+            } else {
+                throw new IllegalArgumentException();
+            }
+            final String dllink = this.callAPI(br, req_requestdl, account, link).toString();
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                checkErrors(br, account, link);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "WTF");
+            }
+            dl.startDownload();
         }
     }
 

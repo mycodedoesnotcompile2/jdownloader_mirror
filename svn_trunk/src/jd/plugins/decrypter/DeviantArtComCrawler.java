@@ -17,9 +17,11 @@ package jd.plugins.decrypter;
 
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
@@ -29,6 +31,7 @@ import org.jdownloader.plugins.components.config.DeviantArtComConfig;
 import org.jdownloader.plugins.components.config.DeviantArtComConfig.ArtCrawlMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -50,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50988 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51020 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
     /**
      * @author raztoki, pspzockerscene
@@ -360,34 +363,143 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
                 }
             }
         }
-        if (allowedresults.isEmpty()) {
-            logger.info("Found single item");
-        }
         int position = 1;
         final String[] propertiesToCopy = new String[] { DeviantArtCom.PROPERTY_USERNAME, DeviantArtCom.PROPERTY_TITLE, DeviantArtCom.PROPERTY_TYPE };
-        for (final String url : allowedresults) {
-            if (position == 1) {
-                mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
-            } else {
+        try {
+            String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
+            json = PluginJSonUtils.unescape(json);
+            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            final List<Map<String, Object>> additionalMedias = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "@@entities/deviationExtended/{0}/additionalMedia");
+            logger.info("Number of additionalMedia: " + additionalMedias.size());
+            final boolean isImage = true;
+            final boolean isVideo = false;
+            /* Start at position 2 since these "extra" items do not contain the main image item. */
+            position = 2;
+            for (final Map<String, Object> additionalMedia : additionalMedias) {
+                final Number filesize = (Number) additionalMedia.get("filesize");
+                final Map<String, Object> media = (Map<String, Object>) additionalMedia.get("media");
                 final DownloadLink image = this.createDownloadlink(contenturl);
                 /* Inherit some properties from main link. */
                 for (final String property : propertiesToCopy) {
                     image.setProperty(property, mainlink.getProperty(property));
                 }
                 image.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION, position);
-                image.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
-                image.setAvailable(true);
+                final String baseUri = (String) media.get("baseUri");
+                final String prettyName = (String) media.get("prettyName");
+                final List<Map<String, Object>> types = (List<Map<String, Object>>) media.get("types");
+                Map<String, Object> bestType = null;
+                final List<String> bestTypesList;
+                if (isImage) {
+                    bestTypesList = Arrays.asList(new String[] { "fullview" });
+                } else if (isVideo) {
+                    bestTypesList = Arrays.asList(new String[] { "video" });
+                } else {
+                    bestTypesList = new ArrayList<String>(0);
+                }
+                typeStringLoop: for (final String typeString : bestTypesList) {
+                    for (final Map<String, Object> type : types) {
+                        if (typeString.equals(type.get("t"))) {
+                            if (isImage) {
+                                bestType = type;
+                                break typeStringLoop;
+                            } else if (isVideo) {
+                                if (bestType == null || ((Number) type.get("h")).intValue() > ((Number) bestType.get("h")).intValue()) {
+                                    bestType = type;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (bestType == null) {
+                    continue;
+                }
+                String displayedImageURL = null;
+                Number unlimitedImageSize = null;
+                String displayedVideoURL = null;
+                Number displayedVideoSize = null;
+                if (isImage) {
+                    String c = (String) bestType.get("c");
+                    if (c == null) {
+                        if ("fullview".equals(bestType.get("t"))) {
+                            // r=1? o=true??(maybe original)
+                            c = "";// raw image without any processing?
+                        } else {
+                            final Number h = (Number) bestType.get("h");
+                            final Number w = (Number) bestType.get("w");
+                            if (h != null && w != null) {
+                                c = "/v1/fit/w_" + w + ",h_" + h + "/";
+                            }
+                        }
+                    }
+                    if (c != null) {
+                        c = c.replaceFirst(",q_\\d+(,strp)?", "");
+                        final List<String> tokens = (List<String>) media.get("token");
+                        final String token = tokens.get(0);
+                        image.setProperty(DeviantArtCom.PROPERTY_IMAGE_TOKEN, token);
+                        displayedImageURL = baseUri + c.replaceFirst("<prettyName>", Matcher.quoteReplacement(prettyName));
+                        displayedImageURL = displayedImageURL + "?token=" + token;
+                    }
+                } else if (isVideo) {
+                    displayedVideoURL = (String) bestType.get("b");
+                    displayedVideoSize = (Number) bestType.get("f");
+                }
+                if (isImage && displayedImageURL == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else if (isVideo && displayedVideoURL == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                if (isImage) {
+                    image.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, displayedImageURL);
+                } else {
+                    // TODO
+                    image.setProperty(DeviantArtCom.PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL, displayedVideoURL);
+                }
+                if (filesize != null) {
+                    image.setDownloadSize(filesize.longValue());
+                }
+                image.setProperty("displayedImageURL", displayedImageURL);
+                image.setProperty("unlimitedImageSize", unlimitedImageSize);
+                image.setProperty("displayedVideoURL", displayedVideoURL);
+                image.setProperty("displayedVideoSize", displayedVideoSize);
+                position++;
                 ret.add(image);
             }
-            position++;
+        } catch (final Throwable e) {
+            logger.log(e);
+            logger.warning("additionalMedias handling failed");
+        }
+        if (ret.size() == 1 && allowedresults.size() > 0) {
+            /* Legacy handling */
+            logger.info("Fallback to old way");
+            position = 1;
+            for (final String url : allowedresults) {
+                if (position == 1) {
+                    mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
+                } else {
+                    final DownloadLink image = this.createDownloadlink(contenturl);
+                    /* Inherit some properties from main link. */
+                    for (final String property : propertiesToCopy) {
+                        image.setProperty(property, mainlink.getProperty(property));
+                    }
+                    image.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION, position);
+                    image.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
+                    ret.add(image);
+                }
+                position++;
+            }
+        }
+        if (ret.size() == 1) {
+            logger.info("Found single item");
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(mainlink.getStringProperty(DeviantArtCom.PROPERTY_TITLE));
         for (final DownloadLink result : ret) {
+            result.setContentUrl(br.getURL());
             if (ret.size() > 1) {
                 result._setFilePackage(fp);
             }
             result.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION_MAX, ret.size());
+            result.setAvailable(true);
             this.hosterplugin.setFilename(result, account, null);
         }
         return ret;

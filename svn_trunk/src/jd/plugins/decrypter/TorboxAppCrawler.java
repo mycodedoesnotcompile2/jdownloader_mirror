@@ -20,8 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.parser.UrlQuery;
+
+import com.formdev.flatlaf.util.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -39,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.TorboxApp;
 
-@DecrypterPlugin(revision = "$Revision: 51005 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51019 $", interfaceVersion = 3, names = {}, urls = {})
 public class TorboxAppCrawler extends PluginForDecrypt {
     public TorboxAppCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,17 +87,12 @@ public class TorboxAppCrawler extends PluginForDecrypt {
             /* Account required to access any torbox.app content */
             throw new AccountRequiredException();
         }
-        final TorboxApp plugin = (TorboxApp) this.getNewPluginForHostInstance(this.getHost());
+        final TorboxApp hosterplugin = (TorboxApp) this.getNewPluginForHostInstance(this.getHost());
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* Unfinished plugin */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        // TODO: Add functionality
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
         final String dl_id = query.get("id");
         final String dl_type = query.get("type");
@@ -105,30 +101,38 @@ public class TorboxAppCrawler extends PluginForDecrypt {
         Map<String, Object> data = null;
         if (dl_type.equalsIgnoreCase("torrents")) {
             final Request req = br.createGetRequest(TorboxApp.API_BASE + "/torrents/mylist?" + query.toString());
-            data = (Map<String, Object>) plugin.callAPI(br, req, account, null);
+            data = (Map<String, Object>) hosterplugin.callAPI(br, req, account, null);
         } else if (dl_type.equalsIgnoreCase("web_downloads")) {
             final Request req = br.createGetRequest(TorboxApp.API_BASE + "/webdl/mylist?" + query.toString());
-            data = (Map<String, Object>) plugin.callAPI(br, req, account, null);
+            data = (Map<String, Object>) hosterplugin.callAPI(br, req, account, null);
         } else if (dl_type.equalsIgnoreCase("usenet_downloads")) {
             final Request req = br.createGetRequest(TorboxApp.API_BASE + "/usenet/mylist?" + query.toString());
-            data = (Map<String, Object>) plugin.callAPI(br, req, account, null);
+            data = (Map<String, Object>) hosterplugin.callAPI(br, req, account, null);
         } else {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported type");
         }
         files = (List<Map<String, Object>>) data.get("files");
         for (final Map<String, Object> file : files) {
             final String filename = file.get("short_name").toString();
-            String path = file.get("name").toString();
+            final String md5 = (String) file.get("md5");
+            final String internalName = file.get("name").toString();
             /* Remove filename from path */
-            path = path.replaceFirst("/" + Pattern.quote(filename) + "$", "");
+            String path = internalName.replaceFirst("/" + Pattern.quote(filename) + "$", "");
             final DownloadLink link = this.createDownloadlink("https://dummy.link.todo/" + file.get("name") + ".jdeatme");
+            link.setHost(hosterplugin.getHost());
+            link.setDefaultPlugin(hosterplugin);
             link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_TYPE, dl_type);
-            link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_FILE_ID, dl_id);
+            link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_ID, dl_id);
+            link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_FILE_ID, file.get("id"));
+            link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_FILE_INTERNAL_NAME, internalName);
             if (Boolean.TRUE.equals(file.get("infected"))) {
                 link.setProperty(TorboxApp.PROPERTY_IS_INFECTED, true);
             }
             link.setFinalFileName(filename);
             link.setVerifiedFileSize(((Number) file.get("size")).longValue());
+            if (!StringUtils.isEmpty(md5)) {
+                link.setMD5Hash(md5);
+            }
             link.setAvailable(true);
             link.setRelativeDownloadFolderPath(path);
             final FilePackage fp = FilePackage.getInstance();

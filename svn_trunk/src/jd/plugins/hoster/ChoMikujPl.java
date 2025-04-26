@@ -20,11 +20,12 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Random;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -37,12 +38,13 @@ import jd.http.URLConnectionAdapter;
 import jd.http.requests.PostRequest;
 import jd.nutils.JDHash;
 import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -54,31 +56,36 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51010 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51020 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     private String               dllink                                                = null;
-    private static final String  PREMIUMONLY                                           = "(Aby pobrać ten plik, musisz być zalogowany lub wysłać jeden SMS\\.|Właściciel tego chomika udostępnia swój transfer, ale nie ma go już w wystarczającej|wymaga opłacenia kosztów transferu z serwerów Chomikuj\\.pl)";
     private static final String  ACCESSDENIED                                          = "Nie masz w tej chwili uprawnień do tego pliku lub dostęp do niego nie jest w tej chwili możliwy z innych powodów\\.";
-    private final String         VIDEOENDINGS                                          = "\\.(avi|flv|mp4|mpg|rmvb|divx|wmv|mkv)";
     private static final String  MAINPAGE                                              = "https://chomikuj.pl/";
     /* Plugin settings */
     public static final String   DECRYPTFOLDERS                                        = "DECRYPTFOLDERS";
     private static final String  AVOIDPREMIUMMP3TRAFFICUSAGE                           = "AVOIDPREMIUMMP3TRAFFICUSAGE";
+    private static final boolean default_AVOIDPREMIUMMP3TRAFFICUSAGE                   = false;
     private static final String  FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK = "FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK";
     private static final String  IGNORE_TRAFFIC_LIMIT                                  = "IGNORE_TRAFFIC_LIMIT";
     private Browser              cbr                                                   = null;
-    private static final int     free_maxchunks                                        = 1;
-    private static final boolean free_resume                                           = false;
-    private static final int     free_maxdls                                           = -1;
-    private static final int     account_maxchunks                                     = 0;
-    private static final boolean account_resume                                        = true;
-    private static final int     account_maxdls                                        = -1;
-    private boolean              plus18                                                = false;
+    private boolean              adultContent                                          = false;
 
     public ChoMikujPl(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://chomikuj.pl/Create.aspx");
+        this.enablePremium("https://" + getHost() + "/Create.aspx");
         setConfigElements();
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/Regulamin.aspx";
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @SuppressWarnings("deprecation")
@@ -98,12 +105,41 @@ public class ChoMikujPl extends antiDDoSForHost {
 
     @Override
     protected Browser prepBrowser(final Browser prepBr, final String host) {
-        if (!(this.browserPrepped.containsKey(prepBr) && this.browserPrepped.get(prepBr) == Boolean.TRUE)) {
+        if (!(browserPrepped.containsKey(prepBr) && browserPrepped.get(prepBr) == Boolean.TRUE)) {
             super.prepBrowser(prepBr, host);
             /* define custom browser headers and language settings */
             prepBr.setAllowedResponseCodes(new int[] { 500 });
         }
         return prepBr;
+    }
+
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
+            /* Free Account */
+            return true;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+            /* Premium account */
+            return true;
+        } else {
+            /* Free(anonymous) and unknown account type */
+            return false;
+        }
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
+            /* Free Account */
+            return 1;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+            /* Premium account */
+            return 0;
+        } else {
+            /* Free(anonymous) and unknown account type */
+            return 1;
+        }
     }
 
     @Override
@@ -136,8 +172,8 @@ public class ChoMikujPl extends antiDDoSForHost {
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        plus18 = false;
-        br.setFollowRedirects(true);
+        adultContent = false;
+        dllink = null;
         final String fid = getFID(link);
         final String mainlink = getMainlink(link);
         if (fid == null) {
@@ -153,7 +189,7 @@ public class ChoMikujPl extends antiDDoSForHost {
             if (isDownload) {
                 this.passwordHandling(link, account);
             }
-            if (this.br.getHttpConnection() != null && this.br.getHttpConnection().getResponseCode() == 404) {
+            if (br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (requiresPasswordPrompt(br)) {
                 logger.info("Cannot fetch file information because password is required");
@@ -174,38 +210,7 @@ public class ChoMikujPl extends antiDDoSForHost {
             } else {
                 logger.info("Failed to find html filename for single link");
             }
-            plus18 = this.br.containsHTML("\"FormAdultViewAccepted\"");
-        }
-        /*
-         * 2016-11-03: Removed filesize check [for free download attempts] because free downloads are only rarely possible and usually
-         * require a captcha.
-         */
-        if (dllink != null && !isDownload) {
-            // In case the link redirects to the finallink
-            br.setFollowRedirects(true);
-            URLConnectionAdapter con = null;
-            try {
-                con = br.openHeadConnection(dllink);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                    /* Only set final filename if it wasn't set before as video and */
-                    /* audio streams can have bad filenames */
-                    final String fname = getFileNameFromConnection(con);
-                    if (link.getFinalFileName() == null && fname != null) {
-                        link.setFinalFileName(Encoding.htmlDecode(fname));
-                    }
-                } else {
-                    /* Just because we get html here that doesn't mean that the file is offline ... */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to file");
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
-                }
-            }
+            adultContent = br.containsHTML("\"FormAdultViewAccepted\"");
         }
         return AvailableStatus.TRUE;
     }
@@ -216,7 +221,7 @@ public class ChoMikujPl extends antiDDoSForHost {
         login(account, true);
         final String remainingTraffic = br.getRegex("<strong>([^<>\"]*?)</strong>\\s*transferu").getMatch(0);
         if (remainingTraffic != null) {
-            if (this.getPluginConfig().getBooleanProperty(ChoMikujPl.IGNORE_TRAFFIC_LIMIT, false) || this.getPluginConfig().getBooleanProperty(ChoMikujPl.AVOIDPREMIUMMP3TRAFFICUSAGE, false)) {
+            if (this.getPluginConfig().getBooleanProperty(ChoMikujPl.IGNORE_TRAFFIC_LIMIT, false) || this.getPluginConfig().getBooleanProperty(ChoMikujPl.AVOIDPREMIUMMP3TRAFFICUSAGE, default_AVOIDPREMIUMMP3TRAFFICUSAGE)) {
                 /*
                  * Uploaders can always download their OWN files no matter how much traffic they have left and downloading streams does not
                  * use up any traffic.
@@ -253,132 +258,6 @@ public class ChoMikujPl extends antiDDoSForHost {
         return ai;
     }
 
-    @Override
-    public String getAGBLink() {
-        return "https://chomikuj.pl/Regulamin.aspx";
-    }
-
-    private String getDllink(final DownloadLink link, final Browser br, final boolean premium) throws Exception {
-        final boolean redirectsSetting = br.isFollowingRedirects();
-        br.setFollowRedirects(false);
-        String unescapedBR;
-        final String fid = getFID(link);
-        br.getHeaders().put("Accept", "*/*");
-        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        String downloadurl = null;
-        try {
-            /* 2016-11-30: That page does not exist anymore. */
-            // getPageWithCleanup(br, "http://chomikuj.pl/action/fileDetails/Index/" + fid);
-            // final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
-            // if (filesize != null) {
-            // theLink.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
-            // }
-            // if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("fileDetails/Unavailable")) {
-            // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            // }
-            final String requestVerificationToken = br.getRegex("<div id=\"content\">\\s*?<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-            if (requestVerificationToken == null) {
-                logger.warning("Failed to find requestVerificationToken");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            br.setCookie(this.getHost(), "cookiesAccepted", "1");
-            postPageWithCleanup(br, "https://" + this.getHost() + "/action/License/DownloadContext", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-            unescapedBR = Encoding.unicodeDecode(br.toString());
-            String serializedUserSelection = new Regex(unescapedBR, "name=\"SerializedUserSelection\" type=\"hidden\" value=\"([^<>\"]+)\"").getMatch(0);
-            if (serializedUserSelection == null) {
-                serializedUserSelection = new Regex(unescapedBR, "name=\\\\\"SerializedUserSelection\\\\\" type=\\\\\"hidden\\\\\" value=\\\\\"([^<>\"]+)\\\\\"").getMatch(0);
-            }
-            String serializedOrgFile = new Regex(unescapedBR, "name=\"SerializedOrgFile\" type=\"hidden\" value=\"([^<>\"]+)\"").getMatch(0);
-            if (serializedOrgFile == null) {
-                serializedOrgFile = new Regex(unescapedBR, "name=\\\\\"SerializedOrgFile\\\\\" type=\\\\\"hidden\\\\\" value=\\\\\"([^<>\"]+)\\\\\"").getMatch(0);
-            }
-            if (br.containsHTML("downloadWarningForm")) {
-                if (serializedUserSelection == null || serializedOrgFile == null) {
-                    /* Plugin broken or download is premium only content */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                postPageWithCleanup(br, "/action/License/DownloadWarningAccept", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken) + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile));
-                unescapedBR = Encoding.unicodeDecode(br.toString());
-            }
-            if (br.containsHTML("g\\-recaptcha")) {
-                final String rcSiteKey = PluginJSonUtils.getJson(unescapedBR, "sitekey");
-                if (rcSiteKey == null || serializedUserSelection == null || serializedOrgFile == null) {
-                    /* Plugin broken or premium only content */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                /* Handle captcha */
-                logger.info("Handling captcha");
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, rcSiteKey).getToken();
-                final String postData = "FileId=" + fid + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile) + "&FileName=" + Encoding.urlEncode(link.getName()) + "&g-recaptcha-response=" + Encoding.urlEncode(recaptchaV2Response) + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken);
-                postPageWithCleanup(br, "/action/License/DownloadNotLoggedCaptchaEntered", postData);
-            } else {
-                postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-            }
-            if (cbr.containsHTML(PREMIUMONLY)) {
-                throw new AccountRequiredException();
-            } else if (cbr.containsHTML(ACCESSDENIED)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            downloadurl = PluginJSonUtils.getJson(br, "redirectUrl");
-            if (StringUtils.isEmpty(downloadurl)) {
-                downloadurl = br.getRegex("\\\\u003ca href=\\\\\"([^\"]*?)\\\\\" title").getMatch(0);
-            }
-            if (StringUtils.isEmpty(downloadurl)) {
-                downloadurl = br.getRegex("\"(https?://[A-Za-z0-9\\-_\\.]+\\.chomikuj\\.pl/File\\.aspx[^<>\"]*?)\\\\\"").getMatch(0);
-            }
-            if (!StringUtils.isEmpty(downloadurl)) {
-                downloadurl = Encoding.htmlDecode(downloadurl);
-            }
-            if (downloadurl == null) {
-                logger.info("Failed to perform official download");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-        } catch (final Exception ep) {
-            logger.info("Failed to get official downloadurl --> Checking if stream download is possible");
-            final boolean isVideo = isVideo(link);
-            final boolean isAudio = StringUtils.endsWithCaseInsensitive(link.getName(), ".mp3");
-            if (!this.getPluginConfig().getBooleanProperty(FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, true)) {
-                logger.info("Stream download as fallback is not allowed --> Treat this as premiumonly content");
-                if (isAudio || isVideo) {
-                    throw new AccountRequiredException("Account required and stream download is disabled. Enable stream download in plugin settings and you might be able to download this item.");
-                } else {
-                    throw new AccountRequiredException();
-                }
-            }
-            ep.printStackTrace();
-            /* Premium users can always download the original file except for accounts that do not have enough traffic */
-            if (isVideo) {
-                /* Download video stream (free download) */
-                logger.info("Attempting to download MP4 stream");
-                br.setFollowRedirects(true);
-                getPageWithCleanup(br, "https://" + this.getHost() + "/ShowVideo.aspx?id=" + fid);
-                if (br.getURL().contains("chomikuj.pl/Error404.aspx") || cbr.containsHTML("(Nie znaleziono|Strona, której szukasz nie została odnaleziona w portalu\\.<|>Sprawdź czy na pewno posługujesz się dobrym adresem)")) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                br.setFollowRedirects(false);
-                getPage(br, "https://" + this.getHost() + "/Video.ashx?id=" + fid + "&type=1&ts=" + new Random().nextInt(1000000000) + "&file=video&start=0");
-                downloadurl = br.getRedirectLocation();
-                if (downloadurl != null) {
-                    link.setFinalFileName(link.getName());
-                    return downloadurl;
-                } else {
-                    /* Probably not free downloadable! */
-                }
-            } else if (isAudio) {
-                /* Download mp3 stream */
-                logger.info("Attempting to download MP3 stream");
-                downloadurl = getDllinkMP3(link);
-            } else {
-                logger.warning("Failed to find any download option --> Plugin broken or premiumonly content");
-            }
-        }
-        if (!StringUtils.isEmpty(downloadurl)) {
-            downloadurl = Encoding.unicodeDecode(downloadurl);
-        }
-        br.setFollowRedirects(redirectsSetting);
-        return downloadurl;
-    }
-
     private static Object PWLOCK = new Object();
 
     private void passwordHandling(final DownloadLink link, final Account account) throws Exception {
@@ -410,146 +289,212 @@ public class ChoMikujPl extends antiDDoSForHost {
         if (filename == null) {
             filename = dl.getName();
         }
-        if (filename != null && filename.contains(".")) {
-            final String ext = filename.substring(filename.lastIndexOf("."));
-            if (ext.matches(VIDEOENDINGS)) {
-                return true;
-            }
+        if (filename == null) {
+            return false;
+        }
+        if (!filename.contains(".")) {
+            return false;
+        }
+        final String ext = filename.substring(filename.lastIndexOf("."));
+        if (ext.matches("\\.(avi|flv|mp4|mpg|rmvb|divx|wmv|mkv)")) {
+            return true;
         }
         return false;
     }
 
-    @SuppressWarnings("deprecation")
-    public boolean getDllink_premium(final DownloadLink link, final Account account, final Browser br, final boolean premium) throws Exception {
-        final boolean redirectsSetting = br.isFollowingRedirects();
-        br.setFollowRedirects(false);
-        final String fid = this.getFID(link);
+    /**
+     * Unified method to get download link for both free and premium users
+     *
+     * @param link
+     *            The DownloadLink to process
+     * @param account
+     *            The account to use (can be null for free users)
+     * @return The download link
+     * @throws Exception
+     *             If an error occurs
+     */
+    private String getDllink(final DownloadLink link, final Account account) throws Exception {
+        final boolean isPremium = account != null && AccountType.PREMIUM.equals(account.getType());
+        final boolean isVideo = isVideo(link);
+        final boolean isAudio = StringUtils.endsWithCaseInsensitive(link.getName(), ".mp3");
+        String downloadUrl = null;
+        final String fid = getFID(link);
+        br.getHeaders().put("Accept", "*/*");
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        if (this.getPluginConfig().getBooleanProperty(AVOIDPREMIUMMP3TRAFFICUSAGE, false) && link.getName().toLowerCase().endsWith(".mp3")) {
+        // Check if account wants to force MP3 stream download
+        if (isPremium && isAudio && this.getPluginConfig().getBooleanProperty(AVOIDPREMIUMMP3TRAFFICUSAGE, default_AVOIDPREMIUMMP3TRAFFICUSAGE)) {
             /* User wants to force stream download for .mp3 files --> Does not use up any premium traffic. */
-            dllink = getDllinkMP3(link);
-            return true;
+            return getDllinkAudioStream(link);
         }
-        /* Premium users can always download the original file */
-        final boolean accountHasLessTrafficThanRequiredForThisFile = account.getAccountInfo().getTrafficLeft() < link.getView().getBytesTotal();
+        // Premium users check for traffic (if traffic checking is enabled)
+        final boolean accountHasLessTrafficThanRequiredForThisFile = isPremium && !account.getAccountInfo().isSpecialTraffic() && account.getAccountInfo().getTrafficLeft() < link.getView().getBytesTotal();
+        String content = null;
         try {
+            // Perform a special file info check for account users
+            if (account != null) {
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("https://" + getHost() + "/action/fileDetails/Index/" + fid);
+                final String filesize = brc.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
+                if (filesize != null) {
+                    link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
+                }
+                if (StringUtils.containsIgnoreCase(brc.getURL(), "fileDetails/Unavailable")) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (accountHasLessTrafficThanRequiredForThisFile) {
+                    /* Users can override traffic check. For this case we'll check if we have enough traffic for this file here. */
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 15 * 60 * 1000l);
+                }
+            }
+            // Get the verification token
             final String requestVerificationToken = br.getRegex("<div id=\"content\">\\s*?<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
             if (requestVerificationToken == null) {
                 logger.warning("Failed to find requestVerificationToken");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            /* First, kind of a linkcheck - if we haven't found the filesize before we'll probably find it now. */
-            getPageWithCleanup(br, "https://chomikuj.pl/action/fileDetails/Index/" + fid);
-            final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
-            if (filesize != null) {
-                link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
+            // Set cookies and make initial request
+            br.setCookie(this.getHost(), "cookiesAccepted", "1");
+            if (isPremium) {
+                br.setCookie("http://chomikuj.pl/", "__RequestVerificationToken_Lw__", requestVerificationToken);
+                br.getHeaders().put("Referer", link.getPluginPatternMatcher());
             }
-            if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("fileDetails/Unavailable")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (!account.getAccountInfo().isSpecialTraffic() && accountHasLessTrafficThanRequiredForThisFile) {
-                /* Users can override traffic check. For this case we'll check if we have enough traffic for this file here. */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 30 * 60 * 1000l);
-            }
-            br.setCookie("http://chomikuj.pl/", "__RequestVerificationToken_Lw__", requestVerificationToken);
-            br.getHeaders().put("Referer", link.getDownloadURL());
-            postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadContext", "fileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+            postPageWithCleanup(br, "https://" + getHost() + "/action/License/DownloadContext", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+            Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            content = (String) entries.get("Content");
+            // Check for access denied
             if (cbr.containsHTML(ACCESSDENIED)) {
-                return false;
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            /* Low traffic warning(?) */
-            if (cbr.containsHTML("action=\"/action/License/DownloadWarningAccept\"")) {
-                final String serializedUserSelection = cbr.getRegex("name=\"SerializedUserSelection\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-                final String serializedOrgFile = cbr.getRegex("name=\"SerializedOrgFile\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-                if (serializedUserSelection == null || serializedOrgFile == null) {
-                    logger.warning("Failed to pass low traffic warning!");
-                    return false;
-                }
-                postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadWarningAccept", "FileId=" + fid + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile) + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-            }
-            if (cbr.containsHTML("dontShowBoxInSession")) {
-                postPageWithCleanup(br, "/action/chomikbox/DontDownloadWithBox", "__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-                postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-            }
-            if (cbr.containsHTML("/action/License/acceptLargeTransfer")) {
-                // this can happen also
-                // problem is.. general cleanup is wrong, response is = Content-Type: application/json; charset=utf-8
-                cleanupBrowser(br, PluginJSonUtils.unescape(br.toString()));
-                // so we can get output in logger for debug purposes.
-                logger.info(cbr.toString());
-                final Form f = cbr.getFormbyAction("/action/License/acceptLargeTransfer");
-                if (f == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                submitFormWithCleanup(br, f);
-            } else if (cbr.containsHTML("/action/License/AcceptOwnTransfer")) {
-                /*
-                 * Some files on chomikuj hoster are available to download using transfer from file owner. When there's no owner transfer
-                 * left then transfer is reduced from downloader account (downloader is asked if he wants to use his own transfer). We have
-                 * to confirm this here.
-                 */
-                // problem is.. general cleanup is wrong, response is = Content-Type: application/json; charset=utf-8
-                cleanupBrowser(cbr, PluginJSonUtils.unescape(br.toString()));
-                // so we can get output in logger for debug purposes.
-                logger.info(cbr.toString());
-                final Form f = cbr.getFormbyAction("/action/License/AcceptOwnTransfer");
-                if (f == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                f.remove(null);
-                f.remove(null);
-                f.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
-                submitFormWithCleanup(br, f);
-            }
-            dllink = br.getRegex("redirectUrl\":\"(https?://.*?)\"").getMatch(0);
-            if (dllink == null) {
-                dllink = br.getRegex("\\\\u003ca href=\\\\\"([^\"]*?)\\\\\" title").getMatch(0);
-            }
-            if (dllink == null) {
-                dllink = br.getRegex("\"(https?://[A-Za-z0-9\\-_\\.]+\\.chomikuj\\.pl/File\\.aspx[^<>\"]*?)\\\\\"").getMatch(0);
-            }
-            if (dllink == null) {
-                if (cbr.containsHTML("\"BuyAdditionalTransfer")) {
-                    logger.info("Disabling chomikuj.pl account: Not enough traffic available");
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
-                }
-                logger.warning("Failed to find final downloadurl");
+            final String serializedUserSelection = cbr.getRegex("name=\"SerializedUserSelection\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
+            final String serializedOrgFile = cbr.getRegex("name=\"SerializedOrgFile\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
+            if (serializedUserSelection == null || serializedOrgFile == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dllink = Encoding.unicodeDecode(dllink);
-            dllink = Encoding.htmlDecode(dllink);
-            if (dllink.contains("#SliderTransfer")) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Traffic limit reached", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+            if (content.contains("action=\"/action/License/DownloadWarningAccept\"")) {
+                /* This step is mostly required */
+                postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadWarningAccept", "FileId=" + fid + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile) + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+                entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                content = (String) entries.get("Content");
             }
-            br.setFollowRedirects(redirectsSetting);
-        } catch (final PluginException e) {
-            String msg = null;
-            try {
-                final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
-                msg = (String) entries.get("Content");
-                msg = msg.trim();
-            } catch (final Throwable e2) {
-            }
-            if (e.getLinkStatus() == LinkStatus.ERROR_PLUGIN_DEFECT && accountHasLessTrafficThanRequiredForThisFile) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 30 * 60 * 1000l);
-            } else if (!StringUtils.isEmpty(msg) && msg.length() <= 100) {
-                /* Try to display more precise errormessage, avoid plugin defect. */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg);
+            if (account != null) {
+                // Handle "don't show box" dialog
+                if (cbr.containsHTML("dontShowBoxInSession")) {
+                    /* TODO: Check if this is still needed */
+                    postPageWithCleanup(br, "/action/chomikbox/DontDownloadWithBox", "__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+                    postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+                    entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    content = (String) entries.get("Content");
+                }
+                // Handle large transfer acceptance
+                if (cbr.containsHTML("/action/License/acceptLargeTransfer")) {
+                    cleanupBrowser(br, PluginJSonUtils.unescape(br.getRequest().getHtmlCode()));
+                    logger.info(cbr.getRequest().getHtmlCode());
+                    final Form f = cbr.getFormbyAction("/action/License/acceptLargeTransfer");
+                    if (f == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    submitFormWithCleanup(br, f);
+                } else if (cbr.containsHTML("/action/License/AcceptOwnTransfer")) {
+                    cleanupBrowser(cbr, PluginJSonUtils.unescape(br.getRequest().getHtmlCode()));
+                    logger.info(cbr.getRequest().getHtmlCode());
+                    final Form f = cbr.getFormbyAction("/action/License/AcceptOwnTransfer");
+                    if (f == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    f.remove(null);
+                    f.remove(null);
+                    f.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
+                    submitFormWithCleanup(br, f);
+                }
             } else {
+                // Handle captcha for free users
+                if (br.containsHTML("g\\-recaptcha")) {
+                    // TODO: Check if this is still required
+                    final String rcSiteKey = PluginJSonUtils.getJson(PluginJSonUtils.unescape(br.getRequest().getHtmlCode()), "sitekey");
+                    if (rcSiteKey == null || serializedUserSelection == null || serializedOrgFile == null) {
+                        /* Plugin broken or premium only content */
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    /* Handle captcha */
+                    logger.info("Handling captcha");
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, rcSiteKey).getToken();
+                    final String postData = "FileId=" + fid + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile) + "&FileName=" + Encoding.urlEncode(link.getName()) + "&g-recaptcha-response=" + Encoding.urlEncode(recaptchaV2Response) + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken);
+                    postPageWithCleanup(br, "/action/License/DownloadNotLoggedCaptchaEntered", postData);
+                    entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    content = (String) entries.get("Content");
+                } else {
+                    postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+                    entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    content = (String) entries.get("Content");
+                }
+                if (cbr.containsHTML("(Aby pobrać ten plik, musisz być zalogowany lub wysłać jeden SMS\\.|Właściciel tego chomika udostępnia swój transfer, ale nie ma go już w wystarczającej|wymaga opłacenia kosztów transferu z serwerów Chomikuj\\.pl)")) {
+                    throw new AccountRequiredException();
+                } else if (cbr.containsHTML(ACCESSDENIED)) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+            }
+            // Extract the download URL from the response
+            downloadUrl = (String) entries.get("redirectUrl");
+            if (StringUtils.isEmpty(downloadUrl)) {
+                if (StringUtils.containsIgnoreCase(content, "\"BuyAdditionalTransfer")) {
+                    /* E.g. Próbujesz pobrać plik o rozmiarze 103,06 MB. Każdy plik powyżej 1 MB wymaga opłacenia kosztów trasferu. */
+                    if (account != null) {
+                        throw new AccountUnavailableException("Not enough traffic available", 5 * 60 * 1000);
+                    } else {
+                        throw new AccountRequiredException();
+                    }
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+            }
+            if (StringUtils.containsIgnoreCase(downloadUrl, "#SliderTransfer")) {
+                throw new AccountUnavailableException("Traffic limit reached", 5 * 60 * 1000);
+            }
+        } catch (final Exception e) {
+            if (isPremium) {
                 throw e;
             }
+            /* Fall back to stream download for free users if possible && allowed */
+            if (!isAudio && !isVideo) {
+                /* Stream download impossible -> We failed to find a downloadlink */
+                // return null;
+                /* Check for possible error message in "content" field. */
+                if (!StringUtils.isEmpty(content) && content.length() <= 200) {
+                    /* Try to display more precise errormessage, avoid plugin defect. */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, content);
+                } else {
+                    throw e;
+                }
+            }
+            logger.info("Failed to get official downloadurl --> Checking if stream download fallback is possible");
+            if (!this.getPluginConfig().getBooleanProperty(FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, true)) {
+                throw new AccountRequiredException("Add a premium account or allow stream download fallback in plugin settings to download this file.");
+            }
+            /* Stream download */
+            if (isVideo) {
+                /* Download video stream (free download) */
+                logger.info("Attempting to download MP4 stream");
+                getPageWithCleanup(br, "https://" + this.getHost() + "/ShowVideo.aspx?id=" + fid);
+                if (br.getURL().contains("chomikuj.pl/Error404.aspx") || cbr.containsHTML("(Nie znaleziono|Strona, której szukasz nie została odnaleziona w portalu\\.<|>Sprawdź czy na pewno posługujesz się dobrym adresem)")) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                downloadUrl = getDllinkVideoStream(link);
+            } else {
+                /* Download mp3 stream */
+                logger.info("Attempting to download MP3 stream");
+                downloadUrl = getDllinkAudioStream(link);
+            }
         }
-        return true;
+        return downloadUrl;
     }
 
-    private String getDllinkMP3(final DownloadLink dl) throws Exception {
-        final String fid = getFID(dl);
-        getPageWithCleanup(br, "https://" + this.getHost() + "/Audio.ashx?id=" + fid + "&type=2&tp=mp3");
-        String dllink = br.getRedirectLocation();
-        if (dllink == null) {
-            logger.warning("Failed to find stream-URL");
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        dllink = Encoding.unicodeDecode(dllink);
+    private String getDllinkAudioStream(final DownloadLink link) throws Exception {
+        final String fid = getFID(link);
+        final String dllink = "https://" + this.getHost() + "/Audio.ashx?id=" + fid + "&type=2&tp=mp3";
+        return dllink;
+    }
+
+    private String getDllinkVideoStream(final DownloadLink link) throws Exception {
+        final String fid = getFID(link);
+        final String dllink = "https://" + this.getHost() + "/Video.ashx?id=" + fid + "&type=1&ts=" + new Random().nextInt(1000000000) + "&file=video&start=0";
         return dllink;
     }
 
@@ -559,49 +504,42 @@ public class ChoMikujPl extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdls;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return account_maxdls;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        dllink = checkDirectLink(link, null);
+        handleDownload(link, null);
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        handleDownload(link, account);
+    }
+
+    public void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        dllink = checkDirectLink(link, account);
         if (dllink == null) {
-            requestFileInformation(link, null, true);
-            // final boolean is_premiumonly = cbr != null && cbr.containsHTML(PREMIUMONLY) || this.premiumonly;
-            if (plus18) {
-                logger.info("Adult content only downloadable when logged in");
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+            requestFileInformation(link, account, true);
+            if (adultContent) {
+                throw new AccountRequiredException("Account required to download adult content");
             }
-            this.dllink = this.getDllink(link, this.br, false);
+            this.dllink = this.getDllink(link, account);
             if (StringUtils.isEmpty(this.dllink)) {
                 /* 2020-04-20: Lazy handling because most files are premiumonly: Final downloadlink not found = premiumonly */
                 throw new AccountRequiredException();
             }
         }
-        handleDownload(link, null, free_resume, free_maxchunks);
-    }
-
-    @Override
-    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        dllink = checkDirectLink(link, account);
         if (dllink == null) {
-            /* Login will happen inside requestFileInformation */
-            requestFileInformation(link, account, true);
-            getDllink_premium(link, account, br, true);
-        }
-        handleDownload(link, account, account_resume, account_maxchunks);
-    }
-
-    public void handleDownload(final DownloadLink link, final Account account, boolean resume, int maxChunks) throws Exception, PluginException {
-        if (dllink == null) {
-            logger.warning("dllink is null");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        boolean resume = this.isResumeable(link, account);
+        int maxChunks = this.getMaxChunks(link, account);
         final boolean isAudioStreamDownload = StringUtils.containsIgnoreCase(dllink, "/Audio.ashx");
         final boolean isVideoStreamPreviewDownload = StringUtils.containsIgnoreCase(dllink, "/Preview.ashx");
         if (isAudioStreamDownload || isVideoStreamPreviewDownload) {
@@ -615,7 +553,9 @@ public class ChoMikujPl extends antiDDoSForHost {
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             logger.warning("The final dllink seems not to be a file!");
-            handleServerErrors();
+            if (StringUtils.containsIgnoreCase(br.getURL(), "Error.aspx")) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 5 * 60 * 1000l);
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (account != null) {
@@ -640,7 +580,7 @@ public class ChoMikujPl extends antiDDoSForHost {
                 final Browser br2 = br.cloneBrowser();
                 br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
-                if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                if (this.looksLikeDownloadableContent(con)) {
                     return dllink;
                 } else {
                     link.removeProperty(directlinkproperty);
@@ -658,75 +598,62 @@ public class ChoMikujPl extends antiDDoSForHost {
         return null;
     }
 
-    private void handleServerErrors() throws PluginException {
-        if (br.getURL().contains("Error.aspx")) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 5 * 60 * 1000l);
-        }
-    }
-
     public void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                br.setFollowRedirects(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    br.setCookies(cookies);
-                    if (!force) {
-                        /* Do not verify cookies */
-                        return;
-                    }
-                    getPageWithCleanup(this.br, MAINPAGE);
-                    if (this.isLoggedIn(this.br)) {
-                        logger.info("Successfully loggedin via cookies");
-                        /* Save new cookie timestamp */
-                        account.saveCookies(this.br.getCookies(this.getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Failed to login via cookies");
-                    }
+            br.setCookiesExclusive(true);
+            br.setFollowRedirects(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                br.setCookies(cookies);
+                if (!force) {
+                    /* Do not verify cookies */
+                    return;
                 }
-                logger.info("Performing full login");
-                br.clearCookies(account.getHoster());
-                prepBrowser(br, account.getHoster());
-                br.setCookiesExclusive(true);
-                br.setFollowRedirects(true);
-                getPageWithCleanup(this.br, MAINPAGE);
-                String postData = "ReturnUrl=&Login=" + Encoding.urlEncode(account.getUser()) + "&Password=" + Encoding.urlEncode(account.getPass());
-                final String[] requestVerificationTokens = br.getRegex("<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"\\']+)\"").getColumn(0);
-                if (requestVerificationTokens.length > 0) {
-                    logger.info("Found " + requestVerificationTokens.length + "x '__RequestVerificationToken' values");
-                    /*
-                     * 2019-10-17: Strange - website contains this value twice (well different values, same key) and uses them in login POST
-                     * data. According to my tests, login works even without these tokens or with them set to "".
-                     */
-                    for (final String requestVerificationToken : requestVerificationTokens) {
-                        postData += "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken);
-                    }
+                getPageWithCleanup(br, MAINPAGE);
+                if (this.isLoggedIn(br)) {
+                    logger.info("Successfully loggedin via cookies");
+                    /* Save new cookie timestamp */
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
                 } else {
-                    logger.info("Failed to find any '__RequestVerificationToken' - trying to login without it");
+                    logger.info("Failed to login via cookies");
                 }
-                PostRequest postRequest = br.createPostRequest("/action/Login/TopBarLogin", postData);
-                postRequest.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                // postPageRawWithCleanup(this.br, "/action/Login/TopBarLogin",
-                // "rememberLogin=true&rememberLogin=false&ReturnUrl=&Login=" + Encoding.urlEncode(account.getUser()) + "&Password=" +
-                // Encoding.urlEncode(account.getPass()) + "&__RequestVerificationToken=" +
-                // Encoding.urlEncode(requestVerificationToken));
-                postRequestWithCleanup(this.br, postRequest);
-                if (!isLoggedIn(this.br)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                br.setCookie(br.getHost(), "cookiesAccepted", "1");
-                br.setCookie(br.getHost(), "spt", "0");
-                br.setCookie(br.getHost(), "rcid", "1");
-                getPageWithCleanup(this.br, "/" + Encoding.urlEncode(account.getUser()));
-                account.saveCookies(this.br.getCookies(this.getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             }
+            logger.info("Performing full login");
+            br.clearCookies(account.getHoster());
+            prepBrowser(br, account.getHoster());
+            br.setCookiesExclusive(true);
+            br.setFollowRedirects(true);
+            getPageWithCleanup(br, MAINPAGE);
+            String postData = "ReturnUrl=&Login=" + Encoding.urlEncode(account.getUser()) + "&Password=" + Encoding.urlEncode(account.getPass());
+            final String[] requestVerificationTokens = br.getRegex("<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"\\']+)\"").getColumn(0);
+            if (requestVerificationTokens.length > 0) {
+                logger.info("Found " + requestVerificationTokens.length + "x '__RequestVerificationToken' values");
+                /*
+                 * 2019-10-17: Strange - website contains this value twice (well different values, same key) and uses them in login POST
+                 * data. According to my tests, login works even without these tokens or with them set to "".
+                 */
+                for (final String requestVerificationToken : requestVerificationTokens) {
+                    postData += "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken);
+                }
+            } else {
+                logger.info("Failed to find any '__RequestVerificationToken' - trying to login without it");
+            }
+            PostRequest postRequest = br.createPostRequest("/action/Login/TopBarLogin", postData);
+            postRequest.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            // postPageRawWithCleanup(br, "/action/Login/TopBarLogin",
+            // "rememberLogin=true&rememberLogin=false&ReturnUrl=&Login=" + Encoding.urlEncode(account.getUser()) + "&Password=" +
+            // Encoding.urlEncode(account.getPass()) + "&__RequestVerificationToken=" +
+            // Encoding.urlEncode(requestVerificationToken));
+            br.getPage(postRequest);
+            if (!isLoggedIn(br)) {
+                throw new AccountInvalidException();
+            }
+            br.setCookie(br.getHost(), "cookiesAccepted", "1");
+            br.setCookie(br.getHost(), "spt", "0");
+            br.setCookie(br.getHost(), "rcid", "1");
+            br.getPage("/" + Encoding.urlEncode(account.getUser()));
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -739,35 +666,21 @@ public class ChoMikujPl extends antiDDoSForHost {
     private void getPageWithCleanup(final Browser br, final String url) throws Exception {
         getPage(br, url);
         cbr = br.cloneBrowser();
-        cleanupBrowser(cbr, correctBR(br.toString()));
+        cleanupBrowser(cbr, correctBR(br.getRequest().getHtmlCode()));
     }
 
     /** Performs request and then puts cleaned up html into cbr browser instance. */
     private void postPageWithCleanup(final Browser br, final String url, final String postData) throws Exception {
         postPage(br, url, postData);
         cbr = br.cloneBrowser();
-        cleanupBrowser(cbr, correctBR(br.toString()));
-    }
-
-    /** Performs request and then puts cleaned up html into cbr browser instance. */
-    private void postPageRawWithCleanup(final Browser br, final String url, final String postData) throws Exception {
-        postPageRaw(br, url, postData);
-        cbr = br.cloneBrowser();
-        cleanupBrowser(cbr, correctBR(br.toString()));
-    }
-
-    /** Performs request and then puts cleaned up html into cbr browser instance. */
-    private void postRequestWithCleanup(final Browser br, Request request) throws Exception {
-        sendRequest(br, request);
-        cbr = br.cloneBrowser();
-        cleanupBrowser(cbr, correctBR(br.toString()));
+        cleanupBrowser(cbr, correctBR(br.getRequest().getHtmlCode()));
     }
 
     /** Performs request and then puts cleaned up html into cbr browser instance. */
     private void submitFormWithCleanup(final Browser br, final Form form) throws Exception {
         submitForm(br, form);
         cbr = br.cloneBrowser();
-        cleanupBrowser(cbr, correctBR(br.toString()));
+        cleanupBrowser(cbr, correctBR(br.getRequest().getHtmlCode()));
     }
 
     private String correctBR(final String input) {
@@ -785,7 +698,7 @@ public class ChoMikujPl extends antiDDoSForHost {
      * @author raztoki
      */
     private void cleanupBrowser(final Browser ibr, final String t) throws Exception {
-        String dMD5 = JDHash.getMD5(ibr.toString());
+        String dMD5 = JDHash.getMD5(ibr.getRequest().getHtmlCode());
         // preserve valuable original request components.
         final String oURL = ibr.getURL();
         final URLConnectionAdapter con = ibr.getRequest().getHttpConnection();
@@ -820,8 +733,8 @@ public class ChoMikujPl extends antiDDoSForHost {
         };
         ibr.setRequest(req);
         if (ibr.isDebug()) {
-            logger.info("\r\ndirtyMD5sum = " + dMD5 + "\r\ncleanMD5sum = " + JDHash.getMD5(ibr.toString()) + "\r\n");
-            System.out.println(ibr.toString());
+            logger.info("\r\ndirtyMD5sum = " + dMD5 + "\r\ncleanMD5sum = " + JDHash.getMD5(ibr.getRequest().getHtmlCode()) + "\r\n");
+            // System.out.println(ibr.getRequest().getHtmlCode());
         }
     }
 
@@ -846,7 +759,7 @@ public class ChoMikujPl extends antiDDoSForHost {
     }
 
     private void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.AVOIDPREMIUMMP3TRAFFICUSAGE, "Account download: Prefer download of stream versions of .mp3 files in account mode?\r\n<html><b>Avoids premium traffic usage for .mp3 files!</b></html>").setDefaultValue(false));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.AVOIDPREMIUMMP3TRAFFICUSAGE, "Account download: Prefer download of stream versions of audio files in account mode?\r\n<html><b>Avoids premium traffic usage for audio files!</b></html>").setDefaultValue(default_AVOIDPREMIUMMP3TRAFFICUSAGE));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.FREE_ANONYMOUS_MODE_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, "Allow fallback to stream download if original file is not downloadable without account?").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.DECRYPTFOLDERS, "Crawl subfolders in folders").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.IGNORE_TRAFFIC_LIMIT, "Ignore trafficlimit in account (e.g. useful to download self uploaded files or stream download in account mode)?").setDefaultValue(false));

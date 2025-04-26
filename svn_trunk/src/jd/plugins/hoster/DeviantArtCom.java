@@ -61,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50989 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51020 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -77,7 +77,7 @@ public class DeviantArtCom extends PluginForHost {
     private static final String        PROPERTY_OFFICIAL_DOWNLOADURL               = "official_downloadurl";
     public static final String         PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL       = "image_display_or_preview_url";
     public static final String         PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2     = "image_display_or_preview_url_2";
-    private static final String        PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL       = "video_display_or_preview_url";
+    public static final String         PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL       = "video_display_or_preview_url";
     private static final String        PROPERTY_DEVIATION_HTML                     = "deviation_html";
     private static final String        PROPERTY_TIER_ACCESS                        = "tier_access";
     public static final String         PROPERTY_IMAGE_POSITION                     = "image_position";
@@ -87,6 +87,19 @@ public class DeviantArtCom extends PluginForHost {
     /* Don't touch the following! */
     private static final AtomicInteger freeDownloadsRunning                        = new AtomicInteger(0);
     private static final AtomicInteger accountDownloadsRunning                     = new AtomicInteger(0);
+
+    @Override
+    public String getPluginContentURL(final DownloadLink link) {
+        String ret = super.getPluginContentURL(link);
+        if (ret == null) {
+            return null;
+        }
+        final int imagePosition = getImagePosition(link);
+        if (imagePosition > 1) {
+            ret += "#image-" + imagePosition;
+        }
+        return ret;
+    }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -979,7 +992,7 @@ public class DeviantArtCom extends PluginForHost {
                 }
             }
         } else if (officialDownloadurl != null) {
-            /* Non image item e.g. official pdf download */
+            /* Non media item e.g. pdf file download */
             dllink = officialDownloadurl;
         }
         return dllink;
@@ -1013,6 +1026,7 @@ public class DeviantArtCom extends PluginForHost {
                 url = url.replaceAll("\\?token=.+", "?token=" + token);
             }
         }
+        link.setComment(url);
         return url;
     }
 

@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50355 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51018 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -119,7 +119,7 @@ public class JubaGetCom extends PluginForHost {
             }
             br.postPage("/api/generate", query);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            String dllink = (String) entries.get("download");
+            final String dllink = (String) entries.get("download");
             if (StringUtils.isEmpty(dllink)) {
                 /* E.g. {"error":true,"error_message":"Error generate"} */
                 final String error_message = (String) entries.get("error_message");
