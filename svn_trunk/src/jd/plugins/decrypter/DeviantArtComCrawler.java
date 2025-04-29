@@ -38,7 +38,6 @@ import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.parser.Regex;
-import jd.parser.html.HTMLParser;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
@@ -53,11 +52,8 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 51020 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51022 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
-    /**
-     * @author raztoki, pspzockerscene
-     */
     public DeviantArtComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -345,31 +341,17 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
             return ret;
         }
         mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION, 1);
-        final HashSet<String> dupes = new HashSet<String>();
-        final List<String> allowedresults = new ArrayList<String>();
-        String[] urls = br.getRegex("src=\"(https?://[^/]+/[^\"]+)\"[^>]*/></button>").getColumn(0);
-        if (urls == null || urls.length == 0) {
-            final String html_unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
-            urls = HTMLParser.getHttpLinks(html_unescaped, br.getURL());
-        }
-        if (urls != null && urls.length > 0) {
-            for (final String url : urls) {
-                if (!dupes.add(url)) {
-                    /* Skip duplicates */
-                    continue;
-                }
-                if (StringUtils.containsIgnoreCase(url, "fit/w_150,h_150") && StringUtils.containsIgnoreCase(url, ".jpg") && StringUtils.containsIgnoreCase(url, "token=")) {
-                    allowedresults.add(url);
-                }
-            }
-        }
         int position = 1;
         final String[] propertiesToCopy = new String[] { DeviantArtCom.PROPERTY_USERNAME, DeviantArtCom.PROPERTY_TITLE, DeviantArtCom.PROPERTY_TYPE };
-        try {
+        findAdditionalMedias: try {
             String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
             json = PluginJSonUtils.unescape(json);
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             final List<Map<String, Object>> additionalMedias = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "@@entities/deviationExtended/{0}/additionalMedia");
+            if (additionalMedias == null) {
+                logger.info("Failed to find any images");
+                break findAdditionalMedias;
+            }
             logger.info("Number of additionalMedia: " + additionalMedias.size());
             final boolean isImage = true;
             final boolean isVideo = false;
@@ -467,26 +449,6 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         } catch (final Throwable e) {
             logger.log(e);
             logger.warning("additionalMedias handling failed");
-        }
-        if (ret.size() == 1 && allowedresults.size() > 0) {
-            /* Legacy handling */
-            logger.info("Fallback to old way");
-            position = 1;
-            for (final String url : allowedresults) {
-                if (position == 1) {
-                    mainlink.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
-                } else {
-                    final DownloadLink image = this.createDownloadlink(contenturl);
-                    /* Inherit some properties from main link. */
-                    for (final String property : propertiesToCopy) {
-                        image.setProperty(property, mainlink.getProperty(property));
-                    }
-                    image.setProperty(DeviantArtCom.PROPERTY_IMAGE_POSITION, position);
-                    image.setProperty(DeviantArtCom.PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2, url);
-                    ret.add(image);
-                }
-                position++;
-            }
         }
         if (ret.size() == 1) {
             logger.info("Found single item");

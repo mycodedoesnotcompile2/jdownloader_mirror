@@ -556,7 +556,7 @@ public class IconIO {
                 try {
                     InputStream is = resource.openStream();
                     try {
-                        return getSvgFactory().getIconFromSVG(is, w, h, null);
+                        return getSvgFactory().getIconFromSVG(is, null, w, h, null);
                     } finally {
                         is.close();
                     }

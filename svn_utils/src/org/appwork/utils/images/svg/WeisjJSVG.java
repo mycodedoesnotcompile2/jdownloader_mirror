@@ -42,10 +42,14 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 
 import javax.swing.JComponent;
 
 import org.appwork.utils.images.ScalableIcon;
+
+import com.github.weisj.jsvg.parser.LoaderContext;
+import com.github.weisj.jsvg.view.FloatSize;
 
 /**
  * @author daniel
@@ -53,12 +57,12 @@ import org.appwork.utils.images.ScalableIcon;
  *
  */
 public class WeisjJSVG {
-    public static Image getImageFromSVG(InputStream inputStream, int w, int h) throws IOException {
+    public static Image getImageFromSVG(InputStream inputStream, URI base, int w, int h) throws IOException {
         try {
             com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
-            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(inputStream);
+            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(inputStream, base, LoaderContext.createDefault());
             if (svgDocument != null) {
-                final com.github.weisj.jsvg.geometry.size.FloatSize size = svgDocument.size();
+                final FloatSize size = svgDocument.size();
                 if (w <= 0) {
                     w = (int) size.getWidth();
                 }
@@ -106,10 +110,10 @@ public class WeisjJSVG {
      * @param height
      * @return
      */
-    public static ScalableIcon getIconFromSVG(InputStream stream, int width, int height) {
+    public static ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height) {
         try {
             com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
-            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(stream);
+            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(stream, base, LoaderContext.createDefault());
             if (svgDocument == null) {
                 return null;
             }
@@ -124,7 +128,7 @@ public class WeisjJSVG {
                 }
 
                 private void ensureDimensions() {
-                    final com.github.weisj.jsvg.geometry.size.FloatSize size = svgDocument.size();
+                    final FloatSize size = svgDocument.size();
                     if (super.getIconWidth() <= 0) {
                         setIconWidth((int) size.getWidth());
                     }
@@ -147,7 +151,7 @@ public class WeisjJSVG {
                  */
                 @Override
                 public void paintIcon(Component c, Graphics g1D, int x, int y, int width, int height) {
-                    final com.github.weisj.jsvg.geometry.size.FloatSize size = svgDocument.size();
+                    final FloatSize size = svgDocument.size();
                     if (width <= 0) {
                         width = (int) size.getWidth();
                     }
@@ -165,7 +169,7 @@ public class WeisjJSVG {
                     // this centers the image in the new viewport.
                     x += (orgWidth - width) / 2;
                     y += (orgHeight - height) / 2;
-                    final Graphics2D g = (Graphics2D) ((Graphics2D) g1D).create();
+                    final Graphics2D g = (Graphics2D) g1D.create();
                     RenderingHints restoreHints = g.getRenderingHints();
                     AffineTransform restoreTransform = g.getTransform();
                     // HIGHDPI: g already has set the correct scaling (tested with flatLAF), and thus there is nothing more to do here.

@@ -37,7 +37,7 @@ import java.awt.Color;
 import java.awt.Image;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.net.URI;
 
 import org.appwork.utils.images.ScalableIcon;
 
@@ -53,13 +53,13 @@ public interface SVGFactory {
      * @param size2
      * @return
      */
-    Image getImageFromSVG(URL resource, int width, int height) throws IOException;
+    Image getImageFromSVG(URI resource, int width, int height) throws IOException;
 
-    Image getImageFromSVG(URL resource, int width, int height, Color color) throws IOException;
+    Image getImageFromSVG(URI resource, int width, int height, Color color) throws IOException;
 
-    Image getImageFromSVG(InputStream inputStream, int width, int height, Color color) throws IOException;
+    Image getImageFromSVG(InputStream inputStream, URI base, int width, int height, Color color) throws IOException;
 
     boolean isSupported();
 
-    ScalableIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException;
+    ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException;
 }

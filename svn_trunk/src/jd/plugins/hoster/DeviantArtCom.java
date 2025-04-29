@@ -61,7 +61,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51020 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51021 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -1010,6 +1010,10 @@ public class DeviantArtCom extends PluginForHost {
              * <br>
              * Removes everything until "?token=..." <br>
              * Important: This does not work for the first image, only for the images >= 2!
+             */
+            /*
+             * TODO: 2025-04-25: Remove this if we are sure that the new handling works fine, see DeviantArtComCrawler -> Search for
+             * "prettyName".
              */
             url = url.replaceAll("(/v1/fit/.*150\\.jpg)", "");
         }

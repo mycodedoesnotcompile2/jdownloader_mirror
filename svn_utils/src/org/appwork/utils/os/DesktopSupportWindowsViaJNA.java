@@ -20,12 +20,9 @@ import com.sun.jna.ptr.IntByReference;
 
 @BuildDecisionRequired(tags = { DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_YES, DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO }, imports = { DesktopSupportWindowsViaJNA.ORG_APPWORK_UTILS_OS_DESKTOP_SUPPORT_WINDOWS_VIA_JNA, "" }, dependsOn = { org.appwork.JNAHelper.JNA_HELPER_USE_JNA, "" })
 public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {
-  
     @AWTestValidateClassReference
     static final String        ORG_APPWORK_UTILS_OS_DESKTOP_SUPPORT_WINDOWS_VIA_JNA = "org.appwork.utils.os.DesktopSupportWindowsViaJNA";
-  
     public static final String DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO                   = "DesktopSupportWindowsViaJNA.no";
- 
     public static final String DESKTOP_SUPPORT_WINDOWS_VIA_JNA_YES                  = "DesktopSupportWindowsViaJNA.yes";
 
     public DesktopSupportWindowsViaJNA() {
@@ -81,13 +78,13 @@ public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {
             } else {
                 throw new WTFException();
             }
-            LogV3.info("Table Size: " + table.table.length + "/" + table.dwNumEntries.intValue());
+            // LogV3.info("Table Size: " + table.table.length + "/" + table.dwNumEntries.intValue());
             for (int i = 0; i < table.dwNumEntries.intValue(); i++) {
                 final MIB_TCPROW2 e = table.table[i];
                 if (e != null) {
                     if (requestingAddress.equals(getInetAdress(e.dwLocalAddr)) && switchbytes(e.dwLocalPort) == port) {
                         final long ret = e.dwOwningPid.longValue();
-                        LogV3.fine("Get PID By socket(JNA): " + adr + " -> " + ret);
+                        // LogV3.fine("Get PID By socket(JNA): " + adr + " -> " + ret);
                         return (int) ret;
                     }
                 }

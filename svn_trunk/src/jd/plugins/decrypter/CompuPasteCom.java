@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50963 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51021 $", interfaceVersion = 2, names = {}, urls = {})
 public class CompuPasteCom extends PluginForDecrypt {
     public CompuPasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,6 +59,7 @@ public class CompuPasteCom extends PluginForDecrypt {
         ret.add(new String[] { "hopepaste.download" });
         ret.add(new String[] { "fullpaste.todofullxd.com" });
         ret.add(new String[] { "box.sphinxanime.net" });
+        ret.add(new String[] { "multipaste.org" });
         return ret;
     }
 

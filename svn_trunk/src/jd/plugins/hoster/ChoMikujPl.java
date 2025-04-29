@@ -56,7 +56,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51020 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51022 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     private String               dllink                                                = null;
     private static final String  ACCESSDENIED                                          = "Nie masz w tej chwili uprawnień do tego pliku lub dostęp do niego nie jest w tej chwili możliwy z innych powodów\\.";
@@ -352,28 +352,29 @@ public class ChoMikujPl extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             // Set cookies and make initial request
-            br.setCookie(this.getHost(), "cookiesAccepted", "1");
+            br.setCookie(getHost(), "cookiesAccepted", "1");
             if (isPremium) {
                 br.setCookie("http://chomikuj.pl/", "__RequestVerificationToken_Lw__", requestVerificationToken);
                 br.getHeaders().put("Referer", link.getPluginPatternMatcher());
             }
+            Browser dummy = br.cloneBrowser();
             postPageWithCleanup(br, "https://" + getHost() + "/action/License/DownloadContext", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
             Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             content = (String) entries.get("Content");
+            dummy.getRequest().setHtmlCode(content);
             // Check for access denied
             if (cbr.containsHTML(ACCESSDENIED)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final String serializedUserSelection = cbr.getRegex("name=\"SerializedUserSelection\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
             final String serializedOrgFile = cbr.getRegex("name=\"SerializedOrgFile\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-            if (serializedUserSelection == null || serializedOrgFile == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            if (content.contains("action=\"/action/License/DownloadWarningAccept\"")) {
-                /* This step is mostly required */
-                postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadWarningAccept", "FileId=" + fid + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile) + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+            final Form form_DownloadWarningAccept = dummy.getFormbyAction("/action/License/DownloadWarningAccept");
+            if (form_DownloadWarningAccept != null) {
+                form_DownloadWarningAccept.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
+                br.submitForm(form_DownloadWarningAccept);
                 entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 content = (String) entries.get("Content");
+                dummy.getRequest().setHtmlCode(content);
             }
             if (account != null) {
                 // Handle "don't show box" dialog
@@ -383,27 +384,24 @@ public class ChoMikujPl extends antiDDoSForHost {
                     postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
                     entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     content = (String) entries.get("Content");
+                    dummy.getRequest().setHtmlCode(content);
                 }
                 // Handle large transfer acceptance
-                if (cbr.containsHTML("/action/License/acceptLargeTransfer")) {
-                    cleanupBrowser(br, PluginJSonUtils.unescape(br.getRequest().getHtmlCode()));
-                    logger.info(cbr.getRequest().getHtmlCode());
-                    final Form f = cbr.getFormbyAction("/action/License/acceptLargeTransfer");
-                    if (f == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    submitFormWithCleanup(br, f);
-                } else if (cbr.containsHTML("/action/License/AcceptOwnTransfer")) {
-                    cleanupBrowser(cbr, PluginJSonUtils.unescape(br.getRequest().getHtmlCode()));
-                    logger.info(cbr.getRequest().getHtmlCode());
-                    final Form f = cbr.getFormbyAction("/action/License/AcceptOwnTransfer");
-                    if (f == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    f.remove(null);
-                    f.remove(null);
-                    f.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
-                    submitFormWithCleanup(br, f);
+                final Form form_acceptLargeTransfer = dummy.getFormbyAction("/action/License/acceptLargeTransfer");
+                final Form form_AcceptOwnTransfer = dummy.getFormbyAction("/action/License/AcceptOwnTransfer");
+                if (form_acceptLargeTransfer != null) {
+                    /* 2025-04-28: This still exists */
+                    form_acceptLargeTransfer.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
+                    br.submitForm(form_acceptLargeTransfer);
+                    entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    content = (String) entries.get("Content");
+                    dummy.getRequest().setHtmlCode(content);
+                } else if (form_AcceptOwnTransfer != null) {
+                    form_AcceptOwnTransfer.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
+                    br.submitForm(form_AcceptOwnTransfer);
+                    entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    content = (String) entries.get("Content");
+                    dummy.getRequest().setHtmlCode(content);
                 }
             } else {
                 // Handle captcha for free users
@@ -421,10 +419,12 @@ public class ChoMikujPl extends antiDDoSForHost {
                     postPageWithCleanup(br, "/action/License/DownloadNotLoggedCaptchaEntered", postData);
                     entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     content = (String) entries.get("Content");
+                    dummy.getRequest().setHtmlCode(content);
                 } else {
                     postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
                     entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     content = (String) entries.get("Content");
+                    dummy.getRequest().setHtmlCode(content);
                 }
                 if (cbr.containsHTML("(Aby pobrać ten plik, musisz być zalogowany lub wysłać jeden SMS\\.|Właściciel tego chomika udostępnia swój transfer, ale nie ma go już w wystarczającej|wymaga opłacenia kosztów transferu z serwerów Chomikuj\\.pl)")) {
                     throw new AccountRequiredException();
@@ -663,6 +663,7 @@ public class ChoMikujPl extends antiDDoSForHost {
     }
 
     /** Performs request and then puts cleaned up html into cbr browser instance. */
+    @Deprecated
     private void getPageWithCleanup(final Browser br, final String url) throws Exception {
         getPage(br, url);
         cbr = br.cloneBrowser();
@@ -670,19 +671,14 @@ public class ChoMikujPl extends antiDDoSForHost {
     }
 
     /** Performs request and then puts cleaned up html into cbr browser instance. */
+    @Deprecated
     private void postPageWithCleanup(final Browser br, final String url, final String postData) throws Exception {
         postPage(br, url, postData);
         cbr = br.cloneBrowser();
         cleanupBrowser(cbr, correctBR(br.getRequest().getHtmlCode()));
     }
 
-    /** Performs request and then puts cleaned up html into cbr browser instance. */
-    private void submitFormWithCleanup(final Browser br, final Form form) throws Exception {
-        submitForm(br, form);
-        cbr = br.cloneBrowser();
-        cleanupBrowser(cbr, correctBR(br.getRequest().getHtmlCode()));
-    }
-
+    @Deprecated
     private String correctBR(final String input) {
         return input.replace("\\", "");
     }
@@ -697,6 +693,7 @@ public class ChoMikujPl extends antiDDoSForHost {
      *            Provided replacement string output browser
      * @author raztoki
      */
+    @Deprecated
     private void cleanupBrowser(final Browser ibr, final String t) throws Exception {
         String dMD5 = JDHash.getMD5(ibr.getRequest().getHtmlCode());
         // preserve valuable original request components.

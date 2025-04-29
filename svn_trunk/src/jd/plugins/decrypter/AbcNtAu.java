@@ -21,6 +21,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -30,18 +34,16 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 /**
  *
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 49093 $", interfaceVersion = 2, names = { "abc.net.au" }, urls = { "https?://(?:www\\.)?abc\\.net\\.au/.+" })
+@DecrypterPlugin(revision = "$Revision: 51022 $", interfaceVersion = 2, names = { "abc.net.au" }, urls = { "https?://(?:www\\.)?abc\\.net\\.au/.+" })
 public class AbcNtAu extends PluginForDecrypt {
     public AbcNtAu(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,9 +51,12 @@ public class AbcNtAu extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        br.getPage(parameter);
+        br.getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         String lastMediaTitle = null;
         final String json = br.getRegex("id=\"__NEXT_DATA__\" type=\"application/json\"[^>]*>(\\{.*?\\})</script>").getMatch(0);
         final HashSet<String> dupesMediaids = new HashSet<String>();
@@ -186,7 +191,7 @@ public class AbcNtAu extends PluginForDecrypt {
         if (o instanceof Map) {
             final Map<String, Object> map = (Map<String, Object>) o;
             final String docType = (String) map.get("docType");
-            if (StringUtils.equalsIgnoreCase(docType, "audiosegment") && map.containsKey("duration")) {
+            if ((StringUtils.equalsIgnoreCase(docType, "audiosegment") || StringUtils.equalsIgnoreCase(docType, "audioepisode")) && map.containsKey("duration")) {
                 results.add(map);
             } else {
                 for (final Map.Entry<String, Object> entry : map.entrySet()) {

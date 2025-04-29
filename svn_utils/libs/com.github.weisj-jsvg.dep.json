@@ -34,11 +34,43 @@
       "minJRE":"JVM_1_8",
       "name":"Jsvg",
       "version":"1.7.0"
+    },
+    {
+      "changes":"1.7.1\t: ## Changes:\r\n- `NullPlatformSupport` is now a singleton. Its constructor has been deprecated. Use `NullPlatformSupport.INSTANCE` instead. (by @VISTALL )\r\n\r\n## Fixed issues: \r\n- Parsing loop if `paint-order` is invalid (some cases) or `normal` #88",
+      "date":"2025-03-19T08:30:15.553+01:00",
+      "dependencies":null,
+      "description":"A lightweight Java2D SVG renderer",
+      "files":null,
+      "hashes":{"jsvg.jar":"b68e541ace91ad17f098859395db256c4618363c7b7781517fac860f2a0014c4"},
+      "licenses":[{
+        "name":"MIT",
+        "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
+        "distribution":"repo"
+      }],
+      "minJRE":"JVM_1_8",
+      "name":"Jsvg",
+      "version":"1.7.1"
+    },
+    {
+      "changes":"1.7.2\t: > [!IMPORTANT] \r\n> The last release erroneously contained byte code incompatible with Java versions before Java 21 if animations are used. This release fixes this and makes the library again compatible with Java 8. \r\n\r\n## Changes\r\n- Correctness improvements for `text-anchor` #110 7d1fb8f11d479dcd6a3d22574e2928dc4f86304f\r\n- The default resource policy now allows for embedded data uri images. 8ab4aae69f35f81a56c014f1fc747995fdc3b1d8\r\n- Percentage values in `startOffset` of a `<textPath>` now properly resolve with respect to the length of the paths. Some scenarios are still unsupported e.g. negative values and values larger than the path length. #115 eef22110b9d588aa1fb99258e142f2ece72ad978\r\n- Fix incorrect inheritance behaviour of the `dominant-baseline` property #116 be435832b093deac009f2def9c79bb242b045d19\r\n- Font family names within single or double quotes are now correctly resolved. #117 5614b6c9c49b8a8751cb47a090916cb2104aa759\r\n- Fix exception when radial gradients have a non-positive radius #118 e953115172669834db5ff4b7985e0d86caeaa8bb\r\n- Fix exception when the last two gradients stops  have have the same offset value #118 e953115172669834db5ff4b7985e0d86caeaa8bb\r\n- Fix exception when gradients have only one specified stop #118 55261f73e11f13cd1d01eabdd970c1407067e87c\r\n\r\n\r\n**Full Changelog**: https://github.com/weisJ/jsvg/compare/v1.7.0-rc1...v1.7.1-rc1",
+      "date":"2025-04-22T20:27:00.947+02:00",
+      "dependencies":null,
+      "description":"A lightweight Java2D SVG renderer",
+      "files":null,
+      "hashes":{"jsvg.jar":"5591409ef245e48004f0524790b7042cd239acc01327326cfd4edfa57f475f99"},
+      "licenses":[{
+        "name":"MIT",
+        "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
+        "distribution":"repo"
+      }],
+      "minJRE":"JVM_1_8",
+      "name":"Jsvg",
+      "version":"1.7.2"
     }
   ],
   "installed":{
-    "changes":"1.7.1\t: ## Changes:\r\n- `NullPlatformSupport` is now a singleton. Its constructor has been deprecated. Use `NullPlatformSupport.INSTANCE` instead. (by @VISTALL )\r\n\r\n## Fixed issues: \r\n- Parsing loop if `paint-order` is invalid (some cases) or `normal` #88",
-    "date":"2025-03-19T08:30:15.553+01:00",
+    "changes":"2.0.0\t: ## Changes\r\n- Fix broken animations\r\n\r\n**Full Changelog**: https://github.com/weisJ/jsvg/compare/v1.7.1-rc1...v1.7.2-rc1",
+    "date":"2025-04-26T20:02:00.459+02:00",
     "dependencies":null,
     "description":"A lightweight Java2D SVG renderer",
     "files":[
@@ -85,7 +117,7 @@
       "jsvg.pom.sha512",
       "meta.json"
     ],
-    "hashes":{"jsvg.jar":"b68e541ace91ad17f098859395db256c4618363c7b7781517fac860f2a0014c4"},
+    "hashes":{"jsvg.jar":"81fc9ada579fc3f4924ec35f904c043de13ee8fba280322e638c7092006f1b52"},
     "licenses":[{
       "name":"MIT",
       "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
@@ -93,7 +125,7 @@
     }],
     "minJRE":"JVM_1_8",
     "name":"Jsvg",
-    "version":"1.7.1"
+    "version":"2.0.0"
   },
   "minJRE":"1.8",
   "provider":"maven",

@@ -37,7 +37,7 @@ import java.awt.Color;
 import java.awt.Image;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.net.URI;
 
 import org.appwork.utils.images.ScalableIcon;
 
@@ -54,17 +54,17 @@ public class KitFoxFactory implements SVGFactory {
     }
 
     @Override
-    public Image getImageFromSVG(URL resource, int width, int height) throws IOException {
+    public Image getImageFromSVG(URI resource, int width, int height) throws IOException {
         return SVGIO.getImageFromSVG(resource, width, height);
     }
 
     @Override
-    public Image getImageFromSVG(URL resource, int width, int height, Color color) throws IOException {
+    public Image getImageFromSVG(URI resource, int width, int height, Color color) throws IOException {
         return SVGIO.getImageFromSVG(resource, width, height, color);
     }
 
     @Override
-    public Image getImageFromSVG(InputStream inputStream, int width, int height, Color color) throws IOException {
+    public Image getImageFromSVG(InputStream inputStream, URI base, int width, int height, Color color) throws IOException {
         return SVGIO.getImageFromSVG(inputStream, width, height, color);
     }
 
@@ -76,10 +76,10 @@ public class KitFoxFactory implements SVGFactory {
     }
 
     /**
-     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, int, int, java.awt.Color)
+     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, URI, int, int, java.awt.Color)
      */
     @Override
-    public ScalableIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
+    public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException {
         return SVGIO.getIconFromSVG(stream, width, height, color);
     }
 }

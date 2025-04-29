@@ -45,7 +45,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.images.ScalableIcon;
@@ -61,15 +60,15 @@ import com.kitfox.svg.SVGUniverse;
  *
  */
 public class SVGIO {
-    public static Image getImageFromSVG(URL url, int w, int h) throws IOException {
+    public static Image getImageFromSVG(URI url, int w, int h) throws IOException {
         return getImageFromSVG(url, w, h, null);
     }
 
-    public static Image getImageFromSVG(URL url, int w, int h, Color color) throws IOException {
+    public static Image getImageFromSVG(URI url, int w, int h, Color color) throws IOException {
         try {
             InputStream is = null;
             try {
-                is = url.openStream();
+                is = url.toURL().openStream();
                 if (is != null) {
                     return getImageFromSVG(is, w, h, color);
                 } else {

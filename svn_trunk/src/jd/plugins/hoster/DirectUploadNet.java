@@ -16,8 +16,12 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.appwork.utils.formatter.SizeFormatter;
+
+import com.formdev.flatlaf.util.StringUtils;
 
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
@@ -29,15 +33,49 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48082 $", interfaceVersion = 2, names = { "directupload.net" }, urls = { "https?://(?:www\\.)?directupload\\.net/file/d/(\\d+)/([A-Za-z0-9\\-_]+)\\.htm" })
+@HostPlugin(revision = "$Revision: 51021 $", interfaceVersion = 2, names = {}, urls = {})
 public class DirectUploadNet extends PluginForHost {
     public DirectUploadNet(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "directupload.eu", "directupload.net" });
+        return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2025-04-28: Main domain has changed from .net to .eu */
+        return this.rewriteHost(getPluginDomains(), host);
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/file/d/(\\d+)/([A-Za-z0-9\\-_]+)\\.htm");
+        }
+        return ret.toArray(new String[0]);
+    }
+
     @Override
     public String getAGBLink() {
-        return "https://www.directupload.net/index.php?mode=agb";
+        return "https://www." + getHost() + "/index.php?mode=agb";
     }
 
     @Override
@@ -59,6 +97,7 @@ public class DirectUploadNet extends PluginForHost {
         if (!link.isNameSet()) {
             String weakFilename = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
             weakFilename = weakFilename.replace("_", ".");
+            weakFilename = weakFilename.replaceFirst("(?i)\\.htm$", "");
             link.setName(weakFilename);
         }
         this.setBrowserExclusive();
@@ -70,11 +109,11 @@ public class DirectUploadNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("<img  id=\"ImgFrame\" src=\"\" alt=\"([^<>\"]*?)\"").getMatch(0);
-        if (filename == null) {
+        if (StringUtils.isEmpty(filename)) {
             filename = br.getRegex("property=\"og:description\" content=\"([^\"]+)\"").getMatch(0);
         }
         final String filesize = br.getRegex("Dateigröße: ([^<>\"]*?) \\|").getMatch(0);
-        if (filename != null) {
+        if (!StringUtils.isEmpty(filename)) {
             link.setName(Encoding.htmlDecode(filename).trim());
         }
         if (filesize != null) {
@@ -86,7 +125,7 @@ public class DirectUploadNet extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String dllink = link.getDownloadURL().replaceFirst("(?i)/file/", "/down/");
+        final String dllink = br.getURL().replaceFirst("(?i)/file/", "/down/");
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
@@ -101,7 +140,7 @@ public class DirectUploadNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

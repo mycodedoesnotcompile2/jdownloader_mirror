@@ -237,11 +237,9 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         if (connectionType == HttpConnectionType.UNKNOWN) {
             throw new IOException("Unsupported " + requestLine);
         }
-
         final String requestedURL = new Regex(requestLine, HttpConnection.REQUESTLINE).getMatch(0);
         final String requestedPath = new Regex(requestedURL, HttpConnection.REQUESTURL).getMatch(0);
         final List<KeyValuePair> requestedURLParameters = this.parseRequestURLParams(requestedURL);
-
         /* read request Headers */
         final HeaderCollection requestHeaders = this.parseRequestHeaders();
         final HttpRequest request;
@@ -550,6 +548,7 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
                 response.getOutputStream(true);
             }
         } catch (final Throwable e) {
+            e.printStackTrace();
             try {
                 closeConnection = this.onException(e, this.request, this.response);
             } catch (final Throwable nothing) {

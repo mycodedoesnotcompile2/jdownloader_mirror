@@ -38,7 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.Storable;
-import org.appwork.utils.net.httpserver.requests.HttpRequest;
+import org.appwork.utils.net.httpserver.requests.HttpRequestInterface;
 
 public class BrowserDetector {
     // Enum for supported browsers.
@@ -101,7 +101,7 @@ public class BrowserDetector {
      *            HTTP request containing browser headers.
      * @return BrowserInfo with detected Browser enum and version as double.
      */
-    public static BrowserInfo detectBrowser(HttpRequest request) {
+    public static BrowserInfo detectBrowser(HttpRequestInterface request) {
         // Use Sec-CH-UA if available; otherwise, use User-Agent.
         String header = request.getRequestHeaders().getValue("Sec-CH-UA");
         if (header == null || header.isEmpty()) {

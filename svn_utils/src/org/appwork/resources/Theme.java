@@ -65,6 +65,7 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.resources.ThemeContext.Target;
 import org.appwork.storage.config.MinTimeWeakReference;
 import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
+import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -331,6 +332,14 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         // the context might be null above. we create a default context only if the cache did not hit
         if (context == null) {
             context = createNewDefaultContext();
+        }
+        // jd webinterface
+        if (StringUtils.equalsIgnoreCase(relativePath, "disabled") || StringUtils.equalsIgnoreCase(relativePath, "checkbox_false")) {
+            ret = new CheckBoxIcon(Math.max(width, height), false, true);
+        } else if (StringUtils.equalsIgnoreCase(relativePath, "enabled") || StringUtils.equalsIgnoreCase(relativePath, "checkbox_true")) {
+            ret = new CheckBoxIcon(Math.max(width, height), true, true);
+        } else if (StringUtils.equalsIgnoreCase(relativePath, "checkbox_undefined")) {
+            ret = new CheckBoxIcon(Math.max(width, height), true, false);
         }
         context.ensureTarget(Target.ICON);
         if (ret == null) {
@@ -1217,7 +1226,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.storage.config.MinTimeWeakReferenceCleanup# onMinTimeWeakReferenceCleanup
      * (org.appwork.storage.config.MinTimeWeakReference)
      */

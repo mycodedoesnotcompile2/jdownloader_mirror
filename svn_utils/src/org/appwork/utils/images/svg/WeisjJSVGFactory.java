@@ -37,7 +37,7 @@ import java.awt.Color;
 import java.awt.Image;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.net.URI;
 
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.images.ScalableIcon;
@@ -64,20 +64,20 @@ public class WeisjJSVGFactory implements SVGFactory {
     }
 
     @Override
-    public Image getImageFromSVG(URL url, int w, int h) throws IOException {
-        return getImageFromSVG(url, w, h, null);
+    public Image getImageFromSVG(URI uri, int w, int h) throws IOException {
+        return getImageFromSVG(uri, w, h, null);
     }
 
     @Override
-    public Image getImageFromSVG(URL url, int w, int h, Color color) throws IOException {
+    public Image getImageFromSVG(URI uri, int w, int h, Color color) throws IOException {
         try {
             InputStream is = null;
             try {
-                is = url.openStream();
+                is = uri.toURL().openStream();
                 if (is != null) {
-                    return getImageFromSVG(is, w, h, color);
+                    return getImageFromSVG(is, null, w, h, color);
                 } else {
-                    throw new IOException("Not found:" + url);
+                    throw new IOException("Not found:" + uri);
                 }
             } finally {
                 if (is != null) {
@@ -87,20 +87,20 @@ public class WeisjJSVGFactory implements SVGFactory {
         } catch (IOException e) {
             throw e;
         } catch (Throwable e) {
-            throw new IOException("URL:" + url, e);
+            throw new IOException("URL:" + uri, e);
         }
     }
 
     @Override
-    public Image getImageFromSVG(InputStream inputStream, int w, int h, Color color) throws IOException {
-        return WeisjJSVG.getImageFromSVG(inputStream, w, h);
+    public Image getImageFromSVG(InputStream inputStream, URI base, int w, int h, Color color) throws IOException {
+        return WeisjJSVG.getImageFromSVG(inputStream, base, w, h);
     }
 
     /**
-     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, int, int, java.awt.Color)
+     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, URI, int, int, java.awt.Color)
      */
     @Override
-    public ScalableIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
-        return WeisjJSVG.getIconFromSVG(stream, width, height);
+    public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException {
+        return WeisjJSVG.getIconFromSVG(stream, base, width, height);
     }
 }

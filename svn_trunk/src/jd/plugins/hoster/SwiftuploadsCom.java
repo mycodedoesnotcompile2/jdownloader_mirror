@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50410 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51022 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwiftuploadsCom extends PluginForHost {
     public SwiftuploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,6 +67,7 @@ public class SwiftuploadsCom extends PluginForHost {
         ret.add(new String[] { "swiftuploads.com" });
         ret.add(new String[] { "uptoearn.xyz" });
         ret.add(new String[] { "uploadzap.com" });
+        ret.add(new String[] { "akirabox.com" });
         return ret;
     }
 
@@ -110,8 +111,21 @@ public class SwiftuploadsCom extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
+    /** Docs: https://akirabox.com/api */
+    private boolean supports_linkcheck_api() {
+        return getHost().equals("akirabox.com");
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        if (this.getPluginEnvironment() == PluginEnvironment.LINK_CHECK && this.supports_linkcheck_api()) {
+            return requestFileInformationAPI(link);
+        } else {
+            return requestFileInformationWebsite(link);
+        }
+    }
+
+    private AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {
         if (!link.isNameSet()) {
             /* Fallback */
             link.setName(this.getFID(link));
@@ -131,6 +145,28 @@ public class SwiftuploadsCom extends PluginForHost {
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    private AvailableStatus requestFileInformationAPI(final DownloadLink link) throws IOException, PluginException {
+        if (!link.isNameSet()) {
+            /* Fallback */
+            link.setName(this.getFID(link));
+        }
+        this.setBrowserExclusive();
+        br.getPage("https://" + getHost() + "/api/files?url=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            /* E.g. {"status":404,"message":"File not found"} */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        link.setFinalFileName(entries.get("name").toString());
+        String filesizeStr = (String) entries.get("size");
+        if (filesizeStr != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
         } else {
             logger.warning("Failed to find filesize");
         }
