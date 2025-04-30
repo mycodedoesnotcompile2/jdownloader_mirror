@@ -82,7 +82,6 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
         POST,
         OPTIONS,
         UNKNOWN;
-
         private final byte[] requestTypeBytes;
 
         private HttpConnectionType() {
@@ -548,7 +547,6 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
                 response.getOutputStream(true);
             }
         } catch (final Throwable e) {
-            e.printStackTrace();
             try {
                 closeConnection = this.onException(e, this.request, this.response);
             } catch (final Throwable nothing) {
@@ -560,9 +558,6 @@ public class HttpConnection implements HttpConnectionRunnable, RawHttpConnection
                 this.closeConnection();
                 this.close();
             }
-            // if (getHook() == null) {
-            // LogV3.finer("No Connection Hook!");
-            // }
         }
     }
 

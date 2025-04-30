@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -33,23 +37,26 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51028 $", interfaceVersion = 3, names = {}, urls = {})
 public class DownloadRu extends PluginForHost {
     public DownloadRu(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    public String getAGBLink() {
-        return "https://download.ru/about";
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setCookie(getHost(), "locale", "en");
+        return br;
     }
 
-    private static List<String[]> getPluginDomains() {
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/about";
+    }
+
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "download.ru" });
@@ -68,22 +75,15 @@ public class DownloadRu extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/files/([A-Za-z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/files/([A-Za-z0-9]{8})");
         }
         return ret.toArray(new String[0]);
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 0;
 
-    // private static final boolean ACCOUNT_FREE_RESUME = true;
-    // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_FREE_MAXDOWNLOADS = 20;
-    // private static final boolean ACCOUNT_PREMIUM_RESUME = true;
-    // private static final int ACCOUNT_PREMIUM_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
     @Override
     public String getLinkID(final DownloadLink link) {
         final String fid = getFID(link);
@@ -103,25 +103,30 @@ public class DownloadRu extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getHeaders().put("Referer", link.getPluginPatternMatcher());
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
-        br.setCookie(this.getHost(), "locale", "en");
         /* 2020-09-25: Their website can be used like an API. Their official API is broken or not yet usable: https://download.ru/api */
         br.getPage("https://" + this.getHost() + "/files/" + this.getFID(link) + ".json");
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* 2020-09-25: E.g. {"code":404,"reason":"file","message":"File not found."} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        entries = restoreFromString(br.toString(), TypeRef.MAP);
+        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         entries = (Map<String, Object>) entries.get("object");
+        parseFileInfo(link, entries);
+        return AvailableStatus.TRUE;
+    }
+
+    public void parseFileInfo(final DownloadLink link, final Map<String, Object> entries) throws PluginException {
         final boolean is_dir = ((Boolean) entries.get("is_dir")).booleanValue();
         if (is_dir) {
             /* 2020-09-25: Unsupported (I was unable to create a public test-folder) */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = (String) entries.get("name");
         final long filesize = JavaScriptEngineFactory.toLong(entries.get("size"), 0);
         final String sha1 = (String) entries.get("sha1");
+        // final String crc32 = (String) entries.get("crc32");
         if (StringUtils.isEmpty(filename)) {
             /* Fallback */
             link.setName(this.getFID(link));
@@ -134,7 +139,7 @@ public class DownloadRu extends PluginForHost {
         if (!StringUtils.isEmpty(sha1)) {
             link.setSha1Hash(sha1);
         }
-        return AvailableStatus.TRUE;
+        link.setAvailable(true);
     }
 
     @Override
@@ -175,7 +180,6 @@ public class DownloadRu extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     return dllink;
@@ -211,7 +215,7 @@ public class DownloadRu extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

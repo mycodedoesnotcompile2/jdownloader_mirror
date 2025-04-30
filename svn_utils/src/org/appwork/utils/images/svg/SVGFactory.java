@@ -61,5 +61,7 @@ public interface SVGFactory {
 
     boolean isSupported();
 
+    InputStream openInputStream(URI resource) throws IOException;
+
     ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException;
 }

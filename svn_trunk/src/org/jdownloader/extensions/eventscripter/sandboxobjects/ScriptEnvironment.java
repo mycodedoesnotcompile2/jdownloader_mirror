@@ -41,6 +41,28 @@ import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import javax.swing.text.JTextComponent;
 
+import jd.controlling.AccountController;
+import jd.controlling.TaskQueue;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ProxyInfoHistory;
+import jd.controlling.downloadcontroller.ProxyInfoHistory.WaitingSkipReasonContainer;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.Reconnecter;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import net.sourceforge.htmlunit.corejs.javascript.Function;
+import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
@@ -69,6 +91,7 @@ import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.api.RemoteAPIController;
+import org.jdownloader.controlling.packagizer.PackagizerController;
 import org.jdownloader.extensions.eventscripter.EnvironmentException;
 import org.jdownloader.extensions.eventscripter.ScriptAPI;
 import org.jdownloader.extensions.eventscripter.ScriptEntry;
@@ -85,30 +108,8 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.SoundSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
-import jd.controlling.AccountController;
-import jd.controlling.TaskQueue;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ProxyInfoHistory;
-import jd.controlling.downloadcontroller.ProxyInfoHistory.WaitingSkipReasonContainer;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.Reconnecter;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import net.sourceforge.htmlunit.corejs.javascript.Function;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
-
 public class ScriptEnvironment {
-    private static HashMap<String, Object>                       GLOBAL_PROPERTIES = new HashMap<String, Object>();
+
     @ScriptAPI(description = "JDownloader Installation Directory")
     public static String                                         JD_HOME           = Application.getResource("").getAbsolutePath();
     private static LogSource                                     LOGGER            = LogController.getInstance().getLogger("ScriptEnvironment");
@@ -603,11 +604,11 @@ public class ScriptEnvironment {
     @ScriptAPI(description = "Get a Property. Set global to true if you want to access a global property", parameters = { "\"key\"", "global(boolean)" }, example = "var value=getProperty(\"myobject\", false);")
     public static Object getProperty(String key, boolean global) throws EnvironmentException {
         try {
-            synchronized (GLOBAL_PROPERTIES) {
-                if (global) {
-                    return GLOBAL_PROPERTIES.get(key);
-                } else {
-                    HashMap<String, Object> store = SCRIPT_PROPERTIES.get(getScriptThread().getScript());
+            if (global) {
+                return PackagizerController.getGlobalProperty(key);
+            } else {
+                synchronized (SCRIPT_PROPERTIES) {
+                    final HashMap<String, Object> store = SCRIPT_PROPERTIES.get(getScriptThread().getScript());
                     if (store == null) {
                         return null;
                     }
@@ -1142,10 +1143,10 @@ public class ScriptEnvironment {
     @ScriptAPI(description = "Set a Property. This property will be available until JD-exit or a script overwrites it. if global is true, the property will be available for al scripts", parameters = { "\"key\"", "anyValue", "global(boolean)" }, example = "var oldValue=setProperty(\"myobject\", { \"name\": true}, false);")
     public static Object setProperty(String key, Object value, boolean global) throws EnvironmentException {
         try {
-            synchronized (GLOBAL_PROPERTIES) {
-                if (global) {
-                    return GLOBAL_PROPERTIES.put(key, value);
-                } else {
+            if (global) {
+                return PackagizerController.putGlobalProperty(key, value);
+            } else {
+                synchronized (SCRIPT_PROPERTIES) {
                     HashMap<String, Object> store = SCRIPT_PROPERTIES.get(getScriptThread().getScript());
                     if (store == null) {
                         store = new HashMap<String, Object>();
@@ -1154,6 +1155,7 @@ public class ScriptEnvironment {
                     return store.put(key, value);
                 }
             }
+
         } catch (Throwable e) {
             throw new EnvironmentException(e);
         }

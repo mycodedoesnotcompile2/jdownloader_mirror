@@ -38,6 +38,14 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.PluginForHost;
+import net.sf.image4j.codec.ico.ICODecoder;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.shutdown.ShutdownController;
@@ -63,14 +71,6 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.PluginForHost;
-import net.sf.image4j.codec.ico.ICODecoder;
 
 public class FavIcons {
     private static final int                                                     BASE_SIZE       = 16;
@@ -923,7 +923,7 @@ public class FavIcons {
             BufferedImage ret = null;
             if (StringUtils.endsWithCaseInsensitive(con.getURL().getPath(), ".svg")) {
                 try {
-                    final Image img = IconIO.getSvgFactory().getImageFromSVG(is, 32, 32, null);
+                    final Image img = IconIO.getSvgFactory().getImageFromSVG(is, null, 32, 32, null);
                     if (img != null) {
                         ret = IconIO.toBufferedImage(img);
                     }

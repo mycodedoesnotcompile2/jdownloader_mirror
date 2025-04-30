@@ -74,4 +74,12 @@ public class NoSVGSupportFactory implements SVGFactory {
     public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException {
         return null;
     }
+
+    /**
+     * @see org.appwork.utils.images.svg.SVGFactory#openInputStream(java.net.URI)
+     */
+    @Override
+    public InputStream openInputStream(URI resource) throws IOException {
+        throw new IOException("Unsupported for " + getClass().getSimpleName());
+    }
 }

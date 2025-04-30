@@ -71,11 +71,10 @@ public class WeisjJSVGFactory implements SVGFactory {
     @Override
     public Image getImageFromSVG(URI uri, int w, int h, Color color) throws IOException {
         try {
-            InputStream is = null;
+            final InputStream is = openInputStream(uri);
             try {
-                is = uri.toURL().openStream();
                 if (is != null) {
-                    return getImageFromSVG(is, null, w, h, color);
+                    return getImageFromSVG(is, uri, w, h, color);
                 } else {
                     throw new IOException("Not found:" + uri);
                 }
@@ -91,9 +90,13 @@ public class WeisjJSVGFactory implements SVGFactory {
         }
     }
 
+    protected WeisjJSVG newInstance() {
+        return new WeisjJSVG(this);
+    }
+
     @Override
     public Image getImageFromSVG(InputStream inputStream, URI base, int w, int h, Color color) throws IOException {
-        return WeisjJSVG.getImageFromSVG(inputStream, base, w, h);
+        return newInstance().getImageFromSVG(inputStream, base, w, h);
     }
 
     /**
@@ -101,6 +104,14 @@ public class WeisjJSVGFactory implements SVGFactory {
      */
     @Override
     public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException {
-        return WeisjJSVG.getIconFromSVG(stream, base, width, height);
+        return newInstance().getIconFromSVG(stream, base, width, height);
+    }
+
+    /**
+     * @see org.appwork.utils.images.svg.SVGFactory#openInputStream(java.net.URI)
+     */
+    @Override
+    public InputStream openInputStream(URI uri) throws IOException {
+        return uri.toURL().openStream();
     }
 }

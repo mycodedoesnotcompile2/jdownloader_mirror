@@ -114,7 +114,7 @@ public class BrowserDetector {
         System.out.println(getBrowser("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"));
     }
 
-    protected static BrowserInfo getBrowser(String header) {
+    public static BrowserInfo getBrowser(String header) {
         Browser browser = Browser.OTHER;
         double version = 0.0;
         Matcher matcher = EDGE.matcher(header);

@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,67 +32,43 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.images.svg;
+package org.appwork.remoteapi.tests;
 
-import java.awt.Color;
-import java.awt.Image;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-
-import org.appwork.utils.images.ScalableIcon;
+import org.appwork.remoteapi.BrowserDetector;
+import org.appwork.remoteapi.BrowserDetector.Browser;
+import org.appwork.remoteapi.BrowserDetector.BrowserInfo;
+import org.appwork.testframework.AWTest;
 
 /**
  * @author thomas
- * @date 16.01.2023
+ * @date 27.03.2025
  *
  */
-public class KitFoxFactory implements SVGFactory {
+public class BrowserDetectorTest extends AWTest {
     /**
-     *
-     */
-    public KitFoxFactory() {
-    }
-
-    protected SVGIO newInstance() {
-        return new SVGIO(this);
-    }
-
-    @Override
-    public Image getImageFromSVG(URI resource, int width, int height) throws IOException {
-        return newInstance().getImageFromSVG(resource, width, height);
-    }
-
-    @Override
-    public Image getImageFromSVG(URI resource, int width, int height, Color color) throws IOException {
-        return newInstance().getImageFromSVG(resource, width, height, color);
-    }
-
-    @Override
-    public Image getImageFromSVG(InputStream inputStream, URI base, int width, int height, Color color) throws IOException {
-        return newInstance().getImageFromSVG(inputStream, base, width, height, color);
-    }
-
-    @Override
-    public boolean isSupported() {
-        // https://github.com/blackears/svgSalamander/tree/ecd1092927971a9e02a9062fdd1a95dd610d7309
-        // self compiled for Java 1.6 compatibility
-        return true;// JVMVersion.isMinimum(JVMVersion.JAVA_1_8);
-    }
-
-    /**
-     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, URI, int, int, java.awt.Color)
+     * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
-    public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException {
-        return newInstance().getIconFromSVG(stream, base, width, height, color);
+    public void runTest() throws Exception {
+        test(Browser.FIREFOX, 136d, "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0");
+        test(Browser.CHROMIUM, 136d, "\"Not.A/Brand\";v=\"99\", \"Chromium\";v=\"136\"");
+        test(Browser.OPERA, 117, "\"Not A(Brand\";v=\"8\", \"Chromium\";v=\"132\", \"Opera\";v=\"117\"");
+        test(Browser.OPERA, 87, "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Opera\";v=\"87\"");
+        test(Browser.OPERA, 87, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 OPR/87.0.4390.2");
+        test(Browser.EDGE, 134, "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"");
+        test(Browser.EDGE, 134, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0");
+        test(Browser.SAFARI, 18.3, "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15");
+        test(Browser.IE, 7.0, "Mozilla/5.0 (Windows NT 10.0; Trident/7.0; rv:11.0) like Gecko");
     }
 
-    /**
-     * @see org.appwork.utils.images.svg.SVGFactory#openInputStream(java.net.URI)
-     */
-    @Override
-    public InputStream openInputStream(URI uri) throws IOException {
-        return uri.toURL().openStream();
+    public static void main(String[] args) {
+        run();
+    }
+
+    private void test(Browser br, double version, String uaOderSec) throws Exception {
+        BrowserInfo browser = BrowserDetector.getBrowser(uaOderSec);
+        System.out.println(uaOderSec);
+        assertEquals(br, browser.getBrowser());
+        assertEquals(version, browser.getVersion());
     }
 }

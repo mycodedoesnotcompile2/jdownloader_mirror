@@ -27,6 +27,15 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -51,16 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 50937 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51028 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -468,8 +468,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String seeAllURL = br.getRegex("(" + Regex.escape(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
         if (seeAllURL != null) {
             /**
-             * E.g. users/bla/videos --> /users/bla/videos/favorites </br> Without this we might only see some of all items and no
-             * pagination which is needed to be able to find all items.
+             * E.g. users/bla/videos --> /users/bla/videos/favorites </br>
+             * Without this we might only see some of all items and no pagination which is needed to be able to find all items.
              */
             logger.info("Found seeAllURL: " + seeAllURL);
             PornHubCom.getPage(br, seeAllURL);
@@ -635,7 +635,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlAllGifsOfAUser(final CryptedLink param, final Account account) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final boolean webm = SubConfiguration.getConfig(this.getHost()).getBooleanProperty(PornHubCom.GIFS_WEBM, true);
+        final boolean webm = SubConfiguration.getConfig(this.getHost()).getBooleanProperty(PornHubCom.GIFS_WEBM, PornHubCom.default_GIFS_WEBM);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -831,10 +831,11 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
         final boolean bestonly = cfg.getBooleanProperty(PornHubCom.BEST_ONLY, false);
         final boolean bestselectiononly = cfg.getBooleanProperty(PornHubCom.BEST_SELECTION_ONLY, false);
-        final boolean fastlinkcheck = cfg.getBooleanProperty(PornHubCom.FAST_LINKCHECK, false);
-        boolean crawlHLS = cfg.getBooleanProperty(PornHubCom.CRAWL_VIDEO_HLS, true);
-        boolean crawlMP4 = PornHubCom.ENABLE_INTERNAL_MP4_PROGRESSIVE_SUPPORT && cfg.getBooleanProperty(PornHubCom.CRAWL_VIDEO_MP4, true);
-        final boolean crawlThumbnail = cfg.getBooleanProperty(PornHubCom.CRAWL_THUMBNAIL, false);
+        final boolean fastlinkcheck = cfg.getBooleanProperty(PornHubCom.FAST_LINKCHECK, PornHubCom.default_FAST_LINKCHECK);
+        final boolean setAdditionalPluginProperties = cfg.getBooleanProperty(PornHubCom.CRAWL_AND_SET_ADDITIONAL_PLUGIN_PROPERTIES, PornHubCom.default_CRAWL_AND_SET_ADDITIONAL_PLUGIN_PROPERTIES);
+        boolean crawlHLS = cfg.getBooleanProperty(PornHubCom.CRAWL_VIDEO_HLS, PornHubCom.default_CRAWL_VIDEO_HLS);
+        boolean crawlMP4 = PornHubCom.ENABLE_INTERNAL_MP4_PROGRESSIVE_SUPPORT && cfg.getBooleanProperty(PornHubCom.CRAWL_VIDEO_MP4, PornHubCom.default_CRAWL_VIDEO_MP4);
+        final boolean crawlThumbnail = cfg.getBooleanProperty(PornHubCom.CRAWL_THUMBNAIL, PornHubCom.default_CRAWL_THUMBNAIL);
         if (!crawlHLS && !crawlMP4) {
             logger.info("User disabled HLS and HTTP versions -> Force-enable both");
             crawlHLS = true;
@@ -930,6 +931,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         if (better_date != null) {
             uploadDate = better_date;
         }
+        final String videodata_js = br.getRegex("'videodata':\\s*(\\{[^\\}]+\\})").getMatch(0);
+        final String internal_video_id = br.getRegex("\"video_id\":(\\d+)").getMatch(0);
         boolean skippedFlag = false;
         for (final Entry<String, Map<String, String>> qualityEntry : qualities.entrySet()) {
             final String quality = qualityEntry.getKey();
@@ -1044,7 +1047,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
                 /*
                  * 2023-02-17: The following line of code contains a typo. This typo now needs to be there forever otherwise it would break
                  * the ability to find duplicates for thumbnails added in order versions :D
-                 * 
+                 *
                  * 2023-03-17: Nope, you can just fix PluginForHost.getLinkID and add support for old/new one ;)
                  */
                 dl.setLinkID("pornhub://" + viewkey + "_thumnail");
@@ -1084,6 +1087,12 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             }
             if (!StringUtils.isEmpty(uploaderType)) {
                 result.setProperty(PornHubCom.PROPERTY_UPLOADER_TYPE, uploaderType);
+            }
+            if (!StringUtils.isEmpty(videodata_js) && setAdditionalPluginProperties) {
+                result.setProperty(PornHubCom.PROPERTY_VIDEODATA_JS, videodata_js);
+            }
+            if (!StringUtils.isEmpty(internal_video_id)) {
+                result.setProperty(PornHubCom.PROPERTY_INTERNAL_VIDEO_ID, internal_video_id);
             }
         }
         final FilePackage fp = FilePackage.getInstance();

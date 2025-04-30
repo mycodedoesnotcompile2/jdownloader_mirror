@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50979 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51026 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1606,8 +1606,22 @@ public class RapidGatorNet extends PluginForHost {
         handleErrorsWebsite(br, link, account, currentIP, false);
     }
 
+    /**
+     * Returns error message for files that require the user to be subscribed to a specific uploader to be able to download them. <br>
+     *
+     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
+     * This can be the same as when "isBuyFile()" returns true but with a more detailed error message.
+     */
     private String getErrormessageSubscriberOnlyDownload(final Browser br) {
         return br.getRegex("(The files of this publisher \"[^\"<>]+\" can be downloaded only by subscribers\\.)").getMatch(0);
+    }
+
+    /**
+     * Returns error message for files that need to be bought separately. <br>
+     * This can be the same as when "isBuyFile()" returns true but with a more detailed error message.
+     */
+    private String getErrormessagePaidDownload(final Browser br) {
+        return br.getRegex("\">\\s*(Buy for [0-9.]+ USD)").getMatch(0);
     }
 
     private void handleErrorsWebsite(final Browser br, final DownloadLink link, final Account account, final String currentIP, final boolean doExtendedOfflineCheck) throws PluginException {
@@ -1713,21 +1727,22 @@ public class RapidGatorNet extends PluginForHost {
              * downloads or upon instant retry of an e.g. interrupted free download --> Reconnect is not required
              */
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "You can't download more than one file within a certain time period in free mode", PluginJsonConfig.get(RapidGatorConfig.class).getWaitSecondsOnErrorYouCantDownloadMoreThanOneFile() * 1000l);
-        } else if (isBuyFile(br, link, account)) {
-            /* 2022-11-07: Files that need to be purchased separately in order to be able to download them. */
-            throw new AccountRequiredException("The files of this publisher can be downloaded only by subscribers.");
         }
         if (br.containsHTML(">\\s*An unexpected error occurred\\s*\\.?\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "An unexpected error occurred", 15 * 60 * 1000l);
         }
         /* Check if item is only downloadable for premium users. */
-        final String subscribersOnlyDownload = getErrormessageSubscriberOnlyDownload(br);
-        if (subscribersOnlyDownload != null) {
-            /**
-             * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
-             * This is the same as when "isBuyFile()" returns true but with a more detailed error message.
-             */
-            throw new AccountRequiredException(subscribersOnlyDownload);
+        final String premiumonly_subscribersOnlyDownload = getErrormessageSubscriberOnlyDownload(br);
+        if (premiumonly_subscribersOnlyDownload != null) {
+            throw new AccountRequiredException(premiumonly_subscribersOnlyDownload);
+        }
+        final String premiumonly_paidFile = getErrormessagePaidDownload(br);
+        if (premiumonly_paidFile != null) {
+            throw new AccountRequiredException(premiumonly_paidFile);
+        }
+        if (isBuyFile(br, link, account)) {
+            /* 2022-11-07: Files that need to be purchased separately in order to be able to download them. */
+            throw new AccountRequiredException("The files of this publisher can be downloaded only by subscribers.");
         }
         final String errormsgFreeFilesizeLimit = br.getRegex("'(You can download files up to ([\\d\\.]+ ?(MB|GB)) in free mode)\\s*<").getMatch(0);
         if (errormsgFreeFilesizeLimit != null) {

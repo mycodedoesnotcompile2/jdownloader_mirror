@@ -49,6 +49,7 @@ import javax.swing.JComponent;
 import org.appwork.utils.images.ScalableIcon;
 
 import com.github.weisj.jsvg.parser.LoaderContext;
+import com.github.weisj.jsvg.parser.impl.MutableLoaderContext;
 import com.github.weisj.jsvg.view.FloatSize;
 
 /**
@@ -57,10 +58,17 @@ import com.github.weisj.jsvg.view.FloatSize;
  *
  */
 public class WeisjJSVG {
-    public static Image getImageFromSVG(InputStream inputStream, URI base, int w, int h) throws IOException {
+    public WeisjJSVG(SVGFactory factory) {
+    }
+
+    protected LoaderContext createLoaderContext() {
+        return MutableLoaderContext.createDefault();
+    }
+
+    public Image getImageFromSVG(InputStream inputStream, URI base, int w, int h) throws IOException {
         try {
             com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
-            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(inputStream, base, LoaderContext.createDefault());
+            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(inputStream, base, createLoaderContext());
             if (svgDocument != null) {
                 final FloatSize size = svgDocument.size();
                 if (w <= 0) {
@@ -110,10 +118,10 @@ public class WeisjJSVG {
      * @param height
      * @return
      */
-    public static ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height) {
+    public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height) {
         try {
             com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
-            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(stream, base, LoaderContext.createDefault());
+            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(stream, base, createLoaderContext());
             if (svgDocument == null) {
                 return null;
             }

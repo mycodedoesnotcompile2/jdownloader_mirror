@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51021 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51026 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -116,7 +116,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         Browser.setRequestIntervalLimitGlobal("api.x.com", true, cfg.getGlobalRequestIntervalLimitApiTwitterComMilliseconds());
     }
 
-    private static final Pattern           PATTERN_CARD                                                     = Pattern.compile("(?i)https?://[^/]+/i/cards/tfw/v1/(\\d+)");
+    private static final Pattern           PATTERN_CARD                                                     = Pattern.compile("/i/cards/tfw/v1/(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern           TYPE_USER_ALL                                                    = Pattern.compile("(?i)https?://[^/]+/([\\w\\-]+)(?:/(?:media|likes))?(\\?.*)?");
     private static final Pattern           TYPE_USER_LIKES                                                  = Pattern.compile("(?i)https?://[^/]+/([\\w\\-]+)/likes.*");
     private static final Pattern           TYPE_USER_MEDIA                                                  = Pattern.compile("(?i)https?://[^/]+/([\\w\\-]+)/media.*");
@@ -182,6 +182,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
             regex += "[A-Za-z0-9_\\-]+/status/\\d+";
             regex += "|i/videos/tweet/\\d+";
             regex += "|[A-Za-z0-9_\\-]{2,}(?:/(?:media|likes))?(\\?.*)?";
+            regex += "|i/cards/tfw/v1/(\\d+)";
             regex += ")";
             ret.add(regex);
         }
@@ -189,7 +190,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
     }
 
     private String getContentURL(final CryptedLink param) {
-        return param.getCryptedUrl().replaceFirst("(?i)https?://(www\\.|mobile\\.)?twitter\\.com/", "https://" + this.getHost() + "/");
+        return param.getCryptedUrl().replaceFirst("(?i)^https?://(www\\.|mobile\\.)?[^/]+/", "https://" + this.getHost() + "/");
     }
 
     public static enum ProfileCrawlMode {
@@ -246,17 +247,19 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 throw new AccountRequiredException();
             }
         }
-        final Regex singletweetVideoEmbed = new Regex(contenturl, TwitterCom.TYPE_VIDEO_EMBED);
-        final Regex singletweet = new Regex(contenturl, PATTERN_SINGLE_TWEET);
-        if (new Regex(contenturl, PATTERN_CARD).patternFind()) {
-            return this.crawlCard(contenturl);
-        } else if (singletweetVideoEmbed.patternFind()) {
-            final String tweetID = singletweetVideoEmbed.getMatch(0);
-            return this.crawlSingleTweet(account, null, tweetID);
-        } else if (singletweet.patternFind()) {
-            final String username = singletweet.getMatch(0);
-            final String tweetID = singletweet.getMatch(1);
+        final Regex single_tweetVideoEmbed;
+        final Regex single_tweetCard;
+        final Regex single_tweet = new Regex(contenturl, PATTERN_SINGLE_TWEET);
+        if (single_tweet.patternFind()) {
+            final String username = single_tweet.getMatch(0);
+            final String tweetID = single_tweet.getMatch(1);
             return this.crawlSingleTweet(account, username, tweetID);
+        } else if ((single_tweetVideoEmbed = new Regex(contenturl, TwitterCom.TYPE_VIDEO_EMBED)).patternFind()) {
+            final String tweetID = single_tweetVideoEmbed.getMatch(0);
+            return this.crawlSingleTweet(account, null, tweetID);
+        } else if ((single_tweetCard = new Regex(contenturl, PATTERN_CARD)).patternFind()) {
+            final String tweetID = single_tweetCard.getMatch(0);
+            return this.crawlSingleTweet(account, null, tweetID);
         } else {
             return this.crawlUser(param, account, contenturl);
         }
@@ -1593,44 +1596,6 @@ public class TwitterComCrawler extends PluginForDecrypt {
             logger.log(e);
             return null;
         }
-    }
-
-    @Deprecated
-    private ArrayList<DownloadLink> crawlCard(final String contenturl) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String tweetID = new Regex(contenturl, PATTERN_CARD).getMatch(0);
-        if (tweetID == null) {
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        getPage(contenturl);
-        if (br.getRequest().getHttpConnection().getResponseCode() == 403 || br.getRequest().getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("class=\"ProtectedTimeline\"")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        String externID = br.getRegex("u\\-linkClean js\\-openLink\" href=\"(https?://t\\.co/[^<>\"]*?)\"").getMatch(0);
-        if (externID == null) {
-            externID = br.getRegex("\"card_ur(?:i|l)\"\\s*:\\s*\"(https?[^<>\"]*?)\"").getMatch(0);
-        }
-        if (externID != null) {
-            ret.add(this.createDownloadlink(externID));
-            return ret;
-        }
-        if (ret.isEmpty()) {
-            String dllink = br.getRegex("playlist\\&quot;:\\[\\{\\&quot;source\\&quot;:\\&quot;(https[^<>\"]*?\\.(?:webm|mp4))").getMatch(0);
-            if (dllink == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            dllink = dllink.replace("\\", "");
-            final String filename = tweetID + "_" + new Regex(dllink, "([^/]+\\.[a-z0-9]+)$").getMatch(0);
-            final DownloadLink dl = this.createDownloadlink(dllink);
-            dl.setProperty(PROPERTY_TWEET_ID, tweetID);
-            dl.setName(filename);
-            dl.setAvailable(true);
-            ret.add(dl);
-        }
-        return ret;
     }
 
     /**

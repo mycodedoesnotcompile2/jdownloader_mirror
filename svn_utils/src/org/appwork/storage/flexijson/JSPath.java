@@ -544,12 +544,19 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
                 me = String.valueOf(me);
                 other = String.valueOf(other);
             }
+            if (me == null && other == null) {
+                continue;
+            }
+            if (me == null) {
+                return -1;
+            }
+            if (other == null) {
+                return 1;
+            }
             if (me instanceof Comparable && other instanceof Comparable) {
                 ret = CompareUtils.compareComparable((Comparable) me, (Comparable) other);
             } else {
-                if (me instanceof Comparable && other instanceof Comparable) {
-                    ret = CompareUtils.compareComparable(StringUtils.valueOfOrNull(me), StringUtils.valueOfOrNull(other));
-                }
+                ret = CompareUtils.compareComparable(StringUtils.valueOfOrNull(me), StringUtils.valueOfOrNull(other));
             }
             if (ret != 0) {
                 return ret;

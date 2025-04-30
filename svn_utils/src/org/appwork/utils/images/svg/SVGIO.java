@@ -47,6 +47,7 @@ import java.io.InputStream;
 import java.net.URI;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.utils.Regex;
 import org.appwork.utils.images.ScalableIcon;
 
 import com.kitfox.svg.SVGDiagram;
@@ -60,19 +61,25 @@ import com.kitfox.svg.SVGUniverse;
  *
  */
 public class SVGIO {
-    public static Image getImageFromSVG(URI url, int w, int h) throws IOException {
-        return getImageFromSVG(url, w, h, null);
+    private final SVGFactory factory;
+
+    public SVGIO(SVGFactory factory) {
+        this.factory = factory;
     }
 
-    public static Image getImageFromSVG(URI url, int w, int h, Color color) throws IOException {
+    public Image getImageFromSVG(URI uri, int w, int h) throws IOException {
+        return getImageFromSVG(uri, w, h, null);
+    }
+
+    public Image getImageFromSVG(URI uri, int w, int h, Color color) throws IOException {
         try {
             InputStream is = null;
             try {
-                is = url.toURL().openStream();
+                is = factory.openInputStream(uri);
                 if (is != null) {
-                    return getImageFromSVG(is, w, h, color);
+                    return getImageFromSVG(is, uri, w, h, color);
                 } else {
-                    throw new IOException("Not found:" + url);
+                    throw new IOException("Not found:" + uri);
                 }
             } finally {
                 if (is != null) {
@@ -82,14 +89,24 @@ public class SVGIO {
         } catch (IOException e) {
             throw e;
         } catch (Throwable e) {
-            throw new IOException("URL:" + url, e);
+            throw new IOException("URL:" + uri, e);
         }
     }
 
-    public static Image getImageFromSVG(InputStream is, int w, int h, Color color) throws IOException {
+    protected String getName(final URI uri) {
+        if (uri != null && uri.getPath() != null) {
+            final String uriName = new Regex(uri.getPath(), "/([^/]*?\\.svg)$").getMatch(0);
+            if (uriName != null) {
+                return uriName;
+            }
+        }
+        return "dummy.svg";
+    }
+
+    public Image getImageFromSVG(InputStream is, URI base, int w, int h, Color color) throws IOException {
         try {
             final SVGUniverse universe = new SVGUniverse();
-            final URI uri = universe.loadSVG(is, "dummy.svg");
+            final URI uri = universe.loadSVG(is, getName(base));
             final SVGDiagram diagram = universe.getDiagram(uri);
             if (diagram == null) {
                 return null;
@@ -139,11 +156,11 @@ public class SVGIO {
      * @return
      * @throws IOException
      */
-    public static ScalableIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
+    public ScalableIcon getIconFromSVG(InputStream stream, URI base, int width, int height, Color color) throws IOException {
         final SVGUniverse universe = new SVGUniverse();
         URI uri;
         try {
-            uri = universe.loadSVG(stream, "dummy.svg");
+            uri = universe.loadSVG(stream, getName(base));
             final SVGDiagram diagram = universe.getDiagram(uri);
             if (diagram == null) {
                 return null;

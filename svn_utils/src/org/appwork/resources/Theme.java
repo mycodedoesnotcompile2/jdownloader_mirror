@@ -582,10 +582,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 }
             }
             if (highDPIbase != null) {
-                if (IconIO.isImageDimensionExact(highDPIWidth, highDPIHeight, highDPIbase)) {
+                if (IconIO.isImageMaxSizeInViewport(highDPIWidth, highDPIHeight, highDPIbase)) {
                     baseImageHighDPIFinal = highDPIbase;
                 } else {
-                    // DO NOT UPSCALE!
+                    // DO NOT UPSCALE!s
                     // if (isImageDimensionLargeEnoughForRequestedDimensions(highDPIWidth, highDPIHeight, highDPIbase)) {
                     if (context.isDoNotUpscaleButThrowException() && !IconIO.isImageCanGetDownscaled(highDPIWidth, highDPIHeight, highDPIbase)) {
                         throw new SourceImageTooSmallException(key, highDPIbase, highDPIWidth, highDPIHeight);
@@ -607,7 +607,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             baseImage = baseImageHighDPIFinal;
         }
         Image baseImageTargetFinal = null;
-        if (IconIO.isImageDimensionExact(width, height, baseImage)) {
+        if (IconIO.isImageMaxSizeInViewport(width, height, baseImage)) {
             baseImageTargetFinal = baseImage;
         } else {
             if (context.isDoNotUpscaleButThrowException() && !IconIO.isImageCanGetDownscaled(width, height, baseImage)) {
@@ -860,7 +860,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                             if (es.getKey().endsWith(_VECTOR)) {
                                 // the source has been a vector icon like svg. either return the exact match, or nothing - deriving new
                                 // images from the cached vector icon will get better results.
-                                if (IconIO.isImageDimensionExact(width, height, img)) {
+                                if (IconIO.isImageMaxSizeInViewport(width, height, img)) {
                                     baseImageTarget = img;
                                     bestKeyTarget = es.getKey();
                                     // exact match
@@ -871,7 +871,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                             } else {
                                 baseImageTarget = img;
                                 bestKeyTarget = es.getKey();
-                                if (IconIO.isImageDimensionExact(width, height, img)) {
+                                if (IconIO.isImageMaxSizeInViewport(width, height, img)) {
                                     // update the mintimeweek timer
                                     ref.get();
                                     // the image has exact the requested dimensions.

@@ -20,6 +20,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -43,12 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 49919 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51025 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -99,7 +101,8 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             contentURLCleaned = URLHelper.getUrlWithoutParams(param.getCryptedUrl());
         }
         contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
-        contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/albums/?$", "");
+        final boolean isProfileAlbumsOverview = contentURLCleaned.matches("(?i).+/albums/?$");
+        final Pattern pattern_album = Pattern.compile("https?://[^/]+/a/[\\w.]+", Pattern.CASE_INSENSITIVE);
         /* Always use main domain */
         final String domainInURL = Browser.getHost(contentURLCleaned, true);
         contentURLCleaned = contentURLCleaned.replace(domainInURL, this.getHost());
@@ -152,9 +155,9 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         final String dataparamshidden = br.getRegex("data-params-hidden=\"([^\"]+)").getMatch(0);
         int page = 1;
         final UrlQuery query = dataparamshidden != null ? UrlQuery.parse(dataparamshidden) : new UrlQuery();
-        query.add("action", "list");
-        query.add("list", "images"); // contained in dataparamshidden
-        query.add("sort", "date_desc");
+        query.appendEncoded("action", "list");
+        query.appendEncoded("list", "images"); // contained in dataparamshidden
+        query.appendEncoded("sort", "date_desc");
         // query.add("page", "1"); // added later in do-while-loop
         // query.add("userid", ""); // contained in dataparamshidden
         // query.add("albumid", ""); // contained in dataparamshidden
@@ -164,20 +167,20 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         final String albumid = query.get("albumid");
         final String userid = query.get("userid");
         if (list != null) {
-            query.add("params_hidden%5Blist%5D", list);
+            query.appendEncoded("params_hidden%5Blist%5D", list);
         }
         if (userid != null) {
-            query.add("params_hidden%5Buserid%5D", userid);
+            query.appendEncoded("params_hidden%5Buserid%5D", userid);
         }
         if (from != null) {
-            query.add("params_hidden%5Bfrom%5D", from);
+            query.appendEncoded("params_hidden%5Bfrom%5D", from);
         }
         if (albumid != null) {
-            query.add("params_hidden%5Balbumid%5D", albumid);
+            query.appendEncoded("params_hidden%5Balbumid%5D", albumid);
         }
-        query.add("params_hidden%5Bparams_hidden%5D", "");
+        query.appendEncoded("params_hidden%5Bparams_hidden%5D", "");
         if (token != null) {
-            query.add("auth_token", token);
+            query.appendEncoded("auth_token", token);
         }
         final String siteTitle = HTMLSearch.searchMetaTag(br, "og:title", "twitter:title");
         FilePackage fp = null;
@@ -195,42 +198,61 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             final String[] htmls = br.getRegex("<div class=\"list-item [^\"]+\"(.*?)class=\"btn-lock fas fa-eye-slash\"[^>]*></div>").getColumn(0);
             int numberofNewItems = 0;
             for (final String html : htmls) {
-                final String url = new Regex(html, "<a href=\"(https?://[^\"]+)\" class=\"image-container --media\">").getMatch(0);
-                final String urlThumbnail = new Regex(html, "<img src=\"(https:?//[^\"]+)\"\\s*alt=\"").getMatch(0);
-                final String title = new Regex(html, "data-title=\"([^\"]+)\"").getMatch(0);
-                final String filesizeBytesStr = new Regex(html, "data-size=\"(\\d+)\"").getMatch(0);
-                if (url == null || title == null || filesizeBytesStr == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                if (!dupes.add(url)) {
-                    logger.info("Skipping dupe: " + url);
-                    continue;
-                }
-                imagePosition++;
-                numberofNewItems++;
-                final DownloadLink link = this.createDownloadlink(url);
-                String ext = null;
-                if (urlThumbnail != null) {
-                    ext = Plugin.getFileNameExtensionFromURL(urlThumbnail);
-                }
-                if (ext != null) {
-                    link.setFinalFileName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ext));
+                if (isProfileAlbumsOverview) {
+                    final String url = new Regex(html, pattern_album).getMatch(-1);
+                    if (url == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    // if (!new Regex(url, pattern_album).patternFind()) {
+                    // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    // }
+                    if (!dupes.add(url)) {
+                        logger.info("Skipping dupe: " + url);
+                        continue;
+                    }
+                    final DownloadLink link = this.createDownloadlink(url);
+                    distribute(link);
+                    ret.add(link);
                 } else {
-                    /* Fallback */
-                    link.setName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ".jpg"));
+                    final String url = new Regex(html, "<a href=\"(https?://[^\"]+)\" class=\"image-container --media\">").getMatch(0);
+                    final String urlThumbnail = new Regex(html, "<img src=\"(https:?//[^\"]+)\"\\s*alt=\"").getMatch(0);
+                    final String title = new Regex(html, "data-title=\"([^\"]+)\"").getMatch(0);
+                    final String filesizeBytesStr = new Regex(html, "data-size=\"(\\d+)\"").getMatch(0);
+                    if (url == null || title == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    if (!dupes.add(url)) {
+                        logger.info("Skipping dupe: " + url);
+                        continue;
+                    }
+                    imagePosition++;
+                    numberofNewItems++;
+                    final DownloadLink link = this.createDownloadlink(url);
+                    String ext = null;
+                    if (urlThumbnail != null) {
+                        ext = Plugin.getFileNameExtensionFromURL(urlThumbnail);
+                    }
+                    if (ext != null) {
+                        link.setFinalFileName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ext));
+                    } else {
+                        /* Fallback */
+                        link.setName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ".jpg"));
+                    }
+                    if (filesizeBytesStr != null) {
+                        link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+                    }
+                    link.setAvailable(true);
+                    if (fp != null) {
+                        link._setFilePackage(fp);
+                    }
+                    if (passCode != null) {
+                        link.setDownloadPassword(passCode, true);
+                        link.setProperty(JpgChurch.PROPERTY_PHPSESSID, br.getCookie(br.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN));
+                    }
+                    link.setProperty(JpgChurch.PROPERTY_POSITION, imagePosition);
+                    distribute(link);
+                    ret.add(link);
                 }
-                link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
-                link.setAvailable(true);
-                if (fp != null) {
-                    link._setFilePackage(fp);
-                }
-                if (passCode != null) {
-                    link.setDownloadPassword(passCode, true);
-                    link.setProperty(JpgChurch.PROPERTY_PHPSESSID, br.getCookie(br.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN));
-                }
-                link.setProperty(JpgChurch.PROPERTY_POSITION, imagePosition);
-                distribute(link);
-                ret.add(link);
             }
             logger.info("Crawled page " + page + " | Number of new items on current page: " + numberofNewItems + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
@@ -260,9 +282,9 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             }
         } while (true);
         if (ret.isEmpty()) {
-            final String numberofImagesStr = br.getRegex("data-text=\"image-count\">(\\d+)</span>").getMatch(0);
-            if (numberofImagesStr != null && Integer.parseInt(numberofImagesStr) == 0) {
-                logger.info("This gallery contains zero images");
+            final String numberofImagesStr = br.getRegex("data-text=\"image-count\">\\s*(\\d+)\\s*</span>").getMatch(0);
+            if (StringUtils.equals(numberofImagesStr, "0")) {
+                logger.info("This profile contains zero images");
                 throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -274,9 +296,15 @@ public class JpgChurchCrawler extends PluginForDecrypt {
     public static Form getPasswordForm(final Browser br) {
         Form pwform = br.getFormbyKey("content-password");
         if (pwform != null) {
-            /* Correct bad default action */
+            /* Fix bad default action */
             pwform.setAction("");
         }
         return pwform;
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* Avoid hitting rate-limits. */
+        return 1;
     }
 }

@@ -810,8 +810,21 @@ public class IconIO {
      * returns true, if the image size is exact the given width or height. if width or height is <=0, any value is accepted
      *
      */
-    public static boolean isImageDimensionExact(int width, int height, Image baseImage) {
-        return (width <= 0 || baseImage.getWidth(null) == width) && (height <= 0 || baseImage.getHeight(null) == height);
+    public static boolean isImageMaxSizeInViewport(int width, int height, Image baseImage) {
+        int iw = baseImage.getWidth(null);
+        int ih = baseImage.getHeight(null);
+        if ((width <= 0 || iw == width) && (height <= 0 || ih == height)) {
+            // perfect fit.
+            return true;
+        }
+        if (iw == width && (height <= 0 || ih < height)) {
+            // width ok, height lower... we cannot get it bigger without breaking the viewport
+            return true;
+        } else if (iw == width && (height <= 0 || ih < height)) {
+            // height ok. max size in viewport
+            return true;
+        }
+        return false;
     }
 
     /**

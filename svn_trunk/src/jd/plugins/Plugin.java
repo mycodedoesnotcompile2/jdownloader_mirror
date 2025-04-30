@@ -837,17 +837,15 @@ public abstract class Plugin implements ActionListener {
             final Thread thread = Thread.currentThread();
             if (thread instanceof SingleDownloadController) {
                 return PluginEnvironment.DOWNLOAD;
-            }
-            if (thread instanceof LinkCrawlerThread) {
+            } else if (thread instanceof LinkCrawlerThread) {
                 return PluginEnvironment.CRAWLER;
-            }
-            if (thread instanceof LinkCrawlerThread) {
+            } else if (thread instanceof LinkCheckerThread) {
                 return PluginEnvironment.LINK_CHECK;
-            }
-            if (thread instanceof AccountCheckerThread) {
+            } else if (thread instanceof AccountCheckerThread) {
                 return PluginEnvironment.ACCOUNT_CHECK;
+            } else {
+                return PluginEnvironment.UNKNOWN;
             }
-            return PluginEnvironment.UNKNOWN;
         }
 
     }
