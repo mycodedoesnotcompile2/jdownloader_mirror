@@ -66,6 +66,7 @@ import org.appwork.resources.ThemeContext.Target;
 import org.appwork.storage.config.MinTimeWeakReference;
 import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
 import org.appwork.swing.components.CheckBoxIcon;
+import org.appwork.swing.components.HeadlessCheckboxIconRef;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -334,9 +335,9 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             context = createNewDefaultContext();
         }
         // jd webinterface
-        if (StringUtils.equalsIgnoreCase(relativePath, "disabled") || StringUtils.equalsIgnoreCase(relativePath, "checkbox_false")) {
+        if (StringUtils.equalsIgnoreCase(relativePath, "disabled") || (Target.ICON.equals(context.getTarget()) && HeadlessCheckboxIconRef.HEADLESS_checkbox_false.path().equals(relativePath))) {
             ret = new CheckBoxIcon(Math.max(width, height), false, true);
-        } else if (StringUtils.equalsIgnoreCase(relativePath, "enabled") || StringUtils.equalsIgnoreCase(relativePath, "checkbox_true")) {
+        } else if (StringUtils.equalsIgnoreCase(relativePath, "enabled") || (Target.ICON.equals(context.getTarget()) && HeadlessCheckboxIconRef.HEADLESS_checkbox_true.path().equals(relativePath))) {
             ret = new CheckBoxIcon(Math.max(width, height), true, true);
         } else if (StringUtils.equalsIgnoreCase(relativePath, "checkbox_undefined")) {
             ret = new CheckBoxIcon(Math.max(width, height), true, false);

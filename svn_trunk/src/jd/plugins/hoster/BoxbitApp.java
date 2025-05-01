@@ -23,17 +23,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -44,6 +33,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountUnavailableException;
+import jd.plugins.BrowserAdapter;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -55,11 +45,21 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51022 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51034 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
 public class BoxbitApp extends PluginForHost {
     /**
-     * New project of: geragera.com.br </br>
-     * API docs: https://boxbit.readme.io/reference/introduction
+     * New project of: geragera.com.br </br> API docs: https://boxbit.readme.io/reference/introduction
      */
     private static final String          API_BASE                         = "https://api.boxbit.app";
     private static MultiHosterManagement mhm                              = new MultiHosterManagement("boxbit.app");
@@ -198,11 +198,14 @@ public class BoxbitApp extends PluginForHost {
         if (account != null) {
             this.setLoginHeader(br, account);
         }
-        final int maxChunks = this.getMaxChunks(link);
-        logger.info("maxChunks: " + maxChunks);
+        int maxChunks = this.getMaxChunks(link);
+        logger.info("maxChunks(BeforeOpen): " + maxChunks);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), maxChunks);
         this.handleConnectionErrors(br, dl.getConnection());
         parseAndSetMaxChunksLimitFromHeader(link, dl.getConnection());
+        maxChunks = this.getMaxChunks(link);
+        logger.info("maxChunks(AfterOpen): " + maxChunks);
+        BrowserAdapter.applySettings(dl, this.isResumeable(link, account), maxChunks);
         dl.startDownload();
     }
 
@@ -238,8 +241,8 @@ public class BoxbitApp extends PluginForHost {
             }
             link.setProperty(PROPERTY_DOWNLOADLINK_maxchunks, entries.get("max_chunks"));
         }
-        final int maxChunks = this.getMaxChunks(link);
-        logger.info("maxChunks: " + maxChunks);
+        int maxChunks = this.getMaxChunks(link);
+        logger.info("maxChunks(BeforeOpen): " + maxChunks);
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), maxChunks);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -259,6 +262,10 @@ public class BoxbitApp extends PluginForHost {
         if (storedDirecturl == null) {
             link.setProperty(this.getHost() + PROPERTY_DOWNLOADLINK_directlink, dl.getConnection().getURL().toExternalForm());
         }
+        parseAndSetMaxChunksLimitFromHeader(link, dl.getConnection());
+        maxChunks = this.getMaxChunks(link);
+        logger.info("maxChunks(AfterOpen): " + maxChunks);
+        BrowserAdapter.applySettings(dl, this.isResumeable(link, account), maxChunks);
         dl.startDownload();
     }
 

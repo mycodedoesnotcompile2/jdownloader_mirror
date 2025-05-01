@@ -36,6 +36,7 @@ package org.appwork.utils.singleapp.test;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -142,13 +143,13 @@ public class TestSingleInstance extends AWTest {
                                                            };
     private ResponseListener         mayNotGetResponses    = new ResponseListener() {
                                                                @Override
-                                                               public void onReceivedResponse(Response r) {
+                                                               public void onReceivedResponse(SingleAppInstance instance, Response r) {
                                                                    exception = new Exception("Received Response - this should not happen");
                                                                    LogV3.info(Application.getThreadDump());
                                                                }
 
                                                                @Override
-                                                               public void onConnected(String[] message) {
+                                                               public void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] message) {
                                                                }
                                                            };
 
@@ -427,11 +428,11 @@ public class TestSingleInstance extends AWTest {
                     }.start();
                     client.start(new ResponseListener() {
                         @Override
-                        public void onConnected(String[] message) {
+                        public void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] message) {
                         }
 
                         @Override
-                        public void onReceivedResponse(Response r) {
+                        public void onReceivedResponse(SingleAppInstance instance, Response r) {
                             LogV3.info("Client " + Thread.currentThread().getName() + ":" + r);
                             responsesViaCallback.add(r);
                         }
@@ -526,12 +527,12 @@ public class TestSingleInstance extends AWTest {
             server.setForwardMessageDirectIfNoOtherInstanceIsFound(false);
             server.start(new ResponseListener() {
                 @Override
-                public void onReceivedResponse(Response r) {
+                public void onReceivedResponse(SingleAppInstance instance, Response r) {
                     exception = new Exception("Received Response 1 - this should not happen");
                 }
 
                 @Override
-                public void onConnected(String[] message) {
+                public void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] message) {
                     exception = new Exception("Received Response 1 - this should not happen");
                 }
             }, "");
@@ -562,13 +563,13 @@ public class TestSingleInstance extends AWTest {
                                 }
                                 client.start(new ResponseListener() {
                                     @Override
-                                    public void onConnected(String[] message) {
+                                    public void onReceivedResponse(SingleAppInstance instance, Response r) {
+                                        LogV3.info("Client " + Thread.currentThread().getName() + ":" + r);
+                                        responsesViaCallback.add(r);
                                     }
 
                                     @Override
-                                    public void onReceivedResponse(Response r) {
-                                        LogV3.info("Client " + Thread.currentThread().getName() + ":" + r);
-                                        responsesViaCallback.add(r);
+                                    public void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] message) {
                                     }
                                 }, withStart);
                                 throw new Exception("Should not reach this part");
@@ -650,11 +651,11 @@ public class TestSingleInstance extends AWTest {
                 String toSend = "test" + System.currentTimeMillis();
                 ResponseListener callback = new ResponseListener() {
                     @Override
-                    public void onConnected(String[] message) {
+                    public void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] message) {
                     }
 
                     @Override
-                    public void onReceivedResponse(Response r) {
+                    public void onReceivedResponse(SingleAppInstance instance, Response r) {
                         System.out.println("Received Response " + r);
                         synchronized (LOCK) {
                             responses.add(r.toString());

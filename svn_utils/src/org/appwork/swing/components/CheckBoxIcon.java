@@ -47,7 +47,6 @@ import javax.swing.JCheckBox;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.images.IconDebugger;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.ScalableIcon;
 
@@ -56,9 +55,9 @@ public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
     public static final Icon TRUE      = (new CheckBoxIcon(true));
     public static final Icon UNDEFINED = (new CheckBoxIcon(true, false));
     private int              size;
-    private JCheckBox        checkBox;
+    private final JCheckBox  checkBox;
     private Rectangle2D      unscaledDimensionAndPosition;
-    private Image            image;
+    private final Image      image;
     private boolean          selected;
     private boolean          enabled;
 
@@ -66,26 +65,29 @@ public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
         this(-1, selected, enabled);
     }
 
-    public static void main(String[] args) {
-        IconDebugger.show(TRUE, "TRUE");
-        IconDebugger.show(FALSE, "FALSE");
-        IconDebugger.show(UNDEFINED, "UNDEFINED");
+    protected Image buildHeadlessCheckBoxIcon(int size, boolean selected, boolean enabled) {
+        final Image ret;
+        if (selected) {
+            ret = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(size);
+        } else {
+            ret = HeadlessCheckboxIconRef.HEADLESS_checkbox_false.image(size);
+        }
+        if (!enabled) {
+            return IconIO.toGrayScale(ret);
+        }
+        return ret;
     }
 
     public CheckBoxIcon(int size, boolean selected, boolean enabled) {
         this.selected = selected;
         this.enabled = enabled;
         this.size = size;
-        if (Application.isHeadless() || false) {
-            if (selected) {
-                image = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(size);
-            } else {
-                image = HeadlessCheckboxIconRef.HEADLESS_checkbox_false.image(size);
-            }
-            if (!enabled) {
-                image = IconIO.toGrayScale(image);
-            }
+        if (Application.isHeadless()) {
+            checkBox = null;
+            image = buildHeadlessCheckBoxIcon(size, selected, enabled);
         } else {
+            Image image = null;
+            JCheckBox checkBox = null;
             try {
                 checkBox = new JCheckBox();
                 checkBox.setEnabled(enabled);
@@ -102,16 +104,12 @@ public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
                 g2d.dispose();
                 unscaledDimensionAndPosition = record.getCompleteDrawnArea();
             } catch (Exception e) {
+                checkBox = null;
                 LogV3.log(e);
-                if (selected) {
-                    image = HeadlessCheckboxIconRef.HEADLESS_checkbox_true.image(size);
-                } else {
-                    image = HeadlessCheckboxIconRef.HEADLESS_checkbox_false.image(size);
-                }
-                if (!enabled) {
-                    image = IconIO.toGrayScale(image);
-                }
+                image = buildHeadlessCheckBoxIcon(size, selected, enabled);
             }
+            this.checkBox = checkBox;
+            this.image = image;
         }
     }
 

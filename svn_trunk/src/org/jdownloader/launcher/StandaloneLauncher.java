@@ -17,6 +17,7 @@
 package org.jdownloader.launcher;
 
 import java.io.File;
+import java.net.SocketAddress;
 import java.util.Arrays;
 
 import org.appwork.app.launcher.parameterparser.ParameterParser;
@@ -110,13 +111,14 @@ public class StandaloneLauncher {
             singleInstance.setForwardMessageDirectIfNoOtherInstanceIsFound(false);
             try {
                 singleInstance.start(new ResponseListener() {
+
                     @Override
-                    public void onReceivedResponse(Response r) {
+                    public void onReceivedResponse(SingleAppInstance instance, Response r) {
                         LOGGER.info("Received Response from existing instance: " + r);
                     }
 
                     @Override
-                    public void onConnected(String[] message) {
+                    public void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] args) {
                         LOGGER.info("existing jD instance found!");
                         LOGGER.info("Send parameters to existing jD instance and exit: " + Arrays.toString(args));
                     }

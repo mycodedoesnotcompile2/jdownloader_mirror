@@ -42,7 +42,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50429 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51030 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComThepornbangCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -52,6 +52,7 @@ public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "thepornbang.com" });
+        ret.add(new String[] { "porngrey.net" });
         return ret;
     }
 
@@ -138,6 +139,7 @@ public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2
             }
         } catch (final Throwable e) {
             logger.log(e);
+            logger.warning("Special handling failed due to Exception");
         }
         return super.handleQualitySelection(br, link, qualityMap);
     }
@@ -160,6 +162,12 @@ public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2
     @Override
     public Class<? extends KVSConfig> getConfigInterface() {
         return KVSConfigThepornbangCom.class;
+        // TODO: Use the commented out code down below
+        // if(this.getHost().equals("thepornbang.com")) {
+        // return KVSConfigThepornbangCom.class;
+        // }else {
+        // return KVSConfigPorngreyNet.class;
+        // }
     }
 
     @Override

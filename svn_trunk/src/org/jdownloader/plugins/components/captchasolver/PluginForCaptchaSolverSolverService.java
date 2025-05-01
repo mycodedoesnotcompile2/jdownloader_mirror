@@ -16,7 +16,10 @@ import jd.gui.swing.jdgui.components.premiumbar.ServicePanelExtender;
 import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
 
 public class PluginForCaptchaSolverSolverService extends AbstractSolverService implements ServicePanelExtender {
-    public PluginForCaptchaSolverSolverService() {
+    protected final abstractPluginForCaptchaSolver plugin;
+
+    public PluginForCaptchaSolverSolverService(final abstractPluginForCaptchaSolver plugin) {
+        this.plugin = plugin;
     }
 
     @Override
@@ -26,6 +29,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public Icon getIcon(int size) {
+        // TODO: Return plugin favicon
+        // return this.plugin.getFavIcon(this.plugin.getHost());
         return NewTheme.I().getIcon(IconKey.ICON_LOGO_DBC, size);
     }
 
@@ -36,7 +41,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public String getName() {
-        return "TODO_DUMMY";
+        return this.plugin.getHost();
     }
 
     @Override
@@ -46,7 +51,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public String getID() {
-        return "TODO";
+        return this.plugin.getHost();
     }
 
     @Override

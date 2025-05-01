@@ -37,7 +37,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 50969 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -109,15 +109,15 @@ public class Bunkr extends PluginForHost {
     }
 
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning                                         = new AtomicInteger(0);
-    private final static Pattern       PATTERN_FID                                         = Pattern.compile("(-([A-Za-z0-9]{8}))(\\.[^\\.]+)?$");
+    private static AtomicInteger freeRunning                                         = new AtomicInteger(0);
+    private final static Pattern PATTERN_FID                                         = Pattern.compile("(-([A-Za-z0-9]{8}))(\\.[^\\.]+)?$");
     /* Plugin properties */
-    private static final String        PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
-    private static final String        PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
-    private static final String        PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL = "last_grabbed_image_fullsize_view_directurl";
-    private static final String        PROPERTY_LAST_USED_SINGLE_FILE_URL                  = "last_used_single_file_url";
-    public static final String         PROPERTY_FILENAME_FROM_ALBUM                        = "filename_from_album";
-    public static final String         PROPERTY_PARSED_FILESIZE                            = "parsed_filesize";
+    private static final String  PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
+    private static final String  PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
+    private static final String  PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL = "last_grabbed_image_fullsize_view_directurl";
+    private static final String  PROPERTY_LAST_USED_SINGLE_FILE_URL                  = "last_used_single_file_url";
+    public static final String   PROPERTY_FILENAME_FROM_ALBUM                        = "filename_from_album";
+    public static final String   PROPERTY_PARSED_FILESIZE                            = "parsed_filesize";
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {

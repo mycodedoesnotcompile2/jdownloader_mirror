@@ -26,15 +26,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -56,7 +47,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 51005 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,27 +83,27 @@ public class SankakucomplexCom extends PluginForHost {
         br.setCookie(host, "v", "0");
     }
 
-    private static final boolean       ACCESS_MODE_AUTO_PREFER_API_MODE      = false;
-    public static final String         PROPERTY_UPLOADER                     = "uploader";
-    public static final String         PROPERTY_DIRECTURL                    = "directurl";
-    public static final String         PROPERTY_DIRECTURL_FILENAME           = "directurl_filename";
-    public static final String         PROPERTY_BOOK_TITLE                   = "book_title";
-    public static final String         PROPERTY_TAGS_COMMA_SEPARATED         = "tags_comma_separated";
-    public static final String         PROPERTY_IS_PREMIUMONLY               = "is_premiumonly";
-    public static final String         PROPERTY_POSITION_NUMBER              = "position_number";
-    public static final String         PROPERTY_PAGE_NUMBER                  = "page_number";
-    public static final String         PROPERTY_PAGE_NUMBER_MAX              = "page_number_max";
-    public static final String         PROPERTY_SOURCE                       = "source";
-    public static final String         PROPERTY_DATE_PUBLISHED               = "date_published";
+    private static final boolean ACCESS_MODE_AUTO_PREFER_API_MODE      = false;
+    public static final String   PROPERTY_UPLOADER                     = "uploader";
+    public static final String   PROPERTY_DIRECTURL                    = "directurl";
+    public static final String   PROPERTY_DIRECTURL_FILENAME           = "directurl_filename";
+    public static final String   PROPERTY_BOOK_TITLE                   = "book_title";
+    public static final String   PROPERTY_TAGS_COMMA_SEPARATED         = "tags_comma_separated";
+    public static final String   PROPERTY_IS_PREMIUMONLY               = "is_premiumonly";
+    public static final String   PROPERTY_POSITION_NUMBER              = "position_number";
+    public static final String   PROPERTY_PAGE_NUMBER                  = "page_number";
+    public static final String   PROPERTY_PAGE_NUMBER_MAX              = "page_number_max";
+    public static final String   PROPERTY_SOURCE                       = "source";
+    public static final String   PROPERTY_DATE_PUBLISHED               = "date_published";
     /* Contains file extension hint. */
-    public static final String         PROPERTY_EXT_HINT                     = "ext_hint";
-    private final String               TIMESTAMP_LAST_TIME_FILE_MAYBE_BROKEN = "timestamp_last_time_file_maybe_broken";
-    private static final String        PROPERTY_ACCOUNT_ACCESS_TOKEN         = "access_token";
+    public static final String   PROPERTY_EXT_HINT                     = "ext_hint";
+    private final String         TIMESTAMP_LAST_TIME_FILE_MAYBE_BROKEN = "timestamp_last_time_file_maybe_broken";
+    private static final String  PROPERTY_ACCOUNT_ACCESS_TOKEN         = "access_token";
     /* 2024-04-26: Refresh-token is currently not used. */
-    private static final String        PROPERTY_ACCOUNT_REFRESH_TOKEN        = "refresh_token";
+    private static final String  PROPERTY_ACCOUNT_REFRESH_TOKEN        = "refresh_token";
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning                           = new AtomicInteger(0);
-    private static final AtomicInteger premiumRunning                        = new AtomicInteger(0);
+    private static AtomicInteger freeRunning                           = new AtomicInteger(0);
+    private static AtomicInteger premiumRunning                        = new AtomicInteger(0);
 
     @Override
     public String getAGBLink() {
@@ -465,8 +465,8 @@ public class SankakucomplexCom extends PluginForHost {
 
     private static void prepareDownloadHeaders(final Browser br) {
         /**
-         * 2024-11-12: Do not send a referer header! </br>
-         * This is really important else we may get redirected to a dummy image. Looks to be some kind of pseudo protection.
+         * 2024-11-12: Do not send a referer header! </br> This is really important else we may get redirected to a dummy image. Looks to be
+         * some kind of pseudo protection.
          */
         br.getHeaders().put("Referer", "");
         // br.setCurrentURL(null);
@@ -496,8 +496,8 @@ public class SankakucomplexCom extends PluginForHost {
         final String errortext = "Broken or temporarily unavailable file";
         if (System.currentTimeMillis() - timestampLastTimeFileMaybeBroken <= 5 * 60 * 1000l) {
             /**
-             * Failed again in a short time even with fresh direct URL: </br>
-             * Wait longer time before retry as we've just recently tried and it failed again.
+             * Failed again in a short time even with fresh direct URL: </br> Wait longer time before retry as we've just recently tried and
+             * it failed again.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext, 5 * 60 * 1000l);
         } else {

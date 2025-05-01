@@ -20,13 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -42,7 +35,14 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 50517 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,13 +62,13 @@ public class JpgChurch extends PluginForHost {
         return 1;
     }
 
-    private String                     dllink             = null;
-    private final String               PROPERTY_USER      = "user";
-    public static final String         PROPERTY_PHPSESSID = "phpsessid";
+    private String               dllink             = null;
+    private final String         PROPERTY_USER      = "user";
+    public static final String   PROPERTY_PHPSESSID = "phpsessid";
     /* Position of item if added as part of album (starts from 1). */
-    public static final String         PROPERTY_POSITION  = "position";
+    public static final String   PROPERTY_POSITION  = "position";
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning        = new AtomicInteger(0);
+    private static AtomicInteger freeRunning        = new AtomicInteger(0);
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();

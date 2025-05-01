@@ -28,24 +28,6 @@ import java.util.Map.Entry;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.RapidGatorConfig;
-import org.jdownloader.plugins.components.config.RapidGatorConfig.PremiumDownloadBehaviorForSubscriberOnlyFiles;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
@@ -70,7 +52,25 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51026 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.RapidGatorConfig;
+import org.jdownloader.plugins.components.config.RapidGatorConfig.PremiumDownloadBehaviorForSubscriberOnlyFiles;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
+
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -128,29 +128,29 @@ public class RapidGatorNet extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    private final int                  API_SESSION_ID_REFRESH_TIMEOUT_MINUTES      = 45;
+    private final int                API_SESSION_ID_REFRESH_TIMEOUT_MINUTES      = 45;
     /*
      * 2020-01-07: Use 120 minutes for the website login for now. Consider disabling this on negative feedback as frequent website logins
      * may lead to login-captchas!
      */
-    private final int                  WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES  = 120;
-    private static Map<String, Long>   blockedIPsMap                               = new HashMap<String, Long>();
-    private final String               PROPERTY_LAST_BLOCKED_IPS_MAP               = "rapidgatornet__last_blockedIPsMap";
-    private final String               PROPERTY_LAST_DOWNLOAD_STARTED_TIMESTAMP    = "rapidgatornet__last_download_started_timestamp";
-    private final String               PROPERTY_sessionid                          = "session_id";
-    private final String               PROPERTY_timestamp_session_create_api       = "session_create";
-    private final String               PROPERTY_timestamp_session_create_website   = "session_create_website";
-    private final String               PROPERTY_HOTLINK                            = "HOTLINK";
+    private final int                WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES  = 120;
+    private static Map<String, Long> blockedIPsMap                               = new HashMap<String, Long>();
+    private final String             PROPERTY_LAST_BLOCKED_IPS_MAP               = "rapidgatornet__last_blockedIPsMap";
+    private final String             PROPERTY_LAST_DOWNLOAD_STARTED_TIMESTAMP    = "rapidgatornet__last_download_started_timestamp";
+    private final String             PROPERTY_sessionid                          = "session_id";
+    private final String             PROPERTY_timestamp_session_create_api       = "session_create";
+    private final String             PROPERTY_timestamp_session_create_website   = "session_create_website";
+    private final String             PROPERTY_HOTLINK                            = "HOTLINK";
     /* 2019-12-12: Lowered from 2 to 1 hour */
-    private final long                 FREE_RECONNECTWAIT_GENERAL_MILLIS           = 1 * 60 * 60 * 1001L;
-    private final long                 FREE_RECONNECTWAIT_DAILYLIMIT_MILLIS        = 3 * 60 * 60 * 1000L;
-    private final long                 FREE_RECONNECTWAIT_OTHERS_MILLIS            = 30 * 60 * 1000L;
-    private final long                 FREE_RECONNECTWAIT_BETWEEN_DOWNLOADS_MILLIS = 2 * 60 * 60 * 1000L;
-    private final int                  FREE_CAPTCHA_EXPIRE_TIME_MILLIS             = 105 * 1000;
+    private final long               FREE_RECONNECTWAIT_GENERAL_MILLIS           = 1 * 60 * 60 * 1001L;
+    private final long               FREE_RECONNECTWAIT_DAILYLIMIT_MILLIS        = 3 * 60 * 60 * 1000L;
+    private final long               FREE_RECONNECTWAIT_OTHERS_MILLIS            = 30 * 60 * 1000L;
+    private final long               FREE_RECONNECTWAIT_BETWEEN_DOWNLOADS_MILLIS = 2 * 60 * 60 * 1000L;
+    private final int                FREE_CAPTCHA_EXPIRE_TIME_MILLIS             = 105 * 1000;
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning                                 = new AtomicInteger(0);
-    private static final String        PROPERTY_LAST_USED_CAPTCHA_TYPE             = "last_used_captcha_type";
-    private static final String        CAPTCHA_TYPE_RECAPTCHA                      = "recaptcha";
+    private static AtomicInteger     freeRunning                                 = new AtomicInteger(0);
+    private static final String      PROPERTY_LAST_USED_CAPTCHA_TYPE             = "last_used_captcha_type";
+    private static final String      CAPTCHA_TYPE_RECAPTCHA                      = "recaptcha";
 
     @Override
     public String getAGBLink() {
@@ -308,8 +308,8 @@ public class RapidGatorNet extends PluginForHost {
         try {
             if (this.looksLikeDownloadableContent(con)) {
                 /**
-                 * Looks like direct-downloadable item. </br>
-                 * Either we're logged in as a premium user or this item was made hot-linked by a premium user.
+                 * Looks like direct-downloadable item. </br> Either we're logged in as a premium user or this item was made hot-linked by a
+                 * premium user.
                  */
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
@@ -449,10 +449,9 @@ public class RapidGatorNet extends PluginForHost {
                 }
                 if (finalDownloadURL != null) {
                     /**
-                     * Premium downloadlink found! </br>
-                     * This does not mean that the user owns a premium account. It can also mean that this is a subscription-only file and
-                     * the user owns the needed subscription. </br>
-                     * The maps down below help us to determine the resumeability of such items.
+                     * Premium downloadlink found! </br> This does not mean that the user owns a premium account. It can also mean that this
+                     * is a subscription-only file and the user owns the needed subscription. </br> The maps down below help us to determine
+                     * the resumeability of such items.
                      */
                     logger.info("Premium account or active subscription");
                     if (account != null) {
@@ -520,9 +519,8 @@ public class RapidGatorNet extends PluginForHost {
                 if (cfg.isEnableFreeDownloadModeCaptchaDuringPreDownloadWait() && lastUsedCaptchaType != null) {
                     /**
                      * 2023-10-03: A small trick: We know their captcha key and can thus always obtain captcha solutions at any point of
-                     * time. </br>
-                     * Requesting the captcha here basically allows us to solve it during the serverside wait time which is impossible to do
-                     * in browser.
+                     * time. </br> Requesting the captcha here basically allows us to solve it during the serverside wait time which is
+                     * impossible to do in browser.
                      */
                     final long timeBeforeCaptchaInput = Time.systemIndependentCurrentJVMTimeMillis();
                     if (CAPTCHA_TYPE_RECAPTCHA.equals(lastUsedCaptchaType)) {
@@ -668,8 +666,8 @@ public class RapidGatorNet extends PluginForHost {
                 link.setResumeable(false);
             }
             /**
-             * Save timestamp when download was started. </br>
-             * Serverside wait time until next download can be started counts from beginning of first/last download.
+             * Save timestamp when download was started. </br> Serverside wait time until next download can be started counts from beginning
+             * of first/last download.
              */
             if (currentIP != null) {
                 synchronized (blockedIPsMap) {
@@ -733,11 +731,10 @@ public class RapidGatorNet extends PluginForHost {
     public int getChallengeTimeout(Challenge<?> challenge) {
         /**
          * If users need more than X seconds to enter the captcha [in free download mode before final download-step] and we actually send
-         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br>
-         * RG will first display a precise errormessage but then it will display the same message which is displayed when the user has
-         * reached the daily/hourly download-limit. </br>
-         * This function exists to avoid this. Instead of sending the captcha it can throw a retry exception, avoiding the 60+ minutes IP
-         * 'ban'.
+         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br> RG will
+         * first display a precise errormessage but then it will display the same message which is displayed when the user has reached the
+         * daily/hourly download-limit. </br> This function exists to avoid this. Instead of sending the captcha it can throw a retry
+         * exception, avoiding the 60+ minutes IP 'ban'.
          */
         if (useShortChallengeTimeoutToAvoidServersideBan) {
             return FREE_CAPTCHA_EXPIRE_TIME_MILLIS;
@@ -1111,8 +1108,7 @@ public class RapidGatorNet extends PluginForHost {
                     if (br.containsHTML(">\\s*Invalid auth code")) {
                         /**
                          * 2FA code required or previously entered code is invalid. This also means that the users' login credentials are
-                         * valid. </br>
-                         * Ask user for 2FA login code in next round.
+                         * valid. </br> Ask user for 2FA login code in next round.
                          */
                         logger.info("2FA code needed");
                         accountRequires2FALoginCode = true;
@@ -1609,8 +1605,8 @@ public class RapidGatorNet extends PluginForHost {
     /**
      * Returns error message for files that require the user to be subscribed to a specific uploader to be able to download them. <br>
      *
-     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
-     * This can be the same as when "isBuyFile()" returns true but with a more detailed error message.
+     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br> This can be the
+     * same as when "isBuyFile()" returns true but with a more detailed error message.
      */
     private String getErrormessageSubscriberOnlyDownload(final Browser br) {
         return br.getRegex("(The files of this publisher \"[^\"<>]+\" can be downloaded only by subscribers\\.)").getMatch(0);
@@ -1667,11 +1663,11 @@ public class RapidGatorNet extends PluginForHost {
         if (br.containsHTML("id=\"exceeded_storage\"")) {
             /**
              * 2024-10-31: <br>
-             * Your storage space is full. Delete some files or upgrade to the new
-             * <a href="/article/premium" style="color: #ff801a;">storage plan</a>.<br>
+             * Your storage space is full. Delete some files or upgrade to the new <a href="/article/premium"
+             * style="color: #ff801a;">storage plan</a>.<br>
              * It looks like this error can happen even when a user is not logged in. At this moment we just assume that this means that the
-             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br>
-             * This could also be a fake message which they display whenever the user tried to use a blocked proxy/VPN.
+             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br> This could also be a fake message
+             * which they display whenever the user tried to use a blocked proxy/VPN.
              *
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Uploaders' storage is full. Wait until uploader buys more traffic to download this file");

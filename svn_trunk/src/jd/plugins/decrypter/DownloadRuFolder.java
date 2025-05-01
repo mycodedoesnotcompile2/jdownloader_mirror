@@ -26,6 +26,7 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -36,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DownloadRu;
 
-@DecrypterPlugin(revision = "$Revision: 51028 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51029 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { DownloadRu.class })
 public class DownloadRuFolder extends PluginForDecrypt {
     public DownloadRuFolder(PluginWrapper wrapper) {
@@ -80,7 +81,9 @@ public class DownloadRuFolder extends PluginForDecrypt {
         br.getHeaders().put("Referer", param.getCryptedUrl());
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         br.getPage("https://" + getHost() + "/folders/" + folder_id + ".json");
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            throw new AccountRequiredException();
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);

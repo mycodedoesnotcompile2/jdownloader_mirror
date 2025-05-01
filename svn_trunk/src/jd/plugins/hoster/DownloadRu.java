@@ -30,6 +30,7 @@ import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account.AccountType;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -37,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51028 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51029 $", interfaceVersion = 3, names = {}, urls = {})
 public class DownloadRu extends PluginForHost {
     public DownloadRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +108,15 @@ public class DownloadRu extends PluginForHost {
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         /* 2020-09-25: Their website can be used like an API. Their official API is broken or not yet usable: https://download.ru/api */
         br.getPage("https://" + this.getHost() + "/files/" + this.getFID(link) + ".json");
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        final PluginEnvironment pe = this.getPluginEnvironment();
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            /* Item is online but account is required to download it */
+            /* {"code":403,"reason":"permission_denied","message":"Permission denied"} */
+            if (pe != PluginEnvironment.LINK_CHECK) {
+                throw new AccountRequiredException();
+            }
+            return AvailableStatus.TRUE;
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
             /* 2020-09-25: E.g. {"code":404,"reason":"file","message":"File not found."} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.TorboxApp;
 
-@DecrypterPlugin(revision = "$Revision: 51023 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51030 $", interfaceVersion = 3, names = {}, urls = {})
 public class TorboxAppCrawler extends PluginForDecrypt {
     public TorboxAppCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +83,7 @@ public class TorboxAppCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account == null) {
-            /* Account required to access any torbox.app content */
+            /* Account required to access any torbox.app selfhosted content! */
             throw new AccountRequiredException();
         }
         final TorboxApp hosterplugin = (TorboxApp) this.getNewPluginForHostInstance(this.getHost());
@@ -91,13 +91,11 @@ public class TorboxAppCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
         final String dl_id = query.get("id");
         final String dl_type = query.get("type");
         // final String dl_name = query.get("name");
-        List<Map<String, Object>> files = null;
-        Map<String, Object> data = null;
+        final Map<String, Object> data;
         if (dl_type.equalsIgnoreCase("torrents")) {
             final Request req = br.createGetRequest(TorboxApp.API_BASE + "/torrents/mylist?" + query.toString());
             data = (Map<String, Object>) hosterplugin.callAPI(br, req, account, null);
@@ -108,16 +106,18 @@ public class TorboxAppCrawler extends PluginForDecrypt {
             final Request req = br.createGetRequest(TorboxApp.API_BASE + "/usenet/mylist?" + query.toString());
             data = (Map<String, Object>) hosterplugin.callAPI(br, req, account, null);
         } else {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported type");
+            /* This should never happen */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported type: " + dl_type);
         }
-        files = (List<Map<String, Object>>) data.get("files");
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final List<Map<String, Object>> files = (List<Map<String, Object>>) data.get("files");
         for (final Map<String, Object> file : files) {
             final String filename = file.get("short_name").toString();
             final String md5 = (String) file.get("md5");
             final String internalName = file.get("name").toString();
             /* Remove filename from path */
             String path = internalName.replaceFirst("/" + Pattern.quote(filename) + "$", "");
-            final DownloadLink link = this.createDownloadlink("https://dummy.link.todo/" + file.get("name") + ".jdeatme");
+            final DownloadLink link = this.createDownloadlink("https://dummy.link/" + file.get("name"));
             link.setHost(hosterplugin.getHost());
             link.setDefaultPlugin(hosterplugin);
             link.setProperty(TorboxApp.PROPERTY_DOWNLOAD_TYPE, dl_type);

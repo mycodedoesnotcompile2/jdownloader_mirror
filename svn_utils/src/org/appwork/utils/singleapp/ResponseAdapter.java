@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.singleapp;
 
+import java.net.SocketAddress;
+
 /**
  * @author thomas
  * @date 27.03.2023
@@ -43,13 +45,13 @@ public abstract class ResponseAdapter implements ResponseListener {
      * @see org.appwork.utils.singleapp.ResponseListener#onConnected(java.lang.String[])
      */
     @Override
-    public void onConnected(String[] message) {        
+    public void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] message) {        
     }
 
     /* (non-Javadoc)
      * @see org.appwork.utils.singleapp.ResponseListener#onReceivedResponse(org.appwork.utils.singleapp.Response)
      */
     @Override
-    public void onReceivedResponse(Response r) {        
+    public void onReceivedResponse(SingleAppInstance instance, Response r) {        
     }
 }

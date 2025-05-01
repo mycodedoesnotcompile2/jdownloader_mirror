@@ -964,9 +964,10 @@ public class Browser {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
+     * 
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1779,8 +1780,8 @@ public class Browser {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
-     * facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
+     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request != null) {
@@ -2438,7 +2439,8 @@ public class Browser {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br>
+     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2583,7 +2585,8 @@ public class Browser {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br> To be called after a sent request.
+     * Checks for block by firewalls and similar. </br>
+     * To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (this.getThrowExceptionOnBlockedBy(request)) {
@@ -2607,47 +2610,45 @@ public class Browser {
         final HTTPConnection con;
         if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
             return null;
-        } else {
-            // final boolean isCloudflareHeaderCfRayExistent = req.getResponseHeader("cf-ray") != null;
-            final boolean isCloudflareServer = StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare");
-            final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 522 || con.getResponseCode() == 523;
-            // TODO: Add better Cloudflare detection (more/better html snippets)
-            // TODO: Add separate BlockedType for Cloudflare-Captcha, see: https://svn.jdownloader.org/issues/90281
-            /**
-             * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-             * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
-             */
-            /*
-             * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login ->
-             * Cloudflare check without html --> Fails!
-             */
-            if (isCloudflareServer && isTypicalCloudflareResponseCode) {
-                final boolean isCloudflareChallengeHTML = request.containsHTML("(?i)<title>\\s*Attention Required!(\\s*\\| Cloudflare)?\\s*</title>") || request.containsHTML("data-translate=\"challenge_headline\"") || request.containsHTML("<title>\\s*Just a moment\\.*\\s*</title>") && request.containsHTML("<form id\\s*=\\s*\"challenge-form\"");
-                final boolean isCloudflareOtherHTML = request.containsHTML("(?i)<title>\\s*Access denied\\s*\\| [^<]* used Cloudflare to restrict access\\s*</title>") || request.containsHTML("class\\s*=\\s*\"(ray-id|cf-error-title)\"") || request.containsHTML("(class|id)\\s*=\\s*\"cf-error-details\"") || request.containsHTML("window\\._cf_chl_opt");
-                if (isCloudflareChallengeHTML || isCloudflareOtherHTML) {
-                    String errorCode = request.getRegex("<span class\\s*=\\s*\"(?:cf-)?code-label\"\\s*>\\s*Error code\\s*(?:<span>)?(\\d+)(?:</span>)?\\s*</span>").getMatch(0);
+        }
+        // final boolean isCloudflareHeaderCfRayExistent = req.getResponseHeader("cf-ray") != null;
+        final boolean isCloudflareServer = StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare");
+        final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 522 || con.getResponseCode() == 523;
+        /**
+         * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
+         * Cloudflare block happens. </br>
+         * I've just added code 502 to the list of "Cloudflare response-codes".
+         */
+        /*
+         * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login -> Cloudflare
+         * check without html --> Fails!
+         */
+        if (isCloudflareServer && isTypicalCloudflareResponseCode) {
+            final boolean isCloudflareChallengeHTML = request.containsHTML("(?i)<title>\\s*Attention Required!(\\s*\\| Cloudflare)?\\s*</title>") || request.containsHTML("data-translate=\"challenge_headline\"") || request.containsHTML("<title>\\s*Just a moment\\.*\\s*</title>") && request.containsHTML("<form id\\s*=\\s*\"challenge-form\"");
+            final boolean isCloudflareOtherHTML = request.containsHTML("(?i)<title>\\s*Access denied\\s*\\| [^<]* used Cloudflare to restrict access\\s*</title>") || request.containsHTML("class\\s*=\\s*\"(ray-id|cf-error-title)\"") || request.containsHTML("(class|id)\\s*=\\s*\"cf-error-details\"") || request.containsHTML("window\\._cf_chl_opt");
+            if (isCloudflareChallengeHTML || isCloudflareOtherHTML) {
+                String errorCode = request.getRegex("<span class\\s*=\\s*\"(?:cf-)?code-label\"\\s*>\\s*Error code\\s*(?:<span>)?(\\d+)(?:</span>)?\\s*</span>").getMatch(0);
+                if (errorCode == null) {
+                    errorCode = request.getRegex("cloudflare\\.com[^\"]*\\?utm_source=(\\d+)_error").getMatch(0);
                     if (errorCode == null) {
-                        errorCode = request.getRegex("cloudflare\\.com[^\"]*\\?utm_source=(\\d+)_error").getMatch(0);
+                        errorCode = request.getRegex("cloudflare\\.com[^\"]*\\?utm_source=errorcode_(\\d+)").getMatch(0);
                         if (errorCode == null) {
-                            errorCode = request.getRegex("cloudflare\\.com[^\"]*\\?utm_source=errorcode_(\\d+)").getMatch(0);
-                            if (errorCode == null) {
-                                errorCode = request.getRegex("(?i)<p>Error code\\s*:\\s*(\\d+)</p>").getMatch(0);
-                            }
+                            errorCode = request.getRegex("(?i)<p>Error code\\s*:\\s*(\\d+)</p>").getMatch(0);
                         }
                     }
-                    /* 2023-06-06: This is only a text output. Do not use the errormessage/text for anything else at this moment!! */
-                    final String errorText = request.getRegex("<h1[^>]*>\\s*(.*?)\\s*</h1>").getMatch(0);
-                    browser.getLogger().info("Cloudflare parsed errormessage: " + errorText);
-                    if (errorCode != null) {
-                        if (errorCode.matches("5\\d{2}")) {
-                            /* e.g. 502 */
-                            return CloudflareBlockedType.CLOUDFLARE_SITE_OFFLINE;
-                        } else if ("1020".equals(errorCode)) {
-                            return CloudflareBlockedType.CLOUDFLARE_IP_BLOCK;
-                        }
-                    }
-                    return CloudflareBlockedType.CLOUDFLARE_SITE;
                 }
+                /* 2023-06-06: This is only a text output. Do not use the errormessage/text for anything else at this moment!! */
+                final String errorText = request.getRegex("<h1[^>]*>\\s*(.*?)\\s*</h1>").getMatch(0);
+                browser.getLogger().info("Cloudflare parsed errormessage: " + errorText);
+                if (errorCode != null) {
+                    if (errorCode.matches("5\\d{2}")) {
+                        /* e.g. 502 */
+                        return CloudflareBlockedType.CLOUDFLARE_SITE_OFFLINE;
+                    } else if ("1020".equals(errorCode)) {
+                        return CloudflareBlockedType.CLOUDFLARE_IP_BLOCK;
+                    }
+                }
+                return CloudflareBlockedType.CLOUDFLARE_SITE;
             }
         }
         return null;
@@ -2657,12 +2658,11 @@ public class Browser {
         final HTTPConnection con;
         if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
             return null;
-        } else {
-            final boolean isCloudflareServer = StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare");
-            if (isCloudflareServer && !con.isOK()) {
-                con.setAllowedResponseCodes(Browser.buildAllowedResponseCodes(con.getAllowedResponseCodes(), con.getResponseCode()));
-                return Boolean.TRUE;
-            }
+        }
+        final boolean isCloudflareServer = StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare");
+        if (isCloudflareServer && !con.isOK()) {
+            con.setAllowedResponseCodes(Browser.buildAllowedResponseCodes(con.getAllowedResponseCodes(), con.getResponseCode()));
+            return Boolean.TRUE;
         }
         return null;
     }
@@ -3139,8 +3139,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {
@@ -3267,6 +3267,45 @@ public class Browser {
             public Boolean prepareBlockDetection(Browser browser, Request request) {
                 return null;
             }
+        },
+        AMAZON_AWS_WAF_WEB_APPLICATION_FIREWALL {
+            @Override
+            public String getLabel() {
+                return "Amazon AWS Web Application Firewall";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                }
+                if (con.getResponseCode() == 202 && request.getResponseHeader("x-amzn-waf-action") != null && StringUtils.containsIgnoreCase(request.getResponseHeader("server"), "awselb")) {
+                    /**
+                     * Typical reaponse-headers: <br>
+                     * Server: awselb/2.0 <br>
+                     * x-amzn-waf-action: challenge <br>
+                     * Access-Control-Allow-Headers: x-amzn-waf-action
+                     */
+                    return this;
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
         }
     }
 
@@ -3284,8 +3323,8 @@ public class Browser {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
-     * https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
+     * See also: https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

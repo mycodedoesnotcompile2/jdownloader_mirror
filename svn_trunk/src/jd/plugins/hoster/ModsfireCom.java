@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -44,7 +38,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50515 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModsfireCom extends PluginForHost {
     public ModsfireCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +88,7 @@ public class ModsfireCom extends PluginForHost {
     }
 
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning = new AtomicInteger(0);
+    private static AtomicInteger freeRunning = new AtomicInteger(0);
 
     @Override
     public String getLinkID(final DownloadLink link) {

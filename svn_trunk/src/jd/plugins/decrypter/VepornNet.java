@@ -37,10 +37,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 50190 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51029 $", interfaceVersion = 3, names = {}, urls = {})
 public class VepornNet extends PluginForDecrypt {
     public VepornNet(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -79,14 +86,13 @@ public class VepornNet extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String urlSlug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        final String url = param.getCryptedUrl().replaceFirst("https?://m\\.", "https://www.");
-        br.setFollowRedirects(true);
-        br.getPage(url);
+        final String contenturl = param.getCryptedUrl().replaceFirst("https?://m\\.", "https://www.");
+        br.getPage(contenturl);
         final String rateLimitRegex = "(?i)>\\s*Site is too crowded\\s*<";
         if (br.containsHTML(rateLimitRegex)) {
             for (int i = 1; i <= 3; i++) {
                 sleep(i * 3 * 1001l, param);
-                br.getPage(url);
+                br.getPage(contenturl);
                 if (!br.containsHTML(rateLimitRegex)) {
                     break;
                 }
@@ -151,8 +157,9 @@ public class VepornNet extends PluginForDecrypt {
                 counter++;
             }
         }
+        title = Encoding.htmlDecode(title).trim();
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(Encoding.htmlDecode(title).trim());
+        fp.setName(title);
         fp.addLinks(ret);
         return ret;
     }

@@ -134,7 +134,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#getIconHeight()
          */
         @Override
@@ -144,7 +144,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#getIconWidth()
          */
         @Override
@@ -154,7 +154,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.swing.components.IdentifierInterface#toIdentifier()
          */
         @Override
@@ -176,7 +176,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
@@ -554,7 +554,7 @@ public class IconIO {
         if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
             if (getSvgFactory() != null) {
                 try {
-                    InputStream is = resource.openStream();
+                    final InputStream is = resource.openStream();
                     try {
                         return getSvgFactory().getIconFromSVG(is, null, w, h, null);
                     } finally {

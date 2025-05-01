@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.singleapp;
 
+import java.net.SocketAddress;
+
 /**
  * @author thomas
  * @date 27.03.2023
@@ -40,12 +42,15 @@ package org.appwork.utils.singleapp;
  */
 public interface ResponseListener {
     /**
+     * @param instance TODO
+     * @param remoteSocket TODO
      * @param message
      */
-    void onConnected(String[] message);
+    void onConnected(SingleAppInstance instance, SocketAddress remoteSocket, String[] message);
 
     /**
+     * @param instance TODO
      * @param r
      */
-    void onReceivedResponse(Response r);
+    void onReceivedResponse(SingleAppInstance instance, Response r);
 }

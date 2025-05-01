@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
@@ -34,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49004 $", interfaceVersion = 2, names = { "eltrecetv.com.ar" }, urls = { "https?://(?:www\\.)?eltrecetv\\.com\\.ar/.+\\d+/?$" })
+@HostPlugin(revision = "$Revision: 51029 $", interfaceVersion = 2, names = { "eltrecetv.com.ar" }, urls = { "https?://(?:www\\.)?eltrecetv\\.com\\.ar/.+\\d+/?$" })
 public class EltrecetvComAr extends PluginForHost {
     public EltrecetvComAr(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +56,8 @@ public class EltrecetvComAr extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private String hlsurl = null;
+    private String hls_url    = null;
+    private String hls_master = null;
 
     protected String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), "(\\d+)/?$").getMatch(0);
@@ -78,7 +80,7 @@ public class EltrecetvComAr extends PluginForHost {
         if (!link.isNameSet() && fid != null) {
             link.setName(fid + extDefault);
         }
-        hlsurl = null;
+        hls_url = null;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
@@ -94,9 +96,14 @@ public class EltrecetvComAr extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            hlsurl = (String) entries.get("m3u8_url");
-            if (StringUtils.isEmpty(hlsurl)) {
-                hlsurl = (String) JavaScriptEngineFactory.walkJson(entries, "sources/{0}/src");
+            final List<Object> qualities_array = (List<Object>) entries.get("qualities_array");
+            if (qualities_array != null && qualities_array.size() > 0) {
+                /* First item = Best quality */
+                hls_url = (String) JavaScriptEngineFactory.walkJson(qualities_array, "{0}/src");
+            }
+            hls_master = (String) JavaScriptEngineFactory.walkJson(entries, "sources/{0}/src");
+            if (StringUtils.isEmpty(hls_master)) {
+                hls_master = (String) entries.get("m3u8_url");
             }
             title = entries.get("video_name").toString();
         } else {
@@ -113,7 +120,7 @@ public class EltrecetvComAr extends PluginForHost {
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             /* 2021-09-15: HTTP stream is also available but only in lower quality 480p. */
-            this.hlsurl = JavaScriptEngineFactory.walkJson(entries, "sources/{0}/src").toString();
+            this.hls_url = JavaScriptEngineFactory.walkJson(entries, "sources/{0}/src").toString();
             title = entries.get("video_name").toString();
         }
         if (title != null && subtitle != null) {
@@ -140,13 +147,16 @@ public class EltrecetvComAr extends PluginForHost {
 
     private void download(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        if (StringUtils.isEmpty(hlsurl)) {
+        if (StringUtils.isEmpty(hls_url) && StringUtils.isEmpty(hls_master)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.getPage(hlsurl);
-        final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+        if (StringUtils.isEmpty(hls_url)) {
+            br.getPage(hls_master);
+            final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+            hls_url = hlsbest.getDownloadurl();
+        }
         checkFFmpeg(link, "Download a HLS Stream");
-        dl = new HLSDownloader(link, br, hlsbest.getDownloadurl());
+        dl = new HLSDownloader(link, br, hls_url);
         dl.startDownload();
     }
 

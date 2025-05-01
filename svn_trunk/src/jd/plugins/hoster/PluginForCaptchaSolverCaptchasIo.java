@@ -9,20 +9,20 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51033 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
-public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
+@HostPlugin(revision = "$Revision: 51033 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
 
-    public PluginForCaptchaSolverTwoCaptcha(PluginWrapper wrapper) {
+    public PluginForCaptchaSolverCaptchasIo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
     public String getBuyPremiumUrl() {
-        return "https://2captcha.com?from=15779444";
+        return "https://app." + getHost() + "/clients/v2/packages";
     }
 
     @Override
@@ -35,9 +35,9 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
-        types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
+        // types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
-        types.add(CAPTCHA_TYPE.MT_CAPTCHA);
+        // types.add(CAPTCHA_TYPE.MT_CAPTCHA);
         return types;
     }
 
@@ -47,7 +47,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
 
     @Override
     public String getAGBLink() {
-        return "https://" + getHost() + "/terms-of-service";
+        return "https://" + getHost() + "/agreement";
     }
 
     @Override
@@ -55,11 +55,11 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         if (str == null) {
             return false;
         }
-        return str.matches("[a-f0-9]{32}");
+        return str.matches("[a-f0-9-.]{32}");
     }
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + getHost() + "/enterpage";
+        return "https://app." + getHost() + "/clients/v2/index";
     }
 }

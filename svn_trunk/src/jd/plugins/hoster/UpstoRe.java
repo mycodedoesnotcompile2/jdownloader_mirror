@@ -25,15 +25,6 @@ import java.util.Map.Entry;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.components.config.UpstoReConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
 import jd.http.Browser;
@@ -53,7 +44,16 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.components.config.UpstoReConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,12 +105,12 @@ public class UpstoRe extends antiDDoSForHost {
     }
 
     /* Constants (limits) */
-    private static final long          FREE_RECONNECTWAIT            = 1 * 60 * 60 * 1000L;
-    private static final long          FREE_RECONNECTWAIT_ADDITIONAL = 60 * 1000l;
-    private static Map<String, Long>   blockedIPsMap                 = new HashMap<String, Long>();
-    private static final String        PROPERTY_last_blockedIPsMap   = "UPSTORE_last_blockedIPsMap";
+    private static final long        FREE_RECONNECTWAIT            = 1 * 60 * 60 * 1000L;
+    private static final long        FREE_RECONNECTWAIT_ADDITIONAL = 60 * 1000l;
+    private static Map<String, Long> blockedIPsMap                 = new HashMap<String, Long>();
+    private static final String      PROPERTY_last_blockedIPsMap   = "UPSTORE_last_blockedIPsMap";
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning                   = new AtomicInteger(0);
+    private static AtomicInteger     freeRunning                   = new AtomicInteger(0);
 
     @Override
     public String getLinkID(final DownloadLink link) {

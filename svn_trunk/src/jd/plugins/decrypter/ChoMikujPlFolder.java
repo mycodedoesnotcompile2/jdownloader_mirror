@@ -49,7 +49,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.ChoMikujPl;
 
-@DecrypterPlugin(revision = "$Revision: 47418 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
+@DecrypterPlugin(revision = "$Revision: 51030 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
 public class ChoMikujPlFolder extends PluginForDecrypt {
     public ChoMikujPlFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -330,7 +330,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         }
         String subfolderStructure = br.getRegex("value=\"https?://[^/]+/([^\"]+)\"[^>]*id=\"FolderAddress\"").getMatch(0);
         final PluginForHost hosterPlugin = this.getNewPluginForHostInstance(this.getHost());
-        final boolean decryptFolders = hosterPlugin.getPluginConfig().getBooleanProperty(ChoMikujPl.DECRYPTFOLDERS, false);
+        final boolean decryptFolders = hosterPlugin.getPluginConfig().getBooleanProperty(ChoMikujPl.CRAWL_SUBFOLDERS, ChoMikujPl.default_CRAWL_SUBFOLDERS);
         String[][] allFolders = null;
         FilePackage fp = null;
         if (subfolderStructure != null) {

@@ -424,12 +424,12 @@ public class SingleAppInstance {
                 if (message == null || message.length == 0) {
                     this.writeLine(chunkedOut, "0");
                     if (callback != null) {
-                        callback.onConnected(message);
+                        callback.onConnected(this, socket.getRemoteSocketAddress(), message);
                     }
                 } else {
                     this.writeLine(chunkedOut, message.length + "");
                     if (callback != null) {
-                        callback.onConnected(message);
+                        callback.onConnected(this, socket.getRemoteSocketAddress(), message);
                     }
                     for (final String msg : message) {
                         this.writeLine(chunkedOut, msg);
@@ -515,7 +515,7 @@ public class SingleAppInstance {
                 clientIDOK = true;
                 continue;
             } else if (callback != null) {
-                callback.onReceivedResponse(response);
+                callback.onReceivedResponse(this, response);
             }
         }
         if (exception != null) {
@@ -683,7 +683,7 @@ public class SingleAppInstance {
                     listener.onIncommingMessage(new ResponseSender() {
                         @Override
                         public void sendResponse(final Response response) {
-                            responseListener.onReceivedResponse(response);
+                            responseListener.onReceivedResponse(SingleAppInstance.this, response);
                         }
                     }, message);
                 }

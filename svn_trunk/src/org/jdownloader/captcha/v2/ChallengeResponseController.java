@@ -329,19 +329,24 @@ public class ChallengeResponseController {
             final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
             final HashSet<String> unavailableSolverDomains = new HashSet<String>();
             for (final Account solverAccount : solverAccounts) {
+                boolean success = false;
                 try {
                     final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
                     final PluginChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
                     if (solver == null) {
                         /* E.g. solver cannot handle challenge it gets presented */
-                        unavailableSolverDomains.add(solverAccount.getHoster());
                         continue;
                     }
-                    unavailableSolverDomains.remove(solverAccount.getHoster());
                     ret.add(solver);
+                    success = true;
                 } catch (final Throwable e) {
                     logger.log(e);
-                    unavailableSolverDomains.add(solverAccount.getHoster());
+                } finally {
+                    if (success) {
+                        unavailableSolverDomains.remove(solverAccount.getHoster());
+                    } else {
+                        unavailableSolverDomains.add(solverAccount.getHoster());
+                    }
                 }
             }
             logger.info("Solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);

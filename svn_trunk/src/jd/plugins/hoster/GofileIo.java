@@ -65,7 +65,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50937 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,12 +119,12 @@ public class GofileIo extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final String        PROPERTY_DANGEROUS_FILE         = "dangerous_file";
-    private static final String        PROPERTY_INTERNAL_FILEID        = "internal_fileid";
-    private static final String        PROPERTY_PARENT_FOLDER_ID       = "parent_folder_id";
-    public static final String         PROPERTY_PARENT_FOLDER_SHORT_ID = "parent_folder_short_id";
+    private static final String  PROPERTY_DANGEROUS_FILE         = "dangerous_file";
+    private static final String  PROPERTY_INTERNAL_FILEID        = "internal_fileid";
+    private static final String  PROPERTY_PARENT_FOLDER_ID       = "parent_folder_id";
+    public static final String   PROPERTY_PARENT_FOLDER_SHORT_ID = "parent_folder_short_id";
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning                     = new AtomicInteger(0);
+    private static AtomicInteger freeRunning                     = new AtomicInteger(0);
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {

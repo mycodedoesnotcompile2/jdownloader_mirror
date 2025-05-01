@@ -45,6 +45,11 @@ public class BrowserAdapter {
         } else {
             dl = new jd.plugins.download.raf.OldRAFDownload(downloadable, request);
         }
+        return applySettings(dl, resumeEnabled, pluginConnections);
+    }
+
+    public static DownloadInterface applySettings(final DownloadInterface dl, boolean resumeEnabled, int pluginConnections) throws Exception {
+        final Downloadable downloadable = dl.getDownloadable();
         findDomainRuleChunks: if (pluginConnections <= 0) {
             final DomainRuleSet domainRuleSet = downloadable.getDownloadLinkController().getDownloadLinkCandidate().getDomainRuleSet();
             Integer domainRuleChunksInteger = null;
@@ -112,6 +117,7 @@ public class BrowserAdapter {
             ((OldRAFDownload) dl).setResume(resumeEnabled);
         }
         return dl;
+
     }
 
     public static Downloadable getDownloadable(DownloadLink downloadLink, Browser br) {

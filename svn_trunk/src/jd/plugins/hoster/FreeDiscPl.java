@@ -27,21 +27,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.FreeDiscPlConfig;
-import org.jdownloader.plugins.components.config.FreeDiscPlConfig.StreamDownloadMode;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -67,7 +52,22 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50764 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.FreeDiscPlConfig;
+import org.jdownloader.plugins.components.config.FreeDiscPlConfig.StreamDownloadMode;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 2, names = {}, urls = {})
 public class FreeDiscPl extends PluginForHost {
     public FreeDiscPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,22 +119,22 @@ public class FreeDiscPl extends PluginForHost {
         }
     }
 
-    private static final boolean       PREFER_AVAILABLECHECK_VIA_AJAX_REQUEST = true;
-    protected static Cookies           botSafeCookies                         = new Cookies();
-    private static final AtomicLong    timestampLastFreeDownloadStarted       = new AtomicLong(0);
+    private static final boolean    PREFER_AVAILABLECHECK_VIA_AJAX_REQUEST = true;
+    protected static Cookies        botSafeCookies                         = new Cookies();
+    private static final AtomicLong timestampLastFreeDownloadStarted       = new AtomicLong(0);
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning                            = new AtomicInteger(0);
-    private static final String        TYPE_FILE                              = "https?://[^/]+/(?:#(?:!|%21))?([A-Za-z0-9\\-_]+,f-(\\d+)(,([\\w\\-]+))?)";
-    private static final String        TYPE_EMBED_ALL                         = "https?://[^/]+/embed/(audio|video)/(\\d+)";
-    private static final String        TYPE_EMBED_AUDIO                       = "https?://[^/]+/embed/audio/(\\d+)";
-    private static final String        TYPE_EMBED_VIDEO                       = "https?://[^/]+/embed/video/(\\d+)";
-    private static final String        PROPERTY_AUDIO_STREAM_IS_AVAILABLE     = "stream_is_available_audio";
-    private static final String        PROPERTY_VIDEO_STREAM_IS_AVAILABLE     = "stream_is_available_video";
-    private static final String        PROPERTY_DIRECTURL                     = "directurl";
-    private static final String        PROPERTY_DIRECTURL_ACCOUNT             = "directurl_account";
-    private static final String        PROPERTY_HAS_ATTEMPTED_STREAM_DOWNLOAD = "isvideo";
-    private static final String        PROPERTY_STREAMING_FILENAME            = "streaming_filename";
-    private static final String        PROPERTY_UPLOADER                      = "uploader";
+    private static AtomicInteger    freeRunning                            = new AtomicInteger(0);
+    private static final String     TYPE_FILE                              = "https?://[^/]+/(?:#(?:!|%21))?([A-Za-z0-9\\-_]+,f-(\\d+)(,([\\w\\-]+))?)";
+    private static final String     TYPE_EMBED_ALL                         = "https?://[^/]+/embed/(audio|video)/(\\d+)";
+    private static final String     TYPE_EMBED_AUDIO                       = "https?://[^/]+/embed/audio/(\\d+)";
+    private static final String     TYPE_EMBED_VIDEO                       = "https?://[^/]+/embed/video/(\\d+)";
+    private static final String     PROPERTY_AUDIO_STREAM_IS_AVAILABLE     = "stream_is_available_audio";
+    private static final String     PROPERTY_VIDEO_STREAM_IS_AVAILABLE     = "stream_is_available_video";
+    private static final String     PROPERTY_DIRECTURL                     = "directurl";
+    private static final String     PROPERTY_DIRECTURL_ACCOUNT             = "directurl_account";
+    private static final String     PROPERTY_HAS_ATTEMPTED_STREAM_DOWNLOAD = "isvideo";
+    private static final String     PROPERTY_STREAMING_FILENAME            = "streaming_filename";
+    private static final String     PROPERTY_UPLOADER                      = "uploader";
 
     private boolean preferAvailablecheckViaAjaxRequest(final DownloadLink link) {
         final String username = getUploader(link);
@@ -929,8 +929,7 @@ public class FreeDiscPl extends PluginForHost {
                 } else if (errMsg.equalsIgnoreCase("Jeden użytkownik, jedno konto! Pozostałe konta zostały czasowo zablokowane!")) {
                     /**
                      * 2022-03-22: Account is temp. banned under current IP. This can happen when trying to login with two accounts under
-                     * the same IP. </br>
-                     * Solution: Wait and retry later or delete cookies, change IP and try again.
+                     * the same IP. </br> Solution: Wait and retry later or delete cookies, change IP and try again.
                      */
                     throw new AccountUnavailableException(errMsg, 5 * 60 * 1000l);
                 } else {

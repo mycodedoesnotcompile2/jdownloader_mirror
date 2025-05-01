@@ -121,6 +121,14 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             public boolean canHandle(Challenge<?> c) {
                 return c instanceof CloudflareTurnstileChallenge;
             }
+        },
+        MT_CAPTCHA {
+            /* https://www.mtcaptcha.com/ */
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                /* 2025-04-30: Not supported by JDownloader yet. */
+                return false;
+            }
         };
 
         /**
@@ -161,18 +169,13 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         if (!validateBlackWhite(c)) {
             return false;
         }
-        boolean allowedByType = false;
         final List<CAPTCHA_TYPE> supportedTypes = this.getSupportedCaptchaTypes();
         for (final CAPTCHA_TYPE supportedType : supportedTypes) {
             if (supportedType.canHandle(c)) {
-                allowedByType = true;
-                break;
+                return true;
             }
         }
-        if (!allowedByType) {
-            return false;
-        }
-        return true;
+        return false;
     }
 
     public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, Account account) throws Exception {
@@ -180,8 +183,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
             return null;
         }
         final abstractPluginForCaptchaSolver plugin = getNewPluginInstance(getLazyP());
-        final PluginForCaptchaSolverSolverService dummyService = new PluginForCaptchaSolverSolverService();
-        return new PluginChallengeSolver<T>(plugin, account, /* TODO */dummyService);
+        plugin.setBrowser(plugin.createNewBrowserInstance());
+        return new PluginChallengeSolver<T>(plugin, account);
     }
 
     /**
@@ -248,7 +251,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * @return true if the user should be notified on low balance, false otherwise
      */
     public boolean notifyOnLowBalance() {
-        // TODO: Implement logic
+        // TODO: Implement setting and logic
         return true;
     }
 

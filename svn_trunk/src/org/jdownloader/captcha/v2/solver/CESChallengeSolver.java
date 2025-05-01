@@ -66,25 +66,7 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
             cesJob.hideBubble();
         }
     }
-    /**
-     * Enum representing different types of captchas. <br>
-     * Mockup code
-     */
-    // public enum CAPTCHA_TYPE {
-    // IMAGE,
-    // RECAPTCHA_V2,
-    // HCAPTCHA,
-    // FUNCAPTCHA,
-    // GEETEST,
-    // KEYCAPTCHA
-    // }
 
-    /** Placeholder / mockup code */
-    // public java.util.List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-    // java.util.List<CAPTCHA_TYPE> types = new java.util.ArrayList<CAPTCHA_TYPE>();
-    // types.add(CAPTCHA_TYPE.IMAGE);
-    // return types;
-    // }
     protected Browser createNewBrowserInstance() {
         return new Browser();
     }

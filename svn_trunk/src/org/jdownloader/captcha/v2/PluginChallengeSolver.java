@@ -3,6 +3,7 @@ package org.jdownloader.captcha.v2;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 import jd.controlling.captcha.SkipException;
@@ -16,9 +17,15 @@ import jd.plugins.PluginException;
 public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     protected final Account                        account;
     protected final abstractPluginForCaptchaSolver plugin;
+    // public PluginChallengeSolver(abstractPluginForCaptchaSolver plugin, Account account, SolverService solverService) {
+    // super(solverService, 0);
+    // this.service = new PluginForCaptchaSolverSolverService(plugin);
+    // this.account = account;
+    // this.plugin = plugin;
+    // }
 
-    public PluginChallengeSolver(abstractPluginForCaptchaSolver plugin, Account account, SolverService solverService) {
-        super(solverService, 0);
+    public PluginChallengeSolver(abstractPluginForCaptchaSolver plugin, Account account) {
+        this.service = new PluginForCaptchaSolverSolverService(plugin);
         this.account = account;
         this.plugin = plugin;
     }
