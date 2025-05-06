@@ -53,6 +53,7 @@ import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.URLUserInfoAuthentication;
 import jd.nutils.SimpleFTP;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadConnectionVerifier;
@@ -95,8 +96,8 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 /**
  * TODO: remove after next big update of core to use the public static methods!
  */
-@HostPlugin(revision = "$Revision: 50998 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
-        "https?(viajd)?://[^/]+/.*\\.((jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|bin|ape|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nsf|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}$)(\\.\\d{1,4})?(?=\\?|$|#|\"|\r|\n|;))" })
+@HostPlugin(revision = "$Revision: 51039 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
+"https?(viajd)?://[^/]+/.*\\.((jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|bin|ape|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nsf|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}$)(\\.\\d{1,4})?(?=\\?|$|#|\"|\r|\n|;))" })
 public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVerifier {
     public static final String  ENDINGS                                      = "\\.(jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|ape|bin|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nfs|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}(?=\\?|$|#|\"|\r|\n|;))";
     public static final String  NORESUME                                     = "nochunkload";
@@ -761,12 +762,21 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
         return downloadLink.getStringProperty(DirectHTTP.POSSIBLE_URLPARAM, null);
     }
 
-    private boolean retryConnection(final DownloadLink downloadLink, final URLConnectionAdapter con) {
+    private URL getHtmlDecodedURL(final URL url) throws IOException {
+        final String htmlDecodedPath = Encoding.htmlOnlyDecode(url.getPath());
+        if (StringUtils.equals(url.getPath(), htmlDecodedPath)) {
+            return null;
+        }
+        final String ret = URLHelper.createURL(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), htmlDecodedPath, url.getQuery(), url.getRef());
+        return new URL(ret);
+    }
+
+    private boolean retryConnection(final DownloadLink downloadLink, final URLConnectionAdapter con) throws IOException {
         switch (con.getResponseCode()) {
         case 200:
             /*
              * for example HTTP/1.1 200 OK, Content-Disposition: inline; filename=error.html
-             * 
+             *
              * we retry without HEAD in order to get full html response
              */
             return RequestMethod.HEAD.equals(con.getRequest().getRequestMethod()) && Boolean.FALSE.equals(verifyDownloadableContent(null, con));
@@ -774,6 +784,9 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
         case 401:// Unauthorized
         case 403:// Forbidden
         case 404:// Not found
+            if (con.getResponseCode() == 404 && getHtmlDecodedURL(con.getURL()) != null) {
+                return true;
+            }
         case 410:// Gone
         case 470:// special response code, see thread 81171
             return getPossibleURLParams(downloadLink) != null || RequestMethod.HEAD.equals(con.getRequest().getRequestMethod());
@@ -1011,6 +1024,15 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
                     optionSet.add("avoidOpenRange");
                 }
                 if (retryConnection(downloadLink, urlConnection) || (StringUtils.contains(urlConnection.getContentType(), "image") && (urlConnection.getLongContentLength() < 1024) || StringUtils.containsIgnoreCase(getFileNameFromConnection(urlConnection), "expired"))) {
+                    if (urlConnection.getResponseCode() == 404) {
+                        final URL htmlDecodedURL = getHtmlDecodedURL(urlConnection.getURL());
+                        if (htmlDecodedURL != null) {
+                            logger.info("autofix html encoded URL:before=" + urlConnection.getURL().toExternalForm() + "|after=" + htmlDecodedURL.toExternalForm());
+                            followURLConnection(br, urlConnection);
+                            setDownloadURL(htmlDecodedURL.toExternalForm(), downloadLink);
+                            return this.requestFileInformation(downloadLink, retry + 1, optionSet);
+                        }
+                    }
                     final String possibleURLParams = getPossibleURLParams(downloadLink);
                     if (possibleURLParams != null || RequestMethod.HEAD.equals(urlConnection.getRequest().getRequestMethod())) {
                         followURLConnection(br, urlConnection);
@@ -1519,7 +1541,7 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
             if (link.contains("sites.google.com")) {
                 /*
                  * It seems google checks referer and ip must have called the page lately.
-                 * 
+                 *
                  * TODO: 2021-12-07 Check if this is still required
                  */
                 br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://sites.google.com");

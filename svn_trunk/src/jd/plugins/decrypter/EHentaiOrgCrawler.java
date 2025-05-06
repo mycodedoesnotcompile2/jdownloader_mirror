@@ -23,16 +23,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Files;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.EhentaiConfig;
-import org.jdownloader.plugins.components.config.EhentaiConfig.GalleryCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -51,7 +41,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.EHentaiOrg;
 
-@DecrypterPlugin(revision = "$Revision: 50052 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(g|mpv)/(\\d+)/([a-z0-9]+).*" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Files;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.EhentaiConfig;
+import org.jdownloader.plugins.components.config.EhentaiConfig.GalleryCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51039 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(g|mpv)/(\\d+)/([a-z0-9]+).*" })
 public class EHentaiOrgCrawler extends PluginForDecrypt {
     public EHentaiOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,12 +62,11 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY, LazyPlugin.FEATURE.XXX };
     }
 
-    private EhentaiConfig cfg = PluginJsonConfig.get(EhentaiConfig.class);
-
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final EHentaiOrg hostplugin = (EHentaiOrg) this.getNewPluginForHostInstance("e-hentai.org");
+        final EhentaiConfig cfg = PluginJsonConfig.get(EhentaiConfig.class);
         final Account account = AccountController.getInstance().getValidAccount(hostplugin);
         if (account != null) {
             hostplugin.login(this.br, account, false);
@@ -107,7 +106,7 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
             logger.warning("Blank page --> Are you trying to access exhentai.org without the appropriate rights?");
             throw new AccountRequiredException();
         }
-        String title = hostplugin.getTitle(br);
+        String title = hostplugin.getTitle(cfg, br);
         if (title == null) {
             /* Fallback */
             title = br._getURL().getPath();
@@ -135,8 +134,8 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
             }
             ziparchive.setAvailable(true);
             /**
-             * 2024-05-06: Do not sert FilePackage here so .zip and images go into separate packages. </br>
-             * This was done based on user feedback: https://board.jdownloader.org/showpost.php?p=534063&postcount=11
+             * 2024-05-06: Do not sert FilePackage here so .zip and images go into separate packages. </br> This was done based on user
+             * feedback: https://board.jdownloader.org/showpost.php?p=534063&postcount=11
              */
             // ziparchive._setFilePackage(fp);
             ret.add(ziparchive);
@@ -237,7 +236,7 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
                         continue;
                     }
                     final String url = mpv_url + "#page" + page;
-                    final DownloadLink dl = getDownloadlink(url, galleryid, uploaderName, tagsCommaSeparated, title, originalFilename, numberofImages, imagecounter);
+                    final DownloadLink dl = getDownloadlink(cfg, url, galleryid, uploaderName, tagsCommaSeparated, title, originalFilename, numberofImages, imagecounter);
                     dl.setProperty(EHentaiOrg.PROPERTY_MPVKEY, mpvkey);
                     dl.setProperty(EHentaiOrg.PROPERTY_IMAGEKEY, imagekey);
                     if (setEstimatedFilesize) {
@@ -270,7 +269,7 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
                     if (this_title != null) {
                         originalFilename = new Regex(this_title, "\\s*(?:Page\\s*\\d+\\s*:?)?\\s+(.*?\\.(jpe?g|png|gif))").getMatch(0);
                     }
-                    final DownloadLink dl = getDownloadlink(singleLink, galleryid, uploaderName, tagsCommaSeparated, title, originalFilename, numberofImages, imagecounter);
+                    final DownloadLink dl = getDownloadlink(cfg, singleLink, galleryid, uploaderName, tagsCommaSeparated, title, originalFilename, numberofImages, imagecounter);
                     if (setEstimatedFilesize) {
                         dl.setDownloadSize(estimatedBytesPerImage);
                     }
@@ -305,7 +304,7 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
 
     final Set<String> dupes = new HashSet<String>();
 
-    private DownloadLink getDownloadlink(final String url, final String galleryID, final String uploaderName, final String tagsCommaSeparated, final String packageName, final String originalFilename, final int numberofItems, final int imagePos) {
+    private DownloadLink getDownloadlink(EhentaiConfig cfg, final String url, final String galleryID, final String uploaderName, final String tagsCommaSeparated, final String packageName, final String originalFilename, final int numberofItems, final int imagePos) {
         final DownloadLink dl = createDownloadlink(url);
         final int padLength;
         if (numberofItems == -1) {

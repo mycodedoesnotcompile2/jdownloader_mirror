@@ -20,19 +20,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.EhentaiConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -55,7 +42,20 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.EhentaiConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51039 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
 public class EHentaiOrg extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -173,8 +173,8 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Take account from download candidate! </br>
-     * 2021-01-18: There is an API available but it is only returning the metadata: https://ehwiki.org/wiki/API
+     * Take account from download candidate! </br> 2021-01-18: There is an API available but it is only returning the metadata:
+     * https://ehwiki.org/wiki/API
      *
      * @param link
      * @param account
@@ -241,8 +241,8 @@ public class EHentaiOrg extends PluginForHost {
                 /* Another step */
                 final String continue_url2 = br.getRegex("document\\.getElementById\\(\"continue\"\\).*?document\\.location\\s*=\\s*\"((?:/|http)[^\"]+)\"").getMatch(0);
                 /**
-                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br>
-                 * We prefer best quality --> "Original Archive"
+                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br> We prefer best quality -->
+                 * "Original Archive"
                  */
                 final Form continueForm = br.getFormByInputFieldKeyValue("dltype", "org");
                 if (continue_url2 != null) {
@@ -391,7 +391,7 @@ public class EHentaiOrg extends PluginForHost {
             /* Special handling: Package customizer altered, or user altered value, we need to update this value. */
             link.setForcedFileName(this.applyFilenameExtension(link.getForcedFileName(), ext));
         } else {
-            final String title = getFileTitle(br, link);
+            final String title = getFileTitle(cfg, br, link);
             /* Set filename based on user setting */
             if (StringUtils.isNotEmpty(originalFileName) && cfg.isPreferOriginalFilename()) {
                 link.setFinalFileName(originalFileName);
@@ -614,10 +614,9 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * If this returns true: </br>
-     * Download of this image has just recently failed due to the image being serverside broken/unavailable. </br>
-     * Website has a feature called 'Reload broken image' which we are making use of here. </br>
-     * This will give us the same image hosted on a different CDN.
+     * If this returns true: </br> Download of this image has just recently failed due to the image being serverside broken/unavailable.
+     * </br> Website has a feature called 'Reload broken image' which we are making use of here. </br> This will give us the same image
+     * hosted on a different CDN.
      */
     private boolean needsBrokenImageWorkaround(final DownloadLink link, final Account account) {
         final long timestampLastFailDueToBrokenImage = link.getLongProperty(PROPERTY_TIMESTAMP_LAST_BROKEN_IMAGE_FAIL, 0);
@@ -808,8 +807,8 @@ public class EHentaiOrg extends PluginForHost {
                 logger.info("e-hentai.org: Successfully logged in via cookies -> Checking exhentai.org login");
                 /* Get- and save exhentai.org cookies too */
                 /**
-                 * Important! Get- and save exhentai cookies: First time this will happen: </br>
-                 * exhentai.org -> forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
+                 * Important! Get- and save exhentai cookies: First time this will happen: </br> exhentai.org ->
+                 * forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
                  */
                 br.getPage(MAINPAGE_exhentai);
                 if (this.isLoggedInEhentaiOrExhentai(br)) {
@@ -925,11 +924,8 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Access e-hentai.org/home.php before calling this! </br>
-     * Returns array of numbers with: </br>
-     * [0] = number of items downloaded / used from limit </br>
-     * [1] = max limit for this account </br>
-     * [1] minus [0] = points left
+     * Access e-hentai.org/home.php before calling this! </br> Returns array of numbers with: </br> [0] = number of items downloaded / used
+     * from limit </br> [1] = max limit for this account </br> [1] minus [0] = points left
      */
     private int[] parseImagePointsLeftInfo(final Browser br) {
         if (!br.getURL().endsWith("/home.php")) {
@@ -952,7 +948,7 @@ public class EHentaiOrg extends PluginForHost {
         handleDownload(link, account);
     }
 
-    private String getFileTitle(final Browser br, final DownloadLink link) throws PluginException {
+    private String getFileTitle(EhentaiConfig cfg, final Browser br, final DownloadLink link) throws PluginException {
         final String filenamePartFromCrawler = link.getStringProperty("namepart");
         if (filenamePartFromCrawler != null) {
             return filenamePartFromCrawler;
@@ -961,7 +957,7 @@ public class EHentaiOrg extends PluginForHost {
         final DecimalFormat df = new DecimalFormat("0000");
         // we can do that based on image part
         final String[] uidPart = new Regex(link.getPluginPatternMatcher(), "/(\\d+)-(\\d+)$").getRow(0);
-        final String fpName = getTitle(br);
+        final String fpName = getTitle(cfg, br);
         if (fpName == null || uidPart == null || uidPart.length != 2) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -969,7 +965,15 @@ public class EHentaiOrg extends PluginForHost {
         return title;
     }
 
-    public String getTitle(final Browser br) {
+    public String getTitle(EhentaiConfig cfg, final Browser br) {
+        final String japanese = br.getRegex("<h(\\d+)[^>]*id\\s*=\\s*\"gj\"[^>]*>\\s*(.*?)</h\\1>").getMatch(1);
+        if (cfg.isPreferJapaneseName() && StringUtils.isNotEmpty(japanese)) {
+            return japanese;
+        }
+        final String english = br.getRegex("<h(\\d+)[^>]*id\\s*=\\s*\"gn\"[^>]*>\\s*(.*?)</h\\1>").getMatch(1);
+        if (english != null) {
+            return english;
+        }
         final String title = br.getRegex("<title>([^<>\"]*?)(?:\\s*-\\s*E-Hentai Galleries|\\s*-\\s*ExHentai\\.org)?</title>").getMatch(0);
         return title;
     }

@@ -47,7 +47,7 @@ import org.jdownloader.auth.AuthenticationController;
 import org.jdownloader.plugins.components.abstractGenericHTTPDirectoryIndexCrawler;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 49586 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
+@DecrypterPlugin(revision = "$Revision: 51039 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
 public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirectoryIndexCrawler {
     private enum DirectoryListingMode {
         NGINX,
@@ -309,7 +309,8 @@ public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirecto
     }
 
     protected DownloadLink parseEntry(final DirectoryListingMode directoryListing, final Browser br, final String finfo[]) throws PluginException, IOException {
-        final String url = br.getURL(finfo[0]).toString();
+        final String path = Encoding.htmlOnlyDecode(finfo[0]);
+        final String url = br.getURL(path).toString();
         final String filesizeStr;
         switch (directoryListing) {
         case APACHE:
@@ -339,6 +340,8 @@ public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirecto
             String name = url.substring(url.lastIndexOf("/") + 1);
             if (Encoding.isUrlCoded(name)) {
                 name = Encoding.htmlDecode(name);
+            } else {
+                name = Encoding.htmlOnlyDecode(name);
             }
             dlfile.setName(name);
             dlfile.setProperty(DirectHTTP.TRY_ALL, Boolean.TRUE);
@@ -375,6 +378,8 @@ public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirecto
         } else {
             if (Encoding.isUrlCoded(path)) {
                 path = Encoding.htmlDecode(path);
+            } else {
+                path = Encoding.htmlOnlyDecode(path);
             }
             return path;
         }

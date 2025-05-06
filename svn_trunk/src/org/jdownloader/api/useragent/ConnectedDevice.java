@@ -1,24 +1,31 @@
 package org.jdownloader.api.useragent;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.api.myjdownloader.MyJDownloaderConnectThread;
+import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.api.myjdownloader.MyJDownloaderDirectHttpConnection;
 import org.jdownloader.api.myjdownloader.MyJDownloaderHttpConnection;
+import org.jdownloader.api.myjdownloader.api.MyJDownloaderAPI;
+import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
 
 public class ConnectedDevice {
-    public static final String   FRONTEND_WEBINTERFACE              = "Webinterface http://my.jdownloader.org by AppWork";
-    public static final String   FRONTEND_ANDROID_APP               = "MyJDownloader by AppWork";
-    public static final String   FRONTEND_FIREFOX_EXTENSION         = "Firefox Extension by AppWork";
-    public static final String   FRONTEND_CHROME_EXTENSION          = "Chrome Extension by AppWork";
-    private static final Pattern ANDROID_USERAGENT_PATTERN          = Pattern.compile("MyJDownloader Android App \\(Version: (.+) \\/ (.+)\\) \\(Android (.+);(.+)\\/(.+)\\)");
-    private static final Pattern WINMOB_FILERECON_USERAGENT_PATTERN = Pattern.compile("MyJDownloader file.recon App \\(Version: (.+) \\/ (.+)\\)");
-    private static final Pattern WIN_UNIVERSAL_USERAGENT_PATTERN    = Pattern.compile("MyJDownloader JD Universal App \\(Version: (.+) \\/ (.+)\\)");
-    private RemoteAPIRequest     latestRequest;
-    private String               token;
+    public static final String            FRONTEND_WEBINTERFACE              = "Webinterface http://my.jdownloader.org by AppWork";
+    public static final String            FRONTEND_ANDROID_APP               = "MyJDownloader by AppWork";
+    public static final String            FRONTEND_FIREFOX_EXTENSION         = "Firefox Extension by AppWork";
+    public static final String            FRONTEND_CHROME_EXTENSION          = "Chrome Extension by AppWork";
+    private static final Pattern          ANDROID_USERAGENT_PATTERN          = Pattern.compile("MyJDownloader Android App \\(Version: (.+) \\/ (.+)\\) \\(Android (.+);(.+)\\/(.+)\\)");
+    private static final Pattern          WINMOB_FILERECON_USERAGENT_PATTERN = Pattern.compile("MyJDownloader file.recon App \\(Version: (.+) \\/ (.+)\\)");
+    private static final Pattern          WIN_UNIVERSAL_USERAGENT_PATTERN    = Pattern.compile("MyJDownloader JD Universal App \\(Version: (.+) \\/ (.+)\\)");
+    private RemoteAPIRequest              latestRequest;
+    private String                        token;
+    private final AtomicReference<Object> appKey                             = new AtomicReference<Object>();
 
     public String getConnectToken() {
         return token;
@@ -49,6 +56,51 @@ public class ConnectedDevice {
         this.id = nuaID;
     }
 
+    public String getAppKey() {
+        final Object appKey = this.appKey.get();
+        if (appKey == this) {
+            return "unknown";
+        } else if (appKey instanceof Thread) {
+            return "unknown";
+        } else if (appKey instanceof String) {
+            return appKey.toString();
+        }
+        final Thread fetchAppKey = new Thread() {
+
+            public SessionInfoResponse getSessionInfo(String queryToken) {
+                final MyJDownloaderConnectThread th = MyJDownloaderController.getInstance().getConnectThread();
+                if (th == null || !th.isAlive()) {
+                    return null;
+                }
+                try {
+                    final MyJDownloaderAPI api = th.getApi();
+                    if (api != null && queryToken != null) {
+                        return api.getSessionInfo(queryToken);
+                    }
+                } catch (Exception e) {
+                    th.getLogger().log(e);
+                }
+                return null;
+            }
+
+            public void run() {
+                try {
+                    final SessionInfoResponse sessionInfo = getSessionInfo(token);
+                    if (sessionInfo != null) {
+                        ConnectedDevice.this.appKey.compareAndSet(Thread.currentThread(), sessionInfo.getAppKey());
+                    }
+                } finally {
+                    ConnectedDevice.this.appKey.compareAndSet(Thread.currentThread(), ConnectedDevice.this);
+                }
+            };
+        };
+        if (this.appKey.compareAndSet(null, fetchAppKey)) {
+            fetchAppKey.setDaemon(true);
+            fetchAppKey.start();
+        }
+        return getAppKey();
+    }
+
     public long getTimeout() {
         return 5 * 60 * 1000l;
     }
@@ -70,8 +122,8 @@ public class ConnectedDevice {
     }
 
     private String _getFrontendName() {
-        final String origin = latestRequest.getRequestHeaders().getValue("Origin");
-        final String referer = latestRequest.getRequestHeaders().getValue("Referer");
+        final String origin = latestRequest.getRequestHeaders().getValue(HTTPConstants.HEADER_REQUEST_ORIGIN);
+        final String referer = latestRequest.getRequestHeaders().getValue(HTTPConstants.HEADER_REQUEST_REFERER);
         if (StringUtils.startsWithCaseInsensitive(origin, "http://my.jdownloader.org") || StringUtils.startsWithCaseInsensitive(origin, "https://my.jdownloader.org")) {
             return FRONTEND_WEBINTERFACE;
         } else if (StringUtils.startsWithCaseInsensitive(referer, "http://my.jdownloader.org") || StringUtils.startsWithCaseInsensitive(referer, "https://my.jdownloader.org")) {
@@ -87,11 +139,11 @@ public class ConnectedDevice {
             return "file.recon by Pseudocode";
         } else if (isJDUniversalApp(getUserAgentString())) {
             return "JD Universal by Pseudocode";
-        }
-        if (StringUtils.isNotEmpty(origin) && !"null".equals(origin)) {
+        } else if (StringUtils.isNotEmpty(origin) && !"null".equals(origin)) {
             return origin;
+        } else {
+            return getAppKey();
         }
-        return "Unknown";
     }
 
     private String _getDeviceName() {
@@ -118,10 +170,10 @@ public class ConnectedDevice {
                 return "JDUniversal@Win10";
             }
         }
-        if (info != null) {
+        if (info != null && !StringUtils.equals(info.getName(), "unknown")) {
             return info.getName() + "@" + info.getOs();
         } else {
-            return getUserAgentString();
+            return uA;
         }
     }
 

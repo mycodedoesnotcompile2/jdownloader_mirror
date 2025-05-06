@@ -34,7 +34,8 @@ public interface EhentaiConfig extends PluginConfigInterface {
     }
 
     @DefaultBooleanValue(true)
-    @TakeValueFromSubconfig("PREFER_ORIGINAL_QUALITY") // Legacy compatibility
+    @TakeValueFromSubconfig("PREFER_ORIGINAL_QUALITY")
+    // Legacy compatibility
     @AboutConfig
     @DescriptionForConfigEntry(text_AccountDownloadsPreferOriginalQuality)
     @Order(20)
@@ -43,7 +44,8 @@ public interface EhentaiConfig extends PluginConfigInterface {
     void setAccountDownloadsPreferOriginalQuality(boolean b);
 
     @DefaultBooleanValue(true)
-    @TakeValueFromSubconfig("PREFER_ORIGINAL_FILENAME") // Legacy compatibility
+    @TakeValueFromSubconfig("PREFER_ORIGINAL_FILENAME")
+    // Legacy compatibility
     @AboutConfig
     @DescriptionForConfigEntry(text_PreferOriginalFilename)
     @Order(30)
@@ -80,4 +82,11 @@ public interface EhentaiConfig extends PluginConfigInterface {
     GalleryCrawlMode getGalleryCrawlMode();
 
     void setGalleryCrawlMode(final GalleryCrawlMode mode);
+
+    @AboutConfig
+    @DefaultBooleanValue(false)
+    @Order(50)
+    void setPreferJapaneseName(boolean b);
+
+    boolean isPreferJapaneseName();
 }
