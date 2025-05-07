@@ -23,6 +23,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -45,21 +56,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51034 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 51042 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
 public class BoxbitApp extends PluginForHost {
     /**
-     * New project of: geragera.com.br </br> API docs: https://boxbit.readme.io/reference/introduction
+     * New project of: geragera.com.br </br>
+     * API docs: https://boxbit.readme.io/reference/introduction
      */
     private static final String          API_BASE                         = "https://api.boxbit.app";
     private static MultiHosterManagement mhm                              = new MultiHosterManagement("boxbit.app");
@@ -477,32 +478,33 @@ public class BoxbitApp extends PluginForHost {
             /* No error */
             return entries;
         }
-        if (errors != null && errors.size() > 0) {
-            for (final String error : errors) {
-                if (error.equalsIgnoreCase("subscription_not_active")) {
-                    /* Account doesn't have any paid subscription package */
-                    throw new AccountInvalidException(message);
-                } else if (error.equalsIgnoreCase("unsupported_filehost") || error.equalsIgnoreCase("user_missing_filehost") || error.equalsIgnoreCase("filehost_unavailable") || error.equalsIgnoreCase("filehost_links_quota_exceeded") || error.equalsIgnoreCase("filehost_traffic_quota_exceeded")) {
-                    /* Errors that immediately temporarily disable a host */
-                    mhm.putError(account, link, 5 * 60 * 1000l, message);
-                } else if (error.equalsIgnoreCase("wrong_password")) {
-                    /* Missing or wrong password */
-                    link.setPasswordProtected(true); // Enable this so next time we'll ask the user to enter the password
-                    link.setDownloadPassword(null);
-                    throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-                } else if (error.equalsIgnoreCase("file_not_found")) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else {
-                    /*
-                     * Stuff we may know but purposely handle as generic error: blocked_ip, temporarily_unavailable, ip_address_not_br
-                     */
-                    logger.info("Detected unknown/generic errorkey: " + error);
-                }
+        for (final String error : errors) {
+            if (error.equalsIgnoreCase("subscription_not_active")) {
+                /* Account doesn't have any paid subscription package */
+                throw new AccountInvalidException(message);
+            } else if (error.equalsIgnoreCase("unsupported_filehost") || error.equalsIgnoreCase("user_missing_filehost") || error.equalsIgnoreCase("filehost_unavailable") || error.equalsIgnoreCase("filehost_links_quota_exceeded") || error.equalsIgnoreCase("filehost_traffic_quota_exceeded")) {
+                /* Errors that immediately temporarily disable a host */
+                mhm.putError(account, link, 5 * 60 * 1000l, message);
+            } else if (error.equalsIgnoreCase("busy_worker")) {
+                /* E.g. {"identifier":"mega","message":"Already processing another file on this filehost.","errors":["busy_worker"]} */
+                mhm.putError(account, link, 30 * 60 * 1000l, message);
+            } else if (error.equalsIgnoreCase("wrong_password")) {
+                /* Missing or wrong password */
+                link.setPasswordProtected(true); // Enable this so next time we'll ask the user to enter the password
+                link.setDownloadPassword(null);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            } else if (error.equalsIgnoreCase("file_not_found")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                /*
+                 * Stuff we may know but purposely handle as generic error: blocked_ip, temporarily_unavailable, ip_address_not_br
+                 */
+                logger.info("Detected unknown/generic errorkey: " + error);
             }
-            /* They also got "file_not_found" but we still don't trust such errors when multihosts return them! */
-            /* No known error? Handle as generic one. */
-            mhm.handleErrorGeneric(account, link, message, 50);
         }
+        /* They also got "file_not_found" but we still don't trust such errors when multihosts return them! */
+        /* No known error? Handle as generic one. */
+        mhm.handleErrorGeneric(account, link, message, 50);
         /* Unreachable code */
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }

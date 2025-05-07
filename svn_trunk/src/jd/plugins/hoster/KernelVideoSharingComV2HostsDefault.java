@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50963 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51043 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "mylust.com" });
         ret.add(new String[] { "yourporngod.com" });
         ret.add(new String[] { "everydayporn.co" });
-        ret.add(new String[] { "upornia.com" });
+        ret.add(new String[] { "upornia.com", "upornia.tube" });
         ret.add(new String[] { "vr.pornhat.com" });
         ret.add(new String[] { "xxxymovies.com" });
         ret.add(new String[] { "needgayporn.com" });
@@ -150,7 +150,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
 
     @Override
     protected boolean useAPI() {
-        return "upornia.com".equals(getHost()) || "tubepornclassic.com".equals(getHost()) || "thegay.com".equals(getHost()) || super.useAPI();
+        return ("upornia.com".equals(getHost()) || "upornia.tube".equals(getHost())) || "tubepornclassic.com".equals(getHost()) || "thegay.com".equals(getHost()) || super.useAPI();
     }
 
     public static String[] getAnnotationNames() {

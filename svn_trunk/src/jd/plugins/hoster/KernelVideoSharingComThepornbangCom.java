@@ -32,6 +32,7 @@ import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigPorngreyNet;
 import org.jdownloader.plugins.components.config.KVSConfigThepornbangCom;
 
 import jd.PluginWrapper;
@@ -42,7 +43,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51030 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51048 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComThepornbangCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -161,13 +162,11 @@ public class KernelVideoSharingComThepornbangCom extends KernelVideoSharingComV2
 
     @Override
     public Class<? extends KVSConfig> getConfigInterface() {
-        return KVSConfigThepornbangCom.class;
-        // TODO: Use the commented out code down below
-        // if(this.getHost().equals("thepornbang.com")) {
-        // return KVSConfigThepornbangCom.class;
-        // }else {
-        // return KVSConfigPorngreyNet.class;
-        // }
+        if (this.getHost().equals("thepornbang.com")) {
+            return KVSConfigThepornbangCom.class;
+        } else {
+            return KVSConfigPorngreyNet.class;
+        }
     }
 
     @Override

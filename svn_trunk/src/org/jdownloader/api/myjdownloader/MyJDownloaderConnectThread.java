@@ -389,7 +389,7 @@ public class MyJDownloaderConnectThread extends Thread implements HTTPBridge, Re
         return myJDownloaderController;
     }
 
-    protected MyJDownloaderAPI getApi() {
+    public MyJDownloaderAPI getApi() {
         return api;
     }
 

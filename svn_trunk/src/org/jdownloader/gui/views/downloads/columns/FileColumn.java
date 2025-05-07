@@ -12,6 +12,17 @@ import javax.swing.JPopupMenu;
 import javax.swing.JSeparator;
 import javax.swing.border.Border;
 
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.gui.swing.jdgui.JDGui;
+import jd.nutils.NaturalOrderComparator;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -38,17 +49,6 @@ import org.jdownloader.gui.views.downloads.action.OpenFileAction;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.gui.swing.jdgui.JDGui;
-import jd.nutils.NaturalOrderComparator;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 public class FileColumn extends ExtTextColumn<AbstractNode> implements GenericConfigEventListener<Boolean> {
     /**
      *
@@ -62,7 +62,7 @@ public class FileColumn extends ExtTextColumn<AbstractNode> implements GenericCo
     protected Border          normalBorder;
     private boolean           selectAll            = false;
     private boolean           hideSinglePackage    = true;
-    public final static int   EXPAND_COLLAPSE_AREA = 32 + 1/* leftGapBorder */ + 5 + 1/* super.defaultBorder */;
+    public final static int   EXPAND_COLLAPSE_AREA = 32 + 1/* leftGapBorder */+ 5 + 1/* super.defaultBorder */;
 
     public FileColumn() {
         super(_GUI.T.filecolumn_title());
@@ -350,7 +350,7 @@ public class FileColumn extends ExtTextColumn<AbstractNode> implements GenericCo
         }
     }
 
-    boolean hadFocusBefore = true;
+    boolean hadFocusBefore = false;
 
     @Override
     public void focusLost(FocusEvent e) {

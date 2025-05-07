@@ -30,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48905 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51044 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileddCom extends XFileSharingProBasic {
     public FileddCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -125,5 +125,15 @@ public class FileddCom extends XFileSharingProBasic {
         if (new Regex(correctedBR, ">\\s*Free Members can download files no bigger than").matches()) {
             throw new AccountRequiredException();
         }
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilesize = new Regex(html, "\\(([^<\\)]+)\\)\\s*</b></span> ").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
+        }
+        return fileInfo;
     }
 }

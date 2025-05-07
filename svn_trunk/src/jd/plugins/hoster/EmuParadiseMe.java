@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50987 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/(roms/roms\\.php\\?gid=\\d+|roms/get-download\\.php\\?gid=\\d+|[^<>/]+/[^<>/]+/\\d+)" })
+@HostPlugin(revision = "$Revision: 51044 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/(roms/roms\\.php\\?gid=\\d+|roms/get-download\\.php\\?gid=\\d+|[^<>/]+/[^<>/]+/\\d+)" })
 public class EmuParadiseMe extends PluginForHost {
     public EmuParadiseMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -261,6 +261,7 @@ public class EmuParadiseMe extends PluginForHost {
         if (br.containsHTML(HTML_TYPE_DIRECT)) {
             dllink = br.getRegex("\"(https?://[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+[^<>\"]*?/[^<>\"/]*?)\"").getMatch(0);
         }
+        boolean unavailableWorkaroundUsed = false;
         if (dllink == null) {
             synchronized (LOCK) {
                 dllink = checkDirectLink(link, directlinkproperty);
@@ -268,6 +269,7 @@ public class EmuParadiseMe extends PluginForHost {
                     final boolean preferWorkaroundRightAway = false;
                     if (preferWorkaroundRightAway) {
                         dllink = getDirectDownloadurlViaWorkaround(this.br, link);
+                        unavailableWorkaroundUsed = true;
                     } else {
                         dllink = br.getRegex(">\\s*Download:?\\s*<a href=\"(/[^\"]+)\"").getMatch(0);
                         if (dllink == null) {
@@ -285,6 +287,11 @@ public class EmuParadiseMe extends PluginForHost {
                                 dllink = getDirectDownloadurlViaWorkaround(this.br, link);
                             }
                         }
+                        if (dllink == null && br.containsHTML(">\\s*This game is unavailable")) {
+                            logger.info("Attempting workaround for unavailable download");
+                            dllink = getDirectDownloadurlViaWorkaround(this.br, link);
+                            unavailableWorkaroundUsed = true;
+                        }
                     }
                 }
             }
@@ -295,7 +302,7 @@ public class EmuParadiseMe extends PluginForHost {
                     if (br.containsHTML("src=\"/happy_hour.php\"")) {
                         final Browser clone = br.cloneBrowser();
                         clone.getPage("/happy_hour.php");
-                        if (clone.containsHTML(".style.display=\"block\"")) {
+                        if (clone.containsHTML(".style\\.display=\"block\"")) {
                             happyHour = true;
                         }
                     }
@@ -308,24 +315,35 @@ public class EmuParadiseMe extends PluginForHost {
             }
         }
         setDownloadServerCookie();
-        /* Without this the directlink won't be accepted! */
-        br.getHeaders().put("Referer", br.getURL());
+        final String error_text_file_unavailable = "Item is not downloadable anymore?";
         if (dllink == null) {
             /* Example: https://www.emuparadise.me/Atari_Jaguar_Emulators/Android/50 */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Item is not downloadable anymore?");
+            throw new PluginException(LinkStatus.ERROR_FATAL, error_text_file_unavailable);
         }
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume, maxchunks);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            final long responsecode = dl.getConnection().getResponseCode();
-            if (responsecode == 400) {
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 400", 2 * 60 * 1000l);
-            } else if (responsecode == 503) {
-                /* Too many connections --> Happy hour is definitly not active --> Only allow 1 simultaneous download. */
-                maxFree.set(1);
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 503 - Too many concurrent connections - wait before starting new downloads", 1 * 60 * 1000l);
+        /* Without this the directlink won't be accepted! */
+        br.getHeaders().put("Referer", br.getURL());
+        try {
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume, maxchunks);
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                final long responsecode = dl.getConnection().getResponseCode();
+                if (responsecode == 400) {
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 400", 2 * 60 * 1000l);
+                } else if (responsecode == 503) {
+                    /* Too many connections --> Happy hour is definitly not active --> Only allow 1 simultaneous download. */
+                    maxFree.set(1);
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 503 - Too many concurrent connections - wait before starting new downloads", 1 * 60 * 1000l);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
+        } catch (final InterruptedException ie) {
+            throw ie;
+        } catch (final Exception e) {
+            if (unavailableWorkaroundUsed) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_text_file_unavailable);
             } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw e;
             }
         }
         link.setProperty(directlinkproperty, dllink);
@@ -341,19 +359,18 @@ public class EmuParadiseMe extends PluginForHost {
             errorNoDownloadlinkAvailable();
         }
         String dllink = null;
-        final boolean allowOldWorkarounds = false;
-        if (allowOldWorkarounds) {
-            if (StringUtils.containsIgnoreCase(br.getURL(), "Sega_Dreamcast_ISOs")) {
-                /* Special case */
-                /* Download can be available in multiple versions (or is it only multiple archive types e.g. .7z and .zip?). */
-                final String[] downloadCandidates = br.getRegex("-download-\\d+\" title=\"Download ([^\"]+) ISO for Sega Dreamcast").getColumn(0);
-                if (downloadCandidates.length == 0) {
-                    errorNoDownloadlinkAvailable();
-                }
-                dllink = "http://50.7.92.186/happyUUKAm8913lJJnckLiePutyNak/Dreamcast/" + URLEncode.encodeURIComponent(downloadCandidates[0]);
-            } else {
-                dllink = "/roms/get-download.php?gid=" + gid + "&test=true";
+        if (StringUtils.containsIgnoreCase(br.getURL(), "Sega_Dreamcast_ISOs")) {
+            /* Special case */
+            /* Download can be available in multiple versions (or is it only multiple archive types e.g. .7z and .zip?). */
+            final String[] downloadCandidates = br.getRegex("-download-\\d+\" title=\"Download ([^\"]+) ISO for Sega Dreamcast").getColumn(0);
+            if (downloadCandidates.length == 0) {
+                errorNoDownloadlinkAvailable();
             }
+            // dllink = "http://50.7.92.186/happyUUKAm8913lJJnckLiePutyNak/Dreamcast/" +
+            // URLEncode.encodeURIComponent(downloadCandidates[0]);
+            dllink = "https://dl.mprd.se/happyTjuaOAO11j4lf94cbvkNAwkm4nkkj/Dreamcast/" + URLEncode.encodeURIComponent(downloadCandidates[0]);
+        } else {
+            dllink = "/roms/get-download.php?gid=" + gid + "&test=true";
         }
         return dllink;
     }

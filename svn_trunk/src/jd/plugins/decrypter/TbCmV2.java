@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51007 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51043 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -774,13 +774,14 @@ public class TbCmV2 extends PluginForDecrypt {
         }
         reversePlaylistPositions: if (this.playlistID != null && cfg.isProcessPlaylistItemsInReverseOrder()) {
             logger.info("Processing crawled playlist in reverse order");
-            if (!this.globalPropertiesForDownloadLink.containsKey(YoutubeHelper.YT_PLAYLIST_SIZE)) {
+            final Number playlistSizeO = (Number) this.getGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_SIZE);
+            if (playlistSizeO == null) {
                 logger.info("Cannot reverse playlist positions because playlist size is not known");
                 break reversePlaylistPositions;
             }
             Collections.reverse(videoIdsToAdd);
             /* Correct positions in video elements */
-            final int playlistSize = ((Number) globalPropertiesForDownloadLink.get(YoutubeHelper.YT_PLAYLIST_SIZE)).intValue();
+            final int playlistSize = playlistSizeO.intValue();
             for (final YoutubeClipData vid : videoIdsToAdd) {
                 final int playListPosition = (Integer) getGlobalProperty(vid.videoID, YoutubeHelper.YT_PLAYLIST_POSITION);
                 final int newPlaylistPosition = (playlistSize - playListPosition) + 1;

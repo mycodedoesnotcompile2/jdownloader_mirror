@@ -17,7 +17,9 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -28,6 +30,7 @@ import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountRequiredException;
@@ -37,7 +40,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50076 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51048 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -200,14 +203,15 @@ public class SharingWtf extends YetiShareCore {
     @Override
     public void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         /* 2020-02-17: Special */
-        if (br.containsHTML("you need to be a registered user to download any files")) {
+        final String premiumonly_1 = br.getRegex(">\\s*(You must be a registered member account to[^<]+)").getMatch(0);
+        final String premiumonly_2 = br.getRegex(">\\s*(You must be a premium member to download files more[^<]+)").getMatch(0);
+        if (premiumonly_1 != null) {
+            throw new AccountRequiredException(Encoding.htmlDecode(premiumonly_1).trim());
+        } else if (br.containsHTML("you need to be a registered user to download any files")) {
             throw new AccountRequiredException();
-        } else if (br.containsHTML(">\\s*You must be a registered member account to download files more than")) {
+        } else if (premiumonly_2 != null) {
             /* 2024-02-09 */
-            throw new AccountRequiredException();
-        } else if (br.containsHTML(">\\s*You must be a premium member to download files more")) {
-            /* 2024-02-09 */
-            throw new AccountRequiredException();
+            throw new AccountRequiredException(premiumonly_2);
         }
         final String dailyLimitReachedText = br.getRegex(">\\s*(You have reached the daily download limit of \\d+ files)").getMatch(0);
         if (dailyLimitReachedText != null) {
@@ -262,10 +266,58 @@ public class SharingWtf extends YetiShareCore {
                 logger.info("Embed workaround failed");
                 super.handleDownloadWebsite(link, account);
             }
-        } else {
-            logger.info("NOT attempting embed workaround");
-            super.handleDownloadWebsite(link, account);
         }
+        if (account != null) {
+            /* Free account download */
+            try {
+                super.handleDownloadWebsite(link, account);
+            } catch (final PluginException pe) {
+                if (pe.getLinkStatus() != LinkStatus.ERROR_PLUGIN_DEFECT) {
+                    throw pe;
+                }
+                /*
+                 * Ugly implementation: Let previous code do its job until it fails, then check if we landet on the captcha page to continue
+                 * lol
+                 */
+                final String filename = br.getRegex("data-filename=\"([^\"]+)").getMatch(0);
+                final String urlhash = br.getRegex("data-urlhash=\"([^\"]+)").getMatch(0);
+                final String sitekey = br.getRegex("data-sitekey=\"([^\"]+)").getMatch(0);
+                if (urlhash == null || sitekey == null || filename == null) {
+                    logger.warning("Speciel handling failed");
+                    throw pe;
+                }
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                final Form captcha = new Form();
+                captcha.setMethod(MethodType.POST);
+                captcha.setAction("/recaptcha/");
+                captcha.put("filename", Encoding.urlEncode(filename));
+                captcha.put("urlhash", Encoding.urlEncode(urlhash));
+                captcha.put("recaptcha", Encoding.urlEncode(recaptchaV2Response));
+                this.submitForm(captcha);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String directurl = entries.get("url").toString();
+                if (StringUtils.isEmpty(directurl)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, this.isResumeable(link, account), this.getMaxChunks(account));
+                final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
+                final URLConnectionAdapter con = dl.getConnection();
+                /*
+                 * Save directurl before download-attempt as it should be valid even if it e.g. fails because of server issue 503 (= too
+                 * many connections) --> Should work fine after the next try.
+                 */
+                link.setProperty(directlinkproperty, con.getURL().toExternalForm());
+                checkResponseCodeErrors(con);
+                if (!looksLikeDownloadableContent(con)) {
+                    br.followConnection(true);
+                    checkErrors(br, link, account);
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to downloadable content");
+                }
+                dl.startDownload();
+                return;
+            }
+        }
+        super.handleDownloadWebsite(link, account);
     }
 
     @Override

@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50555 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51042 $", interfaceVersion = 2, names = {}, urls = {})
 public class WebShareCz extends PluginForHost {
     public WebShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -358,7 +358,6 @@ public class WebShareCz extends PluginForHost {
                 } else {
                     logger.info("Cookie login failed");
                     br.clearCookies(null);
-                    account.clearCookies("");
                 }
             }
             logger.info("Performing full login");

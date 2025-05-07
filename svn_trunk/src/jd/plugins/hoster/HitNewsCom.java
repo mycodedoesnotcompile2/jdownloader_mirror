@@ -5,6 +5,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -20,12 +25,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-
-@HostPlugin(revision = "$Revision: 51041 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51048 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
 public class HitNewsCom extends UseNet {
     public HitNewsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,10 +46,13 @@ public class HitNewsCom extends UseNet {
         final Map<String, Object> response = restoreFromString(request.getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> user = (Map<String, Object>) response.get("user");
         final Map<String, Object> active = (Map<String, Object>) response.get("active");
+        final String error = (String) response.get("error");
         if (user == null) {
-            throw new AccountInvalidException();
+            throw new AccountInvalidException(error);
         } else if (active == null) {
-            throw new AccountInvalidException();
+            throw new AccountInvalidException(error);
+        } else if (error != null) {
+            throw new AccountInvalidException(error);
         }
         account.saveCookies(br.getCookies(br.getHost()), "");
         final Number conns = (Number) user.get("conns");
@@ -63,34 +66,32 @@ public class HitNewsCom extends UseNet {
             ai.setTrafficMax(bytes.longValue());
         }
         final String expire_date = active.get("expire_date").toString();
-        if ("Lifetime".equals(expire_date)) {
-            ai.setValidUntil(-1);
-        } else {
+        if (!"Lifetime".equalsIgnoreCase(expire_date)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported account expire date \"" + expire_date + "\", please contact JDownloader support!");
         }
+        ai.setValidUntil(-1);
         final String prodtype = (String) active.get("prodtype");
         final String prod = (String) active.get("prod");
-        if ("block".equals(prodtype)) {
-            final long maxTraffic = SizeFormatter.getSize(prod, false);
-            if (maxTraffic != -1) {
-                ai.setTrafficMax(maxTraffic);
-            } else if ("25gb".equals(prod)) {
-                ai.setTrafficMax(25 * 1000 * 1000 * 1000l);
-            } else if ("500gb".equals(prod)) {
-                ai.setTrafficMax(500 * 1000 * 1000 * 1000l);
-            } else if ("1000gb".equals(prod)) {
-                ai.setTrafficMax(1000 * 1000 * 1000 * 1000l);
-            } else if ("2000gb".equals(prod)) {
-                ai.setTrafficMax(2000 * 1000 * 1000 * 1000);
-            } else if ("5000gb".equals(prod)) {
-                ai.setTrafficMax(5000 * 1000 * 1000 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported product \"" + prod + "\", please contact JDownloader support!");
-            }
-            ai.setStatus("Block " + prod);
-        } else {
+        if (!"block".equals(prodtype)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported product type \"" + prodtype + "\", please contact JDownloader support!");
         }
+        final long maxTraffic = SizeFormatter.getSize(prod, false);
+        if (maxTraffic != -1) {
+            ai.setTrafficMax(maxTraffic);
+        } else if ("25gb".equals(prod)) {
+            ai.setTrafficMax(25 * 1000 * 1000 * 1000l);
+        } else if ("500gb".equals(prod)) {
+            ai.setTrafficMax(500 * 1000 * 1000 * 1000l);
+        } else if ("1000gb".equals(prod)) {
+            ai.setTrafficMax(1000 * 1000 * 1000 * 1000l);
+        } else if ("2000gb".equals(prod)) {
+            ai.setTrafficMax(2000 * 1000 * 1000 * 1000);
+        } else if ("5000gb".equals(prod)) {
+            ai.setTrafficMax(5000 * 1000 * 1000 * 1000l);
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported product \"" + prod + "\", please contact JDownloader support!");
+        }
+        ai.setStatus("Block " + prod);
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
@@ -98,6 +99,7 @@ public class HitNewsCom extends UseNet {
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         setBrowserExclusive();
+        br.setAllowedResponseCodes(400);
         br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
         if (cookies != null) {
@@ -109,7 +111,7 @@ public class HitNewsCom extends UseNet {
                 br.getCookies(getHost()).clear();
             }
         }
-        if (br.getCookie(getHost(), "sess") == null) {
+        if (br.getCookie(getHost(), "sess", Cookies.NOTDELETEDPATTERN) == null) {
             account.clearCookies("");
             br.getPage("https://member.hitnews.com/login.html");
             Form loginForm = br.getFormbyActionRegex("auth/login");
@@ -126,14 +128,8 @@ public class HitNewsCom extends UseNet {
             }
             pass.setValue(Encoding.urlEncode(account.getPass()));
             br.submitForm(loginForm);
-            loginForm = br.getFormbyActionRegex("auth/login");
-            if (loginForm != null && loginForm.containsHTML("login") && loginForm.containsHTML("pass")) {
-                final String errmsg = br.getRegex("class\\s*=\\s*\"am-errors\">\\s*<li>\\s*(.*?)\\s*</li>").getMatch(0);
-                if (errmsg != null) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, errmsg, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
+            if (br.containsHTML("<p>\\s*Invalid user/pass\\s*</p>")) {
+                throw new AccountInvalidException();
             } else if (br.getCookie(getHost(), "sess", Cookies.NOTDELETEDPATTERN) == null) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }

@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50685 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51044 $", interfaceVersion = 3, names = {}, urls = {})
 public class VikingfileCom extends PluginForHost {
     public VikingfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,13 +119,21 @@ public class VikingfileCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(fid);
         }
+        // TODO: Implement mass-linkcheck, see https://vikingfile.com/api
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("hash", fid);
         br.postPage(getApiBase() + "/check-file", query);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        /* 2025-05-06: Response can be list with 1 element or map */
+        final Object respO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        final Map<String, Object> entries;
+        if (respO instanceof List) {
+            entries = (Map<String, Object>) ((List) respO).get(0);
+        } else {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        }
         if (!Boolean.TRUE.equals(entries.get("exist"))) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -140,8 +148,6 @@ public class VikingfileCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(fid);
         }
-        final UrlQuery query = new UrlQuery();
-        query.appendEncoded("hash", fid);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

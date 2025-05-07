@@ -253,10 +253,13 @@ public class ColoredIcon extends AbstractIconPipe {
         final int b = (rgb >> 0) & 0xff;
         for (Entry<ColorLookup, Color> es : colorMap.entrySet()) {
             if (es.getKey().color == null) {
+                // replace all visible colors
                 if (c == null || c.getAlpha() == 0) {
-                    return es.getValue();
+                    // do not replace invisible colors
+                    continue;
                 }
-                continue;
+                // System.out.println(c + "->" + es.getValue());
+                return es.getValue();
             }
             Color replace = es.getValue();
             Color search = es.getKey().color;

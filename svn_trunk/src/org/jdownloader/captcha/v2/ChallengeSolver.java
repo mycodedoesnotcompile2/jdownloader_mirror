@@ -169,7 +169,7 @@ public abstract class ChallengeSolver<T> {
         return resultType;
     }
 
-    protected boolean isChallengeSupported(Challenge<?> c) {
+    protected boolean isChallengeSupported(final Challenge<?> c) {
         if (c instanceof AbstractBrowserChallenge) {
             return false;
         } else {
@@ -177,7 +177,7 @@ public abstract class ChallengeSolver<T> {
         }
     }
 
-    public boolean canHandle(Challenge<?> c) {
+    public boolean canHandle(final Challenge<?> c) {
         if (!isChallengeSupported(c)) {
             return false;
         } else if (!getResultType().isAssignableFrom(c.getResultType())) {
@@ -189,7 +189,7 @@ public abstract class ChallengeSolver<T> {
         }
     }
 
-    public boolean validateBlackWhite(Challenge<?> c) {
+    public boolean validateBlackWhite(final Challenge<?> c) {
         if (!getService().getConfig().isBlackWhiteListingEnabled()) {
             return true;
         }
