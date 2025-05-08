@@ -45,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 50390 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51049 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,9 +84,9 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        final Account account = AccountController.getInstance().getValidAccount(getHost());
         if (account != null) {
-            final ManyvidsCom hosterplugin = (ManyvidsCom) this.getNewPluginForHostInstance(this.getHost());
+            final ManyvidsCom hosterplugin = (ManyvidsCom) this.getNewPluginForHostInstance(getHost());
             hosterplugin.login(account, false);
         }
         final String manyvidsKeyPrefix = "manyvids_com://";
@@ -101,15 +101,15 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
         final String contentID = urlinfo.getMatch(1);
         String urlSlug = urlinfo.getMatch(3);
         if (contentType.equalsIgnoreCase("profile")) {
-            /* Crawl user profile */
-            // br.getPage("https://www." + this.getHost() + "/Profile/" + contentID + "/" + urlSlug + "/");
+            /* Crawl user profile (crawls preview videos if user is not logged in) */
+            // br.getPage("https://www." + getHost() + "/Profile/" + contentID + "/" + urlSlug + "/");
             // if (br.getHttpConnection().getResponseCode() == 404) {
             // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             // } else if (!br.getURL().contains(contentID)) {
             // /* E.g. redirect to mainpage */
             // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             // }
-            br.getPage("https://www." + this.getHost() + "/Profile/" + contentID + "/" + urlSlug + "/Store/Videos/");
+            br.getPage("https://www." + getHost() + "/Profile/" + contentID + "/" + urlSlug + "/Store/Videos/");
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (!br.getURL().contains(contentID)) {
@@ -141,17 +141,47 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                 }
                 final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("data");
                 int numberofNewItems = 0;
+                final boolean crawlFreeVideosOneByOne = true;
                 for (final Map<String, Object> item : items) {
+                    final Map<String, Object> creator = (Map<String, Object>) item.get("creator");
+                    final Map<String, Object> thumbnail = (Map<String, Object>) item.get("thumbnail");
                     final Map<String, Object> preview = (Map<String, Object>) item.get("preview");
+                    final Map<String, Object> price = (Map<String, Object>) item.get("price");
+                    final String video_id = item.get("id").toString();
+                    final String video_title = item.get("title").toString();
                     final String path = preview.get("url").toString();
-                    if (!dupes.add(path)) {
+                    if (!dupes.add(video_id)) {
                         continue;
                     }
                     numberofNewItems++;
+                    final String content_url = "https://www." + getHost() + "/Video/" + video_id + "/" + item.get("slug");
+                    final String previewSuffix;
+                    if (Boolean.TRUE.equals(price.get("free"))) {
+                        if (crawlFreeVideosOneByOne) {
+                            /* This item will go back into our crawler to find the other/official streaming qualities. */
+                            final DownloadLink video = this.createDownloadlink(content_url);
+                            ret.add(video);
+                            distribute(video);
+                            continue;
+                        }
+                        /* Free video */
+                        previewSuffix = "";
+                    } else {
+                        /* Preview video */
+                        previewSuffix = "_PREVIEW";
+                    }
+                    if (thumbnail != null) {
+                        final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnail.get("url").toString()));
+                        thumb.setAvailable(true);
+                        ret.add(thumb);
+                    }
                     final String fullVideoURL = br.getURL(path).toExternalForm();
                     final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(fullVideoURL));
+                    video.setContentUrl(content_url);
                     video.setAvailable(true);
                     video._setFilePackage(fp);
+                    video.setFinalFileName(creator.get("slug") + "_" + video_title + previewSuffix + ".mp4");
+                    video.setLinkID(manyvidsKeyPrefix + "video/" + video_id + "/quality/preview");
                     ret.add(video);
                     distribute(video);
                 }
@@ -204,6 +234,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+            final Map<String, Object> model = (Map<String, Object>) data.get("model");
             title = data.get("title").toString();
             final String filesizeStr = (String) data.get("size");
             final String description = (String) data.get("description");
@@ -221,6 +252,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             final Map<String, Object> entries2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> data2 = (Map<String, Object>) entries2.get("data");
             boolean crawlVideoStreams = true;
+            final String filename_base = model.get("displayName") + "_" + title;
             if (Boolean.TRUE.equals(data2.get("isDownloadable"))) {
                 /**
                  * Crawl official video downloads </br>
@@ -228,9 +260,9 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                  */
                 logger.info("Crawling official downloadlinks");
                 final UrlQuery query = new UrlQuery();
-                query.add("id", contentID);
-                query.add("etag", "KIWI_video_player");
-                br.postPage("https://www." + this.getHost() + "/download.php?" + query.toString(), query);
+                query.appendEncoded("id", contentID);
+                query.appendEncoded("etag", "KIWI_video_player");
+                br.postPage("https://www." + getHost() + "/download.php?" + query.toString(), query);
                 final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final Object errorO = resp.get("error");
                 if (errorO != null) {
@@ -249,7 +281,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                         /* Don't do this, it will fuckup URL-encoding. */
                         // final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(file_url));
                         final DownloadLink video = this.createDownloadlink(file_url);
-                        video.setName(qualitymap.get("file_title") + "." + qualitymap.get("file_ext"));
+                        video.setFinalFileName(filename_base + "_" + videoQualityLabel + ".mp4");
                         video.setDownloadSize(SizeFormatter.getSize(officialVideoDownloadFilesizeStr));
                         video.setLinkID(manyvidsKeyPrefix + "video/" + contentID + "/quality/" + videoQualityLabel);
                         officialVideoDownloads.add(video);
@@ -267,25 +299,33 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             if (crawlVideoStreams) {
                 logger.info("Crawling stream downloadurls");
                 final String videourl1 = (String) data2.get("filepath");
+                boolean originalVideoAvailable = false;
                 if (!StringUtils.isEmpty(videourl1)) {
                     /* Original video -> We may know the filesize of this item. */
                     final DownloadLink video1 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl1));
                     if (!StringUtils.isEmpty(filesizeStr)) {
                         video1.setDownloadSize(SizeFormatter.getSize(filesizeStr));
                     }
+                    video1.setFinalFileName(filename_base + ".mp4");
                     ret.add(video1);
+                    originalVideoAvailable = true;
                 }
-                final String videourl2 = (String) data2.get("transcodedFilepath");
-                if (!StringUtils.isEmpty(videourl2)) {
-                    /* Transcoded video -> We do not know the filesize of this item. */
-                    final DownloadLink video2 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl2));
-                    ret.add(video2);
-                }
-                final Map<String, Object> teasermap = (Map<String, Object>) data2.get("teaser");
-                if (teasermap != null) {
-                    final String videourlTeaser = (String) teasermap.get("filepath");
-                    if (!StringUtils.isEmpty(videourlTeaser)) {
-                        ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourlTeaser)));
+                if (!originalVideoAvailable) {
+                    final String videourl2 = (String) data2.get("transcodedFilepath");
+                    if (!StringUtils.isEmpty(videourl2)) {
+                        /* Transcoded video -> We do not know the filesize of this item. */
+                        final DownloadLink video2 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl2));
+                        video2.setFinalFileName(filename_base + ".mp4");
+                        ret.add(video2);
+                    }
+                    final Map<String, Object> teasermap = (Map<String, Object>) data2.get("teaser");
+                    if (teasermap != null && StringUtils.isEmpty(videourl2)) {
+                        final String videourlTeaser = (String) teasermap.get("filepath");
+                        if (!StringUtils.isEmpty(videourlTeaser)) {
+                            final DownloadLink video3 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourlTeaser));
+                            video3.setFinalFileName(filename_base + "_PREVIEW.mp4");
+                            ret.add(video3);
+                        }
                     }
                 }
             }
@@ -298,6 +338,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             /* Set additional properties */
             for (final DownloadLink result : ret) {
                 result._setFilePackage(fp);
+                /* We know that all of our results are online and downloadable. */
                 result.setAvailable(true);
             }
         }

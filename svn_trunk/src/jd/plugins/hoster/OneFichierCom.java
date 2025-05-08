@@ -65,7 +65,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 51006 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51050 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS             = "use_cdn_credits";
@@ -216,7 +216,7 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
-    private String getDirecturlWithPreferredProtocol(String url) {
+    private String getURLWithPreferredProtocol(String url) {
         if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
             url = url.replaceFirst("(?i)http://", "https://");
         } else {
@@ -315,7 +315,7 @@ public class OneFichierCom extends PluginForHost {
             while (true) {
                 links.clear();
                 while (true) {
-                    /* we test 100 links at once */
+                    /* We check 100 links at once */
                     if (index == urls.length || links.size() == 100) {
                         break;
                     } else {
@@ -417,10 +417,9 @@ public class OneFichierCom extends PluginForHost {
         } else {
             /* Website */
             checkLinks(new DownloadLink[] { link });
-            prepareBrowserWebsite(br);
             if (!link.isAvailabilityStatusChecked()) {
                 return AvailableStatus.UNCHECKED;
-            } else if (link.isAvailabilityStatusChecked() && !link.isAvailable()) {
+            } else if (!link.isAvailable()) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
                 return AvailableStatus.TRUE;
@@ -513,7 +512,7 @@ public class OneFichierCom extends PluginForHost {
         final String directurlproperty = getDirectlinkproperty(account);
         String storedDirecturl = link.getStringProperty(directurlproperty);
         if (storedDirecturl != null) {
-            storedDirecturl = this.getDirecturlWithPreferredProtocol(storedDirecturl);
+            storedDirecturl = this.getURLWithPreferredProtocol(storedDirecturl);
             logger.info("Attempting to download stored directurl: " + storedDirecturl);
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, storedDirecturl, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -526,7 +525,8 @@ public class OneFichierCom extends PluginForHost {
             br.followConnection(true);
             link.removeProperty(directurlproperty);
         }
-        final String contentURL = this.getDirecturlWithPreferredProtocol(getContentURLWebsite(link));
+        prepareBrowserWebsite(br);
+        final String contentURL = this.getURLWithPreferredProtocol(getContentURLWebsite(link));
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (this.looksLikeDownloadableContent(dl.getConnection())) {
             link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
@@ -596,7 +596,7 @@ public class OneFichierCom extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dllink = this.getDirecturlWithPreferredProtocol(dllink);
+        dllink = this.getURLWithPreferredProtocol(dllink);
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             logger.warning("The final dllink seems not to be a file!");
@@ -1308,7 +1308,7 @@ public class OneFichierCom extends PluginForHost {
             final String directurlproperty = getDirectlinkproperty(account);
             String storedDirecturl = link.getStringProperty(directurlproperty);
             if (storedDirecturl != null) {
-                storedDirecturl = this.getDirecturlWithPreferredProtocol(storedDirecturl);
+                storedDirecturl = this.getURLWithPreferredProtocol(storedDirecturl);
                 logger.info("Trying to re-use stored directurl: " + storedDirecturl);
                 dl = new jd.plugins.BrowserAdapter().openDownload(br, link, storedDirecturl, this.isResumeable(link, account), this.getMaxChunks(link, account));
                 if (this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -1324,7 +1324,7 @@ public class OneFichierCom extends PluginForHost {
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dllink = this.getDirecturlWithPreferredProtocol(dllink);
+            dllink = this.getURLWithPreferredProtocol(dllink);
             link.setProperty(directurlproperty, dllink);
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {

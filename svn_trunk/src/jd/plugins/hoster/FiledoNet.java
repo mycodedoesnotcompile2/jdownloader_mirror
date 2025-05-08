@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50471 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51050 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledoNet extends PluginForHost {
     public FiledoNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -285,8 +285,7 @@ public class FiledoNet extends PluginForHost {
         checkLinks(new DownloadLink[] { link });
         if (!link.isAvailabilityStatusChecked()) {
             return AvailableStatus.UNCHECKED;
-        }
-        if (link.isAvailabilityStatusChecked() && !link.isAvailable()) {
+        } else if (!link.isAvailable()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;

@@ -52,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51050 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwojplikPl extends PluginForHost {
     public TwojplikPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -244,11 +244,11 @@ public class TwojplikPl extends PluginForHost {
         checkLinks(new DownloadLink[] { link });
         if (!link.isAvailabilityStatusChecked()) {
             return AvailableStatus.UNCHECKED;
-        }
-        if (link.isAvailabilityStatusChecked() && !link.isAvailable()) {
+        } else if (!link.isAvailable()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else {
+            return AvailableStatus.TRUE;
         }
-        return AvailableStatus.TRUE;
     }
 
     private void setWeakFilename(final DownloadLink link) {

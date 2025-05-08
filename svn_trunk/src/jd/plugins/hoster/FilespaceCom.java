@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51052 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilespaceCom extends XFileSharingProBasic {
     public FilespaceCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -195,5 +195,13 @@ public class FilespaceCom extends XFileSharingProBasic {
             // }
         }
         return ret;
+    }
+
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*File not found")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 }

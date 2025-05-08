@@ -52,7 +52,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51033 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51052 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -63,6 +63,8 @@ public class ChoMikujPl extends antiDDoSForHost {
     private static final boolean default_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK                    = true;
     private static final String  IGNORE_TRAFFIC_LIMIT                                         = "IGNORE_TRAFFIC_LIMIT";
     private static final boolean default_IGNORE_TRAFFIC_LIMIT                                 = false;
+    /* DownloadLink properties */
+    private final String         PROPERTY_ADULT_CONTENT                                       = "adult_content";
 
     public ChoMikujPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -298,6 +300,18 @@ public class ChoMikujPl extends antiDDoSForHost {
     private String getDllink(final DownloadLink link, final Account account) throws Exception {
         final boolean isVideo = isVideo(link);
         final boolean isAudio = StringUtils.endsWithCaseInsensitive(link.getName(), ".mp3");
+        final boolean adultContentBlocked = br.containsHTML("\"FormAdultViewAccepted\"");
+        final boolean allowStreamDownloadFallback = this.getPluginConfig().getBooleanProperty(ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, default_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK);
+        if (adultContentBlocked) {
+            link.setProperty(PROPERTY_ADULT_CONTENT, true);
+            if (!allowStreamDownloadFallback || (!isVideo && !isVideo)) {
+                /* Stream download fallback is impossible */
+                throw new AccountRequiredException("Account required to download adult content");
+            }
+        } else {
+            /* Account required for original file download of adult content but stream can be downloaded without account. */
+            link.removeProperty(PROPERTY_ADULT_CONTENT);
+        }
         String downloadUrl = null;
         final String fid = getFID(link);
         br.getHeaders().put("Accept", "*/*");
@@ -421,7 +435,7 @@ public class ChoMikujPl extends antiDDoSForHost {
         logger.info("Account required for official download -> Checking if stream download fallback is possible");
         if (isAudio || isVideo) {
             /* Fall back to stream download if possible && allowed */
-            if (!this.getPluginConfig().getBooleanProperty(ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, default_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK)) {
+            if (!allowStreamDownloadFallback) {
                 if (account != null) {
                     throw new AccountRequiredException("Buy account balance or allow stream download fallback in plugin settings to download this file.");
                 } else {
@@ -499,10 +513,6 @@ public class ChoMikujPl extends antiDDoSForHost {
         String dllink = checkDirectLink(link, account);
         if (dllink == null) {
             requestFileInformation(link, account, true);
-            final boolean adultContent = br.containsHTML("\"FormAdultViewAccepted\"");
-            if (adultContent) {
-                throw new AccountRequiredException("Account required to download adult content");
-            }
             dllink = this.getDllink(link, account);
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -665,6 +675,11 @@ public class ChoMikujPl extends antiDDoSForHost {
     // for the decrypter, so we have only one session of antiddos
     public void submitForm(final Form form) throws Exception {
         super.submitForm(form);
+    }
+
+    @Override
+    public void resetDownloadlink(DownloadLink link) {
+        link.removeProperty(PROPERTY_ADULT_CONTENT);
     }
 
     private void setConfigElements() {

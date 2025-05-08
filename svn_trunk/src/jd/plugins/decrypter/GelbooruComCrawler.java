@@ -20,9 +20,11 @@ import java.util.ArrayList;
 import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -31,8 +33,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
+import jd.plugins.hoster.GelbooruCom;
 
-@DecrypterPlugin(revision = "$Revision: 48796 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
+@DecrypterPlugin(revision = "$Revision: 51051 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
 public class GelbooruComCrawler extends PluginForDecrypt {
     public GelbooruComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,7 +49,17 @@ public class GelbooruComCrawler extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String contenturl = param.getCryptedUrl().replaceFirst("http://", "https://");
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account != null) {
+            /*
+             * Logged in users can access "hidden" images according to one of our users:
+             * https://board.jdownloader.org/showthread.php?p=546884#post546884
+             */
+            // TODO: Maybe always init a hoster plugin instance so that we can use the prepared browser instance of that plugin.
+            final GelbooruCom hosterplugin = (GelbooruCom) this.getNewPluginForHostInstance(this.getHost());
+            hosterplugin.login(account, false);
+        }
         br.setCookie(getHost(), "fringeBenefits", "yup");
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -61,7 +74,7 @@ public class GelbooruComCrawler extends PluginForDecrypt {
         int offset = 0;
         final int max_entries_per_page = 42;
         int entries_per_page_current = 0;
-        int adPagesSkipped = 0;
+        int number_of_adPagesSkipped = 0;
         final ArrayList<String> dupes = new ArrayList<String>();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String singleResultOnFirstPage = br.getRegex("(/index\\.php\\?page=post&s=view&id=\\d+)").getMatch(0);
@@ -121,10 +134,10 @@ public class GelbooruComCrawler extends PluginForDecrypt {
                 break;
             } else {
                 this.br.getPage(url_part + "&pid=" + offset);
-                if (this.br.containsHTML("You are viewing an advertisement")) {
-                    logger.info("Skipping ad " + adPagesSkipped);
-                    this.br.getPage(url_part + "&pid=" + offset);
-                    adPagesSkipped++;
+                if (br.containsHTML("You are viewing an advertisement")) {
+                    logger.info("Skipping ad " + number_of_adPagesSkipped);
+                    br.getPage(url_part + "&pid=" + offset);
+                    number_of_adPagesSkipped++;
                 }
             }
         } while (!this.isAbort());

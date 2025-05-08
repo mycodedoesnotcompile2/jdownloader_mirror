@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -38,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51044 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51050 $", interfaceVersion = 3, names = {}, urls = {})
 public class VikingfileCom extends PluginForHost {
     public VikingfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,37 +110,79 @@ public class VikingfileCom extends PluginForHost {
     }
 
     @Override
+    public boolean checkLinks(final DownloadLink[] urls) {
+        if (urls == null || urls.length == 0) {
+            return false;
+        }
+        try {
+            final StringBuilder sb = new StringBuilder();
+            final List<DownloadLink> links = new ArrayList<DownloadLink>();
+            int index = 0;
+            while (true) {
+                links.clear();
+                while (true) {
+                    /* We check up to 100 links at once */
+                    if (index == urls.length || links.size() == 100) {
+                        break;
+                    } else {
+                        links.add(urls[index]);
+                        index++;
+                    }
+                }
+                sb.delete(0, sb.capacity());
+                for (final DownloadLink link : links) {
+                    sb.append("hash[]=" + this.getFID(link));
+                    sb.append("&");
+                }
+                // remove last "&"
+                sb.deleteCharAt(sb.length() - 1);
+                br.postPageRaw(getApiBase() + "/check-file", sb.toString());
+                final List<Map<String, Object>> items = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+                if (items == null || items.size() != links.size()) {
+                    /* This should never happen */
+                    throw new WTFException();
+                }
+                for (int i = 0; i < links.size(); i++) {
+                    final DownloadLink link = links.get(i);
+                    final String fid = this.getFID(link);
+                    if (!link.isNameSet()) {
+                        /* Set weak filename */
+                        link.setName(fid);
+                    }
+                    final Map<String, Object> data = items.get(i);
+                    if (Boolean.TRUE.equals(data.get("exist"))) {
+                        link.setAvailable(true);
+                        link.setFinalFileName(data.get("name").toString());
+                        link.setVerifiedFileSize(((Number) data.get("size")).longValue());
+                    } else {
+                        /* Deleted file or invalid fileID. */
+                        link.setAvailable(false);
+                    }
+                }
+                if (index == urls.length) {
+                    break;
+                }
+            }
+        } catch (final Exception e) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         return requestFileInformationAPI(link);
     }
 
     public AvailableStatus requestFileInformationAPI(final DownloadLink link) throws IOException, PluginException {
-        this.setBrowserExclusive();
-        final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(fid);
-        }
-        // TODO: Implement mass-linkcheck, see https://vikingfile.com/api
-        final UrlQuery query = new UrlQuery();
-        query.appendEncoded("hash", fid);
-        br.postPage(getApiBase() + "/check-file", query);
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        checkLinks(new DownloadLink[] { link });
+        if (!link.isAvailabilityStatusChecked()) {
+            return AvailableStatus.UNCHECKED;
+        } else if (link.isAvailabilityStatusChecked() && !link.isAvailable()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        /* 2025-05-06: Response can be list with 1 element or map */
-        final Object respO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-        final Map<String, Object> entries;
-        if (respO instanceof List) {
-            entries = (Map<String, Object>) ((List) respO).get(0);
         } else {
-            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            return AvailableStatus.TRUE;
         }
-        if (!Boolean.TRUE.equals(entries.get("exist"))) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        link.setFinalFileName(entries.get("name").toString());
-        link.setVerifiedFileSize(((Number) entries.get("size")).longValue());
-        return AvailableStatus.TRUE;
     }
 
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {

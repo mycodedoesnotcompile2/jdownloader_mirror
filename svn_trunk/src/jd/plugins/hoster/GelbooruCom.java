@@ -20,11 +20,23 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.GelbooruComConfig;
+import org.jdownloader.plugins.components.config.GelbooruComConfig.FilenameScheme;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -33,22 +45,20 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.GelbooruComConfig;
-import org.jdownloader.plugins.components.config.GelbooruComConfig.FilenameScheme;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51051 $", interfaceVersion = 3, names = {}, urls = {})
 public class GelbooruCom extends PluginForHost {
     public GelbooruCom(PluginWrapper wrapper) {
         super(wrapper);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.enablePremium("https://" + getHost() + "/index.php?page=account&s=reg");
+        }
     }
 
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        br.setCookie(getHost(), "fringeBenefits", "yup");
         return br;
     }
 
@@ -119,7 +129,6 @@ public class GelbooruCom extends PluginForHost {
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
         dllink = null;
         this.setBrowserExclusive();
-        br.setCookie(getHost(), "fringeBenefits", "yup");
         final String extDefault = ".jpg";
         final String fid = this.getFID(link);
         if (!link.isNameSet()) {
@@ -188,6 +197,76 @@ public class GelbooruCom extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), 1);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    public boolean login(final Account account, final boolean force) throws Exception {
+        synchronized (account) {
+            br.setCookiesExclusive(true);
+            final String path_account_overview = "/index.php?page=account&s=home";
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                logger.info("Attempting cookie login");
+                br.setCookies(cookies);
+                if (!force) {
+                    /* Don't validate cookies */
+                    return false;
+                }
+                br.getPage("https://" + this.getHost() + path_account_overview);
+                if (this.isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    /* Refresh cookie timestamp */
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return true;
+                } else {
+                    logger.info("Cookie login failed");
+                }
+            }
+            logger.info("Performing full login");
+            br.getPage("https://" + this.getHost() + "/index.php?page=account&s=login&code=00");
+            final Form loginform = br.getFormbyKey("user");
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
+            }
+            loginform.put("user", Encoding.urlEncode(account.getUser()));
+            loginform.put("pass", Encoding.urlEncode(account.getPass()));
+            br.submitForm(loginform);
+            if (!isLoggedin(br)) {
+                throw new AccountInvalidException();
+            }
+            // br.getPage(path_account_overview);
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            return true;
+        }
+    }
+
+    private boolean isLoggedin(final Browser br) {
+        return br.containsHTML("code=01\"|>\\s*Logout\\s*</a>");
+    }
+
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        login(account, true);
+        final AccountInfo ai = new AccountInfo();
+        // final String user_id = br.getCookie(br.getHost(), "user_id", Cookies.NOTDELETEDPATTERN);
+        /* Detailed account information can be found here: https://gelbooru.com/index.php?page=account&s=profile&id=<user_id> */
+        account.setType(AccountType.FREE);
+        return ai;
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        /* TODO: 2025-05-07: Check if login is needed for downloading. Afaik it is only needed for crawling. */
+        this.handleFree(link);
+    }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        return false;
     }
 
     @Override

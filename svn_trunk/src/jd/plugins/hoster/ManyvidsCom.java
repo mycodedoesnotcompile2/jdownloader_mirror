@@ -44,11 +44,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49074 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51049 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsCom extends PluginForHost {
     public ManyvidsCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.manyvids.com/Create-Free-Account/");
+        this.enablePremium("https://www." + getHost() + "/Create-Free-Account/");
     }
 
     @Override
@@ -65,7 +65,7 @@ public class ManyvidsCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://info.manyvids.com/home";
+        return "https://info." + getHost() + "/home";
     }
 
     private static List<String[]> getPluginDomains() {

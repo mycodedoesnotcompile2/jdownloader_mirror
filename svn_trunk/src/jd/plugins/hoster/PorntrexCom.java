@@ -22,13 +22,14 @@ import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigPorntrexCom;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51052 $", interfaceVersion = 3, names = {}, urls = {})
 public class PorntrexCom extends KernelVideoSharingComV2 {
     public PorntrexCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.porntrex.com/signup/");
+        this.enablePremium("https://www." + getHost() + "/signup/");
     }
 
     public static List<String[]> getPluginDomains() {
@@ -66,6 +67,16 @@ public class PorntrexCom extends KernelVideoSharingComV2 {
     @Override
     protected boolean preferTitleHTML() {
         return true;
+    }
+
+    @Override
+    protected String regexNormalTitleWebsite(final Browser br) {
+        final String title = br.getRegex("video_title:\\s*'([^']+)'").getMatch(0);
+        if (title != null) {
+            return title;
+        } else {
+            return super.regexNormalTitleWebsite(br);
+        }
     }
 
     @Override
