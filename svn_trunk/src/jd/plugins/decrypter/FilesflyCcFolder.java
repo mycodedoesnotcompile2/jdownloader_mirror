@@ -34,11 +34,14 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
+import jd.plugins.hoster.FilesflyCc;
 
-@DecrypterPlugin(revision = "$Revision: 51052 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51053 $", interfaceVersion = 3, names = {}, urls = {})
+@PluginDependencies(dependencies = { FilesflyCc.class })
 public class FilesflyCcFolder extends PluginForDecrypt {
     public FilesflyCcFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,10 +56,7 @@ public class FilesflyCcFolder extends PluginForDecrypt {
     }
 
     public static List<String[]> getPluginDomains() {
-        final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filesfly.cc" });
-        return ret;
+        return FilesflyCc.getPluginDomains();
     }
 
     public static String[] getAnnotationNames() {

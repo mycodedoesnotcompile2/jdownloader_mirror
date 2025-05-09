@@ -33,9 +33,34 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.os;
 
-import java.lang.reflect.Method;
+import static com.sun.jna.platform.win32.WinNT.TOKEN_DUPLICATE;
+import static com.sun.jna.platform.win32.WinNT.TOKEN_QUERY;
+import static com.sun.jna.platform.win32.WinUser.SW_HIDE;
+import static com.sun.jna.platform.win32.WinUser.SW_SHOW;
 
-import org.appwork.utils.StringUtils;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.parser.ShellParser;
+import org.appwork.utils.parser.ShellParser.Style;
+
+import com.sun.jna.Pointer;
+import com.sun.jna.platform.win32.Advapi32;
+import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Advapi32Util.Account;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.Kernel32Util;
+import com.sun.jna.platform.win32.Shell32;
+import com.sun.jna.platform.win32.W32Errors;
+import com.sun.jna.platform.win32.Win32Exception;
+import com.sun.jna.platform.win32.WinBase;
+import com.sun.jna.platform.win32.WinDef.INT_PTR;
+import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
+import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
+import com.sun.jna.platform.win32.WinNT.TOKEN_ELEVATION;
+import com.sun.jna.ptr.IntByReference;
 
 /**
  * @author Thomas
@@ -49,9 +74,49 @@ public class WindowsUtils {
      *             SelfTestPackages if we remove it.
      */
     public static final String SID_LOCAL_SYSTEM = "S-1-5-18";
+
     // public static final String SID_USER = "S-1-5-32-545";
     // public static final String SID_EVERYBODYY = "S-1-1-0";
     // public static final String SID_ADMINISTRATOR = "S-1-5-32-544";
+    public static Account getCurrentUserAccount() {
+        HANDLEByReference phToken = new HANDLEByReference();
+        Win32Exception err = null;
+        try {
+            // open thread or process token
+            HANDLE threadHandle = Kernel32.INSTANCE.GetCurrentThread();
+            if (!Advapi32.INSTANCE.OpenThreadToken(threadHandle, TOKEN_DUPLICATE | TOKEN_QUERY, true, phToken)) {
+                int rc = Kernel32.INSTANCE.GetLastError();
+                if (rc != W32Errors.ERROR_NO_TOKEN) {
+                    throw new Win32Exception(rc);
+                }
+                HANDLE processHandle = Kernel32.INSTANCE.GetCurrentProcess();
+                if (!Advapi32.INSTANCE.OpenProcessToken(processHandle, TOKEN_DUPLICATE | TOKEN_QUERY, phToken)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                }
+            }
+            Advapi32Util.Account userAcct = Advapi32Util.getTokenAccount(phToken.getValue());
+            return userAcct;
+        } catch (Win32Exception e) {
+            err = e;
+            throw err; // re-throw in order to invoke finally block
+        } finally {
+            HANDLE hToken = phToken.getValue();
+            if (!WinBase.INVALID_HANDLE_VALUE.equals(hToken)) {
+                try {
+                    Kernel32Util.closeHandle(hToken);
+                } catch (Win32Exception e) {
+                    if (err == null) {
+                        err = e;
+                    } else {
+                        Exceptions.addSuppressed(err, e);
+                    }
+                }
+            }
+            if (err != null) {
+                throw err;
+            }
+        }
+    }
 
     /**
      * Returns the current user SID. WARNING: Uses Reflection and com.sun packages.
@@ -59,10 +124,7 @@ public class WindowsUtils {
      * @return
      */
     public static String getCurrentUserSID() throws Exception {
-        final Class<?> ntSystemClass = Class.forName("com.sun.security.auth.module.NTSystem");
-        final Object ntSystem = ntSystemClass.newInstance();
-        final Method getSID = ntSystemClass.getDeclaredMethod("getUserSID", new Class[0]);
-        return (String) getSID.invoke(ntSystem, new Object[0]);
+        return getCurrentUserAccount().sidString;
     }
 
     /**
@@ -72,17 +134,21 @@ public class WindowsUtils {
      * @param sid
      * @return
      */
-    public static boolean isCurrentUserPartOfGroup(String sid) throws Exception {
-        final Class<?> ntSystemClass = Class.forName("com.sun.security.auth.module.NTSystem");
-        final Object ntSystem = ntSystemClass.newInstance();
-        final Method getGroupIDs = ntSystemClass.getDeclaredMethod("getGroupIDs", new Class[0]);
-        final String groups[] = (String[]) getGroupIDs.invoke(ntSystem, new Object[0]);
-        for (final String group : groups) {
-            if (StringUtils.equals(sid, group)) {
+    public static boolean isCurrentUserPartOfGroup(String sid) {
+        for (Account a : getCurrentUsersAccounts()) {
+            if (a.sidString.equals(sid)) {
                 return true;
             }
         }
         return false;
+    }
+
+    public static boolean isAdministrator() {
+        return isCurrentUserPartOfGroup(SID.SID_BUILTIN_ADMINISTRATORS.sid);
+    }
+
+    public static boolean isElevated() {
+        return Advapi32Util.isCurrentProcessElevated();
     }
 
     public static enum SID {
@@ -168,7 +234,6 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
-
         public final String sid;
 
         private SID(String sid) {
@@ -176,4 +241,198 @@ public class WindowsUtils {
         }
     }
 
+    public static Set<Account> getCurrentUsersAccounts() {
+        Set<Account> accounts = new HashSet<Account>();
+        HANDLEByReference phToken = new HANDLEByReference();
+        Win32Exception err = null;
+        try {
+            // open thread or process token
+            HANDLE threadHandle = Kernel32.INSTANCE.GetCurrentThread();
+            if (!Advapi32.INSTANCE.OpenThreadToken(threadHandle, TOKEN_DUPLICATE | TOKEN_QUERY, true, phToken)) {
+                int rc = Kernel32.INSTANCE.GetLastError();
+                if (rc != W32Errors.ERROR_NO_TOKEN) {
+                    throw new Win32Exception(rc);
+                }
+                HANDLE processHandle = Kernel32.INSTANCE.GetCurrentProcess();
+                if (!Advapi32.INSTANCE.OpenProcessToken(processHandle, TOKEN_DUPLICATE | TOKEN_QUERY, phToken)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                }
+            }
+            Account[] tg = Advapi32Util.getTokenGroups(phToken.getValue());
+            accounts.add(Advapi32Util.getTokenAccount(phToken.getValue()));
+            for (Account acct : tg) {
+                accounts.add(acct);
+            }
+            return accounts;
+        } catch (Win32Exception e) {
+            err = e;
+            throw err; // re-throw in order to invoke finally block
+        } finally {
+            HANDLE hToken = phToken.getValue();
+            if (!WinBase.INVALID_HANDLE_VALUE.equals(hToken)) {
+                try {
+                    Kernel32Util.closeHandle(hToken);
+                } catch (Win32Exception e) {
+                    if (err == null) {
+                        err = e;
+                    } else {
+                        Exceptions.addSuppressed(err, e);
+                    }
+                }
+            }
+            if (err != null) {
+                throw err;
+            }
+        }
+    }
+
+    /**
+     * @return
+     */
+    public static Set<String> getMyPrincipalNames() {
+        Set<String> myPrincipals = new HashSet<String>();
+        for (Account a : getCurrentUsersAccounts()) {
+            myPrincipals.add(a.domain + "\\" + a.name);
+        }
+        return myPrincipals;
+    }
+
+    /**
+     * Starts a process with elevated privileges (UAC prompt will be shown)
+     *
+     * @param command
+     *            The command to execute
+     * @param workingDir
+     *            The working directory (can be null)
+     * @param showWindow
+     *            Whether to show the window (true) or hide it (false)
+     * @return The process handle if successful, null otherwise
+     * @throws Win32Exception
+     *             if the process cannot be started
+     * @throws IllegalArgumentException
+     *             if the command is invalid
+     */
+    public static INT_PTR startElevatedProcess(String[] command, String workingDir, boolean showWindow) throws Win32Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("This operation is only supported on Windows");
+        }
+        if (command == null || command.length == 0) {
+            throw new IllegalArgumentException("Command cannot be null or empty");
+        }
+        // Convert command to absolute path if it's a file
+        // Build the final command
+        String binary = command[0];
+        String[] params = new String[command.length - 1];
+        System.arraycopy(command, 1, params, 0, params.length);
+        String finalCommand = ShellParser.createCommandLine(Style.WINDOWS, binary);
+        String args = ShellParser.createCommandLine(Style.WINDOWS, params);
+        System.out.println(finalCommand);
+        // Set up ShellExecuteEx parameters
+        Shell32.SHELLEXECUTEINFO sei = new Shell32.SHELLEXECUTEINFO();
+        sei.cbSize = sei.size();
+        sei.lpVerb = "runas"; // Request elevation
+        sei.lpFile = finalCommand;
+        sei.lpParameters = args;
+        sei.lpDirectory = workingDir;
+        sei.nShow = showWindow ? SW_SHOW : SW_HIDE;
+        sei.fMask = Shell32.SEE_MASK_NOCLOSEPROCESS; // Get process handle
+        // Execute the command
+        if (!Shell32.INSTANCE.ShellExecuteEx(sei)) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+        return new INT_PTR(Pointer.nativeValue(sei.hProcess.getPointer()));
+    }
+
+    /**
+     * Gets the process ID from a process handle
+     *
+     * @param processHandle
+     *            The handle of the process
+     * @return The process ID
+     * @throws Win32Exception
+     *             if the operation fails
+     */
+    public static int getProcessId(INT_PTR processHandle) throws Win32Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("This operation is only supported on Windows");
+        }
+        if (processHandle == null) {
+            throw new IllegalArgumentException("Process handle cannot be null");
+        }
+        HANDLE handle = new HANDLE(Pointer.createConstant(processHandle.longValue()));
+        return Kernel32.INSTANCE.GetProcessId(handle);
+    }
+
+    /**
+     * Terminates a process using its handle
+     *
+     * @param processHandle
+     *            The handle of the process to terminate
+     * @param exitCode
+     *            The exit code to set (typically 0 for normal termination)
+     * @return true if the process was terminated successfully, false otherwise
+     * @throws Win32Exception
+     *             if the termination fails
+     */
+    public static boolean terminateProcess(INT_PTR processHandle, int exitCode) throws Win32Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("This operation is only supported on Windows");
+        }
+        if (processHandle == null) {
+            throw new IllegalArgumentException("Process handle cannot be null");
+        }
+        HANDLE handle = new HANDLE(Pointer.createConstant(processHandle.longValue()));
+        // First try to get the process ID to verify the handle is valid
+        int pid = getProcessId(processHandle);
+        System.out.println("Terminating process with PID: " + pid);
+        boolean result = Kernel32.INSTANCE.TerminateProcess(handle, exitCode);
+        if (!result) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+        return result;
+    }
+
+    /**
+     * Checks if a process is running with elevated privileges
+     *
+     * @param pid
+     *            The process ID to check
+     * @return true if the process is running with elevated privileges, false otherwise
+     * @throws Win32Exception
+     *             if the operation fails
+     */
+    public static boolean isProcessElevated(int pid) throws Win32Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("This operation is only supported on Windows");
+        }
+        HANDLEByReference phToken = new HANDLEByReference();
+        try {
+            // Open process token
+            HANDLE processHandle = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (processHandle == null) {
+                throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            }
+            try {
+                // Get process token
+                if (!Advapi32.INSTANCE.OpenProcessToken(processHandle, WinNT.TOKEN_QUERY, phToken)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                }
+                // Get token elevation information
+                IntByReference pReturnLength = new IntByReference();
+                TOKEN_ELEVATION elevation = new TOKEN_ELEVATION();
+                if (!Advapi32.INSTANCE.GetTokenInformation(phToken.getValue(), WinNT.TOKEN_INFORMATION_CLASS.TokenElevation, elevation, elevation.size(), pReturnLength)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                }
+                return elevation.TokenIsElevated != 0;
+            } finally {
+                if (processHandle != null) {
+                    Kernel32Util.closeHandle(processHandle);
+                }
+            }
+        } finally {
+            if (phToken.getValue() != null) {
+                Kernel32Util.closeHandle(phToken.getValue());
+            }
+        }
+    }
 }

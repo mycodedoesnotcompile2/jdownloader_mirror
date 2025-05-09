@@ -34,10 +34,8 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.decrypter.OneDriveLiveComCrawler;
-import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 48619 $", interfaceVersion = 3, names = { "onedrive.live.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51054 $", interfaceVersion = 3, names = { "onedrive.live.com" }, urls = { "" })
 public class OneDriveLiveCom extends PluginForHost {
     public OneDriveLiveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -179,62 +177,6 @@ public class OneDriveLiveCom extends PluginForHost {
             }
         }
         dl.startDownload();
-    }
-
-    @Deprecated
-    private AvailableStatus requestFileInformation_Legacy(final DownloadLink link) throws Exception {
-        // TODO: Remove this in 2024-05-01
-        final String fileID = link.getStringProperty(PROPERTY_FILE_ID);
-        final String cid = link.getStringProperty(PROPERTY_CID);
-        final String id = link.getStringProperty(PROPERTY_FOLDER_ID);
-        final String authkey = link.getStringProperty(PROPERTY_AUTHKEY);
-        /* Legacy */
-        JDUtilities.getPluginForDecrypt(this.getHost());
-        OneDriveLiveComCrawler.prepBrAPILegacy(br);
-        final int maxItems;
-        int startIndex = link.getIntegerProperty("plain_item_si", -1);
-        if (startIndex == -1) {
-            startIndex = 0;
-            maxItems = 1000;// backwards compatibility
-        } else {
-            maxItems = OneDriveLiveComCrawler.MAX_ENTRIES_PER_REQUEST_LEGACY;
-        }
-        String contenturl = link.getStringProperty("original_link");
-        if (contenturl == null) {
-            contenturl = this.getPluginContentURL(link);
-        }
-        final String additional_data;
-        if (authkey != null) {
-            additional_data = "&authkey=" + Encoding.urlEncode(authkey);
-        } else {
-            additional_data = "";
-        }
-        OneDriveLiveComCrawler.accessItems_API(br, contenturl, cid, id, additional_data, startIndex, maxItems);
-        if (br.getRequest().getHttpConnection().getResponseCode() == 500) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500", 30 * 60 * 1000l);
-        } else if (br.containsHTML("\"code\":154")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Object error = entries.get("error");
-        if (error != null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, error.toString());
-        }
-        final List<Object> ressourcelist = (List) entries.get("items");
-        if (fileID != null) {
-            for (final Object ressource : ressourcelist) {
-                final String ret = findDownloadURL_Legacy((Map<String, Object>) ressource, fileID);
-                if (ret != null) {
-                    link.setProperty(PROPERTY_DIRECTURL, ret);
-                    break;
-                }
-            }
-        }
-        final String filename = link.getStringProperty("plain_name");
-        if (filename != null) {
-            link.setFinalFileName(filename);
-        }
-        return AvailableStatus.TRUE;
     }
 
     @Deprecated

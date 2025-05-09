@@ -29,23 +29,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.os.CrossSystem;
-import org.jdownloader.plugins.DownloadPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.settings.GeneralSettings;
-import org.jdownloader.translate._JDT;
-import org.jdownloader.updatev2.InternetConnectionSettings;
-
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
@@ -69,6 +52,23 @@ import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.BytesMappedFile.BytesMappedFileCallback;
 import jd.plugins.download.raf.FileBytesMap.FileBytesMapView;
 import jd.plugins.download.raf.HTTPChunk.ERROR;
+
+import org.appwork.exceptions.WTFException;
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.os.CrossSystem;
+import org.jdownloader.plugins.DownloadPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.translate._JDT;
+import org.jdownloader.updatev2.InternetConnectionSettings;
 
 public class HTTPDownloader extends DownloadInterface implements FileBytesCacheFlusher, BytesMappedFileCallback {
     public static enum STATEFLAG {
@@ -456,9 +456,11 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
         final List<ChunkRange> unMarkedAreas = chunkStrategy.getUnMarkedAreas();
         final long verifiedFileSize = downloadable.getVerifiedFileSize();
         final String rangeRequest;
-        if (tryRangeRequest && (unMarkedAreas.size() > 0 && unMarkedAreas.get(0).getFrom() > 0) || Boolean.TRUE.equals(requestRangeIfPossible)) {
-            final ChunkRange chunkRange = unMarkedAreas.get(0);// TODO: unMarkedAreas.size kann 0 sein
+        if (tryRangeRequest && unMarkedAreas.size() > 0 && unMarkedAreas.get(0).getFrom() > 0) {
+            final ChunkRange chunkRange = unMarkedAreas.get(0);
             rangeRequest = chunkRange.getRangeHeaderContent(true);
+        } else if (Boolean.TRUE.equals(requestRangeIfPossible)) {
+            rangeRequest = new ChunkRange(0).getRangeHeaderContent(true);
         } else {
             rangeRequest = null;
         }

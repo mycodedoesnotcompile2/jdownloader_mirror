@@ -20,7 +20,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.GelbooruComConfig;
 import org.jdownloader.plugins.components.config.GelbooruComConfig.FilenameScheme;
@@ -45,13 +44,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51051 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51053 $", interfaceVersion = 3, names = {}, urls = {})
 public class GelbooruCom extends PluginForHost {
     public GelbooruCom(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://" + getHost() + "/index.php?page=account&s=reg");
-        }
+        this.enablePremium("https://" + getHost() + "/index.php?page=account&s=reg");
     }
 
     @Override

@@ -22,8 +22,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -48,11 +48,20 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.ChoMikujPl;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51052 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
+@DecrypterPlugin(revision = "$Revision: 51053 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
 public class ChoMikujPlFolder extends PluginForDecrypt {
     public ChoMikujPlFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setLoadLimit(4194304);
+        return br;
     }
 
     private String                            FOLDERPASSWORD                  = null;
@@ -74,20 +83,19 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
      */
     protected void loadCookies(final Browser prepBr, final String host) {
         synchronized (recentCookies) {
-            if (!recentCookies.isEmpty()) {
-                for (final Map.Entry<String, Cookies> cookieEntry : recentCookies.entrySet()) {
-                    final String key = cookieEntry.getKey();
-                    if (key != null && key.equals(host)) {
-                        try {
-                            prepBr.setCookies(key, cookieEntry.getValue(), false);
-                        } catch (final Throwable e) {
-                        }
+            for (final Map.Entry<String, Cookies> cookieEntry : recentCookies.entrySet()) {
+                final String key = cookieEntry.getKey();
+                if (key != null && key.equals(host)) {
+                    try {
+                        prepBr.setCookies(key, cookieEntry.getValue(), false);
+                    } catch (final Throwable e) {
                     }
                 }
             }
         }
     }
 
+    @Override
     public int getMaxConcurrentProcessingInstances() {
         return 4;
     }
@@ -95,26 +103,25 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         loadHosterPlugin();
         ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setLoadLimit(3123000);
         int startPage = 1;
         boolean scanForMorePages = false;
         String parameter_without_page_number = null;
-        if (new Regex(param.getCryptedUrl(), Pattern.compile(VIDEO_DIRECTURL, Pattern.CASE_INSENSITIVE)).matches()) {
-            /* 2019-07-16: Very rare case e.g. svn.jdownloader.org/issues/81525 */
-            ret.add(this.createDownloadlink("directhttp://" + param.toString()));
+        if (new Regex(param.getCryptedUrl(), Pattern.compile(VIDEO_DIRECTURL, Pattern.CASE_INSENSITIVE)).patternFind()) {
+            /* 2019-07-16: Very rare case e.g. https://svn.jdownloader.org/issues/81525 */
+            ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(param.getCryptedUrl())));
             return ret;
         }
         String parameter;
-        if (param.toString().matches(PAGEDECRYPTLINK)) {
-            final String base = new Regex(param.toString(), "\\.pl/result/([^\\?]+)").getMatch(0);
+        if (param.getCryptedUrl().matches(PAGEDECRYPTLINK)) {
+            final String base = new Regex(param.getCryptedUrl(), "\\.pl/result/([^\\?]+)").getMatch(0);
             parameter = Encoding.Base64Decode(base);
-            if (param.toString().contains("?check_for_more=true")) {
+            if (param.getCryptedUrl().contains("?check_for_more=true")) {
                 scanForMorePages = true;
                 startPage = Integer.parseInt(new Regex(parameter, ",(\\d+)$").getMatch(0));
                 parameter_without_page_number = parameter.substring(0, parameter.lastIndexOf(","));
             }
         } else {
-            parameter = param.toString().replace("chomikuj.pl//", "chomikuj.pl/");
+            parameter = param.getCryptedUrl().replace("chomikuj.pl//", "chomikuj.pl/");
             if (parameter.contains(",")) {
                 scanForMorePages = false;
                 parameter_without_page_number = parameter.substring(0, parameter.lastIndexOf(","));
@@ -135,8 +142,6 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         }
         /* Correct added link */
         parameter = parameter.replace("www.", "").replace("http://", "https://");
-        br.setFollowRedirects(true);
-        br.setLoadLimit(4194304);
         /********************** Load recent cookies ************************/
         this.loadCookies(br, this.getHost());
         /********************** Login if possible ************************/
@@ -322,8 +327,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
 
     @SuppressWarnings("deprecation")
     private ArrayList<DownloadLink> crawlAll(final String url, final String postdata, final CryptedLink param, final String chomikID) throws Exception {
-        br.setFollowRedirects(true);
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String baseURL = br.getURL();
         if (baseURL.endsWith("/")) {
             baseURL = baseURL.substring(0, baseURL.lastIndexOf("/"));
@@ -341,10 +345,10 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         }
         int pageCount = 1;
         /** More than one page? Every page goes back into the crawler as a single url! */
-        if (pageCount > 1 && !param.toString().matches(PAGEDECRYPTLINK)) {
+        if (pageCount > 1 && !param.getCryptedUrl().matches(PAGEDECRYPTLINK)) {
             // Moved up
         } else {
-            /* Decrypt all pages, start with 1 (not 0 as it was before) */
+            /* Crawl all pages, start with 1 (not 0 as it was before) */
             pageCount = 1;
             final String pageCountStr = new Regex(url, ",(\\d{1,3})$").getMatch(0);
             if (pageCountStr != null) {
@@ -467,7 +471,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                 }
                 dl.setContentUrl(content_url);
                 distribute(dl);
-                decryptedLinks.add(dl);
+                ret.add(dl);
             }
         }
         if (decryptFolders && allFolders != null && allFolders.length != 0) {
@@ -489,11 +493,11 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                     }
                     fp.add(dl);
                     distribute(dl);
-                    decryptedLinks.add(dl);
+                    ret.add(dl);
                 }
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 
     /**
@@ -505,124 +509,116 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
     public void passwordHandling(final Object param) throws Exception {
         synchronized (LOCK) {
             logger.info("Entered password handling");
-            final boolean followRedirectBefore = br.isFollowingRedirects();
-            br.setFollowRedirects(true);
-            try {
-                final String urlBeforeEnteringPassword = br.getURL();
-                if (isSpecialUserPasswordProtected(br)) {
-                    logger.info("Content is password protected (special folder user password)");
-                    /**
-                     * This is not a folder password but another type of password which needs to be entered before! Some folders have this
-                     * protection AND a folder-password!
-                     */
-                    boolean success = false;
-                    for (int i = 0; i <= 3; i++) {
-                        final Form pass = getSpecialUserPasswordProtectedForm(br);
-                        if (param instanceof DownloadLink) {
-                            FOLDERPASSWORD_SPECIAL = ((DownloadLink) param).getStringProperty(PROPERTY_FOLDERPASSWORD_SPECIAL);
-                        }
-                        if (FOLDERPASSWORD_SPECIAL == null) {
-                            /* Try last working password first */
-                            FOLDERPASSWORD_SPECIAL = this.getPluginConfig().getStringProperty(PROPERTY_FOLDERPASSWORD_SPECIAL);
-                        }
-                        if (FOLDERPASSWORD_SPECIAL == null || i > 0) {
-                            if (param instanceof CryptedLink) {
-                                FOLDERPASSWORD_SPECIAL = getUserInput("Enter folder USER password", (CryptedLink) param);
-                            } else {
-                                FOLDERPASSWORD_SPECIAL = getUserInput("Enter folder USER password", new CryptedLink(((DownloadLink) param).getPluginPatternMatcher()));
-                            }
-                        }
-                        pass.put("Password", FOLDERPASSWORD_SPECIAL);
-                        pass.remove("Remember");
-                        /* This is set to true in host plugin - we will try to save- and re-use cookies there! */
-                        pass.put("Remember", "False");
-                        submitForm(pass);
-                        if (isSpecialUserPasswordProtected(br)) {
-                            continue;
+            final String urlBeforeEnteringPassword = br.getURL();
+            if (isSpecialUserPasswordProtected(br)) {
+                logger.info("Content is password protected (special folder user password)");
+                /**
+                 * This is not a folder password but another type of password which needs to be entered before! Some folders have this
+                 * protection AND a folder-password!
+                 */
+                boolean success = false;
+                for (int i = 0; i <= 3; i++) {
+                    final Form pass = getSpecialUserPasswordProtectedForm(br);
+                    if (param instanceof DownloadLink) {
+                        FOLDERPASSWORD_SPECIAL = ((DownloadLink) param).getStringProperty(PROPERTY_FOLDERPASSWORD_SPECIAL);
+                    }
+                    if (FOLDERPASSWORD_SPECIAL == null) {
+                        /* Try last working password first */
+                        FOLDERPASSWORD_SPECIAL = this.getPluginConfig().getStringProperty(PROPERTY_FOLDERPASSWORD_SPECIAL);
+                    }
+                    if (FOLDERPASSWORD_SPECIAL == null || i > 0) {
+                        if (param instanceof CryptedLink) {
+                            FOLDERPASSWORD_SPECIAL = getUserInput("Enter folder USER password", (CryptedLink) param);
                         } else {
-                            success = true;
-                            break;
+                            FOLDERPASSWORD_SPECIAL = getUserInput("Enter folder USER password", new CryptedLink(((DownloadLink) param).getPluginPatternMatcher()));
                         }
                     }
-                    if (success) {
-                        logger.info("Special folder password handling successful");
-                        if (param instanceof DownloadLink) {
-                            ((DownloadLink) param).setProperty(PROPERTY_FOLDERPASSWORD_SPECIAL, FOLDERPASSWORD_SPECIAL);
-                        }
-                        this.getPluginConfig().setProperty(PROPERTY_FOLDERPASSWORD_SPECIAL, FOLDERPASSWORD_SPECIAL);
-                        if (!br.getURL().equals(urlBeforeEnteringPassword)) {
-                            /* Sometimes redirect to root may happen --> Correct that */
-                            logger.info("Correcting URL: " + br.getURL() + " --> " + urlBeforeEnteringPassword);
-                            br.getPage(urlBeforeEnteringPassword);
-                        }
+                    pass.put("Password", FOLDERPASSWORD_SPECIAL);
+                    pass.remove("Remember");
+                    /* This is set to true in host plugin - we will try to save- and re-use cookies there! */
+                    pass.put("Remember", "False");
+                    submitForm(pass);
+                    if (isSpecialUserPasswordProtected(br)) {
+                        continue;
                     } else {
-                        logger.info("Special folder password handling failed");
-                        throw new DecrypterException(DecrypterException.PASSWORD);
+                        success = true;
+                        break;
                     }
                 }
-                if (isFolderPasswordProtected(br)) {
-                    logger.info("Content is password protected (folder password)");
-                    // prevent more than one password from processing and displaying at
-                    // any point in time!
-                    prepareBrowser(param.toString(), br);
-                    final Form pass = br.getFormbyProperty("id", "LoginToFolder");
-                    if (pass == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    Map<String, Object> folderAnswer = null;
-                    boolean success = false;
-                    for (int i = 0; i <= 3; i++) {
-                        if (param instanceof CryptedLink) {
-                            FOLDERPASSWORD = ((CryptedLink) param).getDecrypterPassword();
-                        } else {
-                            FOLDERPASSWORD = ((DownloadLink) param).getDownloadPassword();
-                        }
-                        if (FOLDERPASSWORD == null) {
-                            /* Try last working password first */
-                            FOLDERPASSWORD = this.getPluginConfig().getStringProperty(CFG_FOLDERPASSWORD);
-                        }
-                        if (FOLDERPASSWORD == null || i > 0) {
-                            if (param instanceof CryptedLink) {
-                                FOLDERPASSWORD = getUserInput(null, (CryptedLink) param);
-                            } else {
-                                FOLDERPASSWORD = getUserInput(null, new CryptedLink(((DownloadLink) param).getPluginPatternMatcher()));
-                            }
-                        }
-                        pass.put("Password", FOLDERPASSWORD);
-                        pass.remove("Remember");
-                        /* This is set to true in host plugin - we will try to save- and re-use cookies there! */
-                        pass.put("Remember", "False");
-                        submitForm(pass);
-                        folderAnswer = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
-                        /* Important! The other parts of this plugin cannot handle escaped results! */
-                        br.getRequest().setHtmlCode(PluginJSonUtils.unescape(br.toString()));
-                        if ((Boolean) folderAnswer.get("IsSuccess")) {
-                            success = true;
-                            break;
-                        } else {
-                            continue;
-                        }
-                    }
-                    if (success) {
-                        logger.info("Folder password handling successful");
-                        if (param instanceof CryptedLink) {
-                            ((CryptedLink) param).setDecrypterPassword(FOLDERPASSWORD);
-                        } else {
-                            ((DownloadLink) param).setDownloadPassword(FOLDERPASSWORD);
-                        }
-                        this.getPluginConfig().setProperty(CFG_FOLDERPASSWORD, FOLDERPASSWORD);
-                        /** Small workaround so following code can work with the raw HTML code */
-                        /* TODO: Remove this as it will nullify "br.getHttpConnection()"! */
-                        final Request req = new GetRequest(urlBeforeEnteringPassword);
-                        req.setHtmlCode(folderAnswer.get("Data").toString());
-                        br.setRequest(req);
+                if (!success) {
+                    logger.info("Special folder password handling failed");
+                    throw new DecrypterException(DecrypterException.PASSWORD);
+                }
+                logger.info("Special folder password handling successful");
+                if (param instanceof DownloadLink) {
+                    ((DownloadLink) param).setProperty(PROPERTY_FOLDERPASSWORD_SPECIAL, FOLDERPASSWORD_SPECIAL);
+                }
+                this.getPluginConfig().setProperty(PROPERTY_FOLDERPASSWORD_SPECIAL, FOLDERPASSWORD_SPECIAL);
+                if (!br.getURL().equals(urlBeforeEnteringPassword)) {
+                    /* Sometimes redirect to root may happen --> Correct that */
+                    logger.info("Correcting URL: " + br.getURL() + " --> " + urlBeforeEnteringPassword);
+                    br.getPage(urlBeforeEnteringPassword);
+                }
+            }
+            if (isFolderPasswordProtected(br)) {
+                logger.info("Content is password protected (folder password)");
+                // prevent more than one password from processing and displaying at
+                // any point in time!
+                prepareBrowser(param.toString(), br);
+                final Form pass = br.getFormbyProperty("id", "LoginToFolder");
+                if (pass == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                Map<String, Object> folderAnswer = null;
+                boolean success = false;
+                for (int i = 0; i <= 3; i++) {
+                    if (param instanceof CryptedLink) {
+                        FOLDERPASSWORD = ((CryptedLink) param).getDecrypterPassword();
                     } else {
-                        logger.info("Folder password handling failed");
-                        throw new DecrypterException(DecrypterException.PASSWORD);
+                        FOLDERPASSWORD = ((DownloadLink) param).getDownloadPassword();
+                    }
+                    if (FOLDERPASSWORD == null) {
+                        /* Try last working password first */
+                        FOLDERPASSWORD = this.getPluginConfig().getStringProperty(CFG_FOLDERPASSWORD);
+                    }
+                    if (FOLDERPASSWORD == null || i > 0) {
+                        if (param instanceof CryptedLink) {
+                            FOLDERPASSWORD = getUserInput(null, (CryptedLink) param);
+                        } else {
+                            FOLDERPASSWORD = getUserInput(null, new CryptedLink(((DownloadLink) param).getPluginPatternMatcher()));
+                        }
+                    }
+                    pass.put("Password", FOLDERPASSWORD);
+                    pass.remove("Remember");
+                    /* This is set to true in host plugin - we will try to save- and re-use cookies there! */
+                    pass.put("Remember", "False");
+                    submitForm(pass);
+                    folderAnswer = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    /* Important! The other parts of this plugin cannot handle escaped results! */
+                    br.getRequest().setHtmlCode(PluginJSonUtils.unescape(br.toString()));
+                    if (Boolean.TRUE.equals(folderAnswer.get("IsSuccess"))) {
+                        success = true;
+                        break;
+                    } else {
+                        continue;
                     }
                 }
-            } finally {
-                br.setFollowRedirects(followRedirectBefore);
+                if (!success) {
+                    logger.info("Folder password handling failed");
+                    throw new DecrypterException(DecrypterException.PASSWORD);
+                }
+                logger.info("Folder password handling successful");
+                if (param instanceof CryptedLink) {
+                    ((CryptedLink) param).setDecrypterPassword(FOLDERPASSWORD);
+                } else {
+                    ((DownloadLink) param).setDownloadPassword(FOLDERPASSWORD);
+                }
+                this.getPluginConfig().setProperty(CFG_FOLDERPASSWORD, FOLDERPASSWORD);
+                /** Small workaround so following code can work with the raw HTML code */
+                /* TODO: Remove this as it will nullify "br.getHttpConnection()"! */
+                final Request req = new GetRequest(urlBeforeEnteringPassword);
+                req.setHtmlCode(folderAnswer.get("Data").toString());
+                br.setRequest(req);
             }
         }
     }

@@ -21,15 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -47,7 +38,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 51007 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51055 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -151,14 +151,51 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br>
-         * For this reason, some user may prefer website mode.
+         * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
+         * website mode.
          */
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && ACCESS_MODE_AUTO_PREFER_API_MODE)) {
             return crawlTagsPostsAPI(param, tags, language);
         } else {
             return crawlTagsPostsWebsite(param, tags, language);
         }
+    }
+
+    private String removeDiv(String input, String divStart) {
+        if (divStart == null) {
+            return input;
+        }
+        final int startIndex = input.indexOf(divStart);
+        if (startIndex == -1) {
+            return input;
+        }
+        int nextDivIndex = startIndex;
+        int divCount = 1;
+        while (true) {
+            int nextOpen = input.indexOf("<div", nextDivIndex);
+            int nextClose = input.indexOf("</div>", nextDivIndex);
+            if (nextOpen == -1) {
+                break;
+            }
+            if (nextOpen < nextClose) {
+                divCount++;
+                nextDivIndex = nextOpen + 1;
+            } else if (nextClose < nextOpen) {
+                divCount--;
+                nextDivIndex = nextClose + "</div>".length();
+            }
+            if (divCount == 1) {
+                break;
+            }
+        }
+        if (startIndex == nextDivIndex) {
+            return input;
+        }
+        // String removeThis= input.substring(startIndex, nextDivIndex);
+        final StringBuilder sb = new StringBuilder(input);
+        logger.info("removeDiv:" + divStart);
+        sb.replace(startIndex, nextDivIndex, "");
+        return sb.toString();
     }
 
     private ArrayList<DownloadLink> crawlTagsPostsWebsite(final CryptedLink param, final String tags, final String language) throws Exception {
@@ -193,21 +230,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
              * Remove unwanted items / ads from html source. Typically this is only relevant for the html code of the first page. </br>
              * Typically this removes two kinds of items: Popular/Recommended items and ads for "Create your own ai art"
              */
-            final String[] ads = new Regex(html, "<div class=\"post-gallery post-gallery-inline post-gallery-150\"[^>]*>(.*?)</div>\\s*</div>\\s*</div>\\s*</div>").getColumn(0);
-            if (ads != null && ads.length > 0) {
-                for (final String ad : ads) {
-                    html = html.replace(ad, "");
-                }
-            } else {
-                if (page == 1) {
-                    logger.warning("Failed to remove unwanted posts (ads) from html source");
-                }
-            }
-            final String chatWithMeAds = br.getRegex("<div class=\"carousel-data carousel-data-companion\"[^>]*>(.*?)</div>\\s*</div>\\s*</div>").getMatch(0);
-            if (chatWithMeAds != null) {
-                html = html.replace(chatWithMeAds, "");
-            }
-            final String[] postIDs = new Regex(html, "/posts/([A-Za-z0-9]+)").getColumn(0);
+            html = removeDiv(html, new Regex(html, "(<div[^>]*id\\s*=\\s*\"popular-preview\"[^>]*>)").getMatch(0));
+            html = removeDiv(html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*news-carousel\"[^>]*>)").getMatch(0));
+            html = removeDiv(html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*topbar-carousel\"[^>]*>)").getMatch(0));
+            html = removeDiv(html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*carousel-data-companion\"[^>]*>)").getMatch(0));
+            final String[] postIDs = new Regex(html, "(?i)PostModeMenu.click\\('([A-Za-z0-9]+)'\\)").getColumn(0);
             if (postIDs == null || postIDs.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -218,8 +245,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                     continue;
                 } else if (!SankakucomplexCom.isValidPostID(postID)) {
                     /**
-                     * Skip invalid items such as: </br>
-                     * https://chan.sankakucomplex.com/posts/update </br>
+                     * Skip invalid items such as: </br> https://chan.sankakucomplex.com/posts/update </br>
                      * https://chan.sankakucomplex.com/posts/upload
                      */
                     logger.info("Skipping invalid lowercase postID: " + postID);

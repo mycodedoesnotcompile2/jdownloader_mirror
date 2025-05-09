@@ -16,12 +16,14 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -29,17 +31,25 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.hoster.EmuParadiseMe;
 
 /**
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 50987 $", interfaceVersion = 2, names = { "emuparadise.me" }, urls = { "https?://(?:www\\.)?emuparadise\\.me/[^<>/]+/[^<>/]+/\\d{4,}" })
+@DecrypterPlugin(revision = "$Revision: 51054 $", interfaceVersion = 2, names = {}, urls = {})
 public class EmuParadiseMeCrawler extends PluginForDecrypt {
     public EmuParadiseMeCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -47,51 +57,84 @@ public class EmuParadiseMeCrawler extends PluginForDecrypt {
         return 1;
     }
 
-    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
-        // set cross browser support
-        ((jd.plugins.hoster.EmuParadiseMe) plugin).setCookies();
-        final String parameter = param.toString();
-        br.setFollowRedirects(true);
-        br.getPage(parameter);
-        if (((jd.plugins.hoster.EmuParadiseMe) plugin).isOffline()) {
-            decryptedLinks.add(createOfflinelink(parameter));
-            return decryptedLinks;
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "emuparadise.me" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + EmuParadiseMe.TYPE_ROM.pattern() + "|" + EmuParadiseMe.TYPE_ROM_OLD.pattern() + ")");
         }
-        // many links? single link?
-        final String[] links = br.getRegex(jd.plugins.hoster.EmuParadiseMe.TYPE_SEMICOLON_DOWNLOAD).getColumn(-1);
-        if (links != null && links.length > 0) {
-            // many
-            final String fpName = PluginJSonUtils.getJson(br, "name");
-            final FilePackage fp;
-            if (fpName != null) {
-                fp = FilePackage.getInstance();
-                fp.setName(Encoding.htmlDecode(fpName.trim()));
-                fp.addLinks(decryptedLinks);
-            } else {
-                fp = null;
-            }
-            for (final String link : links) {
-                final String url = Request.getLocation(link, br.getRequest());
-                final DownloadLink dl = createDownloadlink(url);
-                final Regex s = new Regex(br, "<a href=\"" + Pattern.quote(link) + "\" title=\"Download (.*?) ISO for.*?\".*?</a>\\s*\\((\\d+(?:\\.\\d+)?[KMG]{1}[B]{0,1})\\)");
-                final String name = s.getMatch(0);
-                String size = s.getMatch(1);
-                dl.setName(name);
-                dl.setDownloadSize(SizeFormatter.getSize(((jd.plugins.hoster.EmuParadiseMe) plugin).correctFilesize(size)));
-                dl.setAvailable(true);
-                decryptedLinks.add(dl);
-                if (fp != null) {
-                    fp.add(dl);
-                }
-            }
+        return ret.toArray(new String[0]);
+    }
+
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
+        final EmuParadiseMe hosterplugin = (EmuParadiseMe) this.getNewPluginForHostInstance(this.getHost());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
+        if (hosterplugin.isOffline(br)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String[] urls = br.getRegex(jd.plugins.hoster.EmuParadiseMe.TYPE_DOWNLOAD).getColumn(-1);
+        if (urls == null || urls.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        String title = br.getRegex("\"name\":\\s*\"([^\"]+)").getMatch(0);
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            fp.setName(Encoding.htmlDecode(title.trim()));
         } else {
-            /* Single link */
-            final DownloadLink singlink = createDownloadlink(br.getURL());
-            ((jd.plugins.hoster.EmuParadiseMe) plugin).parseFileInfo(singlink);
-            decryptedLinks.add(singlink);
+            /* Fallback */
+            fp.setName(br._getURL().getPath());
         }
-        return decryptedLinks;
+        logger.info("Found downloads: " + urls.length);
+        for (String url : urls) {
+            final String absolute_url = Request.getLocation(url, br.getRequest());
+            final DownloadLink link = createDownloadlink(absolute_url);
+            final Regex regex = new Regex(br, Pattern.quote(url) + "\"[^>]*>\\s*Download ([^<]+)</a>\\s*\\(([^\\)]+)\\)");
+            if (regex.patternFind()) {
+                String filename = regex.getMatch(0);
+                filename = Encoding.htmlDecode(filename).trim();
+                String filesizeStr = regex.getMatch(1);
+                filesizeStr = hosterplugin.correctFilesize(filesizeStr);
+                final String filename_quoted = Pattern.quote(filename);
+                if (br.containsHTML(filename_quoted + "\\.7z")) {
+                    filename += ".7z";
+                } else if (br.containsHTML(filename_quoted + "\\.zip")) {
+                    filename += ".zip";
+                } else {
+                    /* Having the correct file extension is important for the "unavailableWorkaroundUsed", see hoster plugin. */
+                    logger.warning("Failed to find file extension for file: " + filename);
+                    filename += EmuParadiseMe.EXT_DEFAULT;
+                }
+                link.setProperty(EmuParadiseMe.PROPERTY_DOWNLOAD_LINK_FILENAME, filename);
+                link.setFinalFileName(filename);
+                link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+            } else {
+                logger.warning("Failed to find file information for: " + url);
+            }
+            link.setAvailable(true);
+            link._setFilePackage(fp);
+            ret.add(link);
+        }
+        return ret;
     }
 }

@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51053 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesflyCc extends XFileSharingProBasic {
     public FilesflyCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -94,7 +94,7 @@ public class FilesflyCc extends XFileSharingProBasic {
 
     @Override
     protected String getPremiumOnlyErrorMessage(final Browser br) {
-        String msg = br.getRegex("<h5><p style=\"color:#b30000\">(.*?)</p></h4>").getMatch(0);
+        String msg = br.getRegex("<h5>\\s*<p style=\"color:#b30000\">(.*?)</p></h4>").getMatch(0);
         if (msg != null) {
             msg = Encoding.htmlDecode(msg);
             final String filePrice = br.getRegex("File price:\\s*<strong>(\\d+\\.\\d{2} USD)").getMatch(0);

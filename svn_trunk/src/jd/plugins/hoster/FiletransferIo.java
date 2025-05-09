@@ -20,6 +20,7 @@ import java.io.IOException;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.AccountRequiredException;
@@ -30,21 +31,27 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47895 $", interfaceVersion = 3, names = { "filetransfer.io" }, urls = { "https?://(?:www\\.)?filetransfer\\.io/data\\-package/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51054 $", interfaceVersion = 3, names = { "filetransfer.io" }, urls = { "https?://(?:www\\.)?filetransfer\\.io/data\\-package/([A-Za-z0-9]+)" })
 public class FiletransferIo extends PluginForHost {
     public FiletransferIo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "https://filetransfer.io/tos";
+        return "https://" + getHost() + "/tos";
     }
 
     /* Connection stuff */
-    private final boolean FREE_RESUME       = true;
-    private final int     FREE_MAXCHUNKS    = -2;
-    private final int     FREE_MAXDOWNLOADS = -1;
+    private final boolean FREE_RESUME    = true;
+    private final int     FREE_MAXCHUNKS = -2;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -62,13 +69,16 @@ public class FiletransferIo extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        final String fid = getFID(link);
         if (!link.isNameSet()) {
-            link.setName(getFID(link) + ".zip");
+            link.setName(fid + ".zip");
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
-        if (this.br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!br.getURL().contains(fid)) {
+            /* E.g. redirect to main page */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filetitle = br.getRegex("(?i)<title>([^<>\"]+) \\- FileTransfer\\.io</title>").getMatch(0);
@@ -128,7 +138,7 @@ public class FiletransferIo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
