@@ -26,15 +26,36 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.raf.FileBytesMap;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
 import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.storage.SimpleMapper;
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
@@ -43,6 +64,7 @@ import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.logging2.LogInterface;
@@ -83,24 +105,6 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
-
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.raf.FileBytesMap;
 
 //http://tools.ietf.org/html/draft-pantos-http-live-streaming-13
 public class HLSDownloader extends DownloadInterface {
@@ -1092,6 +1096,50 @@ public class HLSDownloader extends DownloadInterface {
                 }
             }
 
+            private final Map<String, Object> parseRetryMap(HttpRequest request) throws Exception {
+                final String value = request.getParameterbyKey("retryMap");
+                if (value == null) {
+                    return null;
+                }
+                return ((DownloadLinkDownloadable) getDownloadable()).getPlugin().restoreFromString(value, TypeRef.MAP);
+            }
+
+            private final String retry(HttpRequest request, int responseCode, int maxRetry) throws Exception {
+                Map<String, Object> retryMap = parseRetryMap(request);
+                if (retryMap == null) {
+                    retryMap = new HashMap<String, Object>();
+                }
+                Number retryCount = (Number) retryMap.get(String.valueOf(responseCode));
+                if (retryCount == null) {
+                    retryCount = 1;
+                } else {
+                    retryCount = retryCount.intValue() + 1;
+                }
+                if (retryCount.intValue() > maxRetry) {
+                    throw new IOException("retry(" + retryCount + ") limit(" + maxRetry + ") reached for responseCode=" + responseCode);
+                }
+                retryMap.put(String.valueOf(responseCode), retryCount);
+                String ret = request.getRequestedURL();
+                final String retryMapString = URLEncode.encodeURIComponent(new SimpleMapper().setPrettyPrintEnabled(false).objectToString(retryMap));
+                if (!ret.contains("retryMap=")) {
+                    ret = ret + "&retryMap=" + retryMapString;
+                } else {
+                    ret = ret.replaceFirst("(retryMap=.*?)(&|$)", "retryMap=" + Matcher.quoteReplacement(retryMapString));
+                }
+                return ret;
+            }
+
+            private final boolean handleRetry(HttpRequest request, HttpResponse response, URLConnectionAdapter connection) throws Exception {
+                if (connection.getResponseCode() == 429) {
+                    final String location = retry(request, 429, 2);
+                    Thread.sleep(1000);
+                    response.setResponseCode(ResponseCode.get(302));
+                    response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_LOCATION, location));
+                    return true;
+                }
+                return false;
+            }
+
             @Override
             public boolean onGetRequest(GetRequest request, HttpResponse response) {
                 boolean requestOkay = false;
@@ -1304,7 +1352,9 @@ public class HLSDownloader extends DownloadInterface {
                                     try {
                                         ffmpeg.updateLastUpdateTimestamp(getRequest.getConnectTimeout() + getRequest.getReadTimeout() + timeoutBuffer);
                                         connection = br.openRequestConnection(getRequest);
-                                        if (connection.getResponseCode() != 200 && connection.getResponseCode() != 206) {
+                                        if (handleRetry(request, response, connection)) {
+                                            return true;
+                                        } else if (connection.getResponseCode() != 200 && connection.getResponseCode() != 206) {
                                             throw new IOException("ResponseCode(" + connection.getResponseCode() + ") must be 200 or 206!");
                                         } else {
                                             closeConnection = false;

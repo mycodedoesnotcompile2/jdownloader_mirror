@@ -56,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51042 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 51056 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "https://download\\.boxbit\\.app/([a-f0-9]{32})(/([^/]+))?" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -487,7 +487,7 @@ public class BoxbitApp extends PluginForHost {
                 mhm.putError(account, link, 5 * 60 * 1000l, message);
             } else if (error.equalsIgnoreCase("busy_worker")) {
                 /* E.g. {"identifier":"mega","message":"Already processing another file on this filehost.","errors":["busy_worker"]} */
-                mhm.putError(account, link, 30 * 60 * 1000l, message);
+                mhm.putError(account, link, 1 * 60 * 1000l, message);
             } else if (error.equalsIgnoreCase("wrong_password")) {
                 /* Missing or wrong password */
                 link.setPasswordProtected(true); // Enable this so next time we'll ask the user to enter the password

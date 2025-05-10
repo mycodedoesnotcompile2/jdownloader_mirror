@@ -39,6 +39,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.parser.UrlQuery;
@@ -47,7 +48,7 @@ import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessM
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51055 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51058 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -243,13 +244,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 if (!dupes.add(postID)) {
                     /* Skip dupes */
                     continue;
-                } else if (!SankakucomplexCom.isValidPostID(postID)) {
-                    /**
-                     * Skip invalid items such as: </br> https://chan.sankakucomplex.com/posts/update </br>
-                     * https://chan.sankakucomplex.com/posts/upload
-                     */
-                    logger.info("Skipping invalid lowercase postID: " + postID);
-                    continue;
                 }
                 numberofNewItemsThisPage++;
                 final DownloadLink link = this.createDownloadlink(generateSinglePostURL(postID, language, tagsUrlEncoded));
@@ -273,7 +267,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 link.setAvailable(true);
                 link._setFilePackage(fp);
                 ret.add(link);
-                distribute(link);
+                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    distribute(link);
+                }
                 position++;
             }
             String nextPageURL = br.getRegex("next-page-url=\"([^\"]+)\"").getMatch(0);

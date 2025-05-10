@@ -19,12 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.YetiShareCore;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -40,7 +34,13 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51048 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.YetiShareCore;
+
+@HostPlugin(revision = "$Revision: 51058 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -275,6 +275,7 @@ public class SharingWtf extends YetiShareCore {
                 if (pe.getLinkStatus() != LinkStatus.ERROR_PLUGIN_DEFECT) {
                     throw pe;
                 }
+                logger.log(pe);
                 /*
                  * Ugly implementation: Let previous code do its job until it fails, then check if we landet on the captcha page to continue
                  * lol
@@ -283,7 +284,7 @@ public class SharingWtf extends YetiShareCore {
                 final String urlhash = br.getRegex("data-urlhash=\"([^\"]+)").getMatch(0);
                 final String sitekey = br.getRegex("data-sitekey=\"([^\"]+)").getMatch(0);
                 if (urlhash == null || sitekey == null || filename == null) {
-                    logger.warning("Speciel handling failed");
+                    logger.warning("Special handling failed");
                     throw pe;
                 }
                 final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();

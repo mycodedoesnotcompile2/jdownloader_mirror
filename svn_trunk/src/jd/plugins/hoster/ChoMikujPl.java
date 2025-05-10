@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51054 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51056 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -64,6 +64,7 @@ public class ChoMikujPl extends antiDDoSForHost {
     /* DownloadLink properties */
     private final String         PROPERTY_DOWNLOADLINK_ADULT_CONTENT                          = "adult_content";
     private final String         PROPERTY_DOWNLOADLINK_OWNED_BY_USERNAME                      = "owned_by_username";
+    private final String         PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE                 = "stream_download_active";
 
     public ChoMikujPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,6 +122,9 @@ public class ChoMikujPl extends antiDDoSForHost {
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
         if (account != null) {
+            return 0;
+        } else if (link.hasProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE)) {
+            /* No chunk limit for stream download */
             return 0;
         } else {
             return 1;
@@ -325,6 +329,7 @@ public class ChoMikujPl extends antiDDoSForHost {
      *             If an error occurs
      */
     private String getDllink(final DownloadLink link, final Account account) throws Exception {
+        link.removeProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE);
         final boolean isAudio = looksLikeAudio(link);
         final boolean isVideo = looksLikeVideo(link);
         final boolean adultContentBlocked = br.containsHTML("\"FormAdultViewAccepted\"");
@@ -353,6 +358,7 @@ public class ChoMikujPl extends antiDDoSForHost {
         // Check if account wants to force MP3 stream download
         if (account != null && isAudio && this.getPluginConfig().getBooleanProperty(ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES, default_ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES)) {
             /* User prefers stream download for .mp3 files --> Does not use up any account traffic. */
+            link.setProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE, true);
             return getDllinkAudioStream(link);
         }
         // Account users check for traffic (if traffic checking is enabled)
@@ -506,6 +512,7 @@ public class ChoMikujPl extends antiDDoSForHost {
             }
             /* Reset verifiedFilesize if it was set because file size of stream download may differ from previously set verifiedFilesize. */
             link.setVerifiedFileSize(-1);
+            link.setProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE, true);
             return downloadurl;
         }
         /* Failure -> Try to find out why a download of this file was impoossible. */
@@ -581,19 +588,8 @@ public class ChoMikujPl extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        boolean resume = this.isResumeable(link, account);
-        int maxChunks = this.getMaxChunks(link, account);
-        final boolean isAudioStreamDownload = StringUtils.containsIgnoreCase(dllink, "/Audio.ashx");
-        final boolean isVideoStreamPreviewDownload = StringUtils.containsIgnoreCase(dllink, "/Preview.ashx");
-        if (isAudioStreamDownload || isVideoStreamPreviewDownload) {
-            resume = true;
-            maxChunks = 0;
-        }
-        if (!resume) {
-            maxChunks = 1;
-        }
         try {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 logger.warning("The final dllink seems not to be a file!");
@@ -705,7 +701,10 @@ public class ChoMikujPl extends antiDDoSForHost {
 
     @Override
     public boolean hasCaptcha(DownloadLink link, Account acc) {
-        if (acc == null && (!this.allowStreamDownloadFallback() || !this.looksLikeStreamableFile(link))) {
+        if (this.getStoredDirectlink(link, acc) != null) {
+            /* Stored directurl available -> Assume that no captcha will be needed. */
+            return false;
+        } else if (acc == null && (!this.allowStreamDownloadFallback() || !this.looksLikeStreamableFile(link))) {
             /**
              * Captcha required for <br>
              * : - Original file downloads without account
@@ -758,6 +757,12 @@ public class ChoMikujPl extends antiDDoSForHost {
         } else if (this.getStoredDirectlink(link, account) != null) {
             /* Stored directurl available -> Assume that it is still valid so it can be used without using up additional traffic. */
             return true;
+        } else if (link.hasProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE)) {
+            /* Stream download will not deduct traffic. */
+            return false;
+        } else if (this.allowStreamDownloadFallback() && this.looksLikeStreamableFile(link)) {
+            /* Stream download will happen as fallback -> Stream download will not deduct traffic. */
+            return false;
         } else {
             return super.enoughTrafficFor(link, account);
         }
