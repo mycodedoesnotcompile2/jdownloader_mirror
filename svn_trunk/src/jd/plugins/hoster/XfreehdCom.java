@@ -19,16 +19,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.config.KVSConfig;
-import org.jdownloader.plugins.components.config.KVSConfigXfreehdCom;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49462 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigXfreehdCom;
+
+@HostPlugin(revision = "$Revision: 51059 $", interfaceVersion = 3, names = {}, urls = {})
 public class XfreehdCom extends KernelVideoSharingComV2 {
     public XfreehdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,17 @@ public class XfreehdCom extends KernelVideoSharingComV2 {
             return urlhd;
         } else {
             /* Fallback */
-            return super.getDllink(link, br);
+            try {
+                return super.getDllink(link, br);
+            } catch (PluginException e) {
+                logger.log(e);
+                if (urlsd != null) {
+                    /* prefer SD quality over PluginException */
+                    return urlsd;
+                } else {
+                    throw e;
+                }
+            }
         }
     }
 
