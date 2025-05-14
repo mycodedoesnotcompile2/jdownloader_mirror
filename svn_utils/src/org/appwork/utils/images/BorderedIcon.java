@@ -97,6 +97,7 @@ public class BorderedIcon extends AbstractIconPipe {
             g2d.setTransform(originalTransform);
         }
         g2d.setColor(Color.green);
+        g2d.dispose();
         paintDelegate(c, g, x + borderWidth, y + borderWidth, parents);
     }
 

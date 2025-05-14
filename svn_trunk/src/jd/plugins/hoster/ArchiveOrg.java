@@ -36,6 +36,28 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.CryptedLink;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.ArchiveOrgCrawler;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -59,29 +81,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.seamless.util.io.IO;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.CryptedLink;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.decrypter.ArchiveOrgCrawler;
-
-@HostPlugin(revision = "$Revision: 50957 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 51061 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,9 +111,8 @@ public class ArchiveOrg extends PluginForHost {
         if (isAudioPlaylistItem(link)) {
             /**
              * This enables us to add the same link twice, one time as playlist item (with different filenames) and one time as "original
-             * file". </br>
-             * We basically need to trick our own duplicate detection to allow the user to add a file as playlist item and "original" at the
-             * same time.
+             * file". </br> We basically need to trick our own duplicate detection to allow the user to add a file as playlist item and
+             * "original" at the same time.
              */
             return super.getLinkID(link) + "_audio_playlist_item";
         } else if (this.isBook(link)) {
@@ -332,9 +331,8 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * Returns true if this book page is borrowed at this moment. </br>
-     * This information is only useful with the combination of the borrow-cookies and can become invalid at any point of time if e.g. the
-     * user returns the book manually via browser.
+     * Returns true if this book page is borrowed at this moment. </br> This information is only useful with the combination of the
+     * borrow-cookies and can become invalid at any point of time if e.g. the user returns the book manually via browser.
      */
     private boolean isLendAtThisMoment(final DownloadLink link) {
         final long borrowedUntilTimestamp = link.getLongProperty(PROPERTY_IS_BORROWED_UNTIL_TIMESTAMP, -1);
@@ -367,8 +365,8 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * A special string that is the same as the bookID but different for multi volume books. </br>
-     * ...thus only relevant for multi volume books.
+     * A special string that is the same as the bookID but different for multi volume books. </br> ...thus only relevant for multi volume
+     * books.
      */
     private String getBookSubPrefix(final DownloadLink link) {
         return link.getStringProperty(PROPERTY_BOOK_SUB_PREFIX);
@@ -449,10 +447,9 @@ public class ArchiveOrg extends PluginForHost {
         if (link.getHashInfo() != null) {
             /**
              * Check if we can use the current HashInfo. Delete it if we can't be sure that the file we are going to download is the same
-             * file/version which was initially crawled. </br>
-             * Getting the current/new file-hash would also be too much effort and in most of all cases the files won't have changed until
-             * download is initiated but it is relly important to clear the hash if in doubt otherwise the user may get a "CRC check failed"
-             * error message for no reason.
+             * file/version which was initially crawled. </br> Getting the current/new file-hash would also be too much effort and in most
+             * of all cases the files won't have changed until download is initiated but it is relly important to clear the hash if in doubt
+             * otherwise the user may get a "CRC check failed" error message for no reason.
              */
             boolean deleteHashInfo = false;
             final long lastModifiedTimestampFromAPI = link.getLongProperty(PROPERTY_TIMESTAMP_FROM_API_LAST_MODIFIED, -1);
@@ -517,60 +514,66 @@ public class ArchiveOrg extends PluginForHost {
         handleDownload(null, link);
     }
 
+    private static Object DEOBFUSCATE_LOCK = new Object();
+
     /**
      * https://github.com/justimm/Archive.org-Downloader/blob/main/archive-org-downloader.py
      */
     private void deObfuscate(final File file, final String url, final String XObfuscateHeader, final String XencrypteddataHeader) throws Exception {
-        if (XObfuscateHeader == null) {
-            logger.info("Book page is not obfuscated -> Doing nothing");
-            return;
-        }
-        final String XObfuscate[] = XObfuscateHeader.split("\\|");
-        if (!"1".equals(XObfuscate[0])) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported X-Obfuscate:" + XObfuscate[0]);
-        }
-        final byte[] counter_b64 = Base64.decode(XObfuscate[1]);
-        final String aesKey = url.replaceFirst("https://.*?/", "/");
-        final byte[] key = Arrays.copyOf(HexFormatter.hexToByteArray(Hash.getSHA1(aesKey)), 16);
-        final byte[] prefix = Arrays.copyOf(counter_b64, 8);
-        final long initial_value = ByteBuffer.wrap(counter_b64, 8, 8).order(ByteOrder.BIG_ENDIAN).getLong();
-        final byte[] iv = new byte[16];
-        System.arraycopy(prefix, 0, iv, 0, 8);
-        for (int i = 0; i < 8; i++) {
-            iv[15 - i] = (byte) (initial_value >>> (8 * i));
-        }
-        final Cipher cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
-        final IvParameterSpec ivSpec = new IvParameterSpec(iv);
-        final SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
-        cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
-        final int encryptedDataLength = XencrypteddataHeader != null ? Integer.parseInt(XencrypteddataHeader) : 1024;
-        byte[] decrypted = null;
-        if (true) {
-            // verify that de-obfuscated image can be loaded
-            final byte[] data = IO.readBytes(file);
-            try {
-                decrypted = cipher.doFinal(Arrays.copyOf(data, encryptedDataLength));
-                System.arraycopy(decrypted, 0, data, 0, encryptedDataLength);
-                final BufferedImage image = ImageIO.read(new ByteArrayInputStream(data));
-                if (image == null) {
-                    throw new IOException("No image?!");
+        synchronized (DEOBFUSCATE_LOCK) {
+            if (XObfuscateHeader == null) {
+                logger.info("Book page is not obfuscated -> Doing nothing");
+                return;
+            }
+            final String XObfuscate[] = XObfuscateHeader.split("\\|");
+            if (!"1".equals(XObfuscate[0])) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported X-Obfuscate:" + XObfuscate[0]);
+            }
+            final byte[] counter_b64 = Base64.decode(XObfuscate[1]);
+            final String aesKey = url.replaceFirst("https://.*?/", "/");
+            final byte[] key = Arrays.copyOf(HexFormatter.hexToByteArray(Hash.getSHA1(aesKey)), 16);
+            final byte[] prefix = Arrays.copyOf(counter_b64, 8);
+            final long initial_value = ByteBuffer.wrap(counter_b64, 8, 8).order(ByteOrder.BIG_ENDIAN).getLong();
+            final byte[] iv = new byte[16];
+            System.arraycopy(prefix, 0, iv, 0, 8);
+            for (int i = 0; i < 8; i++) {
+                iv[15 - i] = (byte) (initial_value >>> (8 * i));
+            }
+            final Cipher cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding");
+            final IvParameterSpec ivSpec = new IvParameterSpec(iv);
+            final SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
+            final int encryptedDataLength = XencrypteddataHeader != null ? Integer.parseInt(XencrypteddataHeader) : 1024;
+            byte[] decrypted = null;
+            if (true) {
+                // verify that de-obfuscated image can be loaded
+                final byte[] data = IO.readBytes(file);
+                try {
+                    decrypted = cipher.doFinal(Arrays.copyOf(data, encryptedDataLength));
+                    System.arraycopy(decrypted, 0, data, 0, encryptedDataLength);
+                    final BufferedImage image = ImageIO.read(new ByteArrayInputStream(data));
+                    if (image == null) {
+                        throw new IOException("No image?!");
+                    } else {
+                        image.flush();
+                    }
+                } catch (Exception e) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
                 }
-            } catch (Exception e) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
             }
-        }
-        final RandomAccessFile raf = new RandomAccessFile(file, "rw");
-        try {
-            raf.seek(0);
-            if (decrypted == null) {
-                byte[] encrypted = new byte[encryptedDataLength];
-                raf.readFully(encrypted);
-                decrypted = cipher.doFinal(encrypted);
+            final RandomAccessFile raf = new RandomAccessFile(file, "rw");
+            try {
                 raf.seek(0);
+                if (decrypted == null) {
+                    byte[] encrypted = new byte[encryptedDataLength];
+                    raf.readFully(encrypted);
+                    decrypted = cipher.doFinal(encrypted);
+                    raf.seek(0);
+                }
+                raf.write(decrypted);
+            } finally {
+                raf.close();
             }
-            raf.write(decrypted);
-        } finally {
-            raf.close();
         }
     }
 
@@ -830,8 +833,7 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * Borrows given bookID which gives us a token we can use to download all pages of that book. </br>
-     * It is typically valid for one hour.
+     * Borrows given bookID which gives us a token we can use to download all pages of that book. </br> It is typically valid for one hour.
      */
     private void borrowBook(final Browser br, final Account account, final String bookID, final boolean skipAllExceptLastStep) throws Exception {
         if (account == null) {
@@ -865,9 +867,9 @@ public class ArchiveOrg extends PluginForHost {
                     if (StringUtils.equalsIgnoreCase(error, "This book is not available to borrow at this time. Please try again later.")) {
                         /**
                          * Happens if you try to borrow a book that can't be borrowed or if you try to borrow a book while too many
-                         * (2022-08-31: max 10) books per hour have already been borrowed with the current account. </br>
-                         * With setting this timestamp we can ensure not to waste more http requests on trying to borrow books but simply
-                         * set error status on all future links [for the next 60 minutes].
+                         * (2022-08-31: max 10) books per hour have already been borrowed with the current account. </br> With setting this
+                         * timestamp we can ensure not to waste more http requests on trying to borrow books but simply set error status on
+                         * all future links [for the next 60 minutes].
                          */
                         account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_BORROW_LIMIT_REACHED, Time.systemIndependentCurrentJVMTimeMillis());
                         /*
