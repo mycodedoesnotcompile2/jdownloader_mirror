@@ -21,6 +21,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -38,17 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51058 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51062 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -152,8 +152,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
-         * website mode.
+         * Some items are only visible for logged in users and are never returned via API. </br>
+         * For this reason, some user may prefer website mode.
          */
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && ACCESS_MODE_AUTO_PREFER_API_MODE)) {
             return crawlTagsPostsAPI(param, tags, language);
@@ -268,6 +268,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 link._setFilePackage(fp);
                 ret.add(link);
                 if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    /* Developers / IDE-only: Do not add links during crawling. */
                     distribute(link);
                 }
                 position++;

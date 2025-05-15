@@ -15,15 +15,14 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.net.ConnectException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.antiDDoSForHost;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -31,169 +30,152 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47473 $", interfaceVersion = 2, names = { "yourupload.com" }, urls = { "https?://((?:www\\.)?(yourupload\\.com|yucache\\.net)/((file|embed(_ext/\\w+)?|watch)/|download\\?file=)[a-z0-9]+|embed\\.(yourupload\\.com|yucache\\.net)/[A-Za-z0-9]+)" })
-public class YourUploadCom extends antiDDoSForHost {
-    private String dllink        = null;
-    private String regexEmbed    = ".+(/embed_ext/|embed\\.(?:yourupload\\.com|yucache\\.net)/|yourupload\\.com/embed/).+";
-    private String regexDownload = ".+/download\\?file=.+";
+@HostPlugin(revision = "$Revision: 51062 $", interfaceVersion = 2, names = {}, urls = {})
+public class YourUploadCom extends PluginForHost {
+    private static final Pattern PATTERN_EMBED = Pattern.compile("/embed/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_WATCH = Pattern.compile("/watch/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_FILE  = Pattern.compile("/download\\?file=(\\d+)", Pattern.CASE_INSENSITIVE);
 
     public YourUploadCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    public String getAGBLink() {
-        return "http://yourupload.com/index.php?act=pages&page=terms-of-service";
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
-    @SuppressWarnings("deprecation")
-    public void correctDownloadLink(DownloadLink link) {
-        if (link.getDownloadURL().matches(".+/watch/.+")) {
-            link.setUrlDownload("http://embed.yourupload.com/" + new Regex(link.getDownloadURL(), "([A-Za-z0-9]+)$").getMatch(0));
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/index.php?act=pages&page=terms-of-service";
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "yourupload.com" });
+        ret.add(new String[] { "yucache.net" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_EMBED.pattern() + "|" + PATTERN_WATCH.pattern() + "|" + PATTERN_FILE.pattern() + ")");
         }
-        // you can not convert embed formats back! will always show up offline!
-        if (!link.getDownloadURL().matches(regexEmbed) && !link.getDownloadURL().matches(regexDownload)) {
-            link.setUrlDownload("http://yourupload.com/file/" + new Regex(link.getDownloadURL(), "([A-Za-z0-9]+)$").getMatch(0));
+        return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        } else {
+            return super.getLinkID(link);
         }
+    }
+
+    private String getFID(final DownloadLink link) {
+        String fid = new Regex(link.getPluginPatternMatcher(), PATTERN_WATCH).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        return null;
     }
 
     @SuppressWarnings("deprecation")
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.setReadTimeout(2 * 60 * 1000);
-        br.setConnectTimeout(2 * 60 * 1000);
-        // Correct old links
-        correctDownloadLink(link);
-        getPage(link.getDownloadURL());
+        final String file_id = this.getFID(link);
+        if (!link.isNameSet()) {
+            /* Set weak filename */
+            link.setName(file_id + ".mp4");
+        }
         String filename = null;
-        if (link.getDownloadURL().matches(regexEmbed)) {
-            if (br.getHttpConnection() == null || br.getHttpConnection().getResponseCode() > 400 || br.containsHTML("<h1>Error</h1>") || br.containsHTML("Embed\\+entry\\+doesnt\\+exist") || br.containsHTML("No htmlCode read") || br.containsHTML("Could not redirect legacy")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (this.br.containsHTML("file[\r\n\t ]*?:[\r\n\t ]*?\\'\\',")) {
-                /* Browser will show "Error loading player: No playable sources found" in this case */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            filename = br.getRegex("<title>(.*?)</title>").getMatch(0);
-            if (filename == null) {
-                filename = br.getRegex("<meta name=\"description\" content=\"(.*?)\" />").getMatch(0);
-            }
-            dllink = br.getRegex("(?:\\')?file(?:\\')?\\s*?:\\s*?\\'((?:https?://|/).*?)\\'").getMatch(0);
-            if (dllink == null) {
-                dllink = br.getRegex("property=\"og:video\" content=\"(https?://.*?)\"").getMatch(0);
-            }
-            if (dllink == null) {
-                dllink = br.getRegex("<source[^<>]+?src=\"(.*?)\"").getMatch(0);
-            }
-            if (dllink == null || filename == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            link.setFinalFileName(filename);
-            final Browser br2 = br.cloneBrowser();
-            // In case the link redirects to the finallink
-            br2.setFollowRedirects(true);
-            URLConnectionAdapter con = null;
-            try {
-                try {
-                    con = br2.openHeadConnection(this.dllink);
-                } catch (final ConnectException e) {
-                    return AvailableStatus.TRUE;
-                }
-                // only way to check for made up links... or offline is here
-                if (con.getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (con.getCompleteContentLength() == 0) {
-                    /* 2020-11-23 */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                if (!this.looksLikeDownloadableContent(con)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                final String etagHeader = con.getHeaderField("ETag");
-                if (etagHeader != null && etagHeader.equalsIgnoreCase("W/\"3208b07-17e68b9dcf7\"")) {
-                    /* 2022-09-24: Big bucks bunny demo video */
-                    /* Content-Length: 52464391 */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                link.setVerifiedFileSize(con.getCompleteContentLength());
-                return AvailableStatus.TRUE;
-            } catch (final BrowserException eb) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } catch (Exception e) {
-                throw e;
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
-                }
-            }
-        } else if (link.getDownloadURL().matches(regexDownload)) {
+        String filesize = null;
+        final Regex regex_file = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE);
+        if (regex_file.patternFind()) {
+            br.getPage(link.getPluginPatternMatcher());
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            filename = br.getRegex("<h1>Downloading ([^<>\"]+)</h1>").getMatch(0);
-            if (filename == null) {
-                /* 2021-05-18 */
-                filename = br.getRegex("<h1>Download ([^<>\"]+)</h1>").getMatch(0);
-            }
-            if (filename != null) {
-                link.setName(filename);
-            }
-            return AvailableStatus.TRUE;
-        }
-        if (br.containsHTML(">System Error<|>could not find file|>File not found<|Array doesn\\'t have key named|File not found") || br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (this.br.getURL().length() < 30) {
-            /* E.g. redirect to mainpage --> Offline */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        filename = br.getRegex(">Name</b>[\r\n\t ]+</td>[\r\n\t ]+<td>([^<>\"]+)</td>").getMatch(0);
-        final String filesize = br.getRegex(">Size</b>[\r\n\t ]+</td>[\r\n\t ]+<td>([^<>\"]+)</td>").getMatch(0);
-        if (filename == null || filesize == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        filename = Encoding.htmlDecode(filename.trim());
-        String ext = null;
-        if (filename.contains(".")) {
-            ext = filename.substring(filename.lastIndexOf("."));
-        }
-        if (ext != null && ext.length() > 5) {
-            ext = null;
-        }
-        if (br.containsHTML("<td>video/mp4</td>") && ext == null) {
-            ext = ".mp4";
-        }
-        if (ext != null && !filename.endsWith(ext)) {
-            link.setFinalFileName(filename + ext);
+            filename = br.getRegex("<h1>Download ([^<>\"]+)</h1>").getMatch(0);
         } else {
-            link.setName(filename);
+            /* Links of type "/watch/..." and "/embed/..." -> Use same format internally */
+            final String contenturl = "https://www." + getHost() + "/watch/" + file_id;
+            br.getPage(contenturl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            filename = br.getRegex("class=\"container\"[^>]*>\\s*<h1>([^<]+)</h1>").getMatch(0);
+            filesize = br.getRegex("Size\\s*</td>\\s*<td>([^<]+)</td>").getMatch(0);
         }
-        link.setDownloadSize(SizeFormatter.getSize(filesize));
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename.trim());
+            link.setFinalFileName(filename);
+        } else {
+            logger.warning("Failed to find filename");
+        }
+        if (filesize != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesize));
+        }
         return AvailableStatus.TRUE;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        if (link.getDownloadURL().matches(regexDownload)) {
-            dllink = br.getRegex("(/download\\?file=[^<>\"]+)\"").getMatch(0);
-            if (dllink != null) {
-                dllink = Encoding.htmlDecode(dllink);
+        final Regex regex_file = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE);
+        if (!regex_file.patternFind()) {
+            /* Aka "/watch/..." link or "/embed/..." link */
+            final String nextStepURL = br.getRegex("(/download\\?file=\\d+)").getMatch(0);
+            if (nextStepURL == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-        } else {
-            if (dllink == null) {
-                dllink = br.getRegex("(http://download\\.(yourupload\\.com|yucache\\.net)/[a-f0-9]{32}[^\"]+)").getMatch(0);
-            }
+            br.getPage(nextStepURL);
         }
+        String dllink = br.getRegex("data-url=\"(/download\\?[^\"]+)").getMatch(0);
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
+        dllink = Encoding.htmlOnlyDecode(dllink);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String etagHeader = dl.getConnection().getHeaderField("ETag");
+        if (etagHeader != null && etagHeader.equalsIgnoreCase("W/\"3208b07-17e68b9dcf7\"")) {
+            /* 2022-09-24: Big bucks bunny demo video */
+            /* Content-Length: 52464391 */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         dl.startDownload();
     }
@@ -204,7 +186,7 @@ public class YourUploadCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

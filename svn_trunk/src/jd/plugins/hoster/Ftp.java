@@ -28,12 +28,6 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyException;
-import org.jdownloader.DomainInfo;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.linkcrawler.CheckableLink;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -55,10 +49,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.SimpleFTPDownloadInterface;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.HTTPProxyException;
+import org.jdownloader.DomainInfo;
+import org.jdownloader.DomainInfo.DomainInfoFactory;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 // DEV NOTES:
 // - ftp filenames can contain & characters!
-@HostPlugin(revision = "$Revision: 49673 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftpviajd://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
-public class Ftp extends PluginForHost {
+@HostPlugin(revision = "$Revision: 51066 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftpviajd://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
+public class Ftp extends PluginForHost implements DomainInfoFactory {
     public static Set<String> AUTH_TLS_DISABLED = new HashSet<String>();
 
     public Ftp(PluginWrapper wrapper) {
@@ -239,7 +242,15 @@ public class Ftp extends PluginForHost {
                         return false;
                     }
                 }
-                final boolean ret = super.AUTH_TLS_CC();
+                final boolean ret;
+                try {
+                    ret = super.AUTH_TLS_CC();
+                } catch (IOException e) {
+                    synchronized (set) {
+                        set.add(host);
+                    }
+                    throw e;
+                }
                 if (!ret) {
                     synchronized (set) {
                         set.add(host);
@@ -457,5 +468,12 @@ public class Ftp extends PluginForHost {
 
     public static String createURLForThisPlugin(final String url) {
         return url == null ? null : url.replaceFirst("^(?i)ftp://", "ftpviajd://");
+    }
+
+    @Override
+    public DomainInfo createDomainInfo(String tld, String domain) {
+        final DomainInfo ret = new DomainInfo(tld, domain);
+        ret.setFavIcon(new AbstractIcon(IconKey.ICON_URL, 16));
+        return ret;
     }
 }

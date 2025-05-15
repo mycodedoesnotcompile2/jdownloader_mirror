@@ -47,6 +47,7 @@ import jd.controlling.accountchecker.AccountChecker;
 import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadSession.SessionState;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
 import jd.controlling.downloadcontroller.DownloadWatchDogJob;
 import jd.controlling.downloadcontroller.ProxyInfoHistory;
@@ -971,6 +972,22 @@ public class ScriptEnvironment {
             DownloadWatchDog.getInstance().requestReconnect(false);
         } catch (InterruptedException e) {
             throw new EnvironmentException(e);
+        }
+    }
+
+    @ScriptAPI(description = "Return current reconnect status", example = "var reconnectStatus=getReconnectState();")
+    public static String getReconnectState() {
+        final DownloadSession session = DownloadWatchDog.getInstance().getSession();
+        if (session == null) {
+            return null;
+        }
+        final SessionState state = session.getSessionState();
+        switch (state) {
+        case RECONNECT_REQUESTED:
+        case RECONNECT_RUNNING:
+            return state.name();
+        default:
+            return null;
         }
     }
 

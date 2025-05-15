@@ -1334,7 +1334,11 @@ public class HLSDownloader extends DownloadInterface {
                         try {
                             retryLoop: for (int retry = 0; retry < 5; retry++) {
                                 try {
-                                    final jd.http.requests.GetRequest getRequest = new jd.http.requests.GetRequest(buildDownloadUrl(downloadURL));
+                                    final jd.http.requests.GetRequest getRequest = new jd.http.requests.GetRequest(buildDownloadUrl(downloadURL)) {
+                                        protected boolean isBrotliAcceptEncodingEnabled() {
+                                            return false;
+                                        };
+                                    };
                                     final long byteRange[] = segment.getByteRange();
                                     if (fileBytesMap.getFinalSize() > 0) {
                                         requestLogger.info("Resume(" + retry + "): " + fileBytesMap.toString());

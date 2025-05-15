@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -33,19 +33,44 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.os;
 
+import static com.sun.jna.platform.win32.WinNT.DACL_SECURITY_INFORMATION;
+import static com.sun.jna.platform.win32.WinNT.FILE_ALL_ACCESS;
+import static com.sun.jna.platform.win32.WinNT.FILE_GENERIC_EXECUTE;
+import static com.sun.jna.platform.win32.WinNT.FILE_GENERIC_READ;
+import static com.sun.jna.platform.win32.WinNT.FILE_GENERIC_WRITE;
+import static com.sun.jna.platform.win32.WinNT.GROUP_SECURITY_INFORMATION;
+import static com.sun.jna.platform.win32.WinNT.OWNER_SECURITY_INFORMATION;
+import static com.sun.jna.platform.win32.WinNT.STANDARD_RIGHTS_READ;
 import static com.sun.jna.platform.win32.WinNT.TOKEN_DUPLICATE;
+import static com.sun.jna.platform.win32.WinNT.TOKEN_IMPERSONATE;
 import static com.sun.jna.platform.win32.WinNT.TOKEN_QUERY;
 import static com.sun.jna.platform.win32.WinUser.SW_HIDE;
 import static com.sun.jna.platform.win32.WinUser.SW_SHOW;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.jna.windows.Kernel32Ext;
+import org.appwork.jna.windows.interfaces.Advapi32Ext;
+import org.appwork.jna.windows.interfaces.ByHandleFileInformation;
+import org.appwork.jna.windows.interfaces.ExplicitAccess;
+import org.appwork.jna.windows.interfaces.Trustee;
+import org.appwork.loggingv3.LogV3;
+import org.appwork.storage.StorableDoc;
+import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.parser.ShellParser.Style;
 
+import com.sun.jna.Memory;
 import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
+import com.sun.jna.platform.win32.AccCtrl;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.Advapi32Util.Account;
@@ -55,100 +80,91 @@ import com.sun.jna.platform.win32.Shell32;
 import com.sun.jna.platform.win32.W32Errors;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinBase;
+import com.sun.jna.platform.win32.WinDef.BOOLByReference;
+import com.sun.jna.platform.win32.WinDef.DWORD;
+import com.sun.jna.platform.win32.WinDef.DWORDByReference;
 import com.sun.jna.platform.win32.WinDef.INT_PTR;
+import com.sun.jna.platform.win32.WinError;
 import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.platform.win32.WinNT.ACL;
+import com.sun.jna.platform.win32.WinNT.GENERIC_MAPPING;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
+import com.sun.jna.platform.win32.WinNT.PACLByReference;
+import com.sun.jna.platform.win32.WinNT.PRIVILEGE_SET;
+import com.sun.jna.platform.win32.WinNT.PSID;
+import com.sun.jna.platform.win32.WinNT.SECURITY_DESCRIPTOR_RELATIVE;
+import com.sun.jna.platform.win32.WinNT.SECURITY_IMPERSONATION_LEVEL;
+import com.sun.jna.platform.win32.WinNT.SID_NAME_USE;
 import com.sun.jna.platform.win32.WinNT.TOKEN_ELEVATION;
 import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.PointerByReference;
 
 /**
+ * Utility class for Windows-specific operations and permissions management. This class provides methods to handle Windows-specific
+ * functionality like: - Process elevation and management - File permissions checking - User account and SID management - Security
+ * descriptor operations
+ *
  * @author Thomas
  * @date 14.10.2018
- *
  */
 public class WindowsUtils {
-    // stay
-    /**
-     * @deprecated user WindowsUtils.SID enum instead we keep this field, because we would have to rebuild all Connect Service
-     *             SelfTestPackages if we remove it.
-     */
-    public static final String SID_LOCAL_SYSTEM = "S-1-5-18";
+    public static enum AccessPermission {
+        // File/Directory specific access rights
+        @StorableDoc("For a file object, the right to read the corresponding file data. For a directory object, the right to read the corresponding directory data.")
+        FILE_READ_DATA(WinNT.FILE_READ_DATA),
+        @StorableDoc("For a directory object, the right to list the contents of the directory.")
+        FILE_LIST_DIRECTORY(WinNT.FILE_LIST_DIRECTORY),
+        @StorableDoc("For a file object, the right to write data to the file. For a directory object, the right to create a file in the directory.")
+        FILE_WRITE_DATA(WinNT.FILE_WRITE_DATA),
+        @StorableDoc("For a directory object, the right to create a file in the directory.")
+        FILE_ADD_FILE(WinNT.FILE_ADD_FILE),
+        @StorableDoc("For a file object, the right to append data to the file. For a directory object, the right to create a subdirectory.")
+        FILE_APPEND_DATA(WinNT.FILE_APPEND_DATA),
+        @StorableDoc("For a directory object, the right to create a subdirectory.")
+        FILE_ADD_SUBDIRECTORY(WinNT.FILE_ADD_SUBDIRECTORY),
+        @StorableDoc("For a named pipe, the right to create a pipe instance.")
+        FILE_CREATE_PIPE_INSTANCE(WinNT.FILE_CREATE_PIPE_INSTANCE),
+        @StorableDoc("The right to read extended attributes.")
+        FILE_READ_EA(WinNT.FILE_READ_EA),
+        @StorableDoc("The right to write extended attributes.")
+        FILE_WRITE_EA(WinNT.FILE_WRITE_EA),
+        @StorableDoc("The right to execute a file.")
+        FILE_EXECUTE(WinNT.FILE_EXECUTE),
+        @StorableDoc("For a directory object, the right to traverse the directory.")
+        FILE_TRAVERSE(WinNT.FILE_TRAVERSE),
+        @StorableDoc("For a directory object, the right to delete entries within the directory.")
+        FILE_DELETE_CHILD(WinNT.FILE_DELETE_CHILD),
+        @StorableDoc("The right to delete the object.")
+        DELETE(WinNT.DELETE),
+        @StorableDoc("The right to read file attributes.")
+        FILE_READ_ATTRIBUTES(WinNT.FILE_READ_ATTRIBUTES),
+        @StorableDoc("The right to write file attributes.")
+        FILE_WRITE_ATTRIBUTES(WinNT.FILE_WRITE_ATTRIBUTES),
+        @StorableDoc("All possible access rights for a file.")
+        FILE_ALL_ACCESS(WinNT.FILE_ALL_ACCESS),
+        @StorableDoc("Generic read access.")
+        FILE_GENERIC_READ(WinNT.FILE_GENERIC_READ),
+        @StorableDoc("Generic write access.")
+        FILE_GENERIC_WRITE(WinNT.FILE_GENERIC_WRITE),
+        @StorableDoc("Generic execute access.")
+        FILE_GENERIC_EXECUTE(WinNT.FILE_GENERIC_EXECUTE),
+        // Security descriptor access rights - not for CreateFile usage
+        @StorableDoc("The right to read the security descriptor and ownership.")
+        READ_CONTROL(WinNT.READ_CONTROL),
+        @StorableDoc("The right to modify the discretionary access control list (DACL) in the object's security descriptor.")
+        WRITE_DAC(WinNT.WRITE_DAC),
+        @StorableDoc("The right to change the owner in the object's security descriptor.")
+        WRITE_OWNER(WinNT.WRITE_OWNER),
+        @StorableDoc("The right to use the object for synchronization.")
+        SYNCHRONIZE(WinNT.SYNCHRONIZE),
+        @StorableDoc("Access system security.")
+        ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY);
+        public final int mask;
 
-    // public static final String SID_USER = "S-1-5-32-545";
-    // public static final String SID_EVERYBODYY = "S-1-1-0";
-    // public static final String SID_ADMINISTRATOR = "S-1-5-32-544";
-    public static Account getCurrentUserAccount() {
-        HANDLEByReference phToken = new HANDLEByReference();
-        Win32Exception err = null;
-        try {
-            // open thread or process token
-            HANDLE threadHandle = Kernel32.INSTANCE.GetCurrentThread();
-            if (!Advapi32.INSTANCE.OpenThreadToken(threadHandle, TOKEN_DUPLICATE | TOKEN_QUERY, true, phToken)) {
-                int rc = Kernel32.INSTANCE.GetLastError();
-                if (rc != W32Errors.ERROR_NO_TOKEN) {
-                    throw new Win32Exception(rc);
-                }
-                HANDLE processHandle = Kernel32.INSTANCE.GetCurrentProcess();
-                if (!Advapi32.INSTANCE.OpenProcessToken(processHandle, TOKEN_DUPLICATE | TOKEN_QUERY, phToken)) {
-                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
-                }
-            }
-            Advapi32Util.Account userAcct = Advapi32Util.getTokenAccount(phToken.getValue());
-            return userAcct;
-        } catch (Win32Exception e) {
-            err = e;
-            throw err; // re-throw in order to invoke finally block
-        } finally {
-            HANDLE hToken = phToken.getValue();
-            if (!WinBase.INVALID_HANDLE_VALUE.equals(hToken)) {
-                try {
-                    Kernel32Util.closeHandle(hToken);
-                } catch (Win32Exception e) {
-                    if (err == null) {
-                        err = e;
-                    } else {
-                        Exceptions.addSuppressed(err, e);
-                    }
-                }
-            }
-            if (err != null) {
-                throw err;
-            }
+        private AccessPermission(int mask) {
+            this.mask = mask;
         }
-    }
-
-    /**
-     * Returns the current user SID. WARNING: Uses Reflection and com.sun packages.
-     *
-     * @return
-     */
-    public static String getCurrentUserSID() throws Exception {
-        return getCurrentUserAccount().sidString;
-    }
-
-    /**
-     * Tests if the current user is part of a SID group (e.g. {@link #SID_EVERYBODYY}) WARNING: Does not work for Local System. use
-     * getCurrentUserSID() instead; WARNING: Uses Reflection and com.sun packages.
-     *
-     * @param sid
-     * @return
-     */
-    public static boolean isCurrentUserPartOfGroup(String sid) {
-        for (Account a : getCurrentUsersAccounts()) {
-            if (a.sidString.equals(sid)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean isAdministrator() {
-        return isCurrentUserPartOfGroup(SID.SID_BUILTIN_ADMINISTRATORS.sid);
-    }
-
-    public static boolean isElevated() {
-        return Advapi32Util.isCurrentProcessElevated();
     }
 
     public static enum SID {
@@ -241,6 +257,70 @@ public class WindowsUtils {
         }
     }
 
+    // stay
+    /**
+     * @deprecated user WindowsUtils.SID enum instead we keep this field, because we would have to rebuild all Connect Service
+     *             SelfTestPackages if we remove it.
+     */
+    public static final String SID_LOCAL_SYSTEM = "S-1-5-18";
+
+    // public static final String SID_USER = "S-1-5-32-545";
+    // public static final String SID_EVERYBODYY = "S-1-1-0";
+    // public static final String SID_ADMINISTRATOR = "S-1-5-32-544";
+    /**
+     * Gets the current user's account information. This method retrieves the account details of the currently logged-in user.
+     *
+     * @return Account object containing user information
+     * @throws Win32Exception
+     *             if the operation fails
+     */
+    public static Account getCurrentUserAccount() {
+        HANDLEByReference phToken = new HANDLEByReference();
+        Win32Exception err = null;
+        try {
+            // open thread or process token
+            HANDLE threadHandle = Kernel32.INSTANCE.GetCurrentThread();
+            if (!Advapi32.INSTANCE.OpenThreadToken(threadHandle, TOKEN_DUPLICATE | TOKEN_QUERY, true, phToken)) {
+                int rc = Kernel32.INSTANCE.GetLastError();
+                if (rc != W32Errors.ERROR_NO_TOKEN) {
+                    throw new Win32Exception(rc);
+                }
+                HANDLE processHandle = Kernel32.INSTANCE.GetCurrentProcess();
+                if (!Advapi32.INSTANCE.OpenProcessToken(processHandle, TOKEN_DUPLICATE | TOKEN_QUERY, phToken)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                }
+            }
+            Advapi32Util.Account userAcct = Advapi32Util.getTokenAccount(phToken.getValue());
+            return userAcct;
+        } catch (Win32Exception e) {
+            err = e;
+            throw err; // re-throw in order to invoke finally block
+        } finally {
+            HANDLE hToken = phToken.getValue();
+            if (!WinBase.INVALID_HANDLE_VALUE.equals(hToken)) {
+                try {
+                    Kernel32Util.closeHandle(hToken);
+                } catch (Win32Exception e) {
+                    if (err == null) {
+                        err = e;
+                    } else {
+                        Exceptions.addSuppressed(err, e);
+                    }
+                }
+            }
+            if (err != null) {
+                throw err;
+            }
+        }
+    }
+
+    /**
+     * Gets all accounts associated with the current user, including group memberships.
+     *
+     * @return Set of Account objects representing the user and their group memberships
+     * @throws Win32Exception
+     *             if the operation fails
+     */
     public static Set<Account> getCurrentUsersAccounts() {
         Set<Account> accounts = new HashSet<Account>();
         HANDLEByReference phToken = new HANDLEByReference();
@@ -287,7 +367,49 @@ public class WindowsUtils {
     }
 
     /**
-     * @return
+     * Returns the current user's Security Identifier (SID).
+     *
+     * @return String representation of the user's SID
+     * @throws Exception
+     *             if the operation fails
+     */
+    public static String getCurrentUserSID() throws Exception {
+        return getCurrentUserAccount().sidString;
+    }
+
+    /**
+     * Checks which file permissions are missing for a given directory path.
+     *
+     * @param dirPath
+     *            The directory path to check
+     * @param permissions
+     *            The permissions to verify
+     * @return Set of missing AccessPermission values
+     */
+    public static Set<AccessPermission> getMissingPermissionsViaHandle(File dirPath, AccessPermission... permissions) {
+        int access = 0;
+        for (AccessPermission p : permissions) {
+            access |= p.mask;
+        }
+        HashSet<AccessPermission> ret = new HashSet<AccessPermission>();
+        HANDLE h = Kernel32.INSTANCE.CreateFile(dirPath.getAbsolutePath(), access, WinNT.FILE_SHARE_READ | WinNT.FILE_SHARE_WRITE | WinNT.FILE_SHARE_DELETE, null, WinNT.OPEN_EXISTING, WinNT.FILE_FLAG_BACKUP_SEMANTICS, null);
+        boolean hasAccess = !WinBase.INVALID_HANDLE_VALUE.equals(h);
+        if (hasAccess) {
+            Kernel32.INSTANCE.CloseHandle(h);
+            return ret;
+        }
+        for (AccessPermission p : permissions) {
+            if (!checkFileAccessViaHandle(dirPath, p)) {
+                ret.add(p);
+            }
+        }
+        return ret;
+    }
+
+    /**
+     * Gets the principal names associated with the current user.
+     *
+     * @return Set of principal names in format "domain\\username"
      */
     public static Set<String> getMyPrincipalNames() {
         Set<String> myPrincipals = new HashSet<String>();
@@ -298,59 +420,15 @@ public class WindowsUtils {
     }
 
     /**
-     * Starts a process with elevated privileges (UAC prompt will be shown)
-     *
-     * @param command
-     *            The command to execute
-     * @param workingDir
-     *            The working directory (can be null)
-     * @param showWindow
-     *            Whether to show the window (true) or hide it (false)
-     * @return The process handle if successful, null otherwise
-     * @throws Win32Exception
-     *             if the process cannot be started
-     * @throws IllegalArgumentException
-     *             if the command is invalid
-     */
-    public static INT_PTR startElevatedProcess(String[] command, String workingDir, boolean showWindow) throws Win32Exception {
-        if (!CrossSystem.isWindows()) {
-            throw new UnsupportedOperationException("This operation is only supported on Windows");
-        }
-        if (command == null || command.length == 0) {
-            throw new IllegalArgumentException("Command cannot be null or empty");
-        }
-        // Convert command to absolute path if it's a file
-        // Build the final command
-        String binary = command[0];
-        String[] params = new String[command.length - 1];
-        System.arraycopy(command, 1, params, 0, params.length);
-        String finalCommand = ShellParser.createCommandLine(Style.WINDOWS, binary);
-        String args = ShellParser.createCommandLine(Style.WINDOWS, params);
-        System.out.println(finalCommand);
-        // Set up ShellExecuteEx parameters
-        Shell32.SHELLEXECUTEINFO sei = new Shell32.SHELLEXECUTEINFO();
-        sei.cbSize = sei.size();
-        sei.lpVerb = "runas"; // Request elevation
-        sei.lpFile = finalCommand;
-        sei.lpParameters = args;
-        sei.lpDirectory = workingDir;
-        sei.nShow = showWindow ? SW_SHOW : SW_HIDE;
-        sei.fMask = Shell32.SEE_MASK_NOCLOSEPROCESS; // Get process handle
-        // Execute the command
-        if (!Shell32.INSTANCE.ShellExecuteEx(sei)) {
-            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
-        }
-        return new INT_PTR(Pointer.nativeValue(sei.hProcess.getPointer()));
-    }
-
-    /**
-     * Gets the process ID from a process handle
+     * Gets the process ID from a process handle.
      *
      * @param processHandle
      *            The handle of the process
      * @return The process ID
      * @throws Win32Exception
      *             if the operation fails
+     * @throws UnsupportedOperationException
+     *             if not running on Windows
      */
     public static int getProcessId(INT_PTR processHandle) throws Win32Exception {
         if (!CrossSystem.isWindows()) {
@@ -364,42 +442,106 @@ public class WindowsUtils {
     }
 
     /**
-     * Terminates a process using its handle
+     * Checks if the current user has the specified permissions for a folder.
      *
-     * @param processHandle
-     *            The handle of the process to terminate
-     * @param exitCode
-     *            The exit code to set (typically 0 for normal termination)
-     * @return true if the process was terminated successfully, false otherwise
-     * @throws Win32Exception
-     *             if the termination fails
+     * @param dirPath
+     *            The directory path to check
+     * @param permissions
+     *            The permissions to verify
+     * @return true if the user has all specified permissions, false otherwise
      */
-    public static boolean terminateProcess(INT_PTR processHandle, int exitCode) throws Win32Exception {
-        if (!CrossSystem.isWindows()) {
-            throw new UnsupportedOperationException("This operation is only supported on Windows");
+    public static boolean checkFileAccessViaHandle(File dirPath, AccessPermission... permissions) {
+        int access = 0;
+        for (AccessPermission p : permissions) {
+            access |= p.mask;
         }
-        if (processHandle == null) {
-            throw new IllegalArgumentException("Process handle cannot be null");
+        ;
+        HANDLE h = Kernel32.INSTANCE.CreateFile(dirPath.getAbsolutePath(), access, WinNT.FILE_SHARE_READ | WinNT.FILE_SHARE_WRITE | WinNT.FILE_SHARE_DELETE, null, WinNT.OPEN_EXISTING, WinNT.FILE_FLAG_BACKUP_SEMANTICS, null);
+        boolean hasAccess = !WinBase.INVALID_HANDLE_VALUE.equals(h);
+        if (hasAccess) {
+            try {
+                if (Arrays.asList(permissions).contains(AccessPermission.FILE_READ_ATTRIBUTES)) {
+                    ByHandleFileInformation info = new ByHandleFileInformation();
+                    boolean ok = Kernel32Ext.INSTANCE.GetFileInformationByHandle(h, info);
+                    if (!ok) {
+                        return false;
+                    }
+                }
+            } finally {
+                Kernel32.INSTANCE.CloseHandle(h);
+            }
         }
-        HANDLE handle = new HANDLE(Pointer.createConstant(processHandle.longValue()));
-        // First try to get the process ID to verify the handle is valid
-        int pid = getProcessId(processHandle);
-        System.out.println("Terminating process with PID: " + pid);
-        boolean result = Kernel32.INSTANCE.TerminateProcess(handle, exitCode);
-        if (!result) {
-            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
-        }
-        return result;
+        return hasAccess;
     }
 
     /**
-     * Checks if a process is running with elevated privileges
+     *
+     * @deprecated actually this method is NOT DEPRECATED, however you may not want to use it. To change an owner, you should run elevated
+     *             and you will have to enable some privileges first (e.g. SeRestorePrivilege or SeTakeOwnershipPrivilege)
+     */
+    @Deprecated
+    public static void setFileOwner(File path, String ownerSidString) {
+        PSID psid = new WinNT.PSID(Advapi32Util.getAccountBySid(ownerSidString).sid);
+        int result = Advapi32.INSTANCE.SetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.OWNER_SECURITY_INFORMATION, psid.getPointer(), null, null, null);
+        if (result != WinError.ERROR_SUCCESS) {
+            LogV3.warning("Change owner usualy only works elevated AND after enabling some privileges like SeRestorePrivilege or SeTakeOwnershipPrivilege");
+            throw new Win32Exception(result);
+        }
+    }
+
+    public static Account getFileOwnerSid(File path) {
+        PointerByReference pOwnerSid = new PointerByReference();
+        int result = Advapi32.INSTANCE.GetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.OWNER_SECURITY_INFORMATION, pOwnerSid, null, null, null, new PointerByReference());
+        if (result != WinError.ERROR_SUCCESS) {
+            throw new Win32Exception(result);
+        }
+        return Advapi32Util.getAccountBySid(new WinNT.PSID(pOwnerSid.getValue()));
+    }
+
+    /**
+     * Checks if the current user is an administrator.
+     *
+     * @return true if the user is an administrator, false otherwise
+     */
+    public static boolean isAdministrator() {
+        return isCurrentUserPartOfGroup(SID.SID_BUILTIN_ADMINISTRATORS.sid);
+    }
+
+    /**
+     * Checks if the current user is part of a specific SID group. WANRING: MAY fail for local system.
+     *
+     * @param sid
+     *            The SID to check against
+     * @return true if the user is part of the specified group, false otherwise
+     */
+    public static boolean isCurrentUserPartOfGroup(String sid) {
+        for (Account a : getCurrentUsersAccounts()) {
+            if (a.sidString.equals(sid)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if the current process is running with elevated privileges.
+     *
+     * @return true if the process is elevated, false otherwise
+     */
+    public static boolean isElevated() {
+        return Advapi32Util.isCurrentProcessElevated();
+    }
+
+    /**
+     * Checks if a specific process is running with elevated privileges.
      *
      * @param pid
      *            The process ID to check
-     * @return true if the process is running with elevated privileges, false otherwise
+     * @return true if the process is elevated, false otherwise
      * @throws Win32Exception
      *             if the operation fails
+     * @throws UnsupportedOperationException
+     *             if not running on Windows
      */
     public static boolean isProcessElevated(int pid) throws Win32Exception {
         if (!CrossSystem.isWindows()) {
@@ -433,6 +575,649 @@ public class WindowsUtils {
             if (phToken.getValue() != null) {
                 Kernel32Util.closeHandle(phToken.getValue());
             }
+        }
+    }
+
+    /**
+     * Starts a process with elevated privileges (UAC prompt will be shown).
+     *
+     * @param command
+     *            The command to execute
+     * @param workingDir
+     *            The working directory (can be null)
+     * @param showWindow
+     *            Whether to show the window (true) or hide it (false)
+     * @return The process handle if successful
+     * @throws Win32Exception
+     *             if the process cannot be started
+     * @throws IllegalArgumentException
+     *             if the command is invalid
+     * @throws UnsupportedOperationException
+     *             if not running on Windows
+     */
+    public static INT_PTR startElevatedProcess(String[] command, String workingDir, boolean showWindow) throws Win32Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("This operation is only supported on Windows");
+        }
+        if (command == null || command.length == 0) {
+            throw new IllegalArgumentException("Command cannot be null or empty");
+        }
+        // Convert command to absolute path if it's a file
+        // Build the final command
+        String binary = command[0];
+        String[] params = new String[command.length - 1];
+        System.arraycopy(command, 1, params, 0, params.length);
+        String finalCommand = ShellParser.createCommandLine(Style.WINDOWS, binary);
+        String args = ShellParser.createCommandLine(Style.WINDOWS, params);
+        System.out.println(finalCommand);
+        // Set up ShellExecuteEx parameters
+        Shell32.SHELLEXECUTEINFO sei = new Shell32.SHELLEXECUTEINFO();
+        sei.cbSize = sei.size();
+        sei.lpVerb = "runas"; // Request elevation
+        sei.lpFile = finalCommand;
+        sei.lpParameters = args;
+        sei.lpDirectory = workingDir;
+        sei.nShow = showWindow ? SW_SHOW : SW_HIDE;
+        sei.fMask = Shell32.SEE_MASK_NOCLOSEPROCESS; // Get process handle
+        // Execute the command
+        if (!Shell32.INSTANCE.ShellExecuteEx(sei)) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+        return new INT_PTR(Pointer.nativeValue(sei.hProcess.getPointer()));
+    }
+
+    /**
+     * Terminates a process using its handle.
+     *
+     * @param processHandle
+     *            The handle of the process to terminate
+     * @param exitCode
+     *            The exit code to set (typically 0 for normal termination)
+     * @return true if the process was terminated successfully
+     * @throws Win32Exception
+     *             if the termination fails
+     * @throws UnsupportedOperationException
+     *             if not running on Windows
+     */
+    public static boolean terminateProcess(INT_PTR processHandle, int exitCode) throws Win32Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("This operation is only supported on Windows");
+        }
+        if (processHandle == null) {
+            throw new IllegalArgumentException("Process handle cannot be null");
+        }
+        HANDLE handle = new HANDLE(Pointer.createConstant(processHandle.longValue()));
+        // First try to get the process ID to verify the handle is valid
+        int pid = getProcessId(processHandle);
+        System.out.println("Terminating process with PID: " + pid);
+        boolean result = Kernel32.INSTANCE.TerminateProcess(handle, exitCode);
+        if (!result) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+        return result;
+    }
+
+    /**
+     * Gets the security descriptor for a file.
+     *
+     * @param absoluteFilePath
+     *            The absolute path to the file
+     * @return Memory object containing the security descriptor
+     * @throws Win32Exception
+     *             if the operation fails
+     */
+    private static Memory getSecurityDescriptorForFile(final String absoluteFilePath) {
+        final int infoType = OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION;
+        final IntByReference lpnSize = new IntByReference();
+        boolean succeeded = Advapi32.INSTANCE.GetFileSecurity(absoluteFilePath, infoType, null, 0, lpnSize);
+        if (!succeeded) {
+            final int lastError = Kernel32.INSTANCE.GetLastError();
+            if (W32Errors.ERROR_INSUFFICIENT_BUFFER != lastError) {
+                throw new Win32Exception(lastError);
+            }
+        }
+        final int nLength = lpnSize.getValue();
+        final Memory securityDescriptorMemoryPointer = new Memory(nLength);
+        succeeded = Advapi32.INSTANCE.GetFileSecurity(absoluteFilePath, infoType, securityDescriptorMemoryPointer, nLength, lpnSize);
+        if (!succeeded) {
+            securityDescriptorMemoryPointer.clear();
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+        return securityDescriptorMemoryPointer;
+    }
+
+    /**
+     * Checks actual access permissions via ACL for a folder. Ths method does not only check if the user has the permissions, but also if
+     * the user
+     *
+     * @param folder
+     *            The folder to check
+     * @param permissions
+     *            The permissions to verify
+     * @return true if the user has all specified permissions, false otherwise
+     */
+    public static boolean checkFileAccessViaACL(File folder, AccessPermission... permissions) {
+        Memory securityDescriptorMemoryPointer = getSecurityDescriptorForFile(folder.getAbsolutePath().replace('/', '\\'));
+        HANDLEByReference openedAccessToken = new HANDLEByReference();
+        HANDLEByReference duplicatedToken = new HANDLEByReference();
+        Win32Exception err = null;
+        try {
+            int desireAccess = TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_DUPLICATE | STANDARD_RIGHTS_READ;
+            HANDLE hProcess = Kernel32.INSTANCE.GetCurrentProcess();
+            if (!Advapi32.INSTANCE.OpenProcessToken(hProcess, desireAccess, openedAccessToken)) {
+                throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            }
+            if (!Advapi32.INSTANCE.DuplicateToken(openedAccessToken.getValue(), SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, duplicatedToken)) {
+                throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            }
+            GENERIC_MAPPING mapping = new GENERIC_MAPPING();
+            mapping.genericRead = new DWORD(FILE_GENERIC_READ);
+            mapping.genericWrite = new DWORD(FILE_GENERIC_WRITE);
+            mapping.genericExecute = new DWORD(FILE_GENERIC_EXECUTE);
+            mapping.genericAll = new DWORD(FILE_ALL_ACCESS);
+            int perm = 0;
+            for (AccessPermission fp : permissions) {
+                perm |= fp.mask;
+            }
+            DWORDByReference rights = new DWORDByReference(new DWORD(perm));
+            Advapi32.INSTANCE.MapGenericMask(rights, mapping);
+            PRIVILEGE_SET privileges = new PRIVILEGE_SET(1);
+            privileges.PrivilegeCount = new DWORD(0);
+            DWORDByReference privilegeLength = new DWORDByReference(new DWORD(privileges.size()));
+            DWORDByReference grantedAccess = new DWORDByReference();
+            BOOLByReference result = new BOOLByReference();
+            if (!Advapi32.INSTANCE.AccessCheck(securityDescriptorMemoryPointer, duplicatedToken.getValue(), rights.getValue(), mapping, privileges, privilegeLength, grantedAccess, result)) {
+                throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            }
+            boolean ret = result.getValue().booleanValue();
+            return ret;
+        } catch (Win32Exception e) {
+            err = e;
+            throw err; // re-throw so finally block executed
+        } finally {
+            try {
+                Kernel32Util.closeHandleRefs(openedAccessToken, duplicatedToken);
+            } catch (Win32Exception e) {
+                if (err == null) {
+                    err = e;
+                } else {
+                    Exceptions.addSuppressed(err, e);
+                }
+            }
+            if (securityDescriptorMemoryPointer != null) {
+                securityDescriptorMemoryPointer.clear();
+            }
+            if (err != null) {
+                throw err;
+            }
+        }
+    }
+
+    /**
+     * Gets token information for a specific token type.
+     *
+     * @param <T>
+     *            The type of token information structure
+     * @param class1
+     *            The class of the token information structure
+     * @param type
+     *            The type of token information to retrieve
+     * @param sessionProcessToken2
+     *            The process token
+     * @return The token information structure
+     * @throws Win32Exception
+     *             if the operation fails
+     */
+    public static <T extends Structure> T getTokenInformation(final Class<T> class1, final int type, final HANDLE sessionProcessToken2) {
+        final IntByReference tokenInformationLength = new IntByReference();
+        int rc;
+        if (Advapi32.INSTANCE.GetTokenInformation(sessionProcessToken2, type, (Structure) null, 0, tokenInformationLength)) {
+            throw new RuntimeException("Expected GetTokenInformation to fail with ERROR_INSUFFICIENT_BUFFER");
+        } else if ((rc = Kernel32.INSTANCE.GetLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+            throw new Win32Exception(rc);
+        } else {
+            try {
+                final T user = class1.getDeclaredConstructor(int.class).newInstance(tokenInformationLength.getValue());
+                if (!Advapi32.INSTANCE.GetTokenInformation(sessionProcessToken2, type, user, tokenInformationLength.getValue(), tokenInformationLength)) {
+                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+                } else {
+                    return user;
+                }
+            } catch (final Win32Exception e) {
+                throw e;
+            } catch (final Throwable e) {
+                throw new WTFException(e);
+            }
+        }
+    }
+
+    /**
+     * Gets the available file permissions for a folder.
+     *
+     * @param folder
+     *            The folder to check
+     * @return Set of available AccessPermission values
+     * @throws WTFException
+     *             if the operation fails
+     */
+    public static Set<AccessPermission> getAvailableAccessPermissions(File folder) {
+        try {
+            WinNT.SECURITY_DESCRIPTOR absolute = new WinNT.SECURITY_DESCRIPTOR(ACL.MAX_ACL_SIZE);
+            SECURITY_DESCRIPTOR_RELATIVE relative = Advapi32Util.getFileSecurityDescriptor(folder, false);
+            WinNT.PSID pOwner = new WinNT.PSID(WinNT.SECURITY_MAX_SID_SIZE);
+            WinNT.PSID pGroup = new WinNT.PSID(WinNT.SECURITY_MAX_SID_SIZE);
+            ACL pDacl1 = new ACL(ACL.MAX_ACL_SIZE);
+            ACL pSacl = new ACL(ACL.MAX_ACL_SIZE);
+            IntByReference lpdwBufferLength = new IntByReference(absolute.size());
+            IntByReference lpdwDaclSize = new IntByReference(ACL.MAX_ACL_SIZE);
+            IntByReference lpdwSaclSize = new IntByReference(ACL.MAX_ACL_SIZE);
+            IntByReference lpdwOwnerSize = new IntByReference(WinNT.SECURITY_MAX_SID_SIZE);
+            IntByReference lpdwPrimaryGroupSize = new IntByReference(WinNT.SECURITY_MAX_SID_SIZE);
+            if (!Advapi32.INSTANCE.MakeAbsoluteSD(relative, absolute, lpdwBufferLength, pDacl1, lpdwDaclSize, pSacl, lpdwSaclSize, pOwner, lpdwOwnerSize, pGroup, lpdwPrimaryGroupSize)) {
+                throw new WTFException();
+            }
+            PACLByReference pDacl = new PACLByReference();
+            BOOLByReference present = new BOOLByReference();
+            BOOLByReference defaulted = new BOOLByReference();
+            if (!Advapi32.INSTANCE.GetSecurityDescriptorDacl(absolute, present, pDacl, defaulted) || !present.getValue().booleanValue()) {
+                throw new WTFException("Failed at GetSecurityDescriptorDacl ");
+            }
+            HANDLEByReference hToken = new HANDLEByReference();
+            boolean tokenResult = Advapi32.INSTANCE.OpenProcessToken(Kernel32.INSTANCE.GetCurrentProcess(), WinNT.TOKEN_QUERY | WinNT.TOKEN_DUPLICATE, hToken);
+            if (!tokenResult) {
+                throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            }
+            final WinNT.TOKEN_USER tokenUser = getTokenInformation(WinNT.TOKEN_USER.class, WinNT.TOKEN_INFORMATION_CLASS.TokenUser, hToken.getValue());
+            IntByReference effective = new IntByReference();
+            Trustee trustee = new Trustee.ByReference();
+            trustee.clear();
+            trustee.pMultipleTrustee = Pointer.NULL;
+            trustee.MultipleTrusteeOperation = Advapi32Ext.MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
+            trustee.TrusteeForm = Advapi32Ext.TRUSTEE_FORM.TRUSTEE_IS_SID;
+            trustee.TrusteeType = Advapi32Ext.TRUSTEE_TYPE.TRUSTEE_IS_USER;
+            trustee.ptstrName = tokenUser.User.Sid.getPointer();
+            trustee.write();
+            int result = Advapi32Ext.INSTANCE.GetEffectiveRightsFromAcl(pDacl.getValue(), trustee, effective);
+            if (result != 0) {
+                int error = Kernel32.INSTANCE.GetLastError();
+                throw new Win32Exception(error);
+            } else {
+                int mask = effective.getValue();
+                HashSet<AccessPermission> ret = new HashSet<AccessPermission>();
+                for (AccessPermission fp : AccessPermission.values()) {
+                    if (BinaryLogic.containsAll(mask, fp.mask)) {
+                        ret.add(fp);
+                    }
+                }
+                return ret;
+            }
+        } catch (final Throwable e) {
+            throw new WTFException(e);
+        }
+    }
+
+    /**
+     * Represents a single Access Control Entry (ACE) in the Access Control List (ACL). This class encapsulates all information about
+     * permissions for a specific Security Identifier (SID).
+     *
+     * An ACE defines the access rights that a specific user or group has to a file or directory. It contains information about: - The SID
+     * (Security Identifier) of the user or group - The set of permissions granted or denied - Inheritance settings that determine how
+     * permissions propagate to child objects - Whether the entry is inherited from a parent object - Whether the entry allows or denies
+     * access
+     *
+     * @author thomas
+     * @since 14.10.2018
+     */
+    public static class AccessPermissionEntry {
+        /** The Security Identifier (SID) of the user or group */
+        private final String                sid;
+        /** The set of permissions associated with this entry */
+        private final Set<AccessPermission> permissions;
+        /** Whether this entry should be inherited by child objects */
+        private final boolean               inherit;
+        /** Whether this entry allows (true) or denies (false) access */
+        private final boolean               allow;
+        /** Whether this entry only applies to inherited objects */
+        private final boolean               inheritOnly;
+        /** Whether inheritance should not propagate to child objects */
+        private final boolean               noPropagateInherit;
+        /** Whether this entry applies to files (objects) */
+        private final boolean               objectInherit;
+        /** Whether this entry applies to directories (containers) */
+        private final boolean               containerInherit;
+        /** Whether this entry was inherited from a parent object */
+        private boolean                     inherited;
+
+        /**
+         * Creates a new AccessPermissionEntry with basic inheritance settings.
+         *
+         * @param sid
+         *            The Security Identifier (SID) of the user or group
+         * @param permissions
+         *            The set of permissions to grant or deny
+         * @param inherit
+         *            Whether this entry should be inherited by child objects
+         * @param allow
+         *            Whether this entry allows (true) or denies (false) access
+         */
+        public AccessPermissionEntry(String sid, Set<AccessPermission> permissions, boolean inherit, boolean allow) {
+            this(sid, permissions, false, inherit, allow, false, false, true, true);
+        }
+
+        /**
+         * Creates a new AccessPermissionEntry with detailed inheritance settings.
+         *
+         * @param sid
+         *            The Security Identifier (SID) of the user or group
+         * @param permissions
+         *            The set of permissions to grant or deny
+         * @param inherited
+         *            Whether this entry was inherited from a parent object
+         * @param inherit
+         *            Whether this entry should be inherited by child objects
+         * @param allow
+         *            Whether this entry allows (true) or denies (false) access
+         * @param inheritOnly
+         *            Whether this entry only applies to inherited objects
+         * @param noPropagateInherit
+         *            Whether inheritance should not propagate to child objects
+         * @param objectInherit
+         *            Whether this entry applies to files (objects)
+         * @param containerInherit
+         *            Whether this entry applies to directories (containers)
+         */
+        public AccessPermissionEntry(String sid, Set<AccessPermission> permissions, boolean inherited, boolean inherit, boolean allow, boolean inheritOnly, boolean noPropagateInherit, boolean objectInherit, boolean containerInherit) {
+            this.sid = sid;
+            this.permissions = permissions;
+            this.inherit = inherit;
+            this.inherited = inherited;
+            this.allow = allow;
+            this.inheritOnly = inheritOnly;
+            this.noPropagateInherit = noPropagateInherit;
+            this.objectInherit = objectInherit;
+            this.containerInherit = containerInherit;
+        }
+
+        /**
+         * Gets whether this entry was inherited from a parent object.
+         *
+         * @return true if this entry was inherited, false otherwise
+         */
+        public boolean isInherited() {
+            return inherited;
+        }
+
+        /**
+         * Sets whether this entry was inherited from a parent object.
+         *
+         * @param inherited
+         *            true if this entry was inherited, false otherwise
+         */
+        public void setInherited(boolean inherited) {
+            this.inherited = inherited;
+        }
+
+        /**
+         * Gets the Security Identifier (SID) of the user or group.
+         *
+         * @return The SID string
+         */
+        public String getSid() {
+            return sid;
+        }
+
+        /**
+         * Gets the set of permissions associated with this entry.
+         *
+         * @return The set of AccessPermission values
+         */
+        public Set<AccessPermission> getPermissions() {
+            return permissions;
+        }
+
+        /**
+         * Gets whether this entry should be inherited by child objects.
+         *
+         * @return true if this entry should be inherited, false otherwise
+         */
+        public boolean isInherit() {
+            return inherit;
+        }
+
+        /**
+         * Gets whether this entry allows or denies access.
+         *
+         * @return true if this entry allows access, false if it denies access
+         */
+        public boolean isAllow() {
+            return allow;
+        }
+
+        /**
+         * Gets whether this entry only applies to inherited objects.
+         *
+         * @return true if this entry only applies to inherited objects, false otherwise
+         */
+        public boolean isInheritOnly() {
+            return inheritOnly;
+        }
+
+        /**
+         * Gets whether inheritance should not propagate to child objects.
+         *
+         * @return true if inheritance should not propagate, false otherwise
+         */
+        public boolean isNoPropagateInherit() {
+            return noPropagateInherit;
+        }
+
+        /**
+         * Gets whether this entry applies to files (objects).
+         *
+         * @return true if this entry applies to files, false otherwise
+         */
+        public boolean isObjectInherit() {
+            return objectInherit;
+        }
+
+        /**
+         * Gets whether this entry applies to directories (containers).
+         *
+         * @return true if this entry applies to directories, false otherwise
+         */
+        public boolean isContainerInherit() {
+            return containerInherit;
+        }
+
+        public int getInheritanceFlags() {
+            int flags = 0;
+            if (inheritOnly) {
+                flags |= WinNT.INHERIT_ONLY_ACE;
+            }
+            if (noPropagateInherit) {
+                flags |= WinNT.NO_PROPAGATE_INHERIT_ACE;
+            }
+            if (objectInherit) {
+                flags |= WinNT.OBJECT_INHERIT_ACE;
+            }
+            if (containerInherit) {
+                flags |= WinNT.CONTAINER_INHERIT_ACE;
+            }
+            return flags;
+        }
+    }
+
+    /**
+     * Gets all access control entries (ACEs) for a folder.
+     *
+     * @param folder
+     *            The folder to get permissions for
+     * @return Array of AccessPermissionEntry objects containing all ACEs
+     * @throws Win32Exception
+     *             if the operation fails
+     * @throws UnsupportedOperationException
+     *             if not running on Windows
+     */
+    public static AccessPermissionEntry[] getFileAccess(File folder) throws Win32Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("This operation is only supported on Windows");
+        }
+        // Get security descriptor
+        WinNT.SECURITY_DESCRIPTOR absolute = new WinNT.SECURITY_DESCRIPTOR(ACL.MAX_ACL_SIZE);
+        SECURITY_DESCRIPTOR_RELATIVE relative = Advapi32Util.getFileSecurityDescriptor(folder, false);
+        WinNT.PSID pOwner = new WinNT.PSID(WinNT.SECURITY_MAX_SID_SIZE);
+        WinNT.PSID pGroup = new WinNT.PSID(WinNT.SECURITY_MAX_SID_SIZE);
+        ACL pDacl1 = new ACL(ACL.MAX_ACL_SIZE);
+        ACL pSacl = new ACL(ACL.MAX_ACL_SIZE);
+        IntByReference lpdwBufferLength = new IntByReference(absolute.size());
+        IntByReference lpdwDaclSize = new IntByReference(ACL.MAX_ACL_SIZE);
+        IntByReference lpdwSaclSize = new IntByReference(ACL.MAX_ACL_SIZE);
+        IntByReference lpdwOwnerSize = new IntByReference(WinNT.SECURITY_MAX_SID_SIZE);
+        IntByReference lpdwPrimaryGroupSize = new IntByReference(WinNT.SECURITY_MAX_SID_SIZE);
+        if (!Advapi32.INSTANCE.MakeAbsoluteSD(relative, absolute, lpdwBufferLength, pDacl1, lpdwDaclSize, pSacl, lpdwSaclSize, pOwner, lpdwOwnerSize, pGroup, lpdwPrimaryGroupSize)) {
+            throw new WTFException();
+        }
+        PACLByReference pDacl = new PACLByReference();
+        BOOLByReference present = new BOOLByReference();
+        BOOLByReference defaulted = new BOOLByReference();
+        if (!Advapi32.INSTANCE.GetSecurityDescriptorDacl(absolute, present, pDacl, defaulted) || !present.getValue().booleanValue()) {
+            throw new WTFException("Failed at GetSecurityDescriptorDacl");
+        }
+        ACL acl = pDacl.getValue();
+        List<AccessPermissionEntry> entries = new ArrayList<AccessPermissionEntry>();
+        for (int i = 0; i < acl.AceCount; i++) {
+            PointerByReference acePointer = new PointerByReference();
+            if (Advapi32.INSTANCE.GetAce(acl, i, acePointer)) {
+                WinNT.ACCESS_ALLOWED_ACE ace = new WinNT.ACCESS_ALLOWED_ACE(acePointer.getValue());
+                WinNT.PSID aceSid = ace.getSID();
+                String sidString = Advapi32Util.convertSidToStringSid(aceSid);
+                // Calculate inheritance flags
+                WinNT.ACE_HEADER aceHeader = new WinNT.ACE_HEADER(acePointer.getValue());
+                aceHeader.read();
+                int aceFlags = aceHeader.AceFlags;
+                boolean inherited = (aceFlags & WinNT.INHERITED_ACE) != 0;
+                boolean inheritOnly = (aceFlags & WinNT.INHERIT_ONLY_ACE) != 0;
+                boolean noPropagateInherit = (aceFlags & WinNT.NO_PROPAGATE_INHERIT_ACE) != 0;
+                boolean objectInherit = (aceFlags & WinNT.OBJECT_INHERIT_ACE) != 0;
+                boolean containerInherit = (aceFlags & WinNT.CONTAINER_INHERIT_ACE) != 0;
+                boolean inherit = objectInherit || containerInherit;
+                // Calculate permissions
+                Set<AccessPermission> permissions = new HashSet<AccessPermission>();
+                for (AccessPermission perm : AccessPermission.values()) {
+                    if ((ace.Mask & perm.mask) == perm.mask) {
+                        permissions.add(perm);
+                    }
+                }
+                entries.add(new AccessPermissionEntry(sidString, permissions, inherited, inherit, aceHeader.AceType == WinNT.ACCESS_ALLOWED_ACE_TYPE, inheritOnly, noPropagateInherit, objectInherit, containerInherit));
+            }
+        }
+        return entries.toArray(new AccessPermissionEntry[0]);
+    }
+
+    public static void applyPermissions(String path, boolean append, boolean blockInheritedEntries, List<AccessPermissionEntry> entries) {
+        try {
+            if (entries == null || entries.isEmpty()) {
+                throw new IllegalArgumentException("No ACL entries provided – this would remove all access (empty DACL).");
+            }
+            ExplicitAccess[] accessList = new ExplicitAccess[entries.size()];
+            for (int i = 0; i < entries.size(); i++) {
+                AccessPermissionEntry entry = entries.get(i);
+                Account account = Advapi32Util.getAccountBySid(entry.sid);
+                Trustee trustee = new Trustee();
+                trustee.pMultipleTrustee = null;
+                trustee.MultipleTrusteeOperation = Advapi32Ext.MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
+                trustee.TrusteeForm = Trustee.FORM_IS_SID;
+                switch (account.accountType) {
+                case SID_NAME_USE.SidTypeUser:
+                    trustee.TrusteeType = Trustee.TYPE_IS_USER;
+                    break;
+                case SID_NAME_USE.SidTypeGroup:
+                    trustee.TrusteeType = Trustee.TYPE_IS_GROUP;
+                    break;
+                case SID_NAME_USE.SidTypeDomain:
+                    trustee.TrusteeType = Trustee.TYPE_IS_DOMAIN;
+                    break;
+                case SID_NAME_USE.SidTypeAlias:
+                    trustee.TrusteeType = Trustee.TYPE_IS_ALIAS;
+                    break;
+                case SID_NAME_USE.SidTypeWellKnownGroup:
+                    trustee.TrusteeType = Trustee.TYPE_IS_WELL_KNOWN_GROUP;
+                    break;
+                case SID_NAME_USE.SidTypeDeletedAccount:
+                    trustee.TrusteeType = Trustee.TYPE_IS_DELETED;
+                    break;
+                case SID_NAME_USE.SidTypeInvalid:
+                    trustee.TrusteeType = Trustee.TYPE_IS_INVALID;
+                    break;
+                case SID_NAME_USE.SidTypeComputer:
+                    trustee.TrusteeType = Trustee.TYPE_IS_COMPUTER;
+                    break;
+                default:
+                    trustee.TrusteeType = Trustee.TYPE_IS_UNKNOWN;
+                    break;
+                }
+                trustee.ptstrName = new WinNT.PSID(account.sid).getPointer();
+                ExplicitAccess access = new ExplicitAccess();
+                access.grfAccessPermissions = 0;
+                for (AccessPermission p : entry.permissions) {
+                    access.grfAccessPermissions |= p.mask;
+                }
+                access.grfAccessMode = entry.allow ? ExplicitAccess.SET_ACCESS : ExplicitAccess.DENY_ACCESS;
+                access.grfInheritance = 0;
+                if (entry.inheritOnly) {
+                    access.grfInheritance |= WinNT.INHERIT_ONLY_ACE;
+                }
+                if (entry.noPropagateInherit) {
+                    access.grfInheritance |= WinNT.NO_PROPAGATE_INHERIT_ACE;
+                }
+                if (entry.objectInherit) {
+                    access.grfInheritance |= WinNT.OBJECT_INHERIT_ACE;
+                }
+                if (entry.containerInherit) {
+                    access.grfInheritance |= WinNT.CONTAINER_INHERIT_ACE;
+                }
+                access.Trustee = trustee;
+                accessList[i] = access;
+            }
+            PointerByReference pOldDacl = new PointerByReference();
+            PointerByReference pNewDacl = new PointerByReference();
+            if (append) {
+                // get existing dacl
+                successOrException(Advapi32.INSTANCE.GetNamedSecurityInfo(path, AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.DACL_SECURITY_INFORMATION, null, null, pOldDacl, null, new PointerByReference()));
+            }
+            try {
+                // merge
+                successOrException(Advapi32Ext.INSTANCE.SetEntriesInAclW(accessList.length, accessList, append ? pOldDacl.getValue() : null, pNewDacl));
+                int flags = WinNT.DACL_SECURITY_INFORMATION;
+                if (blockInheritedEntries) {
+                    flags |= WinNT.PROTECTED_DACL_SECURITY_INFORMATION;
+                } else {
+                    flags |= WinNT.UNPROTECTED_DACL_SECURITY_INFORMATION;
+                }
+                successOrException(Advapi32.INSTANCE.SetNamedSecurityInfo(path, AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, flags, null, null, pNewDacl.getValue(), null));
+            } finally {
+                Pointer p = pNewDacl.getValue();
+                if (p != null && !p.equals(Pointer.NULL)) {
+                    Kernel32.INSTANCE.LocalFree(p);
+                } else {
+                    p = pOldDacl.getValue();
+                    if (p != null && !p.equals(Pointer.NULL)) {
+                        Kernel32.INSTANCE.LocalFree(p);
+                    }
+                }
+            }
+            System.out.println("ACL successfully applied to: " + path);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to set ACL", e);
+        }
+    }
+
+    /**
+     * @param resultCode
+     */
+    private static void successOrException(int resultCode) throws Win32Exception {
+        if (resultCode != WinError.ERROR_SUCCESS) {
+            throw new Win32Exception(resultCode);
         }
     }
 }

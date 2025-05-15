@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50560 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51062 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +64,7 @@ public class MixdropCo extends antiDDoSForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mixdrop.to", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps" });
+        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mixdrop.to", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my" });
         return ret;
     }
 

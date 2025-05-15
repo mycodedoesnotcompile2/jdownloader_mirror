@@ -18,6 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -27,10 +30,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50705 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51062 $", interfaceVersion = 3, names = {}, urls = {})
 public class FreedlInk extends XFileSharingProBasic {
     public FreedlInk(final PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +47,7 @@ public class FreedlInk extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "freedl.ink", "frdl.to", "frdl.io", "frdl.is" });
+        ret.add(new String[] { "freedl.ink", "frdl.to", "frdl.io", "frdl.is", "frdl.my" });
         return ret;
     }
 
@@ -55,6 +55,7 @@ public class FreedlInk extends XFileSharingProBasic {
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("frdl.to");
+        deadDomains.add("frdl.is");
         return deadDomains;
     }
 

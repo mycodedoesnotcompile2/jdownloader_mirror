@@ -18,7 +18,6 @@ import org.jdownloader.plugins.config.Type;
 public interface RapidGatorConfig extends PluginConfigInterface {
     final String                    text_ActivateExperimentalWaittimeHandling             = "Activate experimental waittime handling to prevent 24-hours IP ban from rapidgator?";
     final String                    text_EnableAPIPremium                                 = "Enable API for premium downloads [recommended] (disabled = use website for premium downloads)?";
-    final String                    text_EnableResumeFree                                 = "Attempt to resume stopped downloads in free (& free-account) mode? Rapidgator sometimes allows resume in free mode for some files and sometimes doesn't.";
     final String                    text_ExperimentalEnforceSSL                           = "Activate experimental forced SSL for downloads?";
     final String                    text_Referer                                          = "Define custom referer";
     final String                    text_ReadTimeout                                      = "Define custom browser read-timeout (seconds)";
@@ -35,7 +34,7 @@ public interface RapidGatorConfig extends PluginConfigInterface {
         }
 
         public String getEnableResumeFree_label() {
-            return text_EnableResumeFree;
+            return "Attempt to resume stopped downloads in free (& free-account) mode? Rapidgator sometimes allows resume in free mode for some files and sometimes doesn't.";
         }
 
         public String getEnableFreeDownloadModeCaptchaDuringPreDownloadWait_label() {
@@ -90,7 +89,6 @@ public interface RapidGatorConfig extends PluginConfigInterface {
      */
     @AboutConfig
     @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry(text_EnableResumeFree)
     @DefaultOnNull()
     @Order(21)
     boolean isEnableResumeFree();

@@ -3,6 +3,7 @@ package org.jdownloader.gui.notify;
 import java.awt.Component;
 
 import javax.swing.Icon;
+import javax.swing.JLabel;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import javax.swing.text.JTextComponent;
@@ -18,6 +19,7 @@ public class BasicContentPanel extends AbstractBubbleContentPanel {
     public BasicContentPanel(String text, Icon icon) {
         super(icon);
         setLayout(new MigLayout("ins 0,wrap 2", "[][grow,fill]", "[]"));
+        add(new JLabel(icon), "aligny top");
         add(getMessage(text), "aligny center");
         SwingUtils.setOpaque(this, false);
     }

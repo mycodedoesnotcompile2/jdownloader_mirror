@@ -12,18 +12,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.WeakHashSet;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyException;
-import org.jdownloader.auth.AuthenticationController;
-import org.jdownloader.auth.AuthenticationInfo;
-import org.jdownloader.auth.AuthenticationInfo.Type;
-import org.jdownloader.auth.Login;
-import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -46,7 +34,19 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50992 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.config.WeakHashSet;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.HTTPProxyException;
+import org.jdownloader.auth.AuthenticationController;
+import org.jdownloader.auth.AuthenticationInfo;
+import org.jdownloader.auth.AuthenticationInfo.Type;
+import org.jdownloader.auth.Login;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51066 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
 public class Ftp extends PluginForDecrypt {
     private static Map<String, Integer>     LIMITS = new HashMap<String, Integer>();
     private static Map<String, Set<Thread>> LOCKS  = new HashMap<String, Set<Thread>>();
@@ -165,7 +165,15 @@ public class Ftp extends PluginForDecrypt {
                         return false;
                     }
                 }
-                final boolean ret = super.AUTH_TLS_CC();
+                final boolean ret;
+                try {
+                    ret = super.AUTH_TLS_CC();
+                } catch (IOException e) {
+                    synchronized (set) {
+                        set.add(host);
+                    }
+                    throw e;
+                }
                 if (!ret) {
                     synchronized (set) {
                         set.add(host);

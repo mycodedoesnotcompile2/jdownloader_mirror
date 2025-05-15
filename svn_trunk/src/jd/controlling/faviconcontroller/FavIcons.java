@@ -772,11 +772,11 @@ public class FavIcons {
         } else {
             final String requestHtml = favBr.toString().replaceAll("(?s)<!--.*?-->", "");
             for (final String rel : new String[] { "icon", "shortcut icon", "apple-touch-icon" }) {
-                String urls[] = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "('|\")[^>]*href\\s*=\\s*('|\")([^>'\"]*\\.(ico|png|svg|jpg)[^>'\"]*)('|\")").getColumn(3);
+                String urls[] = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "('|\")[^>]*href\\s*=\\s*('|\")([^>'\"]*\\.(ico|png|svg|jpg|gif)[^>'\"]*)('|\")").getColumn(3);
                 if (urls != null && urls.length > 0) {
                     ret.addAll(Arrays.asList(urls));
                 }
-                urls = new Regex(requestHtml, "(?i)href\\s*=\\s*('|\")([^>'\"]*\\.(ico|png|svg|jpg)[^>'\"]*)('|\")[^>]*rel\\s*=\\s*('|\")" + rel + "('|\")").getColumn(1);
+                urls = new Regex(requestHtml, "(?i)href\\s*=\\s*('|\")([^>'\"]*\\.(ico|png|svg|jpg|gif)[^>'\"]*)('|\")[^>]*rel\\s*=\\s*('|\")" + rel + "('|\")").getColumn(1);
                 if (urls != null && urls.length > 0) {
                     ret.addAll(Arrays.asList(urls));
                 }
@@ -784,7 +784,7 @@ public class FavIcons {
                     /*
                      * workaround for hoster with not complete url, eg rapidshare.com
                      */
-                    String url = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "('|\")[^>]*href\\s*=\\s*[^>]*//([^>'\"]*\\.(ico|png|svg|jpg)[^>'\"]*)('|\")").getMatch(2);
+                    String url = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "('|\")[^>]*href\\s*=\\s*[^>]*//([^>'\"]*\\.(ico|png|svg|jpg|gif)[^>'\"]*)('|\")").getMatch(2);
                     if (!StringUtils.isEmpty(url)) {
                         if (!url.equalsIgnoreCase(host)) {
                             url = "http://" + url;
@@ -923,12 +923,14 @@ public class FavIcons {
             BufferedImage ret = null;
             if (StringUtils.endsWithCaseInsensitive(con.getURL().getPath(), ".svg")) {
                 try {
-                    final Image img = IconIO.getSvgFactory().getImageFromSVG(is, null, 32, 32, null);
-                    if (img != null) {
-                        ret = IconIO.toBufferedImage(img);
+                    final Image img = IconIO.getSvgFactory().getImageFromSVG(is, null, 64, 64, null);
+                    if (img == null) {
+                        return null;
                     }
+                    ret = IconIO.toBufferedImage(img);
                 } catch (IOException e) {
                     logger.log(e);
+                    return null;
                 }
             }
             if (ret == null) {

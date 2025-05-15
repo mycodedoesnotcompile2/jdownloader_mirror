@@ -54,6 +54,8 @@ import java.util.StringTokenizer;
 import java.util.TimeZone;
 import java.util.WeakHashMap;
 
+import jd.plugins.Plugin;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -71,8 +73,6 @@ import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
-
-import jd.plugins.Plugin;
 
 /**
  * SimpleFTP is a simple package that implements a Java FTP client. With SimpleFTP, you can connect to an FTP server and upload multiple
@@ -502,16 +502,40 @@ public abstract class SimpleFTP {
         socket.getSocket().setSoTimeout(getReadTimeout(STATE.CONNECTED));
         switch (mode) {
         case EXPLICIT_REQUIRED_CC:
-        case EXPLICIT_OPTIONAL_CC:
-            if (AUTH_TLS_CC()) {
+        case EXPLICIT_OPTIONAL_CC: {
+            final boolean ccTLS;
+            try {
+                ccTLS = AUTH_TLS_CC();
+            } catch (IOException e) {
+                if (TLS_MODE.EXPLICIT_REQUIRED_CC.equals(mode)) {
+                    throw e;
+                }
+                getLogger().log(e);
+                disconnect(false);
+                connect(host, port, user, pass, TLS_MODE.NONE);
+                return;
+            }
+            if (ccTLS) {
                 setTLSMode(mode);
             } else if (TLS_MODE.EXPLICIT_REQUIRED_CC.equals(mode)) {
                 throw new IOException("TLS_MODE:" + mode + " failed!");
             }
             break;
+        }
         case EXPLICIT_REQUIRED_CC_DC:
-        case EXPLICIT_OPTIONAL_CC_DC:
-            final boolean ccTLS = AUTH_TLS_CC();
+        case EXPLICIT_OPTIONAL_CC_DC: {
+            final boolean ccTLS;
+            try {
+                ccTLS = AUTH_TLS_CC();
+            } catch (IOException e) {
+                if (TLS_MODE.EXPLICIT_REQUIRED_CC_DC.equals(mode)) {
+                    throw e;
+                }
+                getLogger().log(e);
+                disconnect(false);
+                connect(host, port, user, pass, TLS_MODE.NONE);
+                return;
+            }
             if (ccTLS && AUTH_TLS_DC()) {
                 setTLSMode(mode);
             } else if (TLS_MODE.EXPLICIT_REQUIRED_CC_DC.equals(mode)) {
@@ -522,6 +546,7 @@ public abstract class SimpleFTP {
                 setTLSMode(TLS_MODE.NONE);
             }
             break;
+        }
         default:
             setTLSMode(TLS_MODE.NONE);
             break;
@@ -546,19 +571,21 @@ public abstract class SimpleFTP {
         // Now logged in.
         if (TLS_MODE.NONE.equals(getTLSMode())) {
             switch (mode) {
-            case EXPLICIT_OPTIONAL_CC:
+            case EXPLICIT_OPTIONAL_CC: {
                 if (AUTH_TLS_CC()) {
-                    setTLSMode(mode);
+                    setTLSMode(TLS_MODE.EXPLICIT_OPTIONAL_CC);
                 }
                 break;
-            case EXPLICIT_OPTIONAL_CC_DC:
+            }
+            case EXPLICIT_OPTIONAL_CC_DC: {
                 final boolean ccTLS = AUTH_TLS_CC();
                 if (ccTLS && AUTH_TLS_DC()) {
-                    setTLSMode(mode);
+                    setTLSMode(TLS_MODE.EXPLICIT_OPTIONAL_CC_DC);
                 } else if (ccTLS) {
                     setTLSMode(TLS_MODE.EXPLICIT_OPTIONAL_CC);
                 }
                 break;
+            }
             default:
                 break;
             }
@@ -606,12 +633,12 @@ public abstract class SimpleFTP {
     /**
      * Disconnects from the FTP server.
      */
-    public void disconnect() throws IOException {
+    public void disconnect(final boolean sendQuit) throws IOException {
         final SocketStreamInterface lsocket = getControlSocket();
         try {
             /* avoid stackoverflow for io-exception during sendLine */
             socket = null;
-            if (lsocket != null) {
+            if (lsocket != null && sendQuit) {
                 sendLine(ENCODING.ASCII7BIT, lsocket, "QUIT");
             }
         } finally {
@@ -622,6 +649,10 @@ public abstract class SimpleFTP {
             } catch (final Throwable e) {
             }
         }
+    }
+
+    public void disconnect() throws IOException {
+        disconnect(true);
     }
 
     /**
@@ -663,6 +694,7 @@ public abstract class SimpleFTP {
         int c = 0;
         int length = 0;
         boolean CR = false;
+        boolean doubleCR = false;
         while (true) {
             c = is.read();
             if (c == -1) {
@@ -672,12 +704,18 @@ public abstract class SimpleFTP {
                 return -1;
             } else if (c == 13) {
                 if (CR) {
-                    throw new IOException("CRCR!?");
+                    if (doubleCR) {
+                        throw new IOException("CRCR!?");
+                    }
+                    doubleCR = true;
                 } else {
                     CR = true;
                 }
             } else if (c == 10) {
                 if (CR) {
+                    if (doubleCR) {
+                        // \r\r\n detected
+                    }
                     break;
                 } else {
                     throw new IOException("LF!?");

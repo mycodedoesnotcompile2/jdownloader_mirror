@@ -7,9 +7,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import javax.swing.Icon;
+
 import jd.controlling.linkcollector.LinkCollectingJob;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
 import jd.controlling.packagecontroller.PackageController;
 import jd.plugins.DownloadLink;
 
@@ -18,6 +21,8 @@ import org.appwork.storage.JsonKeyValueStorage;
 import org.appwork.storage.Storable;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.reflection.Clazz;
+import org.jdownloader.api.linkcollector.v2.CrawledLinkAPIStorableV2;
+import org.jdownloader.api.linkcollector.v2.LinkCollectorAPIImplV2;
 import org.jdownloader.controlling.Priority;
 import org.jdownloader.extensions.eventscripter.ScriptAPI;
 import org.jdownloader.extensions.extraction.Archive;
@@ -25,6 +30,9 @@ import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkFac
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveValidator;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
+import org.jdownloader.myjdownloader.client.json.JsonMap;
+import org.jdownloader.plugins.ConditionalSkipReason;
+import org.jdownloader.plugins.CustomConditionalSkipReasonMessageIcon;
 import org.jdownloader.settings.UrlDisplayType;
 
 @ScriptAPI(description = "The context linkgrabber list link")
@@ -60,6 +68,34 @@ public class CrawledLinkSandbox {
                 link.setPriority(Priority.DEFAULT);
             }
         }
+    }
+
+    private CrawledLinkAPIStorableV2 _getStatus() {
+        if (link != null) {
+            final CrawledLinkAPIStorableV2 ret = new CrawledLinkAPIStorableV2(link);
+            LinkCollectorAPIImplV2.setStatus(ret, link, new CustomConditionalSkipReasonMessageIcon() {
+                @Override
+                public String getMessage(ConditionalSkipReason conditionalSkipReason, AbstractNode node) {
+                    return conditionalSkipReason.getMessage(conditionalSkipReason, node);
+                }
+
+                @Override
+                public Icon getIcon(ConditionalSkipReason conditionalSkipReason, AbstractNode node) {
+                    return conditionalSkipReason.getIcon(conditionalSkipReason, node);
+                }
+            });
+            return ret;
+        } else {
+            return null;
+        }
+    }
+
+    public JsonMap getAdvancedStatus() {
+        final CrawledLinkAPIStorableV2 ret = _getStatus();
+        if (ret != null) {
+            return ret.getAdvancedStatus();
+        }
+        return null;
     }
 
     public CrawlerJobSandbox getSourceJob() {

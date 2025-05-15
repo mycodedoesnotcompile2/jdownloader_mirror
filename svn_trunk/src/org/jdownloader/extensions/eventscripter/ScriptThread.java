@@ -19,6 +19,15 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.swing.SwingUtilities;
 
+import jd.http.Browser;
+import net.sourceforge.htmlunit.corejs.javascript.Context;
+import net.sourceforge.htmlunit.corejs.javascript.EcmaError;
+import net.sourceforge.htmlunit.corejs.javascript.NativeJavaMethod;
+import net.sourceforge.htmlunit.corejs.javascript.ScriptRuntime;
+import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
+import net.sourceforge.htmlunit.corejs.javascript.UniqueTag;
+import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
@@ -37,17 +46,9 @@ import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.ScriptEnvironment;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.myjdownloader.client.json.JsonMap;
 import org.jdownloader.scripting.JSHtmlUnitPermissionRestricter;
 import org.jdownloader.scripting.JSShutterDelegate;
-
-import jd.http.Browser;
-import net.sourceforge.htmlunit.corejs.javascript.Context;
-import net.sourceforge.htmlunit.corejs.javascript.EcmaError;
-import net.sourceforge.htmlunit.corejs.javascript.NativeJavaMethod;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptRuntime;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
-import net.sourceforge.htmlunit.corejs.javascript.UniqueTag;
-import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
 
 public class ScriptThread extends Thread implements JSShutterDelegate {
     private final ScriptEntry                  script;
@@ -252,7 +253,7 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
         dupes.add("net.sourceforge.htmlunit.corejs.javascript.Function");
         dupes.add("void");
         StringBuilder preloadClasses = new StringBuilder("");
-        for (Class<?> c : new Class[] { Boolean.class, Byte.class, Short.class, Integer.class, Long.class, String.class, Double.class, Float.class, ArrayList.class, List.class, LinkedList.class, Map.class, HashMap.class, Set.class, HashSet.class, MinimalMemoryMap.class, net.sourceforge.htmlunit.corejs.javascript.EcmaError.class, ScriptEnvironment.class, EnvironmentException.class }) {
+        for (Class<?> c : new Class[] { Boolean.class, Byte.class, Short.class, Integer.class, Long.class, String.class, Double.class, Float.class, ArrayList.class, List.class, LinkedList.class, Map.class, HashMap.class, JsonMap.class, Set.class, HashSet.class, MinimalMemoryMap.class, net.sourceforge.htmlunit.corejs.javascript.EcmaError.class, ScriptEnvironment.class, EnvironmentException.class }) {
             if (c.isArray()) {
                 c = c.getComponentType();
             }

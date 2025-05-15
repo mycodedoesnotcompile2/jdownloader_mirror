@@ -23,6 +23,11 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 
 public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Icon, IDIcon {
+
+    public static interface DomainInfoFactory {
+        public DomainInfo createDomainInfo(String tld, String domain);
+    }
+
     private static final HashMap<String, String> HARDCODEDFAVICONS = new HashMap<String, String>();
     static {
         HARDCODEDFAVICONS.put("http", IconKey.ICON_URL);// 'http links' results in 'http'
@@ -42,7 +47,7 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
     private final String                         domain;
     private final IconIdentifier                 iconIdentifier;
 
-    private DomainInfo(String tld, String domain) {
+    public DomainInfo(String tld, String domain) {
         this.tld = Property.dedupeString(tld);
         if (domain == null || domain.equals(tld)) {
             this.domain = tld;
@@ -164,6 +169,10 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
     }
 
     public static DomainInfo getInstance(final String domain) {
+        return getInstance(domain, null);
+    }
+
+    public static DomainInfo getInstance(final String domain, final DomainInfoFactory builder) {
         if (domain == null) {
             return null;
         }
@@ -172,7 +181,13 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
             DomainInfo ret = null;
             final WeakReference<DomainInfo> domainInfo = CACHE.get(lcaseTld);
             if (domainInfo == null || (ret = domainInfo.get()) == null) {
-                ret = new DomainInfo(Browser.getHost(lcaseTld, true), lcaseTld);
+                final String host = Browser.getHost(lcaseTld, true);
+                if (builder != null) {
+                    ret = builder.createDomainInfo(host, lcaseTld);
+                }
+                if (ret == null) {
+                    ret = new DomainInfo(host, lcaseTld);
+                }
                 CACHE.put(lcaseTld, new WeakReference<DomainInfo>(ret));
             }
             return ret;

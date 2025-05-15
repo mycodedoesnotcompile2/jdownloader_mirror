@@ -18,10 +18,10 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -34,25 +34,31 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "http://(www\\.)?5sing\\.kugou\\.com/(f|y)c/\\d+\\.html" })
+@HostPlugin(revision = "$Revision: 51063 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "http://(www\\.)?5sing\\.kugou\\.com/(f|y)c/\\d+\\.html" })
 public class FiveSingCom extends PluginForHost {
     public FiveSingCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    public String getAGBLink() {
-        return "http://5sing.com/";
+    public FEATURE[] getFeatures() {
+        return new FEATURE[] { FEATURE.AUDIO_STREAMING };
     }
 
-    private static final String CRIPPLEDLINK = "http://(www\\.)?5sing\\.kugou\\.com/(f|y)c/\\d+\\.html";
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/";
+    }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
-        if (br.containsHTML("/images/404/btn\\.jpg") || br.getURL().contains("FileNotFind") || br.getURL().contains("5sing.com/404.htm") || br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!this.canHandle(br.getURL())) {
+            /* E.g. redirect to mainpage */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String extension = br.getRegex("(<em>)?格式：(</em>)?([^<>\"]*?)(<|&)").getMatch(2);
@@ -64,10 +70,11 @@ public class FiveSingCom extends PluginForHost {
         final String fileid = br.getRegex("var SongID[^<>\"\t\n\r]*= ([^<>\"]*?);").getMatch(0);
         final String stype = br.getRegex("var SongType[^<>\"\t\n\r]*= \"([^<>\"]*?)\";").getMatch(0);
         String filesize = br.getRegex("(<em>)?大小：(</em>)?([^<>\"]*?)(<|\")").getMatch(2);
-        if (filename == null || extension == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (filename != null && extension != null) {
+            link.setFinalFileName(stype + "-" + Encoding.htmlDecode(filename.trim()) + "-" + fileid + "." + Encoding.htmlDecode(extension.trim()));
+        } else {
+            logger.warning("Failed to find filename information");
         }
-        link.setFinalFileName(stype + "-" + Encoding.htmlDecode(filename.trim()) + "-" + fileid + "." + Encoding.htmlDecode(extension.trim()));
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize + "b"));
         }
@@ -75,15 +82,15 @@ public class FiveSingCom extends PluginForHost {
     }
 
     @Override
-    public void handleFree(final DownloadLink downloadLink) throws Exception, PluginException {
-        requestFileInformation(downloadLink);
+    public void handleFree(final DownloadLink link) throws Exception, PluginException {
+        requestFileInformation(link);
         String src = br.getRegex("\"ticket\": \"([^<>\"]*?)\"").getMatch(0);
         if (src == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         src = Encoding.Base64Decode(src).replace("\\", "");
-        String dllink = new Regex(src, "\"file\":\"(https?:[^<>\"]*?)\"").getMatch(0);
-        if (dllink == null) {
+        String dllink = new Regex(src, "\"file\":\"(https?:[^\"]*?)\"").getMatch(0);
+        if (StringUtils.isEmpty(dllink)) {
             Map<String, Object> map = restoreFromString(src, TypeRef.MAP);
             final String songID = map.containsKey("songID") ? String.valueOf(map.get("songID")) : null;
             final String songType = map.containsKey("songType") ? String.valueOf(map.get("songType")) : null;
@@ -92,7 +99,7 @@ public class FiveSingCom extends PluginForHost {
             }
             final Browser brc = br.cloneBrowser();
             brc.getPage("http://service.5sing.kugou.com/song/getsongurl?jsoncallback=jQuery" + System.currentTimeMillis() + "_" + System.currentTimeMillis() + "&songid=" + songID + "&songtype=" + songType + "&from=web&version=6.6.72&_=1539798427612");
-            map = restoreFromString(new Regex(brc.toString(), "(\\{.+\\})").getMatch(0), TypeRef.MAP);
+            map = restoreFromString(new Regex(brc.getRequest().getHtmlCode(), "(\\{.+\\})").getMatch(0), TypeRef.MAP);
             map = (Map<String, Object>) map.get("data");
             dllink = (String) map.get("lqurl");
             if (dllink == null) {
@@ -102,8 +109,8 @@ public class FiveSingCom extends PluginForHost {
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, downloadLink, dllink, true, 0);
-        if (dl.getConnection().getContentType().contains("html")) {
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -116,7 +123,7 @@ public class FiveSingCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

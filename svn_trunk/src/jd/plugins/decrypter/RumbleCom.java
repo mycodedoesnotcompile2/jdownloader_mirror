@@ -47,7 +47,7 @@ import org.jdownloader.plugins.components.config.RumbleComConfig.QualitySelectio
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 50962 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51066 $", interfaceVersion = 3, names = {}, urls = {})
 public class RumbleCom extends PluginForDecrypt {
     public RumbleCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,6 +120,7 @@ public class RumbleCom extends PluginForDecrypt {
             videoID = new Regex(param.getCryptedUrl(), TYPE_EMBED).getMatch(0);
         } else {
             br.getPage(param.getCryptedUrl());
+            br.followRedirect();
             videoID = br.getRegex("\"video\":\"([a-z0-9]+)\"").getMatch(0);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

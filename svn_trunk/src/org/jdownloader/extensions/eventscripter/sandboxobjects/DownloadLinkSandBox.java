@@ -33,6 +33,7 @@ import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkA
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveValidator;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
+import org.jdownloader.myjdownloader.client.json.JsonMap;
 import org.jdownloader.plugins.ConditionalSkipReason;
 import org.jdownloader.plugins.CustomConditionalSkipReasonMessageIcon;
 import org.jdownloader.plugins.DownloadPluginProgress;
@@ -484,6 +485,14 @@ public class DownloadLinkSandBox {
     }
 
     public String getStatus() {
+        final DownloadLinkAPIStorableV2 ret = _getStatus();
+        if (ret != null) {
+            return ret.getStatus();
+        }
+        return null;
+    }
+
+    private DownloadLinkAPIStorableV2 _getStatus() {
         if (downloadLink != null) {
             final DownloadLinkAPIStorableV2 ret = new DownloadLinkAPIStorableV2(downloadLink);
             DownloadsAPIV2Impl.setStatus(ret, downloadLink, new CustomConditionalSkipReasonMessageIcon() {
@@ -497,10 +506,18 @@ public class DownloadLinkSandBox {
                     return conditionalSkipReason.getIcon(conditionalSkipReason, node);
                 }
             });
-            return ret.getStatus();
+            return ret;
         } else {
             return null;
         }
+    }
+
+    public JsonMap getAdvancedStatus() {
+        final DownloadLinkAPIStorableV2 ret = _getStatus();
+        if (ret != null) {
+            return ret.getAdvancedStatus();
+        }
+        return null;
     }
 
     public String getHost() {

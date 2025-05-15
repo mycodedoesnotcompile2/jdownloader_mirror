@@ -24,14 +24,6 @@ import java.util.regex.Pattern;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -52,7 +44,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51054 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+
+@HostPlugin(revision = "$Revision: 51066 $", interfaceVersion = 2, names = {}, urls = {})
 public class EmuParadiseMe extends PluginForHost {
     public EmuParadiseMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -326,7 +326,7 @@ public class EmuParadiseMe extends PluginForHost {
         setDownloadServerCookie();
         final String error_text_file_unavailable = "Item is not downloadable anymore?";
         if (dllink == null) {
-            /* Example: https://www.emuparadise.me/Atari_Jaguar_Emulators/Android/50 */
+            /* Example: /Atari_Jaguar_Emulators/Android/50 */
             throw new PluginException(LinkStatus.ERROR_FATAL, error_text_file_unavailable);
         }
         dllink = Encoding.htmlOnlyDecode(dllink);

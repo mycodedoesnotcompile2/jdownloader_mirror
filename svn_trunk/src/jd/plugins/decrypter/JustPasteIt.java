@@ -32,7 +32,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49609 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51063 $", interfaceVersion = 2, names = {}, urls = {})
 public class JustPasteIt extends AbstractPastebinCrawler {
     public JustPasteIt(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,6 +96,9 @@ public class JustPasteIt extends AbstractPastebinCrawler {
         } else if (br.containsHTML("\"isCaptchaRequired\":true")) {
             logger.warning("Captcha is not supported");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (!this.canHandle(br.getURL())) {
+            /* Redirect to unsupported URL e.g. mainpage, example: https://jpst.it/xxxTestYyy */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String pastebinText = br.getRegex("<div[^>]+id=\"articleContent\"[^>]*>(.*?)</div>").getMatch(0);
         if (pastebinText == null) {
