@@ -35,7 +35,6 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.gui.translate._GUI;
@@ -69,7 +68,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
+@HostPlugin(revision = "$Revision: 51068 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
 public class FShareVn extends PluginForHost {
     private final String         SERVERERROR                            = "Tài nguyên bạn yêu cầu không tìm thấy";
     private final String         IPBLOCKED                              = "<li>Tài khoản của bạn thuộc GUEST nên chỉ tải xuống";
@@ -98,7 +97,7 @@ public class FShareVn extends PluginForHost {
     public FShareVn(PluginWrapper wrapper) {
         super(wrapper);
         Browser.setRequestIntervalLimitGlobal(getHost(), 500);
-        this.enablePremium("https://www.fshare.vn/payment/package/?type=vip");
+        this.enablePremium("https://www." + getHost() + "/payment/package/?type=vip");
     }
 
     @Override
@@ -116,7 +115,7 @@ public class FShareVn extends PluginForHost {
 
     @Override
     public Object getFavIcon(String host) throws IOException {
-        return "https://www.fshare.vn/images/favicon.png";
+        return "https://www." + getHost() + "/images/favicon.png";
     }
 
     private String getUID(final DownloadLink link) {
@@ -135,46 +134,53 @@ public class FShareVn extends PluginForHost {
     }
 
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {
+        final String fid = this.getUID(link);
         if (!link.isNameSet()) {
-            link.setName(this.getUID(link));
+            link.setName(fid);
         }
         this.setBrowserExclusive();
         correctDownloadLink(link);
         br.setFollowRedirects(false);
         br.getHeaders().put("Referer", link.getPluginPatternMatcher());
+        /*
+         * The following call changes the website language to our desired language and it should redirect back to the referer value we just
+         * set.
+         */
         prepBrowserWebsite(this.br);
-        String redirect = br.getRedirectLocation();
-        if (redirect != null) {
-            final boolean follows_redirects = br.isFollowingRedirects();
-            URLConnectionAdapter con = null;
-            br.setFollowRedirects(true);
-            try {
-                con = br.openHeadConnection(redirect);
-                if (!looksLikeDownloadableContent(con)) {
-                    br.followConnection(true);
-                    if (con.getRequestMethod() == RequestMethod.HEAD) {
-                        br.getPage(redirect);
+        final String redirect = br.getRedirectLocation();
+        final String checkForDirectlinkURL;
+        if (redirect != null && redirect.contains(fid)) {
+            logger.info("Found possible direct-downloadable link");
+            checkForDirectlinkURL = redirect;
+        } else {
+            checkForDirectlinkURL = link.getPluginPatternMatcher();
+        }
+        final boolean follows_redirects = br.isFollowingRedirects();
+        URLConnectionAdapter con = null;
+        br.setFollowRedirects(true);
+        try {
+            con = br.openGetConnection(checkForDirectlinkURL);
+            if (looksLikeDownloadableContent(con)) {
+                /* Directurl */
+                link.setName(getFileNameFromConnection(con));
+                if (con.getCompleteContentLength() > 0) {
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
-                } else {
-                    /* Directurl */
-                    link.setName(getFileNameFromConnection(con));
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    }
-                    dllink = con.getURL().toString();
-                    return AvailableStatus.TRUE;
                 }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
-                }
-                br.setFollowRedirects(follows_redirects);
+                dllink = con.getURL().toExternalForm();
+                return AvailableStatus.TRUE;
             }
+            /* Not a direct URL */
+            br.followConnection(true);
+        } finally {
+            try {
+                con.disconnect();
+            } catch (Throwable e) {
+            }
+            br.setFollowRedirects(follows_redirects);
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -184,18 +190,9 @@ public class FShareVn extends PluginForHost {
             /* 2022-09-14 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("file\" title=\"(.*?)\">").getMatch(0);
+        String filename = br.getRegex("<title>(?:Fshare - )?(.*?)(?: - Fshare)?</title>").getMatch(0);
         if (filename == null) {
-            filename = br.getRegex("<p><b>Tên file:</b> (.*?)</p>").getMatch(0);
-        }
-        if (filename == null) {
-            filename = br.getRegex("<i class=\"fa fa\\-file[^\"]*?\"></i>\\s*(.*?)\\s*</div>").getMatch(0);
-        }
-        if (filename == null) {
-            filename = br.getRegex("<title>(?:Fshare - )?(.*?)(?: - Fshare)?</title>").getMatch(0);
-        }
-        if (filename == null) {
-            filename = br.getRegex("<i class=\"fa fa\\-file\\-o\"></i>\\s*(.*?)\\s*</div>").getMatch(0);
+            filename = br.getRegex("id=\"file-name-r\"[^>]*>([^<]+)</div>").getMatch(0);
         }
         String filesize = br.getRegex("<i class=\"fa fa-hdd-o\"></i>\\s*(.*?)\\s*</div>").getMatch(0);
         if (filesize == null) {
@@ -205,6 +202,7 @@ public class FShareVn extends PluginForHost {
         final boolean isPasswordProtected = websiteGetPasswordProtectedForm(this.br) != null;
         if (isPasswordProtected) {
             link.setPasswordProtected(true);
+            logger.info("Filename and filesize are not given for password protected items");
         } else {
             link.setPasswordProtected(false);
             if (filename != null) {

@@ -31,6 +31,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -47,15 +48,24 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.SaveTv;
 
-@DecrypterPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm" })
+@DecrypterPlugin(revision = "$Revision: 51067 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setLoadLimit(br.getLoadLimit() * 3);
+        br.setFollowRedirects(true);
+        return br;
     }
 
     /* Settings stuff */
@@ -95,7 +105,6 @@ public class SaveTvDecrypter extends PluginForDecrypt {
     private boolean                  only_grab_new_entries                        = false;
     /* If this != null, API is currently used */
     private boolean                  fast_linkcheck                               = false;
-    private String                   parameter                                    = null;
 
     @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
@@ -112,39 +121,40 @@ public class SaveTvDecrypter extends PluginForDecrypt {
     }
 
     @SuppressWarnings({ "deprecation", "unchecked" })
-    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         timestamp_crawl_started = System.currentTimeMillis();
-        parameter = param.toString();
         api_enabled = jd.plugins.hoster.SaveTv.is_API_enabled(this.getHost());
         fast_linkcheck = cfg.getBooleanProperty(jd.plugins.hoster.SaveTv.CRAWLER_ENABLE_FAST_LINKCHECK, SaveTv.defaultCrawlerFastLinkcheck);
         crawler_DialogsEnabled = cfg.getBooleanProperty(jd.plugins.hoster.SaveTv.CRAWLER_ENABLE_DIALOGS, jd.plugins.hoster.SaveTv.defaultCrawlerActivateInformationDialogs);
         only_grab_new_entries = cfg.getBooleanProperty(CRAWLER_ONLY_ADD_NEW_IDS, false);
         only_grab_entries_of_specified_timeframe = cfg.getLongProperty(jd.plugins.hoster.SaveTv.CRAWLER_GRAB_TIMEFRAME_COUNT, 0);
-        this.br.setFollowRedirects(true);
-        this.br.setLoadLimit(this.br.getLoadLimit() * 3);
-        if (!cfg.getBooleanProperty(CRAWLER_ACTIVATE, false)) {
+        final List<Account> accounts = AccountController.getInstance().getValidAccounts(this.getHost());
+        if (accounts == null || accounts.isEmpty()) {
+            throw new AccountRequiredException("Save.tv Account benötigt");
+        }
+        final String source = UrlQuery.parse(param.getCryptedUrl()).get("source");
+        /*
+         * If the source URL was added via JDownloader toolbar, it shall be processed even if the user has deactivated the archive crawler.
+         */
+        if (!cfg.getBooleanProperty(CRAWLER_ACTIVATE, false) && !StringUtils.equalsIgnoreCase(source, "jdtoolbar")) {
             logger.info("save.tv: Decrypting save.tv archives is disabled, doing nothing...");
-            ret.add(this.createOfflinelink(parameter, "Archiv_Crawler_in_Plugin_Einstellungen_deaktiviert", "Archiv_Crawler_in_Plugin_Einstellungen_deaktiviert"));
+            ret.add(this.createOfflinelink(param.getCryptedUrl(), "Archiv_Crawler_in_Plugin_Einstellungen_deaktiviert", "Archiv Crawler in Plugin Einstellungen deaktiviert!"));
             return ret;
         }
+        totalAccountsNum = accounts.size();
         try {
-            final ArrayList<Account> all_stv_accounts = AccountController.getInstance().getValidAccounts(this.getHost());
-            totalAccountsNum = all_stv_accounts != null ? all_stv_accounts.size() : 0;
-            if (totalAccountsNum == 0) {
-                throw new AccountRequiredException("Save.tv Account benötigt");
-            }
-            for (final Account stvacc : all_stv_accounts) {
-                if (!getUserLogin(stvacc, false)) {
-                    logger.info("Failed to log in account: " + stvacc.getUser());
+            for (final Account acc : accounts) {
+                if (!getUserLogin(acc, false)) {
+                    logger.info("Failed to log in account: " + acc.getUser());
                     continue;
                 }
-                timestamp_last_crawl_ended = stvacc.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL_NEWLINKS, 0);
-                timestamp_last_record_started = stvacc.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL_LATEST_START_DATE, 0);
+                timestamp_last_crawl_ended = acc.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL_NEWLINKS, 0);
+                timestamp_last_record_started = acc.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL_LATEST_START_DATE, 0);
                 dupecheckList.clear();
                 totalAccountsLoggedInSuccessfulNum++;
                 if (only_grab_new_entries) {
                     /* Load list of saved IDs + timestamp when they were added */
-                    final Object crawledIDSMap = stvacc.getProperty(CRAWLER_PROPERTY_TELECASTIDS_ADDED);
+                    final Object crawledIDSMap = acc.getProperty(CRAWLER_PROPERTY_TELECASTIDS_ADDED);
                     if (crawledIDSMap != null && crawledIDSMap instanceof Map) {
                         crawledTelecastIDsMap = (Map<String, Long>) crawledIDSMap;
                     }
@@ -152,15 +162,15 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                     tdifference_milliseconds = only_grab_entries_of_specified_timeframe * 24 * 60 * 60 * 1000;
                 }
                 if (api_enabled) {
-                    api_decrypt_All(stvacc);
+                    api_decrypt_All(acc);
                 } else {
-                    site_decrypt_All(stvacc);
+                    site_decrypt_All(acc);
                 }
-                cleanAndSaveMapOfAddedTelecastIDs(stvacc);
+                cleanAndSaveMapOfAddedTelecastIDs(acc);
                 if (ret.size() > 0) {
-                    stvacc.setProperty(CRAWLER_PROPERTY_LASTCRAWL_NEWLINKS, System.currentTimeMillis());
+                    acc.setProperty(CRAWLER_PROPERTY_LASTCRAWL_NEWLINKS, System.currentTimeMillis());
                 }
-                stvacc.setProperty(CRAWLER_PROPERTY_LASTCRAWL, System.currentTimeMillis());
+                acc.setProperty(CRAWLER_PROPERTY_LASTCRAWL, System.currentTimeMillis());
             }
             logger.info("save.tv: total links found: " + ret.size() + " of " + totalLinksNum);
         } catch (final Throwable e) {
@@ -172,7 +182,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
             }
             if (e instanceof DecrypterException) {
                 logger.log(e);
-                logger.info("Decrypt process aborted by user: " + parameter);
+                logger.info("Decrypt process aborted by user: " + param);
                 if (crawler_DialogsEnabled) {
                     try {
                         String message = "Save.tv - Der Crawler wurde frühzeitig vom Benutzer beendet!\r\n";
@@ -255,7 +265,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         do {
             logger.info("Request " + currentRequestCount + " of " + requestCountMax);
             api_GET(this.br, "/records" + api_get_data + offset);
-            ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+            ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
             for (final Object telecastID_o : ressourcelist) {
                 final DownloadLink dl = addID_api(acc, telecastID_o);
                 latestRecordTimeTemp = dl.getLongProperty(jd.plugins.hoster.SaveTv.PROPERTY_originaldate, 0);
@@ -273,17 +283,16 @@ public class SaveTvDecrypter extends PluginForDecrypt {
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private void site_decrypt_All(final Account acc) throws Exception {
+    private void site_decrypt_All(final Account account) throws Exception {
         boolean is_groups_enabled = false;
         boolean groups_enabled_by_user = false;
-        this.br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        getPageSafe(acc, "https://www." + getHost() + "/STV/M/obj/archive/JSON/VideoArchiveApi.cfm?" + "iEntriesPerPage=1&iCurrentPage=1&dStartdate=0");
+        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        getPageSafe(account, "https://www." + getHost() + "/STV/M/obj/archive/JSON/VideoArchiveApi.cfm?" + "iEntriesPerPage=1&iCurrentPage=1&dStartdate=0");
         is_groups_enabled = !br.containsHTML("\"IGROUPCOUNT\":1\\.0");
         groups_enabled_by_user = is_groups_enabled;
         final String totalLinksInsideCurrentAccount = PluginJSonUtils.getJsonValue(this.br, "ITOTALENTRIES");
         if (totalLinksInsideCurrentAccount == null) {
-            logger.warning("Decrypter broken for link: " + parameter);
-            return;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final int totalLinksInsideCurrentAccount_int = (int) Double.parseDouble(totalLinksInsideCurrentAccount);
         /* Parse as double as 'totalLinks' can contain dots although it makes absolutely no sense as that number will always be flat! */
@@ -293,7 +302,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
             return;
         }
         /* Save on account to display in account information */
-        acc.setProperty(SaveTv.PROPERTY_acc_count_telecast_ids, Integer.toString(totalLinksInsideCurrentAccount_int));
+        account.setProperty(SaveTv.PROPERTY_acc_count_telecast_ids, Integer.toString(totalLinksInsideCurrentAccount_int));
         final BigDecimal bd = new BigDecimal((double) totalLinksNum / SITE_ENTRIES_PER_REQUEST);
         requestCountMax = bd.setScale(0, BigDecimal.ROUND_UP).intValue();
         int added_entries;
@@ -316,15 +325,15 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 if (is_groups_enabled) {
                     /* Disable stupid groups setting to crawl faster and to make it work anyways */
                     logger.info("Disabling groups setting");
-                    this.br.postPage("/STV/M/obj/user/submit/submitVideoArchiveOptions.cfm", "ShowGroupedVideoArchive=false");
+                    br.postPage("/STV/M/obj/user/submit/submitVideoArchiveOptions.cfm", "ShowGroupedVideoArchive=false");
                     is_groups_enabled = false;
                 }
                 /* 2016-09-14: dStartdate and dEnddate parameters are important now! */
-                this.br.postPage("/STV/M/obj/archive/JSON/VideoArchiveApi.cfm", "iEntriesPerPage=" + SITE_ENTRIES_PER_REQUEST + "&iCurrentPage=" + request_num + "&dStartdate=" + date_start_formatted + "&dEnddate=" + date_end_formatted);
-                final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(this.br.toString());
+                br.postPage("/STV/M/obj/archive/JSON/VideoArchiveApi.cfm", "iEntriesPerPage=" + SITE_ENTRIES_PER_REQUEST + "&iCurrentPage=" + request_num + "&dStartdate=" + date_start_formatted + "&dEnddate=" + date_end_formatted);
+                final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
                 final List<Object> resource_data_list = (List) entries.get("ARRVIDEOARCHIVEENTRIES");
                 for (final Object singleid_information : resource_data_list) {
-                    addID_site(acc, singleid_information);
+                    addID_site(account, singleid_information);
                     added_entries++;
                 }
                 logger.info("Found " + added_entries + " entries in request " + request_num + " of " + requestCountMax);
@@ -338,7 +347,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 if (groups_enabled_by_user && !is_groups_enabled) {
                     /* Restore users' groups-setting after decryption if changed */
                     logger.info("Re-enabling groups setting");
-                    this.br.postPage("https://www." + this.getHost() + "/STV/M/obj/user/submit/submitVideoArchiveOptions.cfm", "ShowGroupedVideoArchive=true");
+                    br.postPage("https://www." + this.getHost() + "/STV/M/obj/user/submit/submitVideoArchiveOptions.cfm", "ShowGroupedVideoArchive=true");
                     logger.info("Successfully re-enabled groups setting");
                 }
             } catch (final Throwable settingfail) {
@@ -537,7 +546,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
             boolean failed = true;
             do {
                 try {
-                    this.br.getPage(url);
+                    br.getPage(url);
                     failed = false;
                 } catch (final BrowserException e) {
                     failed = true;
@@ -548,7 +557,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                     }
                 }
             } while (failed);
-            if (this.br.getURL().contains(jd.plugins.hoster.SaveTv.URL_LOGGED_OUT)) {
+            if (br.getURL().contains(jd.plugins.hoster.SaveTv.URL_LOGGED_OUT)) {
                 for (int i2 = 0; i2 <= 1; i2++) {
                     logger.info("Link redirected to login page, logging in again to retry this: " + url);
                     logger.info("Try " + i2 + " of 1");
@@ -569,14 +578,14 @@ public class SaveTvDecrypter extends PluginForDecrypt {
 
     /**
      * Performs save.tv API GET requests. <br />
-     * TODO: Add errorhandling
+     * TODO: Add error handling
      *
      * @throws Exception
      */
     private String api_GET(final Browser br, String url) throws Exception {
         url = jd.plugins.hoster.SaveTv.correctURLAPI(url);
         br.getPage(url);
-        return br.toString();
+        return br.getRequest().getHtmlCode();
     }
 
     // }

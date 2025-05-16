@@ -42,10 +42,13 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
 
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.swing.SwingUtils;
+import org.appwork.utils.swing.dialog.AbstractDialog;
+import org.appwork.utils.swing.dialog.InternDialog;
 
 /**
  * @author Thomas
@@ -77,16 +80,27 @@ public abstract class AbstractLocator implements Locator {
         return id;
     }
 
+    public static String getAutoWindowID(final Window window) {
+        final Class<?> windowClass;
+        if (window instanceof InternDialog) {
+            final AbstractDialog<?> dialog = ((InternDialog<?>) window).getDialogModel();
+            windowClass = dialog.getClass();
+        } else {
+            windowClass = window.getClass();
+        }
+        String title = "";
+        if (window instanceof Dialog) {
+            title = ((Dialog) window).getTitle();
+        }
+        if (StringUtils.isEmpty(title) && window instanceof Frame) {
+            title = ((Frame) window).getTitle();
+        }
+        return windowClass.getName().replaceAll("[\\d\\$]+$", "") + "-" + Hash.getMD5(title);
+    }
+
     protected String getID(final Window window) {
         if (id == null) {
-            String title = "";
-            if (window instanceof Dialog) {
-                title = ((Dialog) window).getTitle();
-            }
-            if (StringUtils.isEmpty(title) && window instanceof Frame) {
-                title = ((Frame) window).getTitle();
-            }
-            id = window.getClass().getName().replaceAll("[\\d\\$]+$", "") + "-" + title;
+            id = getAutoWindowID(window);
         }
         return id;
     }

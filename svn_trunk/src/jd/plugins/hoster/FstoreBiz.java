@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -30,7 +31,6 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
-import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -39,16 +39,23 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 41192 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51070 $", interfaceVersion = 3, names = {}, urls = {})
 public class FstoreBiz extends PluginForHost {
     public FstoreBiz(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(new int[] { 444 });
+        return br;
     }
 
     @Override
     public String getAGBLink() {
-        return "https://fstore.biz/";
+        return "https://" + getHost();
     }
 
     private static List<String[]> getPluginDomains() {
@@ -56,6 +63,13 @@ public class FstoreBiz extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "fstore.biz", "uploadfree.info", "2speed.net" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("uploadfree.info");
+        deadDomains.add("2speed.net");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -76,19 +90,9 @@ public class FstoreBiz extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 0;
 
-    // private static final boolean ACCOUNT_FREE_RESUME = true;
-    // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_FREE_MAXDOWNLOADS = 20;
-    // private static final boolean ACCOUNT_PREMIUM_RESUME = true;
-    // private static final int ACCOUNT_PREMIUM_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
-    //
-    // /* don't touch the following! */
-    // private static AtomicInteger maxPrem = new AtomicInteger(1);
     @Override
     public String getLinkID(final DownloadLink link) {
         final String linkid = getFID(link);
@@ -106,8 +110,6 @@ public class FstoreBiz extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.setAllowedResponseCodes(new int[] { 444 });
         br.getPage("https://" + this.getHost() + "/file/" + this.getFID(link));
         if (br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 444) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -161,21 +163,29 @@ public class FstoreBiz extends PluginForHost {
             }
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
-        if (dl.getConnection().getContentType().contains("html")) {
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             if (dl.getConnection().getResponseCode() == 403) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
             } else if (dl.getConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
             }
             br.followConnection();
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (br.containsHTML(">\\s*Please choose a server to download")) {
+                final String mirror_0 = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>Server #1").getMatch(0);
+                if (mirror_0 != null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    link.setComment(mirror_0);
+                }
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Download from external sources like GoogleDrive is not [yet] supported -> Mirror: " + mirror_0);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
-    private String checkDirectLink(final DownloadLink downloadLink, final String property) {
-        String dllink = downloadLink.getStringProperty(property);
+    private String checkDirectLink(final DownloadLink link, final String property) {
+        String dllink = link.getStringProperty(property);
         if (dllink != null) {
             URLConnectionAdapter con = null;
             try {
@@ -184,12 +194,12 @@ public class FstoreBiz extends PluginForHost {
                 /* 2019-08-29: Content is hosted on GDrive(?) - do NOT use Head-Request here! It will answer with error 500 then! */
                 con = br2.openGetConnection(dllink);
                 if (!con.isContentDisposition()) {
-                    downloadLink.setProperty(property, Property.NULL);
+                    link.setProperty(property, Property.NULL);
                     dllink = null;
                 }
             } catch (final Exception e) {
                 logger.log(e);
-                downloadLink.setProperty(property, Property.NULL);
+                link.setProperty(property, Property.NULL);
                 dllink = null;
             } finally {
                 if (con != null) {
@@ -202,21 +212,12 @@ public class FstoreBiz extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
-        if (acc == null) {
-            /* no account, yes we can expect captcha */
-            return true;
-        }
-        if (acc.getType() == AccountType.FREE) {
-            /* Free accounts can have captchas */
-            return true;
-        }
-        /* Premium accounts do not have captchas */
-        return false;
+        return true;
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

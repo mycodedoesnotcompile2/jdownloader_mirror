@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50038 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51069 $", interfaceVersion = 3, names = {}, urls = {})
 public class ZzupCom extends PluginForHost {
     public ZzupCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,7 @@ public class ZzupCom extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.IMAGE_HOST };
     }
 
     private String dllink = null;
@@ -122,7 +122,7 @@ public class ZzupCom extends PluginForHost {
         // title = title.trim();
         // link.setFinalFileName(title + extDefault);
         // }
-        if (!StringUtils.isEmpty(dllink) && !isDownload) {
+        if (!StringUtils.isEmpty(dllink) && !link.isSizeSet() && !isDownload) {
             this.basicLinkCheck(br, br.createHeadRequest(this.dllink), link, fid, extDefault);
         }
         return AvailableStatus.TRUE;
@@ -148,7 +148,7 @@ public class ZzupCom extends PluginForHost {
             } else if (con.getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
             } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video broken?");
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Image broken?");
             }
         }
     }
@@ -156,17 +156,5 @@ public class ZzupCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

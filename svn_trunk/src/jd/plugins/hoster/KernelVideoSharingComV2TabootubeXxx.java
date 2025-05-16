@@ -15,16 +15,19 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
-import jd.plugins.Account;
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51071 $", interfaceVersion = 3, names = {}, urls = {})
-public class KernelVideoSharingHdzogCom extends KernelVideoSharingComV2 {
-    public KernelVideoSharingHdzogCom(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 51067 $", interfaceVersion = 3, names = {}, urls = {})
+public class KernelVideoSharingComV2TabootubeXxx extends KernelVideoSharingComV2 {
+    public KernelVideoSharingComV2TabootubeXxx(final PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -32,7 +35,7 @@ public class KernelVideoSharingHdzogCom extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "hdzog.com", "videohdzog.com", "hdzog.tube" });
+        ret.add(new String[] { "tabootube.xxx" });
         return ret;
     }
 
@@ -46,22 +49,26 @@ public class KernelVideoSharingHdzogCom extends KernelVideoSharingComV2 {
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPattern(getPluginDomains());
+        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultNoVideosNoFUID(getPluginDomains());
     }
 
     @Override
-    protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
-        return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
+    protected boolean hasFUIDInsideURL(final String url) {
+        return false;
     }
 
     @Override
-    protected int getMaxChunks(final Account account) {
-        /* 2024-02-14 */
-        return 1;
+    protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
+        return generateContentURLDefaultNoVideosNoFUID(host, urlSlug);
     }
 
     @Override
-    protected boolean useAPI() {
-        return true;
+    protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
+        final String[] downloadlinks = br.getRegex("class=\"download-link\" data-href=\"(https?://[^\"]+)").getColumn(0);
+        if (downloadlinks == null || downloadlinks.length == 0) {
+            return null;
+        }
+        /* Last = Best */
+        return downloadlinks[downloadlinks.length - 1];
     }
 }

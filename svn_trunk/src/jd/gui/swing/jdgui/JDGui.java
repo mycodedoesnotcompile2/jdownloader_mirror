@@ -639,17 +639,29 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         RememberRelativeDialogLocator locator;
         // set a default locator to remmber dialogs position
         AbstractDialog.setDefaultLocator(locator = new RememberRelativeDialogLocator("", mainFrame) {
+
+            private String getAutoWindowID(final Window window) {
+                final Class<?> windowClass;
+                if (window instanceof InternDialog) {
+                    final AbstractDialog<?> dialog = ((InternDialog<?>) window).getDialogModel();
+                    windowClass = dialog.getClass();
+                } else {
+                    windowClass = window.getClass();
+                }
+                String title = "";
+                if (window instanceof java.awt.Dialog) {
+                    title = ((java.awt.Dialog) window).getTitle();
+                }
+                if (StringUtils.isEmpty(title) && window instanceof Frame) {
+                    title = ((Frame) window).getTitle();
+                }
+                return windowClass.getName().replaceAll("[\\d\\$]+$", "") + "-" + Hash.getMD5(title);
+            }
+
             @Override
             protected String getID(Window frame) {
                 try {
-                    if (frame instanceof InternDialog) {
-                        AbstractDialog dialog = ((InternDialog) frame).getDialogModel();
-                        String key = dialog.getTitle();
-                        if (StringUtils.isEmpty(key)) {
-                            key = dialog.toString();
-                        }
-                        return Hash.getMD5(key);
-                    }
+                    return getAutoWindowID(frame);
                 } catch (Exception e) {
                     logger.log(e);
                 }

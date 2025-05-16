@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46794 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?fshare\\.vn/folder/([A-Z0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 51068 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?fshare\\.vn/folder/([A-Z0-9]+)" })
 public class FShareVnFolder extends PluginForDecrypt {
     public FShareVnFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +51,7 @@ public class FShareVnFolder extends PluginForDecrypt {
         }
         final LinkedHashSet<String> dupe = new LinkedHashSet<String>();
         jd.plugins.hoster.FShareVn.prepBrowserWebsite(br);
-        /* Important or we'll get XML ;) */
+        /* Important otherwise we'll get XML ;) */
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         br.getPage("https://www." + getHost() + "/api/v3/files/folder?linkcode=" + folderid + "&sort=type,name");
         do {

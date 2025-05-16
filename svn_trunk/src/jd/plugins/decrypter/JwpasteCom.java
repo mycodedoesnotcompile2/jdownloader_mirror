@@ -30,7 +30,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49609 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51067 $", interfaceVersion = 2, names = {}, urls = {})
 public class JwpasteCom extends AbstractPastebinCrawler {
     public JwpasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,8 +86,8 @@ public class JwpasteCom extends AbstractPastebinCrawler {
         }
         Form pwform = this.getPasswordProtectedForm(br);
         if (pwform != null) {
-            final String initialURL = br.getURL();
             logger.info("Paste is password protected");
+            final String initialURL = br.getURL();
             int tries = 0;
             boolean success = false;
             do {

@@ -33,12 +33,10 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.swing.dimensor;
 
-import java.awt.Dialog;
 import java.awt.Dimension;
-import java.awt.Frame;
 import java.awt.Window;
 
-import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.locator.AbstractLocator;
 
 /**
  * @author Thomas
@@ -84,16 +82,8 @@ public abstract class AbstractDimensor implements DimensorInterface {
 
     protected String getID(final Window window) {
         if (id == null) {
-            String title = "";
-            if (window instanceof Dialog) {
-                title = ((Dialog) window).getTitle();
-            }
-            if (StringUtils.isEmpty(title) && window instanceof Frame) {
-                title = ((Frame) window).getTitle();
-            }
-            id = window.getClass().getName().replaceAll("[\\d\\$]+$", "") + "-" + title;
+            id = AbstractLocator.getAutoWindowID(window);
         }
         return id;
     }
-
 }

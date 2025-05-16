@@ -32,7 +32,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 51063 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51067 $", interfaceVersion = 2, names = {}, urls = {})
 public class JustPasteIt extends AbstractPastebinCrawler {
     public JustPasteIt(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,13 +82,14 @@ public class JustPasteIt extends AbstractPastebinCrawler {
 
     @Override
     public PastebinMetadata crawlMetadata(final CryptedLink param, final Browser br) throws Exception {
-        final String contentID = this.getFID(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        final String contentID = this.getFID(contenturl);
         final boolean contentIDContainsNumbers = !contentID.replaceAll("\\d", "").equals(contentID);
         if (contentID.toLowerCase(Locale.ENGLISH).equals(contentID) && !contentIDContainsNumbers) {
             /* Lowercase contentID without numbers -> Invalid e.g.: https://justpaste.it/about */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 451) {
@@ -104,7 +105,7 @@ public class JustPasteIt extends AbstractPastebinCrawler {
         if (pastebinText == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final PastebinMetadata metadata = new PastebinMetadata(param, this.getFID(param.getCryptedUrl()));
+        final PastebinMetadata metadata = new PastebinMetadata(param, contentID);
         metadata.setPastebinText(pastebinText);
         // metadata.setUsername("@anonymous");
         final String json = br.getRegex("window\\.barOptions\\s*=\\s*(\\{.*?\\});").getMatch(0);

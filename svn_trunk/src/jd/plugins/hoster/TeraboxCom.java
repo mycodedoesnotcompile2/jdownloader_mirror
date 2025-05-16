@@ -55,7 +55,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50582 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51069 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -288,11 +288,16 @@ public class TeraboxCom extends PluginForHost {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 /* Fallback if link changes e.g. old link was: https://www.terabox.com/disk/home -> Leads to error 404 now */
                 br.getPage("https://" + br.getHost(true) + "/");
+                /* Unreachable code */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            String jstoken = regexJsToken(br);
             final String bdstoken = br.getRegex("\"bdstoken\":\"([a-f0-9]{32})\"").getMatch(0);
             final String pcftoken = br.getRegex("\"pcftoken\":\"([a-f0-9]{32})\"").getMatch(0);
             if (bdstoken == null || pcftoken == null) {
                 errorAccountInvalid(account);
+                /* Unreachable code */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             account.setProperty(PROPERTY_ACCOUNT_TOKEN, bdstoken);
             /* Try to find additional account information */
@@ -310,6 +315,8 @@ public class TeraboxCom extends PluginForHost {
                  */
                 /* E.g. {"error_code":100003,"error_msg":"Invalid Bduss","request_id":"<Number>"} */
                 errorAccountInvalid(account);
+                /* Unreachable code */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final Map<String, Object> data = (Map<String, Object>) root.get("data");
             final Map<String, Object> member_info = (Map<String, Object>) data.get("member_info");
@@ -323,9 +330,12 @@ public class TeraboxCom extends PluginForHost {
             } else {
                 account.setType(AccountType.FREE);
             }
-            final String jstoken = getJsToken(br, br.getHost());
             if (jstoken == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find jstoken");
+                logger.info("Failed to find jstoken so far -> Trying to fetch it via dedicated http call");
+                jstoken = getJsToken(br, br.getHost(false));
+                if (jstoken == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find jstoken");
+                }
             }
             account.setProperty(PROPERTY_ACCOUNT_JS_TOKEN, jstoken);
             account.setProperty(PROPERTY_ACCOUNT_JS_TOKEN_REFRESH_TIMESTAMP, Time.systemIndependentCurrentJVMTimeMillis());
@@ -340,7 +350,10 @@ public class TeraboxCom extends PluginForHost {
                 final Map<String, Object> userinfo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root3, "records/{0}");
                 final String uname = (String) userinfo.get("uname");
                 if (StringUtils.isEmpty(uname)) {
+                    logger.info("Failed to find 'uname' field");
                     errorAccountInvalid(account);
+                    /* Unreachable code */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 if (uname.contains("@") && !account.getUser().contains("@")) {
                     account.setUser(uname);

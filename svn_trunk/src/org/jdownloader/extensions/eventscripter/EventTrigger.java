@@ -631,9 +631,7 @@ public enum EventTrigger implements LabelInterface {
         }
 
         public HashMap<String, Object> getTestProperties() {
-            final HashMap<String, Object> props = new HashMap<String, Object>();
-            props.put("name", "MyMenuButton");
-            return props;
+            return getContextTriggerProperties(true, true);
         }
 
         public String getAPIDescription() {

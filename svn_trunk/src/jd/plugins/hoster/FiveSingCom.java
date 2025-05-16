@@ -19,12 +19,16 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -34,10 +38,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51063 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "http://(www\\.)?5sing\\.kugou\\.com/(f|y)c/\\d+\\.html" })
+@HostPlugin(revision = "$Revision: 51070 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "https?://(?:www\\.)?5sing\\.kugou\\.com/(f|y)c/(\\d+)\\.html" })
 public class FiveSingCom extends PluginForHost {
     public FiveSingCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -54,7 +65,9 @@ public class FiveSingCom extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.getPage(link.getPluginPatternMatcher());
+        /* 2025-05-15: They do not support https */
+        final String contenturl = link.getPluginPatternMatcher().replaceFirst("https://", "http://");
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!this.canHandle(br.getURL())) {
@@ -67,11 +80,11 @@ public class FiveSingCom extends PluginForHost {
         }
         // final String filename = br.getRegex("var SongName[^<>\"\t\n\r]*= \"([^<>\"]*?)\"").getMatch(0);
         final String filename = br.getRegex("song_title\" title=\"([^<>\"]*?)\"").getMatch(0);
-        final String fileid = br.getRegex("var SongID[^<>\"\t\n\r]*= ([^<>\"]*?);").getMatch(0);
+        final String song_id = br.getRegex("var SongID[^<>\"\t\n\r]*= ([^<>\"]*?);").getMatch(0);
         final String stype = br.getRegex("var SongType[^<>\"\t\n\r]*= \"([^<>\"]*?)\";").getMatch(0);
         String filesize = br.getRegex("(<em>)?大小：(</em>)?([^<>\"]*?)(<|\")").getMatch(2);
         if (filename != null && extension != null) {
-            link.setFinalFileName(stype + "-" + Encoding.htmlDecode(filename.trim()) + "-" + fileid + "." + Encoding.htmlDecode(extension.trim()));
+            link.setFinalFileName(stype + "-" + Encoding.htmlDecode(filename).trim() + "-" + song_id + "." + Encoding.htmlDecode(extension).trim());
         } else {
             logger.warning("Failed to find filename information");
         }
@@ -91,20 +104,91 @@ public class FiveSingCom extends PluginForHost {
         src = Encoding.Base64Decode(src).replace("\\", "");
         String dllink = new Regex(src, "\"file\":\"(https?:[^\"]*?)\"").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
-            Map<String, Object> map = restoreFromString(src, TypeRef.MAP);
-            final String songID = map.containsKey("songID") ? String.valueOf(map.get("songID")) : null;
+            final Map<String, Object> map = restoreFromString(src, TypeRef.MAP);
+            final String song_id = map.containsKey("songID") ? String.valueOf(map.get("songID")) : null;
             final String songType = map.containsKey("songType") ? String.valueOf(map.get("songType")) : null;
-            if (StringUtils.isEmpty(songType) || StringUtils.isEmpty(songID)) {
+            if (StringUtils.isEmpty(songType) || StringUtils.isEmpty(song_id)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final Browser brc = br.cloneBrowser();
-            brc.getPage("http://service.5sing.kugou.com/song/getsongurl?jsoncallback=jQuery" + System.currentTimeMillis() + "_" + System.currentTimeMillis() + "&songid=" + songID + "&songtype=" + songType + "&from=web&version=6.6.72&_=1539798427612");
-            map = restoreFromString(new Regex(brc.getRequest().getHtmlCode(), "(\\{.+\\})").getMatch(0), TypeRef.MAP);
-            map = (Map<String, Object>) map.get("data");
-            dllink = (String) map.get("lqurl");
-            if (dllink == null) {
-                dllink = (String) map.get("hqurl");
+            final boolean useNewAPI = DebugMode.TRUE_IN_IDE_ELSE_FALSE;
+            final Map<String, Object> data;
+            if (useNewAPI) {
+                // TODO: Unfinished code
+                // TODO: mod and dfid are null
+                final String mid = br.getCookie(br.getHost(), "kg_mid", Cookies.NOTDELETEDPATTERN);
+                final String dfid = br.getCookie(br.getHost(), "kg_dfid", Cookies.NOTDELETEDPATTERN);
+                final String appkey = br.getRegex("appkey:\\s*'([^']+)'").getMatch(0);
+                if (StringUtils.isEmpty(mid) || StringUtils.isEmpty(dfid) || StringUtils.isEmpty(appkey)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final String appid = "2918";
+                final String clienttime = Long.toString(System.currentTimeMillis());
+                final String clientver = "1000";
+                final String version = "6.6.72";
+                final String songtype;
+                if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "/fc/")) {
+                    songtype = "fc";
+                } else {
+                    songtype = "yc";
+                }
+                final StringBuilder sb = new StringBuilder();
+                sb.append(appkey);
+                sb.append("appid=" + appid);
+                sb.append("clienttime=" + clienttime);
+                sb.append("clientver=" + clientver);
+                sb.append("dfid=" + dfid);
+                sb.append("mid=" + mid);
+                sb.append("songid=" + song_id);
+                sb.append("songtype=" + songtype);
+                sb.append("uuid=" + mid);
+                sb.append("version=" + version);
+                sb.append(appkey);
+                /**
+                 * See: <br>
+                 * https://5sstatic.kugou.com/public/common/inf_sign-2.0.0.min.js <br>
+                 * Function: t.signature = g(n.join(''))
+                 */
+                final String signature = Hash.getMD5(sb.toString());
+                final UrlQuery query = new UrlQuery();
+                query.appendEncoded("appid", appid);
+                query.appendEncoded("clientver", clientver);
+                query.appendEncoded("mid", mid);
+                query.appendEncoded("uuid", mid);
+                query.appendEncoded("dfid", dfid);
+                query.appendEncoded("songid", song_id);
+                query.appendEncoded("songtype", songtype);
+                query.appendEncoded("version", version);
+                query.appendEncoded("clienttime", clienttime);
+                query.appendEncoded("signature", signature);
+                brc.getPage("https://5sservice.kugou.com/song/getsongurl?" + query.toString());
+                final Map<String, Object> map2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                data = (Map<String, Object>) map2.get("data");
+            } else {
+                /* Old API */
+                brc.getPage("http://service.5sing.kugou.com/song/getsongurl?jsoncallback=jQuery" + System.currentTimeMillis() + "_" + System.currentTimeMillis() + "&songid=" + song_id + "&songtype=" + songType + "&from=web&version=6.6.72&_=1539798427612");
+                final Map<String, Object> map2 = restoreFromString(new Regex(brc.getRequest().getHtmlCode(), "(\\{.+\\})").getMatch(0), TypeRef.MAP);
+                data = (Map<String, Object>) map2.get("data");
             }
+            dllink = (String) data.get("hqurl");
+            String md5hash = (String) data.get("hqurlmd5");
+            Object filesizeO = data.get("hqsize");
+            String ext = (String) data.get("hqext"); // usually "mp3"
+            if (StringUtils.isEmpty(dllink)) {
+                dllink = (String) map.get("lqurl");
+                md5hash = (String) data.get("lqurlmd5");
+                filesizeO = data.get("lqsize");
+                ext = (String) data.get("lqext");
+            }
+            // TODO: Check if we can use this for CRC checking
+            if (!StringUtils.isEmpty(md5hash)) {
+                link.setMD5Hash(md5hash);
+            }
+            if (filesizeO != null) {
+                // TODO: Check if this is the correct filesize value
+                link.setVerifiedFileSize(Long.parseLong(filesizeO.toString()));
+            }
+            // TODO: Make use of "ext" value
         }
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

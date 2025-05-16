@@ -68,6 +68,8 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.crawler.CrawlerPluginController;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
@@ -600,6 +602,17 @@ public class FavIcons {
         return source;
     }
 
+    private static boolean isSameDomain(String[] siteSupportedNames, final String domain, final URL url) {
+        if (siteSupportedNames != null && siteSupportedNames.length > 0) {
+            for (String siteSupportedName : siteSupportedNames) {
+                if (StringUtils.equalsIgnoreCase(siteSupportedName, domain) || StringUtils.equalsIgnoreCase(siteSupportedName, url.getHost())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static boolean isSameDomain(final Browser br, String host, String[] siteSupportedNames) throws IOException {
         if (host.matches("(?i)^https?://.+")) {
             host = new URL(host).getHost();
@@ -633,11 +646,14 @@ public class FavIcons {
                     }
                 }
             }
-            if (siteSupportedNames != null && siteSupportedNames.length > 0) {
-                for (String siteSupportedName : siteSupportedNames) {
-                    if (StringUtils.equalsIgnoreCase(siteSupportedName, domain) || StringUtils.equalsIgnoreCase(siteSupportedName, url.getHost())) {
-                        return true;
-                    }
+            if (isSameDomain(siteSupportedNames, domain, url)) {
+                return true;
+            }
+            final List<LazyCrawlerPlugin> crawlerPlugins = CrawlerPluginController.getInstance().list(true);
+            for (LazyCrawlerPlugin crawlerPlugin : crawlerPlugins) {
+                final String[] siteSupported = crawlerPlugin.getSitesSupported();
+                if (isSameDomain(siteSupported, domain, url)) {
+                    return true;
                 }
             }
             return false;

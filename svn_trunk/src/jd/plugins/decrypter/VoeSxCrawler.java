@@ -19,6 +19,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -37,12 +38,14 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+import jd.plugins.hoster.VoeSx;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 51039 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51071 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,7 +62,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "voe.sx", "voe-unblock.com", "voe-unblock.net", "voeunblock.com", "voeunblk.com", "voeunblck.com", "voe-un-block.com", "un-block-voe.net", "voeunbl0ck.com", "voeunblock1.com", "voeunblock2.com", "voeunblock3.com", "voeunblock4.com", "voeunblock5.com", "voeunblock6.com", "voeun-block.net", "v-o-e-unblock.com", "audaciousdefaulthouse.com", "launchreliantcleaverriver.com", "reputationsheriffkennethsand.com", "fittingcentermondaysunday.com", "housecardsummerbutton.com", "fraudclatterflyingcar.com", "bigclatterhomesguideservice.com", "uptodatefinishconferenceroom.com", "realfinanceblogcenter.com", "tinycat-voe-fashion.com", "20demidistance9elongations.com", "telyn610zoanthropy.com", "toxitabellaeatrebates306.com", "greaseball6eventual20.com", "745mingiestblissfully.com", "19turanosephantasia.com", "30sensualizeexpression.com", "321naturelikefurfuroid.com",
                 "449unceremoniousnasoseptal.com", "cyamidpulverulence530.com", "boonlessbestselling244.com", "antecoxalbobbing1010.com", "matriculant401merited.com", "scatch176duplicities.com", "35volitantplimsoles5.com", "tummulerviolableness.com", "tubelessceliolymph.com", "availedsmallest.com", "counterclockwisejacky.com", "monorhinouscassaba.com", "tummulerviolableness.com", "urochsunloath.com", "simpulumlamerop.com", "wolfdyslectic.com", "metagnathtuggers.com", "gamoneinterrupted.com", "chromotypic.com", "crownmakermacaronicism.com", "generatesnitrosate.com", "yodelswartlike.com", "figeterpiazine.com", "cigarlessarefy.com", "valeronevijao.com", "apinchcaseation.com", "nectareousoverelate.com", "phenomenalityuniform.com", "nonesnanking.com", "troyyourlead.com", "stevenimaginelittle.com", "edwardarriveoften.com", "lukecomparetwo.com", "bradleyviewdoctor.com", "jamiesamewalk.com",
-                "seanshowcould.com", "sandrataxeight.com", "jayservicestuff.com", "graceaddresscommunity.com", "loriwithinfamily.com", "roberteachfinal.com", "erikcoldperson.com", "jasminetesttry.com", "heatherdiscussionwhen.com", "robertplacespace.com", "alleneconomicmatter.com", "josephseveralconcern.com", "donaldlineelse.com", "bethshouldercan.com", "thomasalthoughhear.com", " richardstorehalf.com", "brittneystandardwestern.com", "sandratableother.com", "robertordercharacter.com", "maxfinishseveral.com", "alejandrocenturyoil.com", "heatherwholeinvolve.com", "kristiesoundsimply.com", "adrianmissionminute.com", "nathanfromsubject.com", "jennifercertaindevelopment.com", "richardsignfish.com", "diananatureforeign.com", "jonathansociallike.com", "sarahnewspaperbeat.com", });
+                "seanshowcould.com", "sandrataxeight.com", "jayservicestuff.com", "graceaddresscommunity.com", "loriwithinfamily.com", "roberteachfinal.com", "erikcoldperson.com", "jasminetesttry.com", "heatherdiscussionwhen.com", "robertplacespace.com", "alleneconomicmatter.com", "josephseveralconcern.com", "donaldlineelse.com", "bethshouldercan.com", "thomasalthoughhear.com", " richardstorehalf.com", "brittneystandardwestern.com", "sandratableother.com", "robertordercharacter.com", "maxfinishseveral.com", "alejandrocenturyoil.com", "heatherwholeinvolve.com", "kristiesoundsimply.com", "adrianmissionminute.com", "nathanfromsubject.com", "jennifercertaindevelopment.com", "richardsignfish.com", "diananatureforeign.com", "jonathansociallike.com", "sarahnewspaperbeat.com", "johnalwayssame.com" });
         return ret;
     }
 
@@ -198,7 +201,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
                 ret.add(link);
                 link.setAvailableStatus(status);
                 distribute(link);
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 // prefer fresh instance
                 ret.add(this.createDownloadlink(param.getCryptedUrl()));
                 logger.log(e);
@@ -213,6 +216,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(packagename);
+            String javaScriptJSON = null;
             String[] subtitleHTMLs = br.getRegex("<track kind=\"(captions|subtitles)\"[^<]+/>").getColumn(-1);
             if (subtitleHTMLs == null || subtitleHTMLs.length == 0) {
                 /* 2023-09-25 */
@@ -234,6 +238,26 @@ public class VoeSxCrawler extends PluginForDecrypt {
                     ret.add(subtitle);
                 }
                 logger.info("Found numberof subtitles: " + subtitleHTMLs.length);
+            } else if ((javaScriptJSON = ((VoeSx) hosterPlugin).getJavaScriptJSON()) != null) {
+                final Map<String, Object> jsMap = restoreFromString(javaScriptJSON, TypeRef.MAP);
+                final List<Map<String, Object>> captions = (List<Map<String, Object>>) jsMap.get("captions");
+                if (captions != null) {
+                    for (Map<String, Object> caption : captions) {
+                        final String file = caption.get("file").toString();
+                        final URL subtitleURLFull = br.getURL(file);
+                        final DownloadLink subtitle = createDownloadlink(subtitleURLFull.toString());
+                        if (subtitleHTMLs.length == 1) {
+                            /* There is only one subtitle --> Set same title as video-file. */
+                            subtitle.setFinalFileName(packagename + ".vtt");
+                        } else {
+                            /* There are multiple subtitles available -> Set different filename for each */
+                            subtitle.setFinalFileName(packagename + "_" + Plugin.getFileNameFromURL(subtitleURLFull));
+                        }
+                        subtitle.setAvailable(true);
+                        ret.add(subtitle);
+                    }
+                    logger.info("Found numberof subtitles: " + captions.size());
+                }
             } else {
                 logger.info("This item does not have any subtitles");
             }

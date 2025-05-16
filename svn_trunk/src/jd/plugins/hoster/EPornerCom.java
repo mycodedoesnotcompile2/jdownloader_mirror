@@ -51,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50291 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51067 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -522,7 +522,7 @@ public class EPornerCom extends PluginForHost {
             if (!isLoggedin()) {
                 throw new AccountInvalidException();
             }
-            account.saveCookies(this.br.getCookies(br.getHost()), "");
+            account.saveCookies(br.getCookies(br.getHost()), "");
             return true;
         }
     }

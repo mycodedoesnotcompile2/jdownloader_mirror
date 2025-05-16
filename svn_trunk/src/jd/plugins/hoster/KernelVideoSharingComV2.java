@@ -77,7 +77,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50983 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51067 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1606,7 +1606,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                     }
                 }
             }
-            /* Hosts with crypted URLs: hdzog.com, hclips.com */
+            /* Hosts with crypted URLs: hdzog.com, hclips.com, tabootube.xxx */
             String video_url_append = br.getRegex("video_url\\s*\\+=\\s*(\"|')(.*?)(\"|')\\s*;").getMatch(1);
             if (video_url != null && video_url_append != null) {
                 video_url += video_url_append;
