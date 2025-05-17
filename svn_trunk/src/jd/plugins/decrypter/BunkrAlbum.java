@@ -53,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.Bunkr;
 
-@DecrypterPlugin(revision = "$Revision: 50914 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51072 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,9 +109,12 @@ public class BunkrAlbum extends PluginForDecrypt {
     public static final Pattern PATTERN_ALBUM                = Pattern.compile("/a/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     /* 2023-03-24: bunkr, files subdomain seems outdated? */
     public static final Pattern PATTERN_SINGLE_FILE          = Pattern.compile("/(d|i|v|f)/([^/#\\?\"\\']+).*", Pattern.CASE_INSENSITIVE);
-    public static final Pattern PATTERN_CDN_WITHOUT_EXT      = Pattern.compile("https?://c(?:dn)?(\\d+)?\\.[^/]+/[^/#\\?\"\\']+", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_CDN_WITHOUT_EXT      = Pattern.compile("https?://c(?:dn)?(\\d+)?\\.[^/]+/([^/#\\?\"\\']+)", Pattern.CASE_INSENSITIVE);
     public static final String  TYPE_CDN_WITH_EXT            = PATTERN_CDN_WITHOUT_EXT + "(\\." + EXTENSIONS + ")";
+    /** 2025-05-16: psp: I believe that the "media-files..." URLs do not exist anymore. */
+    @Deprecated
     public static final String  TYPE_MEDIA_FILES_WITHOUT_EXT = "(?i)https?://media-files(\\d*)\\.[^/]+/[^/#\\?\"\\']+";
+    @Deprecated
     public static final String  TYPE_MEDIA_FILES_WITH_EXT    = TYPE_MEDIA_FILES_WITHOUT_EXT + "(\\." + EXTENSIONS + ")";
     private PluginForHost       plugin                       = null;
 
@@ -256,9 +259,8 @@ public class BunkrAlbum extends PluginForDecrypt {
                 final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(getHost());
                 if (lazyHostPlugin == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    plugin = lazyHostPlugin.getPrototype(null, false);
                 }
+                plugin = lazyHostPlugin.getPrototype(null, false);
             } catch (final Throwable e) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
             }
@@ -319,10 +321,10 @@ public class BunkrAlbum extends PluginForDecrypt {
             return null;
         } else if (new Regex(url, PATTERN_SINGLE_FILE).patternFind()) {
             return url;
-        } else if (url.matches(TYPE_CDN_WITH_EXT) || new Regex(url, PATTERN_CDN_WITHOUT_EXT).patternFind()) {
+        } else if (new Regex(url, PATTERN_CDN_WITHOUT_EXT).patternFind() || url.matches(TYPE_CDN_WITH_EXT)) {
             /* cdn can be empty(!) -> cdn.bunkr.is -> media-files.bunkr.is */
             return url;
-        } else if (url.matches(TYPE_MEDIA_FILES_WITH_EXT) || url.matches(TYPE_MEDIA_FILES_WITHOUT_EXT)) {
+        } else if (url.matches(TYPE_MEDIA_FILES_WITHOUT_EXT) || url.matches(TYPE_MEDIA_FILES_WITH_EXT)) {
             // bunkr
             return url;
         } else {

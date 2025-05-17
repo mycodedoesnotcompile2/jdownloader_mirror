@@ -25,40 +25,52 @@ import org.appwork.utils.Regex;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47338 $", interfaceVersion = 3, names = { "ebay.com" }, urls = { "https?://(?:www\\.)?ebay[\\.\\w]+/itm/(\\d+).*" })
+@DecrypterPlugin(revision = "$Revision: 51076 $", interfaceVersion = 3, names = { "ebay.com" }, urls = { "https?://(?:www\\.)?ebay[\\.\\w]+/itm/(\\d+).*" })
 public class Ebay extends PluginForDecrypt {
     public Ebay(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.getPage(param.getCryptedUrl());
-        final String fpName = br.getRegex("<title>([^<]+?)\\s+\\|\\s*eBay\\s*</title>").getMatch(0);
-        final String itemID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String title = br.getRegex("<title>([^<]+?)</title>").getMatch(0);
+        final String articleID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         String[] links = br.getRegex("\"maxImageUrl\":\"([^\"]+)\"").getColumn(0);
         if (links == null || links.length == 0) {
             links = br.getRegex("\"ZOOM_GUID\",\"URL\":\"(https?://[^\"]+)\"").getColumn(0);
-        }
-        if (links == null || links.length == 0) {
-            links = br.getRegex("<div\\s*class\\s*=\\s*\"ux-image-carousel-item[^>]*>\\s*<img[^>]*src\\s*=\\s*(https?[^\" >]+)").getColumn(0);
+            if (links == null || links.length == 0) {
+                links = br.getRegex("<div\\s*class\\s*=\\s*\"ux-image-carousel-item[^>]*>\\s*<img[^>]*src\\s*=\\s*(https?[^\" >]+)").getColumn(0);
+            }
         }
         /* Images may be available in up to 4 qualities -> Try to return best only */
         int highestHeight = -1;
         final Map<Integer, List<DownloadLink>> qualityPackages = new HashMap<Integer, List<DownloadLink>>();
         for (String link : links) {
             final DownloadLink dl = createDownloadlink(Encoding.unicodeDecode(link));
-            final String filename = itemID + "_" + Hash.getMD5(link) + Plugin.getFileNameExtensionFromURL(link);
+            final String filename = articleID + "_" + Hash.getMD5(link) + Plugin.getFileNameExtensionFromURL(link);
             dl.setFinalFileName(filename);
             ret.add(dl);
             final String heightStr = new Regex(link, "(\\d+)\\.jpg$").getMatch(0);
@@ -80,12 +92,19 @@ public class Ebay extends PluginForDecrypt {
             ret.clear();
             ret.addAll(qualityPackages.get(highestHeight));
         }
-        if (fpName != null) {
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName).trim());
-            fp.setAllowMerge(true);
-            fp.addLinks(ret);
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            /* Remove stuff we don't want */
+            title = title.replaceFirst("\\s*\\| eBay.\\w+$", "");
+            fp.setName(title);
+        } else {
+            /* Fallback */
+            fp.setName(articleID);
         }
+        fp.setPackageKey("ebay://" + articleID);
+        fp.setAllowMerge(true);
+        fp.addLinks(ret);
         return ret;
     }
 }

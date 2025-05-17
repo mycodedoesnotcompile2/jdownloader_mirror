@@ -11,6 +11,14 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -29,15 +37,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51072 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -204,9 +204,14 @@ public class Bunkr extends PluginForHost {
         return fid;
     }
 
+    /**
+     * Returns usable content-url. <br>
+     * If added URL contains a dead domain, a working one will be used instead.
+     */
     private String getContentURL(final DownloadLink link) {
         final String url = Encoding.htmlOnlyDecode(link.getPluginPatternMatcher());
         final Regex singleFileRegex = new Regex(url, BunkrAlbum.PATTERN_SINGLE_FILE);
+        final Regex cdnUrlRegex;
         final String hostFromAddedURLWithoutSubdomain = Browser.getHost(url, false);
         if (singleFileRegex.patternFind()) {
             final List<String> deadDomains = BunkrAlbum.getDeadDomains();
@@ -221,6 +226,9 @@ public class Bunkr extends PluginForHost {
                 host = hostFromAddedURLWithoutSubdomain;
             }
             return "https://" + host + "/" + type + "/" + filename;
+        } else if ((cdnUrlRegex = new Regex(url, BunkrAlbum.PATTERN_CDN_WITHOUT_EXT)).patternFind()) {
+            final String filenameFromURL = cdnUrlRegex.getMatch(1);
+            return this.generateSingleFileURL(filenameFromURL);
         } else {
             /* Do not touch URL-structure, only correct dead domains. */
             final List<String> deadDomains = getDeadCDNDomains();
@@ -246,22 +254,8 @@ public class Bunkr extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
-    }
-
-    @Override
-    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-        if (source == FILENAME_SOURCE.URL && con != null) {
-            final String ret = getNameFromURL(this, con.getURL().toExternalForm());
-            if (ret != null) {
-                return ret;
-            }
-        }
-        return super.getFileNameFromSource(source, link, customName, customExtension, con);
-    }
-
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         this.setBrowserExclusive();
+        final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
         final String contenturl = this.getContentURL(link);
         final String filenameFromURL = getFilenameFromURL(link);
         if (filenameFromURL != null && !link.isNameSet()) {
@@ -320,6 +314,11 @@ public class Bunkr extends PluginForHost {
         String officialDownloadurl;
         String preDownloadRefererHeader = null;
         if (new Regex(link.getPluginPatternMatcher(), BunkrAlbum.PATTERN_SINGLE_FILE).patternFind()) {
+            officialDownloadurl = getDirecturlFromSingleFileAvailablecheck(link, contenturl, true, isDownload);
+            if (!isDownload) {
+                return AvailableStatus.TRUE;
+            }
+        } else if (new Regex(link.getPluginPatternMatcher(), BunkrAlbum.PATTERN_CDN_WITHOUT_EXT).patternFind()) {
             officialDownloadurl = getDirecturlFromSingleFileAvailablecheck(link, contenturl, true, isDownload);
             if (!isDownload) {
                 return AvailableStatus.TRUE;
@@ -455,6 +454,17 @@ public class Bunkr extends PluginForHost {
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    @Override
+    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
+        if (source == FILENAME_SOURCE.URL && con != null) {
+            final String ret = getNameFromURL(this, con.getURL().toExternalForm());
+            if (ret != null) {
+                return ret;
+            }
+        }
+        return super.getFileNameFromSource(source, link, customName, customExtension, con);
     }
 
     private String getDirecturlFromSingleFileAvailablecheck(final DownloadLink link, final String singleFileURL, final boolean accessURL, final boolean isDownload) throws PluginException, IOException {
@@ -705,7 +715,7 @@ public class Bunkr extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         if (this.dl == null) {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

@@ -587,13 +587,12 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                             bt.setRolloverIcon(icon);
                             bt.setSelectedIcon(icon = NewTheme.I().getCheckBoxImage(iconKey, true, 24));
                             bt.setRolloverSelectedIcon(icon);
-                            bt.setHideActionText(true);
                         } else {
                             action.requestUpdate(MainToolBar.this);
                             bt = new ExtButton(action);
                             bt.setIcon(NewTheme.I().getIcon(validateIconKey(action.getIconKey()), 24));
-                            bt.setHideActionText(true);
                         }
+                        bt.setHideActionText(true);
                     }
                     add(bt, "width 32!,height 32!,hidemode 3");
                     action.addVisibilityPropertyChangeListener(bt);

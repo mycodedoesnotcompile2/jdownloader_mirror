@@ -65,11 +65,11 @@ public class MenuItemData implements Storable {
     public static boolean isEmptyValue(String value) {
         if (StringUtils.equals(EMPTY, value)) {
             return true;
-        }
-        if (StringUtils.equals(EMPTY_NAME, value)) {
+        } else if (StringUtils.equals(EMPTY_NAME, value)) {
             return true;
+        } else {
+            return false;
         }
-        return false;
     }
 
     public String toString() {

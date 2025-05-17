@@ -4,6 +4,8 @@ import java.awt.event.ActionEvent;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.swing.AbstractButton;
+
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
@@ -14,6 +16,7 @@ import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcollector.LinkOrigin;
 import jd.plugins.Account.AccountType;
 
+import org.appwork.swing.components.ExtButton;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
@@ -30,8 +33,7 @@ import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
 
 public class SyncSaveTvToolbarAction extends AbstractToolBarAction {
     public SyncSaveTvToolbarAction() {
-        setName("Sync Save.TV Library");
-        setSmallIcon(DomainInfo.getInstance("save.tv").getFavIcon(true));
+        setTooltipText("Sync Save.TV Library");
         new EDTRunner() {
             @Override
             protected void runInEDT() {
@@ -48,10 +50,23 @@ public class SyncSaveTvToolbarAction extends AbstractToolBarAction {
     }
 
     @Override
+    public String getName() {
+        return super.getName();
+    }
+
+    @Override
     public void actionPerformed(ActionEvent e) {
         if (isEnabled() && UIOManager.I().showConfirmDialog(UIOManager.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, "Save.TV Library Sync", "JDownloader will now search all available media files in your Save.TV media library and add them to the Linkgrabber tab.\r\nPlease be patient - this will take a while.")) {
             LinkCollector.getInstance().addCrawlerJob(new LinkCollectingJob(LinkOrigin.TOOLBAR.getLinkOriginDetails(), "https://www.save.tv/STV/M/obj/archive/VideoArchive.cfm?source=jdtoolbar"));
         }
+    }
+
+    @Override
+    public AbstractButton createButton() {
+        final ExtButton ret = new ExtButton(this);
+        ret.setHideActionText(true);
+        ret.setIcon(DomainInfo.getInstance("save.tv").getFavIcon(true));
+        return ret;
     }
 
     @Override

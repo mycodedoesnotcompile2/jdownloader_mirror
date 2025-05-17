@@ -56,7 +56,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50206 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51072 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -409,12 +409,11 @@ public class PixeldrainCom extends PluginForHost {
             final UrlQuery query = new UrlQuery();
             query.add("download", "");
             if (this.hasCaptcha(link, account)) {
-                if (cfg.getActionOnCaptchaRequired() == ActionOnCaptchaRequired.PROCESS_CAPTCHA) {
-                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Lfbzz4UAAAAAAaBgox1R7jU0axiGneLDkOA-PKf").getToken();
-                    query.appendEncoded("recaptcha_response", recaptchaV2Response);
-                } else {
+                if (cfg.getActionOnCaptchaRequired() != ActionOnCaptchaRequired.PROCESS_CAPTCHA) {
                     throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait to avoid captcha", 5 * 60 * 1000l);
                 }
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Lfbzz4UAAAAAAaBgox1R7jU0axiGneLDkOA-PKf").getToken();
+                query.appendEncoded("recaptcha_response", recaptchaV2Response);
             }
             /* That link shall be direct-downloadable. */
             dllink = API_BASE + "/file/" + this.getFID(link) + "?" + query.toString();

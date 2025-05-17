@@ -4,6 +4,8 @@ import java.awt.event.ActionEvent;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.swing.AbstractButton;
+
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
@@ -14,6 +16,7 @@ import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcollector.LinkOrigin;
 import jd.plugins.Account.AccountType;
 
+import org.appwork.swing.components.ExtButton;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
@@ -30,8 +33,7 @@ import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
 
 public class SyncGoProLibraryToolbarAction extends AbstractToolBarAction {
     public SyncGoProLibraryToolbarAction() {
-        setName("Sync GoPro Plus Library");
-        setSmallIcon(DomainInfo.getInstance("gopro.com").getFavIcon(true));
+        setTooltipText("Sync GoPro Plus Library");
         new EDTRunner() {
             @Override
             protected void runInEDT() {
@@ -45,6 +47,14 @@ public class SyncGoProLibraryToolbarAction extends AbstractToolBarAction {
                 });
             }
         };
+    }
+
+    @Override
+    public AbstractButton createButton() {
+        final AbstractButton ret = new ExtButton(this);
+        ret.setHideActionText(true);
+        ret.setIcon(DomainInfo.getInstance("gopro.com").getFavIcon(true));
+        return ret;
     }
 
     @Override

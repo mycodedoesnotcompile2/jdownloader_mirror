@@ -16,10 +16,12 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -38,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51070 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "https?://(?:www\\.)?5sing\\.kugou\\.com/(f|y)c/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 51076 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "https?://(?:www\\.)?5sing\\.kugou\\.com/(f|y)c/(\\d+)\\.html" })
 public class FiveSingCom extends PluginForHost {
     public FiveSingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,19 +113,24 @@ public class FiveSingCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final Browser brc = br.cloneBrowser();
-            final boolean useNewAPI = DebugMode.TRUE_IN_IDE_ELSE_FALSE;
+            final boolean useNewAPI = true;
             final Map<String, Object> data;
             if (useNewAPI) {
                 // TODO: Unfinished code
                 // TODO: mod and dfid are null
-                final String mid = br.getCookie(br.getHost(), "kg_mid", Cookies.NOTDELETEDPATTERN);
-                final String dfid = br.getCookie(br.getHost(), "kg_dfid", Cookies.NOTDELETEDPATTERN);
+                String mid = br.getCookie(br.getHost(), "kg_mid", Cookies.NOTDELETEDPATTERN);
+                if (StringUtils.isEmpty(mid)) {
+                    mid = Hash.getMD5(Long.toString(System.currentTimeMillis()));
+                    br.setCookie(br.getHost(), "kg_mid", mid);
+                }
+                String dfid = br.getCookie(br.getHost(), "kg_dfid", Cookies.NOTDELETEDPATTERN);
                 final String appkey = br.getRegex("appkey:\\s*'([^']+)'").getMatch(0);
-                if (StringUtils.isEmpty(mid) || StringUtils.isEmpty(dfid) || StringUtils.isEmpty(appkey)) {
+                if (StringUtils.isEmpty(appkey)) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
+                final String uuid = mid;
                 final String appid = "2918";
-                final String clienttime = Long.toString(System.currentTimeMillis());
+                final String clienttime = Long.toString(System.currentTimeMillis() / 1000);
                 final String clientver = "1000";
                 final String version = "6.6.72";
                 final String songtype;
@@ -131,6 +138,53 @@ public class FiveSingCom extends PluginForHost {
                     songtype = "fc";
                 } else {
                     songtype = "yc";
+                }
+                if (StringUtils.isEmpty(dfid)) {
+                    logger.info("Obtaining fresh dfid");
+                    final String p_token = "";
+                    final String platid = "4";
+                    final String userid = "0";
+                    final String thisClientVers = "0";
+                    final String secretKey = appid;
+                    final List<String> vals = new ArrayList<String>();
+                    vals.add(appid);
+                    vals.add(clienttime);
+                    vals.add(thisClientVers);
+                    vals.add(mid);
+                    vals.add(p_token);
+                    vals.add(platid);
+                    vals.add(userid);
+                    vals.add(uuid);
+                    Collections.sort(vals);
+                    final String str = StringUtils.join(vals, "");
+                    final String signature = Hash.getMD5(secretKey + str + secretKey);
+                    final UrlQuery query = new UrlQuery();
+                    query.appendEncoded("appid", appid);
+                    query.appendEncoded("platid", platid);
+                    query.appendEncoded("clientver", thisClientVers);
+                    query.appendEncoded("clienttime", clienttime);
+                    query.appendEncoded("signature", signature);
+                    query.appendEncoded("mid", mid);
+                    query.appendEncoded("userid", "0");
+                    query.appendEncoded("uuid", uuid);
+                    query.appendEncoded("p.token", p_token);
+                    /* js fingerprinting: They don't really care what we send. */
+                    final String fingerprintStuff = "{\"appCodeName\":\"\",\"appName\":\"\",\"appVersion\":\"\",\"connection\":\"\",\"doNotTrack\":\"\",\"hardwareConcurrency\":8,\"language\":\"\",\"languages\":\"\",\"maxTouchPoints\":0,\"mimeTypes\":\"\",\"platform\":\"\",\"plugins\":\"\",\"userAgent\":\"\",\"colorDepth\":24,\"pixelDepth\":24,\"screenResolution\":\"\",\"timezoneOffset\":-120,\"sessionStorage\":true,\"localStorage\":true,\"indexedDB\":true,\"cookie\":true,\"adBlock\":false,\"devicePixelRatio\":1,\"hasLiedOs\":false,\"hasLiedLanguages\":false,\"hasLiedResolution\":false,\"hasLiedBrowser\":false,\"webglRenderer\":\"\",\"webglVendor\":\"\",\"canvas\":\"\",\"fonts\":\"\",\"dt\":\"\",\"time\":\"\",\"userid\":\"\",\"mid\":\"" + mid + "\",\"uuid\":\"" + uuid + "\",\"appid\":1058,\"webdriver\":false,\"callPhantom\":false,\"tempKgMid\":\"\",\"referrer\":\"\",\"source\":\""
+                            + link.getPluginPatternMatcher() + "\",\"clientAppid\":\"\",\"clientver\":\"\",\"clientMid\":\"\",\"clientDfid\":\"\",\"clientUserId\":\"\",\"audioKey\":\"\"}";
+                    final String fingerprintStuffB64 = Encoding.Base64Encode(fingerprintStuff);
+                    brc.postPageRaw("https://userservice.kugou.com/risk/v1/r_register_dev?" + query.toString(), fingerprintStuffB64);
+                    final Map<String, Object> riskmap = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final Object dataO = riskmap.get("data");
+                    if (dataO instanceof String) {
+                        /* This should never happen */
+                        throw new PluginException(LinkStatus.ERROR_FATAL, dataO.toString());
+                    }
+                    final Map<String, Object> riskmap_data = (Map<String, Object>) dataO;
+                    dfid = riskmap_data.get("dfid").toString();
+                    br.setCookie(br.getHost(), "kg_dfid", dfid);
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
                 }
                 final StringBuilder sb = new StringBuilder();
                 sb.append(appkey);
@@ -164,33 +218,56 @@ public class FiveSingCom extends PluginForHost {
                 brc.getPage("https://5sservice.kugou.com/song/getsongurl?" + query.toString());
                 final Map<String, Object> map2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 data = (Map<String, Object>) map2.get("data");
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
             } else {
-                /* Old API */
+                /**
+                 * Old API <br>
+                 * 2025-05-16: Call itself still works but returns error
+                 */
                 brc.getPage("http://service.5sing.kugou.com/song/getsongurl?jsoncallback=jQuery" + System.currentTimeMillis() + "_" + System.currentTimeMillis() + "&songid=" + song_id + "&songtype=" + songType + "&from=web&version=6.6.72&_=1539798427612");
                 final Map<String, Object> map2 = restoreFromString(new Regex(brc.getRequest().getHtmlCode(), "(\\{.+\\})").getMatch(0), TypeRef.MAP);
                 data = (Map<String, Object>) map2.get("data");
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
             }
-            dllink = (String) data.get("hqurl");
-            String md5hash = (String) data.get("hqurlmd5");
-            Object filesizeO = data.get("hqsize");
-            String ext = (String) data.get("hqext"); // usually "mp3"
+            final String[] qualities = new String[] { "hq", "sq", "lq" };
+            String md5hash = null;
+            Object filesizeO = null;
+            String ext = null;
+            // Loop through qualities (best to worst) and break when first valid one is found
+            for (String quality : qualities) {
+                dllink = (String) data.get(quality + "url");
+                if (StringUtils.isEmpty(dllink)) {
+                    continue;
+                }
+                md5hash = (String) data.get(quality + "urlmd5");
+                filesizeO = data.get(quality + "size");
+                ext = (String) data.get(quality + "ext");
+                break; // Exit the loop once we find a valid quality
+            }
             if (StringUtils.isEmpty(dllink)) {
-                dllink = (String) map.get("lqurl");
-                md5hash = (String) data.get("lqurlmd5");
-                filesizeO = data.get("lqsize");
-                ext = (String) data.get("lqext");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            // TODO: Check if we can use this for CRC checking
             if (!StringUtils.isEmpty(md5hash)) {
                 link.setMD5Hash(md5hash);
             }
             if (filesizeO != null) {
-                // TODO: Check if this is the correct filesize value
                 link.setVerifiedFileSize(Long.parseLong(filesizeO.toString()));
             }
-            // TODO: Make use of "ext" value
+            /* Correct file extension in existing filename if needed */
+            if (ext != null && link.getName() != null) {
+                /* Correct file extension. This should not be needed (so far it was always .mp3 files), but let's play safe. */
+                final String newFilename = this.correctOrApplyFileNameExtension(link.getName(), ext, null);
+                if (!newFilename.equals(link.getName())) {
+                    logger.info("Filename has changed: Old: " + link.getName() + " | New: " + newFilename);
+                    link.setFinalFileName(newFilename);
+                }
+            }
         }
-        if (dllink == null) {
+        if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
@@ -198,6 +275,8 @@ public class FiveSingCom extends PluginForHost {
             br.followConnection();
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        /* Save for later usage */
+        link.setProperty("directurl", dllink);
         dl.startDownload();
     }
 

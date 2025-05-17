@@ -20,6 +20,21 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.EhentaiConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -42,20 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.EhentaiConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51039 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
+@HostPlugin(revision = "$Revision: 51072 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
 public class EHentaiOrg extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -64,7 +66,7 @@ public class EHentaiOrg extends PluginForHost {
 
     public EHentaiOrg(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://e-hentai.org/");
+        this.enablePremium("https://" + getHost() + "/");
     }
 
     @Override
@@ -173,8 +175,8 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Take account from download candidate! </br> 2021-01-18: There is an API available but it is only returning the metadata:
-     * https://ehwiki.org/wiki/API
+     * Take account from download candidate! </br>
+     * 2021-01-18: There is an API available but it is only returning the metadata: https://ehwiki.org/wiki/API
      *
      * @param link
      * @param account
@@ -241,8 +243,8 @@ public class EHentaiOrg extends PluginForHost {
                 /* Another step */
                 final String continue_url2 = br.getRegex("document\\.getElementById\\(\"continue\"\\).*?document\\.location\\s*=\\s*\"((?:/|http)[^\"]+)\"").getMatch(0);
                 /**
-                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br> We prefer best quality -->
-                 * "Original Archive"
+                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br>
+                 * We prefer best quality --> "Original Archive"
                  */
                 final Form continueForm = br.getFormByInputFieldKeyValue("dltype", "org");
                 if (continue_url2 != null) {
@@ -562,24 +564,26 @@ public class EHentaiOrg extends PluginForHost {
         }
         try {
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, this.isResumeable(link, account), getMaxChunks(link, account));
-            long expectedFilesize = link.getView().getBytesTotal();
-            if (expectedFilesize > 1000) {
-                /*
-                 * Allow content to be up to 1KB smaller than expected filesize --> All to prevent downloading static images e.g. when
-                 * trying to download after randomly being logged-out.
-                 */
-                expectedFilesize -= 1000;
-            }
+            final long expectedFilesizeBytes = link.getView().getBytesTotal();
+            /*
+             * Allow content to be up to 10% smaller than expected file size --> All to prevent downloading static images e.g. when trying
+             * to download after randomly being logged-out.
+             */
+            final long minFilesizeBytes = (long) (expectedFilesizeBytes * 0.9);
+            final long realFilesizeBytes = dl.getConnection().getCompleteContentLength();
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 checkErrors(br, link, account);
                 this.handleErrorsLastResort(link, account, this.br); /* This should never be reached. */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else if (dl.getConnection().getResponseCode() != 206 && dl.getConnection().getCompleteContentLength() > 0 && expectedFilesize > 0 && dl.getConnection().getCompleteContentLength() < expectedFilesize) {
+            } else if (dl.getConnection().getResponseCode() != 206 && realFilesizeBytes > 0 && realFilesizeBytes < minFilesizeBytes) {
                 /* Don't jump into this for response code 206 Partial Content (when download is resumed). */
                 br.followConnection(true);
                 /* Rare error: E.g. "403 picture" is smaller than 1 KB but is still downloaded content (picture). */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error - file is too small:" + dl.getConnection().getCompleteContentLength(), 2 * 60 * 1000l);
+                final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+                final String realSizeFormatted = SIZEUNIT.formatValue(maxSizeUnit, realFilesizeBytes);
+                final String expectedSizeFormatted = SIZEUNIT.formatValue(maxSizeUnit, expectedFilesizeBytes);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, String.format("Server error - file is too small got: %s expect: %s", realSizeFormatted, expectedSizeFormatted), 2 * 60 * 1000l);
             } else if (requiresAccount(dl.getConnection().getURL().toExternalForm())) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -614,9 +618,10 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * If this returns true: </br> Download of this image has just recently failed due to the image being serverside broken/unavailable.
-     * </br> Website has a feature called 'Reload broken image' which we are making use of here. </br> This will give us the same image
-     * hosted on a different CDN.
+     * If this returns true: </br>
+     * Download of this image has just recently failed due to the image being serverside broken/unavailable. </br>
+     * Website has a feature called 'Reload broken image' which we are making use of here. </br>
+     * This will give us the same image hosted on a different CDN.
      */
     private boolean needsBrokenImageWorkaround(final DownloadLink link, final Account account) {
         final long timestampLastFailDueToBrokenImage = link.getLongProperty(PROPERTY_TIMESTAMP_LAST_BROKEN_IMAGE_FAIL, 0);
@@ -807,8 +812,8 @@ public class EHentaiOrg extends PluginForHost {
                 logger.info("e-hentai.org: Successfully logged in via cookies -> Checking exhentai.org login");
                 /* Get- and save exhentai.org cookies too */
                 /**
-                 * Important! Get- and save exhentai cookies: First time this will happen: </br> exhentai.org ->
-                 * forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
+                 * Important! Get- and save exhentai cookies: First time this will happen: </br>
+                 * exhentai.org -> forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
                  */
                 br.getPage(MAINPAGE_exhentai);
                 if (this.isLoggedInEhentaiOrExhentai(br)) {
@@ -924,8 +929,11 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Access e-hentai.org/home.php before calling this! </br> Returns array of numbers with: </br> [0] = number of items downloaded / used
-     * from limit </br> [1] = max limit for this account </br> [1] minus [0] = points left
+     * Access e-hentai.org/home.php before calling this! </br>
+     * Returns array of numbers with: </br>
+     * [0] = number of items downloaded / used from limit </br>
+     * [1] = max limit for this account </br>
+     * [1] minus [0] = points left
      */
     private int[] parseImagePointsLeftInfo(final Browser br) {
         if (!br.getURL().endsWith("/home.php")) {

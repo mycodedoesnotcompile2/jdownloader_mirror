@@ -31,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50885 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51072 $", interfaceVersion = 3, names = {}, urls = {})
 public class GettSu extends XFileSharingProBasic {
     public GettSu(final PluginWrapper wrapper) {
         super(wrapper);
@@ -158,5 +158,15 @@ public class GettSu extends XFileSharingProBasic {
             }
         }
         return super.getDllink(link, account, br, src);
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilesize = new Regex(html, "class=\"fad fa-save fa-lg\"[^>]*>\\s*</i>([^<]+)<").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
+        }
+        return fileInfo;
     }
 }
