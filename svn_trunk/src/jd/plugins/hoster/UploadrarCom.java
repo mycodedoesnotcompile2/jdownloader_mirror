@@ -18,12 +18,12 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49674 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51081 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadrarCom extends XFileSharingProBasic {
     public UploadrarCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -60,13 +60,11 @@ public class UploadrarCom extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(String[] fileInfo) {
-        super.scanInfo(fileInfo);
-        // if (StringUtils.isEmpty(fileInfo[0])) {
-        // fileInfo[0] = br.getRegex("div\\s*class\\s*=\\s*\"desc\"\\s*>\\s*<span>\\s*(.*?)\\s*</span>").getMatch(0);
-        // }
-        if (StringUtils.isEmpty(fileInfo[1])) {
-            fileInfo[1] = br.getRegex("<p>\\s*size\\s*:\\s*([0-9\\.]+(?:\\s+|\\&nbsp;)?(KB|MB|GB))").getMatch(0);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        String better_filesize = new Regex(html, "<p>\\s*size\\s*:\\s*([0-9\\.]+(?:\\s+|\\&nbsp;)?(KB|MB|GB))").getMatch(0);
+        if (better_filesize != null) {
+            fileInfo[1] = better_filesize;
         }
         return fileInfo;
     }
@@ -182,7 +180,10 @@ public class UploadrarCom extends XFileSharingProBasic {
         if (br.containsHTML(">\\s*No such file\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String filename = regexFilenameAbuse(br);
+        String filename = regexFilenameAbuse(br);
+        if (filename == null) {
+            filename = br.getRegex("Filename:\\s*</b>([^<]+)</div>").getMatch(0);
+        }
         if (filename != null) {
             logger.info("Successfully found filename via report_file");
             return filename;

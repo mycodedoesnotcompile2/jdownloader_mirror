@@ -17,6 +17,8 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
@@ -28,9 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 47482 $", interfaceVersion = 3, names = { "hdpussy.xxx" }, urls = { "https?://(?:www\\.)?hdpussy\\.xxx/video/([a-f0-9]{32})/" })
+@HostPlugin(revision = "$Revision: 51080 $", interfaceVersion = 3, names = { "hdpussy.xxx" }, urls = { "https?://(?:www\\.)?hdpussy\\.xxx/video/([a-f0-9]{32})/?" })
 public class HdPussyXxx extends PluginForHost {
     public HdPussyXxx(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,8 +96,8 @@ public class HdPussyXxx extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (!this.canHandle(this.br.getURL())) {
                 /**
-                 * 2021-08-09: E.g. external redirect to advertising website. </br> This may sometimes happen randomly but not more than two
-                 * times in a row so retry if this happens.
+                 * 2021-08-09: E.g. external redirect to advertising website. </br>
+                 * This may sometimes happen randomly but not more than two times in a row so retry if this happens.
                  */
                 if (counter < 4) {
                     logger.info("MAYBE Offline because of redirect to external website: " + this.br.getURL() + " | Attempt: " + counter);
@@ -115,6 +115,10 @@ public class HdPussyXxx extends PluginForHost {
             filename = br.getRegex("<title>([^<>\"]*?)\\| HD Pussy XXX</title>").getMatch(0);
         }
         dllink = br.getRegex("file\\s*:\\s*\"([^<>\"]*?)\"").getMatch(0);
+        if (dllink == null) {
+            /* 2025-05-19 */
+            dllink = br.getRegex("<source src=\"(https?://[^\"]+)\" type=\"video/mp4\"").getMatch(0);
+        }
         String ext = null;
         if (dllink != null) {
             if (!dllink.startsWith("http")) {
@@ -157,7 +161,7 @@ public class HdPussyXxx extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

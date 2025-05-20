@@ -19,7 +19,7 @@ public interface RedditConfig extends PluginConfigInterface {
     final String                                 text_PreferredCommentsPackagenameScheme = "Select preferred package name scheme for single comments";
     final String                                 text_CustomCommentsPackagenameScheme    = "Define custom packagename scheme";
     final String                                 text_PreferredFilenameScheme            = "Select preferred filename scheme";
-    final String                                 text_CrawlerTextDownloadMode            = "Crawler: Select text download mode";
+    final String                                 text_CrawlerTextDownloadMode            = "Crawler: Text download mode";
     final String                                 text_CrawlUrlsInsidePostText            = "Crawl URLs inside post-text?";
     final String                                 text_ProfileCrawlerMaxPages             = "User crawler: Crawl max X pages (-1 = unlimited, 0 = disable user crawler)";
     final String                                 text_SubredditCrawlerMaxPages           = "Subreddit crawler: Crawl max X pages (-1 = unlimited, 0 = disable subreddit crawler)";

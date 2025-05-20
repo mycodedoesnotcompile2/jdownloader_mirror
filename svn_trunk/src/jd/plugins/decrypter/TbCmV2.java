@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51043 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51081 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1599,7 +1599,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     logger.info("Stopping because: Reached max items limit of " + maxItemsLimit);
                     break pagination;
                 }
-                Set<String> continuationTokens = findAllContinuationTokens(varray);
+                final Set<String> continuationTokens = findAllContinuationTokens(varray);
                 if (continuationTokens.size() == 1) {
                     nextPageToken = continuationTokens.iterator().next();
                 } else if (continuationTokens.size() > 1) {
@@ -1856,16 +1856,30 @@ public class TbCmV2 extends PluginForDecrypt {
     /**
      * Recursively collects continuation tokens from the JSON structure
      */
-    private void collectContinuationTokens(Object jsonObject, Set<String> tokens) {
+    private void collectContinuationTokens(final Object jsonObject, final Set<String> tokens) {
         if (jsonObject == null) {
             return;
         }
         if (jsonObject instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) jsonObject;
-            // Check for continuation token in this object
-            String token = (String) JavaScriptEngineFactory.walkJson(map, "continuationItemRenderer/continuationEndpoint/continuationCommand/token");
-            if (token != null) {
-                tokens.add(token);
+            final Map<String, Object> map = (Map<String, Object>) jsonObject;
+            final Map<String, Object> continuationEndpoint = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "continuationItemRenderer/continuationEndpoint");
+            if (continuationEndpoint != null) {
+                String token = (String) JavaScriptEngineFactory.walkJson(continuationEndpoint, "continuationCommand/token");
+                if (token != null) {
+                    tokens.add(token);
+                } else {
+                    /* 2025-05-19: E.g. playlist when logged in, json looks different */
+                    final List<Map<String, Object>> commands = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(continuationEndpoint, "commandExecutorCommand/commands");
+                    if (commands != null && commands.size() > 0) {
+                        for (final Map<String, Object> command : commands) {
+                            final Map<String, Object> continuationCommand = (Map<String, Object>) command.get("continuationCommand");
+                            if (continuationCommand != null) {
+                                tokens.add(continuationCommand.get("token").toString());
+                                break;
+                            }
+                        }
+                    }
+                }
             }
             // Recursively check all values
             for (Object value : map.values()) {
@@ -1874,7 +1888,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
         } else if (jsonObject instanceof List) {
-            List<Object> list = (List<Object>) jsonObject;
+            final List<Object> list = (List<Object>) jsonObject;
             for (Object item : list) {
                 if (item instanceof Map || item instanceof List) {
                     collectContinuationTokens(item, tokens);

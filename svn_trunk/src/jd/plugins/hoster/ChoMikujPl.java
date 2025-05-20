@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51056 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51081 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -291,19 +291,17 @@ public class ChoMikujPl extends antiDDoSForHost {
     }
 
     private boolean looksLikeVideo(final DownloadLink link) {
-        String filename = link.getFinalFileName();
-        if (filename == null) {
-            filename = link.getName();
-        }
+        final String filename = link.getName();
         if (filename == null) {
             return false;
-        }
-        if (!filename.contains(".")) {
+        } else if (!filename.contains(".")) {
             return false;
         }
-        final String ext = filename.substring(filename.lastIndexOf("."));
-        if (ext.matches("\\.(avi|flv|mp4|mpg|rmvb|divx|wmv|mkv)")) {
-            return true;
+        final String[] video_exts = new String[] { "avi", "flv", "mp4", "mpg", "rmvb", "divx", "wmv", "mkv" };
+        for (final String video_ext : video_exts) {
+            if (StringUtils.endsWithCaseInsensitive(filename, "." + video_ext)) {
+                return true;
+            }
         }
         return false;
     }
@@ -753,16 +751,17 @@ public class ChoMikujPl extends antiDDoSForHost {
     @Override
     public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
         if (this.isOwnedBy(link, account)) {
+            /* Current account owns that file -> Can download it without traffic deduction. */
             return true;
         } else if (this.getStoredDirectlink(link, account) != null) {
             /* Stored directurl available -> Assume that it is still valid so it can be used without using up additional traffic. */
             return true;
         } else if (link.hasProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE)) {
             /* Stream download will not deduct traffic. */
-            return false;
+            return true;
         } else if (this.allowStreamDownloadFallback() && this.looksLikeStreamableFile(link)) {
             /* Stream download will happen as fallback -> Stream download will not deduct traffic. */
-            return false;
+            return true;
         } else {
             return super.enoughTrafficFor(link, account);
         }
@@ -781,11 +780,12 @@ public class ChoMikujPl extends antiDDoSForHost {
     @Override
     public void resetDownloadlink(DownloadLink link) {
         link.removeProperty(PROPERTY_DOWNLOADLINK_ADULT_CONTENT);
+        link.removeProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE);
     }
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES, "Account download: Prefer download of stream versions of audio files in account mode?\r\n<html><b>Avoids traffic usage for audio files!</b></html>").setDefaultValue(default_ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, "Allow fallback to preview/stream download if original file is only downloadable with premium account?").setDefaultValue(default_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, "Allow fallback to preview/stream download if original file is only downloadable with (paid) account?").setDefaultValue(default_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.CRAWL_SUBFOLDERS, "Crawl subfolders in folders").setDefaultValue(default_CRAWL_SUBFOLDERS));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ChoMikujPl.IGNORE_TRAFFIC_LIMIT, "Ignore traffic limit? Useful to download self uploaded files or stream download in account mode.").setDefaultValue(default_IGNORE_TRAFFIC_LIMIT));
     }

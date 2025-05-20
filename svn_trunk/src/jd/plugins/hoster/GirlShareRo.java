@@ -22,6 +22,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.http.RandomUserAgent;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
@@ -33,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49053 $", interfaceVersion = 2, names = { "girlshare.ro" }, urls = { "https?://[\\w\\.]*?girlshare\\.ro/([0-9\\.]+)" })
+@HostPlugin(revision = "$Revision: 51078 $", interfaceVersion = 2, names = { "girlshare.ro" }, urls = { "https?://[\\w\\.]*?girlshare\\.ro/([0-9\\.]+)" })
 public class GirlShareRo extends PluginForHost {
     private static AtomicReference<String> agent = new AtomicReference<String>(RandomUserAgent.generate());
 
@@ -42,13 +43,20 @@ public class GirlShareRo extends PluginForHost {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "http://www.girlshare.ro/";
+        return "http://www." + getHost();
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -71,7 +79,7 @@ public class GirlShareRo extends PluginForHost {
         br.setFollowRedirects(true);
         br.getHeaders().put("User-Agent", agent.get());
         br.getPage(link.getPluginPatternMatcher());
-        if (br.containsHTML("(?i)(<b>Acest fisier nu exista\\.</b>|<title>GirlShare - Acest fisier nu exista\\.</title>)")) {
+        if (br.containsHTML("(<b>Acest fisier nu exista\\.</b>|<title>GirlShare - Acest fisier nu exista\\.</title>)")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("title = \"(.*?)\";").getMatch(0);
@@ -80,7 +88,7 @@ public class GirlShareRo extends PluginForHost {
         }
         String filesize = br.getRegex("</H3>\\s*<br>(.*?) , ").getMatch(0);
         if (filename != null) {
-            link.setName(filename.trim());
+            link.setName(Encoding.htmlDecode(filename).trim());
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));

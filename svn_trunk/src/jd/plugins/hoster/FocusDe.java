@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49416 $", interfaceVersion = 3, names = { "focus.de" }, urls = { "https?://(?:www\\.)?focus\\.de/.+" })
+@HostPlugin(revision = "$Revision: 51078 $", interfaceVersion = 3, names = { "focus.de" }, urls = { "https?://(?:www\\.)?focus\\.de/.+" })
 public class FocusDe extends PluginForHost {
     public FocusDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,11 +45,17 @@ public class FocusDe extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
 
     @Override
     public String getAGBLink() {
@@ -63,7 +69,6 @@ public class FocusDe extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -87,6 +92,7 @@ public class FocusDe extends PluginForHost {
             title = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
         }
         long filesize = -1;
+        String description = null;
         if (videoplayerLicenseKey != null && vms_id != null) {
             /**
              * Prefer information from this API over information from html. </br>
@@ -144,6 +150,27 @@ public class FocusDe extends PluginForHost {
             logger.warning("Cannot obtain information from API -> Download may fail");
         }
         if (StringUtils.isEmpty(dllink)) {
+            /*
+             * 2025-05-19: e.g.
+             * /wissen/mensch/ein-kontinent-bricht-entzwei-und-macht-platz-fuer-einen-neuen-ozean-auf-der-erde_bac478c5-dc0a-4252-ace8-
+             * ae790b04163e.html
+             */
+            final String[] jsons = br.getRegex("<script[^>]*>(.*?)</script>").getColumn(0);
+            for (final String json : jsons) {
+                try {
+                    final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+                    final Map<String, Object> video = (Map<String, Object>) entries.get("video");
+                    if (video != null) {
+                        this.dllink = video.get("contentUrl").toString();
+                        description = (String) video.get("description");
+                        break;
+                    }
+                } catch (final Exception ignore) {
+                    /* Ignore parse exceptions */
+                }
+            }
+        }
+        if (StringUtils.isEmpty(dllink)) {
             final String[] qualities = { "hdurl", "sdurl" };
             for (final String quality : qualities) {
                 dllink = br.getRegex(quality + "[\t\n\r ]+=[\t\n\r ]+\"(http[^<>\"]*?)\"").getMatch(0);
@@ -190,6 +217,10 @@ public class FocusDe extends PluginForHost {
         if (filesize > 0) {
             link.setVerifiedFileSize(filesize);
         }
+        if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
+            link.setComment(description);
+            ;
+        }
         return AvailableStatus.TRUE;
     }
 
@@ -226,7 +257,7 @@ public class FocusDe extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

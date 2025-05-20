@@ -19,9 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51080 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdtubePorn extends KernelVideoSharingComV2 {
     public HdtubePorn(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +46,15 @@ public class HdtubePorn extends KernelVideoSharingComV2 {
     }
 
     public static String[] getAnnotationUrls() {
-        return buildAnnotationUrlsDefaultVideosPatternWithoutFileID(getPluginDomains());
+        return buildAnnotationUrlsDefaultVideosPatternWithoutFileID_Special_HdtubePorn(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrlsDefaultVideosPatternWithoutFileID_Special_HdtubePorn(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(videos?/[^/\\?#]+/?|embed/\\d+/?)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -56,5 +65,15 @@ public class HdtubePorn extends KernelVideoSharingComV2 {
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
         return generateContentURLDefaultVideosPatternWithoutFileID(host, fuid, urlSlug);
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        if (!br.containsHTML("video_id:\\s*'[0-9]+")) {
+            /* E.g. invalid URL: /videos/10/ -> Not a single video URL */
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
+        }
     }
 }

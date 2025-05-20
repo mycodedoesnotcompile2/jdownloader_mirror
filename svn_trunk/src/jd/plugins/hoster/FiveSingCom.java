@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Hash;
+import org.appwork.utils.KeyValueStringEntry;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -40,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51076 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "https?://(?:www\\.)?5sing\\.kugou\\.com/(f|y)c/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 51078 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "https?://(?:www\\.)?5sing\\.kugou\\.com/(f|y)c/(\\d+)\\.html" })
 public class FiveSingCom extends PluginForHost {
     public FiveSingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,15 +76,18 @@ public class FiveSingCom extends PluginForHost {
         } else if (!this.canHandle(br.getURL())) {
             /* E.g. redirect to mainpage */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("/images/404/error\\.jpg")) {
+            /* Example: /fc/6359899.html */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String extension = br.getRegex("(<em>)?格式：(</em>)?([^<>\"]*?)(<|&)").getMatch(2);
         if (extension == null && br.containsHTML("<em>演唱：</em>")) {
             extension = "mp3";
         }
-        // final String filename = br.getRegex("var SongName[^<>\"\t\n\r]*= \"([^<>\"]*?)\"").getMatch(0);
         final String filename = br.getRegex("song_title\" title=\"([^<>\"]*?)\"").getMatch(0);
         final String song_id = br.getRegex("var SongID[^<>\"\t\n\r]*= ([^<>\"]*?);").getMatch(0);
         final String stype = br.getRegex("var SongType[^<>\"\t\n\r]*= \"([^<>\"]*?)\";").getMatch(0);
+        /* 2025-05-19: File size is not always available in html code. */
         String filesize = br.getRegex("(<em>)?大小：(</em>)?([^<>\"]*?)(<|\")").getMatch(2);
         if (filename != null && extension != null) {
             link.setFinalFileName(stype + "-" + Encoding.htmlDecode(filename).trim() + "-" + song_id + "." + Encoding.htmlDecode(extension).trim());
@@ -99,16 +103,16 @@ public class FiveSingCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        String src = br.getRegex("\"ticket\": \"([^<>\"]*?)\"").getMatch(0);
+        String src = br.getRegex("\"ticket\":\\s*\"([^\"]+)").getMatch(0);
         if (src == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        src = Encoding.Base64Decode(src).replace("\\", "");
+        src = Encoding.Base64Decode(src);
         String dllink = new Regex(src, "\"file\":\"(https?:[^\"]*?)\"").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
             final Map<String, Object> map = restoreFromString(src, TypeRef.MAP);
-            final String song_id = map.containsKey("songID") ? String.valueOf(map.get("songID")) : null;
-            final String songType = map.containsKey("songType") ? String.valueOf(map.get("songType")) : null;
+            final String song_id = map.get("songID").toString();
+            final String songType = map.get("songType").toString();
             if (StringUtils.isEmpty(songType) || StringUtils.isEmpty(song_id)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -116,10 +120,9 @@ public class FiveSingCom extends PluginForHost {
             final boolean useNewAPI = true;
             final Map<String, Object> data;
             if (useNewAPI) {
-                // TODO: Unfinished code
-                // TODO: mod and dfid are null
                 String mid = br.getCookie(br.getHost(), "kg_mid", Cookies.NOTDELETEDPATTERN);
                 if (StringUtils.isEmpty(mid)) {
+                    /* This is just a random UUID thing */
                     mid = Hash.getMD5(Long.toString(System.currentTimeMillis()));
                     br.setCookie(br.getHost(), "kg_mid", mid);
                 }
@@ -141,33 +144,20 @@ public class FiveSingCom extends PluginForHost {
                 }
                 if (StringUtils.isEmpty(dfid)) {
                     logger.info("Obtaining fresh dfid");
-                    final String p_token = "";
                     final String platid = "4";
                     final String userid = "0";
                     final String thisClientVers = "0";
-                    final String secretKey = appid;
-                    final List<String> vals = new ArrayList<String>();
-                    vals.add(appid);
-                    vals.add(clienttime);
-                    vals.add(thisClientVers);
-                    vals.add(mid);
-                    vals.add(p_token);
-                    vals.add(platid);
-                    vals.add(userid);
-                    vals.add(uuid);
-                    Collections.sort(vals);
-                    final String str = StringUtils.join(vals, "");
-                    final String signature = Hash.getMD5(secretKey + str + secretKey);
                     final UrlQuery query = new UrlQuery();
                     query.appendEncoded("appid", appid);
                     query.appendEncoded("platid", platid);
                     query.appendEncoded("clientver", thisClientVers);
                     query.appendEncoded("clienttime", clienttime);
-                    query.appendEncoded("signature", signature);
                     query.appendEncoded("mid", mid);
-                    query.appendEncoded("userid", "0");
+                    query.appendEncoded("userid", userid);
                     query.appendEncoded("uuid", uuid);
-                    query.appendEncoded("p.token", p_token);
+                    query.appendEncoded("p.token", "");
+                    final String signature = computeSign2(query, appid);
+                    query.appendEncoded("signature", signature);
                     /* js fingerprinting: They don't really care what we send. */
                     final String fingerprintStuff = "{\"appCodeName\":\"\",\"appName\":\"\",\"appVersion\":\"\",\"connection\":\"\",\"doNotTrack\":\"\",\"hardwareConcurrency\":8,\"language\":\"\",\"languages\":\"\",\"maxTouchPoints\":0,\"mimeTypes\":\"\",\"platform\":\"\",\"plugins\":\"\",\"userAgent\":\"\",\"colorDepth\":24,\"pixelDepth\":24,\"screenResolution\":\"\",\"timezoneOffset\":-120,\"sessionStorage\":true,\"localStorage\":true,\"indexedDB\":true,\"cookie\":true,\"adBlock\":false,\"devicePixelRatio\":1,\"hasLiedOs\":false,\"hasLiedLanguages\":false,\"hasLiedResolution\":false,\"hasLiedBrowser\":false,\"webglRenderer\":\"\",\"webglVendor\":\"\",\"canvas\":\"\",\"fonts\":\"\",\"dt\":\"\",\"time\":\"\",\"userid\":\"\",\"mid\":\"" + mid + "\",\"uuid\":\"" + uuid + "\",\"appid\":1058,\"webdriver\":false,\"callPhantom\":false,\"tempKgMid\":\"\",\"referrer\":\"\",\"source\":\""
                             + link.getPluginPatternMatcher() + "\",\"clientAppid\":\"\",\"clientver\":\"\",\"clientMid\":\"\",\"clientDfid\":\"\",\"clientUserId\":\"\",\"audioKey\":\"\"}";
@@ -186,24 +176,6 @@ public class FiveSingCom extends PluginForHost {
                         throw new InterruptedException();
                     }
                 }
-                final StringBuilder sb = new StringBuilder();
-                sb.append(appkey);
-                sb.append("appid=" + appid);
-                sb.append("clienttime=" + clienttime);
-                sb.append("clientver=" + clientver);
-                sb.append("dfid=" + dfid);
-                sb.append("mid=" + mid);
-                sb.append("songid=" + song_id);
-                sb.append("songtype=" + songtype);
-                sb.append("uuid=" + mid);
-                sb.append("version=" + version);
-                sb.append(appkey);
-                /**
-                 * See: <br>
-                 * https://5sstatic.kugou.com/public/common/inf_sign-2.0.0.min.js <br>
-                 * Function: t.signature = g(n.join(''))
-                 */
-                final String signature = Hash.getMD5(sb.toString());
                 final UrlQuery query = new UrlQuery();
                 query.appendEncoded("appid", appid);
                 query.appendEncoded("clientver", clientver);
@@ -214,9 +186,13 @@ public class FiveSingCom extends PluginForHost {
                 query.appendEncoded("songtype", songtype);
                 query.appendEncoded("version", version);
                 query.appendEncoded("clienttime", clienttime);
-                query.appendEncoded("signature", signature);
+                final String signature1 = computeSign1(query, appkey);
+                query.appendEncoded("signature", signature1);
                 brc.getPage("https://5sservice.kugou.com/song/getsongurl?" + query.toString());
                 final Map<String, Object> map2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (Boolean.FALSE.equals(map2.get("success"))) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, map2.get("message").toString());
+                }
                 data = (Map<String, Object>) map2.get("data");
                 if (this.isAbort()) {
                     throw new InterruptedException();
@@ -278,6 +254,40 @@ public class FiveSingCom extends PluginForHost {
         /* Save for later usage */
         link.setProperty("directurl", dllink);
         dl.startDownload();
+    }
+
+    /**
+     * See: <br>
+     * https://5sstatic.kugou.com/public/common/inf_sign-2.0.0.min.js <br>
+     * Function: t.signature = g(n.join(''))
+     */
+    private String computeSign1(final UrlQuery query, final String secret) {
+        final List<String> vals = new ArrayList<String>();
+        for (final KeyValueStringEntry kv : query.list()) {
+            if (kv.getKey().equalsIgnoreCase("signature")) {
+                continue;
+            }
+            vals.add(kv.getKey() + "=" + kv.getValue());
+        }
+        Collections.sort(vals);
+        final String str = StringUtils.join(vals, "");
+        final String signature = Hash.getMD5(secret + str + secret);
+        return signature;
+    }
+
+    /** https://staticssl.kugou.com/verify/static/js/registerDev.v1.min.js */
+    private String computeSign2(final UrlQuery query, final String secret) {
+        final List<String> vals = new ArrayList<String>();
+        for (final KeyValueStringEntry kv : query.list()) {
+            if (kv.getKey().equalsIgnoreCase("signature")) {
+                continue;
+            }
+            vals.add(kv.getValue());
+        }
+        Collections.sort(vals);
+        final String str = StringUtils.join(vals, "");
+        final String signature = Hash.getMD5(secret + str + secret);
+        return signature;
     }
 
     @Override

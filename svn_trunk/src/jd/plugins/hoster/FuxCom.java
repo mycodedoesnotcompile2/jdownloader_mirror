@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50501 $", interfaceVersion = 2, names = { "fux.com", "4tube.com", "porntube.com", "pornerbros.com" }, urls = { "https?://(?:www\\.)?fux\\.com/(?:videos?|embed)/\\d+/?(?:[\\w-]+)?", "https?://(?:www\\.)?4tube\\.com/(?:embed|videos)/\\d+/?(?:[\\w-]+)?|https?://m\\.4tube\\.com/videos/\\d+/?(?:[\\w-]+)?", "https?://(?:www\\.)?(?:porntube\\.com/videos/[a-z0-9\\-]+_\\d+|embed\\.porntube\\.com/\\d+|porntube\\.com/embed/\\d+)", "https?://(?:www\\.)?(?:pornerbros\\.com/videos/[a-z0-9\\-]+_\\d+|embed\\.pornerbros\\.com/\\d+|pornerbros\\.com/embed/\\d+)" })
+@HostPlugin(revision = "$Revision: 51078 $", interfaceVersion = 2, names = { "fux.com", "4tube.com", "porntube.com" }, urls = { "https?://(?:www\\.)?fux\\.com/(?:videos?|embed)/\\d+/?(?:[\\w-]+)?", "https?://(?:www\\.)?4tube\\.com/(?:embed|videos)/\\d+/?(?:[\\w-]+)?|https?://m\\.4tube\\.com/videos/\\d+/?(?:[\\w-]+)?", "https?://(?:www\\.)?(?:porntube\\.com/videos/[a-z0-9\\-]+_\\d+|embed\\.porntube\\.com/\\d+|porntube\\.com/embed/\\d+)" })
 public class FuxCom extends PluginForHost {
     public FuxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,12 +51,12 @@ public class FuxCom extends PluginForHost {
     /* tags: fux.com, porntube.com, 4tube.com, pornerbros.com */
     @Override
     public String getAGBLink() {
-        return "http://www.fux.com/legal/tos";
+        return "http://www." + getHost() + "/legal/tos";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     public void correctDownloadLink(final DownloadLink link) {

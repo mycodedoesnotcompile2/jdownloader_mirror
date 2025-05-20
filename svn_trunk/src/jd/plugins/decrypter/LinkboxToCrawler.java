@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -40,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.LinkboxTo;
 
-@DecrypterPlugin(revision = "$Revision: 50927 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51078 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { LinkboxTo.class })
 public class LinkboxToCrawler extends PluginForDecrypt {
     public LinkboxToCrawler(PluginWrapper wrapper) {
@@ -71,16 +72,31 @@ public class LinkboxToCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern TYPE_NORMAL = Pattern.compile("/a/(d|f|s)/([A-Za-z0-9]+)(\\?pid=(\\d+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_SHORT  = Pattern.compile("/f/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:(?:www|[a-z]{2})\\.)?" + buildHostsPatternPart(domains) + "/a/(d|f|s)/([A-Za-z0-9]+)(\\?pid=(\\d+))?");
+            ret.add("https?://(?:(?:www|[a-z]{2})\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_NORMAL.pattern() + "|" + TYPE_SHORT.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), this.getSupportedLinks());
+        String contenturl = param.getCryptedUrl();
+        if (new Regex(contenturl, TYPE_SHORT).patternFind()) {
+            br.getPage(contenturl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (!new Regex(br.getURL(), TYPE_NORMAL).patternFind()) {
+                /* Assume that item is offline */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            logger.info("Redirect from shorturl: " + contenturl + " --> " + br.getURL());
+            contenturl = br.getURL();
+        }
+        final Regex urlinfo = new Regex(contenturl, TYPE_NORMAL);
         final String folderType = urlinfo.getMatch(0);
         final String folderID = urlinfo.getMatch(1);
         final String subfolderID = urlinfo.getMatch(3);
