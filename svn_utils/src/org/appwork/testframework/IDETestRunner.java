@@ -94,7 +94,7 @@ public class IDETestRunner {
         lastExecutedTestsFile = Application.getResource("cfg/lastExecutedTests.classes");
         AWTest.initLogger(new SimpleFormatter() {
             {
-                offsetForThrownAt = new IntByReference(20);
+                offsetForThrownAt = new IByReference(20);
             }
 
             @Override

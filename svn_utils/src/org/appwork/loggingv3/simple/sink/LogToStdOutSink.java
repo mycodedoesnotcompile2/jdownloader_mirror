@@ -59,7 +59,7 @@ public class LogToStdOutSink extends AbstractSink {
         this(getStdOut(), getStdErr());
         formatter = new SimpleFormatter() {
             {
-                offsetForThrownAt = new IntByReference(40);
+                offsetForThrownAt = new IByReference(40);
             }
 
             protected String createPre(LogRecord2 record, String sourceString) {

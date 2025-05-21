@@ -18,11 +18,15 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -33,10 +37,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47797 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51083 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotscopeTv extends PluginForHost {
     public HotscopeTv(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -45,10 +56,11 @@ public class HotscopeTv extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
+    private static final Pattern TYPE_NEW       = Pattern.compile("/video/([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_OLD       = Pattern.compile("/(\\w+)/(\\d+)", Pattern.CASE_INSENSITIVE);
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -69,14 +81,14 @@ public class HotscopeTv extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(\\w+)/(\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_NEW.pattern() + "|" + TYPE_OLD.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
     public String getAGBLink() {
-        return "https://hotscope.tv/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -90,8 +102,13 @@ public class HotscopeTv extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-        return urlinfo.getMatch(0) + "_" + urlinfo.getMatch(1);
+        final String video_id_new = new Regex(link.getPluginPatternMatcher(), TYPE_NEW).getMatch(0);
+        if (video_id_new != null) {
+            return video_id_new;
+        } else {
+            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), TYPE_OLD);
+            return urlinfo.getMatch(0) + "_" + urlinfo.getMatch(1);
+        }
     }
 
     private final String PROPERTY_DATE               = "date";
@@ -101,11 +118,11 @@ public class HotscopeTv extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        final String ext_default = ".mp4";
         if (!link.isNameSet()) {
-            link.setName(this.getFID(link) + ".mp4");
+            link.setName(this.getFID(link) + ext_default);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -115,7 +132,7 @@ public class HotscopeTv extends PluginForHost {
         if (title != null) {
             title = Encoding.htmlDecode(title);
             title = title.trim();
-            link.setFinalFileName(title + ".mp4");
+            link.setFinalFileName(title + ext_default);
         }
         /* Packagizer properties */
         final String username = br.getRegex("<a title=\"([^\"]+)\" href=\"/channel/\\d+\"").getMatch(0);
@@ -134,7 +151,8 @@ public class HotscopeTv extends PluginForHost {
         if (PROPERTY_DATE != null) {
             link.setProperty(PROPERTY_DATE, uploadDate);
         }
-        if (!StringUtils.isEmpty(dllink)) {
+        final PluginEnvironment env = this.getPluginEnvironment();
+        if (!StringUtils.isEmpty(dllink) && !StringUtils.endsWithCaseInsensitive(dllink, ".m3u8") && !link.isSizeSet() && env != PluginEnvironment.DOWNLOAD) {
             URLConnectionAdapter con = null;
             try {
                 con = br.openHeadConnection(this.dllink);
@@ -163,9 +181,21 @@ public class HotscopeTv extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
-        handleConnectionErrors(dl.getConnection());
-        dl.startDownload();
+        if (StringUtils.endsWithCaseInsensitive(dllink, ".m3u8")) {
+            br.getPage(dllink);
+            final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+            if (hlsbest == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            dllink = hlsbest.getDownloadurl();
+            checkFFmpeg(link, "Download a HLS Stream");
+            dl = new HLSDownloader(link, br, dllink);
+            dl.startDownload();
+        } else {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
+            handleConnectionErrors(dl.getConnection());
+            dl.startDownload();
+        }
     }
 
     private void handleConnectionErrors(final URLConnectionAdapter con) throws PluginException {
@@ -186,7 +216,7 @@ public class HotscopeTv extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

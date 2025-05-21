@@ -36,12 +36,16 @@ package org.appwork.utils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystemException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -49,6 +53,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.extioexceptions.CouldNotAccessPathExtIOException;
 import org.appwork.utils.os.CrossSystem;
 
 public class Files17 {
@@ -183,5 +188,86 @@ public class Files17 {
             }
         }
         return null;
+    }
+
+    /**
+     * Returns {@code false} if NOFOLLOW_LINKS is present.
+     */
+    private static boolean followLinks(LinkOption... options) {
+        boolean followLinks = true;
+        for (LinkOption opt : options) {
+            if (opt == LinkOption.NOFOLLOW_LINKS) {
+                followLinks = false;
+                continue;
+            }
+            if (opt == null) {
+                throw new NullPointerException();
+            }
+            throw new AssertionError("Should not get here");
+        }
+        return followLinks;
+    }
+
+    /**
+     * returns true or false if we can assure that the path exists or not. else an exception
+     *
+     * @param file
+     * @return
+     * @throws ExtIOException
+     */
+    public static boolean existsPath(Path path, LinkOption... options) throws ExtIOException {
+        try {
+            if (followLinks(options)) {
+                try {
+                    path.getFileSystem().provider().checkAccess(path);
+                } catch (AccessDeniedException e) {
+                    // we may have access to read the attributes anyway
+                    Files.readAttributes(path, BasicFileAttributes.class, options);
+                }
+            } else {
+                // attempt to read attributes without following links
+                Files.readAttributes(path, BasicFileAttributes.class, options);
+            }
+            // file exists
+            return true;
+        } catch (NoSuchFileException e) {
+            return false;
+        } catch (IOException x) {
+            throw new CouldNotAccessPathExtIOException(x.getMessage(), x, path.toFile());
+        }
+    }
+
+    /**
+     * returns true or false if we can assure that the path exists or not. else an exception
+     *
+     * @param file
+     * @return
+     */
+    public static boolean existsDirectory(Path path, LinkOption... options) throws ExtIOException {
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, options);
+            return attributes.isDirectory();
+        } catch (NoSuchFileException e) {
+            return false;
+        } catch (IOException e) {
+            throw new CouldNotAccessPathExtIOException(e.getMessage(), e, path.toFile());
+        }
+    }
+
+    /**
+     * returns true or false if we can assure that the path exists or not. else an exception
+     *
+     * @param file
+     * @return
+     */
+    public static boolean existsFile(Path path, LinkOption... options) throws ExtIOException {
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, options);
+            return attributes.isRegularFile();
+        } catch (NoSuchFileException e) {
+            return false;
+        } catch (IOException e) {
+            throw new CouldNotAccessPathExtIOException(e.getMessage(), e, path.toFile());
+        }
     }
 }

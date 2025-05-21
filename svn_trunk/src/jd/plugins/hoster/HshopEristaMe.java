@@ -22,9 +22,11 @@ import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -34,11 +36,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50648 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51083 $", interfaceVersion = 3, names = {}, urls = {})
 public class HshopEristaMe extends PluginForHost {
     public HshopEristaMe(PluginWrapper wrapper) {
         super(wrapper);
         // this.enablePremium("");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -102,18 +111,25 @@ public class HshopEristaMe extends PluginForHost {
             link.setName(fid + extDefault);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
-        if (br.containsHTML(">\\s*Failed loading Title")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Failed loading Title")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("class=\"err-container\"")) {
+            // 2025-05-20
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String size = br.getRegex("<p>\\s*Size\\s*:\\s*<span[^>]*>\\s*([0-9\\.TGMKBi ]+)").getMatch(0);
         if (size != null) {
             link.setDownloadSize(SizeFormatter.getSize(size));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         final String titleID = br.getRegex("<p>\\s*Title\\s*ID\\s*:\\s*<span[^>]*>\\s*(.*?)\\s*<").getMatch(0);
-        final String titleName = br.getRegex("<div\\s*class\\s*=\\s*\"title-name\"\\s*>\\s*<h2[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+        String titleName = br.getRegex("<div\\s*class\\s*=\\s*\"title-name\"\\s*>\\s*<h2[^>]*>\\s*(.*?)\\s*<").getMatch(0);
         if (titleName != null) {
+            titleName = Encoding.htmlDecode(titleName).trim();
             String filename = titleID + " " + titleName;
             if (filename != null) {
                 link.setName(filename + extDefault);
@@ -121,24 +137,36 @@ public class HshopEristaMe extends PluginForHost {
         } else {
             logger.warning("Failed to determine filename");
         }
+        final String hash_sha256 = br.getRegex("SHA-256 Hash\\s*:\\s*<[^>]*>([a-f0-9]{64})").getMatch(0);
+        if (hash_sha256 != null) {
+            link.setSha256Hash(hash_sha256);
+        }
         return AvailableStatus.TRUE;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        doFree(link, this.isResumeable(link, null), this.getMaxChunks(link, null), "free_directlink");
+        doFree(link, "free_directlink");
     }
 
-    private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
-        if (!attemptStoredDownloadurlDownload(link, directlinkproperty, resumable, maxchunks)) {
+    private void doFree(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
+        if (!attemptStoredDownloadurlDownload(link, directlinkproperty, this.isResumeable(link, null), this.getMaxChunks(link, null))) {
             this.requestFileInformation(link);
             final String fid = this.getFID(link);
+            final String hcaptchaSiteKey = br.getRegex("data-sitekey=\"([^\"]+)").getMatch(0);
+            if (hcaptchaSiteKey != null) {
+                logger.info("Captcha required for downloading");
+                final String hcaptchaResponse = new CaptchaHelperHostPluginHCaptcha(this, br, hcaptchaSiteKey).getToken();
+                br.getPage("/t/" + fid + "/download-widget?captcha_token=" + Encoding.urlEncode(hcaptchaResponse));
+            } else {
+                logger.info("No captcha required for downloading");
+            }
             final String dllink = br.getRegex("href\\s*=\\s*\"(https?://download\\d+\\.erista\\.me/content/" + Pattern.quote(fid) + "\\?token=[a-f0-9]+)\"\\s*>\\s*Direct Download").getMatch(0);
             if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 if (dl.getConnection().getResponseCode() == 403) {
@@ -156,7 +184,7 @@ public class HshopEristaMe extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
-        return false;
+        return true;
     }
 
     private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty, final boolean resumable, final int maxchunks) throws Exception {

@@ -1,5 +1,6 @@
 package org.appwork.utils;
 
+import java.io.File;
 import java.io.IOException;
 
 public class ExtIOException extends IOException {
@@ -11,6 +12,19 @@ public class ExtIOException extends IOException {
     private String          streamInfo;
     private String          desc;
     private IOExceptionType type;
+    private File            file;
+
+    /**
+     * @return the file
+     */
+    public File getFile() {
+        return file;
+    }
+
+    public ExtIOException file(File file) {
+        this.file = file;
+        return this;
+    }
 
     public ExtIOException(Throwable e, IOExceptionType type) {
         super(e);

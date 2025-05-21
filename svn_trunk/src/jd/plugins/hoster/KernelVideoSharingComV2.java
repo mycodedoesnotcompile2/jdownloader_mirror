@@ -77,7 +77,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51067 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51082 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -157,7 +157,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public static String[] buildAnnotationUrlsDefaultVideosPattern(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/((?:[a-z]{2}/)?videos?/\\d+/[^/\\?#]+/?|embed/\\d+/?)|https?://(?:m|member)\\." + buildHostsPatternPart(domains) + "/videos?/\\d+/[^/\\?#]+/?");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/((?:[a-z]{2}/)?videos?/\\d+/[^/\\?#]+/?|embed/\\d+/?)|https?://(?:m|member)\\." + buildHostsPatternPart(domains) + "/videos?/\\d+/[^/\\?#]+/?");
         }
         return ret.toArray(new String[0]);
     }

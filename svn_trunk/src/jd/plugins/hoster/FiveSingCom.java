@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51078 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "https?://(?:www\\.)?5sing\\.kugou\\.com/(f|y)c/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 51083 $", interfaceVersion = 2, names = { "5sing.kugou.com" }, urls = { "https?://(?:www\\.)?5sing\\.kugou\\.com/(f|y)c/(\\d+)\\.html" })
 public class FiveSingCom extends PluginForHost {
     public FiveSingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,6 @@ public class FiveSingCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         /* 2025-05-15: They do not support https */
         final String contenturl = link.getPluginPatternMatcher().replaceFirst("https://", "http://");
         br.getPage(contenturl);
@@ -81,16 +80,16 @@ public class FiveSingCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String extension = br.getRegex("(<em>)?格式：(</em>)?([^<>\"]*?)(<|&)").getMatch(2);
-        if (extension == null && br.containsHTML("<em>演唱：</em>")) {
+        if (StringUtils.isEmpty(extension)) {
             extension = "mp3";
         }
-        final String filename = br.getRegex("song_title\" title=\"([^<>\"]*?)\"").getMatch(0);
+        final String songTitle = br.getRegex("song_title\" title=\"([^<>\"]*?)\"").getMatch(0);
         final String song_id = br.getRegex("var SongID[^<>\"\t\n\r]*= ([^<>\"]*?);").getMatch(0);
         final String stype = br.getRegex("var SongType[^<>\"\t\n\r]*= \"([^<>\"]*?)\";").getMatch(0);
         /* 2025-05-19: File size is not always available in html code. */
         String filesize = br.getRegex("(<em>)?大小：(</em>)?([^<>\"]*?)(<|\")").getMatch(2);
-        if (filename != null && extension != null) {
-            link.setFinalFileName(stype + "-" + Encoding.htmlDecode(filename).trim() + "-" + song_id + "." + Encoding.htmlDecode(extension).trim());
+        if (songTitle != null) {
+            link.setFinalFileName(stype + "-" + Encoding.htmlDecode(songTitle).trim() + "-" + song_id + "." + Encoding.htmlDecode(extension).trim());
         } else {
             logger.warning("Failed to find filename information");
         }
@@ -136,12 +135,6 @@ public class FiveSingCom extends PluginForHost {
                 final String clienttime = Long.toString(System.currentTimeMillis() / 1000);
                 final String clientver = "1000";
                 final String version = "6.6.72";
-                final String songtype;
-                if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "/fc/")) {
-                    songtype = "fc";
-                } else {
-                    songtype = "yc";
-                }
                 if (StringUtils.isEmpty(dfid)) {
                     logger.info("Obtaining fresh dfid");
                     final String platid = "4";
@@ -183,7 +176,7 @@ public class FiveSingCom extends PluginForHost {
                 query.appendEncoded("uuid", mid);
                 query.appendEncoded("dfid", dfid);
                 query.appendEncoded("songid", song_id);
-                query.appendEncoded("songtype", songtype);
+                query.appendEncoded("songtype", songType);
                 query.appendEncoded("version", version);
                 query.appendEncoded("clienttime", clienttime);
                 final String signature1 = computeSign1(query, appkey);
@@ -217,6 +210,7 @@ public class FiveSingCom extends PluginForHost {
             for (String quality : qualities) {
                 dllink = (String) data.get(quality + "url");
                 if (StringUtils.isEmpty(dllink)) {
+                    /* Skip invalid / non-existent qualities */
                     continue;
                 }
                 md5hash = (String) data.get(quality + "urlmd5");
@@ -246,7 +240,8 @@ public class FiveSingCom extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
+        /* 2025-05-20: Set max chunks to 1 because the browser wouldn't use more either. Technically more are allowed. */
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

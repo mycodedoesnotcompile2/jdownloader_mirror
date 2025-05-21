@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,20 +32,41 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.extioexceptions;
+package org.appwork.jna.windows;
 
-import java.io.File;
-
-import org.appwork.utils.ExtIOException;
+import com.sun.jna.Native;
+import com.sun.jna.Structure;
+import com.sun.jna.platform.win32.WinBase;
+import com.sun.jna.platform.win32.WinDef;
 
 /**
- * @author Thomas
- * @date 19.05.2018
+ * @author thomas
+ * @date 15.05.2025
  *
  */
-public class AbstractLocalExtIOException extends ExtIOException {
-    public AbstractLocalExtIOException(String message, Throwable cause, File file) {
-        super(cause, IOExceptionType.LOCAL, message);
-        file(file);
+@Structure.FieldOrder({ "Process", "strAppName", "strServiceShortName", "ApplicationType", "AppStatus", "TSSessionId", "bRestartable" })
+public class RmProcessInfo extends Structure {
+    @Structure.FieldOrder({ "dwProcessId", "ProcessStartTime" })
+    public static class RmUniqueProcess extends Structure {
+        public int              dwProcessId;
+        public WinBase.FILETIME ProcessStartTime;
+    }
+
+    int                    CCH_RM_SESSION_KEY  = 32;
+    int                    CCH_RM_MAX_APP_NAME = 255;
+    int                    CCH_RM_MAX_SVC_NAME = 63;
+    public RmUniqueProcess Process;
+    public char[]          strAppName          = new char[CCH_RM_MAX_APP_NAME + 1];
+    public char[]          strServiceShortName = new char[CCH_RM_MAX_SVC_NAME + 1];
+    public int             ApplicationType;
+    public WinDef.LONG     AppStatus;
+    public int             TSSessionId;
+    public boolean         bRestartable;
+
+    @Override
+    public String toString() {
+        String appName = Native.toString(strAppName);
+        String serviceName = Native.toString(strServiceShortName);
+        return String.format("PID: %d%n" + "AppName: %s%n" + "ServiceName: %s%n" + "AppType: %d%n" + "AppStatus: %d%n" + "SessionId: %d%n" + "Restartable: %b%n", Process, appName, serviceName, ApplicationType, AppStatus, TSSessionId, bRestartable);
     }
 }

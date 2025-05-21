@@ -70,11 +70,11 @@ public class SimpleFormatter implements Formatter {
 
     protected final LocalTimeFormat longTimestamp = new LocalTimeFormat("dd.MM.yy HH:mm:ss.SSS");
 
-    public class IntByReference {
+    public class IByReference {
         /**
          *
          */
-        public IntByReference(int i) {
+        public IByReference(int i) {
             this.i = i;
         }
 
@@ -83,10 +83,10 @@ public class SimpleFormatter implements Formatter {
 
     protected int            maxThreadNameLength;
     protected int            maxSourceStringLength;
-    protected IntByReference offsetForthreadID;
-    protected IntByReference offsetForThreadName;
-    protected IntByReference offsetForTimestamp;
-    protected IntByReference offsetForThrownAt;
+    protected IByReference offsetForthreadID;
+    protected IByReference offsetForThreadName;
+    protected IByReference offsetForTimestamp;
+    protected IByReference offsetForThrownAt;
 
     /**
      *
@@ -94,10 +94,10 @@ public class SimpleFormatter implements Formatter {
     public SimpleFormatter() {
         maxThreadNameLength = 30;
         maxSourceStringLength = 90;
-        offsetForthreadID = new IntByReference(3);
-        offsetForThreadName = new IntByReference(maxThreadNameLength + 3);
-        offsetForTimestamp = new IntByReference(5);
-        offsetForThrownAt = new IntByReference(maxSourceStringLength + 3);
+        offsetForthreadID = new IByReference(3);
+        offsetForThreadName = new IByReference(maxThreadNameLength + 3);
+        offsetForTimestamp = new IByReference(5);
+        offsetForThrownAt = new IByReference(maxSourceStringLength + 3);
     }
 
     /*
@@ -130,7 +130,7 @@ public class SimpleFormatter implements Formatter {
         return "..." + name.substring(name.length() - i);
     }
 
-    public static String fillPre(String string, final String filler, IntByReference max) {
+    public static String fillPre(String string, final String filler, IByReference max) {
         string = string == null ? "null" : string;
         max.i = Math.max(max.i, string.length());
         return fillPre(string, filler, max.i);
@@ -147,7 +147,7 @@ public class SimpleFormatter implements Formatter {
         return StringUtils.fillPre(string, filler, minCount);
     }
 
-    public static String fillPost(String string, final String filler, IntByReference max) {
+    public static String fillPost(String string, final String filler, IByReference max) {
         string = string == null ? "null" : string;
         max.i = Math.max(max.i, string.length());
         if (string.length() == max.i) {

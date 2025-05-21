@@ -17,6 +17,9 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -27,10 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 47474 $", interfaceVersion = 2, names = { "anyhentai.com" }, urls = { "https?://\\w+\\.anyhentai\\.com/([^/]+)\\.mp4(?:\\?.*)?" })
+@HostPlugin(revision = "$Revision: 51082 $", interfaceVersion = 2, names = { "anyhentai.com" }, urls = { "https?://\\w+\\.anyhentai\\.com/([^/]+)\\.mp4(?:\\?.*)?" })
 public class AnyhentaiCom extends PluginForHost {
     private String customFavIconHost = null;
 
@@ -45,12 +45,12 @@ public class AnyhentaiCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://anyhentai.com/";
+        return "https://" + getHost();
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

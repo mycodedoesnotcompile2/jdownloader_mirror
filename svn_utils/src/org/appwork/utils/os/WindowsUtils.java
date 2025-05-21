@@ -50,12 +50,16 @@ import static com.sun.jna.platform.win32.WinUser.SW_SHOW;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.jna.windows.Kernel32Ext;
+import org.appwork.jna.windows.Rm;
+import org.appwork.jna.windows.RmProcessInfo;
 import org.appwork.jna.windows.interfaces.Advapi32Ext;
 import org.appwork.jna.windows.interfaces.ByHandleFileInformation;
 import org.appwork.jna.windows.interfaces.ExplicitAccess;
@@ -64,12 +68,16 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.StorableDoc;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.Joiner;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.parser.ShellParser.Style;
 
 import com.sun.jna.Memory;
 import com.sun.jna.Pointer;
+import com.sun.jna.StringArray;
 import com.sun.jna.Structure;
+import com.sun.jna.WString;
 import com.sun.jna.platform.win32.AccCtrl;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
@@ -98,6 +106,7 @@ import com.sun.jna.platform.win32.WinNT.SECURITY_IMPERSONATION_LEVEL;
 import com.sun.jna.platform.win32.WinNT.SID_NAME_USE;
 import com.sun.jna.platform.win32.WinNT.TOKEN_ELEVATION;
 import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.LongByReference;
 import com.sun.jna.ptr.PointerByReference;
 
 /**
@@ -250,6 +259,7 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
+
         public final String sid;
 
         private SID(String sid) {
@@ -414,7 +424,7 @@ public class WindowsUtils {
     public static Set<String> getMyPrincipalNames() {
         Set<String> myPrincipals = new HashSet<String>();
         for (Account a : getCurrentUsersAccounts()) {
-            myPrincipals.add(a.domain + "\\" + a.name);
+            myPrincipals.add(accountToName(a));
         }
         return myPrincipals;
     }
@@ -515,7 +525,8 @@ public class WindowsUtils {
      * @return true if the user is part of the specified group, false otherwise
      */
     public static boolean isCurrentUserPartOfGroup(String sid) {
-        for (Account a : getCurrentUsersAccounts()) {
+        Set<Account> accounts = getCurrentUsersAccounts();
+        for (Account a : accounts) {
             if (a.sidString.equals(sid)) {
                 return true;
             }
@@ -874,68 +885,211 @@ public class WindowsUtils {
         /** The set of permissions associated with this entry */
         private final Set<AccessPermission> permissions;
         /** Whether this entry should be inherited by child objects */
-        private final boolean               inherit;
+        private boolean                     inherit;
         /** Whether this entry allows (true) or denies (false) access */
         private final boolean               allow;
         /** Whether this entry only applies to inherited objects */
-        private final boolean               inheritOnly;
+        private boolean                     inheritOnly;
         /** Whether inheritance should not propagate to child objects */
-        private final boolean               noPropagateInherit;
+        private boolean                     noPropagateInherit;
         /** Whether this entry applies to files (objects) */
-        private final boolean               objectInherit;
+        private boolean                     objectInherit;
         /** Whether this entry applies to directories (containers) */
-        private final boolean               containerInherit;
+        private boolean                     containerInherit;
         /** Whether this entry was inherited from a parent object */
         private boolean                     inherited;
 
         /**
-         * Creates a new AccessPermissionEntry with basic inheritance settings.
+         * Creates a new AccessPermissionEntry with the specified SID, access type and permissions.
          *
          * @param sid
          *            The Security Identifier (SID) of the user or group
-         * @param permissions
-         *            The set of permissions to grant or deny
-         * @param inherit
-         *            Whether this entry should be inherited by child objects
          * @param allow
          *            Whether this entry allows (true) or denies (false) access
+         * @param permissions
+         *            The set of permissions to grant or deny
          */
-        public AccessPermissionEntry(String sid, Set<AccessPermission> permissions, boolean inherit, boolean allow) {
-            this(sid, permissions, false, inherit, allow, false, false, true, true);
+        public AccessPermissionEntry(String sid, boolean allow, Set<AccessPermission> permissions) {
+            this.sid = sid;
+            this.permissions = permissions;
+            this.allow = allow;
+            this.inherit = false;
+            this.inheritOnly = false;
+            this.noPropagateInherit = false;
+            this.objectInherit = true;
+            this.containerInherit = true;
+            this.inherited = false;
         }
 
         /**
-         * Creates a new AccessPermissionEntry with detailed inheritance settings.
+         * Filters out inherited entries from the given array of AccessPermissionEntry objects. Returns only entries that are directly set
+         * on the current path (not inherited).
+         *
+         * @param entries
+         *            Array of AccessPermissionEntry objects to filter
+         * @return List of AccessPermissionEntry objects that are not inherited
+         */
+        public static List<AccessPermissionEntry> filter(boolean includeInherited, AccessPermissionEntry... entries) {
+            if (entries == null || entries.length == 0) {
+                return Collections.emptyList();
+            }
+            List<AccessPermissionEntry> result = new ArrayList<>();
+            for (AccessPermissionEntry entry : entries) {
+                if (includeInherited == entry.isInherited()) {
+                    result.add(entry);
+                }
+            }
+            return result;
+        }
+
+        public String toString() {
+            return toString(null);
+        }
+
+        public String toString(Account owner) {
+            String accountName = sid;
+            try {
+                Account account = Advapi32Util.getAccountBySid(sid);
+                accountName = accountToName(account);
+            } catch (Exception e) {
+                // If we can't resolve the SID, just use the SID string
+            }
+            // Create a concise permission summary using minimal required permissions
+            Set<String> permissionGroups = new HashSet<>();
+            // Check for full control first - if present, ignore all other permissions
+            if (permissions.contains(AccessPermission.FILE_ALL_ACCESS)) {
+                permissionGroups.add("FULL");
+            } else {
+                // Only check other permissions if FULL is not set
+                // Check for basic read permissions
+                if (permissions.contains(AccessPermission.FILE_READ_DATA) || permissions.contains(AccessPermission.FILE_READ_ATTRIBUTES)) {
+                    permissionGroups.add("READ");
+                }
+                // Check for basic write permissions
+                if (permissions.contains(AccessPermission.FILE_WRITE_DATA) || permissions.contains(AccessPermission.FILE_APPEND_DATA) || permissions.contains(AccessPermission.FILE_ADD_FILE) || permissions.contains(AccessPermission.FILE_ADD_SUBDIRECTORY) || permissions.contains(AccessPermission.FILE_WRITE_ATTRIBUTES)) {
+                    permissionGroups.add("WRITE");
+                }
+                // Check for basic execute permissions
+                if (permissions.contains(AccessPermission.FILE_EXECUTE)) {
+                    permissionGroups.add("EXECUTE");
+                }
+                // Check for delete permissions
+                if (permissions.contains(AccessPermission.DELETE) || permissions.contains(AccessPermission.FILE_DELETE_CHILD)) {
+                    permissionGroups.add("DELETE");
+                }
+            }
+            // If no basic permissions match, list individual permissions
+            if (permissionGroups.isEmpty()) {
+                for (AccessPermission perm : permissions) {
+                    permissionGroups.add(perm.name());
+                }
+            }
+            boolean itseMe = isCurrentUserPartOfGroup(sid);
+            if (owner != null && !itseMe) {
+                itseMe = isCurrentUserPartOfGroup(owner.sidString);
+            }
+            // Create the overview line
+            String overview = String.format("%s%s '%s' to '%s'", itseMe ? "*" : " ", allow ? "ALLOW" : "DENY ", new Joiner(",").join(permissionGroups), accountName);
+            // Add detailed information
+            return String.format("%s | Details: {" + "sid='%s', " + "allow=%b, " + "permissions=%s, " + "inherited=%b, " + "inherit=%b, " + "inheritOnly=%b, " + "noPropagateInherit=%b, " + "objectInherit=%b, " + "containerInherit=%b" + "}", overview, sid, allow, permissions, inherited, inherit, inheritOnly, noPropagateInherit, objectInherit, containerInherit);
+        }
+
+        /**
+         * Creates a new AccessPermissionEntry that allows access.
          *
          * @param sid
          *            The Security Identifier (SID) of the user or group
          * @param permissions
-         *            The set of permissions to grant or deny
-         * @param inherited
-         *            Whether this entry was inherited from a parent object
-         * @param inherit
-         *            Whether this entry should be inherited by child objects
-         * @param allow
-         *            Whether this entry allows (true) or denies (false) access
-         * @param inheritOnly
-         *            Whether this entry only applies to inherited objects
-         * @param noPropagateInherit
-         *            Whether inheritance should not propagate to child objects
-         * @param objectInherit
-         *            Whether this entry applies to files (objects)
-         * @param containerInherit
-         *            Whether this entry applies to directories (containers)
+         *            The set of permissions to grant
+         * @return A new AccessPermissionEntry instance
          */
-        public AccessPermissionEntry(String sid, Set<AccessPermission> permissions, boolean inherited, boolean inherit, boolean allow, boolean inheritOnly, boolean noPropagateInherit, boolean objectInherit, boolean containerInherit) {
-            this.sid = sid;
-            this.permissions = permissions;
-            this.inherit = inherit;
+        public static AccessPermissionEntry allow(String sid, Set<AccessPermission> permissions) {
+            return new AccessPermissionEntry(sid, true, permissions);
+        }
+
+        /**
+         * Creates a new AccessPermissionEntry that denies access.
+         *
+         * @param sid
+         *            The Security Identifier (SID) of the user or group
+         * @param permissions
+         *            The set of permissions to deny
+         * @return A new AccessPermissionEntry instance
+         */
+        public static AccessPermissionEntry deny(String sid, Set<AccessPermission> permissions) {
+            return new AccessPermissionEntry(sid, false, permissions);
+        }
+
+        /**
+         * Sets whether this entry was inherited from a parent object.
+         *
+         * @param inherited
+         *            true if this entry was inherited, false otherwise
+         * @return This instance
+         */
+        public AccessPermissionEntry inherited(boolean inherited) {
             this.inherited = inherited;
-            this.allow = allow;
+            return this;
+        }
+
+        /**
+         * Sets whether this entry should be inherited by child objects.
+         *
+         * @param inherit
+         *            true if this entry should be inherited, false otherwise
+         * @return This instance
+         */
+        public AccessPermissionEntry inherit(boolean inherit) {
+            this.inherit = inherit;
+            return this;
+        }
+
+        /**
+         * Sets whether this entry only applies to inherited objects.
+         *
+         * @param inheritOnly
+         *            true if this entry only applies to inherited objects, false otherwise
+         * @return This instance
+         */
+        public AccessPermissionEntry inheritOnly(boolean inheritOnly) {
             this.inheritOnly = inheritOnly;
+            return this;
+        }
+
+        /**
+         * Sets whether inheritance should not propagate to child objects.
+         *
+         * @param noPropagateInherit
+         *            true if inheritance should not propagate, false otherwise
+         * @return This instance
+         */
+        public AccessPermissionEntry noPropagateInherit(boolean noPropagateInherit) {
             this.noPropagateInherit = noPropagateInherit;
+            return this;
+        }
+
+        /**
+         * Sets whether this entry applies to files (objects).
+         *
+         * @param objectInherit
+         *            true if this entry applies to files, false otherwise
+         * @return This instance
+         */
+        public AccessPermissionEntry objectInherit(boolean objectInherit) {
             this.objectInherit = objectInherit;
+            return this;
+        }
+
+        /**
+         * Sets whether this entry applies to directories (containers).
+         *
+         * @param containerInherit
+         *            true if this entry applies to directories, false otherwise
+         * @return This instance
+         */
+        public AccessPermissionEntry containerInherit(boolean containerInherit) {
             this.containerInherit = containerInherit;
+            return this;
         }
 
         /**
@@ -1058,7 +1212,7 @@ public class WindowsUtils {
      * @throws UnsupportedOperationException
      *             if not running on Windows
      */
-    public static AccessPermissionEntry[] getFileAccess(File folder) throws Win32Exception {
+    public static AccessPermissionEntry[] getFileAccessPermissionEntries(File folder) throws Win32Exception {
         if (!CrossSystem.isWindows()) {
             throw new UnsupportedOperationException("This operation is only supported on Windows");
         }
@@ -1108,20 +1262,38 @@ public class WindowsUtils {
                         permissions.add(perm);
                     }
                 }
-                entries.add(new AccessPermissionEntry(sidString, permissions, inherited, inherit, aceHeader.AceType == WinNT.ACCESS_ALLOWED_ACE_TYPE, inheritOnly, noPropagateInherit, objectInherit, containerInherit));
+                entries.add(aceHeader.AceType == WinNT.ACCESS_ALLOWED_ACE_TYPE ? AccessPermissionEntry.allow(sidString, permissions).inherited(inherited).inherit(inherit).inheritOnly(inheritOnly).noPropagateInherit(noPropagateInherit).objectInherit(objectInherit).containerInherit(containerInherit) : AccessPermissionEntry.deny(sidString, permissions).inherited(inherited).inherit(inherit).inheritOnly(inheritOnly).noPropagateInherit(noPropagateInherit).objectInherit(objectInherit).containerInherit(containerInherit));
             }
         }
         return entries.toArray(new AccessPermissionEntry[0]);
     }
 
-    public static void applyPermissions(String path, boolean append, boolean blockInheritedEntries, List<AccessPermissionEntry> entries) {
+    /**
+     * @param account
+     * @return
+     */
+    public static String accountToName(Account account) {
+        String ret = account.domain;
+        if (StringUtils.isNotEmpty(account.name)) {
+            if (StringUtils.isNotEmpty(ret)) {
+                ret += "\\";
+            }
+            ret += account.name;
+        }
+        return ret;
+    }
+
+    public static void applyPermissions(File path, boolean append, boolean blockInheritedEntries, AccessPermissionEntry... entries) {
         try {
-            if (entries == null || entries.isEmpty()) {
+            if (path == null) {
+                throw new IllegalArgumentException("Path may not be null!");
+            }
+            if (entries == null || entries.length == 0) {
                 throw new IllegalArgumentException("No ACL entries provided – this would remove all access (empty DACL).");
             }
-            ExplicitAccess[] accessList = new ExplicitAccess[entries.size()];
-            for (int i = 0; i < entries.size(); i++) {
-                AccessPermissionEntry entry = entries.get(i);
+            ExplicitAccess[] accessList = new ExplicitAccess[entries.length];
+            for (int i = 0; i < entries.length; i++) {
+                AccessPermissionEntry entry = entries[i];
                 Account account = Advapi32Util.getAccountBySid(entry.sid);
                 Trustee trustee = new Trustee();
                 trustee.pMultipleTrustee = null;
@@ -1183,7 +1355,7 @@ public class WindowsUtils {
             PointerByReference pNewDacl = new PointerByReference();
             if (append) {
                 // get existing dacl
-                successOrException(Advapi32.INSTANCE.GetNamedSecurityInfo(path, AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.DACL_SECURITY_INFORMATION, null, null, pOldDacl, null, new PointerByReference()));
+                successOrException(Advapi32.INSTANCE.GetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.DACL_SECURITY_INFORMATION, null, null, pOldDacl, null, new PointerByReference()));
             }
             try {
                 // merge
@@ -1194,7 +1366,7 @@ public class WindowsUtils {
                 } else {
                     flags |= WinNT.UNPROTECTED_DACL_SECURITY_INFORMATION;
                 }
-                successOrException(Advapi32.INSTANCE.SetNamedSecurityInfo(path, AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, flags, null, null, pNewDacl.getValue(), null));
+                successOrException(Advapi32.INSTANCE.SetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, flags, null, null, pNewDacl.getValue(), null));
             } finally {
                 Pointer p = pNewDacl.getValue();
                 if (p != null && !p.equals(Pointer.NULL)) {
@@ -1210,6 +1382,262 @@ public class WindowsUtils {
         } catch (Exception e) {
             throw new RuntimeException("Failed to set ACL", e);
         }
+    }
+
+    public static class LockInfo {
+        /**
+         * Type of application that has the file locked.
+         */
+        public enum ApplicationType {
+            /**
+             * Application cannot be classified as any other type
+             */
+            RmUnknownApp(0),
+            /**
+             * Application has a main window
+             */
+            RmMainWindow(1),
+            /**
+             * Application does not have a main window
+             */
+            RmOtherWindow(2),
+            /**
+             * Application is a Windows service
+             */
+            RmService(3),
+            /**
+             * Application is Windows Explorer
+             */
+            RmExplorer(4),
+            /**
+             * Application is a console application
+             */
+            RmConsole(5),
+            /**
+             * Application is critical to system operation
+             */
+            RmCritical(6);
+
+            private final int value;
+
+            ApplicationType(int value) {
+                this.value = value;
+            }
+
+            public int getValue() {
+                return value;
+            }
+
+            public static ApplicationType fromValue(int value) {
+                for (ApplicationType type : values()) {
+                    if (type.value == value) {
+                        return type;
+                    }
+                }
+                return RmUnknownApp;
+            }
+        }
+
+        /**
+         * Process ID of the locking process
+         */
+        private final int             pid;
+        /**
+         * Name of the application that has the file locked
+         */
+        private final String          appName;
+        /**
+         * Short name of the service if the locking process is a service
+         */
+        private final String          serviceName;
+        /**
+         * Type of application that has the file locked
+         */
+        private final ApplicationType applicationType;
+        /**
+         * Terminal Services session ID of the process
+         */
+        private final int             tsSessionId;
+
+        /**
+         * Creates a new LockInfo instance with information about a process that has locked a file.
+         *
+         * @param pid
+         *            Process ID of the locking process
+         * @param appName
+         *            Name of the application that has the file locked
+         * @param serviceName
+         *            Short name of the service if the locking process is a service
+         * @param applicationType
+         *            Type of application
+         * @param tsSessionId
+         *            Terminal Services session ID of the process
+         *
+         */
+        public LockInfo(int pid, String appName, String serviceName, int applicationType, int tsSessionId) {
+            this.pid = pid;
+            this.appName = appName;
+            this.serviceName = serviceName;
+            this.applicationType = ApplicationType.fromValue(applicationType);
+            this.tsSessionId = tsSessionId;
+        }
+
+        /**
+         * Gets the process ID of the locking process.
+         *
+         * @return Process ID
+         */
+        public int getPid() {
+            return pid;
+        }
+
+        /**
+         * Gets the name of the application that has the file locked.
+         *
+         * @return Application name
+         */
+        public String getAppName() {
+            return appName;
+        }
+
+        /**
+         * Gets the short name of the service if the locking process is a service.
+         *
+         * @return Service name or empty string if not a service
+         */
+        public String getServiceName() {
+            return serviceName;
+        }
+
+        /**
+         * Gets the type of application that has the file locked.
+         *
+         * @return Application type
+         */
+        public ApplicationType getApplicationType() {
+            return applicationType;
+        }
+
+        /**
+         * Gets the Terminal Services session ID of the process.
+         *
+         * @return Terminal Services session ID
+         */
+        public int getTsSessionId() {
+            return tsSessionId;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("LockInfo{pid=%d, appName='%s', serviceName='%s', type=%s, sessionId=%d}", pid, appName, serviceName, applicationType, tsSessionId);
+        }
+    }
+
+    private static final int                  CCH_RM_SESSION_KEY    = 32;
+    /** All possible permissions */
+    public static final Set<AccessPermission> PERMISSIONSET_FULL    = EnumSet.allOf(AccessPermission.class);
+    /** Read-related permissions */
+    public static final Set<AccessPermission> PERMISSIONSET_READ    = EnumSet.of(AccessPermission.FILE_READ_DATA, AccessPermission.FILE_LIST_DIRECTORY, AccessPermission.FILE_READ_EA, AccessPermission.FILE_READ_ATTRIBUTES, AccessPermission.FILE_GENERIC_READ, AccessPermission.READ_CONTROL);
+    /** Write-related permissions */
+    public static final Set<AccessPermission> PERMISSIONSET_WRITE   = EnumSet.of(AccessPermission.FILE_WRITE_DATA, AccessPermission.FILE_APPEND_DATA, AccessPermission.FILE_ADD_FILE, AccessPermission.FILE_ADD_SUBDIRECTORY, AccessPermission.FILE_WRITE_EA, AccessPermission.FILE_WRITE_ATTRIBUTES, AccessPermission.FILE_GENERIC_WRITE, AccessPermission.WRITE_DAC, AccessPermission.WRITE_OWNER);
+    /** Execute-related permissions */
+    public static final Set<AccessPermission> PERMISSIONSET_EXECUTE = EnumSet.of(AccessPermission.FILE_EXECUTE, AccessPermission.FILE_TRAVERSE, AccessPermission.FILE_GENERIC_EXECUTE);
+    /** Delete-related permissions */
+    public static final Set<AccessPermission> PERMISSIONSET_DELETE  = EnumSet.of(AccessPermission.DELETE, AccessPermission.FILE_DELETE_CHILD);
+    /** Modify = Read + Write + Execute (excluding delete) */
+    public static final Set<AccessPermission> PERMISSIONSET_MODIFY;
+    static {
+        Set<AccessPermission> temp = EnumSet.noneOf(AccessPermission.class);
+        temp.addAll(PERMISSIONSET_READ);
+        temp.addAll(PERMISSIONSET_WRITE);
+        temp.addAll(PERMISSIONSET_EXECUTE);
+        PERMISSIONSET_MODIFY = EnumSet.copyOf(temp);
+    }
+
+    public static List<LockInfo> getLocksOnPath(File filePath) {
+        IntByReference session = new IntByReference();
+        char[] sessionKey = new char[CCH_RM_SESSION_KEY + 1];
+        List<LockInfo> result = new ArrayList<>();
+        try {
+            // Start a new Restart Manager session
+            int res = Rm.INSTANCE.RmStartSession(session, 0, sessionKey);
+            if (res != 0) {
+                throw new Win32Exception(res);
+            }
+            try {
+                // Register the file we're interested in
+                StringArray resources = new StringArray(new WString[] { new WString(filePath.getAbsolutePath()) });
+                res = Rm.INSTANCE.RmRegisterResources(session.getValue(), 1, resources, 0, Pointer.NULL, 0, null);
+                if (res != 0) {
+                    throw new Win32Exception(res);
+                }
+                // First call to get needed array size
+                IntByReference needed = new IntByReference();
+                IntByReference count = new IntByReference();
+                res = Rm.INSTANCE.RmGetList(session.getValue(), needed, count, null, new LongByReference());
+                if (res != WinNT.ERROR_MORE_DATA) {
+                    throw new Win32Exception(res);
+                }
+                if (needed.getValue() == 0) {
+                    return Collections.emptyList();
+                }
+                // Allocate array and call again
+                RmProcessInfo[] arr = (RmProcessInfo[]) new RmProcessInfo().toArray(needed.getValue());
+                count.setValue(needed.getValue());
+                res = Rm.INSTANCE.RmGetList(session.getValue(), needed, count, arr, new LongByReference());
+                if (res != 0) {
+                    throw new Win32Exception(res);
+                }
+                // Process results before ending session
+                for (int i = 0; i < count.getValue(); i++) {
+                    try {
+                        // Create a copy of the data to avoid memory issues
+                        int pid = arr[i].Process.dwProcessId;
+                        if (pid <= 0) {
+                            continue;
+                        }
+                        // Safely convert strings with null checks and copying
+                        String name = "";
+                        String service = "";
+                        try {
+                            if (arr[i].strAppName != null) {
+                                name = new String(arr[i].strAppName).trim();
+                            }
+                            if (arr[i].strServiceShortName != null) {
+                                service = new String(arr[i].strServiceShortName).trim();
+                            }
+                        } catch (Exception e) {
+                            LogV3.exception(WindowsUtils.class, e);
+                        }
+                        // Create LockInfo with copied data
+                        result.add(new LockInfo(pid, name, service, arr[i].ApplicationType, arr[i].TSSessionId));
+                    } catch (Exception e) {
+                        LogV3.exception(WindowsUtils.class, e);
+                        continue;
+                    }
+                }
+            } finally {
+                // End session in a separate try-catch block
+                try {
+                    int sessionHandle = session.getValue();
+                    if (sessionHandle != 0) {
+                        int endRes = Rm.INSTANCE.RmEndSession(sessionHandle);
+                        if (endRes != 0) {
+                            LogV3.exception(WindowsUtils.class, new Win32Exception(endRes));
+                        }
+                    }
+                } catch (Exception e) {
+                    LogV3.exception(WindowsUtils.class, e);
+                }
+            }
+        } catch (Exception e) {
+            LogV3.exception(WindowsUtils.class, e);
+            if (e instanceof Win32Exception) {
+                throw (Win32Exception) e;
+            }
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+        return result;
     }
 
     /**

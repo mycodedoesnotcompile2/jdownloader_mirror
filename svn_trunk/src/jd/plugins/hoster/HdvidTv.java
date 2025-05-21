@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47572 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51082 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdvidTv extends XFileSharingProBasic {
     public HdvidTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,8 +43,22 @@ public class HdvidTv extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "hdvid.tv", "hdvid.fun", "hdthevid.online" });
+        ret.add(new String[] { "hdbestvd.online", "hdvid.tv", "hdvid.fun", "hdthevid.online" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("hdvid.fun");
+        deadDomains.add("hdthevid.online");
+        return deadDomains;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2025-05-20: Main domain has changed from hdvid.tv to hdbestvd.online */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {

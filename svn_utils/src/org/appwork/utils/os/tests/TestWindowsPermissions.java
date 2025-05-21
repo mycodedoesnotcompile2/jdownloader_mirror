@@ -35,17 +35,23 @@
 package org.appwork.utils.os.tests;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.testframework.AWTest;
+import org.appwork.utils.Application;
+import org.appwork.utils.IO;
 import org.appwork.utils.Joiner;
+import org.appwork.utils.Time;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.os.WindowsUtils.AccessPermission;
 import org.appwork.utils.os.WindowsUtils.AccessPermissionEntry;
+import org.appwork.utils.os.WindowsUtils.LockInfo;
 
 import com.sun.jna.platform.win32.Advapi32Util.Account;
 
@@ -114,7 +120,7 @@ public class TestWindowsPermissions extends AWTest {
             WindowsUtils.setFileOwner(testDir, owner.sidString);
             Account newOwner = WindowsUtils.getFileOwnerSid(testDir);
             assertEquals(newOwner.sidString, owner.sidString);
-            AccessPermissionEntry[] is = WindowsUtils.getFileAccess(testDir);
+            AccessPermissionEntry[] is = WindowsUtils.getFileAccessPermissionEntries(testDir);
             String currentUserSid = WindowsUtils.getCurrentUserSID();
             assertNotNull(currentUserSid);
             // AccessPermission.WRITE_DAC,AccessPermission.READ_CONTROL,AccessPermission.FILE_READ_ATTRIBUTES. the owner has this permission
@@ -122,13 +128,13 @@ public class TestWindowsPermissions extends AWTest {
             Set<AccessPermission> testPermissions = new HashSet<AccessPermission>(Arrays.asList(AccessPermission.WRITE_DAC, AccessPermission.READ_CONTROL, AccessPermission.FILE_READ_ATTRIBUTES, AccessPermission.SYNCHRONIZE, AccessPermission.FILE_LIST_DIRECTORY, AccessPermission.FILE_READ_DATA, AccessPermission.FILE_ADD_FILE, AccessPermission.FILE_WRITE_DATA, AccessPermission.FILE_DELETE_CHILD, AccessPermission.DELETE));
             // Create test permissions
             // Create permission entry
-            AccessPermissionEntry entry = new AccessPermissionEntry(currentUserSid, testPermissions, true, true);
-            WindowsUtils.applyPermissions(testDir.getAbsolutePath(), true, false, Arrays.asList(entry));
-            AccessPermissionEntry[] after = WindowsUtils.getFileAccess(testDir);
+            AccessPermissionEntry entry = new AccessPermissionEntry(currentUserSid, true, testPermissions).inherit(true);
+            WindowsUtils.applyPermissions(testDir, true, false, entry);
+            AccessPermissionEntry[] after = WindowsUtils.getFileAccessPermissionEntries(testDir);
             assertTrue(after.length == is.length + 1);
             // Set permissions
-            WindowsUtils.applyPermissions(testDir.getAbsolutePath(), false, true, Arrays.asList(entry));
-            after = WindowsUtils.getFileAccess(testDir);
+            WindowsUtils.applyPermissions(testDir, false, true, entry);
+            after = WindowsUtils.getFileAccessPermissionEntries(testDir);
             assertTrue(after.length == 1);
             HashSet<String> failed = new HashSet<String>();
             for (AccessPermission p : AccessPermission.values()) {
@@ -191,6 +197,42 @@ public class TestWindowsPermissions extends AWTest {
         }
         testBasicFileAccess();
         testSetAndGetPermissions();
+        testHandleBlocks();
+    }
+
+    /**
+     * @throws Exception
+     *
+     */
+    private void testHandleBlocks() throws Exception {
+        long myPID = CrossSystem.getPID();
+        List<LockInfo> myself = WindowsUtils.getLocksOnPath(new File(CrossSystem.getJavaBinary()));
+        assertThat(myself.size()).isHigherThan(0);
+        boolean found = false;
+        for (LockInfo l : myself) {
+            if (l.getPid() == myPID) {
+                found = true;
+            }
+        }
+        assertTrue(found);
+        File file = Application.getTempFile("tests", Time.now() + "");
+        try {
+            IO.secureWrite(file, "abc".getBytes());
+            FileOutputStream fos = new FileOutputStream(file, true);
+            try {
+                System.out.println("Run findLockingPids");
+                for (int i = 0; i < 10; i++) {
+                    List<LockInfo> lockedBy = WindowsUtils.getLocksOnPath(file);
+                    assertTrue(lockedBy.size() == 1);
+                    assertThat(myPID).isNumber(lockedBy.get(0).getPid());
+                    logInfoAnyway("ROund " + i);
+                }
+            } finally {
+                fos.close();
+            }
+        } finally {
+            file.delete();
+        }
     }
 
     public static void main(String[] args) {

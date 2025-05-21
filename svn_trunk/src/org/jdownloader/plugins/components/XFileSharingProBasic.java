@@ -87,7 +87,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51062 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51082 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -5565,7 +5565,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 ai.setUsedSpace(SizeFormatter.getSize(storage_usedO.toString()));
             }
         }
-        // final Object isPremium = result.get("premium"); e.g. highstream.tv
         final Object files_totalO = result.get("files_total");
         if (files_totalO instanceof Number) {
             ai.setFilesNum(((Number) files_totalO).intValue());

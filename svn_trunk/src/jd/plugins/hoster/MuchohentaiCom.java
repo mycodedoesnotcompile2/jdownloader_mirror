@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51081 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51083 $", interfaceVersion = 3, names = {}, urls = {})
 public class MuchohentaiCom extends PluginForHost {
     public MuchohentaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,11 +106,10 @@ public class MuchohentaiCom extends PluginForHost {
         if (!link.isNameSet()) {
             /* Fallback */
             final String fid = this.getFID(link);
+            /* We know that all the files they host are .zip files. */
             link.setName(fid + ".zip");
         }
         this.setBrowserExclusive();
-        // br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)
-        // Chrome/136.0.0.0 Safari/537.36");
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -138,22 +137,11 @@ public class MuchohentaiCom extends PluginForHost {
         final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
         dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
         br.getHeaders().put("Origin", "https://" + br.getHost(true));
-        // br.getHeaders().put("Accept",
-        // "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
-        // br.getHeaders().put("accept-encoding", "gzip, deflate, br, zstd");
-        // br.getHeaders().put("accept-language", "de-DE,de;q=0.9,en;q=0.8,en-US;q=0.7");
-        // br.getHeaders().put("cache-control", "no-cache");
-        // br.getHeaders().put("pragma", "no-cache");
-        // br.getHeaders().put("priority", "u=0, i");
-        // br.getHeaders().put("sec-ch-ua", "\"Chromium\";v=\"136\", \"Google Chrome\";v=\"136\", \"Not.A/Brand\";v=\"99\"");
-        // br.getHeaders().put("sec-ch-ua-mobile", "?0");
-        // br.getHeaders().put("sec-ch-ua-platform", "\"Windows\"");
-        // br.getHeaders().put("sec-fetch-site", "same-origin");
-        // br.getHeaders().put("sec-fetch-mode", "cors");
-        // br.getHeaders().put("sec-fetch-dest", "empty");
-        // br.getHeaders().put("sec-fetch-user", "?1");
-        // br.getHeaders().put("upgrade-insecure-requests", "1");
-        // br.getHeaders().put("", "");
+        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+        /*
+         * 2025-05-20: Download may fail since website only supports http2, not http 1.1, see also:
+         * https://board.jdownloader.org/showthread.php?t=97409
+         */
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlform, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
@@ -166,6 +154,7 @@ public class MuchohentaiCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
+        /* 2025-05-19: Max 1 */
         return 1;
     }
 }

@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48515 $", interfaceVersion = 3, names = { "highporn.net" }, urls = { "highporndecrypted://(.+)" })
+@HostPlugin(revision = "$Revision: 51082 $", interfaceVersion = 3, names = { "highporn.net" }, urls = { "highporndecrypted://(.+)" })
 public class HighpornNet extends antiDDoSForHost {
     @Override
     public String[] siteSupportedNames() {
@@ -132,8 +132,8 @@ public class HighpornNet extends antiDDoSForHost {
             try {
                 final Browser br2 = br.cloneBrowser();
                 con = br2.openHeadConnection(dllink);
-                if (con.getResponseCode() == 200 && !con.getContentType().contains("text")) {
-                    link.setDownloadSize(con.getLongContentLength());
+                if (this.looksLikeDownloadableContent(con)) {
+                    link.setDownloadSize(con.getCompleteContentLength());
                     link.setProperty("directlink", dllink);
                 } else {
                     server_issues = true;

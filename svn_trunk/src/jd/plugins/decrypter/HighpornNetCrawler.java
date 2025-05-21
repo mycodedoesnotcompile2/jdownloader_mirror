@@ -18,7 +18,11 @@ package jd.plugins.decrypter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -35,15 +39,20 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 49197 $", interfaceVersion = 3, names = { "highporn.net", "tanix.net", "japanhub.net", "thatav.net" }, urls = { "https?://(?:www\\.)?highporn\\.net/video/(\\d+)(?:/[a-z0-9\\-]+)?", "https?://(?:www\\.)?tanix\\.net/video/(\\d+)(?:/[a-z0-9\\-]+)?", "https?://(?:www\\.)?japanhub\\.net/video/(\\d+)(?:/[a-z0-9\\-]+)?", "https?://(?:www\\.)?thatav\\.net/video/(\\d+)(?:/[a-z0-9\\-]+)?" })
+@DecrypterPlugin(revision = "$Revision: 51082 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighpornNetCrawler extends PluginForDecrypt {
     public HighpornNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -51,30 +60,60 @@ public class HighpornNetCrawler extends PluginForDecrypt {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "highporn.net" });
+        ret.add(new String[] { "tanix.net" });
+        ret.add(new String[] { "japanhub.net" });
+        ret.add(new String[] { "thatav.net" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video/(\\d+)(?:/[a-z0-9\\-]+)?");
+        }
+        return ret.toArray(new String[0]);
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl().replaceFirst("(?i)www\\.", "");
-        final String videoid = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
-        final String initialHost = Browser.getHost(parameter);
-        br.setFollowRedirects(true);
-        getPage(parameter);
-        if (!br.getURL().contains(initialHost)) {
-            logger.info("Redirect to external website");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)www\\.", "");
+        final String videoid = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        getPage(contenturl);
+        if (!this.canHandle(br.getURL())) {
+            logger.info("Redirect to external website: " + br.getURL());
+            ret.add(this.createDownloadlink(br.getURL()));
+            return ret;
         } else if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!br.getURL().contains(videoid)) {
             /* Offline --> Redirect to (external) ads page / search-page */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fpName = getTitle(this.br, parameter);
+        final String title = getTitle(this.br, contenturl);
         /* 2021-02-10: thatav.net */
         final String specialVideoURL = br.getRegex("\"file\":\\s*\"(https?://[^<>\"]+\\.mp4[^<>\"]+)").getMatch(0);
         if (specialVideoURL != null) {
-            final DownloadLink dl = this.createDownloadlink("directhttp://" + specialVideoURL);
+            final DownloadLink dl = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(specialVideoURL));
             dl.setAvailable(true);
-            if (fpName != null) {
-                dl.setFinalFileName(fpName + ".mp4");
+            if (title != null) {
+                dl.setFinalFileName(title + ".mp4");
             }
             ret.add(dl);
             return ret;
@@ -84,7 +123,7 @@ public class HighpornNetCrawler extends PluginForDecrypt {
         String[] videoIDs = br.getRegex("data-src\\s*=\\s*\"([^\"]+)\"").getColumn(0);
         if (videoIDs == null || videoIDs.length == 0) {
             if (videoLink == null) {
-                logger.warning("Decrypter broken for link: " + parameter);
+                logger.warning("Decrypter broken for link: " + contenturl);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             } else {
                 videoIDs = new String[1];
@@ -100,12 +139,12 @@ public class HighpornNetCrawler extends PluginForDecrypt {
             }
             counter++;
             final String orderid_formatted = String.format(Locale.US, "%0" + padLength + "d", counter);
-            final String filename = fpName + "_" + orderid_formatted + ".mp4";
+            final String filename = title + "_" + orderid_formatted + ".mp4";
             final DownloadLink dl = createDownloadlink("highporndecrypted://" + videoID);
             dl.setName(filename);
             dl.setProperty("decryptername", filename);
-            dl.setProperty("mainlink", parameter);
-            dl.setContentUrl(parameter);
+            dl.setProperty("mainlink", contenturl);
+            dl.setContentUrl(contenturl);
             if (singleVideo) {
                 dl.setProperty("singlevideo", true);
             } else {
@@ -134,9 +173,9 @@ public class HighpornNetCrawler extends PluginForDecrypt {
             }
             ret.add(dl);
         }
-        if (fpName != null) {
+        if (title != null) {
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName.trim()));
+            fp.setName(Encoding.htmlDecode(title).trim());
             fp.addLinks(ret);
         }
         return ret;
@@ -159,12 +198,38 @@ public class HighpornNetCrawler extends PluginForDecrypt {
         }
         return title;
     }
-
     // public static void main(String[] args) throws InterruptedException, MalformedURLException, ScriptException {
     // /* Simple method for decoding msg values obtained from real browser requests. */
     // final StringBuilder sb = new StringBuilder();
     // sb.append(
-    // "function _0x3bbf() {     var _0xad5001 = ['HTXyy', 'r_script_f', 'charAt', 'HnnWl', 'epUkB', 'ODkNs', 'HJKLNMPQRS', 'stateObjec', '__nightmar', 'uFXvr', 'Sequentum', 'sZsMg', 'aMAhK', 'RAXbe', 'setup', 'outerHeigh', 'hidden', 'IFIjP', 'yqpGp', 'aEpaf', 'JjWRM', '__webdrive', 'VRtul', 'DYuQh', 'RPLuu', 'aqyby', '305UmmDux', 'pjUOp', 'FUeub', 'eqMXg', 'wunnS', 'rn\\\\x20this\\\\x22)(', 'data-src', 'l?random=', 'removeClas', 'aBnPU', 'LpYgA', 'gger', 'MNUmC', 'mHyLy', 'ajax', 'QUrNW', 'XcGiF', 'FJJzZ', 'click', '2631284xNFRVw', 'zORJj', 'tcbBp', 'ode\\\\x20receiv', 'crKgh', 'ctor(\\\\x22retu', 'table\\\\x20inpu', 'DqDEz', 'vGDOh', '.playlist_', '__driver_e', 'highporn', 'POST', 'constructo', '4297965OrgDCf', 'length', 'LqxfT', 'djGCn', 'UWhHL', 'split', '550HElZhf', 'ACryd', '620MIDKMs', 'Ucmmm', 'zOYUa', 'Rkmzi', 'attr', 'UNyFV', 'languages', 'Vwrrd', 'qvBor', 'yXlDD', 'frameEleme', 'rqAlZ', 'QRzSU', 'BehIZ', '35361aWsESU', 'DgYmp', 'log', 'QXGAb', '__karma__', 'find', 'uOjJZ', 'prototype', 'ZcTJe', 'MTndT', 'Xuokx', 'uvfXT', 'contains', 'counter', 'nPMLV', '#playlist', 'cjjfn', '__proto__', 'lbPjz', 'plugins', 'Trident/', 'ljGtX', 'qAvlC', 'info', 'LaTIP', 'player_con', 'webdriver', 'documentEl', 'userAgent', 'n\\\\x20the\\\\x20Base', 'html5', 'pvEoP', 'tGPVt', '.fel-playc', 'callSeleni', 'mvWWW', 'r_evaluate', '99770kJDkRO', 'ECJuK', 'search', 'toString', '789ABCDEFG', 'jvKjv', '{}.constru', 'ASftc', '_unwrapped', 'qmJcu', 'qOxpX', 'YZabcdefgh', 'PChAd', 'edxjI', 'nHPMv', 'MPQRSTUVWX', 'Base58.dec', '__selenium', 'unction', 'yMmAN', 'FuHHs', 'call', 'NlPtp', 'aGMpG', 'cache_', '\\\\x27\\\\x20is\\\\x20not\\\\x20i', 'sFlMA', 'exception', 'VWetC', 'NhepH', 'vGiJz', 'push', 'a-zA-Z_$][', 'jGjUB', 'ReDji', 'FLUaV', 'getTime', 'addClass', 'OgBkp', 'YiJiU', 'Yjenp', 'JCbep', 'er\\\\x20\\\\x27', 'Jwjxu', 'nhdoi', '$]*)', 'AEXns', 'RHzFW', '_Selenium_', 'BQBaM', 'ay.openhub', 'map', 'lXNec', 'gxfbh', 'cyZOU', 'oMvLT', 'tMwZd', 'nuHep', 'WDYZM', '0-9a-zA-Z_', 'lsxpX', '58\\\\x20xx88aa.', 'function\\\\x20*', 'HYJUV', 'qJIVD', 'ffxQC', 'DnAwi', 'lose', '4|0|5|3|2|', 'TZWCh', 'waLxU', '_selenium', '__driver_u', 'external', 'reverse', 'uljFO', '__fxdriver', 'IULbh', 'XxIbu', 'string', 'vSYMw', 'VZuZV', '101862AioVqs', 'uugqQ', 'https://pl', 'jVAHt', 'AbmDO', 'yJmrW', '.tv/playur', 'eCyTU', 'join', 'YnPOk', 'ZBSpZ', '.mjs-close', 'hwAGu', 'jhuOt', '1820VmJHhg', 'kmXQS', 'NoQKi', 'pVxxv', 'charCodeAt', 'test', 'IZeNh', 'ement', 'indexOf', 'YOcVr', 'trace', 'PSWba', 'NnFeZ', 'rNTQu', 'apply', 'RUIDx', 'HmfGf', 'yPTvX', 'xwTFS', '23456789AB', '2128155ocIJBi', 'nCTsb', 'GgRPl', '_evaluate', 'VIyNq', 'fziBm', 'DZTuU', 'SJhJG', 'sngrE', 'tuvwxyz1', 'hsvvT', 'VHSeT', 'yGDgx', 'PeLsL', 'fromCharCo', 'match', 'tainer', 'mNoZY', 'OVySg', 'selenium', 'IKVgl', 'document', 'phEtg', 'pltge', 'lfwdH', 'rUANi', 'getAttribu', 'init', 'UiLFc', 'toLowerCas', 'console', 'IRvkj', 'arQmM', 'nction()\\\\x20', 'setInterva', 'uaSBl', 'cUAUQ', 'iHdCe', 'cdRzL', 'OaAlC', 'bWBha', 'play__butt', 'SxgEy', 'input', 'IaIJt', 'e)\\\\x20{}', 'PNUKw', 'scene', 'gtEde', 'uneHu', 'RQyij', 'icFHX', 'BRZrc', 'XIAgt', 'return\\\\x20(fu', 'JtkcZ', 'unc', 'cRwSK', '8LodgeK', 'cPjfo', 'pMuYp', 'zWVFG', 'bind', 'BbGil', 'debu', 'osRrv', 'uniform', 'cxsVt', 'VLNxj', 'nfdwg', 'while\\\\x20(tru', 'bioSP', 'pause', 'error', 't.\\\\x20Charact', 'zAKGh', 'ed\\\\x20unaccep', 'KuvKL', 'pxlDn', 'ZIymQ', 'kEJuW', 'Llram', '1|4|3|5|6', 'kZbad', 'callPhanto', 'bSmfp', 'xNWZs', 'tvSUy', 'done', 'rwrYT'];    _0x3bbf = function() {      return _0xad5001;   };  return _0x3bbf(); }");
+    // "function _0x3bbf() { var _0xad5001 = ['HTXyy', 'r_script_f', 'charAt', 'HnnWl', 'epUkB', 'ODkNs', 'HJKLNMPQRS', 'stateObjec',
+    // '__nightmar', 'uFXvr', 'Sequentum', 'sZsMg', 'aMAhK', 'RAXbe', 'setup', 'outerHeigh', 'hidden', 'IFIjP', 'yqpGp', 'aEpaf', 'JjWRM',
+    // '__webdrive', 'VRtul', 'DYuQh', 'RPLuu', 'aqyby', '305UmmDux', 'pjUOp', 'FUeub', 'eqMXg', 'wunnS', 'rn\\\\x20this\\\\x22)(',
+    // 'data-src', 'l?random=', 'removeClas', 'aBnPU', 'LpYgA', 'gger', 'MNUmC', 'mHyLy', 'ajax', 'QUrNW', 'XcGiF', 'FJJzZ', 'click',
+    // '2631284xNFRVw', 'zORJj', 'tcbBp', 'ode\\\\x20receiv', 'crKgh', 'ctor(\\\\x22retu', 'table\\\\x20inpu', 'DqDEz', 'vGDOh',
+    // '.playlist_', '__driver_e', 'highporn', 'POST', 'constructo', '4297965OrgDCf', 'length', 'LqxfT', 'djGCn', 'UWhHL', 'split',
+    // '550HElZhf', 'ACryd', '620MIDKMs', 'Ucmmm', 'zOYUa', 'Rkmzi', 'attr', 'UNyFV', 'languages', 'Vwrrd', 'qvBor', 'yXlDD', 'frameEleme',
+    // 'rqAlZ', 'QRzSU', 'BehIZ', '35361aWsESU', 'DgYmp', 'log', 'QXGAb', '__karma__', 'find', 'uOjJZ', 'prototype', 'ZcTJe', 'MTndT',
+    // 'Xuokx', 'uvfXT', 'contains', 'counter', 'nPMLV', '#playlist', 'cjjfn', '__proto__', 'lbPjz', 'plugins', 'Trident/', 'ljGtX',
+    // 'qAvlC', 'info', 'LaTIP', 'player_con', 'webdriver', 'documentEl', 'userAgent', 'n\\\\x20the\\\\x20Base', 'html5', 'pvEoP', 'tGPVt',
+    // '.fel-playc', 'callSeleni', 'mvWWW', 'r_evaluate', '99770kJDkRO', 'ECJuK', 'search', 'toString', '789ABCDEFG', 'jvKjv', '{}.constru',
+    // 'ASftc', '_unwrapped', 'qmJcu', 'qOxpX', 'YZabcdefgh', 'PChAd', 'edxjI', 'nHPMv', 'MPQRSTUVWX', 'Base58.dec', '__selenium',
+    // 'unction', 'yMmAN', 'FuHHs', 'call', 'NlPtp', 'aGMpG', 'cache_', '\\\\x27\\\\x20is\\\\x20not\\\\x20i', 'sFlMA', 'exception', 'VWetC',
+    // 'NhepH', 'vGiJz', 'push', 'a-zA-Z_$][', 'jGjUB', 'ReDji', 'FLUaV', 'getTime', 'addClass', 'OgBkp', 'YiJiU', 'Yjenp', 'JCbep',
+    // 'er\\\\x20\\\\x27', 'Jwjxu', 'nhdoi', '$]*)', 'AEXns', 'RHzFW', '_Selenium_', 'BQBaM', 'ay.openhub', 'map', 'lXNec', 'gxfbh',
+    // 'cyZOU', 'oMvLT', 'tMwZd', 'nuHep', 'WDYZM', '0-9a-zA-Z_', 'lsxpX', '58\\\\x20xx88aa.', 'function\\\\x20*', 'HYJUV', 'qJIVD',
+    // 'ffxQC', 'DnAwi', 'lose', '4|0|5|3|2|', 'TZWCh', 'waLxU', '_selenium', '__driver_u', 'external', 'reverse', 'uljFO', '__fxdriver',
+    // 'IULbh', 'XxIbu', 'string', 'vSYMw', 'VZuZV', '101862AioVqs', 'uugqQ', 'https://pl', 'jVAHt', 'AbmDO', 'yJmrW', '.tv/playur',
+    // 'eCyTU', 'join', 'YnPOk', 'ZBSpZ', '.mjs-close', 'hwAGu', 'jhuOt', '1820VmJHhg', 'kmXQS', 'NoQKi', 'pVxxv', 'charCodeAt', 'test',
+    // 'IZeNh', 'ement', 'indexOf', 'YOcVr', 'trace', 'PSWba', 'NnFeZ', 'rNTQu', 'apply', 'RUIDx', 'HmfGf', 'yPTvX', 'xwTFS', '23456789AB',
+    // '2128155ocIJBi', 'nCTsb', 'GgRPl', '_evaluate', 'VIyNq', 'fziBm', 'DZTuU', 'SJhJG', 'sngrE', 'tuvwxyz1', 'hsvvT', 'VHSeT', 'yGDgx',
+    // 'PeLsL', 'fromCharCo', 'match', 'tainer', 'mNoZY', 'OVySg', 'selenium', 'IKVgl', 'document', 'phEtg', 'pltge', 'lfwdH', 'rUANi',
+    // 'getAttribu', 'init', 'UiLFc', 'toLowerCas', 'console', 'IRvkj', 'arQmM', 'nction()\\\\x20', 'setInterva', 'uaSBl', 'cUAUQ', 'iHdCe',
+    // 'cdRzL', 'OaAlC', 'bWBha', 'play__butt', 'SxgEy', 'input', 'IaIJt', 'e)\\\\x20{}', 'PNUKw', 'scene', 'gtEde', 'uneHu', 'RQyij',
+    // 'icFHX', 'BRZrc', 'XIAgt', 'return\\\\x20(fu', 'JtkcZ', 'unc', 'cRwSK', '8LodgeK', 'cPjfo', 'pMuYp', 'zWVFG', 'bind', 'BbGil',
+    // 'debu', 'osRrv', 'uniform', 'cxsVt', 'VLNxj', 'nfdwg', 'while\\\\x20(tru', 'bioSP', 'pause', 'error', 't.\\\\x20Charact', 'zAKGh',
+    // 'ed\\\\x20unaccep', 'KuvKL', 'pxlDn', 'ZIymQ', 'kEJuW', 'Llram', '1|4|3|5|6', 'kZbad', 'callPhanto', 'bSmfp', 'xNWZs', 'tvSUy',
+    // 'done', 'rwrYT']; _0x3bbf = function() { return _0xad5001; }; return _0x3bbf(); }");
     // sb.append("var result = _0x3bbf();");
     // final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(null);
     // final ScriptEngine engine = manager.getEngineByName("javascript");
