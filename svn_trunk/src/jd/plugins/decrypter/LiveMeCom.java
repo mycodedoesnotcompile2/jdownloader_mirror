@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -18,7 +20,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49642 $", interfaceVersion = 2, names = { "liveme.com" }, urls = { "https?://(?:www\\.)?liveme\\.com/(?:media/play/\\?videoid=\\d+|media/liveshort/dist/\\?videoid=\\d+&.*?|live\\.html\\?videoid=\\d+.*?|.*?/\\d+/index.html)" })
+@DecrypterPlugin(revision = "$Revision: 51084 $", interfaceVersion = 2, names = { "liveme.com" }, urls = { "https?://(?:www\\.)?liveme\\.com/(?:media/play/\\?videoid=\\d+|media/liveshort/dist/\\?videoid=\\d+&.*?|live\\.html\\?videoid=\\d+.*?|.*?/\\d+/index.html)" })
 public class LiveMeCom extends PluginForDecrypt {
     public LiveMeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -33,15 +35,42 @@ public class LiveMeCom extends PluginForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* See: https://svn.jdownloader.org/issues/90516 */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
-        final String videoid = getVideoID(parameter);
+        final String contenturl = param.getCryptedUrl();
+        final String videoid = getVideoID(contenturl);
         final String vali = vali(4) + "l" + vali(4) + "m" + vali(5);
-        br.postPage("https://live.ksmobile.net/live/queryinfo", "userid=1&videoid=" + videoid + "&area=&h5=1&vali=" + vali);
+        // br.postPage("https://live.ksmobile.net/live/queryinfo", "userid=1&videoid=" + videoid + "&area=&h5=1&vali=" + vali);
+        /**
+         * TODO: <br>
+         * - Implement signed requests <br>
+         * - Find all the parameters needed for the request down below
+         */
+        br.getHeaders().put("lm-s-sign", "TODO");
+        final UrlQuery query = new UrlQuery();
+        query.appendEncoded("lm_s_id", "TODO");
+        query.appendEncoded("lm_s_ts", "TODO");
+        query.appendEncoded("lm_s_str", "TODO");
+        query.appendEncoded("lm_s_ver", "1");
+        query.appendEncoded("h5", "1");
+        query.appendEncoded("_time", Long.toString(System.currentTimeMillis()));
+        query.appendEncoded("thirdchannel", "6");
+        query.appendEncoded("videoid", videoid);
+        query.appendEncoded("area", "en");
+        query.appendEncoded("vali", vali);
+        query.appendEncoded("tuid", "TODO");
+        query.appendEncoded("uid", "TODO");
+        query.appendEncoded("userid", "TODO");
+        query.appendEncoded("token", "TODO");
+        query.appendEncoded("androidid", "TODO");
+        br.postPage("https://live.liveme.com/live/queryinfosimple?alias=liveme&tongdun_black_box=TODO&os=web", query);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> response = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> data = (Map<String, Object>) response.get("data");
         final Map<String, Object> video_info = (Map<String, Object>) data.get("video_info");
         final Map<String, Object> user_info = (Map<String, Object>) data.get("user_info");

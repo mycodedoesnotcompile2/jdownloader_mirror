@@ -23,6 +23,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.parser.html.InputField;
@@ -33,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49018 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51085 $", interfaceVersion = 3, names = {}, urls = {})
 public class IndiShareMe extends XFileSharingProBasic {
     public IndiShareMe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -224,5 +225,15 @@ public class IndiShareMe extends XFileSharingProBasic {
         } else {
             return super.findFormDownload1Free(br);
         }
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilename = new Regex(html, "class=\"download-title[^\"]*\">([^<]+)</h1>").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = Encoding.htmlDecode(betterFilename).trim();
+        }
+        return fileInfo;
     }
 }

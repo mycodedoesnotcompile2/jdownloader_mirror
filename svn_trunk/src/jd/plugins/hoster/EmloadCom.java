@@ -20,6 +20,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.AccountController;
@@ -42,17 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50729 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51084 $", interfaceVersion = 3, names = {}, urls = {})
 public class EmloadCom extends PluginForHost {
     public EmloadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -158,13 +158,14 @@ public class EmloadCom extends PluginForHost {
         final boolean useAccountDuringAvailablecheck = true;
         if (useAccountDuringAvailablecheck) {
             final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-            return requestFileInformation(link, account, false);
+            return requestFileInformation(link, account);
         } else {
-            return requestFileInformation(link, null, false);
+            return requestFileInformation(link, null);
         }
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
         final String fid = urlinfo.getMatch(0);
         final String filenameFromURL = urlinfo.getMatch(2);
@@ -200,7 +201,7 @@ public class EmloadCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        requestFileInformation(link, null, true);
+        requestFileInformation(link, null);
         doFree(link, "free_directlink");
     }
 
@@ -214,6 +215,7 @@ public class EmloadCom extends PluginForHost {
             if (!StringUtils.isEmpty(premiumonly_api)) {
                 throw new AccountRequiredException();
             }
+            handleWebsiteErrors(br, link, null);
             String dl_server = br.getRegex("freeaccess=\"(http[^\"]+)").getMatch(0);
             if (dl_server == null) {
                 /* 2024-10-07 */
@@ -225,7 +227,6 @@ public class EmloadCom extends PluginForHost {
                 dl_token = br.getRegex("data-dl=\"([^\"]+)").getMatch(0);
             }
             if (StringUtils.isEmpty(dl_server) || StringUtils.isEmpty(dl_token)) {
-                handleWebsiteErrors(br, link, null);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -234,14 +235,13 @@ public class EmloadCom extends PluginForHost {
             if (!skipCaptcha) {
                 final String userid = br.getRegex("uid\\s*=\\s*\"(\\d+)").getMatch(0);
                 if (userid == null) {
-                    handleWebsiteErrors(br, link, null);
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 br.getPage("/api/" + userid + "/ddelay?userid=" + userid);
+                handleWebsiteErrors(br, link, null);
                 /* Usually 45 seconds */
                 final String waittimeStr = PluginJSonUtils.getJson(this.br, "");
                 if (StringUtils.isEmpty(waittimeStr)) {
-                    handleWebsiteErrors(br, link, null);
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final long waittime = Long.parseLong(waittimeStr) * 1001;
@@ -260,10 +260,6 @@ public class EmloadCom extends PluginForHost {
                 // br.postPage("/api/0/downloadbtn?useraccess=&access_token=bla", "");
             }
             dllink = Encoding.htmlDecode(dl_server) + "download.php?accesstoken=" + Encoding.htmlDecode(dl_token);
-            if (StringUtils.isEmpty(dllink)) {
-                handleWebsiteErrors(br, link, null);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         handleConnectionErrors(br, dl.getConnection());
@@ -467,7 +463,7 @@ public class EmloadCom extends PluginForHost {
 
     private void handleWebsiteErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
-            if (br.containsHTML("This link only for premium")) {
+            if (br.containsHTML("This link only for premium|>\\s*This link is for premium only user")) {
                 throw new AccountRequiredException();
             } else if (br.containsHTML(">\\s*Max Filesize Limit Reached")) {
                 /* "As a free user you can download files up to X mb" */
@@ -482,7 +478,7 @@ public class EmloadCom extends PluginForHost {
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         if (account.getType() == AccountType.FREE) {
-            requestFileInformation(link, account, true);
+            requestFileInformation(link, account);
             br.getPage(link.getPluginPatternMatcher());
             doFree(link, "account_free_directlink");
         } else {

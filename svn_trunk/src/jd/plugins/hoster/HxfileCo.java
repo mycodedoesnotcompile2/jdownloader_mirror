@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49064 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51084 $", interfaceVersion = 3, names = {}, urls = {})
 public class HxfileCo extends XFileSharingProBasic {
     public HxfileCo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -113,6 +113,25 @@ public class HxfileCo extends XFileSharingProBasic {
             return dllink;
         } else {
             return super.getDllink(link, account, br, src);
+        }
+    }
+
+    @Override
+    protected boolean isServerUnderMaintenance(final Browser br) {
+        if (br.containsHTML(">\\s*Maintenance for servers migration to new servers")) {
+            return true;
+        } else {
+            return super.isServerUnderMaintenance(br);
+        }
+    }
+
+    @Override
+    public String regexFilenameAbuse(final Browser br) {
+        final String filename = br.getRegex("Filename\\s*</label>\\s*<input[^>]*value=\"([^\"]+)").getMatch(0);
+        if (filename != null) {
+            return filename;
+        } else {
+            return super.regexFilenameAbuse(br);
         }
     }
 }

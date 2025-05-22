@@ -52,7 +52,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
+@HostPlugin(revision = "$Revision: 51084 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
 public class HulkShareCom extends PluginForHost {
     private String              BRBEFORE            = "";
     private static final String PASSWORDTEXT        = "(<br><b>Password:</b> <input|<br><b>Passwort:</b> <input)";
@@ -335,7 +335,11 @@ public class HulkShareCom extends PluginForHost {
             link.setMD5Hash(md5hash);
         }
         if (br.containsHTML("class=\"nhsDisabledPlayerText\"")) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "This file cannot be downloaded");
+            if (br.containsHTML("This file has been disabled for public access")) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "This file has been disabled for public access");
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "This file cannot be downloaded");
+            }
         }
         String dllink = checkDirectLink(link, "freelink");
         if (dllink == null) {

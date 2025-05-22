@@ -87,7 +87,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51082 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51085 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2113,7 +2113,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return filename;
         } else {
             logger.info("Failed to find filename via report_file");
-            final boolean fnameViaAbuseUnsupported = br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500 || !br.getURL().contains("report_file") || br.getRequest().getHtmlCode().trim().equalsIgnoreCase("No such file");
+            final boolean fnameViaAbuseUnsupported = br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500 || !StringUtils.containsIgnoreCase(br.getURL(), "report_file") || br.getRequest().getHtmlCode().trim().equalsIgnoreCase("No such file");
             if (fnameViaAbuseUnsupported) {
                 logger.info("Seems like report_file availablecheck seems not to be supported by this host");
                 final SubConfiguration config = this.getPluginConfig();
