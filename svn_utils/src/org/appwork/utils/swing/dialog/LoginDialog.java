@@ -43,11 +43,13 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.locale._AWU;
+import org.appwork.utils.swing.EDT;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.dialog.LoginDialog.LoginData;
 
@@ -111,6 +113,36 @@ public class LoginDialog extends AbstractDialog<LoginData> implements ActionList
 
     public void setMessage(final String message) {
         this.message = message;
+    }
+
+    public void requestFocusPassword() {
+        new EDT<Void, RuntimeException>() {
+            @Override
+            protected Void runInEDT() throws RuntimeException {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        pass.requestFocus();
+                    }
+                });
+                return null;
+            }
+        }.start();
+    }
+
+    public void requestFocusUser() {
+        new EDT<Void, RuntimeException>() {
+            @Override
+            protected Void runInEDT() throws RuntimeException {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        accid.requestFocus();
+                    }
+                });
+                return null;
+            }
+        }.start();
     }
 
     public LoginDialog(final int flag) {

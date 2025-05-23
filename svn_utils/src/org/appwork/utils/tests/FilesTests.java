@@ -67,11 +67,13 @@ public class FilesTests extends AWTest {
             return;
         }
         File baseFile = Application.getTempUniqueResource("tests");
+        baseFile.getParentFile().mkdirs();
         Path basePath = baseFile.toPath();
         try {
             assertFalse(Files17.existsPath(basePath));
             assertFalse(Files17.existsDirectory(basePath));
             assertFalse(Files17.existsFile(basePath));
+            logInfoAnyway("TestFile: " + baseFile);
             baseFile.createNewFile();
             assertTrue(Files17.existsPath(basePath));
             assertFalse(Files17.existsDirectory(basePath));
@@ -160,7 +162,9 @@ public class FilesTests extends AWTest {
                 }
             }
         } finally {
-            org.appwork.utils.Files.deleteRecursive(baseFile);
+            if (baseFile.exists()) {
+                org.appwork.utils.Files.deleteRecursive(baseFile);
+            }
             assertFalse(Files17.existsPath(basePath));
             assertFalse(Files17.existsDirectory(basePath));
             assertFalse(Files17.existsFile(basePath));

@@ -32,45 +32,104 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.remoteapi.tests;
+package org.appwork.utils;
 
-import org.appwork.remoteapi.BrowserDetector;
-import org.appwork.remoteapi.BrowserDetector.Browser;
-import org.appwork.remoteapi.BrowserDetector.BrowserInfo;
-import org.appwork.testframework.AWTest;
-import org.appwork.testframework.TestDependency;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * @author thomas
- * @date 27.03.2025
+ * @date 22.05.2025
  *
  */
-@TestDependency({ "org.appwork.remoteapi.BrowserDetector" })
-public class BrowserDetectorTest extends AWTest {
-    /**
-     * @see org.appwork.testframework.TestInterface#runTest()
-     */
-    @Override
-    public void runTest() throws Exception {
-        test(Browser.FIREFOX, 136d, "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0");
-        test(Browser.CHROMIUM, 136d, "\"Not.A/Brand\";v=\"99\", \"Chromium\";v=\"136\"");
-        test(Browser.OPERA, 117, "\"Not A(Brand\";v=\"8\", \"Chromium\";v=\"132\", \"Opera\";v=\"117\"");
-        test(Browser.OPERA, 87, "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Opera\";v=\"87\"");
-        test(Browser.OPERA, 87, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 OPR/87.0.4390.2");
-        test(Browser.EDGE, 134, "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"");
-        test(Browser.EDGE, 134, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0");
-        test(Browser.SAFARI, 18.3, "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15");
-        test(Browser.IE, 7.0, "Mozilla/5.0 (Windows NT 10.0; Trident/7.0; rv:11.0) like Gecko");
+public class MapUtils {
+    public static <K, V> Map<K, V> of(K k1, V v1) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        return ret;
     }
 
-    public static void main(String[] args) {
-        run();
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        return ret;
     }
 
-    private void test(Browser br, double version, String uaOderSec) throws Exception {
-        BrowserInfo browser = BrowserDetector.getBrowser(uaOderSec);
-        System.out.println(uaOderSec);
-        assertEquals(br, browser.getBrowser());
-        assertEquals(version, browser.getVersion());
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        ret.put(k3, v3);
+        return ret;
+    }
+
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        ret.put(k3, v3);
+        ret.put(k4, v4);
+        return ret;
+    }
+
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        ret.put(k3, v3);
+        ret.put(k4, v4);
+        ret.put(k5, v5);
+        return ret;
+    }
+
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        ret.put(k3, v3);
+        ret.put(k4, v4);
+        ret.put(k5, v5);
+        ret.put(k6, v6);
+        return ret;
+    }
+
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        ret.put(k3, v3);
+        ret.put(k4, v4);
+        ret.put(k5, v5);
+        ret.put(k6, v6);
+        ret.put(k7, v7);
+        return ret;
+    }
+
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        ret.put(k3, v3);
+        ret.put(k4, v4);
+        ret.put(k5, v5);
+        ret.put(k6, v6);
+        ret.put(k7, v7);
+        ret.put(k8, v8);
+        return ret;
+    }
+
+    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8, K k9, V v9) {
+        LinkedHashMap<K, V> ret = new LinkedHashMap<K, V>();
+        ret.put(k1, v1);
+        ret.put(k2, v2);
+        ret.put(k3, v3);
+        ret.put(k4, v4);
+        ret.put(k5, v5);
+        ret.put(k6, v6);
+        ret.put(k7, v7);
+        ret.put(k8, v8);
+        ret.put(k9, v9);
+        return ret;
     }
 }
