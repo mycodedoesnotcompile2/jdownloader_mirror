@@ -259,7 +259,6 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
-
         public final String sid;
 
         private SID(String sid) {
@@ -933,7 +932,7 @@ public class WindowsUtils {
             if (entries == null || entries.length == 0) {
                 return Collections.emptyList();
             }
-            List<AccessPermissionEntry> result = new ArrayList<>();
+            List<AccessPermissionEntry> result = new ArrayList<AccessPermissionEntry>();
             for (AccessPermissionEntry entry : entries) {
                 if (includeInherited == entry.isInherited()) {
                     result.add(entry);
@@ -955,7 +954,7 @@ public class WindowsUtils {
                 // If we can't resolve the SID, just use the SID string
             }
             // Create a concise permission summary using minimal required permissions
-            Set<String> permissionGroups = new HashSet<>();
+            Set<String> permissionGroups = new HashSet<String>();
             // Check for full control first - if present, ignore all other permissions
             if (permissions.contains(AccessPermission.FILE_ALL_ACCESS)) {
                 permissionGroups.add("FULL");
@@ -1417,7 +1416,6 @@ public class WindowsUtils {
              * Application is critical to system operation
              */
             RmCritical(6);
-
             private final int value;
 
             ApplicationType(int value) {
@@ -1557,7 +1555,7 @@ public class WindowsUtils {
     public static List<LockInfo> getLocksOnPath(File filePath) {
         IntByReference session = new IntByReference();
         char[] sessionKey = new char[CCH_RM_SESSION_KEY + 1];
-        List<LockInfo> result = new ArrayList<>();
+        List<LockInfo> result = new ArrayList<LockInfo>();
         try {
             // Start a new Restart Manager session
             int res = Rm.INSTANCE.RmStartSession(session, 0, sessionKey);

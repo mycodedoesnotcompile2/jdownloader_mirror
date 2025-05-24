@@ -37,23 +37,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.net.BCSSLSocketStreamFactory;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -85,7 +68,24 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51028 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51088 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -108,15 +108,15 @@ public class PornHubCom extends PluginForHost {
     /* Note: Video bitrates and resolutions are not exact, they can vary. */
     /* Quality, { videoCodec, videoBitrate, videoResolution, audioCodec, audioBitrate } */
     public static LinkedHashMap<String, String[]> formats                                            = new LinkedHashMap<String, String[]>(new LinkedHashMap<String, String[]>() {
-                                                                                                         {
-                                                                                                             put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
-                                                                                                             put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
-                                                                                                             put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
-                                                                                                             put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
-                                                                                                             put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
-                                                                                                             put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
-                                                                                                         }
-                                                                                                     });
+        {
+            put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
+            put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
+            put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
+            put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
+            put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
+            put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
+        }
+    });
     /* Plugin settings */
     public static final String                    BEST_ONLY                                          = "BEST_ONLY";
     public static final boolean                   default_BEST_ONLY                                  = false;
@@ -1189,9 +1189,8 @@ public class PornHubCom extends PluginForHost {
 
     /**
      * Performs a full login via website to obtain fresh cookies. There are minor differences between login for free domain/account and
-     * premium (pornhubpremium.com). </br>
-     * Free login: https://www.pornhub.org/login </br>
-     * Premium login: https://www.pornhubpremium.com/premium/login
+     * premium (pornhubpremium.com). </br> Free login: https://www.pornhub.org/login </br> Premium login:
+     * https://www.pornhubpremium.com/premium/login
      */
     private void performFullLogin(final Browser br, final Account account, final String domain, final String path) throws Exception {
         logger.info("Performing full login");
@@ -1283,8 +1282,7 @@ public class PornHubCom extends PluginForHost {
     }
 
     /**
-     * Checks login and sets account-type. </br>
-     * Expects browser instance to be logged in already (cookies need to be there).
+     * Checks login and sets account-type. </br> Expects browser instance to be logged in already (cookies need to be there).
      *
      * @throws Exception
      */
@@ -1699,14 +1697,16 @@ public class PornHubCom extends PluginForHost {
         return "JDownloader's Pornhub plugin helps downloading videoclips from pornhub(premium).com.";
     }
 
-    public static final String   SELECTED_DOMAIN                             = "selected_domain2";
-    public static final int      default_SELECTED_DOMAIN                     = 0;
-    public static final String[] DOMAINS                                     = new String[] { "pornhub.com & pornhubpremium.com", "pornhub.org & pornhubpremium.com" };
-    public static final String   SETTING_URL_CRAWL_LANGUAGE_HANDLING         = "url_crawl_language_handling";
-    public static final int      default_SETTING_URL_CRAWL_LANGUAGE_HANDLING = 0;
-    public static final String[] SETTING_URL_CRAWL_LANGUAGE_HANDLING_OPTIONS = new String[] { "Replace subdomain in url with 'www.' -> Title language English", "Do not touch subdomain -> Title language can vary depending on URL" };
-    public static final String   SETTING_CHANNEL_CRAWLER_LIMIT               = "channel_crawler_limit";
-    public static final int      default_SETTING_CHANNEL_CRAWLER_LIMIT       = -1;
+    public static final String   SELECTED_DOMAIN                                = "selected_domain2";
+    public static final int      default_SELECTED_DOMAIN                        = 0;
+    public static final String[] DOMAINS                                        = new String[] { "pornhub.com & pornhubpremium.com", "pornhub.org & pornhubpremium.com" };
+    public static final String   SETTING_URL_CRAWL_LANGUAGE_HANDLING            = "url_crawl_language_handling";
+    public static final int      default_SETTING_URL_CRAWL_LANGUAGE_HANDLING    = 0;
+    public static final String[] SETTING_URL_CRAWL_LANGUAGE_HANDLING_OPTIONS    = new String[] { "Replace subdomain in url with 'www.' -> Title language English", "Do not touch subdomain -> Title language can vary depending on URL" };
+    public static final String   SETTING_CHANNEL_CRAWLER_LIMIT                  = "channel_crawler_limit";
+    public static final String   SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED         = "channel_crawler_include_tagged";
+    public static final int      default_SETTING_CHANNEL_CRAWLER_LIMIT          = -1;
+    public static final boolean  default_SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED = true;
 
     /** Returns user configured domain based on domain given in URL we want to access. */
     public static String getConfiguredDomainURL(final String pluginDomain, final String domainFromURL) {
@@ -1812,6 +1812,7 @@ public class PornHubCom extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SELECTED_DOMAIN, DOMAINS, "Select preferred domain").setDefaultValue(default_SELECTED_DOMAIN));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_URL_CRAWL_LANGUAGE_HANDLING, SETTING_URL_CRAWL_LANGUAGE_HANDLING_OPTIONS, "URL crawl handling").setDefaultValue(default_SETTING_URL_CRAWL_LANGUAGE_HANDLING));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_CHANNEL_CRAWLER_LIMIT, "Channel/Profile crawler: Limit max results [-1 = no limit, 0 = disable crawler]", default_SETTING_CHANNEL_CRAWLER_LIMIT, 10000, 1).setDefaultValue(-1));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED, "Channel/Profile crawler: include tagged videos]").setDefaultValue(default_SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), CRAWL_AND_SET_ADDITIONAL_PLUGIN_PROPERTIES, "Crawl and set more plugin properties such as 'videodata_js'? [Will use more RAM!]").setDefaultValue(default_CRAWL_AND_SET_ADDITIONAL_PLUGIN_PROPERTIES));
     }

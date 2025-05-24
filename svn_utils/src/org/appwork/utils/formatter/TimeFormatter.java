@@ -87,6 +87,8 @@ public class TimeFormatter {
                 // Java 1.6 does not support X ISO 8601 time zone
                 TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'SSSX", locale));
                 sdf.setLenient(false);
+                TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("yyyy'-'MM'-'dd'T'HH':'mm':'ssX", locale));
+                sdf.setLenient(false);
             }
             TimeFormatter.dateformats.add(sdf = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z", locale));
             sdf.setLenient(true);

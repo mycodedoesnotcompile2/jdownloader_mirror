@@ -55,7 +55,7 @@ import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 51058 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51088 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,7 @@ public class SankakucomplexCom extends PluginForHost {
     }
 
     private static void setDefaultCookies(final Browser br, final String host) {
-        br.setCookie(host, "auto_page", "0");
+        br.setCookie(host, "auto_page", "1");
         br.setCookie(host, "hide_carousel_ai", "1");
         br.setCookie(host, "hide_resized_notice", "1");
         br.setCookie(host, "hide-news-ticker", "1");
@@ -593,7 +593,7 @@ public class SankakucomplexCom extends PluginForHost {
         }
     }
 
-    private boolean isLoggedin(final Browser br) {
+    public boolean isLoggedin(final Browser br) {
         if (br.containsHTML("/users/logout")) {
             return true;
         } else {

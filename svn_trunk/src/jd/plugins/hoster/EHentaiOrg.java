@@ -20,21 +20,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.EhentaiConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -57,7 +42,22 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 51072 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.EhentaiConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 51088 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
 public class EHentaiOrg extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -175,8 +175,8 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Take account from download candidate! </br>
-     * 2021-01-18: There is an API available but it is only returning the metadata: https://ehwiki.org/wiki/API
+     * Take account from download candidate! </br> 2021-01-18: There is an API available but it is only returning the metadata:
+     * https://ehwiki.org/wiki/API
      *
      * @param link
      * @param account
@@ -243,8 +243,8 @@ public class EHentaiOrg extends PluginForHost {
                 /* Another step */
                 final String continue_url2 = br.getRegex("document\\.getElementById\\(\"continue\"\\).*?document\\.location\\s*=\\s*\"((?:/|http)[^\"]+)\"").getMatch(0);
                 /**
-                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br>
-                 * We prefer best quality --> "Original Archive"
+                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br> We prefer best quality -->
+                 * "Original Archive"
                  */
                 final Form continueForm = br.getFormByInputFieldKeyValue("dltype", "org");
                 if (continue_url2 != null) {
@@ -382,11 +382,13 @@ public class EHentaiOrg extends PluginForHost {
             link.setProperty(PROPERTY_TIMESTAMP_LAST_BROKEN_IMAGE_RETRY, true);
         }
         String ext = null;
-        String originalFileName = br.getRegex("(?i)<div>([^<>]*\\.(jpe?g|png|gif))\\s*::\\s*\\d+").getMatch(0);
+        String originalFileName = br.getRegex("(?i)<div>([^<>]*\\.(jpe?g|png|gif|webp))\\s*::\\s*\\d+").getMatch(0);
         final String extDefault = ".jpg";
         if (originalFileName != null) {
             originalFileName = Encoding.htmlDecode(originalFileName).trim();
             ext = getFileNameExtensionFromString(originalFileName, extDefault);
+        } else {
+            ext = extDefault;
         }
         final EhentaiConfig cfg = PluginJsonConfig.get(EhentaiConfig.class);
         if (link.getForcedFileName() != null) {
@@ -618,10 +620,9 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * If this returns true: </br>
-     * Download of this image has just recently failed due to the image being serverside broken/unavailable. </br>
-     * Website has a feature called 'Reload broken image' which we are making use of here. </br>
-     * This will give us the same image hosted on a different CDN.
+     * If this returns true: </br> Download of this image has just recently failed due to the image being serverside broken/unavailable.
+     * </br> Website has a feature called 'Reload broken image' which we are making use of here. </br> This will give us the same image
+     * hosted on a different CDN.
      */
     private boolean needsBrokenImageWorkaround(final DownloadLink link, final Account account) {
         final long timestampLastFailDueToBrokenImage = link.getLongProperty(PROPERTY_TIMESTAMP_LAST_BROKEN_IMAGE_FAIL, 0);
@@ -812,8 +813,8 @@ public class EHentaiOrg extends PluginForHost {
                 logger.info("e-hentai.org: Successfully logged in via cookies -> Checking exhentai.org login");
                 /* Get- and save exhentai.org cookies too */
                 /**
-                 * Important! Get- and save exhentai cookies: First time this will happen: </br>
-                 * exhentai.org -> forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
+                 * Important! Get- and save exhentai cookies: First time this will happen: </br> exhentai.org ->
+                 * forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
                  */
                 br.getPage(MAINPAGE_exhentai);
                 if (this.isLoggedInEhentaiOrExhentai(br)) {
@@ -929,11 +930,8 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Access e-hentai.org/home.php before calling this! </br>
-     * Returns array of numbers with: </br>
-     * [0] = number of items downloaded / used from limit </br>
-     * [1] = max limit for this account </br>
-     * [1] minus [0] = points left
+     * Access e-hentai.org/home.php before calling this! </br> Returns array of numbers with: </br> [0] = number of items downloaded / used
+     * from limit </br> [1] = max limit for this account </br> [1] minus [0] = points left
      */
     private int[] parseImagePointsLeftInfo(final Browser br) {
         if (!br.getURL().endsWith("/home.php")) {

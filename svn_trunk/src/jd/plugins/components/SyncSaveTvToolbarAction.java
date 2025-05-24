@@ -34,6 +34,7 @@ import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
 public class SyncSaveTvToolbarAction extends AbstractToolBarAction {
     public SyncSaveTvToolbarAction() {
         setTooltipText("Sync Save.TV Library");
+        setIconKey("fav/save.tv");
         new EDTRunner() {
             @Override
             protected void runInEDT() {

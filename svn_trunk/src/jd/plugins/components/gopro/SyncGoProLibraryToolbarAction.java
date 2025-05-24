@@ -34,6 +34,7 @@ import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
 public class SyncGoProLibraryToolbarAction extends AbstractToolBarAction {
     public SyncGoProLibraryToolbarAction() {
         setTooltipText("Sync GoPro Plus Library");
+        setIconKey("fav/gopro.com");
         new EDTRunner() {
             @Override
             protected void runInEDT() {

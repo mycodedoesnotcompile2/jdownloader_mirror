@@ -21,16 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,7 +38,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 51062 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51088 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -117,11 +117,18 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     private static final Pattern TYPE_TAGS_BOOKS = Pattern.compile("/(([a-z]{2,3})/?)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_TAGS_POSTS = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
     public static final String   API_BASE        = "https://capi-v2.sankakucomplex.com";
+    private SankakucomplexCom    hosterplugin    = null;
+
+    @Override
+    public void clean() {
+        hosterplugin = null;
+        super.clean();
+    }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account != null) {
-            final SankakucomplexCom hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
+            hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
             hosterplugin.login(account, false);
         }
         final String contenturl = param.getCryptedUrl();
@@ -152,13 +159,13 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br>
-         * For this reason, some user may prefer website mode.
+         * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
+         * website mode.
          */
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && ACCESS_MODE_AUTO_PREFER_API_MODE)) {
-            return crawlTagsPostsAPI(param, tags, language);
+            return crawlTagsPostsAPI(account, param, tags, language);
         } else {
-            return crawlTagsPostsWebsite(param, tags, language);
+            return crawlTagsPostsWebsite(account, param, tags, language);
         }
     }
 
@@ -199,7 +206,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         return sb.toString();
     }
 
-    private ArrayList<DownloadLink> crawlTagsPostsWebsite(final CryptedLink param, final String tags, final String language) throws Exception {
+    private ArrayList<DownloadLink> crawlTagsPostsWebsite(final Account account, final CryptedLink param, final String tags, final String language) throws Exception {
         if (tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -215,6 +222,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         } else if (br.getURL().contains("/premium")) {
             /* Account required (most times due to adult content so free account is enough). */
             throw new AccountRequiredException();
+        }
+        if (account != null && !hosterplugin.isLoggedin(br)) {
+            hosterplugin.login(account, "https://chan.sankakucomplex.com/" + langPart + "posts?tags=" + tagsUrlEncoded, true);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
@@ -275,6 +285,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             }
             String nextPageURL = br.getRegex("next-page-url=\"([^\"]+)\"").getMatch(0);
             if (nextPageURL != null) {
+                nextPageURL = nextPageURL + "&auto_page=t";// smaller html response
                 nextPageURL = Encoding.htmlOnlyDecode(nextPageURL);
             }
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + numberofItemsStr + " | nextPageURL = " + nextPageURL);
@@ -307,7 +318,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlTagsPostsAPI(final CryptedLink param, final String tags, final String language) throws Exception {
+    private ArrayList<DownloadLink> crawlTagsPostsAPI(final Account account, final CryptedLink param, final String tags, final String language) throws Exception {
         if (tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

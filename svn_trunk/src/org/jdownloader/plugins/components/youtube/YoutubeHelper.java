@@ -2066,6 +2066,18 @@ public class YoutubeHelper {
 
     private long parseDate(String dateString) {
         if (dateString != null) {
+            final Date parsedDate = TimeFormatter.parseDateString(dateString);
+            if (parsedDate != null) {
+                // also supports timezones, eg 2008-12-11T20:53:49-08:00
+                final Calendar c = Calendar.getInstance();
+                c.setTimeInMillis(parsedDate.getTime());
+                c.set(Calendar.HOUR_OF_DAY, 0);
+                c.set(Calendar.MINUTE, 0);
+                c.set(Calendar.SECOND, 0);
+                final long result = c.getTimeInMillis();
+                logger.info("Date(" + dateString + ") result " + result + " " + new Date(result));
+                return result;
+            }
             // time. just parse for the date pattern(s).
             String date = new Regex(dateString, "([A-Za-z]+ \\d+, \\d{4})").getMatch(0);
             if (date != null) {
@@ -2968,6 +2980,10 @@ public class YoutubeHelper {
                 final UrlQuery query = UrlQuery.parse(cipher);
                 String queryURL = query.get("url");
                 if (StringUtils.isEmpty(queryURL)) {
+                    // LuanRT/googlevideo/tree/main
+                    // LuanRT/yt-sabr-shaka-demo
+                    // yt-dlp/yt-dlp/issues/12482
+                    // iv-org/invidious/issues/5263
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 queryURL = URLDecoder.decode(queryURL, "UTF-8");

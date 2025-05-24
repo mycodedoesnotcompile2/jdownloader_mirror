@@ -280,7 +280,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
 
     public void init(final PluginForHost plugin, final String name, final String host, final String pluginPatternMatcher, final boolean isEnabled) {
         setDefaultPlugin(plugin);
-        setView(new DefaultDownloadLinkViewImpl());
+        setView(getDefaultDowloadLinkView());
         if (name != null) {
             setName(name);
         }
@@ -289,6 +289,18 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         setHost(host);
         created = System.currentTimeMillis();
         this.setPluginPatternMatcher(pluginPatternMatcher);
+    }
+
+    protected DownloadLinkView getDefaultDowloadLinkView() {
+        final PluginForHost defaultPlugin = getDefaultPlugin();
+        DownloadLinkView ret = null;
+        if (defaultPlugin != null) {
+            ret = defaultPlugin.getDownloadLinkView(this);
+        }
+        if (ret == null) {
+            ret = new DefaultDownloadLinkViewImpl();
+        }
+        return ret;
     }
 
     public long getFinishedDate() {
@@ -863,19 +875,32 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 setCachedName(ignoreUnsafe, ignoreForcedFilename, ret);
                 return ret;
             }
-            final String url = this.getContentUrlOrPatternMatcher();
-            if (StringUtils.isNotEmpty(url)) {
-                final String urlName = Plugin.extractFileNameFromURL(url);
-                if (StringUtils.isNotEmpty(urlName)) {
-                    ret = replaceCustomExtension(urlName);
-                    setCachedName(ignoreUnsafe, ignoreForcedFilename, ret);
-                    return ret;
-                }
+            final String defaultFilename = getDefaultFileName(getDefaultPlugin());
+            if (defaultFilename != null) {
+                setCachedName(ignoreUnsafe, ignoreForcedFilename, defaultFilename);
+                return defaultFilename;
             }
             return UNKNOWN_FILE_NAME;
         } catch (Exception e) {
             return UNKNOWN_FILE_NAME;
         }
+    }
+
+    public String getDefaultFileName(PluginForHost plugin) {
+        if (plugin != null) {
+            final String ret = plugin.getDefaultFileName(this);
+            if (StringUtils.isNotEmpty(ret)) {
+                return ret;
+            }
+        }
+        final String url = this.getContentUrlOrPatternMatcher();
+        if (StringUtils.isNotEmpty(url)) {
+            final String urlName = Plugin.extractFileNameFromURL(url);
+            if (StringUtils.isNotEmpty(urlName)) {
+                return replaceCustomExtension(urlName);
+            }
+        }
+        return null;
     }
 
     public String getRawName() {
@@ -1065,7 +1090,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     /*
      * Gibt zurueck ob Dieser Link schon auf verfuegbarkeit getestet wurde.+ Diese FUnktion fuehrt keinen!! Check durch. Sie prueft nur ob
      * schon geprueft worden ist. anschiessend kann mit isAvailable() die verfuegbarkeit ueberprueft werden
-     *
+     * 
      * @return Link wurde schon getestet (true) nicht getestet(false)
      */
     public boolean isAvailabilityStatusChecked() {
