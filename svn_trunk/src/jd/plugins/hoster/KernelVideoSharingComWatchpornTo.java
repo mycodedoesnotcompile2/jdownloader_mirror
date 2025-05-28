@@ -18,13 +18,14 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.plugins.HostPlugin;
-
 import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigWatchpornTo;
 
-@HostPlugin(revision = "$Revision: 50083 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.HostPlugin;
+
+@HostPlugin(revision = "$Revision: 51091 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComWatchpornTo extends KernelVideoSharingComV2 {
     public KernelVideoSharingComWatchpornTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -61,4 +62,9 @@ public class KernelVideoSharingComWatchpornTo extends KernelVideoSharingComV2 {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
     }
 
+    @Override
+    protected int getMaxChunks(final Account account) {
+        // 2025-05-27
+        return -4;
+    }
 }

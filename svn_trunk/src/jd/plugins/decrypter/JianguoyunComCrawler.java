@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.JianguoyunCom;
 
-@DecrypterPlugin(revision = "$Revision: 48347 $", interfaceVersion = 3, names = { "jianguoyun.com" }, urls = { "https?://(?:www\\.)?jianguoyun\\.com/p/[A-Za-z0-9\\-_]+(?:#dir=[^<>\"/:]+)?" })
+@DecrypterPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = { "jianguoyun.com" }, urls = { "https?://(?:www\\.)?jianguoyun\\.com/p/[A-Za-z0-9\\-_]+(?:#dir=[^<>\"/:]+)?" })
 public class JianguoyunComCrawler extends antiDDoSForDecrypt {
     public JianguoyunComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class JianguoyunComCrawler extends antiDDoSForDecrypt {
         }
         currentFolderName = Encoding.htmlDecode(currentFolderName).trim();
         br.getPage("https://www.jianguoyun.com/d/ajax/dirops/pubDIRBrowse?hash=" + fid + "&relPath=" + subfolder + "&_=" + System.currentTimeMillis());
-        Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+        Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
         final List<Object> ressourcelist = (List) entries.get("objects");
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(currentFolderName);

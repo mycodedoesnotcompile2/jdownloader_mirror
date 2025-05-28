@@ -143,7 +143,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     private long                                                cacheLifetime            = 20000l;
     private String                                              theme;
     private String                                              nameSpace;
-    private final boolean                                       doNotLogMissingIcons     = "false".equals(System.getProperty("DO_NOT_LOG_MISSING_ICONS_EXCEPTION", "false"));
+    private final boolean                                       doLogMissing             = "false".equals(System.getProperty("DO_NOT_LOG_MISSING_ICONS_EXCEPTION", "false"));
     private boolean                                             useHighDPI;
     private static final String                                 MAX_SIZE_KEY             = "ORIGINAL";
     public static final int[]                                   FRAME_ICON_SIZES_WINDOWS = new int[] { 128, 64, 48, 32, 24, 20, 16 };
@@ -268,12 +268,12 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             return null;
         }
         LogV3.info(NO_IMAGE_AVAILABLE + relativePath);
-        DebugMode.debugger();
-        if (doNotLogMissingIcons) {
+        if (doLogMissing) {
             org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.buildPath("images/", relativePath, ".png|svg|ico|exe", false)));
         }
-        BufferedImage ret = createNotAvailableImage(width, height);
-        Icon icon = FACTORY.imageToIcon(ret, width, height);
+        DebugMode.debugger();
+        final BufferedImage ret = createNotAvailableImage(width, height);
+        final Icon icon = FACTORY.imageToIcon(ret, width, height);
         if (context.isUsecache()) {
             this.cache(icon, cacheKey);
         }
@@ -653,7 +653,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             return null;
         }
         LogV3.info(NO_IMAGE_AVAILABLE + relativePath);
-        if (doNotLogMissingIcons) {
+        if (doLogMissing) {
             org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.buildPath("images/", relativePath, ".png|svg|ico", false)));
         }
         DebugMode.debugger();
@@ -1227,7 +1227,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.storage.config.MinTimeWeakReferenceCleanup# onMinTimeWeakReferenceCleanup
      * (org.appwork.storage.config.MinTimeWeakReference)
      */

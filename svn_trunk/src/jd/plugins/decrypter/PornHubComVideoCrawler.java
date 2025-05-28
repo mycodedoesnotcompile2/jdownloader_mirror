@@ -27,6 +27,15 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -51,16 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51088 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -213,45 +213,14 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlModel(final Browser br, final CryptedLink param, final Account account) throws Exception {
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
-        final int resultLimit = cfg.getIntegerProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_LIMIT, PornHubCom.default_SETTING_CHANNEL_CRAWLER_LIMIT);
-        if (resultLimit == 0) {
-            logger.info("User disabled channel crawler -> Returning empty array");
-            return new ArrayList<DownloadLink>();
-        }
-        final PornHubCom hosterPlugin = (PornHubCom) this.getNewPluginForHostInstance(this.getHost());
-        final String contenturl = getCorrectedContentURL(param.getCryptedUrl());
-        PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
-        handleErrorsAndCaptcha(this.br, account);
-        final boolean includeTagged = cfg.getBooleanProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED, PornHubCom.default_SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED);
-        final String model = new Regex(contenturl, "(?i)/model/([^/]+)").getMatch(0);
-        final String mode = new Regex(contenturl, "(?i)/model/[^/]+/(.+)").getMatch(0);
-        /* Main profile URL --> Assume user wants to have all videos of that profile */
-        logger.info("Model:" + model + " | Mode:" + mode);
-        if (StringUtils.isEmpty(mode)) {
-            /* Collect all available categories and let them go through this crawler again. */
-            final String pages[];
-            if (!includeTagged && br.containsHTML("/videos/upload")) {
-                pages = br.getRegex("(/model/" + Pattern.quote(model) + "/(?:videos/upload|gifs|photos))").getColumn(0);
-            } else {
-                pages = br.getRegex("(/model/" + Pattern.quote(model) + "/(?:videos|gifs|photos))").getColumn(0);
-            }
-            if (pages.length > 0) {
-                /* Let crawler crawl each page one by one. */
-                final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-                for (final String page : new HashSet<String>(Arrays.asList(pages))) {
-                    ret.add(createDownloadlink(br.getURL(page).toString()));
-                }
-                return ret;
-            } else {
-                return crawlAllVideosOf(br, account, new HashSet<String>());
-            }
-        } else {
-            return crawlAllVideosOf(br, account, new HashSet<String>());
-        }
+        return crawlModelOrPornstar(br, param, account);
     }
 
     private ArrayList<DownloadLink> crawlPornstar(final Browser br, final CryptedLink param, final Account account) throws Exception {
+        return crawlModelOrPornstar(br, param, account);
+    }
+
+    private ArrayList<DownloadLink> crawlModelOrPornstar(final Browser br, final CryptedLink param, final Account account) throws Exception {
         final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
         final int resultLimit = cfg.getIntegerProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_LIMIT, PornHubCom.default_SETTING_CHANNEL_CRAWLER_LIMIT);
         if (resultLimit == 0) {
@@ -262,23 +231,32 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String contenturl = getCorrectedContentURL(param.getCryptedUrl());
         PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
         handleErrorsAndCaptcha(this.br, account);
-        final String pornstar = new Regex(contenturl, "(?i)/pornstar/([^/]+)").getMatch(0);
-        final String mode = new Regex(contenturl, "(?i)/pornstar/[^/]+/(.+)").getMatch(0);
+        final Regex urlinfo = new Regex(contenturl, "(?i)/(model|pornstar)/([^/]+)(/(.+))?");
+        final String type = urlinfo.getMatch(0); // model or pornstar
+        final String user = urlinfo.getMatch(1);
+        final String mode = urlinfo.getMatch(3);
         final boolean includeTagged = cfg.getBooleanProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED, PornHubCom.default_SETTING_CHANNEL_CRAWLER_INCLUDE_TAGGED);
         /* Main profile URL --> Assume user wants to have all videos of that profile */
-        logger.info("Pornstar:" + pornstar + "|Mode:" + mode);
+        logger.info("Type: " + type + "|User:" + user + "|Mode:" + mode);
         if (StringUtils.isEmpty(mode)) {
-            final String pages[];
-            if (!includeTagged && br.containsHTML("/videos/upload")) {
-                pages = br.getRegex("(/pornstar/" + Pattern.quote(pornstar) + "/(?:videos/upload|gifs))").getColumn(0);
-            } else {
-                pages = br.getRegex("(/pornstar/" + Pattern.quote(pornstar) + "/(?:videos|gifs))").getColumn(0);
-            }
+            final String pages[] = br.getRegex("(/" + type + "/" + Pattern.quote(user) + "/(?:videos/upload|videos|gifs|trailers))").getColumn(0);
             if (pages.length > 0) {
                 /* Let crawler crawl each page one by one. */
+                final HashSet<String> pages_unique = new HashSet<String>(Arrays.asList(pages));
+                final List<String> pages_selected = new ArrayList<String>();
+                for (final String page : pages_unique) {
+                    if (!includeTagged && StringUtils.containsIgnoreCase(page, "/videos/upload")) {
+                        continue;
+                    }
+                    pages_selected.add(page);
+                }
+                if (pages_selected.isEmpty()) {
+                    logger.info("User has deselected all possible items");
+                    throw new DecrypterRetryException(RetryReason.PLUGIN_SETTINGS);
+                }
                 final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-                for (final String page : new HashSet<String>(Arrays.asList(pages))) {
-                    ret.add(createDownloadlink(br.getURL(page).toString()));
+                for (final String page : pages_selected) {
+                    ret.add(createDownloadlink(br.getURL(page).toExternalForm()));
                 }
                 return ret;
             } else {
@@ -479,8 +457,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String seeAllURL = br.getRegex("(" + Regex.escape(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
         if (seeAllURL != null) {
             /**
-             * E.g. users/bla/videos --> /users/bla/videos/favorites </br> Without this we might only see some of all items and no
-             * pagination which is needed to be able to find all items.
+             * E.g. users/bla/videos --> /users/bla/videos/favorites </br>
+             * Without this we might only see some of all items and no pagination which is needed to be able to find all items.
              */
             logger.info("Found seeAllURL: " + seeAllURL);
             PornHubCom.getPage(br, seeAllURL);

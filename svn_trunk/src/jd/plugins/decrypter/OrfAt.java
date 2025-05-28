@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 50866 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51090 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -316,7 +316,10 @@ public class OrfAt extends PluginForDecrypt {
                 final Map<String, Long> qualityIdentifierToFilesizeMap = new HashMap<String, Long>();
                 final List<DownloadLink> videoresults = new ArrayList<DownloadLink>();
                 final HashSet<String> allAvailableQualitiesAsHumanReadableIdentifiers = new HashSet<String>();
+                int sources_index = -1;
                 for (final Map<String, Object> source : sources) {
+                    sources_index++;
+                    final boolean isLastItem = sources_index == sources.size() - 1;
                     final String url_directlink_video = (String) source.get("src");
                     final String fmt = source.get("quality").toString();
                     final String protocol = source.get("protocol").toString();
@@ -342,7 +345,18 @@ public class OrfAt extends PluginForDecrypt {
                         isProgressive = false;
                     }
                     final String fmtHumanReadable = humanReadableQualityIdentifier(fmt.toUpperCase(Locale.ENGLISH).trim());
-                    progressiveStreamFilesizeCheck: if (selectedQualities.contains(fmtHumanReadable) && isProgressive && !settingEnableFastCrawl && !qualityIdentifierToFilesizeMap.containsKey(fmtHumanReadable) && !has_active_youth_protection) {
+                    boolean looksLikeQualityIsSelected = false;
+                    if (settingPreferBestVideo) {
+                        if (isLastItem) {
+                            /* Small hack: Assume that last item == best */
+                            looksLikeQualityIsSelected = true;
+                        }
+                    } else {
+                        if (selectedQualities.contains(fmtHumanReadable)) {
+                            looksLikeQualityIsSelected = true;
+                        }
+                    }
+                    progressiveStreamFilesizeCheck: if (looksLikeQualityIsSelected && isProgressive && !settingEnableFastCrawl && !qualityIdentifierToFilesizeMap.containsKey(fmtHumanReadable) && !has_active_youth_protection) {
                         logger.info("Checking progressive URL to find filesize: " + url_directlink_video);
                         URLConnectionAdapter con = null;
                         try {

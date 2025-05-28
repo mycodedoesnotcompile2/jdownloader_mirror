@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48343 $", interfaceVersion = 2, names = { "jianguoyun.com" }, urls = { "http://jianguoyundecrypted\\.com/\\d+" })
+@HostPlugin(revision = "$Revision: 51090 $", interfaceVersion = 2, names = { "jianguoyun.com" }, urls = { "http://jianguoyundecrypted\\.com/\\d+" })
 public class JianguoyunCom extends PluginForHost {
     public JianguoyunCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,13 +132,14 @@ public class JianguoyunCom extends PluginForHost {
         final String isdeleted = new Regex(pageJson, "isdeleted[\t\n\r ]*?:[\t\n\r ]*?(true|false)").getMatch(0);
         final String isrevoked = new Regex(pageJson, "isrevoked[\t\n\r ]*?:[\t\n\r ]*?(true|false)").getMatch(0);
         final String canNotAccess = new Regex(pageJson, "canNotAccess[\t\n\r ]*?:[\t\n\r ]*?(true|false)").getMatch(0);
-        final String filename = new Regex(pageJson, "name[\t\n\r ]*?:[\t\n\r ]*?\\'([^<>\"\\']+)\\'").getMatch(0);
+        String filename = new Regex(pageJson, "name[\t\n\r ]*?:[\t\n\r ]*?\\'([^<>\"\\']+)\\'").getMatch(0);
         final String filesize = new Regex(pageJson, "size[\t\n\r ]*?:[\t\n\r ]*?\\'(\\d+)\\'").getMatch(0);
         final String download_need_signin = new Regex(pageJson, "download_need_signin[\t\n\r ]*?:[\t\n\r ]*?(true|false)").getMatch(0);
         if (download_need_signin != null) {
             dl.setProperty("download_need_signin", Boolean.parseBoolean(download_need_signin));
         }
         if (filename != null) {
+            filename = Encoding.htmlDecode(filename).trim();
             dl.setName(filename);
         }
         if (filesize != null) {
@@ -162,9 +163,9 @@ public class JianguoyunCom extends PluginForHost {
     }
 
     @Override
-    public void handleFree(final DownloadLink downloadLink) throws Exception, PluginException {
-        requestFileInformation(downloadLink);
-        doFree(downloadLink);
+    public void handleFree(final DownloadLink link) throws Exception, PluginException {
+        requestFileInformation(link);
+        doFree(link);
     }
 
     public void doFree(final DownloadLink link) throws Exception, PluginException {
@@ -265,7 +266,7 @@ public class JianguoyunCom extends PluginForHost {
                         return;
                     }
                     /* Usually 401 == Not logged in */
-                    br = this.prepBR(new Browser());
+                    br = this.prepBR(this.createNewBrowserInstance());
                 }
                 br.getPage("https://www." + this.getHost() + "/d/login");
                 br.postPage(br.getURL(), "login_email=" + Encoding.urlEncode(account.getUser()) + "&login_password=" + Encoding.urlEncode(account.getPass()) + "&remember_me=on");
@@ -326,7 +327,7 @@ public class JianguoyunCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -335,7 +336,7 @@ public class JianguoyunCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

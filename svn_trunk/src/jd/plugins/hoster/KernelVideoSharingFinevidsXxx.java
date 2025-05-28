@@ -26,7 +26,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51091 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingFinevidsXxx extends KernelVideoSharingComV2 {
     public KernelVideoSharingFinevidsXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,11 @@ public class KernelVideoSharingFinevidsXxx extends KernelVideoSharingComV2 {
 
     @Override
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
-        String dllink = br.getRegex("src:\\s*'(http[^\\']+\\.mp4)'").getMatch(0);
+        /**
+         * 2025-05-27: .flv videos still exist e.g. /videos/6064/watch-hawt-veronika-get-in-nature-s-garb/ <br>
+         * Example broken video: /videos/6064/watch-hawt-veronika-get-in-nature-s-garb/
+         */
+        String dllink = br.getRegex("src:\\s*'(http[^\\']+\\.(flv|mp4))'").getMatch(0);
         if (dllink == null) {
             dllink = br.getRegex("<source src=\"(https?://[^\"]+)\" type=\"video/mp4").getMatch(0);
         }

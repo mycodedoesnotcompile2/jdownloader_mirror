@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50897 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+@HostPlugin(revision = "$Revision: 51091 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends PluginForHost {
     private final String        baseURL                   = "https://icerbox.com";
     private final String        apiURL                    = "https://icerbox.com/api/v1";
@@ -442,6 +442,7 @@ public class IcerBoxCom extends PluginForHost {
         }
     }
 
+    @Override
     public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
         final String storedDirecturl = getStoredDirecturl(link, acc);
         if (storedDirecturl == null) {
