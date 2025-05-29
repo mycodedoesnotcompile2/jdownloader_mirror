@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -31,6 +32,7 @@ import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
@@ -45,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51049 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51098 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,9 +87,26 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         final Account account = AccountController.getInstance().getValidAccount(getHost());
+        boolean hasMultiplePaidVideosPages = false;
+        final HashSet<String> paidVideoIDs = new HashSet<String>();
         if (account != null) {
             final ManyvidsCom hosterplugin = (ManyvidsCom) this.getNewPluginForHostInstance(getHost());
             hosterplugin.login(account, false);
+            /* 2025-05-28: We could use some caching here but for now I'll leave it as it is. */
+            logger.info("Obtaining list of videoIDs which the user has bought to determine how to crawl them down below.");
+            final Browser br2 = br.cloneBrowser();
+            br2.getPage("https://www." + getHost() + "/View-my-history/1/");
+            if (br2.containsHTML("View-my-history/2")) {
+                // TODO: Add pagination support
+                logger.info("User has multiple pages of paid videos available -> Crawl all videos separately to ensure that for paid videos, the full length videos get crawled");
+                hasMultiplePaidVideosPages = true;
+                logger.info("TODO: DEV: Add support for user purched videos pagination");
+            }
+            final String[] paidVideoidsArray = br2.getRegex("/Video/(\\d+)").getColumn(0);
+            if (paidVideoidsArray != null && paidVideoidsArray.length > 0) {
+                paidVideoIDs.addAll(Arrays.asList(paidVideoidsArray));
+            }
+            logger.info("Number of paid videos this user owns: " + paidVideoIDs.size());
         }
         final String manyvidsKeyPrefix = "manyvids_com://";
         String title = null;
@@ -130,6 +149,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                 fp.setName(contentID);
             }
             fp.setPackageKey(manyvidsKeyPrefix + contentType + "/" + contentID);
+            final boolean crawlFreeVideosOneByOne = true;
             do {
                 brc.getPage("/bff/store/videos/" + contentID + "/?page=" + page);
                 final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -141,7 +161,6 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                 }
                 final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("data");
                 int numberofNewItems = 0;
-                final boolean crawlFreeVideosOneByOne = true;
                 for (final Map<String, Object> item : items) {
                     final Map<String, Object> creator = (Map<String, Object>) item.get("creator");
                     final Map<String, Object> thumbnail = (Map<String, Object>) item.get("thumbnail");
@@ -156,19 +175,28 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                     numberofNewItems++;
                     final String content_url = "https://www." + getHost() + "/Video/" + video_id + "/" + item.get("slug");
                     final String previewSuffix;
+                    boolean crawlThisVideoSeparately = paidVideoIDs.contains(video_id) || hasMultiplePaidVideosPages;
                     if (Boolean.TRUE.equals(price.get("free"))) {
                         if (crawlFreeVideosOneByOne) {
-                            /* This item will go back into our crawler to find the other/official streaming qualities. */
-                            final DownloadLink video = this.createDownloadlink(content_url);
-                            ret.add(video);
-                            distribute(video);
-                            continue;
+                            crawlThisVideoSeparately = true;
                         }
                         /* Free video */
                         previewSuffix = "";
                     } else {
                         /* Preview video */
                         previewSuffix = "_PREVIEW";
+                    }
+                    if (crawlThisVideoSeparately) {
+                        /**
+                         * This item will go back into our crawler to find the other/official streaming qualities. <br>
+                         * This is important so that: <br>
+                         * - Free full videos are crawled correctly <br>
+                         * - Videos which the user has bought separately are crawled correctly
+                         */
+                        final DownloadLink video = this.createDownloadlink(content_url);
+                        ret.add(video);
+                        distribute(video);
+                        continue;
                     }
                     if (thumbnail != null) {
                         final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnail.get("url").toString()));
@@ -236,6 +264,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             final Map<String, Object> model = (Map<String, Object>) data.get("model");
             title = data.get("title").toString();
+            title = Encoding.htmlDecode(title).trim();
             final String filesizeStr = (String) data.get("size");
             final String description = (String) data.get("description");
             // final Boolean isFree = (Boolean) data.get("isFree");

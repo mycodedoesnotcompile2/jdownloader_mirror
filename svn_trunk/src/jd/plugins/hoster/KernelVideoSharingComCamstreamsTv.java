@@ -22,13 +22,12 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51091 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51097 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComCamstreamsTv extends KernelVideoSharingComV2 {
     public KernelVideoSharingComCamstreamsTv(final PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "camstreams.tv" });

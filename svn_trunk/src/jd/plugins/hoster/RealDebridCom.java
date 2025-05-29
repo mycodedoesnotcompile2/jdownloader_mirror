@@ -27,6 +27,35 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.Icon;
 
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.CaptchaException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.HashInfo;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -70,36 +99,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.CaptchaException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.HashInfo;
-
-@HostPlugin(revision = "$Revision: 50954 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 51092 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String          CLIENT_SECRET_KEY        = "client_secret";
     private static final String          CLIENT_ID_KEY            = "client_id";
@@ -108,7 +108,6 @@ public class RealDebridCom extends PluginForHost {
     private static final String          AUTHORIZATION            = "Authorization";
     private static MultiHosterManagement mhm                      = new MultiHosterManagement("real-debrid.com");
     /* API Docs: https://api.real-debrid.com/ */
-    private static final String          API_BASE                 = "https://api.real-debrid.com";
     private static final String          CLIENT_ID                = "NJ26PAPGHWGZY";
     private static AtomicInteger         MAX_DOWNLOADS            = new AtomicInteger(Integer.MAX_VALUE);
     private static AtomicInteger         RUNNING_DOWNLOADS        = new AtomicInteger(0);
@@ -256,6 +255,34 @@ public class RealDebridCom extends PluginForHost {
         }
     }
 
+    private static AtomicReference<String> API_BASE = new AtomicReference<String>();
+
+    private String getAPIBase() throws PluginException, InterruptedException, IOException {
+        String ret = API_BASE.get();
+        if (ret != null) {
+            return ret;
+        }
+        synchronized (API_BASE) {
+            ret = API_BASE.get();
+            if (ret != null) {
+                return ret;
+            }
+            // https://x.com/RealDebrid/status/1899035874584612870
+            for (final String apiBase : new String[] { "https://api.real-debrid.com", "https://app.real-debrid.com" }) {
+                try {
+                    final Browser brc = br.cloneBrowser();
+                    brc.setAllowedResponseCodes(-1);
+                    brc.getPage(apiBase);
+                    API_BASE.set(apiBase);
+                    return apiBase;
+                } catch (IOException e) {
+                    logger.log(e);
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Cannot reach Real-Debrid API");
+        }
+    }
+
     private <T> T callRestAPI(final Account account, String method, UrlQuery query, TypeRef<T> type) throws IOException, PluginException, APIException, InterruptedException {
         if (account == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -263,7 +290,7 @@ public class RealDebridCom extends PluginForHost {
         ensureAPIBrowser();
         TokenResponse token = login(account, false);
         try {
-            final T ret = callRestAPIInternal(token, API_BASE + "/rest/1.0" + method, query, type);
+            final T ret = callRestAPIInternal(token, getAPIBase() + "/rest/1.0" + method, query, type);
             this.currentToken = token;
             return ret;
         } catch (final APIException e) {
@@ -273,7 +300,7 @@ public class RealDebridCom extends PluginForHost {
                 try {
                     // refresh Token
                     token = login(account, true);
-                    final T ret = callRestAPIInternal(token, API_BASE + "/rest/1.0" + method, query, type);
+                    final T ret = callRestAPIInternal(token, getAPIBase() + "/rest/1.0" + method, query, type);
                     this.currentToken = token;
                     return ret;
                 } catch (final APIException e2) {
@@ -665,7 +692,7 @@ public class RealDebridCom extends PluginForHost {
     }
 
     public ClientSecret checkCredentials(final CodeResponse code) throws Exception {
-        return callRestAPIInternal(null, API_BASE + "/oauth/v2/device/credentials?client_id=" + Encoding.urlEncode(CLIENT_ID) + "&code=" + Encoding.urlEncode(code.getDevice_code()), null, ClientSecret.TYPE);
+        return callRestAPIInternal(null, getAPIBase() + "/oauth/v2/device/credentials?client_id=" + Encoding.urlEncode(CLIENT_ID) + "&code=" + Encoding.urlEncode(code.getDevice_code()), null, ClientSecret.TYPE);
     }
 
     private TokenResponse login(Account account, boolean force) throws PluginException, IOException, APIException, InterruptedException {
@@ -692,7 +719,7 @@ public class RealDebridCom extends PluginForHost {
             if (StringUtils.isNotEmpty(tokenJSon) && StringUtils.isNotEmpty(clientSecretJson)) {
                 final TokenResponse existingToken = restoreFromString(tokenJSon, TokenResponse.TYPE);
                 final ClientSecret clientSecret = restoreFromString(clientSecretJson, ClientSecret.TYPE);
-                final String tokenResponseJson = br.postPage(API_BASE + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", existingToken.getRefresh_token(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
+                final String tokenResponseJson = br.postPage(getAPIBase() + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", existingToken.getRefresh_token(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
                 this.checkErrorsWebsite(br);
                 final TokenResponse newToken = restoreFromString(tokenResponseJson, TokenResponse.TYPE);
                 if (newToken.validate()) {
@@ -704,9 +731,9 @@ public class RealDebridCom extends PluginForHost {
             }
             // Could not refresh the token. login using username and password
             br.setCookiesExclusive(true);
-            br.clearCookies(API_BASE);
+            br.clearCookies(getAPIBase());
             final Browser autoSolveBr = br.cloneBrowser();
-            final String responseJson = br.getPage(API_BASE + "/oauth/v2/device/code?client_id=" + CLIENT_ID + "&new_credentials=yes");
+            final String responseJson = br.getPage(getAPIBase() + "/oauth/v2/device/code?client_id=" + CLIENT_ID + "&new_credentials=yes");
             this.checkErrorsWebsite(br);
             final CodeResponse code = restoreFromString(responseJson, new TypeRef<CodeResponse>(CodeResponse.class) {
             });
@@ -912,12 +939,12 @@ public class RealDebridCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, "OAuth Failed", PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
             }
-            final String tokenResponseJson = br.postPage(API_BASE + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", code.getDevice_code(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
+            final String tokenResponseJson = br.postPage(getAPIBase() + "/oauth/v2/token", new UrlQuery().append(CLIENT_ID_KEY, clientSecret.getClient_id(), true).append(CLIENT_SECRET_KEY, clientSecret.getClient_secret(), true).append("code", code.getDevice_code(), true).append("grant_type", "http://oauth.net/grant_type/device/1.0", true));
             this.checkErrorsWebsite(br);
             final TokenResponse newToken = restoreFromString(tokenResponseJson, new TypeRef<TokenResponse>(TokenResponse.class) {
             });
             if (newToken.validate()) {
-                final UserResponse user = callRestAPIInternal(newToken, API_BASE + "/rest/1.0" + "/user", null, UserResponse.TYPE);
+                final UserResponse user = callRestAPIInternal(newToken, getAPIBase() + "/rest/1.0" + "/user", null, UserResponse.TYPE);
                 if (StringUtils.isEmpty(account.getUser())) {
                     if (StringUtils.isNotEmpty(user.getUsername())) {
                         account.setUser(user.getUsername());

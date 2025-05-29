@@ -19,13 +19,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51091 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51093 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2TabootubeXxx extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2TabootubeXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -74,7 +76,7 @@ public class KernelVideoSharingComV2TabootubeXxx extends KernelVideoSharingComV2
 
     @Override
     protected boolean isOfflineWebsite(final Browser br) {
-        if (!br.getURL().contains("/embed/") && !br.containsHTML("/embed/\\d+")) {
+        if (!StringUtils.containsIgnoreCase(br.getURL(), "/embed/") && !br.containsHTML("/embed/\\d+")) {
             /* Invalid link e.g. /categories/ */
             return true;
         } else {

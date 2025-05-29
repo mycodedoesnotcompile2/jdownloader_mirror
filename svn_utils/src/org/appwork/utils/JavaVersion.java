@@ -42,6 +42,7 @@ public enum JavaVersion implements JavaVersionInterface {
     JVM_26_0(70, "26"/* not verified */) {
         private final long next;
         {
+            // "next" 27 comes after 26
             this.next = parseJavaVersionString("27");
         }
 

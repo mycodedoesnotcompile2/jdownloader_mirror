@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 51090 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51098 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -322,18 +322,23 @@ public class OrfAt extends PluginForDecrypt {
                     final boolean isLastItem = sources_index == sources.size() - 1;
                     final String url_directlink_video = (String) source.get("src");
                     final String fmt = source.get("quality").toString();
+                    final String quality_string = source.get("quality_string").toString();
                     final String protocol = source.get("protocol").toString();
                     final String delivery = source.get("delivery").toString();
                     // final String subtitleUrl = (String) entry_source.get("SubTitleUrl");
                     allFMTs.add(fmt);
+                    /* Skip stuff we cannot handle */
                     if (StringUtils.equals(fmt, "QXADRM")) {
                         numberofSkippedDRMItems++;
                         continue;
-                    } else if (!"http".equals(protocol)) {
+                    } else if (!"http".equalsIgnoreCase(protocol)) {
                         continue;
-                    } else if ("dash".equals(delivery)) {
+                    } else if ("dash".equalsIgnoreCase(delivery)) {
                         continue;
-                    } else if ("rtmp".equals(delivery)) {
+                    } else if ("rtmp".equalsIgnoreCase(delivery)) {
+                        continue;
+                    } else if (quality_string.equalsIgnoreCase("adaptiv")) {
+                        /* Split audio/video HLS items */
                         continue;
                     }
                     /* possible protocols: http, rtmp, rtsp, hds, hls */

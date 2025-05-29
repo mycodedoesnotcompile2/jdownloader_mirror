@@ -21,6 +21,7 @@ import java.util.Map;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.HideCxConfig;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -39,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 50853 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51096 $", interfaceVersion = 3, names = {}, urls = {})
 public class HideCx extends PluginForDecrypt {
     public HideCx(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +86,6 @@ public class HideCx extends PluginForDecrypt {
         if (!contentID.replace("-", "").matches("[a-f0-9]{32}")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid format");
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final HideCxConfig cfg = PluginJsonConfig.get(HideCxConfig.class);
         final String apikey = cfg.getAPIKey();
         if (apikey != null) {
@@ -112,7 +112,6 @@ public class HideCx extends PluginForDecrypt {
                     logger.info("Wrong password or password required");
                     continue;
                 }
-                logger.info("User entered correct password: " + passCode);
                 entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 passwordSuccess = true;
                 break passwordLoop;
@@ -133,30 +132,41 @@ public class HideCx extends PluginForDecrypt {
         if (!passwordSuccess) {
             throw new DecrypterException(DecrypterException.PASSWORD);
         }
+        if (passCode != null) {
+            logger.info("User entered correct password: " + passCode);
+        }
         final String title = (String) entries.get("name");
         final FilePackage fp = FilePackage.getInstance();
-        if (title != null) {
+        if (!StringUtils.isEmpty(title)) {
             fp.setName(title);
         } else {
+            /* Fallback */
             fp.setName(contentID);
         }
         fp.setPackageKey("hide.cx//container/" + contentID);
         final List<Map<String, Object>> downloads = (List<Map<String, Object>>) entries.get("links");
         int progr = 1;
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (final Map<String, Object> download : downloads) {
-            logger.info("Crawling item " + progr + "/" + downloads.size());
-            final String filename = (String) download.get("file");
+            final String download_id = download.get("id").toString();
+            logger.info("Crawling item " + progr + "/" + downloads.size() + " | ID: " + download_id);
+            /* "Real" filename (not always provided) */
+            final String filename = (String) download.get("name");
+            /* "Weak" filename (sometimes this can be the URLs' content_id and not a filename at all) */
+            final String filename_fallback = (String) download.get("file");
             final Number link_size = (Number) download.get("link_size");
             String url = (String) download.get("hoster_url");
             if (url == null) {
-                /* http request needed */
-                br.getPage("/containers/" + contentID + "/links/" + download.get("id"));
+                /* Separate http request needed to fetch url */
+                br.getPage("/containers/" + contentID + "/links/" + download_id);
                 final Map<String, Object> linkresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 url = linkresponse.get("url").toString();
             }
             final DownloadLink link = this.createDownloadlink(url);
-            if (filename != null) {
+            if (!StringUtils.isEmpty(filename)) {
                 link.setName(filename);
+            } else if (!StringUtils.isEmpty(filename_fallback)) {
+                link.setName(filename_fallback);
             }
             if (link_size != null) {
                 link.setDownloadSize(link_size.longValue());

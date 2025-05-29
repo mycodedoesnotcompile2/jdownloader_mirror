@@ -50,7 +50,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.ChoMikujPl;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51053 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
+@DecrypterPlugin(revision = "$Revision: 51097 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
 public class ChoMikujPlFolder extends PluginForDecrypt {
     public ChoMikujPlFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -262,7 +262,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
      * This can be used to determine if the current page is a folder or a single file.
      */
     private DownloadLink crawlSingleFile(final Browser br) {
-        final String filename = br.getRegex("Download: <b>([^<>\"]*?)</b>").getMatch(0);
+        final String filename = br.getRegex("Download:\\s*<b>([^<]+)</b>").getMatch(0);
         final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
         final String fid = br.getRegex("id=\"fileDetails_(\\d+)\"").getMatch(0);
         final String singleFileFolderPath = getSingleFileFolderPath(br);
@@ -295,14 +295,6 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             return null;
         }
         return Encoding.htmlDecode(singleFileFolderPath);
-    }
-
-    private boolean endingLooksLikeFile(final String linkEnding) {
-        if (new Regex(linkEnding, Pattern.compile("\\d+\\.[A-Za-z0-9]{1,5}", Pattern.CASE_INSENSITIVE)).matches()) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     private String regexRequestVerificationToken(final Browser br) {
