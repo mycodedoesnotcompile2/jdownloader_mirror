@@ -26,20 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.simplejson.MinimalMemoryMap;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.RedditConfig;
-import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -66,7 +52,24 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 49953 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.simplejson.MinimalMemoryMap;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.RedditConfig;
+import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
+import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -89,8 +92,8 @@ public class RedditComCrawler extends PluginForDecrypt {
     public int getMaxConcurrentProcessingInstances() {
         /**
          * 2023-08-07: Try not to run into API rate-limits RE:
-         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br>
-         * IMPORTANT: Dev: If you want to set this to a value higher than 1, first check API rate-limit handling and implement locks!!
+         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br> IMPORTANT: Dev: If you want to set
+         * this to a value higher than 1, first check API rate-limit handling and implement locks!!
          */
         return 1;
     }
@@ -352,8 +355,10 @@ public class RedditComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> crawledItems = new ArrayList<DownloadLink>();
         final List<Map<String, Object>> items = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "data/children");
         final RedditConfig cfg = PluginJsonConfig.get(RedditConfig.class);
+        final PreviewCrawlerMode previewMode = cfg.getPreviewDownloadMode();
         int numberofSkippedItems = 0;
         for (final Map<String, Object> post : items) {
+            boolean crawlPreview = !PreviewCrawlerMode.NEVER.equals(previewMode);
             final String kind = (String) post.get("kind");
             final Map<String, Object> data = (Map<String, Object>) post.get("data");
             final String postID = (String) data.get("id");
@@ -441,8 +446,22 @@ public class RedditComCrawler extends PluginForDecrypt {
                             dl.setAvailable(true);
                             thisCrawledLinks.add(dl);
                         }
+                        if (PreviewCrawlerMode.ONLY_IF_NO_MEDIA_SUPPORT_AVAILABLE.equals(previewMode)) {
+                            crawlPreview = false;
+                        }
                     } else if (!this.canHandle(maybeExternalURL)) {
                         logger.info("Found external URL in 'url' field: " + maybeExternalURL);
+                        if (PreviewCrawlerMode.ONLY_IF_NO_MEDIA_SUPPORT_AVAILABLE.equals(previewMode)) {
+                            final List<LazyCrawlerPlugin> nextLazyCrawlerPlugins = findNextLazyCrawlerPlugins(maybeExternalURL);
+                            if (nextLazyCrawlerPlugins.size() > 0) {
+                                crawlPreview = false;
+                            } else {
+                                final List<LazyHostPlugin> nextLazyHostPlugins = findNextLazyHostPlugins(maybeExternalURL);
+                                if (nextLazyHostPlugins.size() > 0) {
+                                    crawlPreview = false;
+                                }
+                            }
+                        }
                         thisCrawledExternalLinks.add(this.createDownloadlink(maybeExternalURL));
                     } else {
                         /*
@@ -454,7 +473,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                 }
                 final Map<String, Object> preview = (Map<String, Object>) data.get("preview");
-                if (preview != null) {
+                if (preview != null && crawlPreview) {
                     final List<Map<String, Object>> images = (List<Map<String, Object>>) preview.get("images");
                     for (final Map<String, Object> image : images) {
                         /**
@@ -484,7 +503,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                                 if (StringUtils.endsWithCaseInsensitive(filenameFromURL, ".gif")) {
                                     /*
                                      * Filename from URL contains .gif extension but this is a .mp4 file
-                                     *
+                                     * 
                                      * -> Correct that but keep .gif to signal source of the mp4
                                      */
                                     direct.setFinalFileName(this.applyFilenameExtension(filenameFromURL, ".gif.mp4"));
@@ -498,8 +517,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                     /**
                      * Return "preview video" because e.g. in some cases original video is hosted on imgur.com but it is offline while
-                     * content on reddit is still online e.g.: </br>
-                     * /r/Bellissima/comments/151ruli/brit_manuela/
+                     * content on reddit is still online e.g.: </br> /r/Bellissima/comments/151ruli/brit_manuela/
                      */
                     final Map<String, Object> reddit_video_preview = (Map<String, Object>) preview.get("reddit_video_preview");
                     if (reddit_video_preview != null && !addedRedditSelfhostedVideo) {
@@ -566,8 +584,8 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                 } else {
                     /**
-                     * No image gallery </br>
-                     * --> Look for embedded content from external sources - the object is always given but can be empty
+                     * No image gallery </br> --> Look for embedded content from external sources - the object is always given but can be
+                     * empty
                      */
                     final Object embeddedMediaO = data.get("media_embed");
                     if (embeddedMediaO != null) {
@@ -623,7 +641,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                     if (thisCrawledLinks.isEmpty()) {
                         postContainsRealMedia = false;
                         final List<Map<String, Object>> images = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(data, "preview/images");
-                        if (images != null) {
+                        if (images != null && crawlPreview) {
                             /* Images slash selfhosted preview images */
                             logger.info(String.format("Found %d selfhosted images", images.size()));
                             int imageNumber = 1;

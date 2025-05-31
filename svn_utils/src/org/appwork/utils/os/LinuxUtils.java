@@ -50,18 +50,14 @@ public class LinuxUtils {
         try {
             final Class<?> unixSystem = Class.forName("com.sun.security.auth.module.UnixSystem");
             final Object instance = unixSystem.getConstructor().newInstance();
-            if (ReflectionUtils.invoke(unixSystem, "getUid", instance, long.class) == 0) {
-                return true;
-            }
+            return ReflectionUtils.invoke(unixSystem, "getUid", instance, long.class) == 0;
         } catch (Throwable e) {
         }
         try {
             if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
                 final File procSelf = new File("/proc/self");
                 if (procSelf.isDirectory()) {
-                    if (((Integer) java.nio.file.Files.getAttribute(procSelf.toPath(), "unix:uid")).intValue() == 0) {
-                        return true;
-                    }
+                    return ((Integer) java.nio.file.Files.getAttribute(procSelf.toPath(), "unix:uid")).intValue() == 0;
                 }
             }
         } catch (UnsupportedOperationException e) {
@@ -75,9 +71,7 @@ public class LinuxUtils {
                 final Class<?> libc = Class.forName("com.sun.jna.platform.unix.LibC");
                 final Class<?> libcApi = Class.forName("com.sun.jna.platform.unix.LibCAPI");
                 final Object instance = ReflectionUtils.getFieldValue(libc, "INSTANCE", libc, libc);
-                if (ReflectionUtils.invoke(libcApi, "getuid", instance, int.class) == 0) {
-                    return true;
-                }
+                return ReflectionUtils.invoke(libcApi, "getuid", instance, int.class) == 0;
             }
         } catch (Throwable e) {
         }

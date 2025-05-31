@@ -22,12 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -50,7 +44,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 51025 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -197,19 +197,18 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         do {
             final String[] htmls = br.getRegex("<div class=\"list-item [^\"]+\"(.*?)class=\"btn-lock fas fa-eye-slash\"[^>]*></div>").getColumn(0);
             int numberofNewItems = 0;
+            int numberofNewAlbums = 0;
             for (final String html : htmls) {
                 if (isProfileAlbumsOverview) {
                     final String url = new Regex(html, pattern_album).getMatch(-1);
                     if (url == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    // if (!new Regex(url, pattern_album).patternFind()) {
-                    // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    // }
                     if (!dupes.add(url)) {
                         logger.info("Skipping dupe: " + url);
                         continue;
                     }
+                    numberofNewAlbums++;
                     final DownloadLink link = this.createDownloadlink(url);
                     distribute(link);
                     ret.add(link);
@@ -258,7 +257,7 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
-            } else if (numberofNewItems == 0) {
+            } else if (numberofNewItems == 0 && numberofNewAlbums == 0) {
                 logger.info("Stopping because: Current page contains no new items");
                 break;
             } else if (apiurl == null || token == null || seek == null) {
@@ -267,17 +266,29 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                 break;
             } else {
                 page++;
-                query.addAndReplace("page", Integer.toString(page));
-                query.addAndReplace("seek", URLEncode.encodeURIComponent(seek));
-                br.postPage(apiurl, query);
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final String html = (String) entries.get("html");
-                if (html != null) {
-                    br.getRequest().setHtmlCode(html);
-                }
-                seek = (String) entries.get("seekEnd");
-                if (seek != null && !seekEnds.add(seek)) {
-                    seek = null;
+                if (isProfileAlbumsOverview) {
+                    // album overview has different pagination, use same as in browser
+                    br.getPage("?page=" + Integer.toString(page) + "&seek=" + URLEncode.encodeURIComponent(seek));
+                    seek = br.getRegex("page=" + Integer.toString(page + 1) + "&seek=([^\\&\"]+)").getMatch(0);
+                    if (seek != null) {
+                        seek = Encoding.htmlDecode(seek);
+                    }
+                    if (seek != null && !seekEnds.add(seek)) {
+                        seek = null;
+                    }
+                } else {
+                    query.addAndReplace("page", Integer.toString(page));
+                    query.addAndReplace("seek", URLEncode.encodeURIComponent(seek));
+                    br.postPage(apiurl, query);
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final String html = (String) entries.get("html");
+                    if (html != null) {
+                        br.getRequest().setHtmlCode(html);
+                    }
+                    seek = (String) entries.get("seekEnd");
+                    if (seek != null && !seekEnds.add(seek)) {
+                        seek = null;
+                    }
                 }
             }
         } while (true);

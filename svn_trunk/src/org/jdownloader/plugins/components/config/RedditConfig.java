@@ -4,6 +4,7 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DefaultStringValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
@@ -20,6 +21,7 @@ public interface RedditConfig extends PluginConfigInterface {
     final String                                 text_CustomCommentsPackagenameScheme    = "Define custom packagename scheme";
     final String                                 text_PreferredFilenameScheme            = "Select preferred filename scheme";
     final String                                 text_CrawlerTextDownloadMode            = "Crawler: Text download mode";
+    final String                                 text_PreviewDownloadMode                = "Crawler: Preview download mode";
     final String                                 text_CrawlUrlsInsidePostText            = "Crawl URLs inside post-text?";
     final String                                 text_ProfileCrawlerMaxPages             = "User crawler: Crawl max X pages (-1 = unlimited, 0 = disable user crawler)";
     final String                                 text_SubredditCrawlerMaxPages           = "Subreddit crawler: Crawl max X pages (-1 = unlimited, 0 = disable subreddit crawler)";
@@ -177,13 +179,44 @@ public interface RedditConfig extends PluginConfigInterface {
         };
     }
 
+    public static enum PreviewCrawlerMode implements LabelInterface {
+        ALWAYS {
+            @Override
+            public String getLabel() {
+                return "Always";
+            }
+        },
+        ONLY_IF_NO_MEDIA_SUPPORT_AVAILABLE {
+            @Override
+            public String getLabel() {
+                return "Only if no supported media is found";
+            }
+        },
+        NEVER {
+            @Override
+            public String getLabel() {
+                return "Never";
+            }
+        };
+    }
+
     @AboutConfig
     @DefaultEnumValue("ALWAYS")
+    @DefaultOnNull
     @Order(17)
     @DescriptionForConfigEntry(text_CrawlerTextDownloadMode)
     TextCrawlerMode getCrawlerTextDownloadMode();
 
     void setCrawlerTextDownloadMode(final TextCrawlerMode mode);
+
+    @AboutConfig
+    @DefaultEnumValue("ALWAYS")
+    @DefaultOnNull
+    @Order(18)
+    @DescriptionForConfigEntry(text_PreviewDownloadMode)
+    PreviewCrawlerMode getPreviewDownloadMode();
+
+    void setPreviewDownloadMode(final PreviewCrawlerMode mode);
 
     @AboutConfig
     @DefaultBooleanValue(false)

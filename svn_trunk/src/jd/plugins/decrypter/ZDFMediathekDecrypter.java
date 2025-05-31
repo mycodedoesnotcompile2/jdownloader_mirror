@@ -46,6 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.hoster.ARDMediathek;
 import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
@@ -62,7 +63,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51092 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -126,7 +127,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         QUALITIES_MAP.put("v15", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() } }));
         /*
          * new String[] { "508k_p9", QUALITY.LOW.name() }
-         *
+         * 
          * new String[] { "808k_p11", QUALITY.HIGH.name() }
          */
         QUALITIES_MAP.put("v17", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() }, new String[] { "6628k_p61", QUALITY.FHD.name() }, new String[] { "6660k_p37", QUALITY.FHD.name() } }));
@@ -1029,7 +1030,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         for (final String[] betterQualityEntry : betterQualities) {
                             final String betterQuality = betterQualityEntry[1];
                             if (!httpQualities.contains(ext + betterQuality)) {
-                                final long filesizeNew = this.checkDownloadable(betterQualityEntry[0]);
+                                final long filesizeNew = this.checkDownloadable(br, betterQualityEntry[0]);
                                 if (filesizeNew > -1) {
                                     logger.info("Optimization for: " + realQuality + "(" + uri + ")->" + betterQuality + "(" + betterQualityEntry[0] + ")");
                                     qualities.add(new Object[] { betterQuality, betterQualityEntry[0], filesizeNew });
@@ -1068,7 +1069,22 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                          */
                         if (thisFilesize > 0) {
                             dl.setAvailable(true);
-                            dl.setVerifiedFileSize(thisFilesize);
+                            final URLConnectionAdapter con = probedURLs.get(finalDownloadURL);
+                            if (con != null) {
+                                if (con.getCompleteContentLength() > 0) {
+                                    if (con.isContentDecoded()) {
+                                        dl.setDownloadSize(con.getCompleteContentLength());
+                                    } else {
+                                        dl.setVerifiedFileSize(con.getCompleteContentLength());
+                                    }
+                                }
+                                final String md5 = ARDMediathek.getMD5FromEtag(con);
+                                if (md5 != null) {
+                                    dl.setMD5Hash(md5);
+                                }
+                            } else {
+                                dl.setVerifiedFileSize(thisFilesize);
+                            }
                         }
                         setDownloadlinkProperties(dl, final_filename, type, linkid, title, tv_show, date_formatted, tv_station);
                         dl.setProperty(ZdfDeMediathek.PROPERTY_language, language);
@@ -1163,26 +1179,34 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         }
     }
 
+    private final HashMap<String, URLConnectionAdapter> probedURLs = new HashMap<String, URLConnectionAdapter>();
+
+    @Override
+    public void clean() {
+        probedURLs.clear();
+        super.clean();
+    }
+
     /** Returns filesize if given URL looks to be downloadable (= leads to accepted file content). */
-    private long checkDownloadable(final String url) {
-        URLConnectionAdapter con = null;
-        final Browser br2 = this.br.cloneBrowser();
+    private long checkDownloadable(final Browser br, final String url) {
         try {
-            br2.setFollowRedirects(true);
-            con = br2.openHeadConnection(url);
-            if (this.looksLikeDownloadableContent(con)) {
-                return con.getCompleteContentLength();
-            } else {
-                throw new IOException();
+            final Browser brc = br.cloneBrowser();
+            brc.setFollowRedirects(true);
+            final URLConnectionAdapter con = brc.openHeadConnection(url);
+            try {
+                if (this.looksLikeDownloadableContent(con)) {
+                    con.getInputStream();// required for correct contentDecoded handling
+                    probedURLs.put(url, con);
+                    return con.getCompleteContentLength();
+                } else {
+                    throw new IOException();
+                }
+            } finally {
+                con.disconnect();
             }
         } catch (final Throwable e) {
             logger.log(e);
             return -1;
-        } finally {
-            try {
-                con.disconnect();
-            } catch (final Throwable e) {
-            }
         }
     }
 

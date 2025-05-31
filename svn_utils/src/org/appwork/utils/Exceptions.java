@@ -48,6 +48,7 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.storage.simplejson.mapper.ClassCache;
+import org.appwork.utils.reflection.Clazz;
 
 /**
  * @author $Author: unknown$
@@ -73,6 +74,17 @@ public class Exceptions {
                 if (Exceptions.getInstanceof(e, class1) != null) {
                     return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    public static boolean withinConstructor(final Class<?> clazz) {
+        final String className = ((Class) Clazz.getNonAnonymousType(clazz)).getName();
+        final Exception now = new Exception();
+        for (StackTraceElement elem : now.getStackTrace()) {
+            if (elem.getClassName().equals(className) && elem.getMethodName().equals("<init>")) {
+                return true;
             }
         }
         return false;

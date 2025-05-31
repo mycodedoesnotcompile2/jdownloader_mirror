@@ -21,14 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -46,7 +38,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51091 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends PluginForHost {
     private final String        baseURL                   = "https://icerbox.com";
     private final String        apiURL                    = "https://icerbox.com/api/v1";
@@ -205,13 +205,17 @@ public class IcerBoxCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        return fetchAccountInfo(account, false);
+    }
+
+    protected AccountInfo fetchAccountInfo(final Account account, boolean forceTokenRefresh) throws Exception {
         synchronized (account) {
             final AccountInfo ai = new AccountInfo();
             final Browser ajax = this.createNewBrowserInstanceAPI();
             String token = account.getStringProperty("token", null);
             boolean tokenLoginSuccess = false;
             Map<String, Object> entries = null;
-            if (StringUtils.isNotEmpty(token)) {
+            if (!forceTokenRefresh && StringUtils.isNotEmpty(token)) {
                 logger.info("Validating stored logintoken");
                 ajax.getHeaders().put("Authorization", "Bearer " + token);
                 ajax.getPage(apiURL + "/user/account");
@@ -294,6 +298,17 @@ public class IcerBoxCom extends PluginForHost {
         handleDownload_API(link, account);
     }
 
+    private String ticketRequest(final Browser br, final DownloadLink link, final Account account) throws Exception {
+        final String token = account.getStringProperty("token", null);
+        final String url = apiURL + "/dl/ticket";
+        br.getHeaders().put("Authorization", "Bearer " + token);
+        final UrlQuery query = new UrlQuery();
+        query.appendEncoded("file", getFID(link));
+        br.postPage(url, query);
+        final Map<String, Object> entries = handleApiErrors(br, account, link);
+        return entries.get("url").toString();
+    }
+
     private void handleDownload_API(final DownloadLink link, final Account account) throws Exception {
         /* links that require premium when we don't have a premium account. */
         requestFileInformationApi(link);
@@ -302,19 +317,24 @@ public class IcerBoxCom extends PluginForHost {
         }
         final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
         final String storedDirecturl = this.getStoredDirecturl(link, account);
-        final String dllink;
+        String dllink = null;
         if (storedDirecturl != null) {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            final String token = account.getStringProperty("token", null);
-            final String url = apiURL + "/dl/ticket";
-            br.getHeaders().put("Authorization", "Bearer " + token);
-            final UrlQuery query = new UrlQuery();
-            query.appendEncoded("file", getFID(link));
-            br.postPage(url, query);
-            final Map<String, Object> entries = handleApiErrors(br, account, link);
-            dllink = entries.get("url").toString();
+            synchronized (account) {
+                try {
+                    dllink = ticketRequest(br, link, account);
+                } catch (AccountInvalidException e) {
+                    logger.log(e);
+                    // retry with fresh account token
+                    fetchAccountInfo(account, true);
+                    dllink = ticketRequest(br, link, account);
+                }
+            }
+        }
+        if (dllink == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         try {
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, true, 0);

@@ -32,7 +32,7 @@ import jd.plugins.PluginException;
 import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 51089 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = {}, urls = {})
 public class WorldBytezCom extends XFileSharingProBasic {
     public WorldBytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,8 +49,13 @@ public class WorldBytezCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "worldbytez.com", "worldbytez.net" });
+        ret.add(new String[] { "worldbytez.net", "worldbytez.com" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(String host) {
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -137,7 +142,7 @@ public class WorldBytezCom extends XFileSharingProBasic {
         if (br.containsHTML("(?i)>\\s*If You Are Using VPN Please Disable To Continue Downloading\\s*<") && account != null) {
             /*
              * <h2 style="color: aliceblue;">Oops File Not Found</h2>
-             * 
+             *
              * <h2 style="color: aliceblue;">If You Are Using VPN Please Disable To Continue Downloading</h2> <h2 style="color: aliceblue;">
              * We apologize for any inconvenience caused.</h2>
              */

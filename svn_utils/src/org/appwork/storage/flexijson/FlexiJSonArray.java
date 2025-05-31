@@ -156,7 +156,10 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      */
     @Override
     public boolean addAll(final Collection<? extends FlexiJSonNode> c) {
-        throw new WTFException("Not supported");
+        for (FlexiJSonNode n : c) {
+            add(n);
+        }
+        return c.size() > 0;
     }
 
     /*

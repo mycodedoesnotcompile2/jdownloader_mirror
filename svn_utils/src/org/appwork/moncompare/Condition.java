@@ -2579,9 +2579,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         if (this._isDebug()) {
             this.log(ret.getPath(), "Key Does not Exist: Base: %s -> %s", scope.getPath().toPathString(true), keyPath.toPathString(false));
         }
-        boolean auto = _isAutoCreateMissingNodes();
-        if (auto) {
-            if (ret.getLast() == KEY_DOES_NOT_EXIST && ret.getParent().getLast() == null) {
+        if (ret.getLast() == KEY_DOES_NOT_EXIST && ret.getParent().getLast() == null) {
+            if (_isAutoCreateMissingNodes()) {
                 List<Object> path = ret.getPath().getElements();
                 // next Element is the next key Element after the missing one - we need it to decide if we need an array or objevt
                 Object nextElement = null;
@@ -2636,9 +2635,9 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         this.log(ret.getPath(), "Auto Created %s", ret.getParent());
                     }
                 }
-            } else {
-                ret.replaceLast(null);
             }
+        } else {
+            ret.replaceLast(null);
         }
     }
 
