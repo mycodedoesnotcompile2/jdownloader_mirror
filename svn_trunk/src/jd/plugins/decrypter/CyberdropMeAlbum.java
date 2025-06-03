@@ -24,14 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -47,7 +39,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 49458 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
+import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51104 $", interfaceVersion = 3, names = {}, urls = {})
 public class CyberdropMeAlbum extends PluginForDecrypt {
     public CyberdropMeAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,7 +97,7 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
 
     public static final Pattern PATTERN_ALBUM       = Pattern.compile("/a/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     public static final String  TYPE_FS             = "(?i)https?://fs-(\\d+)\\.[^/]+/(.*?\\." + EXTENSIONS + ")";
-    public static final Pattern PATTERN_SINGLE_FILE = Pattern.compile("/f/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_SINGLE_FILE = Pattern.compile("/(?:e|f)/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     private PluginForHost       plugin              = null;
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -273,8 +273,8 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
     }
 
     /**
-     * Returns URL if given URL looks like it is pointing to a single file. </br>
-     * Returns null if given URL-structure is unknown or does not seem to point to a single file.
+     * Returns URL if given URL looks like it is pointing to a single file. </br> Returns null if given URL-structure is unknown or does not
+     * seem to point to a single file.
      */
     private String isSingleMediaURL(final String url) {
         if (url == null) {

@@ -87,7 +87,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51085 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51102 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1676,8 +1676,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 filename = new Regex(html, "<div[^>]*id\\s*=\\s*\"dfilename\"[^>]*>\\s*(?:<div>)?\\s*([^<>\"]*?)</").getMatch(0);
             }
         }
+        boolean preferRoughFilesize = false;
         String filesizeBytesStr = null;
         String filesizeWithUnit = null;
+        /* 2020-08-10: E.g. myqloud.org */
+        try {
+            filesizeWithUnit = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, null, true);
+            if (filesizeWithUnit != null) {
+                /* File size from official video download handling can be considered a "safe source" */
+                preferRoughFilesize = true;
+            }
+        } catch (final Throwable e) {
+            logger.log(e);
+        }
         {
             /* New sharebox handling 2024-04-10 */
             /* Look for textarea with special copy-able URLs which will sometimes contain information about filename/size. */
@@ -1818,34 +1829,23 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
              * 'supports_availablecheck_filesize_html' setting:
              */
         }
+        if (filesizeBytesStr == null) {
+            filesizeBytesStr = new Regex(html, "\\((\\d+\\s*bytes)\\)").getMatch(0);
+        }
         if (StringUtils.isAllEmpty(filesizeWithUnit, filesizeBytesStr)) {
             filesizeWithUnit = new Regex(html, "id\\s*=\\s*\"fsize[^\"]*\"\\s*>\\s*([0-9\\.]+\\s*[MBTGK]+)\\s*<").getMatch(0);
             if (StringUtils.isEmpty(filesizeWithUnit)) {
                 /* 2019-07-12: Example: Katfile.com */
                 filesizeWithUnit = new Regex(html, "class\\s*=\\s*\"statd\"\\s*>\\s*size\\s*</span>\\s*<span>\\s*([0-9\\.]+\\s*[MBTGK]+)\\s*<").getMatch(0);
             }
-            if (StringUtils.isEmpty(filesizeWithUnit)) {
-                /* 2020-08-10: E.g. myqloud.org */
-                try {
-                    filesizeWithUnit = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, null, true);
-                } catch (final Throwable e) {
-                    logger.log(e);
-                }
-            }
             if (this.supports_availablecheck_filesize_html() && StringUtils.isEmpty(filesizeWithUnit)) {
-                /** TODO: Clean this up */
-                /* Starting from here - more unsafe attempts */
-                if (StringUtils.isEmpty(filesizeWithUnit)) {
-                    filesizeWithUnit = new Regex(html, "\\((\\d+\\s*bytes)\\)").getMatch(0);
-                    /* Generic failover */
-                    if (StringUtils.isEmpty(filesizeWithUnit)) {
-                        filesizeWithUnit = scanGenericFileSize(html);
-                    }
-                }
+                filesizeWithUnit = scanGenericFileSize(html);
             }
         }
         fileInfo[0] = filename;
-        if (filesizeBytesStr != null) {
+        if (preferRoughFilesize && filesizeWithUnit != null) {
+            fileInfo[1] = filesizeWithUnit;
+        } else if (filesizeBytesStr != null) {
             fileInfo[1] = filesizeBytesStr;
         } else {
             fileInfo[1] = filesizeWithUnit;

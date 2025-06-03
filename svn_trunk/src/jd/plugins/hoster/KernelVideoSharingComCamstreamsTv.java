@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51097 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51103 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComCamstreamsTv extends KernelVideoSharingComV2 {
     public KernelVideoSharingComCamstreamsTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -32,6 +32,10 @@ public class KernelVideoSharingComCamstreamsTv extends KernelVideoSharingComV2 {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "camstreams.tv" });
         return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
     }
 
     @Override

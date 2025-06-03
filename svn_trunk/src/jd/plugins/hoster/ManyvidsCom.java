@@ -25,6 +25,8 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPlugin
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
+import com.formdev.flatlaf.util.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -44,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51049 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51101 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsCom extends PluginForHost {
     public ManyvidsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -284,6 +286,13 @@ public class ManyvidsCom extends PluginForHost {
             account.setType(AccountType.FREE);
         }
         ai.setUnlimitedTraffic();
+        if (account.loadUserCookies() != null) {
+            /* Set unique username because when cookie login is used, user can enter anything into username field. */
+            final String username = (String) entries.get("urlHandle");
+            if (!StringUtils.isEmpty(username)) {
+                account.setUser(username);
+            }
+        }
         return ai;
     }
     // @Override

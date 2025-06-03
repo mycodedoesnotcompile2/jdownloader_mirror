@@ -1,8 +1,13 @@
 <project default="standalone" basedir=".">
 	<!-- Dependencies -->
-	<property name="dep.awu" value="../AppWorkUtils" />
-	<property name="dep.browser" value="../JDBrowser" />
+	<available file="../AppWorkUtils" type="dir" property="dep.awu" value="../AppWorkUtils"/>
+	<available file="../utils" type="dir" property="dep.awu" value="../utils"/>
+
+	<available file="../JDBrowser" type="dir" property="dep.browser" value="../JDBrowser"/>
+        <available file="../browser" type="dir" property="dep.browser" value="../browser"/>
+
 	<property name="dep.myjd" value="../MyJDownloaderClient" />
+	
 	<property name="debug" value="true" />
 
 
@@ -26,10 +31,14 @@
 
 	<!-- Deletes the old build -->
 	<target name="clean">
-
 		<delete dir="${cls}" />
 		<delete dir="${dist}" />
 		<mkdir dir="${working}" />
+	</target>
+
+	<target name="cleanup">
+                <delete dir="${cls}" />
+		<delete file="${working}/classpath" />
 	</target>
 
 	<!-- Compiles the code -->
@@ -458,7 +467,7 @@
 
 
 
-	<target name="standalone" depends="clean,compile,copy_res,jarReconnectOptionals,jarOptionals,jarMain,copy_compiled">
+	<target name="standalone" depends="clean,compile,copy_res,jarReconnectOptionals,jarOptionals,jarMain,copy_compiled,cleanup">
 		<echo message="Finished." />
 	</target>
 </project>

@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51101 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -216,6 +216,16 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "highstream.tv", "clipwatching.com" });
         ret.add(new String[] { "hostmy.de" });
         ret.add(new String[] { "vivud.com" });
+        ret.add(new String[] { "groovesharing.com", "groovestreams.com", "01files.me" });
+        ret.add(new String[] { "dbree.org", "dbree.me" });
+        /* 2025-06-02: Domains that used to be in plugin "ImagemazeCom" START */
+        ret.add(new String[] { "imgmaze.com", "imgmaze.pw", "imgmaze.co", "meetimgz.com" });
+        ret.add(new String[] { "imgtown.net", "imgtown.co", "pictwn.com" });
+        ret.add(new String[] { "outletpic.com", "imgoutlet.com", "imgoutlet.pw", "imgoutlet.co" });
+        ret.add(new String[] { "tezzpic.com", "imgrock.net", "imgrock.info", "imgrock.co", "imgrock.pw", "picrok.com", "piczhq.com" });
+        ret.add(new String[] { "imgdew.com", "dewimg.com" });
+        ret.add(new String[] { "imgview.net", "imgview.pw", "imgview.co" });
+        /* 2025-06-02: Domains that used to be in plugin "ImagemazeCom" END */
         if (cache != null) {
             cache.put(cacheID, ret);
         }

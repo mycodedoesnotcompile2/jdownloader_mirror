@@ -56,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 50769 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51102 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -495,9 +495,17 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
 
     private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final int index) throws PluginException {
         this.ensureInitHosterplugin();
-        final String filename = filemap.get("name").toString();
+        /**
+         * 2025-06-02: Looks like the "name" field is not always given though it missing can also mean that the original file is
+         * broken/missing on the server. <br>
+         * Example: /fanbox/user/64937143/post/2095805
+         */
+        final String filename = (String) filemap.get("name");
         final String filepath = filemap.get("path").toString();
-        final String url = "https://" + this.getHost() + "/data" + filepath + "?f=" + Encoding.urlEncode(filename);
+        String url = "https://" + this.getHost() + "/data" + filepath;
+        if (filename != null) {
+            url += "?f=" + Encoding.urlEncode(filename);
+        }
         final String sha256hash = KemonoParty.getSha256HashFromURL(url);
         final String dupeCheckString;
         if (advancedDupeCheck && sha256hash != null) {
@@ -510,8 +518,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             return null;
         }
         final DownloadLink media = new DownloadLink(this.hostPlugin, this.getHost(), url);
-        media.setFinalFileName(filename);
-        media.setProperty(KemonoParty.PROPERTY_BETTER_FILENAME, filename);
+        if (filename != null) {
+            media.setFinalFileName(filename);
+            media.setProperty(KemonoParty.PROPERTY_BETTER_FILENAME, filename);
+        }
         media.setProperty(KemonoParty.PROPERTY_POST_CONTENT_INDEX, index);
         if (sha256hash != null) {
             media.setSha256Hash(sha256hash);

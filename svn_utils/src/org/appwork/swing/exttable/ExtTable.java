@@ -64,6 +64,7 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTable;
@@ -1903,7 +1904,20 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                             final Rectangle rowRect = getCellRect(row, 0, true);
                             if (!getVisibleRect().intersects(rowRect)) {
                                 // only scrill if the row is not visible
-                                scrollToRow(row, row);
+                                scrollToRow(row, -1);
+                                // scroll parent visible vertical bars and make sure rowRect is complete visible, so scroll height*2
+                                rowRect.height = rowRect.height * 2;
+                                Component parent = ExtTable.this.getParent();
+                                while (parent != null) {
+                                    if (parent instanceof JScrollPane) {
+                                        final JScrollPane scroll = (JScrollPane) parent;
+                                        final JScrollBar verticalScrollBar;
+                                        if ((verticalScrollBar = scroll.getVerticalScrollBar()) != null && verticalScrollBar.isVisible()) {
+                                            scroll.scrollRectToVisible(rowRect);
+                                        }
+                                    }
+                                    parent = parent.getParent();
+                                }
                             }
                         }
                     };

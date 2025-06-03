@@ -29,6 +29,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
@@ -36,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50744 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51105 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -135,6 +136,7 @@ public class DatanodesTo extends XFileSharingProBasic {
                 final String fuid = this.getFUIDFromURL(this.getDownloadLink());
                 final String randStr = br.getRegex("rand=\"([^\"]+)\"").getMatch(0);
                 form = new Form();
+                form.setMethod(MethodType.POST);
                 form.put("op", "download2");
                 form.put("id", fuid);
                 form.put("rand", randStr != null ? Encoding.urlEncode(randStr) : "");

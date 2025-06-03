@@ -32,6 +32,18 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -51,19 +63,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.youtube.YoutubeHelper;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 51103 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -127,7 +127,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         QUALITIES_MAP.put("v15", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() } }));
         /*
          * new String[] { "508k_p9", QUALITY.LOW.name() }
-         * 
+         *
          * new String[] { "808k_p11", QUALITY.HIGH.name() }
          */
         QUALITIES_MAP.put("v17", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() }, new String[] { "6628k_p61", QUALITY.FHD.name() }, new String[] { "6660k_p37", QUALITY.FHD.name() } }));
@@ -410,22 +410,22 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         } else {
             contenturl = param.getCryptedUrl();
         }
-        String sophoraID_safe = this.getSophoraIDFromURL_safe(contenturl);
-        if (sophoraID_safe != null) {
+        String sophoraID_from_url = this.getSophoraIDFromURL_safe(contenturl);
+        if (sophoraID_from_url != null) {
             /* We know that this is a single video so we can skip the steps down below. */
-            return crawlZdfVideoViaSophoraID(param, sophoraID_safe);
+            return crawlZdfVideoViaSophoraID(param, sophoraID_from_url);
         }
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*Video leider nicht mehr verfügbar")) {
             /* E.g. https://www.zdf.de/3sat/politik-und-gesellschaft/die-schweizer-alpen-3-100.html */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        sophoraID_safe = this.getSophoraIDFromURL_safe(br.getURL());
-        if (sophoraID_safe != null) {
+        sophoraID_from_url = this.getSophoraIDFromURL_safe(br.getURL());
+        if (sophoraID_from_url != null) {
             /* We know that this is a single video so we can skip the steps down below. */
-            return crawlZdfVideoViaSophoraID(param, sophoraID_safe);
+            return crawlZdfVideoViaSophoraID(param, sophoraID_from_url);
         }
         final Regex seriesURLRegex = new Regex(br.getURL(), "https://[^/]+/([\\w-]+)/([\\w-]+)[^/]*");
         final String seriesSlug = seriesURLRegex.getMatch(1);
@@ -437,39 +437,70 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             final Integer season = seasonStr != null ? Integer.parseInt(seasonStr) : null;
             return this.crawlZdfSeries(param, seriesSlug, seriesHash, season);
         }
-        String sophoraID = new Regex(html_unescaped, "\"__typename\":\"Video\",\"id\":\"[^\"]+\",\"canonical\":\"([\\w-]+)").getMatch(0);
-        if (sophoraID == null) {
-            final String[] embeddedVideos = br.getRegex("/embed/\\?mediaID=(/[^<>\"']+)").getColumn(0);
-            if (embeddedVideos != null && embeddedVideos.length > 0) {
-                /*
-                 * Check for embedded video items e.g.:
-                 * https://www.zdf.de/nachrichten/heute-sendungen/tafeln-reduzierung-lebensmittel-ausgabe-video-100.html
-                 */
-                final HashSet<String> sophoraIDs = new HashSet<String>();
-                for (final String url : embeddedVideos) {
-                    final String[] urlparts = url.split("/");
-                    final String lastPart = urlparts[urlparts.length - 1];
-                    if (lastPart.matches("[a-z0-9\\-_]+")) {
-                        sophoraIDs.add(lastPart);
-                        sophoraID = lastPart;
+        final String[] sophoraIDs = new Regex(html_unescaped, "\"__typename\":\"Video\",\"id\":\"[^\"]+\",\"canonical\":\"([\\w-]+)").getColumn(0);
+        if (sophoraIDs != null && sophoraIDs.length > 0) {
+            final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+            final HashSet<String> uniqueSophoraIDs = new HashSet<String>();
+            uniqueSophoraIDs.addAll(Arrays.asList(sophoraIDs));
+            if (uniqueSophoraIDs.size() > 1) {
+                final HashSet<String> bestHits = new HashSet<String>();
+                /* Find "play button video item" */
+                for (final String sophoraID : uniqueSophoraIDs) {
+                    if (new Regex(html_unescaped, "\"heroVideo\":\\{[^\\}]*\"" + sophoraID).patternFind()) {
+                        bestHits.add(sophoraID);
                     }
                 }
-                if (sophoraIDs.size() > 1) {
-                    logger.warning("Website contains multiple video embedIDs -> Crawling only last video: " + sophoraID);
+                if (bestHits.size() == 1) {
+                    logger.info("Returning precise sophoraID: " + bestHits.iterator().next());
+                    return crawlZdfVideoViaSophoraID(param, bestHits.iterator().next());
+                }
+                logger.info("Failed to find precise sophoraID hit");
+            }
+            /* Return all results */
+            int index = 0;
+            for (final String sophoraID : uniqueSophoraIDs) {
+                logger.info("Crawling item " + index + 1 + "/" + uniqueSophoraIDs.size());
+                final ArrayList<DownloadLink> results = crawlZdfVideoViaSophoraID(param, sophoraID);
+                distribute(results);
+                ret.addAll(results);
+                if (this.isAbort()) {
+                    return ret;
+                }
+                index++;
+            }
+            return ret;
+        }
+        String sophoraID = null;
+        final String[] embeddedVideos = br.getRegex("/embed/\\?mediaID=(/[^<>\"'&]+)").getColumn(0);
+        if (embeddedVideos != null && embeddedVideos.length > 0) {
+            /*
+             * Check for embedded video items e.g.:
+             * https://www.zdf.de/nachrichten/heute-sendungen/tafeln-reduzierung-lebensmittel-ausgabe-video-100.html
+             */
+            final HashSet<String> uniqueSophoraIDs = new HashSet<String>();
+            for (final String url : embeddedVideos) {
+                final String[] urlparts = url.split("/");
+                final String lastPart = urlparts[urlparts.length - 1];
+                if (lastPart.matches("[a-z0-9\\-_]+")) {
+                    uniqueSophoraIDs.add(lastPart);
+                    sophoraID = lastPart;
                 }
             }
-            if (sophoraID == null) {
-                // TODO: 2025-03-19: Check if this is still needed
-                sophoraID = br.getRegex("\"embed_content\"\\s*:\\s*\"(/.*?)\"").getMatch(0);
-                if (sophoraID == null) {
-                    sophoraID = br.getRegex("embed_content\\s*:\\s*'([^\"\\']+)").getMatch(0);
-                }
+            if (uniqueSophoraIDs.size() > 1) {
+                logger.warning("Website contains multiple video embedIDs -> Crawling only last video: " + sophoraID);
             }
+        }
+        if (sophoraID == null) {
+            // TODO: 2025-03-19: Check if this is still needed
+            sophoraID = br.getRegex("\"embed_content\"\\s*:\\s*\"(/.*?)\"").getMatch(0);
             if (sophoraID == null) {
-                /* Try to obtain ID from older style links */
-                final String videoContentIDFromURL = new Regex(contenturl, "/([\\w-]+)[^/]*$").getMatch(0);
-                sophoraID = videoContentIDFromURL;
+                sophoraID = br.getRegex("embed_content\\s*:\\s*'([^\"\\']+)").getMatch(0);
             }
+        }
+        if (sophoraID == null) {
+            /* Try to obtain ID from older style links */
+            final String videoContentIDFromURL = new Regex(contenturl, "/([\\w-]+)[^/]*$").getMatch(0);
+            sophoraID = videoContentIDFromURL;
         }
         if (sophoraID == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -598,7 +629,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             streamsJsonURL = streamsJsonURL.replace("{playerId}", "android_native_5");
         }
         String title = (String) entries.get("title");
-        final String currentVideoType = (String) entries.get("currentVideoType");
+        // final String currentVideoType = (String) entries.get("currentVideoType");
         final String description = (String) entries.get("leadParagraph");
         final String editorialDate = (String) entries.get("editorialDate");
         final Object tvStationo = entries.get("tvService");
@@ -1020,8 +1051,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                     final String realQuality = ((String) qualitymap.get("quality")).toLowerCase(Locale.ENGLISH);
                     final ArrayList<Object[]> qualities = new ArrayList<Object[]>();
                     /**
-                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br> We want to keep all
-                     * versions though!
+                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br>
+                     * We want to keep all versions though!
                      */
                     final List<String[]> betterQualities = getBetterQualities(uri);
                     final HashSet<String> optimizedQualityIdentifiers = new HashSet<String>();
@@ -1064,8 +1095,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         final DownloadLink dl = this.createDownloadlinkForHosterplugin(finalDownloadURL);
                         dl.setContentUrl(param.getCryptedUrl());
                         /**
-                         * Usually filesize is only given for the official downloads.</br> Only set it here if we haven't touched the
-                         * original downloadurls!
+                         * Usually filesize is only given for the official downloads.</br>
+                         * Only set it here if we haven't touched the original downloadurls!
                          */
                         if (thisFilesize > 0) {
                             dl.setAvailable(true);
@@ -1485,9 +1516,11 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Searches for videos in zdfmediathek that match the given search term. </br> This is mostly used as a workaround to find stuff that is
-     * hosted on their other website on zdfmediathek instead as zdfmediathek is providing a fairly stable search function while other
-     * websites hosting the same content such as kika.de can be complicated to parse. </br> This does not (yet) support pagination!
+     * Searches for videos in zdfmediathek that match the given search term. </br>
+     * This is mostly used as a workaround to find stuff that is hosted on their other website on zdfmediathek instead as zdfmediathek is
+     * providing a fairly stable search function while other websites hosting the same content such as kika.de can be complicated to parse.
+     * </br>
+     * This does not (yet) support pagination!
      */
     public ArrayList<DownloadLink> crawlZDFMediathekSearchResultsVOD(final String tvChannel, final String searchTerm, final int maxResults) throws Exception {
         if (StringUtils.isEmpty(tvChannel) || StringUtils.isEmpty(searchTerm)) {

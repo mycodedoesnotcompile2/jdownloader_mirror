@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50952 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51102 $", interfaceVersion = 3, names = {}, urls = {})
 public class SavefilesCom extends XFileSharingProBasic {
     public SavefilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -112,6 +112,22 @@ public class SavefilesCom extends XFileSharingProBasic {
             } else {
                 throw new PluginException(LinkStatus.ERROR_FATAL, website_error);
             }
+        }
+    }
+
+    @Override
+    protected Boolean requiresCaptchaForOfficialVideoDownload() {
+        return Boolean.FALSE;
+    }
+
+    @Override
+    protected String getDllinkVideohost(final DownloadLink link, final Account account, final Browser br, final String src) {
+        /* 2025-06-02 */
+        final String dllink = br.getRegex("direct link will be available for your IP next[^<]*<br>\\s*<br>\\s*<a href=\"(https?://[^\"]+)").getMatch(0);
+        if (dllink != null) {
+            return dllink;
+        } else {
+            return super.getDllinkVideohost(link, account, br, src);
         }
     }
 }

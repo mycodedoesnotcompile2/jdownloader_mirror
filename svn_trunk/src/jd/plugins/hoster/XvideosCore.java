@@ -20,6 +20,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.PublicSuffixList;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.plugins.components.config.XvideosComConfigCore;
+import org.jdownloader.plugins.components.config.XvideosComConfigCore.PreferredHLSQuality;
+import org.jdownloader.plugins.components.config.XvideosComConfigCore.PreferredHTTPQuality;
+import org.jdownloader.plugins.components.config.XvideosComConfigCore.PreferredOfficialDownloadQuality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -43,28 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.PublicSuffixList;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.net.BCSSLSocketStreamFactory;
-import org.jdownloader.plugins.components.config.XvideosComConfigCore;
-import org.jdownloader.plugins.components.config.XvideosComConfigCore.PreferredHLSQuality;
-import org.jdownloader.plugins.components.config.XvideosComConfigCore.PreferredHTTPQuality;
-import org.jdownloader.plugins.components.config.XvideosComConfigCore.PreferredOfficialDownloadQuality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 50976 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51106 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XvideosCore extends PluginForHost {
     public XvideosCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +84,7 @@ public abstract class XvideosCore extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     public static void setSSLSocketStreamOptions(Browser br) {
@@ -355,8 +356,9 @@ public abstract class XvideosCore extends PluginForHost {
             final boolean useLanguageSwitcherHandling = true;
             if (useLanguageSwitcherHandling) {
                 /**
-                 * Use this to prefer English language. </br> 2021-07-07: Not yet required - only in crawler plugin: Seems like they set the
-                 * language for the main website/video overview based on IP and for single videos, default is English(?)
+                 * Use this to prefer English language. </br>
+                 * 2021-07-07: Not yet required - only in crawler plugin: Seems like they set the language for the main website/video
+                 * overview based on IP and for single videos, default is English(?)
                  */
                 disableAutoTranslation(this, Browser.getHost(contentURL), br);
             }
@@ -439,9 +441,10 @@ public abstract class XvideosCore extends PluginForHost {
                 final String hlsMaster = br.getRegex("setVideoHLS\\('(.*?)'\\)").getMatch(0);
                 /**
                  * 2021-01-27: This website can "shadow ban" users who download "too much". They will then deliver all videos in 240p only.
-                 * This is an attempt to detect this.</br> See also: https://board.jdownloader.org/showthread.php?t=86587 </br> Do not check
-                 * when premium account is given because it usually allows official downloads so downloads will work fine even if HLS
-                 * streaming is not available.
+                 * This is an attempt to detect this.</br>
+                 * See also: https://board.jdownloader.org/showthread.php?t=86587 </br>
+                 * Do not check when premium account is given because it usually allows official downloads so downloads will work fine even
+                 * if HLS streaming is not available.
                  */
                 final boolean lowQualityBlockDetected = StringUtils.isEmpty(hlsMaster) && (account == null || account.getType() != AccountType.PREMIUM) && config != null && config.isTryToRecognizeLimit() && isDownload;
                 if (config == null || config.isPreferHLSStreamDownload()) {
@@ -492,8 +495,8 @@ public abstract class XvideosCore extends PluginForHost {
                 }
                 /**
                  * 2022-09-08: Looks like HLS is available up to 1080p while official downloads are only available for up to 360p (?). </br>
-                 * Tested with a free xvideos.com account. </br> If official download was >= HLS/stream download it would make sense to
-                 * prefer this over stream download.
+                 * Tested with a free xvideos.com account. </br>
+                 * If official download was >= HLS/stream download it would make sense to prefer this over stream download.
                  */
                 String videoURL = null;
                 final String xvideosRedError = "Paid account or direct purchase required to access xvideos.red content";
@@ -509,7 +512,7 @@ public abstract class XvideosCore extends PluginForHost {
                     brc.getPage(br.getURL("/video-download/" + videoID + "/"));
                     Map<String, Object> entries = null;
                     try {
-                        entries = JavaScriptEngineFactory.jsonToJavaMap(brc.getRequest().getHtmlCode());
+                        entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                     } catch (final Throwable e) {
                         logger.log(e);
                         logger.warning("Official video download handling failed due to exception");
@@ -834,20 +837,13 @@ public abstract class XvideosCore extends PluginForHost {
                     }
                 }
                 logger.info("Performing full login");
-                if (!StringUtils.contains(account.getUser(), "@")) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new AccountInvalidException("Bitte gib deine E-Mail Adresse in das 'Benutzername' Feld ein!");
-                    } else {
-                        throw new AccountInvalidException("Please enter your e-mail address into the 'username' field!");
-                    }
-                }
                 final boolean useAjaxLogin = true;
                 if (useAjaxLogin) {
                     br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
                     br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
                     br.getPage("https://www." + this.getHost() + "/");
                     br.postPage("/account/signinform", "");
-                    final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     final String formHTML1 = (String) entries.get("form");
                     if (!StringUtils.isEmpty(formHTML1)) {
                         br.getRequest().setHtmlCode(formHTML1);
@@ -873,11 +869,15 @@ public abstract class XvideosCore extends PluginForHost {
                     } else {
                         loginform.put(Encoding.urlEncode("g-recaptcha-response"), Encoding.urlEncode(recaptchaV2Response));
                     }
+                } else if (br.containsHTML("class=\"frc-captcha")) {
+                    /* 2025-06-02: We do not yet support "Friendly captcha" -> Tell user to try again using cookie login */
+                    showCookieLoginInfo();
+                    throw new AccountInvalidException("Unsupported captcha type 'Friendly Captcha' -> Try cookie login");
                 }
                 br.submitForm(loginform);
                 Map<String, Object> ajaxLoginResponse = null;
                 if (useAjaxLogin) {
-                    ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+                    ajaxLoginResponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     final String formHTML2 = (String) ajaxLoginResponse.get("form");
                     if (!StringUtils.isEmpty(formHTML2)) {
                         /* 2FA login */
@@ -911,7 +911,7 @@ public abstract class XvideosCore extends PluginForHost {
                     logger.info("Submitting 2FA code: " + twoFACode);
                     br.submitForm(unknownBrowserForm);
                     if (useAjaxLogin) {
-                        ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+                        ajaxLoginResponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     }
                 } else if (totpAuthForm != null) {
                     /* TOTP login -> 2FA login which user has enabled via opt-in in his account. */
@@ -943,7 +943,7 @@ public abstract class XvideosCore extends PluginForHost {
                     // totpAuthForm.put(Encoding.urlEncode("totp-auth[post_referer]"), Encoding.urlEncode("https://de.xvideos.com/"));
                     br.submitForm(totpAuthForm);
                     if (useAjaxLogin) {
-                        ajaxLoginResponse = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+                        ajaxLoginResponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     }
                 }
                 String loginFailureText = null;
@@ -983,7 +983,8 @@ public abstract class XvideosCore extends PluginForHost {
                         /* 2FA TOTP login failed */
                         throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
                     } else {
-                        throw new AccountInvalidException();
+                        showCookieLoginInfo();
+                        throw new AccountInvalidException("Login failed. Try cookie login method.");
                     }
                 }
                 if (isPremium(this.br)) {
@@ -1045,8 +1046,8 @@ public abstract class XvideosCore extends PluginForHost {
     }
 
     /**
-     * Only use this when on this page: https://www.domain.tld/account/premium </br> 2021-03-08: Free users cannot even view the account
-     * panel so checking for any elements in there is good enough as premium indicator!
+     * Only use this when on this page: https://www.domain.tld/account/premium </br>
+     * 2021-03-08: Free users cannot even view the account panel so checking for any elements in there is good enough as premium indicator!
      *
      * @throws Exception
      */

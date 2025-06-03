@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DownloadRu;
 
-@DecrypterPlugin(revision = "$Revision: 51029 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51105 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { DownloadRu.class })
 public class DownloadRuFolder extends PluginForDecrypt {
     public DownloadRuFolder(PluginWrapper wrapper) {
@@ -77,11 +77,13 @@ public class DownloadRuFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String folder_id = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        br.getHeaders().put("Referer", param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        final String folder_id = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        br.getHeaders().put("Referer", contenturl);
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         br.getPage("https://" + getHost() + "/folders/" + folder_id + ".json");
         if (br.getHttpConnection().getResponseCode() == 403) {
+            /* No permission e.g. private folder */
             throw new AccountRequiredException();
         } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

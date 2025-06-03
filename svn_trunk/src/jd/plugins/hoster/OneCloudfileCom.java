@@ -31,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51106 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneCloudfileCom extends YetiShareCore {
     public OneCloudfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,7 +95,7 @@ public class OneCloudfileCom extends YetiShareCore {
 
     @Override
     protected String getContinueLink(final Browser br) throws Exception {
-        /* 2023-12-06: Similar for: 1cloudfile.com, bowfile.com */
+        /* 2023-12-06: Similar for: 1cloudfile.com, bowfile.com, koramaup.com */
         final String jsFunc = br.getRegex("(function getNextDownloadPageLink\\(crl, btnText\\).*?\\s+\\})\\s+").getMatch(0);
         final String jsCall = br.getRegex("(getNextDownloadPageLink\\(\".*?\\))\n").getMatch(0);
         if (jsFunc != null && jsCall != null) {
