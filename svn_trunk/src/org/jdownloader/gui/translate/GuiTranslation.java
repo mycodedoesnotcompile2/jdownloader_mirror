@@ -2997,8 +2997,11 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Animation duration (Fade in & Out time in ms)" })
     String BubbleNotifyConfigPanel_BubbleNotifyConfigPanel_fadetime();
 
-    @Default(lngs = { "en" }, values = { "Reset selected link(s)?\r\nThis would reset %s1 Link(s) & delete %s3 file(s)(%s2) from harddisk." })
-    String gui_downloadlist_reset2(int totalCount, String formatBytes, int localFileCount);
+    @Default(lngs = { "en", "de" }, values = { "Reset selected link(s)?\r\nThis would reset %s1 Link(s) & delete %s3 file(s)(%s2) from disk.", "Ausgewählte Link(s) zurücksetzen?\r\nDies würde %s1 Link(s) zurücksetzen und %s3 Datei(en) (%s2) von der Festplatte entfernen." })
+    String gui_downloadlist_reset_delete(int totalCount, String formatBytes, int localFileCount);
+
+    @Default(lngs = { "en", "de" }, values = { "Reset selected link(s)?\r\nThis would reset %s1 Link(s) & move %s3 file(s)(%s2) to recycle bin.", "Ausgewählte Link(s) zurücksetzen?\r\nDies würde %s1 Link(s) zurücksetzen und %s3 Datei(en) (%s2) in den Papierkorb verschieben." })
+    String gui_downloadlist_reset_recycle(int totalCount, String formatBytes, int localFileCount);
 
     @Default(lngs = { "en" }, values = { "Linkgrabber" })
     String GeneralSettingsConfigPanel_GeneralSettingsConfigPanel_linkgrabber();

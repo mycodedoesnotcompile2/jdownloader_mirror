@@ -28,6 +28,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
@@ -37,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51101 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51110 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -352,6 +353,11 @@ public class VidhideCom extends XFileSharingProBasic {
         super.checkErrors(br, html, link, account, checkAll);
         if (br.containsHTML("Video embed restricted for this domain")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Video embed restricted for this domain");
+        }
+        final String errorsMisc2 = br.getRegex("<div class=\"text-danger text-center[^\"]*\"[^>]*>([^<]+)</div>").getMatch(0);
+        if (errorsMisc2 != null) {
+            /* E.g. error "Downloads disabled 620" */
+            throw new PluginException(LinkStatus.ERROR_FATAL, Encoding.htmlDecode(errorsMisc2).trim());
         }
     }
 

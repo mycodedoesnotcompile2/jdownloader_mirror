@@ -1406,6 +1406,7 @@ YoutubeDashConfigPanel_YoutubeDashConfigPanel_ChannelCrawlerPreferredSortMode=Pr
 YoutubeDashConfigPanel_YoutubeDashConfigPanel_ChannelPlaylistCrawlerPackagingMode=Grupni mode pretraživanja Kanala/Playliste
 YoutubeDashConfigPanel_YoutubeDashConfigPanel_PlaylistAndProfileCrawlerMaxItemsLimit=Maksimalan broj stavki Profila/Playliste [-1 = nema limita, 0 = onemogući pretraživač]
 YoutubeDashConfigPanel_YoutubeDashConfigPanel_PlaylistItemsIncludePlaylistPositionAtBeginningOfFilenames=Stavke playliste: Uključiti poziciju na početku imena?
+YoutubeDashConfigPanel_YoutubeDashConfigPanel_PlaylistVideosDuplicateDetectionMode=Stavke playliste: Modus detekcije duplikata
 YoutubeDashConfigPanel_YoutubeDashConfigPanel_ProcessPlaylistItemsInReverseOrder=Procesiraj pretražene stavke playliste u obrnutom redoslijedu (primijenjuje se samo ako nije postavljen limit za pretraživanje ili playlista sadrži manje stavki od podešenog limita pretraživanja)?
 YoutubeDashConfigPanel_YoutubeDashConfigPanel_ProfileCrawlMode=Način pretraživanja kanala
 YoutubeDashConfigPanel_YoutubeDashConfigPanel_best_explained=Youtube nudi video tokove do rezolucije 4320p. Ako želite download-ovati ove tokove, molimo isključite opciju ispod.
@@ -1867,7 +1868,7 @@ gui_config_restart_crc=Restartuj Download kada SFV/CRC provjera ne uspije
 gui_config_simple_container=Automatsko otvaranje Kontejnera Linkova (dlc,ccf,nzb,...)
 gui_config_various=Razno
 gui_dialogs_message_title=Poruka
-gui_downloadlist_reset2=Resetuj selektovane linmjove?\r\nOvo bi resetovalo  %s1 Linkova i izbrisalo %s3 dokumenata(%s2) sa diska.
+gui_downloadlist_reset2=Resetuj označene linkove? Ovo bi moglo resetovati %s1 link i izbrisati %s3 dokumentata(%s2) sa diska.
 gui_filechooser_loaddlc=Učitaj DLC dokument
 gui_linklist_editpackagename_message=Novi naziv paketa
 gui_menu_about=Pomoć

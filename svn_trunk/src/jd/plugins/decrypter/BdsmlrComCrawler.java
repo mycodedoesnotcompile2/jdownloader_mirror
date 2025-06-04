@@ -42,10 +42,9 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 import jd.plugins.hoster.BdsmlrCom;
 
-@DecrypterPlugin(revision = "$Revision: 48413 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51110 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BdsmlrCom.class })
 public class BdsmlrComCrawler extends PluginForDecrypt {
     public BdsmlrComCrawler(PluginWrapper wrapper) {
@@ -68,37 +67,39 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://[\\w\\-]+\\." + buildHostsPatternPart(domains) + "/(?:post/\\d+)?$");
+            ret.add("https?://[\\w\\-]+\\." + buildHostsPatternPart(domains) + "(/.+)?");
         }
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_USER_PROFILE = "(?i)https?://([\\w\\-]+)\\.[^/]+/?$";
+    private static final String TYPE_USER_PROFILE = "(?i)https?://([\\w\\-]+)\\.[^/]+(/.+)?";
     private static final String TYPE_POST         = "(?i)https?://([\\w\\-]+)\\.[^/]+/post/(\\d+)$";
     private static final String PROPERTY_POST_ID  = "post_id";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final Account acc = AccountController.getInstance().getValidAccount(this.getHost());
-        if (acc != null) {
-            final PluginForHost hostPlugin = this.getNewPluginForHostInstance(this.getHost());
-            ((jd.plugins.hoster.BdsmlrCom) hostPlugin).login(acc, false);
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account != null) {
+            final BdsmlrCom hostPlugin = (BdsmlrCom) this.getNewPluginForHostInstance(this.getHost());
+            hostPlugin.login(account, false);
         }
-        if (param.getCryptedUrl().matches(TYPE_USER_PROFILE)) {
-            return crawlUser(param);
-        } else {
+        if (param.getCryptedUrl().matches(TYPE_POST)) {
             return crawlPost(param);
+        } else {
+            return crawlUser(param, account);
         }
     }
 
     private ArrayList<DownloadLink> crawlPost(final CryptedLink param) throws IOException, PluginException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_POST).getMatch(0);
-        final String postID = new Regex(param.getCryptedUrl(), TYPE_POST).getMatch(1);
+        final String contenturl = param.getCryptedUrl();
+        final Regex urlinfo = new Regex(contenturl, TYPE_POST);
+        final String username = urlinfo.getMatch(0);
+        final String postID = urlinfo.getMatch(1);
         if (username == null) {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.setAllowedResponseCodes(new int[] { 500 });
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 500) {
@@ -109,26 +110,44 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         return crawlPosts(br, fp);
     }
 
-    private ArrayList<DownloadLink> crawlUser(final CryptedLink param) throws IOException, PluginException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_USER_PROFILE).getMatch(0);
+    private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account) throws IOException, PluginException, InterruptedException {
+        String contenturl = param.getCryptedUrl();
+        final String username = new Regex(contenturl, TYPE_USER_PROFILE).getMatch(0);
         if (username == null) {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String searchKeyword = new Regex(contenturl, "(?i)/search/([^/]+)").getMatch(0);
+        if (searchKeyword != null) {
+            logger.info("Crawling all posts from user " + username + " matching search term " + searchKeyword);
+        } else {
+            /* Normalize url */
+            contenturl = "https://" + username + "." + getHost() + "/";
+            logger.info("Crawling all posts from user " + username);
+        }
+        if (searchKeyword != null && account == null) {
+            /* 2025-06-03: Accessing search URLs in a logged out state will result in http error 500. */
+            throw new AccountRequiredException("Account required to crawl search URLs");
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)This blog doesn't exist\\.\\s*<br>")) {
+        } else if (br.containsHTML("This blog doesn't exist\\.\\s*<br>")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(username);
+        if (searchKeyword != null) {
+            fp.setName(username + " search " + searchKeyword);
+        } else {
+            fp.setName(username);
+        }
         /* First check if there is already some downloadable content in the html of the current page. */
         ret.addAll(crawlPosts(br, fp));
         if (ret.isEmpty()) {
             logger.info("Didn't find anything in HTML ");
         }
+        /* Now crawl first pagination page which typically contains less items than the rest */
         final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
         if (csrftoken == null) {
             if (br.containsHTML("\"sorry\"\\s*>\\s*Sorry, please login")) {
@@ -147,18 +166,37 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         br.getHeaders().put("Origin", "https://" + username + "." + this.getHost());
         br.getHeaders().put("Referer", "https://" + username + "." + this.getHost() + "/");
         br.getHeaders().put("X-CSRF-TOKEN", csrftoken);
-        br.postPage("/loadfirst", "scroll=5&timenow=" + Encoding.urlEncode(infinitescrollDate));
+        UrlQuery query = new UrlQuery();
+        query.appendEncoded("scroll", "5");
+        query.appendEncoded("timenow", infinitescrollDate);
+        if (searchKeyword != null) {
+            query.appendEncoded("blogname", username);
+            query.appendEncoded("keyword", searchKeyword);
+            query.appendEncoded("last", lastPostID);
+            br.postPage("/infinitesearch", query);
+        } else {
+            br.postPage("/loadfirst", query);
+        }
         ret.addAll(crawlPosts(br, fp));
+        if (this.isAbort()) {
+            throw new InterruptedException();
+        }
         final HashSet<String> dupes = new HashSet<String>();
         final int maxItemsPerPage = 20;
         int index = 0;
         int page = 1;
         profileLoop: do {
-            final UrlQuery query = new UrlQuery();
-            query.add("scroll", Integer.toString(index));
-            query.add("timenow", Encoding.urlEncode(infinitescrollDate));
-            query.add("last", lastPostID);
-            br.postPage("/infinitepb2/" + username, query);
+            query = new UrlQuery();
+            query.appendEncoded("scroll", Integer.toString(index));
+            query.appendEncoded("timenow", Encoding.urlEncode(infinitescrollDate));
+            query.appendEncoded("last", lastPostID);
+            if (searchKeyword != null) {
+                query.appendEncoded("blogname", username);
+                query.appendEncoded("keyword", searchKeyword);
+                br.postPage("/infinitesearch", query);
+            } else {
+                br.postPage("/infinitepb2/" + username, query);
+            }
             final ArrayList<DownloadLink> results = crawlPosts(br, fp);
             int numberofNewItems = 0;
             int numberofSkippedDuplicates = 0;

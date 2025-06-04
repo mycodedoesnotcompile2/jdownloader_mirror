@@ -13,6 +13,7 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 import org.jdownloader.controlling.DownloadLinkAggregator;
+import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
 import org.jdownloader.extensions.extraction.translate.T;
@@ -28,10 +29,10 @@ import jd.gui.UserIO;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
-public class ResetAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> {
+public class ResetAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext {
     private static final long   serialVersionUID = -5583373118359478729L;
     private final static String NAME             = _GUI.T.gui_table_contextmenu_reset();
-    private DeleteMode          deleteMode       = DeleteMode.DELETE;
+    private DeleteMode          deleteMode       = DeleteMode.AUTO;
 
     public ResetAction() {
         setIconKey(IconKey.ICON_UNDO);
@@ -39,6 +40,12 @@ public class ResetAction extends CustomizableTableContextAppAction<FilePackage, 
     }
 
     public static enum DeleteMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto/Global default";
+            }
+        },
         MOVE_TO_TRASH {
             @Override
             public String getLabel() {
@@ -67,23 +74,29 @@ public class ResetAction extends CustomizableTableContextAppAction<FilePackage, 
         this.deleteMode = mode;
     }
 
-    protected static void reset(final List<DownloadLink> selection) {
+    private void reset(final List<DownloadLink> selection) {
         if (selection == null) {
             return;
         } else if (selection.isEmpty()) {
             return;
         }
+        final DeleteMode deleteMode = this.getDeleteMode();
         TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
                 final DownloadLinkAggregator agg = new DownloadLinkAggregator();
                 agg.setLocalFileUsageEnabled(true);
                 agg.update(selection);
-                final String question = _GUI.T.gui_downloadlist_reset2(agg.getTotalCount(), SizeFormatter.formatBytes(agg.getBytesLoaded()), agg.getLocalFileCount());
+                final String question_text;
+                if (deleteMode == DeleteMode.MOVE_TO_TRASH) {
+                    question_text = _GUI.T.gui_downloadlist_reset_recycle(agg.getTotalCount(), SizeFormatter.formatBytes(agg.getBytesLoaded()), agg.getLocalFileCount());
+                } else {
+                    question_text = _GUI.T.gui_downloadlist_reset_delete(agg.getTotalCount(), SizeFormatter.formatBytes(agg.getBytesLoaded()), agg.getLocalFileCount());
+                }
                 new EDTHelper<Void>() {
                     @Override
                     public Void edtRun() {
-                        ConfirmDialog confirmDialog = new ConfirmDialog(Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN | UIOManager.LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL, _GUI.T.jd_gui_userio_defaulttitle_confirm(), question, UserIO.getDefaultIcon(question), null, null) {
+                        ConfirmDialog confirmDialog = new ConfirmDialog(Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN | UIOManager.LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL, _GUI.T.jd_gui_userio_defaulttitle_confirm(), question_text, UserIO.getDefaultIcon(question_text), null, null) {
                             @Override
                             public String getDontShowAgainKey() {
                                 return "org.jdownloader.gui.views.downloads.action.ResetAction";
@@ -91,12 +104,14 @@ public class ResetAction extends CustomizableTableContextAppAction<FilePackage, 
                         };
                         try {
                             Dialog.getInstance().showDialog(confirmDialog);
-                            DownloadWatchDog.getInstance().reset(selection);
                         } catch (DialogClosedException e) {
                             e.printStackTrace();
+                            return null;
                         } catch (DialogCanceledException e) {
                             e.printStackTrace();
+                            return null;
                         }
+                        DownloadWatchDog.getInstance().reset(selection);
                         return null;
                     }
                 }.start(true);

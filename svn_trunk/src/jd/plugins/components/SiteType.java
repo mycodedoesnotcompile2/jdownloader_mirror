@@ -20,11 +20,6 @@ public class SiteType {
          */
         CheveretoImageHosting,
         /**
-         * File host script first used for: <a href="http://www.chomikuj.pl/">chomikuj.pl</a><br />
-         * examples <a href="http:/chomikuj.pl/">chomikuj.pl</a>
-         */
-        ChomikujPlScript,
-        /**
          * File host script: <a href="http://www.daddyscripts.com/products.php?name=daddys_file_host">Daddy's File Host</a><br />
          * example: <a href="http://dosya.tc/">dosya.tc</a>
          */

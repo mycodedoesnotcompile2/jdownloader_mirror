@@ -20,10 +20,10 @@ import java.util.Random;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -47,11 +47,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51081 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
-public class ChoMikujPl extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 51111 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+public class ChoMikujPl extends PluginForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
     public static final boolean  default_CRAWL_SUBFOLDERS                                     = true;
@@ -80,6 +79,7 @@ public class ChoMikujPl extends antiDDoSForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        br.setAllowedResponseCodes(new int[] { 500 });
         br.setFollowRedirects(true);
         return br;
     }
@@ -100,19 +100,11 @@ public class ChoMikujPl extends antiDDoSForHost {
     }
 
     @Override
-    protected Browser prepBrowser(final Browser prepBr, final String host) {
-        if (!(browserPrepped.containsKey(prepBr) && browserPrepped.get(prepBr) == Boolean.TRUE)) {
-            super.prepBrowser(prepBr, host);
-            /* define custom browser headers and language settings */
-            prepBr.setAllowedResponseCodes(new int[] { 500 });
-        }
-        return prepBr;
-    }
-
-    @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
         if (account != null) {
             /* Free Account */
+            return true;
+        } else if (link.hasProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE)) {
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
@@ -138,7 +130,7 @@ public class ChoMikujPl extends antiDDoSForHost {
          * he usually isn't during availablecheck and we do not want to have that content displayed as offline!
          */
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        return requestFileInformation(link, account, false);
+        return requestFileInformation(link, account);
     }
 
     private String getMainlink(final DownloadLink link) {
@@ -175,7 +167,7 @@ public class ChoMikujPl extends antiDDoSForHost {
         return false;
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         final String fid = getFID(link);
         final String mainlink = getMainlink(link);
         if (fid == null) {
@@ -189,16 +181,25 @@ public class ChoMikujPl extends antiDDoSForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* Try to find better filename - usually only needed for single links. */
-        getPage(mainlink);
-        if (isDownload) {
+        br.getPage(mainlink);
+        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
             this.passwordHandling(link, account);
+        }
+        if (br.getHttpConnection().getResponseCode() == 400) {
+            // TODO: Implement workaround
+            logger.warning("Server side error 400 happened -> Attempting workaround");
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                return AvailableStatus.UNCHECKABLE;
+            }
         }
         if (br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (requiresPasswordPrompt(br)) {
+        }
+        if (requiresPasswordPrompt(br)) {
             logger.info("Cannot fetch file information because password is required");
             return AvailableStatus.TRUE;
-        } else if (!br.containsHTML(fid)) {
+        }
+        if (!br.containsHTML(fid)) {
             /* html must contain fileid - if not, content is assumed to be offline (e.g. redirect to upper folder or errorpage) */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -213,6 +214,33 @@ public class ChoMikujPl extends antiDDoSForHost {
             link.setFinalFileName(filename);
         } else {
             logger.info("Failed to find html filename for single link");
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    /**
+     * Alternative way to check files from chomikuj.pl. <br>
+     * Account required for this to also fine the file size. <br>
+     * This does not find the file name!!
+     */
+    private AvailableStatus requestFileInformation2(final DownloadLink link, final Account account) throws Exception {
+        final String fid = this.getFID(link);
+        br.getPage("https://" + getHost() + "/action/fileDetails/Index/" + fid);
+        final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
+        if (filesize != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
+        } else {
+            logger.warning("Failed to find filesize");
+        }
+        if (StringUtils.containsIgnoreCase(br.getURL(), "fileDetails/Unavailable")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/Error403.aspx")) {
+            logger.info("File is online but only downloadable via account");
+            if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+                throw new AccountRequiredException();
+            }
+            // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;
     }
@@ -580,7 +608,7 @@ public class ChoMikujPl extends antiDDoSForHost {
             dllink = storedDirecturl;
         } else {
             logger.info("Obtaining fresh directurl");
-            requestFileInformation(link, account, true);
+            requestFileInformation(link, account);
             dllink = this.getDllink(link, account);
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -650,7 +678,6 @@ public class ChoMikujPl extends antiDDoSForHost {
             }
             logger.info("Performing full login");
             br.clearCookies(null);
-            prepBrowser(br, getHost());
             br.setCookiesExclusive(true);
             br.getPage("https://" + getHost());
             // final Form loginform = br.getFormByRegex("loginDummy");
@@ -726,26 +753,6 @@ public class ChoMikujPl extends antiDDoSForHost {
     /** Checks for presence of logged-in cookie. */
     private boolean isLoggedInCookie(final Browser br) {
         return br.getCookie("https://" + getHost() + "/", "RememberMe", Cookies.NOTDELETEDPATTERN) != null;
-    }
-
-    @Override
-    public SiteTemplate siteTemplateType() {
-        return SiteTemplate.ChomikujPlScript;
-    }
-
-    // for the decrypter, so we have only one session of antiddos
-    public void getPage(final String url) throws Exception {
-        super.getPage(url);
-    }
-
-    // for the decrypter, so we have only one session of antiddos
-    public void postPage(final String url, final String parameter) throws Exception {
-        super.postPage(url, parameter);
-    }
-
-    // for the decrypter, so we have only one session of antiddos
-    public void submitForm(final Form form) throws Exception {
-        super.submitForm(form);
     }
 
     @Override

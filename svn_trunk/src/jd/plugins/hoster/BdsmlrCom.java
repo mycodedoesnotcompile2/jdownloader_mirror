@@ -36,11 +36,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51110 $", interfaceVersion = 3, names = {}, urls = {})
 public class BdsmlrCom extends PluginForHost {
     public BdsmlrCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://bdsmlr.com/register");
+        this.enablePremium("https://" + getHost() + "/register");
     }
 
     @Override
@@ -50,7 +50,7 @@ public class BdsmlrCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://bdsmlr.com/";
+        return "https://" + getHost();
     }
 
     public static List<String[]> getPluginDomains() {

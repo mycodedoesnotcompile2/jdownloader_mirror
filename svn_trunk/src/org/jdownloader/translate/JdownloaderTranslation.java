@@ -50,7 +50,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en", "de" }, values = { "Connection Manager", "Verbindungsverwaltung" })
     String gui_settings_proxy_title();
 
-    @Default(lngs = { "en" }, values = { "No permissions to write to harddisk" })
+    @Default(lngs = { "en" }, values = { "No permissions to write to disk" })
     String download_error_message_iopermissions();
 
     @Default(lngs = { "en" }, values = { "Reconnect duration" })
@@ -221,7 +221,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Reconnect failed too often! Autoreconnect is disabled! Please check your reconnect Settings!" })
     String jd_controlling_reconnect_Reconnector_progress_failed2();
 
-    @Default(lngs = { "en" }, values = { "There is a problem downloading a file!\r\nThe file already exists on harddisk. What do you want to do?" })
+    @Default(lngs = { "en" }, values = { "There is a problem downloading a file!\r\nThe file already exists on disk. What do you want to do?" })
     String jd_controlling_SingleDownloadController_askexists3();
 
     @Default(lngs = { "en" }, values = { "Not tested yet" })
@@ -588,7 +588,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Move files to Recycle if possible" })
     String DeleteOption_recycle();
 
-    @Default(lngs = { "en" }, values = { "Delete files from Harddisk" })
+    @Default(lngs = { "en" }, values = { "Delete files from disk" })
     String DeleteOption_final_delete();
 
     @Default(lngs = { "en" }, values = { "Ask me" })

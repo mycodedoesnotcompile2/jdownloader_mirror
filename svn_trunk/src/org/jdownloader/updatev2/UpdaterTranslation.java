@@ -126,7 +126,7 @@ public interface UpdaterTranslation extends TranslateInterface {
     @Default(lngs = { "en", "de" }, values = { "Estimated remaining wait time: %s1", "Erwartete Wartezeit: %s1" })
     String installframe_statusmsg_preparing_eta(String formatSeconds);
 
-    @Default(lngs = { "en", "de" }, values = { "There is not enough free space on your harddisk C:.\r\nMake sure that there are at least %s1 of free space (%s2 more needed) and restart the update.", "Es ist nicht genügend Speicherplatz auf C:\\ verfügbar. \r\nBitte stellen Sie sicher dass %s1 frei sind (%s2 müssen gelöscht werden) und starten Sie das Update erneut." })
+    @Default(lngs = { "en", "de" }, values = { "There is not enough free space on your disk C:.\r\nMake sure that there are at least %s1 of free space (%s2 more needed) and restart the update.", "Es ist nicht genügend Speicherplatz auf C:\\ verfügbar. \r\nBitte stellen Sie sicher dass %s1 frei sind (%s2 müssen gelöscht werden) und starten Sie das Update erneut." })
     String errordialog_not_enough_space(String formatBytes, String string);
 
     @Default(lngs = { "en", "de" }, values = { "Insufficient permissions to install %s1.\r\nPlease contact your support!", "Fehlende Schreibrechte zur Installation von %s1.\r\nBitte kontaktieren Sie unseren Support." })
@@ -231,9 +231,9 @@ public interface UpdaterTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Installation done. Exit in %s1" })
     String update_done_close_in_TIME(String formatMilliSeconds);
 
-    @Default(lngs = { "en", "de" }, values = { "There is not enough free space on your harddisk %s1.\r\nMake sure that there are at least %s2 of free space (%s3 more needed) and restart the update.\r\nFree space on %s1 after the installation: %s4", "Auf der Festplatte %s1 steht nicht genug freier Speicherplatz zur Verfügung.\r\nStellen Sie sicher, dass mindestens %s2 freier Speicherplatz vorhanden ist (Zusätzliche %s3 werden benötigt), und starten Sie die Aktualisierung neu.\r\nNach der Installation werden auf %s1 %s4 freier Speicherplatz sein." })
+    @Default(lngs = { "en", "de" }, values = { "There is not enough free space on your disk %s1.\r\nMake sure that there are at least %s2 of free space (%s3 more needed) and restart the update.\r\nFree space on %s1 after the installation: %s4", "Auf der Festplatte %s1 steht nicht genug freier Speicherplatz zur Verfügung.\r\nStellen Sie sicher, dass mindestens %s2 freier Speicherplatz vorhanden ist (Zusätzliche %s3 werden benötigt), und starten Sie die Aktualisierung neu.\r\nNach der Installation werden auf %s1 %s4 freier Speicherplatz sein." })
     String errordialog_not_enough_space_specify_incl_changed(File file, String required, String missing, String after);
 
-    @Default(lngs = { "en", "de" }, values = { "There is not enough free space on your harddisk %s1.\r\nMake sure that there are at least %s2 of free space (%s3 more needed) and restart the update.", "Auf der Festplatte %s1 steht nicht genug freier Speicherplatz zur Verfügung.\r\nStellen Sie sicher, dass mindestens %s2 freier Speicherplatz vorhanden ist (Zusätzliche %s3 werden benötigt), und starten Sie die Aktualisierung neu." })
+    @Default(lngs = { "en", "de" }, values = { "There is not enough free space on your disk %s1.\r\nMake sure that there are at least %s2 of free space (%s3 more needed) and restart the update.", "Auf der Festplatte %s1 steht nicht genug freier Speicherplatz zur Verfügung.\r\nStellen Sie sicher, dass mindestens %s2 freier Speicherplatz vorhanden ist (Zusätzliche %s3 werden benötigt), und starten Sie die Aktualisierung neu." })
     String errordialog_not_enough_space_specify(File file, String required, String missing);
 }
