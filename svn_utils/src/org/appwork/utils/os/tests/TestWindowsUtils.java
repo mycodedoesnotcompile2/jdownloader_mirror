@@ -41,6 +41,7 @@ import java.util.Set;
 import org.appwork.processes.ProcessHandlerFactory;
 import org.appwork.processes.ProcessInfo;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Time;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
@@ -55,6 +56,7 @@ import com.sun.jna.platform.win32.WinDef.INT_PTR;
  * @author thomas
  * @date 20.11.2024
  */
+@TestDependency({ "org.appwork.utils.os.WindowsUtils" })
 public class TestWindowsUtils extends AWTest {
     private static final String TEST_DIR = System.getProperty("java.io.tmpdir") + "/WindowsUtilsTest";
     private File                testDir;

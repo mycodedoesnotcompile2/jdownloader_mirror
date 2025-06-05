@@ -20,7 +20,6 @@ import java.util.Random;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -34,6 +33,7 @@ import jd.http.Cookies;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51111 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51114 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends PluginForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -64,6 +64,11 @@ public class ChoMikujPl extends PluginForHost {
     private final String         PROPERTY_DOWNLOADLINK_ADULT_CONTENT                          = "adult_content";
     private final String         PROPERTY_DOWNLOADLINK_OWNED_BY_USERNAME                      = "owned_by_username";
     private final String         PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE                 = "stream_download_active";
+    /* Filename set in crawler; can be null for single- and older file links */
+    public static final String   PROPERTY_DOWNLOADLINK_CRAWLED_FILENAME                       = "crawled_filename";
+    public static final String   PROPERTY_DOWNLOADLINK_FILEID                                 = "fileid";
+    /* id of the folder this file is contained, can be null */
+    public static final String   PROPERTY_DOWNLOADLINK_FOLDER_ID                              = "folder_id";
 
     public ChoMikujPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +139,7 @@ public class ChoMikujPl extends PluginForHost {
     }
 
     private String getMainlink(final DownloadLink link) {
-        final String mainlink = link.getStringProperty(ChoMikujPlFolder.PROPERTY_MAINLINK);
+        final String mainlink = link.getStringProperty(ChoMikujPlFolder.PROPERTY_DOWNLOADLINK_MAINLINK);
         if (mainlink != null) {
             return mainlink;
         } else {
@@ -169,10 +174,16 @@ public class ChoMikujPl extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         final String fid = getFID(link);
+        final String crawledFilename = link.getStringProperty(PROPERTY_DOWNLOADLINK_CRAWLED_FILENAME);
         final String mainlink = getMainlink(link);
         if (fid == null) {
             /* This should never happen! */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (crawledFilename != null) {
+            link.setFinalFileName(crawledFilename);
+        } else if (!link.isNameSet()) {
+            link.setName(fid);
         }
         if (account != null) {
             this.login(account, false);
@@ -182,15 +193,15 @@ public class ChoMikujPl extends PluginForHost {
         }
         /* Try to find better filename - usually only needed for single links. */
         br.getPage(mainlink);
-        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
-            this.passwordHandling(link, account);
-        }
         if (br.getHttpConnection().getResponseCode() == 400) {
-            // TODO: Implement workaround
             logger.warning("Server side error 400 happened -> Attempting workaround");
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            if (account == null) {
                 return AvailableStatus.UNCHECKABLE;
             }
+            return requestFileInformation2(br, link, account);
+        }
+        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+            this.passwordHandling(link, account);
         }
         if (br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -211,19 +222,20 @@ public class ChoMikujPl extends PluginForHost {
         if (filename != null) {
             logger.info("Found html filename for single link");
             filename = Encoding.htmlDecode(filename).trim();
+            /* Important: Set final filename here. */
             link.setFinalFileName(filename);
         } else {
-            logger.info("Failed to find html filename for single link");
+            logger.warning("Failed to find html filename for single link");
         }
         return AvailableStatus.TRUE;
     }
 
     /**
      * Alternative way to check files from chomikuj.pl. <br>
-     * Account required for this to also fine the file size. <br>
+     * Account required for this to work. <br>
      * This does not find the file name!!
      */
-    private AvailableStatus requestFileInformation2(final DownloadLink link, final Account account) throws Exception {
+    private AvailableStatus requestFileInformation2(final Browser br, final DownloadLink link, final Account account) throws Exception {
         final String fid = this.getFID(link);
         br.getPage("https://" + getHost() + "/action/fileDetails/Index/" + fid);
         final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
@@ -236,6 +248,7 @@ public class ChoMikujPl extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (StringUtils.containsIgnoreCase(br.getURL(), "/Error403.aspx")) {
+            /* No account given or we are not logged in */
             logger.info("File is online but only downloadable via account");
             if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
                 throw new AccountRequiredException();
@@ -392,20 +405,20 @@ public class ChoMikujPl extends PluginForHost {
         // Perform a special file info check for account users
         if (account != null) {
             final Browser brc = br.cloneBrowser();
-            brc.getPage("https://" + getHost() + "/action/fileDetails/Index/" + fid);
-            final String filesize = brc.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
-            if (filesize != null) {
-                link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
-            }
-            if (StringUtils.containsIgnoreCase(brc.getURL(), "fileDetails/Unavailable")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (accountHasLessTrafficThanRequiredForThisFile) {
+            this.requestFileInformation2(brc, link, account);
+            if (accountHasLessTrafficThanRequiredForThisFile) {
                 /* Users can override traffic check. For this case we'll check if we have enough traffic for this file here. */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 15 * 60 * 1000l);
             }
         }
         // Get the verification token
-        final String requestVerificationToken = br.getRegex("<div id=\"content\">\\s*?<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
+        boolean error400WorkaroundActive = false;
+        if (br.getHttpConnection().getResponseCode() == 400) {
+            logger.info("Workaround for server side bug -> Access main page so we can find the __RequestVerificationToken");
+            br.getPage("/");
+            error400WorkaroundActive = true;
+        }
+        final String requestVerificationToken = ChoMikujPlFolder.findRequestVerificationToken(br);
         if (requestVerificationToken == null) {
             logger.warning("Failed to find requestVerificationToken");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -417,10 +430,28 @@ public class ChoMikujPl extends PluginForHost {
             br.getHeaders().put("Referer", link.getPluginPatternMatcher());
         }
         final Browser content_br = br.cloneBrowser();
-        br.postPage("https://" + getHost() + "/action/License/DownloadContext", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+        final Form form_DownloadContext = new Form();
+        form_DownloadContext.setAction("https://" + getHost() + "/action/License/DownloadContext");
+        form_DownloadContext.setMethod(MethodType.POST);
+        form_DownloadContext.put("FileId", fid);
+        form_DownloadContext.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
+        br.submitForm(form_DownloadContext);
+        if (error400WorkaroundActive && br.getHttpConnection().getResponseCode() == 500) {
+            /* Error 400 followed by error 500 -> File offline */
+            /*
+             * {"Type":"Window","Title":"Błąd","Content":"Niestety podczas przetwarzania żądania wystąpił błąd.","refreshTopBar":false,
+             * "IsSuccess":true,"Data":null,"ContainsCaptcha":false,"trackingCodeJS":null}
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         String content = (String) entries.get("Content");
         content_br.getRequest().setHtmlCode(content);
+        /* This is a good filename source; use it! */
+        final String filename = content_br.getRegex("<div class=\"windowFileName\"[^>]*>([^<]+)</div>").getMatch(0);
+        if (filename != null) {
+            link.setFinalFileName(Encoding.htmlDecode(filename).trim());
+        }
         // Check for access denied
         final String accessDenied = "Nie masz w tej chwili uprawnień do tego pliku lub dostęp do niego nie jest w tej chwili możliwy z innych powodów";
         if (StringUtils.containsIgnoreCase(content, accessDenied)) {
@@ -523,7 +554,7 @@ public class ChoMikujPl extends PluginForHost {
                 if (account != null) {
                     throw new AccountRequiredException("Buy account balance or allow stream download fallback in plugin settings to download this file.");
                 } else {
-                    throw new AccountRequiredException(adultContentPrefix + "Add an account or allow stream download fallback in plugin settings to download this file.");
+                    throw new AccountRequiredException(adultContentPrefix + "Add account or allow stream download fallback in plugin settings to download this file.");
                 }
             }
             /* Stream download */
@@ -576,7 +607,7 @@ public class ChoMikujPl extends PluginForHost {
     }
 
     private String getFID(final DownloadLink dl) {
-        return dl.getStringProperty(ChoMikujPlFolder.PROPERTY_FILEID);
+        return dl.getStringProperty(PROPERTY_DOWNLOADLINK_FILEID);
     }
 
     @Override
@@ -600,6 +631,11 @@ public class ChoMikujPl extends PluginForHost {
     }
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        /* Set final filename here; prevents losing it when user resets DownloadLink while a stored directurl is available. */
+        final String crawledFilename = link.getStringProperty(PROPERTY_DOWNLOADLINK_CRAWLED_FILENAME);
+        if (crawledFilename != null) {
+            link.setFinalFileName(crawledFilename);
+        }
         final String directlinkproperty = getDirectlinkProperty(account);
         final String storedDirecturl = this.getStoredDirectlink(link, account);
         String dllink = null;

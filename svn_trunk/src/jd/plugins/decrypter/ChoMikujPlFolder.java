@@ -19,6 +19,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
@@ -51,7 +52,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ChoMikujPl;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51111 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
+@DecrypterPlugin(revision = "$Revision: 51114 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
 public class ChoMikujPlFolder extends PluginForDecrypt {
     public ChoMikujPlFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,8 +76,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
     private static Object                     LOCK                            = new Object();
     public static final String                CFG_FOLDERPASSWORD              = "password";
     public static final String                PROPERTY_FOLDERPASSWORD_SPECIAL = "password_special";
-    public static final String                PROPERTY_FILEID                 = "fileid";
-    public static final String                PROPERTY_MAINLINK               = "mainlink";
+    public static final String                PROPERTY_DOWNLOADLINK_MAINLINK  = "mainlink";
 
     /**
      * 2021-11-16: Attempt to save requests and handle password protected folders faster so password input is e.g. only required the first
@@ -104,14 +104,14 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         loadHosterPlugin();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        int startPage = 1;
-        boolean scanForMorePages = false;
-        String parameter_without_page_number = null;
         if (new Regex(param.getCryptedUrl(), Pattern.compile(VIDEO_DIRECTURL, Pattern.CASE_INSENSITIVE)).patternFind()) {
             /* 2019-07-16: Very rare case e.g. https://svn.jdownloader.org/issues/81525 */
             ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(param.getCryptedUrl())));
             return ret;
         }
+        int startPage = 1;
+        boolean scanForMorePages = false;
+        String parameter_without_page_number = null;
         String contenturl;
         if (param.getCryptedUrl().matches(PAGEDECRYPTLINK)) {
             final String base = new Regex(param.getCryptedUrl(), "\\.pl/result/([^\\?]+)").getMatch(0);
@@ -134,6 +134,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         if (contenturl.matches(UNSUPPORTED)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        boolean crawlFolders = plugin.getPluginConfig().getBooleanProperty(ChoMikujPl.CRAWL_SUBFOLDERS, ChoMikujPl.default_CRAWL_SUBFOLDERS);
         String linkending = null;
         if (contenturl.contains(",")) {
             linkending = contenturl.substring(contenturl.lastIndexOf(","));
@@ -154,6 +155,8 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         getPage(contenturl);
         String requestVerificationToken = null;
         boolean performedSpecialWorkaround = false;
+        String estimatedCurrentFolderPath = null;
+        String username = null;
         specialWorkaround: if (br.getHttpConnection().getResponseCode() == 400 && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /**
              * Workaround for a website bug where when trying to open a folder structuree via normal GET request fails although the folder
@@ -168,14 +171,14 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                 logger.info("Special workaround not possible: URL does not have enough segments");
                 break specialWorkaround;
             }
-            final String username = urlSegments[1];
+            username = urlSegments[1];
             this.getPage("/" + username);
-            /* TODO: Make this handling work for password protected folders */
+            /* TODO: Check and make this handling work for password protected folders */
             if (br.getHttpConnection().getResponseCode() != 200) {
                 logger.info("Special workaround not possible: responsecode != 200");
                 break specialWorkaround;
             }
-            requestVerificationToken = this.regexRequestVerificationToken(br);
+            requestVerificationToken = findRequestVerificationToken(br);
             if (requestVerificationToken == null) {
                 logger.info("Special workaround not possible: failed to find requestVerificationToken");
                 break specialWorkaround;
@@ -183,23 +186,13 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             if (this.isAbort()) {
                 throw new InterruptedException();
             }
-            String currentVirtualPath = br._getURL().getPath();
-            /* Important! Start from 2! [0] = empty string, [1] = username */
-            final HashSet<String> processed_folder_ids = new HashSet<String>();
-            for (int i = 2; i < urlSegments.length; i++) {
-                final String segment = urlSegments[i];
-                currentVirtualPath += "/" + segment;
-                final String folderID = br.getRegex(Pattern.quote(currentVirtualPath) + "\" rel=\"(\\d+)").getMatch(0);
-                if (folderID == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find folderID for path " + currentVirtualPath);
-                } else if (processed_folder_ids.contains(folderID)) {
-                    /* This should never happen */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Found duplicated folderID");
-                }
-                logger.info("Ajax navigation to folderID: " + folderID + " | " + currentVirtualPath);
+            final String targetFolderID = param.getDownloadLink() != null ? param.getDownloadLink().getStringProperty("folder_id") : null;
+            if (targetFolderID != null) {
+                /* The fast & easy way: We can navigate to target folder immediately */
+                logger.info("Navigating right away to targetFolder with ID: " + targetFolderID);
                 final UrlQuery query = new UrlQuery();
                 query.appendEncoded("chomikName", username);
-                query.appendEncoded("folderId", folderID);
+                query.appendEncoded("folderId", targetFolderID);
                 query.appendEncoded("fileListSortType", "Date");
                 query.appendEncoded("fileListAscending", "False");
                 query.appendEncoded("gallerySortType", "Name");
@@ -211,13 +204,52 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                 if (this.isAbort()) {
                     throw new InterruptedException();
                 }
-                processed_folder_ids.add(folderID);
+            } else {
+                /* The hard way: Navigate to target folder through each subfolder */
+                String currentVirtualPath = username;
+                /* Important! Start from 2! [0] = empty string, [1] = username */
+                final HashSet<String> processed_folder_ids = new HashSet<String>();
+                for (int i = 2; i < urlSegments.length; i++) {
+                    final String segment = urlSegments[i];
+                    final boolean isLastSegment = i == urlSegments.length - 1;
+                    currentVirtualPath += "/" + segment;
+                    final String folderID = br.getRegex(Pattern.quote(currentVirtualPath) + "\" rel=\"(\\d+)").getMatch(0);
+                    if (folderID == null) {
+                        if (isLastSegment && new Regex(segment, ".*,\\d+.*").patternFind()) {
+                            logger.info("Failed to find folder_id for last segment -> Assuming that we are looking for a single file");
+                            /* We expect to have only files or only a single file -> Do not allow subfolder crawling down below. */
+                            crawlFolders = false;
+                            break;
+                        }
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find folderID for path " + currentVirtualPath);
+                    } else if (processed_folder_ids.contains(folderID)) {
+                        /* Fail safe to prevent endless crawling activity */
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Found duplicated folderID");
+                    }
+                    logger.info("Ajax navigation to folderID: " + folderID + " | " + currentVirtualPath);
+                    final UrlQuery query = new UrlQuery();
+                    query.appendEncoded("chomikName", username);
+                    query.appendEncoded("folderId", folderID);
+                    query.appendEncoded("fileListSortType", "Date");
+                    query.appendEncoded("fileListAscending", "False");
+                    query.appendEncoded("gallerySortType", "Name");
+                    query.appendEncoded("galleryAscending", "False");
+                    query.appendEncoded("isGallery", "False");
+                    query.appendEncoded("folderChanged", "true");
+                    query.appendEncoded("__RequestVerificationToken", requestVerificationToken);
+                    br.postPage("/action/Files/FilesList", query);
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
+                    processed_folder_ids.add(folderID);
+                    estimatedCurrentFolderPath = currentVirtualPath;
+                }
             }
             logger.info("Special workaround looks to be successful");
             performedSpecialWorkaround = true;
         }
         if (requestVerificationToken == null) {
-            requestVerificationToken = this.regexRequestVerificationToken(br);
+            requestVerificationToken = findRequestVerificationToken(br);
         }
         passwordHandling(param);
         if (scanForMorePages) {
@@ -276,7 +308,9 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
             return ret;
         }
         final String numberofFilesStr = br.getRegex("class=\"bold\">(\\d+)</span> plik\\&#243;w<br />").getMatch(0);
-        if (br.containsHTML("Nie znaleziono \\- błąd 404") || br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("Nie znaleziono \\- błąd 404")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!br.containsHTML("class=\"greenActionButton\"|name=\"FolderId\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -286,20 +320,22 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         if (errorMsg != null) {
             logger.info(String.format(errorMsg, contenturl));
             // Offline
-            final DownloadLink dloffline = createDownloadlink(contenturl.replace("chomikuj.pl/", "chomikujdecrypted.pl/") + "," + System.currentTimeMillis() + new Random().nextInt(100000));
-            dloffline.setAvailable(false);
-            dloffline.setName(errorMsg + "_" + new Regex(contenturl, "chomikuj\\.pl/(.+)").getMatch(0));
-            ret.add(dloffline);
+            final DownloadLink dummy = createDownloadlink(contenturl.replace("chomikuj.pl/", "chomikujdecrypted.pl/") + "," + System.currentTimeMillis() + new Random().nextInt(100000));
+            dummy.setAvailable(false);
+            dummy.setName(errorMsg + "_" + new Regex(contenturl, "chomikuj\\.pl/(.+)").getMatch(0));
+            ret.add(dummy);
             return ret;
         }
-        /* Get needed values */
-        String chomikID = br.getRegex("name=\"(?:chomikId|ChomikName)\" type=\"hidden\" value=\"(.+?)\"").getMatch(0);
-        if (chomikID == null) {
-            chomikID = br.getRegex("id=\"__(?:accno|accname)\" name=\"__(?:accno|accname)\" type=\"hidden\" value=\"(.+?)\"").getMatch(0);
-            if (chomikID == null) {
-                chomikID = br.getRegex("name=\"friendId\" type=\"hidden\" value=\"(.+?)\"").getMatch(0);
-                if (chomikID == null) {
-                    chomikID = br.getRegex("\\&amp;(?:chomikId|ChomikName)=(.+?)\"").getMatch(0);
+        /* Obtain some requiredvalues */
+        if (username == null) {
+            username = br.getRegex("name=\"(?:chomikId|ChomikName)\" type=\"hidden\" value=\"(.+?)\"").getMatch(0);
+            if (username == null) {
+                username = br.getRegex("id=\"__(?:accno|accname)\" name=\"__(?:accno|accname)\" type=\"hidden\" value=\"(.+?)\"").getMatch(0);
+                if (username == null) {
+                    username = br.getRegex("name=\"friendId\" type=\"hidden\" value=\"(.+?)\"").getMatch(0);
+                    if (username == null) {
+                        username = br.getRegex("\\&amp;(?:chomikId|ChomikName)=(.+?)\"").getMatch(0);
+                    }
                 }
             }
         }
@@ -309,45 +345,54 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         }
         if (requestVerificationToken == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (folderID == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String url = br.getURL();
-        // All Main-POSTdata
-        final String postdata = "ChomikName=" + chomikID + "&folderId=" + folderID + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken);
         String baseURL = br.getURL();
         if (baseURL.endsWith("/")) {
             baseURL = baseURL.substring(0, baseURL.lastIndexOf("/"));
         }
-        String subfolderStructure = br.getRegex("value=\"https?://[^/]+/([^\"]+)\"[^>]*id=\"FolderAddress\"").getMatch(0);
-        final boolean crawlFolders = this.plugin.getPluginConfig().getBooleanProperty(ChoMikujPl.CRAWL_SUBFOLDERS, ChoMikujPl.default_CRAWL_SUBFOLDERS);
-        String[][] subfolders = null;
-        FilePackage fp = null;
-        if (subfolderStructure != null) {
-            subfolderStructure = Encoding.htmlDecode(subfolderStructure);
-            fp = FilePackage.getInstance();
-            fp.setName(subfolderStructure);
-            fp.setAllowMerge(true);
+        String subfolderPath = br.getRegex("value=\"https?://[^/]+/([^\"]+)\"[^>]*id=\"FolderAddress\"").getMatch(0);
+        if (subfolderPath == null) {
+            logger.warning("Failed to find subfolderPath in HTML code");
+            subfolderPath = estimatedCurrentFolderPath;
+            if (subfolderPath == null) {
+                subfolderPath = br._getURL().getPath();
+            }
         }
-        int pageCount = 1;
+        subfolderPath = Encoding.htmlDecode(subfolderPath);
+        String[][] subfolders = null;
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(subfolderPath);
+        fp.setAllowMerge(true);
+        int page = 1;
         /** More than one page? Every page goes back into the crawler as a single url! */
-        if (pageCount > 1 && !param.getCryptedUrl().matches(PAGEDECRYPTLINK)) {
+        if (page > 1 && !param.getCryptedUrl().matches(PAGEDECRYPTLINK)) {
             // Moved up
         } else {
             /* Crawl all pages, start with 1 */
-            pageCount = 1;
+            page = 1;
             final String pageCountStr = new Regex(url, ",(\\d{1,3})$").getMatch(0);
             if (pageCountStr != null) {
-                pageCount = Integer.parseInt(pageCountStr);
+                page = Integer.parseInt(pageCountStr);
             }
-            logger.info("Crawling page " + pageCount + " of link: " + url);
+            logger.info("Crawling page " + page + " of link: " + url);
             final Browser brc = br.cloneBrowser();
             prepareBrowser(url, brc);
             /** Only request further pages is folder isn't password protected */
             if (FOLDERPASSWORD != null) {
                 getPage(brc, url);
             } else {
-                accessPage(brc, postdata, pageCount);
+                if (username == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else if (folderID == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final UrlQuery query = new UrlQuery();
+                query.appendEncoded("ChomikName", username);
+                query.appendEncoded("folderId", folderID);
+                query.appendEncoded("__RequestVerificationToken", requestVerificationToken);
+                query.appendEncoded("pageNr", Integer.toString(page));
+                brc.postPage("/action/Files/FilesList", query);
             }
             String[] htmls = brc.getRegex("<li class=\"fileItemContainer\"(.*?)href=\"javascript:;\"").getColumn(0);
             if (htmls == null || htmls.length == 0) {
@@ -358,12 +403,12 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                 /* Old fallback */
                 htmls = brc.getRegex("class=\"fileinfo tab\"(.*?)href=\"javascript:;\"").getColumn(0);
             }
-            final String folderTable = brc.getRegex("<div id=\"foldersList\">[\t\n\r ]+<table>(.*?)</table>[\t\n\r ]+</div>").getMatch(0);
+            final String folderTable = brc.getRegex("<div id=\"foldersList\">\\s*<table>(.*?)</table>\\s*</div>").getMatch(0);
             if (folderTable != null) {
-                subfolders = new Regex(folderTable, "<a href=\"(/[^<>\"]*?)\" rel=\"\\d+\" title=\"([^<>\"]*?)\"").getMatches();
+                subfolders = new Regex(folderTable, "<a href=\"(/[^\"]+)\" rel=\"(\\d+)\" title=\"([^<>\"]*?)\"").getMatches();
             }
             for (final String html : htmls) {
-                final DownloadLink dl = createDownloadlink(url.replace("chomikuj.pl/", "chomikujdecrypted.pl/") + "," + System.currentTimeMillis() + new Random().nextInt(100000));
+                final DownloadLink file = createDownloadlink(url.replace("chomikuj.pl/", "chomikujdecrypted.pl/") + "," + System.currentTimeMillis() + new Random().nextInt(100000));
                 String ext = null;
                 String url_filename = null;
                 final String fid = new Regex(html, "rel=\"(\\d+)\"").getMatch(0);
@@ -398,8 +443,8 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                     filename = url_filename;
                 }
                 if (filename == null) {
-                    /* Final fallback */
-                    dl.setName(fid);
+                    /* Fallback */
+                    file.setName(fid);
                 } else if (filename != null) {
                     filename = filename.replaceAll("(\\*([a-f0-9]{2}))", "%$2");
                     if (filename.contains("%")) {
@@ -432,39 +477,49 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                             filename += ext;
                         }
                     }
-                    dl.setName(filename);
+                    file.setName(filename);
+                    file.setProperty(ChoMikujPl.PROPERTY_DOWNLOADLINK_CRAWLED_FILENAME, filename);
                 }
-                dl.setProperty(PROPERTY_FILEID, fid);
-                if (subfolderStructure != null) {
-                    dl.setRelativeDownloadFolderPath(subfolderStructure);
+                file.setProperty(ChoMikujPl.PROPERTY_DOWNLOADLINK_FILEID, fid);
+                if (folderID != null) {
+                    file.setProperty(ChoMikujPl.PROPERTY_DOWNLOADLINK_FOLDER_ID, folderID);
+                }
+                if (subfolderPath != null) {
+                    file.setRelativeDownloadFolderPath(subfolderPath);
                 }
                 if (filesize != null) {
-                    /* Filesize should always be given */
-                    dl.setDownloadSize(SizeFormatter.getSize(filesize));
+                    /* File size should always be given */
+                    file.setDownloadSize(SizeFormatter.getSize(filesize));
+                } else {
+                    logger.warning("Failed to find filesize");
                 }
-                dl.setAvailable(true);
+                file.setAvailable(true);
                 if (FOLDERPASSWORD != null) {
-                    dl.setDownloadPassword(FOLDERPASSWORD);
+                    file.setDownloadPassword(FOLDERPASSWORD);
                 }
                 if (fp != null) {
-                    dl._setFilePackage(fp);
+                    file._setFilePackage(fp);
                 }
-                dl.setContentUrl(content_url);
-                distribute(dl);
-                ret.add(dl);
+                file.setContentUrl(content_url);
+                distribute(file);
+                ret.add(file);
             }
         }
-        final ArrayList<DownloadLink> ret_subfolders = new ArrayList<DownloadLink>();
+        final List<DownloadLink> ret_subfolders = new ArrayList<DownloadLink>();
         if (subfolders != null && subfolders.length != 0) {
-            String linkPart = new Regex(url, "chomikuj\\.pl(/.+)").getMatch(0);
+            String currentFolderPath = new Regex(url, "chomikuj\\.pl(/.+)").getMatch(0);
             // work around Firefox copy/paste URL magic that automatically converts brackets
             // ( and ) to %28 and %29. Chomikuj.pl in page source has links with unencoded
             // brackets, so we need to fix this or links will not match and won't be added.
-            linkPart = linkPart.replaceAll("%28", "(").replaceAll("%29", ")");
-            for (String[] folder : subfolders) {
-                String folderLink = folder[0];
-                folderLink = "https://chomikuj.pl" + folderLink;
-                if (!folderLink.contains(linkPart) || folderLink.equals(url)) {
+            currentFolderPath = currentFolderPath.replaceAll("%28", "(").replaceAll("%29", ")");
+            for (String[] subfolderinfo : subfolders) {
+                final String folderLink = br.getURL(subfolderinfo[0]).toExternalForm();
+                final String folder_id = subfolderinfo[1];
+                if (!folderLink.contains(currentFolderPath)) {
+                    /* Skip unrelated (folder) URLs */
+                    continue;
+                } else if (folderLink.equals(url)) {
+                    /* Skip current folder */
                     continue;
                 }
                 final DownloadLink dl = createDownloadlink(folderLink);
@@ -474,7 +529,9 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
                 if (FOLDERPASSWORD_SPECIAL != null) {
                     dl.setProperty(PROPERTY_FOLDERPASSWORD_SPECIAL, FOLDERPASSWORD_SPECIAL);
                 }
-                fp.add(dl);
+                // fp.add(dl);
+                /* Can be used to speed up folder crawling in next round */
+                dl.setProperty("folder_id", folder_id);
                 ret_subfolders.add(dl);
             }
         }
@@ -508,23 +565,29 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
      * This can be used to determine if the current page is a folder or a single file.
      */
     private DownloadLink crawlSingleFile(final Browser br) {
-        final String filename = br.getRegex("Download:\\s*<b>([^<]+)</b>").getMatch(0);
+        String filename = br.getRegex("Download:\\s*<b>([^<]+)</b>").getMatch(0);
         final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
         final String fid = br.getRegex("id=\"fileDetails_(\\d+)\"").getMatch(0);
         final String singleFileFolderPath = getSingleFileFolderPath(br);
-        if (filename == null || filesize == null || fid == null) {
+        if (filename == null || fid == null) {
             return null;
         }
-        final DownloadLink link = createDownloadlink(br.getURL().replace("chomikuj.pl/", "chomikujdecrypted.pl/") + "," + System.currentTimeMillis() + new Random().nextInt(100000));
-        link.setProperty(PROPERTY_FILEID, fid);
-        link.setName(correctFilename(Encoding.htmlDecode(filename)));
-        link.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(filesize.trim().replace(",", "."))));
-        link.setAvailable(true);
-        link.setContentUrl(br.getURL());
-        if (singleFileFolderPath != null) {
-            link.setRelativeDownloadFolderPath(singleFileFolderPath);
+        filename = correctFilename(Encoding.htmlDecode(filename));
+        final DownloadLink file = createDownloadlink(br.getURL().replace("chomikuj.pl/", "chomikujdecrypted.pl/") + "," + System.currentTimeMillis() + new Random().nextInt(100000));
+        file.setDefaultPlugin(this.plugin);
+        file.setHost(this.getHost());
+        file.setProperty(ChoMikujPl.PROPERTY_DOWNLOADLINK_FILEID, fid);
+        file.setName(filename);
+        file.setProperty(ChoMikujPl.PROPERTY_DOWNLOADLINK_CRAWLED_FILENAME, filename);
+        if (filesize != null) {
+            file.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(filesize.trim().replace(",", "."))));
         }
-        return link;
+        file.setAvailable(true);
+        file.setContentUrl(br.getURL());
+        if (singleFileFolderPath != null) {
+            file.setRelativeDownloadFolderPath(singleFileFolderPath);
+        }
+        return file;
     }
 
     private String getCurrentURLFolderPath(final String url) {
@@ -543,8 +606,8 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         return Encoding.htmlDecode(singleFileFolderPath);
     }
 
-    private String regexRequestVerificationToken(final Browser br) {
-        return br.getRegex("<input name=\"__RequestVerificationToken\"\\s*type=\"hidden\"\\s*value=\"([^<>\"\\']+)\"").getMatch(0);
+    public static String findRequestVerificationToken(final Browser br) {
+        return br.getRegex("<input name=\"__RequestVerificationToken\"\\s*type=\"hidden\"\\s*value=\"([^\"]+)\"").getMatch(0);
     }
 
     private String getError() {
@@ -552,7 +615,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         if (br.containsHTML("label for=\"Password\">Hasło</label><input id=\"Password\"")) {
             error = "Password protected links can't be decrypted: %s";
         } else if (br.containsHTML("Konto czasowo zablokowane")) {
-            error = "Can't decrypt link, the account of the owner is banned: %s";
+            error = "Can't crawl link, the account of the owner is banned: %s";
         } else if (br.containsHTML("Chomik o takiej nazwie nie istnieje<|Nie znaleziono - błąd 404")) {
             error = "This link is offline (received error 404): %s";
         } else if (br.containsHTML("Chomik Jareczczek zablokowany")) {
@@ -705,10 +768,6 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
 
     public static Form getSpecialUserPasswordProtectedForm(final Browser br) {
         return br.getFormbyActionRegex("(?i).*/action/UserAccess/LoginToProtectedWindow");
-    }
-
-    private void accessPage(final Browser pageBR, final String postData, int pageNum) throws Exception {
-        postPage(pageBR, "https://chomikuj.pl/action/Files/FilesList", postData + "&pageNr=" + pageNum);
     }
 
     private static void prepareBrowser(final String referer, final Browser br) {

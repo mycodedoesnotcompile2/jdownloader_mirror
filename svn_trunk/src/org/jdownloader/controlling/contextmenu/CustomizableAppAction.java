@@ -1,6 +1,7 @@
 package org.jdownloader.controlling.contextmenu;
 
 import java.awt.AlphaComposite;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,6 +12,7 @@ import javax.swing.KeyStroke;
 
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.components.CheckBoxIcon;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.GetterSetter;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
@@ -184,6 +186,14 @@ public abstract class CustomizableAppAction extends AppAction {
         super();
         if (this instanceof ActionContext) {
             addContextSetup((ActionContext) this);
+        } else if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            // find Method with Customizer Annotation but missing ActionContext interface
+            // Customizer are only available/in use when getting added via addContextSetup
+            for (final Method method : getClass().getMethods()) {
+                if (method.getAnnotation(Customizer.class) != null) {
+                    System.out.println(getClass());
+                }
+            }
         }
     }
 
@@ -210,12 +220,12 @@ public abstract class CustomizableAppAction extends AppAction {
             }
             return NewTheme.I().getIcon(iconKey, size);
         } else if (LARGE_ICON_KEY.equalsIgnoreCase(key)) {
-            Object ret = super.getValue(key);
+            final Object ret = super.getValue(key);
             if (ret != null && ret instanceof Icon && (((Icon) ret).getIconWidth() > size || ((Icon) ret).getIconHeight() > size)) {
                 return IconIO.getScaledInstance((Icon) ret, size, size);
             }
         } else if (SMALL_ICON.equalsIgnoreCase(key)) {
-            Object ret = super.getValue(key);
+            final Object ret = super.getValue(key);
             if (ret != null && ret instanceof Icon && (((Icon) ret).getIconWidth() > size || ((Icon) ret).getIconHeight() > size)) {
                 return IconIO.getScaledInstance((Icon) ret, size, size);
             }

@@ -17,13 +17,16 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -36,6 +39,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -45,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50530 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51115 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,6 +78,12 @@ public class JumploadsCom extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "jumploads.com", "goloady.com" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("goloady.com");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -407,87 +417,56 @@ public class JumploadsCom extends PluginForHost {
 
     private void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    this.br.setCookies(this.getHost(), cookies);
-                    br.getPage("https://www." + this.getHost() + "/me");
-                    /* 2020-04-07: Seems like their cookies are only valid for a very short time */
-                    if (this.isLoggedin(br)) {
-                        logger.info("Successfully loggedin via cookies");
-                        account.saveCookies(this.br.getCookies(this.getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Failed to login via cookies");
-                    }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            final String path_userinfo = "/drive/";
+            if (cookies != null) {
+                this.br.setCookies(this.getHost(), cookies);
+                br.getPage("https://www." + this.getHost() + path_userinfo);
+                /* 2020-04-07: Seems like their cookies are only valid for a very short time */
+                if (this.isLoggedin(br)) {
+                    logger.info("Successfully loggedin via cookies");
+                    account.saveCookies(this.br.getCookies(this.getHost()), "");
+                    return;
+                } else {
+                    logger.info("Failed to login via cookies");
                 }
-                logger.info("Performing full login");
-                br.getPage("https://www." + this.getHost() + "/user/login");
-                final String js = br.getRegex("(/java/mycloud\\.js\\?\\d+)").getMatch(0);
-                if (js == null) {
-                    logger.warning("Failed to find js");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final Browser brc = br.cloneBrowser();
-                brc.getPage(js);
-                final String access_token = brc.getRegex("app\\s*:\\s*'([a-z0-9]+)'").getMatch(0);
-                if (access_token == null) {
-                    logger.warning("Failed to find access_token");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                // if (br.containsHTML("")) {
-                // final DownloadLink dlinkbefore = this.getDownloadLink();
-                // final DownloadLink dl_dummy;
-                // if (dlinkbefore != null) {
-                // dl_dummy = dlinkbefore;
-                // } else {
-                // dl_dummy = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
-                // this.setDownloadLink(dl_dummy);
-                // }
-                // final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                // if (dlinkbefore != null) {
-                // this.setDownloadLink(dlinkbefore);
-                // }
-                // // g-recaptcha-response
-                // }
-                br.getHeaders().put("x-requested-with", "XMLHttpRequest");
-                br.getHeaders().put("origin", "https://www." + this.getHost());
-                br.getHeaders().put("referer", "https://www." + this.getHost() + "/user/login");
-                br.getHeaders().put("sec-fetch-dest", "empty");
-                br.getHeaders().put("sec-fetch-mode", "cors");
-                br.getHeaders().put("sec-fetch-site", "same-origin");
-                final UrlQuery query = new UrlQuery();
-                query.append("keep", "1", false);
-                query.append("email", account.getUser(), true);
-                query.append("password", account.getPass(), true);
-                br.postPage("/api/0/signmein?useraccess=&access_token=" + access_token, query.toString());
-                final String result = PluginJSonUtils.getJson(br, "result");
-                String logincookie = PluginJSonUtils.getJson(br, "doz");
-                if ("error".equalsIgnoreCase(result) || StringUtils.isEmpty(logincookie)) {
-                    /* 2019-08-13 e.g. {"result":"error","message":"This Mail-server is Banned."} */
-                    final String errormsg = PluginJSonUtils.getJson(br, "message");
-                    if (!StringUtils.isEmpty(errormsg)) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, errormsg, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
-                /* 2020-04-07: This string is already urlencoded but needs to be urlencoded twice! */
-                logincookie = Encoding.urlEncode(logincookie);
-                br.setCookie(br.getURL(), "userdata", logincookie);
-                br.getPage("/me");
-                /* Double-check */
-                if (!this.isLoggedin(br)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                account.saveCookies(this.br.getCookies(this.getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             }
+            logger.info("Performing full login");
+            br.getPage("https://www." + getHost() + "/user/login");
+            final long ts = System.currentTimeMillis();
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("em", account.getUser());
+            postdata.put("passw", account.getPass());
+            postdata.put("robo", "__");
+            postdata.put("___uctmp", ts);
+            final Browser brc = br.cloneBrowser();
+            brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
+            brc.getHeaders().put("origin", "https://www." + this.getHost());
+            brc.getHeaders().put("referer", "https://www." + this.getHost() + "/user/login");
+            brc.getHeaders().put("sec-fetch-dest", "empty");
+            brc.getHeaders().put("sec-fetch-mode", "cors");
+            brc.getHeaders().put("sec-fetch-site", "same-origin");
+            brc.postPageRaw("/app/user/signin?_tm=" + ts, JSonStorage.serializeToJson(postdata));
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.TRUE.equals(entries.get("error"))) {
+                throw new AccountInvalidException(entries.get("message").toString());
+            }
+            /* Set values from json as cookies which should grant us logged-in state. */
+            final String[] login_cookie_keys = new String[] { "uid", "ut", "ud", "si" };
+            for (final String key : login_cookie_keys) {
+                final String value = (String) entries.get(key);
+                if (value == null) {
+                    throw new AccountInvalidException("Failed to find login cookie with key " + key);
+                }
+                br.setCookie(br.getHost(), "__" + key, value);
+            }
+            brc.getPage(path_userinfo);
+            /* Double-check */
+            if (!this.isLoggedin(brc)) {
+                throw new AccountInvalidException("Login failed for unknown reasons; contact support if this continues to happen");
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -501,15 +480,20 @@ public class JumploadsCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
-        if (br.getURL() == null || !br.getURL().contains("/me")) {
-            br.getPage("/me");
+        final AccountInfo ai = new AccountInfo();
+        final Regex trafficRegex = br.getRegex(">(\\d+) of (\\d+)GB</h2>\\s*<h2[^>]*>\\s*Used Bandwidth\\s*</h2>");
+        if (!trafficRegex.patternFind()) {
+            logger.warning("Failed to extract account traffic info");
         }
-        final Regex trafficRegex = br.getRegex("(?i)>\\s*Used Bandwidth\\s*</div>\\s*?<div class =\\s*?\"usedspace_percentage\"[^>]*?>([^<>\"]+) / ([^<>\"]+)</div>");
         final String traffic_usedStr = trafficRegex.getMatch(0);
         final String traffic_maxStr = trafficRegex.getMatch(1);
-        final String expireStr = br.getRegex("(?i)>\\s*Expires on (\\d{4}-\\d{1,2}-\\d{1,2})").getMatch(0);
+        final Regex spaceRegex = br.getRegex(">(\\d+) of (\\d+)GB</h2>\\s*<h2[^>]*>\\s*Used Space\\s*</h2>");
+        if (!spaceRegex.patternFind()) {
+            logger.warning("Failed to extract account space info");
+        }
+        final String space_usedStr = spaceRegex.getMatch(0);
+        final String expireStr = br.getRegex(">\\s*Expires on (\\d{4}-\\d{1,2}-\\d{1,2})").getMatch(0);
         long expireTimestamp = 0;
         if (expireStr != null) {
             expireTimestamp = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd", Locale.ENGLISH);
@@ -525,14 +509,15 @@ public class JumploadsCom extends PluginForHost {
             account.setType(AccountType.PREMIUM);
             account.setConcurrentUsePossible(true);
         }
+        final String unit = "GB";
         long traffic_left = 0;
         if (traffic_usedStr != null && traffic_maxStr != null) {
-            long traffic_used = SizeFormatter.getSize(traffic_usedStr);
+            long traffic_used = SizeFormatter.getSize(traffic_usedStr + unit);
             if (traffic_used == -1) {
                 /* E.g. website displays "--- / 35GB" */
                 traffic_used = 0;
             }
-            final long traffic_max = SizeFormatter.getSize(traffic_maxStr);
+            final long traffic_max = SizeFormatter.getSize(traffic_maxStr + unit);
             traffic_left = traffic_max - traffic_used;
         }
         if (traffic_left > 0) {
@@ -540,6 +525,9 @@ public class JumploadsCom extends PluginForHost {
         } else {
             logger.warning("Failed to find trafficleft");
             ai.setUnlimitedTraffic();
+        }
+        if (space_usedStr != null) {
+            ai.setUsedSpace(SizeFormatter.getSize(space_usedStr + unit));
         }
         return ai;
     }

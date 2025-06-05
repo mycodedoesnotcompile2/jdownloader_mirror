@@ -22,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.URL;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
@@ -32,6 +33,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -52,7 +54,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 51116 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
     public static final String PROPERTY_streamingType    = "streamingType";
@@ -70,7 +72,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.GENERIC, LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     @Override
@@ -92,6 +94,30 @@ public class ZdfDeMediathek extends PluginForHost {
         br.getHeaders().put("User-Agent", "Opera/9.80 (Linux armv7l; HbbTV/1.1.1 (; Sony; KDL32W650A; PKG3.211EUA; 2013;); ) Presto/2.12.362 Version/12.11");
         br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public String getHost(DownloadLink link, Account account, boolean includeSubdomain) {
+        if (link != null) {
+            final String contentURL = link.getStringProperty(DownloadLink.URL_CONTENT);
+            if (contentURL != null) {
+                try {
+                    return Browser.getHost(new URL(contentURL), false);
+                } catch (IOException e) {
+                }
+            }
+            final String tvStation = link.getStringProperty(ZdfDeMediathek.PROPERTY_tv_station);
+            if ("3sat".equals(tvStation)) {
+                return "3sat.de";
+            } else if ("KI.KA".equals(tvStation)) {
+                return "kika.de";
+            } else if ("ZDF".equals(tvStation)) {
+                return "zdf.de";
+            } else {
+                return super.getHost(link, account, includeSubdomain);
+            }
+        }
+        return super.getHost(link, account, includeSubdomain);
     }
 
     @Override

@@ -2579,61 +2579,62 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         if (this._isDebug()) {
             this.log(ret.getPath(), "Key Does not Exist: Base: %s -> %s", scope.getPath().toPathString(true), keyPath.toPathString(false));
         }
+        if (!_isAutoCreateMissingNodes()) {
+            return;
+        }
         if (ret.getLast() == KEY_DOES_NOT_EXIST && ret.getParent().getLast() == null) {
-            if (_isAutoCreateMissingNodes()) {
-                List<Object> path = ret.getPath().getElements();
-                // next Element is the next key Element after the missing one - we need it to decide if we need an array or objevt
-                Object nextElement = null;
-                // Missing key is the key for the element we create
-                Object missingKey = null;
-                int indexNext = -1;
-                int indexMissing = -1;
-                for (int i = path.size() - 1; i >= 0; i--) {
-                    // Search key Elements - skip operators
-                    Object el = path.get(i);
-                    if (el instanceof String) {
-                        if (((String) el).trim().startsWith("§")) {
-                            // Operator
-                            continue;
-                        }
-                    }
-                    if (nextElement == null) {
-                        nextElement = el;
-                        indexNext = i;
+            List<Object> path = ret.getPath().getElements();
+            // next Element is the next key Element after the missing one - we need it to decide if we need an array or objevt
+            Object nextElement = null;
+            // Missing key is the key for the element we create
+            Object missingKey = null;
+            int indexNext = -1;
+            int indexMissing = -1;
+            for (int i = path.size() - 1; i >= 0; i--) {
+                // Search key Elements - skip operators
+                Object el = path.get(i);
+                if (el instanceof String) {
+                    if (((String) el).trim().startsWith("§")) {
+                        // Operator
                         continue;
                     }
-                    if (missingKey == null) {
-                        if (ret.getScope().get(i + 1) != null) {
-                            ret.replaceLast(null);
-                            // the real parent already exists
-                            return;
-                        }
-                        missingKey = el;
-                        indexMissing = i;
-                        break;
-                    }
                 }
-                // remember: path.size() is always < than scope.size() - the scope contains the root elements
-                // search parent: it may not be the direct parent because the scope contains operators etc.
-                List<Object> scopeList = ret.getScope();
-                Object parent = null;
-                for (int i = indexMissing; i >= 0; i--) {
-                    parent = scopeList.get(i);
-                    if (parent != null) {
-                        break;
-                    }
+                if (nextElement == null) {
+                    nextElement = el;
+                    indexNext = i;
+                    continue;
                 }
-                DebugMode.breakIf(parent == null);
-                Object autoCreated = autoCreatePathElement(ret, parent, missingKey, nextElement);
-                if (autoCreated != null) {
-                    if (_isDebug()) {
-                        this.log(ret.getPath(), "Missing Element: %s - Next Element (defines object type): %s", missingKey, nextElement);
+                if (missingKey == null) {
+                    if (ret.getScope().get(i + 1) != null) {
+                        ret.replaceLast(null);
+                        // the real parent already exists
+                        return;
                     }
-                    ret.set(indexMissing + 1, autoCreated);
-                    ret.set(indexNext + 1, null);
-                    if (_isDebug()) {
-                        this.log(ret.getPath(), "Auto Created %s", ret.getParent());
-                    }
+                    missingKey = el;
+                    indexMissing = i;
+                    break;
+                }
+            }
+            // remember: path.size() is always < than scope.size() - the scope contains the root elements
+            // search parent: it may not be the direct parent because the scope contains operators etc.
+            List<Object> scopeList = ret.getScope();
+            Object parent = null;
+            for (int i = indexMissing; i >= 0; i--) {
+                parent = scopeList.get(i);
+                if (parent != null) {
+                    break;
+                }
+            }
+            DebugMode.breakIf(parent == null);
+            Object autoCreated = autoCreatePathElement(ret, parent, missingKey, nextElement);
+            if (autoCreated != null) {
+                if (_isDebug()) {
+                    this.log(ret.getPath(), "Missing Element: %s - Next Element (defines object type): %s", missingKey, nextElement);
+                }
+                ret.set(indexMissing + 1, autoCreated);
+                ret.set(indexNext + 1, null);
+                if (_isDebug()) {
+                    this.log(ret.getPath(), "Auto Created %s", ret.getParent());
                 }
             }
         } else {

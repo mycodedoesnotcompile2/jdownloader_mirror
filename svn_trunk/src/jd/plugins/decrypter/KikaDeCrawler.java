@@ -19,9 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -36,7 +33,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48432 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 51116 $", interfaceVersion = 3, names = {}, urls = {})
 public class KikaDeCrawler extends PluginForDecrypt {
     public KikaDeCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,14 +71,15 @@ public class KikaDeCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/.+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/.*/videos/(filme/)?.+");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         /* Look for link to ardmediathek to the same content. */
-        final String urlSlug = new Regex(param.getCryptedUrl(), "/([a-z0-9\\-]+)$").getMatch(0);
+
+        final String urlSlug = new Regex(param.getCryptedUrl(), "videos/(?:filme/)?([a-z0-9\\-]+)$").getMatch(0);
         if (urlSlug == null) {
             /* Invalid url */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -97,7 +98,7 @@ public class KikaDeCrawler extends PluginForDecrypt {
             ret.add(this.createDownloadlink("https://www.ardmediathek.de/video/dummy-series/dummy-title-url/ard/" + externalId.replace("ard-", "")));
             return ret;
         } else {
-            logger.info("Failed to find mirror in ardmediathek -> Try zdfmediathek");
+            logger.info("Failed to find mirror in ardmediathek -> Try zdfmediathek?:" + externalId);
         }
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -128,6 +129,7 @@ public class KikaDeCrawler extends PluginForDecrypt {
             final String subtitlevtt = (String) entries2.get("webvttUrl");
             if (!StringUtils.isEmpty(subtitlevtt)) {
                 final DownloadLink subtitle = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(subtitlevtt));
+                subtitle.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, "kika.de");
                 if (title != null) {
                     subtitle.setFinalFileName(title + ".vtt");
                 }
@@ -140,6 +142,7 @@ public class KikaDeCrawler extends PluginForDecrypt {
                     continue;
                 }
                 final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(asset.get("url").toString()));
+                video.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, "kika.de");
                 final String filename = (String) asset.get("fileName");
                 if (filename != null) {
                     video.setFinalFileName(filename);

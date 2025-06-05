@@ -270,7 +270,7 @@ public class ConditionTest extends AWTest {
         eval(true, FlexiCondition.parse("{§options:{aggregate:true},§eq:[c.d,{§regexFindOne:[§valid,a(.)(.*?)ef,2]}]}").matches(regex));
         eval(false, FlexiCondition.parse("{§options:{aggregate:true},§eq:[c.d,{§regexFindOne:[§valid,a(.)(.*?)ef,1]}]}").matches(regex));
         eval(true, FlexiCondition.parse("{b:{§or:[{§exists:false},{§eq:null}]}}").matches(regex));
-        eval(true, /* this is true, because b does not exist and this is NOT null. */FlexiCondition.parse("{b:{§ne:null}}").matches(regex));
+        eval(true, /* this is true, because b does not exist and thus is NOT null. */FlexiCondition.parse("{b:{§ne:null}}").matches(regex));
         eval(true, FlexiCondition.parse("{§ne:null}").matches(new Object[] { "a", null }));
         eval(true, new Condition(Condition.$EACH, new Condition(Condition.$NE, null)).matches(regex));
         EmbededObject inst = new EmbededObject();

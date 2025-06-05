@@ -68,7 +68,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DiskYandexNetFolder;
 
-@HostPlugin(revision = "$Revision: 50135 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51115 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNet extends PluginForHost {
     public DiskYandexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -1376,7 +1376,7 @@ public class DiskYandexNet extends PluginForHost {
                     if (account.hasEverBeenValid()) {
                         throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                     } else {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid() + "\r\nTry again with cookies exported from the disk.yandex.COM domain.");
                     }
                 }
             }

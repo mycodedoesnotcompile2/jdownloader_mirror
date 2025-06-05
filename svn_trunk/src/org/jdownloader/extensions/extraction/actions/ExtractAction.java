@@ -19,6 +19,7 @@ import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
 import org.appwork.utils.swing.dialog.ProgressDialog;
 import org.appwork.utils.swing.dialog.ProgressDialog.ProgressGetter;
+import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.Customizer;
 import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ExtractionController;
@@ -35,7 +36,7 @@ import org.jdownloader.gui.views.DownloadFolderChooserDialog;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.images.AbstractIcon;
 
-public class ExtractAction extends AbstractExtractionContextAction {
+public class ExtractAction extends AbstractExtractionContextAction implements ActionContext {
     /**
      *
      */

@@ -43,6 +43,7 @@ import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
 import org.appwork.utils.Joiner;
@@ -61,6 +62,7 @@ import com.sun.jna.platform.win32.Advapi32Util.Account;
  * @author thomas
  * @date 20.11.2024
  */
+@TestDependency({ "org.appwork.utils.os.WindowsUtils" })
 public class TestWindowsPermissions extends AWTest {
     private static final String TEST_DIR = System.getProperty("java.io.tmpdir") + "/WindowsPermissionsTest2";
     private File                testDir;
