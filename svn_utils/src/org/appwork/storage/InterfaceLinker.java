@@ -37,10 +37,12 @@ package org.appwork.storage;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.moncompare.Condition;
+import org.appwork.moncompare.TypeHandler;
 import org.appwork.moncompare.object.MapAccessorInterface;
 import org.appwork.moncompare.typehandler.FlexiTypeHandler;
 import org.appwork.serializer.Deser;
@@ -70,7 +72,9 @@ public class InterfaceLinker {
             this.backend = backend;
             this.cType = CompiledType.create(target.getType());
             Condition<TargetType> condition = new Condition<TargetType>();
-            condition.setTypeHandler(Arrays.asList(new FlexiTypeHandler()));
+            List<TypeHandler> list = new ArrayList<TypeHandler>();
+            list.add(new FlexiTypeHandler());
+            condition.setTypeHandler(list);
             map = condition.getMapWrapper(backend);
             methods = backend.getClass().getMethods();
         }

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -34,11 +35,15 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50935 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51120 $", interfaceVersion = 3, names = {}, urls = {})
 public class ListalCom extends PluginForHost {
     public ListalCom(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST };
     }
 
     @Override
@@ -122,7 +127,7 @@ public class ListalCom extends PluginForHost {
             if (!StringUtils.isEmpty(filename)) {
                 link.setFinalFileName(filename);
             }
-            if (!link.isSizeSet()) {
+            if (!link.isSizeSet() && this.getPluginEnvironment() != PluginEnvironment.DOWNLOAD) {
                 basicLinkCheck(br, br.createHeadRequest(dllink), link, null, null, (FILENAME_SOURCE[]) null);
             }
         }

@@ -24,7 +24,7 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLSearch;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49075 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51120 $", interfaceVersion = 3, names = {}, urls = {})
 public class MambahuyambaCom extends KernelVideoSharingComV2 {
     public MambahuyambaCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -34,7 +34,7 @@ public class MambahuyambaCom extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mobi.huyamba.mobi", "rt.huyamba.mobi", "x.huyamba.mobi", "lx.mambahuyamba.com", "web.mambahuyamba.com", "sx.mambahuyamba.com", "deep.mambahuyamba.com", "most.mambahuyamba.com", "huyamba.info", "pornogovno.me" });
+        ret.add(new String[] { "caramba.huyamba.mobi", "mobi.huyamba.mobi", "rt.huyamba.mobi", "x.huyamba.mobi", "lx.mambahuyamba.com", "web.mambahuyamba.com", "sx.mambahuyamba.com", "deep.mambahuyamba.com", "most.mambahuyamba.com", "huyamba.info", "pornogovno.me" });
         return ret;
     }
 
@@ -77,6 +77,8 @@ public class MambahuyambaCom extends KernelVideoSharingComV2 {
         /* 2024-06-05 */
         deadDomains.add("rt.huyamba.mobi");
         deadDomains.add("web.mambahuyamba.com");
+        /* 2025-06-05 */
+        deadDomains.add("mobi.huyamba.mobi");
         return deadDomains;
     }
 

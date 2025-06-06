@@ -3,7 +3,6 @@ package org.jdownloader.gui.views.downloads.action;
 import java.awt.event.ActionEvent;
 import java.util.List;
 
-import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -16,12 +15,12 @@ import org.jdownloader.controlling.DownloadLinkAggregator;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
-import org.jdownloader.extensions.extraction.translate.T;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.downloads.action.ResetSettings.DeleteMode;
+import org.jdownloader.gui.views.downloads.action.ResetSettings.DisabledItemsBehavior;
 import org.jdownloader.plugins.config.Order;
-import org.jdownloader.translate._JDT;
 
 import jd.controlling.TaskQueue;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -30,38 +29,22 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
 public class ResetAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext {
-    private static final long   serialVersionUID = -5583373118359478729L;
-    private final static String NAME             = _GUI.T.gui_table_contextmenu_reset();
-    private DeleteMode          deleteMode       = DeleteMode.AUTO;
+    private static final long     serialVersionUID      = -5583373118359478729L;
+    private final static String   NAME                  = _GUI.T.gui_table_contextmenu_reset();
+    private DeleteMode            deleteMode            = DeleteMode.AUTO;
+    private DisabledItemsBehavior disabledItemsBehavior = DisabledItemsBehavior.AUTO;
 
     public ResetAction() {
         setIconKey(IconKey.ICON_UNDO);
         setName(NAME);
     }
 
-    public static enum DeleteMode implements LabelInterface {
-        AUTO {
-            @Override
-            public String getLabel() {
-                return "Auto/Global default";
-            }
-        },
-        MOVE_TO_TRASH {
-            @Override
-            public String getLabel() {
-                return _JDT.T.DeleteOption_recycle();
-            }
-        },
-        DELETE {
-            @Override
-            public String getLabel() {
-                return T.T.final_delete();
-            }
-        };
-    }
-
     public static String getTranslationForDeleteMode() {
         return "Delete mode";
+    }
+
+    public static String getTranslationForDisabledItemsBehavior() {
+        return "Disabled items behavior";
     }
 
     @Customizer(link = "#getTranslationForDeleteMode")
@@ -74,6 +57,16 @@ public class ResetAction extends CustomizableTableContextAppAction<FilePackage, 
         this.deleteMode = mode;
     }
 
+    @Customizer(link = "#getTranslationForDisabledItemsBehavior")
+    @Order(20)
+    public DisabledItemsBehavior getDisabledItemsBehavior() {
+        return disabledItemsBehavior;
+    }
+
+    public void setDisabledItemsBehavior(DisabledItemsBehavior behavior) {
+        this.disabledItemsBehavior = behavior;
+    }
+
     private void reset(final List<DownloadLink> selection) {
         if (selection == null) {
             return;
@@ -81,6 +74,11 @@ public class ResetAction extends CustomizableTableContextAppAction<FilePackage, 
             return;
         }
         final DeleteMode deleteMode = this.getDeleteMode();
+        // TODO: Make use of ResetSettings
+        // TODO: If grey out this action if user wants to have disabled links excluded && user has only selected disabled items
+        final ResetSettings settings = new ResetSettings();
+        settings.setDeleteMode(this.getDeleteMode());
+        settings.setDisabledItemsBehavior(this.getDisabledItemsBehavior());
         TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {

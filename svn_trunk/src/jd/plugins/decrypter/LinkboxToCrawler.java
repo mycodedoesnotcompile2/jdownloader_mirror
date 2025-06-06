@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.LinkboxTo;
 
-@DecrypterPlugin(revision = "$Revision: 51078 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51117 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { LinkboxTo.class })
 public class LinkboxToCrawler extends PluginForDecrypt {
     public LinkboxToCrawler(PluginWrapper wrapper) {
@@ -72,7 +72,7 @@ public class LinkboxToCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern TYPE_NORMAL = Pattern.compile("/a/(d|f|s)/([A-Za-z0-9]+)(\\?pid=(\\d+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_NORMAL = Pattern.compile("/a/(d|f|i|s)/([A-Za-z0-9]+)(\\?pid=(\\d+))?", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_SHORT  = Pattern.compile("/f/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -138,7 +138,8 @@ public class LinkboxToCrawler extends PluginForDecrypt {
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             if (data == null) {
-                /* 2023-11-13: E.g. content abused: {"data":null,"msg":"data removed","status":700} */
+                /* 2023-11-13: e.g. content abused: {"data":null,"msg":"data removed","status":700} */
+                /* 2025-06-04: e.g. content expired: {"data":null,"msg":"expire","status":600} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             /* Check if this folder leads to a single file */

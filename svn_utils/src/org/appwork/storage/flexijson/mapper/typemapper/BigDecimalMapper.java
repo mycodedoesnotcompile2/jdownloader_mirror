@@ -56,7 +56,7 @@ public class BigDecimalMapper implements FlexiTypeMapper {
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#obj2Json(java.lang.Object )
      */
     public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
-        BigDecimal c = (BigDecimal) obj;
+        final BigDecimal c = (BigDecimal) obj;
         if (mapper != null) {
             return mapper.createFlexiJSonValue(c.toString());
         } else {
@@ -70,13 +70,13 @@ public class BigDecimalMapper implements FlexiTypeMapper {
      */
 
     public Object json2Obj(FlexiJSonMapper mapper, FlexiJSonNode json, CompiledType type, Setter setter) {
-        Object value = ((FlexiJSonValue) json).getValue();
+        final Object value = ((FlexiJSonValue) json).getValue();
         if (value instanceof String) {
             return new BigDecimal((String) value);
         } else if (value instanceof Double) {
-            return new BigDecimal(((Double) value).doubleValue());
+            return new BigDecimal(Double.toString(((Number) value).doubleValue()));
         } else if (value instanceof Float) {
-            return new BigDecimal(((Float) value).floatValue());
+            return new BigDecimal(Float.toString(((Number) value).floatValue()));
         } else if (value instanceof Number) {
             return new BigDecimal(((Number) value).longValue());
         } else {

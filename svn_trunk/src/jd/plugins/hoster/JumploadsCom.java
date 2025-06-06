@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51115 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51124 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,6 +109,35 @@ public class JumploadsCom extends PluginForHost {
         return this.rewriteHost(getPluginDomains(), host);
     }
 
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
+            /* Free Account */
+            return true;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+            /* Premium account */
+            return true;
+        } else {
+            /* Free(anonymous) and unknown account type */
+            return false;
+        }
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
+            /* Free Account */
+            return 1;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+            /* Premium account */
+            return -5;
+        } else {
+            /* Free(anonymous) and unknown account type */
+            return 1;
+        }
+    }
+
     private String getFallbackFilename(final DownloadLink link) {
         final String urlSlug = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
         if (urlSlug != null) {
@@ -128,15 +157,6 @@ public class JumploadsCom extends PluginForHost {
             return this.getFID(link);
         }
     }
-
-    /* Connection stuff */
-    /* 2019-08-13: Account untested, set FREE limits */
-    private final boolean FREE_RESUME               = false;
-    private final int     FREE_MAXCHUNKS            = 1;
-    private final boolean ACCOUNT_FREE_RESUME       = false;
-    private final int     ACCOUNT_FREE_MAXCHUNKS    = 1;
-    private final boolean ACCOUNT_PREMIUM_RESUME    = true;
-    private final int     ACCOUNT_PREMIUM_MAXCHUNKS = -5;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -206,17 +226,17 @@ public class JumploadsCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        handleDownload(link, null, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
+        handleDownload(link, null, "free_directlink");
     }
 
-    private void handleDownload(final DownloadLink link, final Account account, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
+    private void handleDownload(final DownloadLink link, final Account account, final String directlinkproperty) throws Exception, PluginException {
         String dllink = checkDirectLink(link, directlinkproperty);
         // String dllink = null;
         /* 2020-04-07: Password protected content will also set this to false but password protected content is very rare! */
         boolean directDownloadEnabled = true;
         if (dllink == null) {
             /* 2019-08-13: E.g. premium download or free account download of self-uploaded files */
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), resumable, maxchunks);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
                 /* Direct link */
                 dl.startDownload();
@@ -225,11 +245,7 @@ public class JumploadsCom extends PluginForHost {
             directDownloadEnabled = false;
             br.followConnection(true);
             /* 2020-04-07: E.g. premium account with disabled direct download */
-            dllink = br.getRegex("(/download\\.php[^<>\"\\']+)").getMatch(0);
-            if (dllink == null) {
-                /* 2025-01-29 */
-                dllink = br.getRegex("href=\"(https?://[^/]+/dll/[^\"]+)\"").getMatch(0);
-            }
+            dllink = br.getRegex("href=\"((https?://[^/]+)?/dl/[^\"]+)\"").getMatch(0);
             if (dllink == null) {
                 br.getHeaders().put("x-requested-with", "XMLHttpRequest");
                 if (isPasswordProtectedContent(br)) {
@@ -260,12 +276,14 @@ public class JumploadsCom extends PluginForHost {
                     /* Store valid downloadpassword for previous download-attempts */
                     link.setDownloadPassword(passCode);
                 }
-                String free_server = br.getRegex("freeaccess=\"([^\"]+)\"").getMatch(0);
-                final String freetoken = br.getRegex("freetoken=\"([^\"]+)\"").getMatch(0);
+                String free_server = br.getRegex("(?:freeaccess|data-srv)\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+                final String freetoken = br.getRegex("(?:freetoken|data-dl)\\s*=\\s*\"([^\"]+)\"").getMatch(0);
                 if (freetoken == null || free_server == null) {
                     handleErrors(br);
                     if (account != null && account.getType() == AccountType.PREMIUM) {
                         errorEnableDirectDownload();
+                        /* This code should never be reached. */
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     /* This token is used for all captcha attempts for current downloadlink! */
                     logger.warning("freetoken = " + freetoken + " | free_server = " + free_server);
@@ -299,16 +317,14 @@ public class JumploadsCom extends PluginForHost {
                 }
                 dllink = free_server + "download.php?accesstoken=" + freetoken;
             }
-            if (dllink == null) {
-                handleErrors(br);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (!directDownloadEnabled && account != null && account.getType() == AccountType.PREMIUM) {
                 errorEnableDirectDownload();
+                /* This code should never be reached. */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             if (dl.getConnection().getResponseCode() == 403) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
@@ -461,7 +477,7 @@ public class JumploadsCom extends PluginForHost {
                 }
                 br.setCookie(br.getHost(), "__" + key, value);
             }
-            brc.getPage(path_userinfo);
+            brc.getPage(path_userinfo + "?_svx=" + ts);
             /* Double-check */
             if (!this.isLoggedin(brc)) {
                 throw new AccountInvalidException("Login failed for unknown reasons; contact support if this continues to happen");
@@ -482,52 +498,93 @@ public class JumploadsCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, true);
         final AccountInfo ai = new AccountInfo();
-        final Regex trafficRegex = br.getRegex(">(\\d+) of (\\d+)GB</h2>\\s*<h2[^>]*>\\s*Used Bandwidth\\s*</h2>");
-        if (!trafficRegex.patternFind()) {
-            logger.warning("Failed to extract account traffic info");
-        }
-        final String traffic_usedStr = trafficRegex.getMatch(0);
-        final String traffic_maxStr = trafficRegex.getMatch(1);
-        final Regex spaceRegex = br.getRegex(">(\\d+) of (\\d+)GB</h2>\\s*<h2[^>]*>\\s*Used Space\\s*</h2>");
-        if (!spaceRegex.patternFind()) {
-            logger.warning("Failed to extract account space info");
-        }
-        final String space_usedStr = spaceRegex.getMatch(0);
-        final String expireStr = br.getRegex(">\\s*Expires on (\\d{4}-\\d{1,2}-\\d{1,2})").getMatch(0);
-        long expireTimestamp = 0;
-        if (expireStr != null) {
-            expireTimestamp = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd", Locale.ENGLISH);
-        }
-        if (expireTimestamp < System.currentTimeMillis()) {
-            /* Free & expired premium */
-            account.setType(AccountType.FREE);
-            /* free accounts can still have captcha */
-            account.setConcurrentUsePossible(false);
-        } else {
-            /* Premium */
-            ai.setValidUntil(expireTimestamp, br);
-            account.setType(AccountType.PREMIUM);
-            account.setConcurrentUsePossible(true);
-        }
-        final String unit = "GB";
-        long traffic_left = 0;
-        if (traffic_usedStr != null && traffic_maxStr != null) {
-            long traffic_used = SizeFormatter.getSize(traffic_usedStr + unit);
-            if (traffic_used == -1) {
-                /* E.g. website displays "--- / 35GB" */
-                traffic_used = 0;
+        final String userinfoJson = br.getRegex("ume = (\\{.*?\\}), ").getMatch(0);
+        if (userinfoJson != null) {
+            /* Obtain account information from json source */
+            /* 2025-06-05: same as emload.com */
+            final Map<String, Object> entries = restoreFromString(userinfoJson, TypeRef.MAP);
+            final Map<String, Object> namemap = (Map<String, Object>) entries.get("name");
+            final Map<String, Object> bw = (Map<String, Object>) entries.get("bw");
+            final Map<String, Object> premiuminfo = (Map<String, Object>) entries.get("pro");
+            /* Ensure to set a unique username: Due to cookie login, user could enter whatever he wants into username field in GUI. */
+            if (account.loadUserCookies() != null) {
+                if (account.getUser().contains("@")) {
+                    final String email = StringUtils.valueOfOrNull(entries.get("email"));
+                    if (email != null) {
+                        account.setUser(email);
+                    }
+                } else if (namemap != null) {
+                    final String fname = StringUtils.valueOfOrNull(namemap.get("fname"));
+                    if (fname != null) {
+                        account.setUser(fname);
+                    }
+                }
             }
-            final long traffic_max = SizeFormatter.getSize(traffic_maxStr + unit);
-            traffic_left = traffic_max - traffic_used;
-        }
-        if (traffic_left > 0) {
-            ai.setTrafficLeft(traffic_left);
+            /* 35GB per day, see: https://www.jumploads.com/premium */
+            // final long trafficMax = 35000000000l;
+            final long trafficMax = ((Number) bw.get("avl")).longValue();
+            final long trafficUsed = ((Number) bw.get("cons")).longValue();
+            ai.setTrafficRefill(true);
+            ai.setTrafficLeft(trafficMax - trafficUsed);
+            ai.setTrafficMax(trafficMax);
+            /* E.g. Lifetime Free Account */
+            if (premiuminfo != null) {
+                ai.setValidUntil(((Number) premiuminfo.get("expiry")).longValue() * 1000);
+                account.setType(AccountType.PREMIUM);
+                account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
+                account.setConcurrentUsePossible(true);
+            } else {
+                account.setType(AccountType.FREE);
+                /* free accounts can still have captcha */
+                account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
+                account.setConcurrentUsePossible(false);
+            }
         } else {
-            logger.warning("Failed to find trafficleft");
-            ai.setUnlimitedTraffic();
-        }
-        if (space_usedStr != null) {
-            ai.setUsedSpace(SizeFormatter.getSize(space_usedStr + unit));
+            final Regex trafficRegex = br.getRegex(">(\\d+[^<]*) of (\\d+[^<]+)</h2>\\s*<h2[^>]*>\\s*Used Bandwidth\\s*</h2>");
+            if (!trafficRegex.patternFind()) {
+                logger.warning("Failed to extract account traffic info");
+            }
+            final String traffic_usedStr = trafficRegex.getMatch(0);
+            final String traffic_maxStr = trafficRegex.getMatch(1);
+            final Regex spaceRegex = br.getRegex(">(\\d+[^<]*) of (\\d+[^<]+)</h2>\\s*<h2[^>]*>\\s*Used Space\\s*</h2>");
+            if (!spaceRegex.patternFind()) {
+                logger.warning("Failed to extract account space info");
+            }
+            final String space_usedStr = spaceRegex.getMatch(0);
+            final String expireStr = br.getRegex(">\\s*Expires on (\\d{4}-\\d{1,2}-\\d{1,2})").getMatch(0);
+            long expireTimestamp = 0;
+            if (expireStr != null) {
+                expireTimestamp = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd", Locale.ENGLISH);
+            }
+            final boolean isPremium = br.containsHTML(">\\s*Pro\\s*</div>");
+            if (isPremium || expireTimestamp > System.currentTimeMillis()) {
+                /* Premium */
+                if (expireTimestamp > System.currentTimeMillis()) {
+                    ai.setValidUntil(expireTimestamp, br);
+                }
+                account.setType(AccountType.PREMIUM);
+                account.setConcurrentUsePossible(true);
+            } else {
+                /* Free & expired premium */
+                account.setType(AccountType.FREE);
+                /* free accounts can still have captcha */
+                account.setConcurrentUsePossible(false);
+            }
+            long traffic_left = 0;
+            if (traffic_usedStr != null && traffic_maxStr != null) {
+                final long traffic_used = SizeFormatter.getSize(traffic_usedStr);
+                final long traffic_max = SizeFormatter.getSize(traffic_maxStr);
+                traffic_left = traffic_max - traffic_used;
+            }
+            if (traffic_left > 0) {
+                ai.setTrafficLeft(traffic_left);
+            } else {
+                logger.warning("Failed to find trafficleft");
+                ai.setUnlimitedTraffic();
+            }
+            if (space_usedStr != null) {
+                ai.setUsedSpace(SizeFormatter.getSize(space_usedStr));
+            }
         }
         return ai;
     }
@@ -538,9 +595,9 @@ public class JumploadsCom extends PluginForHost {
         requestFileInformation(link);
         login(account, false);
         if (account.getType() == AccountType.FREE) {
-            handleDownload(link, account, ACCOUNT_FREE_RESUME, ACCOUNT_FREE_MAXCHUNKS, "account_free_directlink");
+            handleDownload(link, account, "account_free_directlink");
         } else {
-            handleDownload(link, account, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS, "premium_directlink");
+            handleDownload(link, account, "premium_directlink");
         }
     }
 

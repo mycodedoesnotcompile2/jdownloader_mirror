@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51114 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 51117 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "" })
 public class ChoMikujPl extends PluginForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -87,11 +87,6 @@ public class ChoMikujPl extends PluginForHost {
         br.setAllowedResponseCodes(new int[] { 500 });
         br.setFollowRedirects(true);
         return br;
-    }
-
-    @SuppressWarnings("deprecation")
-    public void correctDownloadLink(DownloadLink link) {
-        link.setUrlDownload(link.getDownloadURL().replace("chomikujdecrypted.pl/", "chomikuj.pl/"));
     }
 
     @Override

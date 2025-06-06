@@ -20,6 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
@@ -31,27 +37,28 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 47483 $", interfaceVersion = 2, names = { "mais.uol.com.br" }, urls = { "https?://((?:www\\.)?mais\\.uol\\.com\\.br/view/(?:[a-z0-9]+/[A-Za-z0-9\\-]+|\\d+)|player\\.mais\\.uol\\.com\\.br/\\?mediaId=\\d+\\&type=video)" })
+@HostPlugin(revision = "$Revision: 51118 $", interfaceVersion = 2, names = { "mais.uol.com.br" }, urls = { "https?://((?:www\\.)?mais\\.uol\\.com\\.br/view/(?:[a-z0-9]+/[A-Za-z0-9\\-]+|\\d+)|player\\.mais\\.uol\\.com\\.br/\\?mediaId=\\d+\\&type=video)" })
 public class MaisUolComBr extends PluginForHost {
     public MaisUolComBr(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private String  dllinkHTTP      = null;
-    private String  dllinkHLSMaster = null;
-    private boolean server_issues   = false;
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+    }
+
+    private String dllinkHTTP      = null;
+    private String dllinkHLSMaster = null;
 
     @Override
     public String getAGBLink() {
         return "http://mais.uol.com.br/";
     }
 
+    /* E.g. /view/hpekq03k3r08/14856863 */
     private static final String TYPE_NORMAL     = "(?i)https?://(?:www\\.)?mais\\.uol\\.com\\.br/view/([a-z0-9]+)/([A-Za-z0-9\\-]+)";
+    /* E.g. /view/16970053 */
     private static final String TYPE_VIEW_SHORT = "(?i)https?://(?:www\\.)?mais\\.uol\\.com\\.br/view/(\\d+)$";
     private static final String TYPE_EMBED      = "(?i)https?://player\\.mais\\.uol\\.com\\.br/\\?mediaId=(\\d+)\\&type=video";
 
@@ -59,7 +66,7 @@ public class MaisUolComBr extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         dllinkHTTP = null;
-        server_issues = false;
+        dllinkHLSMaster = null;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(new int[] { 400, 500 });
@@ -91,8 +98,14 @@ public class MaisUolComBr extends PluginForHost {
                 br.getPage("https://api.mais.uol.com.br/apiuol/v3/media/detail/" + urlpart);
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (br.getHttpConnection().getResponseCode() != 200) {
+                    /*
+                     * E.g. {"response":{"code":400,"description":"Bad request.","originalRequest":
+                     * "/apiuol/v3/media/detail/ael-academia-estudantil-de-letras"},"error":null}
+                     */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(this.br.toString());
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 entries = (Map<String, Object>) entries.get("item");
                 mediaID = entries.get("mediaId").toString();
             }
@@ -104,7 +117,7 @@ public class MaisUolComBr extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(this.br.toString());
+        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         entries = (Map<String, Object>) entries.get("item");
         String filename = (String) entries.get("title");
         final Object formatsO = entries.get("formats");
@@ -173,8 +186,6 @@ public class MaisUolComBr extends PluginForHost {
                     if (con.getCompleteContentLength() > 0) {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
-                } else {
-                    server_issues = true;
                 }
             } finally {
                 try {
@@ -189,9 +200,7 @@ public class MaisUolComBr extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
-        } else if (StringUtils.isEmpty(this.dllinkHTTP) && StringUtils.isEmpty(this.dllinkHLSMaster)) {
+        if (StringUtils.isEmpty(this.dllinkHTTP) && StringUtils.isEmpty(this.dllinkHLSMaster)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (!StringUtils.isEmpty(this.dllinkHTTP)) {
@@ -216,7 +225,7 @@ public class MaisUolComBr extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

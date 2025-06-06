@@ -29,7 +29,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.LinkboxTo;
 
-@DecrypterPlugin(revision = "$Revision: 48678 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51117 $", interfaceVersion = 3, names = {}, urls = {})
 public class LinkboxToCrawlerShorturls extends PluginForDecrypt {
     public LinkboxToCrawlerShorturls(PluginWrapper wrapper) {
         super(wrapper);
@@ -38,7 +38,7 @@ public class LinkboxToCrawlerShorturls extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "lbx.to" });
+        ret.add(new String[] { "lbx.to", "lbx.so" });
         return ret;
     }
 
@@ -58,7 +58,7 @@ public class LinkboxToCrawlerShorturls extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(d|f|s)/([A-Za-z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(d|f|i|s)/([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }

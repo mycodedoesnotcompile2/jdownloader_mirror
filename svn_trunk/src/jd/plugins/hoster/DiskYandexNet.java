@@ -19,15 +19,18 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -48,7 +51,6 @@ import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.http.requests.PostRequest;
-import jd.nutils.JDHash;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -68,7 +70,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DiskYandexNetFolder;
 
-@HostPlugin(revision = "$Revision: 51115 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51121 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNet extends PluginForHost {
     public DiskYandexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +84,7 @@ public class DiskYandexNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://" + getCurrentDomain() + "/";
+        return "https://" + this.getHost() + "/";
     }
 
     @Override
@@ -94,7 +96,7 @@ public class DiskYandexNet extends PluginForHost {
 
     private void prepBR(final Browser br) {
         br.getHeaders().put("Accept-Language", "en-us;q=0.7,en;q=0.3");
-        br.setCookie(getCurrentDomain(), "ys", "");
+        br.setCookie(getCurrentDiskDomain(), "ys", "");
         br.setAllowedResponseCodes(new int[] { 429, 500 });
         br.setFollowRedirects(true);
     }
@@ -102,7 +104,7 @@ public class DiskYandexNet extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "disk.yandex.net", "disk.yandex.com" });
+        ret.add(new String[] { "disk.yandex.net", "disk.yandex.com", "disk.yandex.ru" });
         return ret;
     }
 
@@ -123,16 +125,49 @@ public class DiskYandexNet extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    /** Returns currently used domain. */
-    public static String getCurrentDomain() {
-        return "disk.yandex.com";
+    private String getCurrentDomain() {
+        return "yandex.com";
+    }
+
+    private String getCurrentDiskDomain(final Account account) {
+        final String domain = account != null ? getAccountDomain(account) : getCurrentDomain();
+        return "disk." + domain;
+    }
+
+    /** Returns currently used "disk.yandex.tld" domain. */
+    private String getCurrentDiskDomain() {
+        return getCurrentDiskDomain(null);
+    }
+
+    /**
+     * Returns domain to be used for this account e.g. "yandex.com". <br>
+     * This depends on the supplied cookies.
+     */
+    private String getAccountDomain(final Account account) {
+        final Cookies cookies = account.loadCookies("");
+        final Cookies userCookies = account.loadUserCookies();
+        /* 2021-02-15: Implemented cookie login for testing purposes */
+        final Cookies final_cookies;
+        if (userCookies != null) {
+            final_cookies = userCookies;
+        } else {
+            final_cookies = cookies;
+        }
+        for (final Cookie cookie : final_cookies.getCookies()) {
+            final String host = cookie.getHost();
+            for (final String domain : additional_domains) {
+                if (host.equals(domain)) {
+                    return domain;
+                }
+            }
+        }
+        return getCurrentDomain();
     }
 
     /* Some constants which they used in browser */
-    public static final String   CLIENT_ID                              = "12139679121706110849432";
+    public static final String   CLIENT_ID                              = "12139679121749126988446";
     /* Domains & other login stuff */
-    private final String[]       cookie_domains                         = new String[] { "https://yandex.ru", "https://yandex.com", "https://disk.yandex.ru/", "https://disk.yandex.com/", "https://disk.yandex.net/", "https://disk.yandex.com.tr/", "https://disk.yandex.kz/" };
-    public static final String[] sk_domains                             = new String[] { "disk.yandex.com", "disk.yandex.ru", "disk.yandex.com.tr", "disk.yandex.ua", "disk.yandex.az", "disk.yandex.com.am", "disk.yandex.com.ge", "disk.yandex.co.il", "disk.yandex.kg", "disk.yandex.lt", "disk.yandex.lv", "disk.yandex.md", "disk.yandex.tj", "disk.yandex.tm", "disk.yandex.uz", "disk.yandex.fr", "disk.yandex.ee", "disk.yandex.kz", "disk.yandex.by" };
+    public static final String[] additional_domains                     = new String[] { "yandex.com", "yandex.ru", "yandex.com.tr", "yandex.ua", "yandex.az", "yandex.com.am", "yandex.com.ge", "yandex.co.il", "yandex.kg", "yandex.lt", "yandex.lv", "yandex.md", "yandex.tj", "yandex.tm", "yandex.uz", "yandex.fr", "yandex.ee", "yandex.kz", "yandex.by" };
     /* Properties */
     public static final String   PROPERTY_HASH                          = "hash_main";
     public static final String   PROPERTY_QUOTA_REACHED                 = "quoty_reached";
@@ -172,16 +207,16 @@ public class DiskYandexNet extends PluginForHost {
     }
 
     /* Make sure we always use our main domain */
-    private String getMainLink(final DownloadLink link) throws Exception {
+    private String getMainLink(final DownloadLink link, final Account account) throws Exception {
         String mainlink = link.getStringProperty("mainlink");
-        if (mainlink == null && getRawHash(link) != null) {
-            mainlink = String.format("https://yadi.sk/public/?hash=%s", URLEncode.encodeURIComponent(getRawHash(link)));
+        /* RawHash should be available for all items. It might be missing for very very old items. */
+        final String rawHash = getRawHash(link);
+        if (rawHash != null) {
+            final String domain = this.getCurrentDiskDomain(account);
+            mainlink = "https://" + domain + "/public/?hash=" + URLEncode.encodeURIComponent(rawHash);
         }
         if (mainlink == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        if (!StringUtils.contains(mainlink, "yadi")) {
-            mainlink = "https://disk.yandex.com/" + new Regex(mainlink, "(?i)yandex\\.[^/]+/(.+)").getMatch(0);
         }
         return mainlink;
     }
@@ -251,11 +286,12 @@ public class DiskYandexNet extends PluginForHost {
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
         /* Remove that value to ensure that we will have a fresh one down below. */
         link.removeProperty(PROPERTY_LAST_AUTH_SK);
-        final String contenturl = getMainLink(link);
+        final String contenturl = getMainLink(link, account);
         /**
          * Why do we need to use the crawler plugin here? </br>
-         * - If the item is password protected and the 'passToken' cookie has expired, it will be refreshed </br>
-         * - If the item was not password protected but it is password protected now, that will be handled correctly </br>
+         * - If the item is password protected and the 'passToken' cookie has expired, it will be refreshed by the crawler (abvoids the need
+         * for duplicated code) </br>
+         * - If the item was not password protected but it is password protected now, the crawler will handle that </br>
          * - If any single-file properties which only our crawler finds change, we will get them
          */
         final CryptedLink cryptedlink = new CryptedLink(contenturl, link);
@@ -277,16 +313,23 @@ public class DiskYandexNet extends PluginForHost {
             /* Dead end */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        /* Set fresh properties */
-        link.setProperties(fresh.getProperties());
-        final String crawledFilename = link.getStringProperty(PROPERTY_CRAWLED_FILENAME);
-        String filename = br.getRegex("class=\"file-name\" data-reactid=\"[^\"]*?\">([^<>\"]+)<").getMatch(0);
-        if (StringUtils.isEmpty(filename)) {
+        /* Set fresh properties, do not overwrite existing properties */
+        final List<String> propertyOverwriteWhitelist = new ArrayList<String>();
+        propertyOverwriteWhitelist.add(PROPERTY_PASSWORD_TOKEN);
+        propertyOverwriteWhitelist.add(PROPERTY_LAST_AUTH_SK);
+        final Iterator<Entry<String, Object>> iterator = fresh.getProperties().entrySet().iterator();
+        while (iterator.hasNext()) {
+            final Entry<String, Object> entry = iterator.next();
+            if (!link.hasProperty(entry.getKey()) || propertyOverwriteWhitelist.contains(entry.getKey())) {
+                link.setProperty(entry.getKey(), entry.getValue());
+            }
         }
-        String filesize_str = br.getRegex("class=\"item-details__name\">\\s*Size:\\s*</span> ([^<>\"]+)</div>").getMatch(0);
+        final String crawledFilename = link.getStringProperty(PROPERTY_CRAWLED_FILENAME);
+        // String filename = br.getRegex("class=\"file-name\" data-reactid=\"[^\"]*\">([^<>\"]+)<").getMatch(0);
+        String filesize_str = br.getRegex("class=\"item-details__name\">\\s*Size:\\s*</span> ([^<]+)</div>").getMatch(0);
         if (filesize_str == null) {
             /* Language independent */
-            filesize_str = br.getRegex("class=\"item-details__name\"[^>]*>[^<>\"]+</span> ([\\d\\.]+ (?:B|KB|MB|GB))</div>").getMatch(0);
+            filesize_str = br.getRegex("class=\"item-details__name\"[^>]*>[^<]+</span> ([\\d\\.]+ (?:B|KB|MB|GB))</div>").getMatch(0);
         }
         /* Important for account download handling */
         if (br.containsHTML("class=\"[^\"]+antifile-sharing\"")) {
@@ -476,7 +519,7 @@ public class DiskYandexNet extends PluginForHost {
         }
         final String passToken = link.getStringProperty(PROPERTY_PASSWORD_TOKEN);
         if (passToken != null) {
-            DiskYandexNetFolder.setFolderPasswordTokenCookie(br, Browser.getHost(getMainLink(link)), passToken);
+            DiskYandexNetFolder.setFolderPasswordTokenCookie(br, Browser.getHost(getMainLink(link, account)), passToken);
         }
         Map<String, Object> directurlresultmap = getDirecturlResult(link, account);
         PluginException exceptionDuringAPILinkcheck = null;
@@ -554,6 +597,8 @@ public class DiskYandexNet extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown download error");
                 }
             }
+        } catch (final InterruptedException ie) {
+            throw ie;
         } catch (final Exception e) {
             if (storedPreviouslyGeneratedDirecturl != null) {
                 link.removeProperty(directurlproperty);
@@ -677,14 +722,21 @@ public class DiskYandexNet extends PluginForHost {
                  */
                 try {
                     plg.logger.info("Trying to empty trash");
-                    br2.postPage("/models/?_m=do-clean-trash", "_model.0=do-clean-trash&idClient=" + CLIENT_ID + "&sk=" + authSk);
+                    final PostRequest request2 = br2.createJSonPostRequest("/models-v2?m=mpfs/async-trash-drop-all", String.format("{\"sk\":\"%s\",\"connection_id\":\"%s\",\"apiMethod\":\"mpfs/async-trash-drop-all\"}", longSK, connection_id));
                     /*
-                     * This just triggers an async serverside action but we'll just assume success at this point to avoid the need to do
+                     * This just triggers an async serverside operation but we'll just assume success at this point to avoid the need to do
                      * further http requests.
                      */
-                    plg.logger.info("Successfully emptied trash");
+                    br2.getPage(request2);
+                    /* E.g. {"oid":"<someHash>","type":"trash","at_version":<someNumber>} */
+                    final Map<String, Object> operation = this.plg.checkErrorsWebAPI(br2, link, account);
+                    if (operation.containsKey("oid")) {
+                        plg.logger.info("Successfully emptied trash");
+                    } else {
+                        plg.logger.warning("Failed to empty trash");
+                    }
                 } catch (final Throwable e) {
-                    plg.logger.warning("Failed to empty trash");
+                    plg.logger.warning("Failed to empty trash (exception)");
                 }
             } else {
                 /* Permanently delete file from trash which we've moved to trash before */
@@ -744,6 +796,8 @@ public class DiskYandexNet extends PluginForHost {
     }
 
     /** Use this before doing requests on "/client/...". */
+    /* 2025-06-05: Deprecated */
+    @Deprecated
     private Browser prepClientapiBrowser(final Browser sourceBrowser) throws Exception {
         final Browser br2 = sourceBrowser.cloneBrowser();
         br2.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
@@ -754,20 +808,21 @@ public class DiskYandexNet extends PluginForHost {
     }
 
     /** Use this before doing requests on "/public/api/...". */
-    private void prepWebapiBrowser(final Browser br3, final DownloadLink link) throws Exception {
+    private void prepWebapiBrowser(final Browser br3, final DownloadLink link, final Account account) throws Exception {
         final String host;
         if (br3.getRequest() != null) {
             host = br3.getHost(true);
         } else {
             /* Fallback */
-            host = getCurrentDomain();
+            host = getCurrentDiskDomain();
         }
+        final String contenturl = this.getMainLink(link, account);
         br3.getHeaders().put("Accept", "*/*");
         br3.getHeaders().put("Content-Type", "text/plain"); // Important header else we will get error 400
         br3.getHeaders().put("Origin", "https://" + host);
-        br3.getHeaders().put("Referer", this.getMainLink(link));
+        br3.getHeaders().put("Referer", contenturl);
         br3.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        br3.getHeaders().put("X-Retpath-Y", this.getMainLink(link));
+        br3.getHeaders().put("X-Retpath-Y", contenturl);
     }
 
     private void prepWebapiRequest(final Browser br3, final PostRequest req) throws Exception {
@@ -776,7 +831,7 @@ public class DiskYandexNet extends PluginForHost {
             host = br3.getHost(true);
         } else {
             /* Fallback */
-            host = getCurrentDomain();
+            host = getCurrentDiskDomain();
         }
         req.getHeaders().put("Accept", "*/*");
         req.getHeaders().put("Origin", "https://" + host);
@@ -809,7 +864,7 @@ public class DiskYandexNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* For requests to "/public/api" */
-        prepWebapiBrowser(br3, link);
+        prepWebapiBrowser(br3, link, account);
         /* Move file into users' account as it is quote limited and without doing this it's impossible to download this file. */
         /* Obtain special token */
         br.getPage("/client/disk/Downloads");
@@ -819,26 +874,21 @@ public class DiskYandexNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         link.setProperty(PROPERTY_LAST_LONG_SK, longSK);
-        final Browser br2 = prepClientapiBrowser(br);
         String internal_file_path = getInternalFilePath(link, account);
         boolean foundStoredInternalPath = false;
         if (internal_file_path != null) {
             logger.info("Checking if stored internal path/file still exists on account | file-path: " + internal_file_path);
             try {
-                final UrlQuery query = new UrlQuery();
-                query.add("idClient", Encoding.urlEncode(CLIENT_ID));
-                query.add("sk", Encoding.urlEncode(longSK));
-                query.add("_model.0", "resources");
-                query.add("sort.0", "mtime");
-                query.add("order.0", "0");
-                query.add("idContext.0", Encoding.urlEncode("/disk/Downloads"));
-                query.add("amount.0", "40");
-                query.add("offset.0", "0");
-                query.add("withParent.0", "1");
-                br2.postPage("/models/?_m=resources", query);
-                checkErrorsWebsite(br2, link, account);
-                final Map<String, Object> entries = this.checkErrorsWebAPI(br2, link, account);
-                final List<Map<String, Object>> resourcelist = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "models/{0}/data/resources");
+                final String postdata = String.format("{\"sk\":\"%s\",\"connection_id\":\"%s\",\"apiMethod\":\"mpfs/resources\",\"requestParams\":{\"sort\":\"mtime\",\"order\":\"0\",\"idContext\":\"/disk/Downloads\",\"amount\":40,\"offset\":0,\"withParent\":\"1\",\"with_share\":\"1\"}}", longSK, CLIENT_ID);
+                prepWebapiBrowser(br3, link, account);
+                br3.postPageRaw("/models-v2?m=mpfs/resources", postdata);
+                checkErrorsWebsite(br3, link, account);
+                /*
+                 * Fetches max 40 items per page. This can theoretically fail for users who are downloading a lot of stuff in a very short
+                 * time -> Edge case we ignore.
+                 */
+                final Map<String, Object> entries = this.checkErrorsWebAPI(br3, link, account);
+                final List<Map<String, Object>> resourcelist = (List<Map<String, Object>>) entries.get("resources");
                 for (final Map<String, Object> fileObject : resourcelist) {
                     if (fileObject.get("path").toString().equals(internal_file_path)) {
                         foundStoredInternalPath = true;
@@ -871,17 +921,17 @@ public class DiskYandexNet extends PluginForHost {
             } else {
                 copySource = "public_web_copy";
             }
-            final Map<String, Object> postmap = new HashMap<String, Object>();
-            postmap.put("hash", this.getRawHash(link));
-            postmap.put("name", link.getName());
-            postmap.put("lang", "en");
-            postmap.put("source", copySource);
-            postmap.put("isAlbum", false);
-            postmap.put("itemId", null);
-            postmap.put("sk", authSk);
-            postmap.put("uid", userID);
-            prepWebapiBrowser(br3, link);
-            br3.postPageRaw("/public/api/save", URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postmap)));
+            final Map<String, Object> postmap0 = new HashMap<String, Object>();
+            postmap0.put("hash", this.getRawHash(link));
+            postmap0.put("name", link.getName());
+            postmap0.put("lang", "en");
+            postmap0.put("source", copySource);
+            postmap0.put("isAlbum", false);
+            postmap0.put("itemId", null);
+            postmap0.put("sk", authSk);
+            postmap0.put("uid", userID);
+            prepWebapiBrowser(br3, link, account);
+            br3.postPageRaw("/public/api/save", URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postmap0)));
             checkErrorsWebsite(br3, link, account);
             final Map<String, Object> entries = this.checkErrorsWebAPI(br3, link, account);
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
@@ -901,14 +951,14 @@ public class DiskYandexNet extends PluginForHost {
             boolean fileWasImportedSuccessfully = false;
             Map<String, Object> fileImportResp = null;
             Map<String, Object> fileImportRespData = null;
-            final Map<String, Object> postMap = new HashMap<String, Object>();
-            postMap.put("oid", oid);
-            postMap.put("lang", "en");
-            postMap.put("sk", authSk);
-            postMap.put("uid", userID);
+            final Map<String, Object> postmap1 = new HashMap<String, Object>();
+            postmap1.put("oid", oid);
+            postmap1.put("lang", "en");
+            postmap1.put("sk", authSk);
+            postmap1.put("uid", userID);
             for (int i = 1; i < 10; i++) {
-                prepWebapiBrowser(br3, link);
-                br3.postPageRaw("/public/api/get-save-operation-status", URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postMap)));
+                prepWebapiBrowser(br3, link, account);
+                br3.postPageRaw("/public/api/get-save-operation-status", URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postmap1)));
                 checkErrorsWebsite(br3, link, account);
                 fileImportResp = this.checkErrorsWebAPI(br3, link, account);
                 fileImportRespData = (Map<String, Object>) fileImportResp.get("data");
@@ -936,16 +986,13 @@ public class DiskYandexNet extends PluginForHost {
             logger.info("given/stored internal filepath: " + internal_file_path);
         }
         /* Generate downloadurl to copy of file which is now owned by the account we are using at this moment. */
-        final UrlQuery query = new UrlQuery();
-        query.add("idClient", Encoding.urlEncode(CLIENT_ID));
-        query.add("sk", Encoding.urlEncode(longSK));
-        query.add("_model.0", "do-get-resource-url");
-        query.add("idResource.0", Encoding.urlEncode(internal_file_path));
-        br2.postPage("/models/?_m=do-get-resource-url", query);
-        checkErrorsWebsite(br2, link, account);
-        final Map<String, Object> entries = this.checkErrorsWebAPI(br2, link, account);
-        final Map<String, Object> downloadMap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "models/{0}/data");
-        final String dllink = downloadMap.get("file").toString();
+        prepWebapiBrowser(br3, link, account);
+        br3.postPageRaw("/models-v2?m=mpfs/url", String.format("{\"sk\":\"%s\",\"connection_id\":\"%s\",\"apiMethod\":\"mpfs/url\",\"requestParams\":{\"path\":\"%s\"}}", longSK, CLIENT_ID, internal_file_path));
+        checkErrorsWebsite(br3, link, account);
+        final Map<String, Object> entries = this.checkErrorsWebAPI(br3, link, account);
+        /* 2025-06-05: Both digest and file is possible */
+        final String dllink = entries.get("digest").toString();
+        // final String dllink = entries.get("file").toString();
         if (StringUtils.isEmpty(dllink)) {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -970,7 +1017,7 @@ public class DiskYandexNet extends PluginForHost {
             /* Video stream download */
             logger.info("Trying to find video stream downloadlink");
             final String passToken = link.getStringProperty(PROPERTY_PASSWORD_TOKEN);
-            this.prepWebapiBrowser(br, link);
+            this.prepWebapiBrowser(br, link, account);
             /* For "WrongSK" handling */
             br.setAllowedResponseCodes(400);
             String errortextStreamingDownloadFailed = "Streaming download failed.";
@@ -991,7 +1038,7 @@ public class DiskYandexNet extends PluginForHost {
                 if (passToken != null) {
                     postData.put("passToken", passToken);
                 }
-                final PostRequest request = br.createJSonPostRequest("https://" + getCurrentDomain() + "/public/api/get-video-streams", postData);
+                final PostRequest request = br.createJSonPostRequest("https://" + getCurrentDiskDomain(account) + "/public/api/get-video-streams", postData);
                 this.prepWebapiRequest(br, request);
                 br.getPage(request);
                 entries = this.checkErrorsWebAPI(br, link, account);
@@ -1147,7 +1194,7 @@ public class DiskYandexNet extends PluginForHost {
             host = br3.getHost(true);
         } else {
             /* Fallback */
-            host = getCurrentDomain();
+            host = getCurrentDiskDomain(account);
         }
         final Map<String, Object> postData = new HashMap<String, Object>();
         postData.put("hash", this.getRawHash(link));
@@ -1159,7 +1206,7 @@ public class DiskYandexNet extends PluginForHost {
             postData.put("uid", userID);
         }
         final PostRequest request = br.createJSonPostRequest("https://" + host + "/public/api/download-url", postData);
-        this.prepWebapiBrowser(br3, link);
+        this.prepWebapiBrowser(br3, link, account);
         this.prepWebapiRequest(br3, request);
         br3.getPage(request);
         final Map<String, Object> entries = this.checkErrorsWebAPI(br3, link, account);
@@ -1376,7 +1423,7 @@ public class DiskYandexNet extends PluginForHost {
                     if (account.hasEverBeenValid()) {
                         throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                     } else {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid() + "\r\nTry again with cookies exported from the disk.yandex.COM domain.");
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                     }
                 }
             }
@@ -1493,7 +1540,7 @@ public class DiskYandexNet extends PluginForHost {
                 continue;
             }
             /* Set cookie on all known domains. */
-            for (final String domain : cookie_domains) {
+            for (final String domain : additional_domains) {
                 br.setCookie(domain, cookie.getKey(), cookie.getValue());
             }
             br.setCookie("passport.yandex.com", cookie.getKey(), cookie.getValue());
@@ -1502,14 +1549,15 @@ public class DiskYandexNet extends PluginForHost {
 
     /** Returns true if given cookies are valid. */
     private boolean checkCookies(final Browser br, final Account account) throws IOException {
-        br.getPage("https://id.yandex.com/");
-        if (br.getURL().contains("passport.yandex.com") || br.getURL().contains("/auth")) {
-            /* Redirect to login-page */
+        final String domain = getAccountDomain(account);
+        br.getPage("https://id." + domain + "/");
+        if (br.getURL().contains("passport.yandex.") || br.getURL().contains("/auth")) {
+            /* Redirect to login-page e.g. https://passport.yandex.ru/auth?retpath=https%3A%2F%2Fid.yandex.ru%2F&noreturn=1 */
             return false;
         }
         logger.info("First check looks good, performing 2nd login check");
         try {
-            br.getPage("https://mail.yandex.com/api/v2/serp/counters?silent");
+            br.getPage("https://mail." + domain + "/api/v2/serp/counters?silent");
             if (br.getRequest().getHtmlCode().startsWith("{")) {
                 /* json response -> Looks like we're logged in */
                 return true;
@@ -1525,9 +1573,10 @@ public class DiskYandexNet extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, true);
-        /* userid is needed for some account related http requests later on. */
-        br.getPage("https://" + getCurrentDomain() + "/client/disk/");
-        this.checkErrorsWebsite(br, getDownloadLink(), account);
+        /* user_id is needed for some account related http requests later on. */
+        final String domain = getAccountDomain(account);
+        br.getPage("https://disk." + domain + "/client/disk/");
+        this.checkErrorsWebsite(br, null, account);
         final String userID = br.getRegex("\"uid\":\"(\\d+)").getMatch(0);
         logger.info("userID = " + userID);
         if (userID == null) {
@@ -1550,7 +1599,7 @@ public class DiskYandexNet extends PluginForHost {
     }
 
     private void saveInternalFilePath(final DownloadLink link, final Account account, final String filepath) {
-        link.setProperty(PROPERTY_PATH_INTERNAL + ":" + JDHash.getMD5(account.getUser()), filepath);
+        link.setProperty(PROPERTY_PATH_INTERNAL + ":" + Hash.getMD5(account.getUser()), filepath);
     }
 
     /**
@@ -1561,7 +1610,7 @@ public class DiskYandexNet extends PluginForHost {
         if (account == null) {
             return null;
         }
-        return link.getStringProperty(PROPERTY_PATH_INTERNAL + ":" + JDHash.getMD5(account.getUser()));
+        return link.getStringProperty(PROPERTY_PATH_INTERNAL + ":" + Hash.getMD5(account.getUser()));
     }
 
     @Override
@@ -1571,10 +1620,6 @@ public class DiskYandexNet extends PluginForHost {
 
     public static String getSK(final Browser br) {
         return PluginJSonUtils.getJsonValue(br, "sk");
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

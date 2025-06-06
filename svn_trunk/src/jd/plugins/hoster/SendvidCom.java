@@ -15,6 +15,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import org.appwork.utils.Regex;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -26,11 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-
-@HostPlugin(revision = "$Revision: 47486 $", interfaceVersion = 2, names = { "sendvid.com" }, urls = { "https?://(?:www\\.)?sendvid\\.com/(?:embed/)?([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51117 $", interfaceVersion = 2, names = { "sendvid.com" }, urls = { "https?://(?:www\\.)?sendvid\\.com/(?:embed/)?([A-Za-z0-9]+)" })
 public class SendvidCom extends PluginForHost {
     public SendvidCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,10 +41,9 @@ public class SendvidCom extends PluginForHost {
     // protocol: https possible
     // other:
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
 
     @Override
     public String getAGBLink() {
@@ -74,8 +73,8 @@ public class SendvidCom extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         /**
-         * 2021-03-15: This API request is really only there to reliably determine the offline status. </br> It doesn't return any other
-         * useful information.
+         * 2021-03-15: This API request is really only there to reliably determine the offline status. </br>
+         * It doesn't return any other useful information.
          */
         br.getPage("https://" + this.getHost() + "/api/v1/videos/" + this.getFID(link) + "/status.json");
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -159,7 +158,7 @@ public class SendvidCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

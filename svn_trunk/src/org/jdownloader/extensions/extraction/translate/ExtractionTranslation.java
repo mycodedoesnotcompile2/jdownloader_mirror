@@ -348,7 +348,7 @@ public interface ExtractionTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Don't delete anything" })
     String dont_delete();
 
-    @Default(lngs = { "en" }, values = { "Delete files finally" })
+    @Default(lngs = { "en" }, values = { "Permanently delete files" })
     String final_delete();
 
     @Default(lngs = { "en" }, values = { "If file exists..." })

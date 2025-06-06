@@ -59,7 +59,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.PixivNetGallery;
 
-@HostPlugin(revision = "$Revision: 48932 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51117 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixivNet extends PluginForHost {
     public PixivNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -179,15 +179,17 @@ public class PixivNet extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         prepBR(this.br);
         if (link.getPluginPatternMatcher().matches(TYPE_NOVEL)) {
-            if (!link.isNameSet()) {
-                link.setName(this.getFID(link) + ".txt");
-            }
-            br.getPage(link.getPluginPatternMatcher());
-            checkErrors(br);
             final String novelID = this.getFID(link);
-            final String json = br.getRegex("id=\"meta-preload-data\"[^>]*content='([^\\']*?)'").getMatch(0);
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            final Map<String, Object> novelInfo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "novel/" + novelID);
+            if (!link.isNameSet()) {
+                link.setName(novelID + ".txt");
+            }
+            br.getPage("https://www." + getHost() + "/ajax/novel/" + novelID + "?lang=en");
+            checkErrors(br);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.TRUE.equals(entries.get("error"))) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final Map<String, Object> novelInfo = (Map<String, Object>) entries.get("body");
             final String createDate = novelInfo.get("createDate").toString();
             final String dateFormatted = new Regex(createDate, "(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
             this.downloadSource = novelInfo.get("content").toString();
@@ -195,7 +197,7 @@ public class PixivNet extends PluginForHost {
             try {
                 link.setDownloadSize(this.downloadSource.getBytes("UTF-8").length);
             } catch (final UnsupportedEncodingException ignore) {
-                ignore.printStackTrace();
+                logger.log(ignore);
             }
         } else if (link.getPluginPatternMatcher().matches(TYPE_ANIMATION_META)) {
             if (!link.isNameSet()) {
