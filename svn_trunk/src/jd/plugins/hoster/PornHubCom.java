@@ -75,6 +75,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -85,13 +86,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
     // private static final boolean FREE_RESUME = true;
     // private static final int FREE_MAXCHUNKS = 0;
-    private static final int                      FREE_MAXDOWNLOADS                                  = 5;
     private static final boolean                  ACCOUNT_FREE_RESUME                                = true;
     private static final int                      ACCOUNT_FREE_MAXCHUNKS                             = 0;
     private static final int                      ACCOUNT_FREE_MAXDOWNLOADS                          = 5;
@@ -452,7 +452,16 @@ public class PornHubCom extends PluginForHost {
         return br.containsHTML("<h2 style[^>]*>\\s*(GIF is unavailable pending review|La GIF è ancora in fase di verifica e non è al momento disponibile|GIF está indisponível com revisão pendente|GIF is niet beschikbaar in afwachting van review)\\.?\\s*</h2>");
     }
 
-    private void checkAvailability(final DownloadLink link, final Browser br) throws PluginException {
+    private void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        if (br.containsHTML("class=\"limited-functionality\"")) {
+            /* 2025-06-06: Pornhub GEO-blocked french users: https://www.theguardian.com/world/2025/jun/03/pornhub-france-id-verification */
+            final String text = "Pornhub is blocking French IP addresses, see cnn.com/2025/06/04/tech/pornhub-exits-france-age-verification-intl";
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, text);
+            } else {
+                throw new AccountUnavailableException(text, 30 * 60 * 1000);
+            }
+        }
         if (StringUtils.containsIgnoreCase(br.getURL(), "/premium/login")) {
             throw new AccountRequiredException();
         } else if (isFlagged(br)) {
@@ -467,6 +476,12 @@ public class PornHubCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (hasPendingReview(br)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unavailable due to pending review");
+        } else if (br.containsHTML(html_premium_only)) {
+            throw new AccountRequiredException("Upgrade to Pornhub Premium to enjoy this video");
+        } else if (br.containsHTML(">\\s*This video has been removed\\s*<")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(html_purchase_only)) {
+            throw new AccountRequiredException("Premium/Purchase only File");
         }
     }
 
@@ -511,7 +526,7 @@ public class PornHubCom extends PluginForHost {
                     return AvailableStatus.TRUE;
                 }
             }
-            checkAvailability(link, br);
+            checkErrors(br, link, account);
             String ext = null;
             final String gifVideoAsMp4 = br.getRegex("<video class=\"centerImageVid\"[^>]*>\\s+<source src=\"(https://[^\"]+)").getMatch(0);
             if (gifVideoAsMp4 != null) {
@@ -542,7 +557,7 @@ public class PornHubCom extends PluginForHost {
             link.setName(viewKey + ".webm");
             br.setFollowRedirects(true);
             getPage(br, createPornhubGifLink(this.getHost(), getPreferredSubdomain(link.getPluginPatternMatcher()), linkHost, viewKey, null));
-            checkAvailability(link, br);
+            checkErrors(br, link, account);
             String title = br.getRegex("data-gif-title\\s*=\\s*\"(.*?)\"").getMatch(0);
             if (title == null) {
                 title = br.getRegex("<title\\s*>\\s*(.*?)\\s*(&#124;|\\|)").getMatch(0);
@@ -591,18 +606,13 @@ public class PornHubCom extends PluginForHost {
             }
             br.setFollowRedirects(true);
             getFirstPageWithAccount(this, account, createPornhubVideoLink(this.getHost(), getPreferredSubdomain(link.getPluginPatternMatcher()), Browser.getHost(source_url), viewKey, account));
-            checkAvailability(link, br);
             if (br.containsHTML(html_privatevideo)) {
                 link.getLinkStatus().setStatusText("You're not authorized to watch/download this private video");
                 link.setName(html_filename);
                 return AvailableStatus.TRUE;
-            } else if (br.containsHTML(html_premium_only)) {
-                throw new AccountRequiredException("Upgrade to Pornhub Premium to enjoy this video");
-            } else if (br.containsHTML(">\\s*This video has been removed\\s*<")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML(html_purchase_only)) {
-                throw new AccountRequiredException("Premium/Purchase only File");
-            } else if (source_url == null || html_filename == null) {
+            }
+            checkErrors(br, link, account);
+            if (source_url == null || html_filename == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
@@ -1091,7 +1101,7 @@ public class PornHubCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return 5;
     }
 
     public static final String COOKIE_ID_FREE    = "v2_free";
@@ -1197,6 +1207,7 @@ public class PornHubCom extends PluginForHost {
         logger.info("Performing full login");
         prepBr(br);
         getPage(br, getProtocolFree() + "www." + domain + path);
+        this.checkErrors(br, null, account);
         final Form loginform = br.getFormbyKey("email");
         if (loginform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -1260,6 +1271,7 @@ public class PornHubCom extends PluginForHost {
             /* Fallback */
             getPage(br, getProtocolFree() + "www." + domain);
         }
+        this.checkErrors(br, null, account);
         if (!isLoggedInHtml(br)) {
             if (twoStepVerification != null && twoStepVerification.intValue() == 1) {
                 throw new AccountInvalidException("Invalid 2-factor-authentication code");
@@ -1295,6 +1307,7 @@ public class PornHubCom extends PluginForHost {
         /* 2022-06-27: New simpler handling */
         if (accessMainpage) {
             getPage(br, (getProtocolFree() + "www." + preferredLoginFreeDomain));
+            this.checkErrors(br, null, account);
         }
         final String hopefullyFreeDomain = br.getHost();
         final boolean loggedinFree = isLoggedInHtml(br);
@@ -1306,6 +1319,7 @@ public class PornHubCom extends PluginForHost {
             logger.info("This is a premium/lifetime account -> Ensure that we are logged in on premium domain");
             /* Determine account type */
             br.getPage(managePremiumLink);
+            this.checkErrors(br, null, account);
             if (br.containsHTML("lifetime")) {
                 setAccountType(account, AccountType.LIFETIME);
             } else {

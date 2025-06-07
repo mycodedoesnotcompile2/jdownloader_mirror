@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 51097 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -1125,7 +1125,12 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         return result;
     }
 
+    /** TODO: Use errorhandling in host plugin to avoid/remove duplicated code */
     private void checkVideoErrors(final Browser br) throws PluginException, DecrypterRetryException {
+        if (br.containsHTML("class=\"limited-functionality\"")) {
+            /* 2025-06-06: Pornhub GEO-blocked french users: https://www.theguardian.com/world/2025/jun/03/pornhub-france-id-verification */
+            throw new AccountRequiredException("Pornhub is blocking French IP addresses, see cnn.com/2025/06/04/tech/pornhub-exits-france-age-verification-intl");
+        }
         if (br.containsHTML(PornHubCom.html_purchase_only)) {
             throw new AccountRequiredException();
         } else if (PornHubCom.isFlagged(br)) {

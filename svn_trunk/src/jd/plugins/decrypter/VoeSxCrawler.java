@@ -45,7 +45,7 @@ import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 51104 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51129 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -198,6 +198,10 @@ public class VoeSxCrawler extends PluginForDecrypt {
             try {
                 hosterPlugin.setDownloadLink(link);
                 final AvailableStatus status = hosterPlugin.requestFileInformation(link);
+                if (((VoeSx) hosterPlugin).getJavaScriptJSON() == null) {
+                    // ensure processing of obfuscated json, embed vs non embed handling in XFileSharingProBasic
+                    ((VoeSx) hosterPlugin).getDllinkVideohostJavaScript(link, null, br, null);
+                }
                 ret.add(link);
                 link.setAvailableStatus(status);
                 distribute(link);

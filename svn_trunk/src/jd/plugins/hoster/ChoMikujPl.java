@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51117 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "" })
 public class ChoMikujPl extends PluginForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -134,11 +134,12 @@ public class ChoMikujPl extends PluginForHost {
     }
 
     private String getMainlink(final DownloadLink link) {
-        final String mainlink = link.getStringProperty(ChoMikujPlFolder.PROPERTY_DOWNLOADLINK_MAINLINK);
+        /* Legacy for super old links */
+        final String mainlink = link.getStringProperty("mainlink");
         if (mainlink != null) {
             return mainlink;
         } else {
-            return link.getContentUrl();
+            return link.getPluginPatternMatcher();
         }
     }
 
@@ -442,15 +443,17 @@ public class ChoMikujPl extends PluginForHost {
         Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         String content = (String) entries.get("Content");
         content_br.getRequest().setHtmlCode(content);
+        /* Check for access denied */
+        final String accessDenied = "Nie masz w tej chwili uprawnień do tego pliku lub dostęp do niego nie jest w tej chwili możliwy z innych powodów";
+        if (StringUtils.containsIgnoreCase(content, accessDenied)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         /* This is a good filename source; use it! */
         final String filename = content_br.getRegex("<div class=\"windowFileName\"[^>]*>([^<]+)</div>").getMatch(0);
         if (filename != null) {
             link.setFinalFileName(Encoding.htmlDecode(filename).trim());
-        }
-        // Check for access denied
-        final String accessDenied = "Nie masz w tej chwili uprawnień do tego pliku lub dostęp do niego nie jest w tej chwili możliwy z innych powodów";
-        if (StringUtils.containsIgnoreCase(content, accessDenied)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else {
+            logger.warning("Failed to find filename from reliable source -> Maybe HTML has changed?");
         }
         final Form form_DownloadWarningAccept = content_br.getFormbyAction("/action/License/DownloadWarningAccept");
         if (form_DownloadWarningAccept != null) {
@@ -500,7 +503,7 @@ public class ChoMikujPl extends PluginForHost {
                 content_br.getRequest().setHtmlCode(content);
             }
         } else {
-            // Handle captcha for free users
+            /* Handle captcha for free users */
             final Form form_DownloadNotLoggedCaptchaEntered = content_br.getFormbyAction("/action/License/DownloadNotLoggedCaptchaEntered");
             final Form form_Download = content_br.getFormbyAction("/action/License/Download");
             if (form_DownloadNotLoggedCaptchaEntered != null) {
