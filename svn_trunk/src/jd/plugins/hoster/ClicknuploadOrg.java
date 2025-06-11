@@ -18,9 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.http.Browser;
@@ -33,7 +30,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50993 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 51134 $", interfaceVersion = 3, names = {}, urls = {})
 public class ClicknuploadOrg extends XFileSharingProBasic {
     public ClicknuploadOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,7 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "clicknupload.click", "clicknupload.link", "clicknupload.red", "clicknupload.to", "clicknupload.cc", "clicknupload.co", "clicknupload.org", "clicknupload.com", "clicknupload.me", "clicknupload.club", "clicknupload.online", "clicknupload.download", "clicknupload.vip", "clicknupload.site", "clicknupload.xyz", "clicknupload.one", "clicknupload.name", "clicknupload.space", "clickndownload.org", "clickndownload.space", "clickndownload.click", "clickndownload.link", "clickndownload.site", "clickndownload.online", "clicknupload.cfd" });
+        ret.add(new String[] { "clicknupload.click", "clicknupload.link", "clicknupload.red", "clicknupload.to", "clicknupload.cc", "clicknupload.co", "clicknupload.org", "clicknupload.com", "clicknupload.me", "clicknupload.club", "clicknupload.online", "clicknupload.download", "clicknupload.vip", "clicknupload.site", "clicknupload.xyz", "clicknupload.one", "clicknupload.name", "clicknupload.space", "clickndownload.org", "clickndownload.space", "clickndownload.click", "clickndownload.link", "clickndownload.site", "clickndownload.online", "clicknupload.cfd", "clickndownload.cloud" });
         return ret;
     }
 
@@ -61,6 +61,7 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
         deadDomains.add("clicknupload.link");
         deadDomains.add("clicknupload.com");
         deadDomains.add("clicknupload.club");
+        deadDomains.add("clickndownload.cloud");
         return deadDomains;
     }
 

@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
@@ -35,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
 public class AvThXyz extends PluginForHost {
     public AvThXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,17 +42,16 @@ public class AvThXyz extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
-    /* Connection stuff */
-    private final int          free_maxdownloads = -1;
-    public static final String PROPERTY_TITLE    = "title";
+    public static final String PROPERTY_TITLE = "title";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "av-th.xyz" });
+        ret.add(new String[] { "loadx.ws" });
         return ret;
     }
 
@@ -76,7 +74,7 @@ public class AvThXyz extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://av-th.xyz/";
+        return "https://" + getHost() + "/terms.html";
     }
 
     @Override
@@ -95,11 +93,12 @@ public class AvThXyz extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        final String extDefault = ".mp4";
         if (link.hasProperty(PROPERTY_TITLE)) {
             /* Check if property has been set e.g. in crawler plugin. */
-            link.setFinalFileName(link.getStringProperty(PROPERTY_TITLE) + ".mp4");
+            link.setFinalFileName(link.getStringProperty(PROPERTY_TITLE) + extDefault);
         } else {
-            link.setFinalFileName(this.getFID(link) + ".mp4");
+            link.setFinalFileName(this.getFID(link) + extDefault);
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
@@ -109,7 +108,7 @@ public class AvThXyz extends PluginForHost {
             br.getHeaders().put("Referer", link.getReferrerUrl());
         } else {
             /* Fallback: Use most common Referer */
-            br.getHeaders().put("Referer", "https://www.av-th.net/");
+            br.getHeaders().put("Referer", "https://www." + getHost() + "/");
         }
         br.postPage("https://" + this.getHost() + "/player/index.php?data=" + fid + "&do=getVideo", "hash=" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -127,12 +126,13 @@ public class AvThXyz extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         /* TODO: Check if this is ever given */
         final List<Object> downloadLinks = (List<Object>) entries.get("downloadLinks");
         if (!downloadLinks.isEmpty()) {
-            logger.info("hit");
+            logger.info("Found official downloadlinks, TODO: Dev: Implement this!!");
         }
+        // final String hlsMaster = entries.get("securedLink").toString();
         final String hlsMaster = entries.get("videoSource").toString();
         if (StringUtils.isEmpty(hlsMaster)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -152,7 +152,7 @@ public class AvThXyz extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

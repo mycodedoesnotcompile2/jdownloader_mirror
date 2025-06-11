@@ -1,7 +1,6 @@
 package org.jdownloader.extensions.eventscripter;
 
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.util.HashMap;
 import java.util.Map;
@@ -10,12 +9,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.Box;
 import javax.swing.JComponent;
 import javax.swing.JEditorPane;
+import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JToolBar;
 
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jsyntaxpane.syntaxkits.JavaSyntaxKit;
+import net.sourceforge.htmlunit.corejs.javascript.Context;
+import net.sourceforge.htmlunit.corejs.javascript.Script;
+import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
+import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
@@ -28,13 +37,6 @@ import org.jdownloader.extensions.eventscripter.sandboxobjects.ScriptEnvironment
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JSHtmlUnitPermissionRestricter;
-
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jsyntaxpane.syntaxkits.JavaSyntaxKit;
-import net.sourceforge.htmlunit.corejs.javascript.Context;
-import net.sourceforge.htmlunit.corejs.javascript.Script;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
-import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
 
 public class JavaScriptEditorDialog extends AbstractDialog<Object> {
     private static final String                   CLEANUP                  = "[^\\w\\d\\(\\)\\+\\-\\[\\]\\;\\,/\\\\]";
@@ -106,6 +108,13 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
         settingsPanel = entry.getEventTrigger().createSettingsPanel(entry, testEventTriggerSettings, this);
         final JEditorPane defaults = new JEditorPane();
         final JavaSyntaxKit javaSyntaxKit = new JavaSyntaxKit();
+        try {
+            // set UI default font to JavaSyntaxKit
+            ReflectionUtils.setField(javaSyntaxKit, "DEFAULT_FONT", new JLabel().getFont());
+        } catch (Exception e) {
+            LogController.CL().log(e);
+            DebugMode.debugger(e);
+        }
         defaults.setEditorKit(javaSyntaxKit);
         // defaults.setFocusable(false);
         p.add(apiScrollbar = new JScrollPane(defaults) {
@@ -118,9 +127,7 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
             }
         });
         defaults.setEditable(false);
-        final Font font = defaults.getFont();
         defaults.setContentType("text/javascript; charset=UTF-8");
-        defaults.setFont(font);// setContentType changes Font
         defaults.setText(ScriptEnvironment.getAPIDescription(entry.getEventTrigger().getAPIClasses()) + "\r\n" + entry.getEventTrigger().getAPIDescription());
         editor = new JEditorPane();
         editor.setEditorKit(javaSyntaxKit);
@@ -141,7 +148,6 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
             }
         };
         editor.setContentType("text/javascript; charset=UTF-8");
-        editor.setFont(font);// setContentType changes Font
         String txt = entry.getScript();
         if (StringUtils.isEmpty(txt)) {
             txt = T.T.emptyScript();

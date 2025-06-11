@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51130 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -127,6 +127,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     private static final String TYPE_USER_FAVORITES         = "(?i)https?://[^/]+/users/([^/]+)/videos(/?|/favorites/?)$";
     private static final String TYPE_USER_VIDEOS_PUBLIC     = "(?i)https?://[^/]+/users/([^/]+)/videos/public$";
     private static final String TYPE_CHANNEL_VIDEOS         = "(?i)https?://[^/]+/channels/([^/]+)(/?|/videos/?)$";
+    private PornHubCom          hostplugin                  = null;
 
     private String getCorrectedContentURL(final String url) throws MalformedURLException {
         final String preferredSubdomain = PornHubCom.getPreferredSubdomain(url);
@@ -139,19 +140,19 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         br.setFollowRedirects(true);
         PornHubCom.prepBr(br);
         final Account account = AccountController.getInstance().getValidAccount(getHost());
-        final PornHubCom hosterPlugin = (PornHubCom) this.getNewPluginForHostInstance(this.getHost());
+        ensureInitHosterplugin();
         if (account != null) {
-            hosterPlugin.login(account, false);
+            hostplugin.login(account, false);
         }
         if (PornHubCom.requiresPremiumAccount(contenturl) && (account == null || account.getType() != AccountType.PREMIUM)) {
             throw new AccountRequiredException();
         }
         if (contenturl.matches("(?i).*/playlist/.*")) {
-            PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
+            this.hostplugin.getFirstPageWithAccount(hostplugin, account, contenturl);
             handleErrorsAndCaptcha(this.br, account);
             return crawlAllVideosOfAPlaylist(account);
         } else if (contenturl.matches("(?i).*/gifs.*")) {
-            PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
+            this.hostplugin.getFirstPageWithAccount(hostplugin, account, contenturl);
             handleErrorsAndCaptcha(this.br, account);
             return crawlAllGifsOfAUser(param, account);
         } else if (contenturl.matches("(?i).*/photos$")) {
@@ -163,36 +164,32 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         } else if (contenturl.matches("(?i).*/(?:users|channels).*")) {
             if (new Regex(br.getURL(), "/(model|pornstar)/").matches()) { // Handle /users/ that has been switched to model|pornstar
                 logger.info("Users->Model|pornstar");
-                PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
+                this.hostplugin.getFirstPageWithAccount(hostplugin, account, contenturl);
                 handleErrorsAndCaptcha(this.br, account);
                 return crawlAllVideosOf(br, account, new HashSet<String>());
             } else {
                 logger.info("Users/Channels");
-                return crawlAllVideosOfAUser(param, hosterPlugin, account);
+                return crawlAllVideosOfAUser(param, hostplugin, account);
             }
         } else {
             return crawlSingleVideo(this.br, param, account);
         }
     }
 
-    private void handleErrorsAndCaptcha(final Browser br, final Account account) throws Exception {
-        if (StringUtils.containsIgnoreCase(br.getURL(), "/premium/login")) {
-            throw new AccountRequiredException();
-        } else if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("<h2>Upgrade now<")) {
-            throw new AccountRequiredException();
+    private void ensureInitHosterplugin() throws PluginException {
+        if (this.hostplugin == null) {
+            this.hostplugin = (PornHubCom) getNewPluginForHostInstance(this.getHost());
         }
+    }
+
+    private void handleErrorsAndCaptcha(final Browser br, final Account account) throws Exception {
+        this.hostplugin.checkErrors(br, null, account);
         if (AbstractRecaptchaV2.containsRecaptchaV2Class(br) && br.containsHTML("/captcha/validate\\?token=")) {
             final Form form = br.getFormByInputFieldKeyValue("captchaType", "1");
             logger.info("Detected captcha method \"reCaptchaV2\" for this host");
             final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
             form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
             br.submitForm(form);
-        }
-        if (br.containsHTML(">\\s*Sorry, but this video is private") && br.containsHTML("href\\s*=\\s*\"/login\"")) {
-            /* Either we're not nogged in or current account does not have permission to view this content. */
-            throw new AccountRequiredException();
         }
     }
 
@@ -227,9 +224,9 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             logger.info("User disabled channel crawler -> Returning empty array");
             return new ArrayList<DownloadLink>();
         }
-        final PornHubCom hosterPlugin = (PornHubCom) this.getNewPluginForHostInstance(this.getHost());
+        ensureInitHosterplugin();
         final String contenturl = getCorrectedContentURL(param.getCryptedUrl());
-        PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
+        this.hostplugin.getFirstPageWithAccount(hostplugin, account, contenturl);
         handleErrorsAndCaptcha(this.br, account);
         final Regex urlinfo = new Regex(contenturl, "(?i)/(model|pornstar)/([^/]+)(/(.+))?");
         final String type = urlinfo.getMatch(0); // model or pornstar
@@ -269,9 +266,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
 
     /** Handles pornhub.com/bla/(model|pornstar)/bla */
     private ArrayList<DownloadLink> crawlAllVideosOf(final Browser br, final Account account, final Set<String> dupes) throws Exception {
-        if (isOfflineGeneral(br)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
+        this.hostplugin.checkErrors(br, null, account);
         final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
         final int resultLimit = cfg.getIntegerProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_LIMIT, PornHubCom.default_SETTING_CHANNEL_CRAWLER_LIMIT);
         final Set<String> pages = new HashSet<String>();
@@ -437,12 +432,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             galleryname = null;
         }
         /* Only access page if it hasn't been accessed before */
-        PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
+        this.hostplugin.getFirstPageWithAccount(hosterPlugin, account, contenturl);
         handleErrorsAndCaptcha(this.br, account);
-        PornHubCom.getPage(br, contenturl);
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">\\s*There are no videos\\.\\.\\.<")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         /* 2021-08-24: E.g. given for "users/username/videos(/favorites)?" */
         final String totalNumberofItemsStr = br.getRegex("class=\"totalSpan\">(\\d+)</span>").getMatch(0);
         final int totalNumberofItems;
@@ -454,7 +445,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             totalNumberofItemsText = "Unknown";
             totalNumberofItems = -1;
         }
-        final String seeAllURL = br.getRegex("(" + Regex.escape(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
+        final String seeAllURL = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
         if (seeAllURL != null) {
             /**
              * E.g. users/bla/videos --> /users/bla/videos/favorites </br>
@@ -809,11 +800,11 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlSingleVideo(final Browser br, final CryptedLink param, final Account account) throws Exception {
-        final PornHubCom hosterPlugin = (PornHubCom) this.getNewPluginForHostInstance(this.getHost());
+        ensureInitHosterplugin();
         String contenturl = getCorrectedContentURL(param.getCryptedUrl());
-        PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
+        this.hostplugin.getFirstPageWithAccount(hostplugin, account, contenturl);
         handleErrorsAndCaptcha(this.br, account);
-        if (PornHubCom.hasOfflineRemovedVideoText(br) || PornHubCom.hasOfflineVideoNotice(br)) {
+        if (PornHubCom.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String sourceUrlUsername = null;
@@ -848,7 +839,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             final String viewkey = PornHubCom.getViewkeyFromURL(contenturl);
             final String newLink = br.getRegex("(https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.(?:com|org)/view_video\\.php\\?viewkey=" + Pattern.quote(viewkey) + ")").getMatch(0);
             if (newLink == null) {
-                checkVideoErrors(br);
+                this.hostplugin.checkErrors(br, source, account);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             contenturl = newLink;
@@ -870,7 +861,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String siteTitle = PornHubCom.getSiteTitle(this, br);
         final Map<String, Map<String, String>> qualities = PornHubCom.getVideoLinks(this, br);
         if (qualities == null || qualities.isEmpty()) {
-            this.checkVideoErrors(br);
+            this.hostplugin.checkErrors(br, source, account);
         }
         logger.info("Debug info: foundLinks_all: " + qualities);
         if (!br.getURL().contains(viewkey)) {
@@ -904,7 +895,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             }
         }
         final String uploaderType = br.getRegex("'video_uploader'\\s*:\\s*'([^<>\"']+)'").getMatch(0);
-        final String[] tags = br.getRegex("(?i)data-label=\"Tag\"[^>]*>([^<]+)</a>").getColumn(0);
+        final String[] tags = br.getRegex("data-label=\"Tag\"[^>]*>([^<]+)</a>").getColumn(0);
         tagsCommaSeparated = getCommaSeparatedString(tags);
         final String pornstarsSrc = br.getRegex("<div class=\"pornstarsWrapper[^\"]*\">(.*?)</div>\\s+</div>").getMatch(0);
         if (pornstarsSrc != null) {
@@ -1123,49 +1114,6 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             }
         }
         return result;
-    }
-
-    /** TODO: Use errorhandling in host plugin to avoid/remove duplicated code */
-    private void checkVideoErrors(final Browser br) throws PluginException, DecrypterRetryException {
-        if (br.containsHTML("class=\"limited-functionality\"")) {
-            /* 2025-06-06: Pornhub GEO-blocked french users: https://www.theguardian.com/world/2025/jun/03/pornhub-france-id-verification */
-            throw new AccountRequiredException("Pornhub is blocking French IP addresses, see cnn.com/2025/06/04/tech/pornhub-exits-france-age-verification-intl");
-        }
-        if (br.containsHTML(PornHubCom.html_purchase_only)) {
-            throw new AccountRequiredException();
-        } else if (PornHubCom.isFlagged(br)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (PornHubCom.isGeoRestricted(br)) {
-            throw new DecrypterRetryException(RetryReason.GEO, "(GeoBlocked)url=" + br.getURL());
-        } else if (br.containsHTML(PornHubCom.html_privatevideo)) {
-            throw new AccountRequiredException();
-        } else if (br.containsHTML(PornHubCom.html_premium_only)) {
-            throw new AccountRequiredException();
-        } else if (PornHubCom.hasOfflineRemovedVideoText(br)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (PornHubCom.hasOfflineVideoNotice(br)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (isOfflineVideo(br)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        /*
-         * 2022-08-16: Generic, can also be GEO-blocked error e.g. <span class="removedVideoText">Dieses Video ist in Ihrem Land nicht
-         * verfügbar.</span>
-         */
-        if (br.containsHTML("class=\"removedVideoText\"")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-    }
-
-    public static boolean isOfflineVideo(final Browser br) {
-        final boolean isNotVideo = !StringUtils.containsIgnoreCase(br.getURL(), "/embed/") && !br.containsHTML("\\'embedSWF\\'");
-        final boolean offline1 = PornHubCom.hasOfflineRemovedVideoText(br);
-        final boolean offline2 = isOfflineGeneral(br);
-        return isNotVideo || offline1 || offline2;
-    }
-
-    public static boolean isOfflineGeneral(final Browser br) {
-        return br.getHttpConnection().getResponseCode() == 404;
     }
 
     private DownloadLink getDecryptDownloadlink(final String viewKey, final String format, final String quality) {

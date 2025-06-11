@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -100,8 +100,6 @@ public class PornHubCom extends PluginForHost {
     private static final String                   type_gif_webm                                      = "(?i).+/(embed)?gif/\\d+";
     public static final String                    html_privatevideo                                  = "id=\"iconLocked\"";
     public static final String                    html_privateimage                                  = "profile/private-lock\\.png";
-    public static final String                    html_purchase_only                                 = "(?i)'Buy on video player'";
-    public static final String                    html_premium_only                                  = "(?i)<h2>\\s*Upgrade to Pornhub Premium to enjoy this video\\.\\s*</h2>";
     private String                                dlUrl                                              = null;
     /** Dev: disable this if pornhub plugins shall skip all mp4 progressive streams and disable user setting for mp4 progressive streams. */
     public static final boolean                   ENABLE_INTERNAL_MP4_PROGRESSIVE_SUPPORT            = true;
@@ -378,12 +376,15 @@ public class PornHubCom extends PluginForHost {
 
     public static Object NO_ACCOUNT_LOCK_OBJECT = new Object();
 
-    public static Request getFirstPageWithAccount(final PornHubCom plg, final Account account, final String url) throws Exception {
+    public Request getFirstPageWithAccount(final PornHubCom plg, final Account account, final String url) throws Exception {
         final Browser br = plg.getBrowser();
+        Request request = null;
         if (account == null) {
             synchronized (NO_ACCOUNT_LOCK_OBJECT) {
-                while (true) {
-                    final Request request = getPage(br, url);
+                int i = 0;
+                while (!this.isAbort() && i <= 1) {
+                    i++;
+                    request = getPage(br, url);
                     final String accessAgeCookie[] = new Regex(request.getHtmlCode(), "setCookieAdvanced\\s*\\(\\s*'(accessAge[^']+)'\\s*,\\s*([^,]+),").getRow(0);
                     if (accessAgeCookie != null) {
                         synchronized (DEFAULT_COOKIES) {
@@ -400,9 +401,12 @@ public class PornHubCom extends PluginForHost {
             }
         } else {
             synchronized (account) {
-                while (true) {
+                int i = 0;
+                final int i_max = 1;
+                while (!this.isAbort() && i <= i_max) {
+                    i++;
                     final boolean verifiedLogin = plg.login(account, false);
-                    final Request request = getPage(br, url);
+                    request = getPage(br, url);
                     final String accessAgeCookie[] = new Regex(request.getHtmlCode(), "setCookieAdvanced\\s*\\(\\s*'(accessAge[^']+)'\\s*,\\s*([^,]+),").getRow(0);
                     if (accessAgeCookie != null) {
                         synchronized (DEFAULT_COOKIES) {
@@ -414,6 +418,10 @@ public class PornHubCom extends PluginForHost {
                             }
                         }
                     }
+                    if (i == i_max) {
+                        /* Last round -> Early exit to prevent leaving with a request that does not contain URL given in "url" parameter. */
+                        break;
+                    }
                     if (!isLoggedInHtml(br)) {
                         plg.getLogger().info("Not logged in?|VerifiedLogin:" + verifiedLogin);
                         plg.login(account, true);
@@ -424,8 +432,10 @@ public class PornHubCom extends PluginForHost {
                 }
             }
         }
+        return request;
     }
 
+    /** Returns true if a single video is unavailable in users' current IP geolocation. */
     public static boolean isGeoRestricted(final Browser br) {
         final String[] errorMessages = new String[] { "Dieser Inhalt ist in deinem Land nicht verfügbar", "Ce contenu n'est pas disponible dans votre pays", "Este contenido no está disponible en tu país", "Questo contenuto non è disponibile nel tuo Paese", "Este conteúdo não está disponível no seu país", "Ten materiał jest niedostępny w Twoim kraju", "Этот контент не доступен в Вашей стране", "このコンテンツはあなたの国ではご利用いただけません。", "Deze content is niet beschikbaar in je land", "Tento Obsah není ve vaší zemi dostupný", "此内容在您的国家不可播放。" };
         for (final String errorMessage : errorMessages) {
@@ -440,11 +450,15 @@ public class PornHubCom extends PluginForHost {
         return br.containsHTML(">\\s*Video has been flagged for verification in accordance with our trust and safety policy.?\\s*<");
     }
 
-    public static boolean hasOfflineRemovedVideoText(final Browser br) {
+    public static boolean isOffline(final Browser br) {
+        return hasOfflineRemovedVideoText(br) || hasOfflineVideoNotice(br) || br.getHttpConnection().getResponseCode() == 404;
+    }
+
+    private static boolean hasOfflineRemovedVideoText(final Browser br) {
         return br.containsHTML("<span[^>]*>\\s*Video has been removed at the request of") || br.containsHTML("<span[^>]*>\\s*This video has been removed\\s*</span>") || br.containsHTML("<span[^>]*>\\s*This video is currently unavailable\\s*</span>");
     }
 
-    public static boolean hasOfflineVideoNotice(final Browser br) {
+    private static boolean hasOfflineVideoNotice(final Browser br) {
         return br.containsHTML("<div[^>]*class[^>]*video-notice[^>]*>\\s*<p>\\s*<span>\\s*This video has been disabled") || br.containsHTML("<h2 style[^>]*>\\s*(This video has been disabled|Dieses Video wurde deaktiviert|Cette vidéo a été désactivée|Este vídeo ha sido deshabilitado|Questo video è stato disattivato|O vídeo foi desativado|Ten film został zablokowany|Это видео было отключено|このビデオは利用できません|Deze video werd uitgeschakeld|Video bylo deaktivováno|此视频已下架)\\.?\\s*</h2>");
     }
 
@@ -452,10 +466,10 @@ public class PornHubCom extends PluginForHost {
         return br.containsHTML("<h2 style[^>]*>\\s*(GIF is unavailable pending review|La GIF è ancora in fase di verifica e non è al momento disponibile|GIF está indisponível com revisão pendente|GIF is niet beschikbaar in afwachting van review)\\.?\\s*</h2>");
     }
 
-    private void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+    public void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         if (br.containsHTML("class=\"limited-functionality\"")) {
             /* 2025-06-06: Pornhub GEO-blocked french users: https://www.theguardian.com/world/2025/jun/03/pornhub-france-id-verification */
-            final String text = "Pornhub is blocking French IP addresses, see cnn.com/2025/06/04/tech/pornhub-exits-france-age-verification-intl";
+            final String text = "PH is blocking French IP addresses, VPN required, see cnn.com/2025/06/04/tech/pornhub-exits-france-age-verification-intl";
             if (link != null) {
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, text);
             } else {
@@ -476,12 +490,15 @@ public class PornHubCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (hasPendingReview(br)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unavailable due to pending review");
-        } else if (br.containsHTML(html_premium_only)) {
+        } else if (br.containsHTML("<h2>\\s*Upgrade to Pornhub Premium to enjoy this video\\.\\s*</h2>")) {
             throw new AccountRequiredException("Upgrade to Pornhub Premium to enjoy this video");
         } else if (br.containsHTML(">\\s*This video has been removed\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(html_purchase_only)) {
+        } else if (br.containsHTML("'Buy on video player'")) {
             throw new AccountRequiredException("Premium/Purchase only File");
+        }
+        if (br.containsHTML(html_privatevideo)) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "You're not authorized to watch/download this private video");
         }
     }
 
@@ -521,10 +538,7 @@ public class PornHubCom extends PluginForHost {
             if (br.containsHTML(html_privateimage)) {
                 br.setFollowRedirects(true);
                 getFirstPageWithAccount(this, account, createPornhubImageLink(this.getHost(), getPreferredSubdomain(link.getPluginPatternMatcher()), linkHost, viewKey, account));
-                if (br.containsHTML(html_privateimage)) {
-                    link.getLinkStatus().setStatusText("You're not authorized to watch/download this private image");
-                    return AvailableStatus.TRUE;
-                }
+                throw new PluginException(LinkStatus.ERROR_FATAL, "You're not authorized to view/download this private image");
             }
             checkErrors(br, link, account);
             String ext = null;
@@ -1054,6 +1068,7 @@ public class PornHubCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link, account);
+        this.checkErrors(br, link, account);
         final String format = link.getStringProperty(PROPERTY_FORMAT);
         if (StringUtils.equalsIgnoreCase(format, "hls")) {
             if (StringUtils.isEmpty(dlUrl)) {
@@ -1077,9 +1092,6 @@ public class PornHubCom extends PluginForHost {
             } else {
                 resume = ACCOUNT_FREE_RESUME;
                 maxchunks = ACCOUNT_FREE_MAXCHUNKS;
-                if (br.containsHTML(html_privatevideo)) {
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "You're not authorized to watch/download this private video");
-                }
                 if (StringUtils.isEmpty(dlUrl)) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }

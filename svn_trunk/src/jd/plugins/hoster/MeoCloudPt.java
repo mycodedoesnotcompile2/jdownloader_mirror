@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -32,15 +33,22 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.MeocloudPtFolder;
 
-@HostPlugin(revision = "$Revision: 47647 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51130 $", interfaceVersion = 2, names = {}, urls = {})
 public class MeoCloudPt extends PluginForHost {
     public MeoCloudPt(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "https://meocloud.pt/";
+        return "https://" + getHost() + "/";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -74,7 +82,6 @@ public class MeoCloudPt extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         URLConnectionAdapter con = null;
         try {
             con = br.openGetConnection(link.getPluginPatternMatcher());
@@ -101,6 +108,8 @@ public class MeoCloudPt extends PluginForHost {
         }
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename).trim());
+        } else {
+            logger.warning("Failed to find filename");
         }
         return AvailableStatus.TRUE;
     }

@@ -1,5 +1,6 @@
 package org.jdownloader.extensions.extraction.gui.config;
 
+import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
 import java.io.File;
@@ -11,7 +12,16 @@ import javax.swing.AbstractAction;
 import javax.swing.JMenu;
 import javax.swing.JPopupMenu;
 import javax.swing.JSeparator;
+import javax.swing.JTextArea;
 import javax.swing.text.BadLocationException;
+
+import jd.controlling.TaskQueue;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.ComboBox;
+import jd.gui.swing.jdgui.views.settings.components.FolderChooser;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
+import jd.gui.swing.jdgui.views.settings.components.TextArea;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -34,14 +44,6 @@ import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.utils.JDFileUtils;
-
-import jd.controlling.TaskQueue;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-import jd.gui.swing.jdgui.views.settings.components.FolderChooser;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-import jd.gui.swing.jdgui.views.settings.components.TextArea;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
 
 public class ExtractionConfigPanel extends ExtensionConfigPanel<ExtractionExtension> {
     private static final long                                serialVersionUID = 1L;
@@ -225,6 +227,8 @@ public class ExtractionConfigPanel extends ExtensionConfigPanel<ExtractionExtens
         blacklist = this.addPair(T.T.settings_blacklist_regex(), null, new TextArea());
         this.addHeader(T.T.settings_passwords(), new AbstractIcon(IconKey.ICON_PASSWORD, 32));
         passwordlist = addPair(T.T.settings_passwordlist(), null, new TextArea());
+        final Component pwTextArea = passwordlist.getComponent().getViewport().getView();
+        ((JTextArea) pwTextArea).setEditable(false);
     }
 
     @Override
@@ -238,23 +242,6 @@ public class ExtractionConfigPanel extends ExtensionConfigPanel<ExtractionExtens
                     path = new File(org.appwork.storage.config.JsonConfig.create(GeneralSettings.class).getDefaultDownloadFolder(), "extracted").getAbsolutePath();
                 }
                 final String finalPath = path;
-                final List<String> pwList = s.getPasswordList();
-                final String pwListString;
-                if (pwList == null || pwList.size() == 0) {
-                    pwListString = "";
-                } else {
-                    if (pwList.size() == 1) {
-                        pwListString = pwList.get(0);
-                    } else {
-                        final StringBuilder sb = new StringBuilder();
-                        final String separator = System.getProperty("line.separator");
-                        for (final String pw : pwList) {
-                            sb.append(pw);
-                            sb.append(separator);
-                        }
-                        pwListString = sb.toString();
-                    }
-                }
                 final String[] blackListPatterns = s.getBlacklistPatterns();
                 final String blackListPatternsString;
                 if (blackListPatterns == null || blackListPatterns.length == 0) {
@@ -287,8 +274,40 @@ public class ExtractionConfigPanel extends ExtensionConfigPanel<ExtractionExtens
                         subPathMinFolders.getComponent().setValue(s.getSubPathMinFoldersTreshhold());
                         subPathMinFilesOrFolders.getComponent().setValue(s.getSubPathMinFilesOrFoldersTreshhold());
                         blacklist.getComponent().setText(blackListPatternsString);
-                        passwordlist.getComponent().setText(pwListString);
                         toggleUseOriginalFileDate.getComponent().setSelected(s.isUseOriginalFileDate());
+                    }
+                }.waitForEDT();
+                return null;
+            }
+        });
+        TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>(Queue.QueuePriority.HIGH) {
+            @Override
+            protected Void run() throws RuntimeException {
+                final ExtractionConfig s = extension.getSettings();
+
+                final List<String> pwList = s.getPasswordList();
+                final String pwListString;
+                if (pwList == null || pwList.size() == 0) {
+                    pwListString = "";
+                } else {
+                    if (pwList.size() == 1) {
+                        pwListString = pwList.get(0);
+                    } else {
+                        final StringBuilder sb = new StringBuilder();
+                        final String separator = System.getProperty("line.separator");
+                        for (final String pw : pwList) {
+                            sb.append(pw);
+                            sb.append(separator);
+                        }
+                        pwListString = sb.toString();
+                    }
+                }
+                new EDTRunner() {
+                    @Override
+                    protected void runInEDT() {
+                        passwordlist.getComponent().setText(pwListString);
+                        final Component pwTextArea = passwordlist.getComponent().getViewport().getView();
+                        ((JTextArea) pwTextArea).setEditable(true);
                     }
                 }.waitForEDT();
                 return null;

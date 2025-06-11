@@ -20,12 +20,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -34,9 +37,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 @HostPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
-public class MegawrzutaPl extends PluginForHost {
-    public MegawrzutaPl(PluginWrapper wrapper) {
+public class StreamupWs extends PluginForHost {
+    public StreamupWs(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     @Override
@@ -54,7 +62,7 @@ public class MegawrzutaPl extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "megawrzuta.pl" });
+        ret.add(new String[] { "streamup.ws", "streamup.cc" });
         return ret;
     }
 
@@ -70,20 +78,16 @@ public class MegawrzutaPl extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/download/([a-f0-9]{32})\\.html");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]{13})");
         }
         return ret.toArray(new String[0]);
     }
 
-    /* Connection stuff */
-    private final boolean FREE_RESUME    = false;
-    private final int     FREE_MAXCHUNKS = 1;
-
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String linkid = getFID(link);
-        if (linkid != null) {
-            return this.getHost() + "://" + linkid;
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
         } else {
             return super.getLinkID(link);
         }
@@ -94,62 +98,59 @@ public class MegawrzutaPl extends PluginForHost {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 0;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        this.setBrowserExclusive();
+        final String extDefault = ".mp4";
         if (!link.isNameSet()) {
-            link.setName(this.getFID(link));
+            /* Fallback */
+            link.setName(this.getFID(link) + extDefault);
         }
+        this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
-        if (this.br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("class=\"title-download-bold wow fadeIn\"")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">\\s*Wrzuta, której szukasz, wygasła lub została usunięta")) {
-            /* "Upload expired" */
+        } else if (br.getRequest().getHtmlCode().length() <= 100) {
+            /* Blank page = Invalid fileID e.g. /p4y0aJ9mXM666 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Regex finfo = br.getRegex("<h3>([^<>\"]+)<h5>([^<>\"]+)<");
-        String filename = finfo.getMatch(0);
-        String filesize = finfo.getMatch(1);
+        String filename = br.getRegex("<title>([^<]+)</title>").getMatch(0);
         if (filename != null) {
-            link.setName(Encoding.htmlDecode(filename).trim());
-        } else {
-            logger.warning("Failed to find filename");
-        }
-        if (!StringUtils.isEmpty(filesize)) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(this.correctOrApplyFileNameExtension(filename, extDefault, null));
         }
         return AvailableStatus.TRUE;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
+        handleDownload(link);
+    }
+
+    private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        doFree(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
-    }
-
-    private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
-        String dllink = br.getRegex("class='download-button-wrapper text-center'>\\s*<a href=(?:'|\")(/files/[^<>\"']+)(?:'|\")").getMatch(0);
-        if (StringUtils.isEmpty(dllink)) {
+        final String hlsMaster = br.getRegex("streaming_url:\\s*\"(https?://[^\"]+)").getMatch(0);
+        if (StringUtils.isEmpty(hlsMaster)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
-        if (dl.getConnection().getContentType().contains("html")) {
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            }
-            br.followConnection();
+        br.getHeaders().put("Origin", "https://" + br.getHost(true));
+        br.getHeaders().put("Referer", "https://" + br.getHost(true) + "/");
+        br.getPage(hlsMaster);
+        final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+        if (hlsbest == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+        final String url_hls = hlsbest.getDownloadurl();
+        checkFFmpeg(link, "Download a HLS Stream");
+        dl = new HLSDownloader(link, br, url_hls);
         dl.startDownload();
-    }
-
-    @Override
-    public int getMaxSimultanFreeDownloadNum() {
-        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -158,10 +159,7 @@ public class MegawrzutaPl extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+    public int getMaxSimultanFreeDownloadNum() {
+        return Integer.MAX_VALUE;
     }
 }

@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 48372 $", interfaceVersion = 2, names = { "pornhub.com" }, urls = { "https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.com/album/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 51130 $", interfaceVersion = 2, names = { "pornhub.com" }, urls = { "https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.com/album/\\d+" })
 public class PornHubComGallery extends PluginForDecrypt {
     public PornHubComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,7 @@ public class PornHubComGallery extends PluginForDecrypt {
         }
         final String domainFromURLNew = Browser.getHost(contenturl);
         PornHubCom.prepBr(br);
-        jd.plugins.hoster.PornHubCom.getFirstPageWithAccount(hosterPlugin, account, contenturl);
+        hosterPlugin.getFirstPageWithAccount(hosterPlugin, account, contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (PornHubCom.isGeoRestricted(br)) {

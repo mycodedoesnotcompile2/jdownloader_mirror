@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51130 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "" })
 public class ChoMikujPl extends PluginForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -176,6 +176,9 @@ public class ChoMikujPl extends PluginForHost {
             /* This should never happen! */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (mainlink == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         if (crawledFilename != null) {
             link.setFinalFileName(crawledFilename);
         } else if (!link.isNameSet()) {
@@ -183,9 +186,6 @@ public class ChoMikujPl extends PluginForHost {
         }
         if (account != null) {
             this.login(account, false);
-        }
-        if (mainlink == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* Try to find better filename - usually only needed for single links. */
         br.getPage(mainlink);
@@ -234,7 +234,7 @@ public class ChoMikujPl extends PluginForHost {
     private AvailableStatus requestFileInformation2(final Browser br, final DownloadLink link, final Account account) throws Exception {
         final String fid = this.getFID(link);
         br.getPage("https://" + getHost() + "/action/fileDetails/Index/" + fid);
-        final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
+        final String filesize = br.getRegex("<p class=\"fileSize\"[^>]*>([^<]+)</p>").getMatch(0);
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
         } else {
@@ -258,7 +258,7 @@ public class ChoMikujPl extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        final String remainingTraffic = br.getRegex("<strong>([^<>\"]*?)</strong>\\s*transferu").getMatch(0);
+        final String remainingTraffic = br.getRegex("<strong>([^<]*?)</strong>\\s*transferu").getMatch(0);
         if (remainingTraffic != null) {
             if (this.getPluginConfig().getBooleanProperty(ChoMikujPl.IGNORE_TRAFFIC_LIMIT, default_IGNORE_TRAFFIC_LIMIT) || this.getPluginConfig().getBooleanProperty(ChoMikujPl.ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES, default_ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES)) {
                 /*
@@ -290,9 +290,11 @@ public class ChoMikujPl extends PluginForHost {
         }
         account.setType(AccountType.PREMIUM);
         /* 2019-07-16: Points can be converted to traffic but for us they're not important */
-        final String collectedPointsStr = br.getRegex("title=\"Punkty\"[^<>]*?><strong>\\s*(\\d+)\\s*</strong>").getMatch(0);
+        final String collectedPointsStr = br.getRegex("title=\"Punkty\"[^>]*?><strong>\\s*(\\d+)\\s*</strong>").getMatch(0);
         if (collectedPointsStr != null) {
             ai.setPremiumPoints(collectedPointsStr);
+        } else {
+            logger.info("Failed to find number of collected points");
         }
         return ai;
     }
@@ -348,7 +350,7 @@ public class ChoMikujPl extends PluginForHost {
         return looksLikeAudio(link) || looksLikeVideo(link);
     }
 
-    private boolean allowStreamDownloadFallback() {
+    private boolean setting_allowStreamDownloadFallback() {
         return this.getPluginConfig().getBooleanProperty(ALLOW_STREAM_DOWNLOAD_AS_FALLBACK, default_ALLOW_STREAM_DOWNLOAD_AS_FALLBACK);
     }
 
@@ -368,7 +370,7 @@ public class ChoMikujPl extends PluginForHost {
         final boolean isAudio = looksLikeAudio(link);
         final boolean isVideo = looksLikeVideo(link);
         final boolean adultContentBlocked = br.containsHTML("\"FormAdultViewAccepted\"");
-        final boolean allowStreamDownloadFallback = this.allowStreamDownloadFallback();
+        final boolean allowStreamDownloadFallback = this.setting_allowStreamDownloadFallback();
         if (account == null) {
             if (adultContentBlocked) {
                 link.setProperty(PROPERTY_DOWNLOADLINK_ADULT_CONTENT, true);
@@ -386,10 +388,6 @@ public class ChoMikujPl extends PluginForHost {
                 logger.warning("User is [supposed to be] logged in but we still got blocked adult content!");
             }
         }
-        String downloadurl = null;
-        final String fid = getFID(link);
-        br.getHeaders().put("Accept", "*/*");
-        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         // Check if account wants to force MP3 stream download
         if (account != null && isAudio && this.getPluginConfig().getBooleanProperty(ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES, default_ACCOUNT_DOWNLOAD_AVOID_TRAFFIC_USAGE_FOR_AUDIO_FILES)) {
             /* User prefers stream download for .mp3 files --> Does not use up any account traffic. */
@@ -397,6 +395,8 @@ public class ChoMikujPl extends PluginForHost {
             return getDllinkAudioStream(link);
         }
         // Account users check for traffic (if traffic checking is enabled)
+        br.getHeaders().put("Accept", "*/*");
+        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         final boolean accountHasLessTrafficThanRequiredForThisFile = account != null && account.getAccountInfo() != null && !account.getAccountInfo().isSpecialTraffic() && account.getAccountInfo().getTrafficLeft() < link.getView().getBytesTotal();
         // Perform a special file info check for account users
         if (account != null) {
@@ -419,6 +419,7 @@ public class ChoMikujPl extends PluginForHost {
             logger.warning("Failed to find requestVerificationToken");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String fid = getFID(link);
         // Set cookies and make initial request
         br.setCookie(getHost(), "cookiesAccepted", "1");
         if (account != null) {
@@ -463,6 +464,7 @@ public class ChoMikujPl extends PluginForHost {
             content = (String) entries.get("Content");
             content_br.getRequest().setHtmlCode(content);
         }
+        String downloadurl = null;
         if (account != null) {
             // Handle "don't show box" dialog
             downloadurl = content_br.getRegex("href=\"(https?://[^\"]+)\"[^>]*class=\"downloadFileWithDM").getMatch(0);
@@ -570,7 +572,7 @@ public class ChoMikujPl extends PluginForHost {
             link.setProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE, true);
             return downloadurl;
         }
-        /* Failure -> Try to find out why a download of this file was impoossible. */
+        /* Failure -> Try to find out why a download of this file was impossible. */
         if (StringUtils.containsIgnoreCase(content, "\"BuyAdditionalTransfer")) {
             /* E.g. Próbujesz pobrać plik o rozmiarze 103,06 MB. Każdy plik powyżej 1 MB wymaga opłacenia kosztów trasferu. */
             if (account != null) {
@@ -714,14 +716,8 @@ public class ChoMikujPl extends PluginForHost {
             br.clearCookies(null);
             br.setCookiesExclusive(true);
             br.getPage("https://" + getHost());
+            /* Do not use the Form from HTML since it does not contain the keys and values we need to send! */
             // final Form loginform = br.getFormByRegex("loginDummy");
-            // if (loginform == null) {
-            // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            // }
-            // loginform.setAction("/action/Login/TopBarLogin");
-            // loginform.put("Login", Encoding.urlEncode(account.getUser()));
-            // loginform.put("Password", Encoding.urlEncode(account.getPass()));
-            // br.submitForm(loginform);
             String postData = "ReturnUrl=&Login=" + Encoding.urlEncode(account.getUser()) + "&Password=" + Encoding.urlEncode(account.getPass());
             final String[] requestVerificationTokens = br.getRegex("<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"\\']+)\"").getColumn(0);
             if (requestVerificationTokens.length > 0) {
@@ -759,23 +755,25 @@ public class ChoMikujPl extends PluginForHost {
     }
 
     @Override
-    public boolean hasCaptcha(DownloadLink link, Account acc) {
-        if (this.getStoredDirectlink(link, acc) != null) {
+    public boolean hasCaptcha(final DownloadLink link, final Account account) {
+        if (this.getStoredDirectlink(link, account) != null) {
             /* Stored directurl available -> Assume that no captcha will be needed. */
             return false;
-        } else if (acc == null && (!this.allowStreamDownloadFallback() || !this.looksLikeStreamableFile(link))) {
-            /**
-             * Captcha required for <br>
-             * : - Original file downloads without account
-             */
-            return true;
-        } else {
+        } else if (account != null) {
             /**
              * Captcha not required for: <br>
              * - Downloads with account <br>
              * - Stream downloads
              */
             return false;
+        } else if (this.setting_allowStreamDownloadFallback() && this.looksLikeStreamableFile(link)) {
+            return false;
+        } else {
+            /**
+             * Captcha required for <br>
+             * : - Original file downloads without account
+             */
+            return true;
         }
     }
 
@@ -800,7 +798,7 @@ public class ChoMikujPl extends PluginForHost {
         } else if (link.hasProperty(PROPERTY_DOWNLOADLINK_STREAM_DOWNLOAD_ACTIVE)) {
             /* Stream download will not deduct traffic. */
             return true;
-        } else if (this.allowStreamDownloadFallback() && this.looksLikeStreamableFile(link)) {
+        } else if (this.setting_allowStreamDownloadFallback() && this.looksLikeStreamableFile(link)) {
             /* Stream download will happen as fallback -> Stream download will not deduct traffic. */
             return true;
         } else {

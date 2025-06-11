@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -52,7 +53,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51132 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
 public class PremboxCom extends PluginForHost {
     private static final String                   CLEAR_DOWNLOAD_HISTORY                     = "CLEAR_DOWNLOAD_HISTORY_COMPLETE";
     /* Properties */
@@ -467,7 +468,17 @@ public class PremboxCom extends PluginForHost {
     }
 
     private Map<String, Object> handleErrors(final Browser br, final Account account, final DownloadLink link) throws Exception {
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            /* This should never happen. */
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l);
+            } else {
+                throw new AccountUnavailableException("Invalid API response", 60 * 1000);
+            }
+        }
         if (Boolean.TRUE.equals(entries.get("success"))) {
             /* No error */
             return entries;

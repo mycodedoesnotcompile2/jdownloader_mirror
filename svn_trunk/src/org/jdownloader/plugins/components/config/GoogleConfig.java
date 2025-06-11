@@ -62,6 +62,10 @@ public interface GoogleConfig extends PluginConfigInterface {
             return text_WaitOnQuotaReachedMinutes;
         }
 
+        public String getAllowMultihosterDownload_label() {
+            return "Allow multihoster usage?";
+        }
+
         public String getDebugAccountLogin_label() {
             return text_DebugAccountLogin;
         }
@@ -203,6 +207,14 @@ public interface GoogleConfig extends PluginConfigInterface {
     int getWaitOnQuotaReachedMinutes();
 
     void setWaitOnQuotaReachedMinutes(int items);
+
+    @AboutConfig
+    @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("Enable this to allow Google Drive links to be downloaded via multihoster accounts.")
+    @Order(52)
+    boolean isAllowMultihosterDownload();
+
+    void setAllowMultihosterDownload(boolean b);
 
     @AboutConfig
     @DefaultBooleanValue(false)

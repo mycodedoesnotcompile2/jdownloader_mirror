@@ -26,35 +26,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.GoogleConfig;
-import org.jdownloader.plugins.components.config.GoogleConfig.APIDownloadMode;
-import org.jdownloader.plugins.components.config.GoogleConfig.PreferredVideoQuality;
-import org.jdownloader.plugins.components.google.GoogleHelper;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.youtube.YoutubeHelper;
-import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GeneralSettings;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
@@ -87,7 +58,36 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51048 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.GoogleConfig;
+import org.jdownloader.plugins.components.config.GoogleConfig.APIDownloadMode;
+import org.jdownloader.plugins.components.config.GoogleConfig.PreferredVideoQuality;
+import org.jdownloader.plugins.components.google.GoogleHelper;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GeneralSettings;
+
+@HostPlugin(revision = "$Revision: 51134 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -422,10 +422,10 @@ public class GoogleDrive extends PluginForHost {
                 break;
             } else {
                 /**
-                 * Rare case: Single file link as shortcut which has been added to hostplugin. </br>
-                 * A shortcut can go to another file/folder which has a different ID than the one of this object. We will skip this redirect
-                 * by making use of this ID right here. </br>
-                 * We need to do this request again with the real fileID in order to obtain the information of the final file.
+                 * Rare case: Single file link as shortcut which has been added to hostplugin. </br> A shortcut can go to another
+                 * file/folder which has a different ID than the one of this object. We will skip this redirect by making use of this ID
+                 * right here. </br> We need to do this request again with the real fileID in order to obtain the information of the final
+                 * file.
                  */
                 fileID = shortcutDetails.get("targetId").toString();
                 logger.info("Item is shortcut item -> Retry with itemID: " + fileID);
@@ -443,10 +443,8 @@ public class GoogleDrive extends PluginForHost {
     }
 
     /**
-     * Contains all fields we need for file/folder API requests. </br>
-     * Use the star symbol "*" to get all fields which exist. </br>
-     * This is very similar to the Google Drive WebAPI but some fields are named differently in the website version. </br>
-     * Additional notes: </br>
+     * Contains all fields we need for file/folder API requests. </br> Use the star symbol "*" to get all fields which exist. </br> This is
+     * very similar to the Google Drive WebAPI but some fields are named differently in the website version. </br> Additional notes: </br>
      * Fields for file hashes: md5Checksum, sha1Checksum, sha256Checksum </br>
      */
     public static final String getSingleFilesFieldsAPI() {
@@ -554,11 +552,10 @@ public class GoogleDrive extends PluginForHost {
     public static void parseGoogleDocumentPropertiesAPIAndSetFilename(final Plugin plg, final DownloadLink link, final String filename, final String googleDriveDocumentType, final Map<String, Object> exportFormatDownloadurls) {
         /**
          * Google Drive documents: Either created directly on Google Drive or user added a "real" document-file to GDrive and converted it
-         * into a GDoc later. </br>
-         * In this case, the "filename" is more like a title no matter whether or not it contains a file-extension.</br>
-         * If it contains a file-extension we will try to find download the output format accordingly. </br>
-         * For GDocs usually there is no filesize given because there is no "original" file anymore. The filesize depends on the format we
-         * chose to download the file in.
+         * into a GDoc later. </br> In this case, the "filename" is more like a title no matter whether or not it contains a
+         * file-extension.</br> If it contains a file-extension we will try to find download the output format accordingly. </br> For GDocs
+         * usually there is no filesize given because there is no "original" file anymore. The filesize depends on the format we chose to
+         * download the file in.
          */
         link.setProperty(PROPERTY_GOOGLE_DOCUMENT, true);
         /* Assume that a filename/title has to be given. */
@@ -752,8 +749,8 @@ public class GoogleDrive extends PluginForHost {
             final long filesize = filesizeO.longValue();
             if (filesize == 0) {
                 /**
-                 * Do not trust this filename as it is most likely missing a file-extension. </br>
-                 * Assume that it is a google document while not trusting it and set default file extension for google doc downloads.
+                 * Do not trust this filename as it is most likely missing a file-extension. </br> Assume that it is a google document while
+                 * not trusting it and set default file extension for google doc downloads.
                  */
                 /* Do NOT set google document flag as we can't be 100% sure that this is a google doc. */
                 // link.setProperty(PROPERTY_GOOGLE_DOCUMENT, true);
@@ -769,8 +766,8 @@ public class GoogleDrive extends PluginForHost {
             setFilename(this, link, null, filename, true);
         } else {
             /**
-             * Try to use cached name if we are unable to find one at this moment. </br>
-             * This can happen if e.g. download quota has been reached for this file.
+             * Try to use cached name if we are unable to find one at this moment. </br> This can happen if e.g. download quota has been
+             * reached for this file.
              */
             final String cachedFilename = link.getStringProperty(PROPERTY_CACHED_FILENAME);
             if (cachedFilename != null) {
@@ -954,9 +951,9 @@ public class GoogleDrive extends PluginForHost {
             link.setName(filename);
         }
         /**
-         * Set filename as property so we can use it later at places where a filename can't be found but is needed. </br>
-         * Example: File was checked successfully but later on download-attempt, it is quota limited and in that case some GDrive endpoints
-         * will not provide a filename.
+         * Set filename as property so we can use it later at places where a filename can't be found but is needed. </br> Example: File was
+         * checked successfully but later on download-attempt, it is quota limited and in that case some GDrive endpoints will not provide a
+         * filename.
          */
         link.setProperty(PROPERTY_CACHED_FILENAME, filename);
     }
@@ -997,8 +994,7 @@ public class GoogleDrive extends PluginForHost {
         }
         /**
          * E.g. older alternative URL for documents: https://docs.google.com/document/export?format=pdf&id=<fid>&includes_info_params=true
-         * </br>
-         * Last rev. with this handling: 42866
+         * </br> Last rev. with this handling: 42866
          */
         String url = "https://drive.google.com";
         /* Minor difference when user is logged in. They don't really check that but let's mimic browser behavior. */
@@ -1064,8 +1060,7 @@ public class GoogleDrive extends PluginForHost {
     }
 
     /**
-     * @return: true: Prefer stream download. </br>
-     *          false: Do not prefer stream download -> Download original version of file
+     * @return: true: Prefer stream download. </br> false: Do not prefer stream download -> Download original version of file
      */
     private boolean isStreamDownloadPreferred(final DownloadLink link) {
         final int lastUsedQuality = link.getIntegerProperty(PROPERTY_USED_QUALITY, -1);
@@ -1168,9 +1163,9 @@ public class GoogleDrive extends PluginForHost {
                     } else if (code == 429) {
                         /* Usually with status "RESOURCE_EXHAUSTED" and message "playback quota exhausted" */
                         /**
-                         * Similar to file-download mode: File is definitely not streamable at this moment! </br>
-                         * Reasons for that may vary and there can be different reasons given for the same error-code. </br>
-                         * The original file could still be downloadable via account but maybe not at this moment.
+                         * Similar to file-download mode: File is definitely not streamable at this moment! </br> Reasons for that may vary
+                         * and there can be different reasons given for the same error-code. </br> The original file could still be
+                         * downloadable via account but maybe not at this moment.
                          */
                         /** Similar handling to { @link #errorDownloadQuotaReachedWebsite } */
                         link.setProperty(PROPERTY_TIMESTAMP_STREAM_QUOTA_REACHED, System.currentTimeMillis());
@@ -1250,9 +1245,8 @@ public class GoogleDrive extends PluginForHost {
                 final String errorcodeStr = queryvideo.get("errorcode");
                 if (errorcodeStr != null) {
                     /**
-                     * This reason varies depending on the language of the google account in use / header preferred language. </br>
-                     * It would be a huge effort to differ between different errormessages so at this moment we will only rely on the
-                     * error-code.
+                     * This reason varies depending on the language of the google account in use / header preferred language. </br> It would
+                     * be a huge effort to differ between different errormessages so at this moment we will only rely on the error-code.
                      */
                     String message = queryvideo.get("reason");
                     if (message != null) {
@@ -1271,9 +1265,9 @@ public class GoogleDrive extends PluginForHost {
                         }
                     } else if (errorcode == 150) {
                         /**
-                         * Similar to file-download mode: File is definitely not streamable at this moment! </br>
-                         * Reasons for that may vary and there can be different reasons given for the same error-code. </br>
-                         * The original file could still be downloadable via account but maybe not at this moment.
+                         * Similar to file-download mode: File is definitely not streamable at this moment! </br> Reasons for that may vary
+                         * and there can be different reasons given for the same error-code. </br> The original file could still be
+                         * downloadable via account but maybe not at this moment.
                          */
                         /** Similar handling to { @link #errorDownloadQuotaReachedWebsite } */
                         link.setProperty(PROPERTY_TIMESTAMP_STREAM_QUOTA_REACHED, System.currentTimeMillis());
@@ -1392,8 +1386,7 @@ public class GoogleDrive extends PluginForHost {
 
     /**
      * Returns result according to file-extensions listed here:
-     * https://support.google.com/drive/answer/2423694/?co=GENIE.Platform%3DiOS&hl=de </br>
-     * Last updated: 2020-11-29
+     * https://support.google.com/drive/answer/2423694/?co=GENIE.Platform%3DiOS&hl=de </br> Last updated: 2020-11-29
      */
     private static boolean looksLikeVideoFile(final String filename) {
         /*
@@ -1519,8 +1512,8 @@ public class GoogleDrive extends PluginForHost {
                     logger.info("Attempting stream download FALLBACK in website mode");
                 }
                 /**
-                 * Sidenote: Files can be blocked for downloading but streaming may still be possible(rare case). </br>
-                 * If downloads are blocked because of "too high traffic", streaming can be blocked too!
+                 * Sidenote: Files can be blocked for downloading but streaming may still be possible(rare case). </br> If downloads are
+                 * blocked because of "too high traffic", streaming can be blocked too!
                  */
                 streamDownloadlink = this.getVideoStreamDownloadurl(br.cloneBrowser(), link, account);
                 directurl = streamDownloadlink;
@@ -1553,9 +1546,9 @@ public class GoogleDrive extends PluginForHost {
                 logger.info("Download attempt failed -> Direct download not possible -> One step more might be required or special handling for stream download or google document download");
                 br.followConnection(true);
                 /**
-                 * 2021-02-02: Interesting behavior of offline content: </br>
-                 * Returns 403 when accessed via: https://drive.google.com/file/d/<fuid> </br>
-                 * Returns 404 when accessed via: https://docs.google.com/uc?id=<fuid>&export=download
+                 * 2021-02-02: Interesting behavior of offline content: </br> Returns 403 when accessed via:
+                 * https://drive.google.com/file/d/<fuid> </br> Returns 404 when accessed via:
+                 * https://docs.google.com/uc?id=<fuid>&export=download
                  */
                 /* Check if an extra step is needed to download this file. */
                 /* E.g. "This file is too big for Google to virus-scan it - download anyway?" */
@@ -1607,9 +1600,8 @@ public class GoogleDrive extends PluginForHost {
         /**
          *
          * Use Dummy DownloadLink item because download is already complete when this gets executed and the linkcheck down below will set
-         * new properties on DownloadLink which often don't fit to the currently downloaded item. </br>
-         * For example file size: If we just downloaded a non-original version of the file we do not want the handling below to set the
-         * original file size on it again.
+         * new properties on DownloadLink which often don't fit to the currently downloaded item. </br> For example file size: If we just
+         * downloaded a non-original version of the file we do not want the handling below to set the original file size on it again.
          */
         final DownloadLink dummy = new DownloadLink(link.getPluginPatternMatcher());
         dummy.setProperties(link.getProperties());
@@ -1655,11 +1647,9 @@ public class GoogleDrive extends PluginForHost {
     private void prepareNonOriginalFileDownload(final DownloadLink link) {
         /**
          * The file we are about to download might not be the original anymore but the original information might have been set on our
-         * DownloadLink item before so: </br>
-         * - Remove verifiedFilesize so the file we are going to download can be different from the original filesize which we might know
-         * </br>
-         * - Delete hash to prevent hash check from failing since the hash of our non-original file will most likely be different from the
-         * original one
+         * DownloadLink item before so: </br> - Remove verifiedFilesize so the file we are going to download can be different from the
+         * original filesize which we might know </br> - Delete hash to prevent hash check from failing since the hash of our non-original
+         * file will most likely be different from the original one
          */
         final long fileSize = link.getVerifiedFileSize();
         if (fileSize != -1) {
@@ -1793,10 +1783,9 @@ public class GoogleDrive extends PluginForHost {
             errorAccountRequiredOrPrivateFile(br, link, account);
         } else if (br.getHttpConnection().getResponseCode() == 403) {
             /**
-             * Most likely quota error or "Missing permissions" error. </br>
-             * 2021-05-19: Important: This can also happen if e.g. this is a private file and permissions are missing! It is hard to detect
-             * the exact reason for error as errormessages differ depending on the user set Google website language! </br>
-             * 2022-11-17: Treat this as "Private file" for now
+             * Most likely quota error or "Missing permissions" error. </br> 2021-05-19: Important: This can also happen if e.g. this is a
+             * private file and permissions are missing! It is hard to detect the exact reason for error as errormessages differ depending
+             * on the user set Google website language! </br> 2022-11-17: Treat this as "Private file" for now
              */
             final boolean usePrivateFileHandlingHere = true;
             if (usePrivateFileHandlingHere) {
@@ -1940,50 +1929,48 @@ public class GoogleDrive extends PluginForHost {
             } else {
                 throw new AccountUnavailableException("Rate limited", getRateLimitWaittime());
             }
+        }
+        /* Rate-limit during download-attempt. */
+        if (!captchaRequired) {
+            throw exceptionRateLimitedSingle;
+        } else if (!canHandleGoogleSpecialCaptcha) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Rate limited - captcha required but not implemented yet", getRateLimitWaittime());
+        }
+        final Form captchaForm = br.getForm(0);
+        if (captchaForm == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+        captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+        /* This should now redirect back to where we initially wanted to got to! */
+        // br.getHeaders().put("X-Client-Data", "0");
+        br.submitForm(captchaForm);
+        /* Double-check to make sure access was granted */
+        if (this.isRateLimitedWebsite(br)) {
+            logger.info("Captcha failed and/or rate-limit is still there");
+            /*
+             * Do not invalidate captcha result because most likely that was correct but our plugin somehow failed -> Try again later
+             */
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Rate limited and captcha failed", getRateLimitWaittime());
         } else {
-            /* Rate-limit during download-attempt. */
-            if (!captchaRequired) {
-                throw exceptionRateLimitedSingle;
-            } else if (!canHandleGoogleSpecialCaptcha) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Rate limited - captcha required but not implemented yet", getRateLimitWaittime());
-            }
-            final Form captchaForm = br.getForm(0);
-            if (captchaForm == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-            captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-            /* This should now redirect back to where we initially wanted to got to! */
-            // br.getHeaders().put("X-Client-Data", "0");
-            br.submitForm(captchaForm);
-            /* Double-check to make sure access was granted */
-            if (this.isRateLimitedWebsite(br)) {
-                logger.info("Captcha failed and/or rate-limit is still there");
+            logger.info("Captcha success");
+            if (account != null) {
                 /*
-                 * Do not invalidate captcha result because most likely that was correct but our plugin somehow failed -> Try again later
+                 * Cookies have changed! Store new cookies so captcha won't happen again immediately. This is stored on the current session
+                 * and not just IP!
                  */
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Rate limited and captcha failed", getRateLimitWaittime());
+                account.saveCookies(br.getCookies(br.getHost()), "");
             } else {
-                logger.info("Captcha success");
-                if (account != null) {
-                    /*
-                     * Cookies have changed! Store new cookies so captcha won't happen again immediately. This is stored on the current
-                     * session and not just IP!
-                     */
-                    account.saveCookies(br.getCookies(br.getHost()), "");
-                } else {
-                    /*
-                     * TODO: Consider to save- and restore session cookies - this captcha only has to be solved once per session per X time!
-                     */
-                }
+                /*
+                 * TODO: Consider to save- and restore session cookies - this captcha only has to be solved once per session per X time!
+                 */
             }
         }
     }
 
     /**
      * Use this for response 403 or messages like 'file can not be downloaded at this moment'. Such files will usually be downloadable via
-     * account. </br>
-     * Only use this for failed website download attempts!
+     * account. </br> Only use this for failed website download attempts!
      */
     private void errorDownloadQuotaReachedWebsite(final DownloadLink link, final Account account) throws PluginException {
         if (account != null) {
@@ -2055,8 +2042,8 @@ public class GoogleDrive extends PluginForHost {
     }
 
     /**
-     * Use this for files which are not downloadable at all (rare case). </br>
-     * This mostly gets called if a file is not downloadable according to the Google Drive API.
+     * Use this for files which are not downloadable at all (rare case). </br> This mostly gets called if a file is not downloadable
+     * according to the Google Drive API.
      */
     private void errorCannotDownload(final DownloadLink link, final boolean isAfterStreamDownloadAttempt) throws PluginException {
         String errorMsg = "Download disabled by file owner!";
@@ -2314,15 +2301,6 @@ public class GoogleDrive extends PluginForHost {
         link.removeProperty(PROPERTY_TIMESTAMP_STREAM_QUOTA_REACHED);
         link.removeProperty(PROPERTY_USED_STREAM_DOWNLOAD_TYPE);
         link.removeProperty(PROPERTY_LAST_IS_PRIVATE_FILE_TIMESTAMP);
-        /**
-         * 2024-07-04: Workarounds for items which have been wrongly tagged as Google Documents. </br>
-         * TODO: Remove after 01/2025 </br>
-         * Reference: https://board.jdownloader.org/showpost.php?p=536339&postcount=12
-         */
-        final String fname = link.getName();
-        if (link.hasProperty(PROPERTY_GOOGLE_DOCUMENT) && fname != null && fname.matches(".+\\.[a-z0-9]{2,5}\\.zip$")) {
-            link.removeProperty(PROPERTY_GOOGLE_DOCUMENT);
-        }
     }
 
     @Override
@@ -2335,9 +2313,36 @@ public class GoogleDrive extends PluginForHost {
         return false;
     }
 
+    // private boolean isMULTIHOST(PluginForHost plugin) {
+    // return plugin != null && plugin.hasFeature(LazyPlugin.FEATURE.MULTIHOST);
+    // }
+    //
+    // @Override
+    // public String buildExternalDownloadURL(final DownloadLink link, final PluginForHost buildForThisPlugin) {
+    // if (isMULTIHOST(buildForThisPlugin)) {
+    // return getFileViewURL(link);
+    // } else {
+    // return super.buildExternalDownloadURL(link, buildForThisPlugin);
+    // }
+    // }
+
     @Override
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        /* No not allow multihost plugins to handle items from this plugin. */
-        return link.getHost().equalsIgnoreCase(plugin.getHost());
+        if (PluginJsonConfig.get(GoogleConfig.class).isAllowMultihosterDownload()) {
+            return super.allowHandle(link, plugin);
+        } else {
+            /**
+             * No not allow multihost plugins to handle items from this plugin. <br>
+             * Reasons include: <br>
+             * - There is no such thing like "Google Drive premium" so using a multihoster will most likely just make google drive downloads
+             * more unstable <br>
+             * - Links to private files would also be forwarded to multihosters and <b>will</b> fail <br>
+             * - JD has very good native Google Drive Support so there is really no point to send Google Drive links to multihosters <br>
+             * - Google Drive has a lot of link-types which our plugin can handle just fine but multihosters may fail to cope with <br>
+             * - Google Drive has a lot of special cases like officially un-downloadable links which our plugin can download/handle fine but
+             * multihosters may fail to handle properly
+             */
+            return link.getHost().equalsIgnoreCase(plugin.getHost());
+        }
     }
 }

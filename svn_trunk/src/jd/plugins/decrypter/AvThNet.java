@@ -34,7 +34,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.AvThXyz;
 
-@DecrypterPlugin(revision = "$Revision: 45941 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
 public class AvThNet extends PluginForDecrypt {
     public AvThNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,7 +74,7 @@ public class AvThNet extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -90,9 +90,9 @@ public class AvThNet extends PluginForDecrypt {
                     video.setProperty(AvThXyz.PROPERTY_TITLE, urlTitleCleaned);
                 }
                 video.setReferrerUrl(br.getURL());
-                decryptedLinks.add(video);
+                ret.add(video);
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 }

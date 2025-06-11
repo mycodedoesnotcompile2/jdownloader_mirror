@@ -39,10 +39,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48362 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51130 $", interfaceVersion = 3, names = {}, urls = {})
 public class MeocloudPtFolder extends PluginForDecrypt {
     public MeocloudPtFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -74,8 +81,6 @@ public class MeocloudPtFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
         if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -85,7 +90,7 @@ public class MeocloudPtFolder extends PluginForDecrypt {
         if (folderPath == null) {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (br.containsHTML("(?i)>\\s*Pasta Vazia")) {
+        } else if (br.containsHTML(">\\s*Pasta Vazia")) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
         final Form pwform = MeocloudPtFolder.getPasswordProtectedForm(br);
@@ -93,8 +98,9 @@ public class MeocloudPtFolder extends PluginForDecrypt {
             /* 2020-02-18: PW protected URLs are not yet supported. */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Password protected links are not yet supported: Contact support and ask for implementation.", 8 * 60 * 1000l);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final PluginForHost hosterPlugin = this.getNewPluginForHostInstance(this.getHost());
-        final String singleDirecturl = br.getRegex("(https?://[^/]+/dl/download/[^/]+/" + Pattern.quote(folderPath) + "\\?download=true)").getMatch(0);
+        final String singleDirecturl = br.getRegex("(https?://[^/]+/dl/download/[^/]+/" + Pattern.quote(Encoding.urlEncode(folderPath)) + "\\?download=true)").getMatch(0);
         if (singleDirecturl != null) {
             final DownloadLink singlefile = new DownloadLink(hosterPlugin, null, this.getHost(), singleDirecturl, true);
             singlefile.setAvailable(true);
