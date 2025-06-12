@@ -74,7 +74,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 50955 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 51141 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -596,6 +596,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> crawlBook(final Browser br, final String ajaxurl, final Account account) throws Exception {
         if (StringUtils.isEmpty(ajaxurl)) {
+            /* Developer mistake */
             throw new IllegalArgumentException();
         }
         final String identifier = UrlQuery.parse(ajaxurl).get("id");
@@ -735,7 +736,12 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             result.setProperty(ArchiveOrg.PROPERTY_BOOK_PAGE_MAX, internalPageIndex);
             final int thispage = result.getIntegerProperty(ArchiveOrg.PROPERTY_BOOK_PAGE_INTERNAL_INDEX, 0);
             /* Set filename */
-            result.setFinalFileName(StringUtils.formatByPadLength(padLength, thispage) + "_" + title + ".jpg");
+            if (result.isAvailable()) {
+                result.setFinalFileName(StringUtils.formatByPadLength(padLength, thispage) + "_" + title + ".jpg");
+            } else {
+                result.setFinalFileName(StringUtils.formatByPadLength(padLength, thispage) + "_ADD_ACCOUNT_AND_RE_CRAWL_TO_DOWNLOAD_" + title + ".jpg");
+                result.setComment("Archive.org Account required to be able to download this book page. Add an archive.org account to JDownloader, then delete and re-add the link to this book to be able to download all book pages.");
+            }
             /* Assign FilePackage to item so all results of this run get placed into one package. */
             result._setFilePackage(fp);
         }

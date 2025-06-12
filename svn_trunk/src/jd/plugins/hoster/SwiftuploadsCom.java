@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51022 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51140 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwiftuploadsCom extends PluginForHost {
     public SwiftuploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,6 +68,7 @@ public class SwiftuploadsCom extends PluginForHost {
         ret.add(new String[] { "uptoearn.xyz" });
         ret.add(new String[] { "uploadzap.com" });
         ret.add(new String[] { "akirabox.com" });
+        ret.add(new String[] { "filearn.top" });
         return ret;
     }
 

@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51140 $", interfaceVersion = 3, names = {}, urls = {})
 public class GenericYetiShareFolder extends PluginForDecrypt {
     public GenericYetiShareFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,6 +97,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         ret.add(new String[] { "anonsharing.com" });
         ret.add(new String[] { "loadedfiles.org" });
         ret.add(new String[] { "drive.sgpedia.com" });
+        ret.add(new String[] { "imgcubby.com" });
         return ret;
     }
 

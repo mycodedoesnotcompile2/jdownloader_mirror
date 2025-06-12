@@ -19,6 +19,13 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.config.FilestoreToConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -39,14 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.config.FilestoreToConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51141 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
 public class FilestoreTo extends PluginForHost {
     public FilestoreTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -168,34 +168,40 @@ public class FilestoreTo extends PluginForHost {
     }
 
     private void checkErrors(final DownloadLink link) throws PluginException {
-        if (br.containsHTML("(?i)Derzeit haben wir leider keinen freien Downloadslots frei\\. Bitte nochmal versuchen\\.")) {
+        if (br.containsHTML("Derzeit haben wir leider keinen freien Downloadslots frei\\. Bitte nochmal versuchen\\.")) {
             errorNoFreeSlots();
-        } else if (br.containsHTML("(?i)>\\s*Leider sind aktuell keine freien Downloadslots")) {
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (br.containsHTML(">\\s*Leider sind aktuell keine freien Downloadslots")) {
             errorNoFreeSlots();
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (br.getURL().contains("/error/limit")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting new downloads", 5 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)>\\s*Datei nicht gefunden")) {
+        } else if (br.containsHTML(">\\s*Datei nicht gefunden")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*DIE DATEI EXISTIERT LEIDER NICHT MEHR")) {
+        } else if (br.containsHTML(">\\s*DIE DATEI EXISTIERT LEIDER NICHT MEHR")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Datei gesperrt")) {
+        } else if (br.containsHTML(">\\s*Datei gesperrt")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)Entweder wurde die Datei von unseren Servern entfernt oder der Download-Link war")) {
+        } else if (br.containsHTML("Entweder wurde die Datei von unseren Servern entfernt oder der Download-Link war")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Für diese Datei ist eine Take Down-Meldung eingegangen")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)Derzeit haben wir Serverprobleme und arbeiten daran\\. Bitte nochmal versuchen\\.")) {
+        } else if (br.containsHTML(">\\s*Für diese Datei ist eine Take Down-Meldung eingegangen")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "File abused");
+        } else if (br.containsHTML("Derzeit haben wir Serverprobleme und arbeiten daran\\. Bitte nochmal versuchen\\.")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server issues", 15 * 60 * 1000l);
         } else if (br.containsHTML(">\\s*Ihr Download ist vorübergehend aufgrund des Verdachtes der")) {
             throw new AccountUnavailableException("Account blocked due to suspicion of account sharing", 30 * 60 * 1000);
-        } else if (br.containsHTML("(?i)>\\s*503 - Service Temporarily Unavailable\\s*<")) {
+        } else if (br.containsHTML(">\\s*Es steht aktuell kein Server zum Download zur Verfügung")) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Es steht aktuell kein Server zum Download zur Verfügung. Bitte versuche es später erneut!", 10 * 60 * 1000l);
+        } else if (br.containsHTML(">\\s*503 - Service Temporarily Unavailable\\s*<")) {
             /* Goes along with correct header responsecode 503 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 503", 5 * 60 * 1000l);
         }
-    }
-
-    private void handleDownload(final DownloadLink link, final Account account, final boolean resume, int maxChunks) throws Exception {
-        final String errorMsg = br.getRegex("class=\"alert alert-danger page-alert mb-2\">\\s*<strong>([^<>]+)</strong>").getMatch(0);
+        String errorMsg = br.getRegex("class=\"alert alert-danger page-alert mb-2\"[^>]*>\\s*<strong>Download-Fehler</strong>\\s*<br>([^<]+)<").getMatch(0);
+        if (errorMsg == null) {
+            errorMsg = br.getRegex("class=\"alert alert-danger page-alert mb-2\">\\s*<strong>([^>]+)</strong>").getMatch(0);
+        }
         if (errorMsg != null) {
             if (errorMsg.matches("(?i)Datei noch nicht bereit")) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errorMsg, 5 * 60 * 1000l);
@@ -204,13 +210,16 @@ public class FilestoreTo extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, errorMsg);
             }
         }
+    }
+
+    private void handleDownload(final DownloadLink link, final Account account, final boolean resume, int maxChunks) throws Exception {
         // form 1
-        Form dlform = br.getFormByRegex("(?i)>\\s*Download\\s*</button>");
+        Form dlform = br.getFormByRegex(">\\s*Download\\s*</button>");
         if (dlform != null) {
             br.submitForm(dlform);
         }
         // form 2
-        dlform = br.getFormByRegex("(?i)>\\s*Download starten\\s*</button>");
+        dlform = br.getFormByRegex(">\\s*Download starten\\s*</button>");
         if (dlform != null) {
             // not enforced
             if (account == null || AccountType.FREE.equals(account.getType())) {
@@ -223,14 +232,17 @@ public class FilestoreTo extends PluginForHost {
             }
             br.submitForm(dlform);
         }
-        String dllink = getDllink(br);
+        String dllink = br.getRegex("<a href\\s*=\\s*(\"|')([^>]*)\\1>hier</a>").getMatch(1);
+        if (dllink == null) {
+            dllink = br.getRegex("<iframe class\\s*=\\s*\"downframe\" src\\s*=\\s*\"(.*?)\"").getMatch(0);
+        }
         if (StringUtils.isEmpty(dllink)) {
             checkErrors(link);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if ((account == null || account.getType() == AccountType.PREMIUM) && PluginJsonConfig.get(FilestoreToConfig.class).isModifyFinalDownloadurls()) {
             /* See: https://board.jdownloader.org/showthread.php?t=91192 */
-            dllink = dllink.replaceFirst("/free/", "/premium/");
+            dllink = dllink.replaceFirst("(?i)/free/", "/premium/");
         }
         if (!resume) {
             maxChunks = 1;
@@ -382,15 +394,6 @@ public class FilestoreTo extends PluginForHost {
         } else {
             handleDownload(link, account, true, 0);
         }
-    }
-
-    /** Finds direct downloadable URL inside HTML code. */
-    private String getDllink(final Browser br) {
-        String dllink = br.getRegex("<a href\\s*=\\s*(\"|')([^>]*)\\1>hier</a>").getMatch(1);
-        if (dllink == null) {
-            dllink = br.getRegex("<iframe class\\s*=\\s*\"downframe\" src\\s*=\\s*\"(.*?)\"").getMatch(0);
-        }
-        return dllink;
     }
 
     // private Browser prepAjax(Browser prepBr) {

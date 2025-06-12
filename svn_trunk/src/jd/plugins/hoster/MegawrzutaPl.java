@@ -18,14 +18,16 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -33,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51139 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegawrzutaPl extends PluginForHost {
     public MegawrzutaPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,6 +45,7 @@ public class MegawrzutaPl extends PluginForHost {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        br.setCookie(getHost(), "popupConsent1", "true");
         return br;
     }
 
@@ -67,17 +70,25 @@ public class MegawrzutaPl extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/download/([a-f0-9]{32})\\.html", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_SHORT  = Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9]{8,})", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/download/([a-f0-9]{32})\\.html");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_NORMAL.pattern() + "|" + PATTERN_SHORT.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
-    /* Connection stuff */
-    private final boolean FREE_RESUME    = false;
-    private final int     FREE_MAXCHUNKS = 1;
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return false;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
+    }
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -90,14 +101,20 @@ public class MegawrzutaPl extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_SHORT).getMatch(0);
+        return fid;
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
+        final String fid = this.getFID(link);
         if (!link.isNameSet()) {
-            link.setName(this.getFID(link));
+            link.setName(fid);
         }
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
@@ -108,16 +125,49 @@ public class MegawrzutaPl extends PluginForHost {
             /* "Upload expired" */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Regex finfo = br.getRegex("<h3>([^<>\"]+)<h5>([^<>\"]+)<");
-        String filename = finfo.getMatch(0);
-        String filesize = finfo.getMatch(1);
-        if (filename != null) {
-            link.setName(Encoding.htmlDecode(filename).trim());
-        } else {
-            logger.warning("Failed to find filename");
+        int numberofFiles = 1;
+        final String numberofFilesStr = br.getRegex("<span>(\\d+)</span>\\s*pliki").getMatch(0);
+        if (numberofFilesStr != null) {
+            numberofFiles = Integer.parseInt(numberofFilesStr);
+            if (numberofFiles == 0) {
+                /* Not sure if this can happen */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Empty folder");
+            }
         }
-        if (!StringUtils.isEmpty(filesize)) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
+        /* Folders can contain multiple files but user cannot download individual files, only if the folder contains only a single file. */
+        final String[] filenames = br.getRegex("<span class=\"ml-2\"[^>]*>([^<]+)</span>").getColumn(0);
+        String folder_title = br.getRegex("<h1 class=\"h3\">Pobierz - ([^<]+)</h1>").getMatch(0);
+        if (folder_title != null) {
+            folder_title = Encoding.htmlDecode(folder_title).trim();
+        }
+        if (numberofFiles == 1) {
+            /* Single file -> Can have varying file extension */
+            if (filenames != null && filenames.length > 0) {
+                final String filename = Encoding.htmlDecode(filenames[0]).trim();
+                link.setFinalFileName(filename);
+            } else {
+                logger.warning("Failed to find filename of single file");
+                /* Fallback */
+                if (folder_title != null) {
+                    link.setName(folder_title);
+                }
+            }
+        } else {
+            /* Multiple files -> Always .zip extension */
+            if (folder_title != null) {
+                link.setName(this.correctOrApplyFileNameExtension(folder_title, ".zip", null));
+            } else {
+                logger.warning("Failed to find folder title");
+                /* Fallback */
+                link.setName(fid + ".zip");
+            }
+        }
+        final String[] filesizes = br.getRegex("<span class=\"text-muted\"[^>]*>(\\d+[^<]+)</span>").getColumn(0);
+        if (filesizes != null && filesizes.length > 0) {
+            /* First file size = Size of all files -> Total file size of folder */
+            link.setDownloadSize(SizeFormatter.getSize(filesizes[0]));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -125,25 +175,13 @@ public class MegawrzutaPl extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        doFree(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
-    }
-
-    private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
-        String dllink = br.getRegex("class='download-button-wrapper text-center'>\\s*<a href=(?:'|\")(/files/[^<>\"']+)(?:'|\")").getMatch(0);
-        if (StringUtils.isEmpty(dllink)) {
+        final Form dlform = br.getForm(0);
+        if (dlform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
-        if (dl.getConnection().getContentType().contains("html")) {
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            }
-            br.followConnection();
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlform, this.isResumeable(link, null), this.getMaxChunks(link, null));
+        this.handleConnectionErrors(br, dl.getConnection());
+        // link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 

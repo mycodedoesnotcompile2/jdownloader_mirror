@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -154,6 +155,31 @@ public class YoutubeLinkGrabberExtender {
         return ret;
     }
 
+    private void aggregate(CrawledLink cl, final VariantGroup variantGroupOnly, final CounterMap<String> matchingLinks, Set<String> dupeAdd, final ArrayList<VariantInfo> vs, List<VariantInfo> variants) {
+        final Set<String> dupe = new HashSet<String>();
+        for (VariantInfo vi : variants) {
+            final AbstractVariant variant = vi.getVariant();
+            if (variantGroupOnly == null || variant.getGroup() == variantGroupOnly) {
+                final String id;
+                if (variant instanceof SubtitleVariant) {
+                    id = variant._getUniqueId();
+                } else if (variant instanceof AudioVariant) {
+                    id = variant._getUniqueId();
+                } else if (variant instanceof VideoVariant) {
+                    id = variant._getUniqueId();
+                } else {
+                    id = new VariantIDStorable(variant).createUniqueID();
+                }
+                if (dupe.add(id)) {
+                    matchingLinks.increment(id);
+                }
+                if (dupeAdd.add(id)) {
+                    vs.add(vi);
+                }
+            }
+        }
+    }
+
     protected void addVariants() {
         if (pv.getChildren().size() == 1) {
             ((YoutubeHostPluginInterface) pv.getPlugin()).showChangeOrAddVariantDialog(pv.getChildren().get(0), null);
@@ -161,23 +187,6 @@ public class YoutubeLinkGrabberExtender {
         }
         ProgressGetter pg = new ProgressGetter() {
             private int done;
-
-            protected void aggregate(CrawledLink cl, final CounterMap<String> matchingLinks, HashSet<String> dupeAdd, final ArrayList<VariantInfo> vs, List<VariantInfo> variants) {
-                HashSet<String> dupe = new HashSet<String>();
-                ;
-                for (VariantInfo vi : variants) {
-                    String id = new VariantIDStorable(vi.getVariant()).createUniqueID();
-                    if (vi.getVariant() instanceof SubtitleVariant) {
-                        id = vi.getVariant()._getUniqueId();
-                    }
-                    if (dupe.add(id)) {
-                        matchingLinks.increment(id);
-                    }
-                    if (dupeAdd.add(id)) {
-                        vs.add(vi);
-                    }
-                }
-            }
 
             @Override
             public void run() throws Exception {
@@ -195,9 +204,9 @@ public class YoutubeLinkGrabberExtender {
                         }
                         List<VariantInfo> variants = clipData.findVariants();
                         helper.extendedDataLoading(variants);
-                        aggregate(cl, matchingLinks, dupeAdd, vs, variants);
-                        aggregate(cl, matchingLinks, dupeAdd, vs, clipData.findDescriptionVariant());
-                        aggregate(cl, matchingLinks, dupeAdd, vs, clipData.findSubtitleVariants());
+                        aggregate(cl, null, matchingLinks, dupeAdd, vs, variants);
+                        aggregate(cl, null, matchingLinks, dupeAdd, vs, clipData.findDescriptionVariant());
+                        aggregate(cl, null, matchingLinks, dupeAdd, vs, clipData.findSubtitleVariants());
                     } finally {
                         done++;
                     }
@@ -317,24 +326,6 @@ public class YoutubeLinkGrabberExtender {
                         }
                     }
                 }.start();
-            }
-
-            protected void aggregate(CrawledLink cl, final VariantGroup g, final CounterMap<String> matchingLinks, HashSet<String> dupeAdd, final ArrayList<VariantInfo> vs, List<VariantInfo> variants) {
-                HashSet<String> dupe = new HashSet<String>();
-                for (VariantInfo vi : variants) {
-                    if (vi.getVariant().getGroup() == g) {
-                        String id = new VariantIDStorable(vi.getVariant()).createUniqueID();
-                        if (g == VariantGroup.SUBTITLES) {
-                            id = vi.getVariant()._getUniqueId();
-                        }
-                        if (dupe.add(id)) {
-                            matchingLinks.increment(id);
-                        }
-                        if (dupeAdd.add(id)) {
-                            vs.add(vi);
-                        }
-                    }
-                }
             }
 
             @Override

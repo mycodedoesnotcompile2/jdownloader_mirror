@@ -176,7 +176,7 @@ public class CrossSystem {
         KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
-         * 
+         *
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -193,7 +193,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         * 
+         *
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -206,9 +206,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         * 
+         *
          * https://wiki.ubuntu.com/Releases
-         * 
+         *
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -265,6 +265,7 @@ public class CrossSystem {
         MAC_VENTURA(OSFamily.MAC), // 10.18/13.00
         MAC_SONOMA(OSFamily.MAC), // 10.19/14.00
         MAC_SEQUOIA(OSFamily.MAC), // 10.20/15.00
+        MAC_TAHOE(OSFamily.MAC), // 10.26/10.21/26.00 unconfirmed
         /*
          * OS2
          */
@@ -560,7 +561,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         * 
+         *
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -1042,7 +1043,10 @@ public class CrossSystem {
                 }
                 final long version = Math.max(parseMacOSVersion(osVersion), parseMacOSVersion(sw_ver.get()));
                 // new version scheme
-                if (version >= 15000000) {
+                if (version >= 26000000) {
+                    // TODO: unconfirmed
+                    return OperatingSystem.MAC_TAHOE;
+                } else if (version >= 15000000) {
                     return OperatingSystem.MAC_SEQUOIA;
                 } else if (version >= 14000000) {
                     return OperatingSystem.MAC_SONOMA;
@@ -1054,7 +1058,10 @@ public class CrossSystem {
                     return OperatingSystem.MAC_BIG_SUR;
                 } else {
                     // old version scheme
-                    if (version >= 10020000) {
+                    if (version >= 10021000 || version >= 10026000) {
+                        // TODO: unconfirmed
+                        return OperatingSystem.MAC_TAHOE;
+                    } else if (version >= 10020000) {
                         // os.version=10.20
                         return OperatingSystem.MAC_SEQUOIA;
                     } else if (version >= 10019000) {

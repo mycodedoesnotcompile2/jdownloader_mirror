@@ -52,11 +52,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51140 $", interfaceVersion = 3, names = {}, urls = {})
 public class FikperCom extends PluginForHost {
     public FikperCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://fikper.com/register");
+        this.enablePremium("https://" + getHost() + "/register");
     }
 
     @Override
@@ -66,7 +66,7 @@ public class FikperCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://fikper.com/terms-of-use";
+        return "https://" + getHost() + "/terms-of-use";
     }
 
     private static List<String[]> getPluginDomains() {

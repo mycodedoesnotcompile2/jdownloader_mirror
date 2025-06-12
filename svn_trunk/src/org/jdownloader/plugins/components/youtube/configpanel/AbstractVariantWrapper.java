@@ -1,5 +1,8 @@
 package org.jdownloader.plugins.components.youtube.configpanel;
 
+import java.util.Locale;
+
+import org.appwork.txtresource.TranslationFactory;
 import org.jdownloader.plugins.components.youtube.Projection;
 import org.jdownloader.plugins.components.youtube.VariantIDStorable;
 import org.jdownloader.plugins.components.youtube.itag.AudioType;
@@ -61,6 +64,17 @@ public class AbstractVariantWrapper {
             lng = lng.replaceAll("[^a-zA-Z\\-]*", "");
         }
         return lng;
+    }
+
+    public Locale getLanguageLocale() {
+        if (variant instanceof AudioInterface) {
+            return ((AudioInterface) variant).getAudioLocale();
+        } else if (variant instanceof SubtitleVariant) {
+            final String lng = ((SubtitleVariant) variant).getLanguageCode();
+            return TranslationFactory.stringToLocale(lng.replaceAll("[^a-zA-Z\\-]*", ""));
+        } else {
+            return null;
+        }
     }
 
     public int getWidth() {

@@ -35,6 +35,7 @@ public class SubtitleVariant extends AbstractVariant<YoutubeSubtitleStorable> {
 
     @Override
     public String _getUniqueId() {
+        // TODO: add Translated/SpeedToText support
         return getGenericInfo()._getUniqueId();
     }
 

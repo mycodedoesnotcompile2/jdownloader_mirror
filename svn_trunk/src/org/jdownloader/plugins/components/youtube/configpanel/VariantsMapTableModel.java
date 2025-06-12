@@ -8,12 +8,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.JTableHeader;
+
+import jd.gui.swing.jdgui.AlternateHighlighter;
 
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -50,8 +53,6 @@ import org.jdownloader.plugins.components.youtube.variants.VideoVariant;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.gui.swing.jdgui.AlternateHighlighter;
 
 public class VariantsMapTableModel extends ExtTableModel<AbstractVariantWrapper> implements GenericConfigEventListener<Object> {
     protected static int globalCompare(int ret, AbstractVariantWrapper o1, AbstractVariantWrapper o2, boolean b) {
@@ -639,12 +640,17 @@ public class VariantsMapTableModel extends ExtTableModel<AbstractVariantWrapper>
         addColumn(new AutoResizingTextColumn(_GUI.T.YOUTUBE_CONFIG_PANEL_TABLE_LANGUAGE()) {
             @Override
             public String getStringValue(AbstractVariantWrapper value) {
-                final AudioType audioType = value.getAudioType();
-                final String ret = value.getLanguageCode();
-                if (audioType != null) {
-                    return ret + " " + audioType.getLabel();
+                final Locale locale = value.getLanguageLocale();
+                if (locale == null) {
+                    return "";
                 }
-                return ret;
+                final String displayName = locale.getDisplayName();
+                final AudioType audioType = value.getAudioType();
+                if (audioType == null) {
+                    return displayName;
+                } else {
+                    return displayName + " (" + audioType.getLabel() + ")";
+                }
             }
         });
     }
@@ -674,7 +680,12 @@ public class VariantsMapTableModel extends ExtTableModel<AbstractVariantWrapper>
                         return value.variant._getName(null);
                     }
                 default:
-                    return value.variant.getGroup().getLabel();
+                    final AudioType audioType = value.getAudioType();
+                    if (audioType == null) {
+                        return value.variant.getGroup().getLabel();
+                    } else {
+                        return value.variant.getGroup().getLabel() + " (" + audioType.getLabel() + ")";
+                    }
                 }
             }
         });

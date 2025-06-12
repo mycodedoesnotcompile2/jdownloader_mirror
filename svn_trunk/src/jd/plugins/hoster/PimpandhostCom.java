@@ -15,6 +15,14 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -27,15 +35,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "pimpandhost.com" }, urls = { "https?://(?:www\\.)?pimpandhost\\.com/image/(\\d+)" })
+@HostPlugin(revision = "$Revision: 51138 $", interfaceVersion = 3, names = {}, urls = {})
 public class PimpandhostCom extends PluginForHost {
     public PimpandhostCom(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    private static final Pattern PATTERN_NORMAL = Pattern.compile("/image/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_OLD_1  = Pattern.compile("/image/show/id/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_OLD_2  = Pattern.compile("/index\\.php/image/(\\d+)-[a-z]+\\.html", Pattern.CASE_INSENSITIVE);
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -48,14 +56,23 @@ public class PimpandhostCom extends PluginForHost {
     public String getLinkID(final DownloadLink link) {
         final String fid = getFID(link);
         if (fid != null) {
-            return "pimpandhost_com://" + fid;
+            return getHost() + "://" + fid;
         } else {
             return super.getLinkID(link);
         }
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_OLD_1).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_OLD_2).getMatch(0);
+        return fid;
     }
 
     @Override
@@ -63,15 +80,15 @@ public class PimpandhostCom extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST };
     }
 
-    /* Extension which will be used if no correct extension is found */
-    private static final String default_extension = ".jpg";
-    /* Connection stuff */
-    private static final int    free_maxchunks    = 0;
-    private String              dllink            = null;
+    private String dllink = null;
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
         return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
     }
 
     @Override
@@ -79,12 +96,37 @@ public class PimpandhostCom extends PluginForHost {
         return "https://" + getHost() + "/site/tos";
     }
 
-    @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "pimpandhost.com" });
+        return ret;
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_NORMAL.pattern() + "|" + PATTERN_OLD_1.pattern() + "|" + PATTERN_OLD_2.pattern() + ")");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        final String default_extension = ".jpg";
         dllink = null;
         this.setBrowserExclusive();
         if (!link.isNameSet()) {
@@ -93,32 +135,17 @@ public class PimpandhostCom extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("Image not found")) {
+        } else if (br.containsHTML(">\\s*Image not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String titleFromURL = new Regex(link.getPluginPatternMatcher(), "/(.*)$").getMatch(0);
-        final String filesize = this.br.getRegex(">\\s*Size: ([^<>\"]+)<").getMatch(0);
+        String filesize = br.getRegex("&gt;Size:\\s*([^&]+)&").getMatch(0);
         String filename = br.getRegex("data-filename=\"([^\"]+)").getMatch(0);
-        if (filename == null && titleFromURL != null) {
-            /* Fallback */
-            filename = titleFromURL.replace("-", " ").trim();
-        }
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename);
-            filename = filename.trim();
-        }
-        // could be password protected
-        if (br.containsHTML("<h4>\\s*Album\\s*'.*?'\\s*is protected with password\\s*</h4>")) {
-            // don't know password to implement support
-            link.setName(filename);
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Password protected items are not yet supported  | Contact JDownloader support");
-        }
         /* Alternative way to get highest quality: br.getPage("http://pimpandhost.com/image/" + picID + "-original.html"); */
         dllink = br.getRegex("data-src=\"([^\"]+)").getMatch(0);
         if (dllink == null) {
-            dllink = br.getRegex("<img[^>]*?class=\"normal\"[^>]*?src=\"(https?[^<>\"]+)\"").getMatch(0);
+            dllink = br.getRegex("<img[^>]*class=\"normal\"[^>]*src=\"(https?[^<>\"]+)\"").getMatch(0);
             if (dllink == null) {
-                dllink = br.getRegex("<img[^>]*?class=\"normal\"[^>]*?src=\"(//[^<>\"]+)\"").getMatch(0);
+                dllink = br.getRegex("<img[^>]*class=\"normal\"[^>]*src=\"(//[^<>\"]+)\"").getMatch(0);
             }
         }
         final String ext;
@@ -128,16 +155,21 @@ public class PimpandhostCom extends PluginForHost {
             ext = default_extension;
         }
         if (filename != null) {
-            if (!filename.endsWith(ext)) {
-                filename += ext;
-            }
+            filename = Encoding.htmlDecode(filename);
+            filename = filename.trim();
+            filename = this.correctOrApplyFileNameExtension(filename, ext, null);
             link.setFinalFileName(filename);
         }
+        final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
             link.setName(filename);
-        } else if (dllink != null && !isDownload) {
+        } else if (!isDownload && !link.isSizeSet() && !StringUtils.isEmpty(this.dllink)) {
             basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, filename, ext);
+        }
+        // could be password protected
+        if (isDownload && br.containsHTML("<h4>\\s*Album\\s*'.*?'\\s*is protected with password\\s*</h4>")) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Password protected items are not yet supported  | Contact JDownloader support");
         }
         return AvailableStatus.TRUE;
     }
@@ -148,7 +180,7 @@ public class PimpandhostCom extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, null), free_maxchunks);
+        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
