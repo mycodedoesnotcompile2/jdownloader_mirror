@@ -19,8 +19,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -31,10 +34,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49089 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51143 $", interfaceVersion = 2, names = {}, urls = {})
 public class ModDbComDecrypter extends PluginForDecrypt {
     public ModDbComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     private volatile boolean loaded = false;
@@ -79,7 +89,6 @@ public class ModDbComDecrypter extends PluginForDecrypt {
         final String singlefileitemregexStr = "(?i).+/(addons|downloads)/([\\w\\-]+)$";
         final Regex singleitemregex = new Regex(contenturl, singlefileitemregexStr);
         final String titleSlug = urlinforegex.getMatch(1);
-        br.setFollowRedirects(true);
         if (singleitemregex.patternFind()) {
             /* Single file */
             final String singlefileitemSlug = singleitemregex.getMatch(1);
@@ -107,22 +116,25 @@ public class ModDbComDecrypter extends PluginForDecrypt {
             return ret;
         } else {
             /* Multiple items */
-            if (!contenturl.contains("/addons") && !contenturl.contains("/downloads")) {
+            if (!StringUtils.containsIgnoreCase(contenturl, "/addons") && !StringUtils.containsIgnoreCase(contenturl, "/downloads")) {
                 /* Correct URL added by user */
                 contenturl += "/downloads";
             }
             br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML(">\\s*No files were found matching the criteria specified")) {
+                /* e.g. /games/nom-nom-apocalypse/downloads */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final String[] downloadlinks = br.getRegex("(/[\\w\\-]+/" + titleSlug + "/(addons|downloads)/(?!feed|page)[\\w\\-]+)").getColumn(0);
-            if (downloadlinks == null || downloadlinks.length == 0) {
+            final String[] urls = br.getRegex("(/[\\w\\-]+/" + titleSlug + "/(addons|downloads)/(?!feed|page)[\\w\\-]+)").getColumn(0);
+            if (urls == null || urls.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(titleSlug.replace("-", " ").trim());
             fp.setPackageKey("moddb://slug/" + titleSlug);
-            for (final String downloadlink : downloadlinks) {
+            for (final String downloadlink : urls) {
                 final Regex thisSingleitemregex = new Regex(downloadlink, singlefileitemregexStr);
                 final String thisTitleSlug = thisSingleitemregex.getMatch(1);
                 /* Skip invalid results here already in order to prevent getting ugly offline-items later on. */

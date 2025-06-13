@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51142 $", interfaceVersion = 2, names = {}, urls = {})
 public class LoadedfilesOrg extends YetiShareCore {
     public LoadedfilesOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,23 +78,23 @@ public class LoadedfilesOrg extends YetiShareCore {
     public int getMaxChunks(final Account account) {
         if (account != null && account.getType() == AccountType.FREE) {
             /* Free Account */
-            return 0;
+            return 1;
         } else if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
             return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 0;
+            return 1;
         }
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return 5;
     }
 
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return -1;
+        return 5;
     }
 
     @Override

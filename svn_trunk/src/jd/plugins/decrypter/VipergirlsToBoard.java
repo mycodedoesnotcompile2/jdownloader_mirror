@@ -20,7 +20,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50783 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51142 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipergirlsToBoard extends PluginForDecrypt {
     public VipergirlsToBoard(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,6 +67,9 @@ public class VipergirlsToBoard extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("class=\"standard_error\"")) {
+            /* 2025-06-12 e.g. /threads/15022025-2025-06-11-Amelia-Riven-Amelia-s-Gambit-1-x114 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String threadID = new Regex(contenturl, "(?i)threads/(\\d+)").getMatch(0);

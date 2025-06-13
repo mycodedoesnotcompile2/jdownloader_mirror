@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 51096 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51142 $", interfaceVersion = 3, names = {}, urls = {})
 public class HideCx extends PluginForDecrypt {
     public HideCx(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,24 +76,21 @@ public class HideCx extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/container/([a-f0-9-]{32,36})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(container|state)/([a-f0-9-]{32,36})");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1);
         if (!contentID.replace("-", "").matches("[a-f0-9]{32}")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid format");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid container_id format");
         }
         final HideCxConfig cfg = PluginJsonConfig.get(HideCxConfig.class);
         final String apikey = cfg.getAPIKey();
         if (apikey != null) {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + apikey);
         }
-        // br.getHeaders().put("Content-Type", "application/json");
-        // br.getHeaders().put("Origin", "https://hide.cx");
-        // br.getHeaders().put("Referer", "https://hide.cx/");
         /* Important, else we will get http response 404 */
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         final String api_base = "https://api.hide.cx";
@@ -104,6 +101,7 @@ public class HideCx extends PluginForDecrypt {
         passwordLoop: for (int i = 0; i <= 3; i++) {
             if (i > 0 || passCode != null) {
                 if (i > 0) {
+                    /* Password required and none given or given password was wrong */
                     passCode = getUserInput("Password?", param);
                 }
                 br.postPageRaw(api_base + "/containers/" + contentID + "/unlock", "{\"password\":\"" + PluginJSonUtils.escape(passCode) + "\"}");
@@ -111,23 +109,27 @@ public class HideCx extends PluginForDecrypt {
                     /* {"error":"no permission password is required"} */
                     logger.info("Wrong password or password required");
                     continue;
+                } else if (br.getHttpConnection().getResponseCode() == 404) {
+                    /* e.g. {"error":"container not found or invalid"} */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                passwordSuccess = true;
+                break passwordLoop;
+            } else {
+                br.getPage(api_base + "/containers/" + contentID);
+                if (br.getHttpConnection().getResponseCode() == 403) {
+                    /* {"error":"no permission password is required"} */
+                    logger.info("Wrong password or password required");
+                    continue;
+                } else if (br.getHttpConnection().getResponseCode() == 404) {
+                    /* e.g. {"error":"container not found or invalid"} */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 passwordSuccess = true;
                 break passwordLoop;
             }
-            br.getPage(api_base + "/containers/" + contentID);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (br.getHttpConnection().getResponseCode() == 403) {
-                /* {"error":"no permission password is required"} */
-                logger.info("Wrong password or password required");
-                continue;
-            }
-            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            passwordSuccess = true;
-            break passwordLoop;
         }
         if (!passwordSuccess) {
             throw new DecrypterException(DecrypterException.PASSWORD);
@@ -135,6 +137,11 @@ public class HideCx extends PluginForDecrypt {
         if (passCode != null) {
             logger.info("User entered correct password: " + passCode);
         }
+        /*
+         * Possible status values: online, offline, deleted, partial -> Partial means, this container contains links with mixed individual
+         * status values
+         */
+        // final String container_status = entries.get("access_status").toString();
         final String title = (String) entries.get("name");
         final FilePackage fp = FilePackage.getInstance();
         if (!StringUtils.isEmpty(title)) {
@@ -144,12 +151,13 @@ public class HideCx extends PluginForDecrypt {
             fp.setName(contentID);
         }
         fp.setPackageKey("hide.cx//container/" + contentID);
+        /* A container can never be empty so "links" will always contain at least one item. */
         final List<Map<String, Object>> downloads = (List<Map<String, Object>>) entries.get("links");
-        int progr = 1;
+        int position = 1;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (final Map<String, Object> download : downloads) {
             final String download_id = download.get("id").toString();
-            logger.info("Crawling item " + progr + "/" + downloads.size() + " | ID: " + download_id);
+            logger.info("Crawling item " + position + "/" + downloads.size() + " | ID: " + download_id);
             /* "Real" filename (not always provided) */
             final String filename = (String) download.get("name");
             /* "Weak" filename (sometimes this can be the URLs' content_id and not a filename at all) */
@@ -157,7 +165,7 @@ public class HideCx extends PluginForDecrypt {
             final Number link_size = (Number) download.get("link_size");
             String url = (String) download.get("hoster_url");
             if (url == null) {
-                /* Separate http request needed to fetch url */
+                /* Separate http request needed to fetch url for each item */
                 br.getPage("/containers/" + contentID + "/links/" + download_id);
                 final Map<String, Object> linkresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 url = linkresponse.get("url").toString();
@@ -171,16 +179,22 @@ public class HideCx extends PluginForDecrypt {
             if (link_size != null) {
                 link.setDownloadSize(link_size.longValue());
             }
-            if (download.get("link_status").toString().equalsIgnoreCase("online")) {
+            /* Possible link_status values: online, offline, deleted */
+            final String link_status = download.get("link_status").toString();
+            if (link_status.equalsIgnoreCase("online")) {
                 link.setAvailable(true);
+            } else if (link_status.equalsIgnoreCase("offline") || link_status.equalsIgnoreCase("deleted")) {
+                link.setAvailable(false);
+            } else {
+                /* Do not set any status, let hoster plugin check such links. */
             }
             link._setFilePackage(fp);
             ret.add(link);
             distribute(link);
-            progr++;
+            position++;
         }
         if (ret.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
     }
