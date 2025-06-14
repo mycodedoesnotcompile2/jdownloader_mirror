@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -32,9 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
-@HostPlugin(revision = "$Revision: 51088 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51145 $", interfaceVersion = 3, names = {}, urls = {})
 public class MuchohentaiCom extends PluginForHost {
     public MuchohentaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,9 +115,6 @@ public class MuchohentaiCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*The file you are looking for was not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (true) {
-            // site doesn't work with http1.1, 20.05.2025
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return AvailableStatus.TRUE;
     }
@@ -136,6 +133,11 @@ public class MuchohentaiCom extends PluginForHost {
         final Form dlform = br.getForm(0);
         if (dlform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (true) {
+            // site doesn't work with http1.1, 20.05.2025, see https://board.jdownloader.org/showthread.php?p=547314#post547314
+            // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Broken due to missing http2/http3 support see: https://board.jdownloader.org/showthread.php?p=547314#post547314");
         }
         final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
         dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));

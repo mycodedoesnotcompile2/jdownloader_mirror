@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51137 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51145 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -229,6 +229,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "megafiles.io", "megafile.cc" });
         ret.add(new String[] { "istream.lol" });
         ret.add(new String[] { "micloudfiles.com" });
+        ret.add(new String[] { "mrdeepfakes.com" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

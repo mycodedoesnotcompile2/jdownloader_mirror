@@ -7,4 +7,4 @@ LogModel_initColumns_x_=Check
 LogTable_onContextMenu_disable_=Unselect
 LogTable_onContextMenu_enable_=Select
 SendLogDialog_SendLogDialog_title_=Send a Bugreport
-SendLogDialog_layoutDialogContent_desc_=When did the Problem occure? Please check all entries that may be worth considering!
+SendLogDialog_layoutDialogContent_desc_=When did the problem occur? Please check all relevant entries.

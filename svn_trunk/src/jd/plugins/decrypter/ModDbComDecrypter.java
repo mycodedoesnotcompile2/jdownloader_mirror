@@ -32,9 +32,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.utils.JDUtilities;
+import jd.plugins.hoster.ModDbCom;
 
-@DecrypterPlugin(revision = "$Revision: 51143 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51145 $", interfaceVersion = 2, names = {}, urls = {})
 public class ModDbComDecrypter extends PluginForDecrypt {
     public ModDbComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,9 +46,6 @@ public class ModDbComDecrypter extends PluginForDecrypt {
         br.setFollowRedirects(true);
         return br;
     }
-
-    private volatile boolean loaded = false;
-    private static Object    LOCK   = new Object();
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -79,7 +76,7 @@ public class ModDbComDecrypter extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String contenturl = param.getCryptedUrl();
         final Regex urlinforegex = new Regex(contenturl, this.getSupportedLinks());
         final HashSet<String> invalidfileitems = new HashSet<String>();
@@ -89,6 +86,7 @@ public class ModDbComDecrypter extends PluginForDecrypt {
         final String singlefileitemregexStr = "(?i).+/(addons|downloads)/([\\w\\-]+)$";
         final Regex singleitemregex = new Regex(contenturl, singlefileitemregexStr);
         final String titleSlug = urlinforegex.getMatch(1);
+        final ModDbCom hosterplugin = (ModDbCom) this.getNewPluginForHostInstance(this.getHost());
         if (singleitemregex.patternFind()) {
             /* Single file */
             final String singlefileitemSlug = singleitemregex.getMatch(1);
@@ -96,22 +94,9 @@ public class ModDbComDecrypter extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             br.getPage(contenturl);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (loaded == false) {
-                synchronized (LOCK) {
-                    if (loaded == false) {
-                        /*
-                         * we only have to load this once, to make sure its loaded
-                         */
-                        JDUtilities.getPluginForHost(this.getHost());
-                    }
-                    loaded = true;
-                }
-            }
+            hosterplugin.checkErrors(br);
             // Get pages with the mirrors
-            jd.plugins.hoster.ModDbCom.getSinglemirrorpage(br);
+            hosterplugin.getSinglemirrorpage(br);
             ret.add(createDownloadlink(contenturl.replace("moddb.com/", "moddbdecrypted.com/")));
             return ret;
         } else {
@@ -121,10 +106,9 @@ public class ModDbComDecrypter extends PluginForDecrypt {
                 contenturl += "/downloads";
             }
             br.getPage(contenturl);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML(">\\s*No files were found matching the criteria specified")) {
-                /* e.g. /games/nom-nom-apocalypse/downloads */
+            hosterplugin.checkErrors(br);
+            if (br.containsHTML(">\\s*No files were found matching the criteria specified")) {
+                /* e.g. /games/nom-nom-apocalypse/downloads and /games/monday-meltdown */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final String[] urls = br.getRegex("(/[\\w\\-]+/" + titleSlug + "/(addons|downloads)/(?!feed|page)[\\w\\-]+)").getColumn(0);

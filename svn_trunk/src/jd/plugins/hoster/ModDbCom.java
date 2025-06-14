@@ -33,7 +33,7 @@ import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
 //Links come from a decrypter plugin
-@HostPlugin(revision = "$Revision: 49089 $", interfaceVersion = 2, names = { "moddb.com" }, urls = { "https?://(www\\.)?moddbdecrypted\\.com/(games|mods|engines|groups)/.*?/(addons|downloads)/[0-9a-z-]+" })
+@HostPlugin(revision = "$Revision: 51145 $", interfaceVersion = 2, names = { "moddb.com" }, urls = { "https?://(www\\.)?moddbdecrypted\\.com/(games|mods|engines|groups)/.*?/(addons|downloads)/[0-9a-z-]+" })
 public class ModDbCom extends PluginForHost {
     public void correctDownloadLink(DownloadLink link) {
         link.setUrlDownload(link.getDownloadURL().replace("moddbdecrypted.com/", "moddb.com/"));
@@ -62,9 +62,8 @@ public class ModDbCom extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("An error has occured") || br.containsHTML("The download requested could not be found")) {
+        checkErrors(br);
+        if (br.containsHTML("An error has occured") || br.containsHTML("The download requested could not be found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("<h5>Filename</h5>.*?<span class=\"summary\">(.*?)</span>").getMatch(0);
@@ -253,13 +252,14 @@ public class ModDbCom extends PluginForHost {
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             logger.info("invalid final downloadlink (dllink) ?!");
             br.followConnection(true);
+            checkErrors(br);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
     }
 
     // Also used by the decrypter
-    public static String getSinglemirrorpage(final Browser br) throws IOException {
+    public String getSinglemirrorpage(final Browser br) throws IOException {
         // Get pages with the mirror
         String singlemirrorpage = br.getRegex("window\\.open\\(\\'(.*?)\\'").getMatch(0);
         String mirrorid = br.getRegex("id=\"downloads(\\d+)report\"").getMatch(0);
@@ -278,6 +278,15 @@ public class ModDbCom extends PluginForHost {
             }
         }
         return singlemirrorpage;
+    }
+
+    /** Checks for generic errors that can happen on any moddb.com subpage. */
+    public void checkErrors(final Browser br) throws PluginException {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 503) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 503 rate limit reached");
+        }
     }
 
     @Override

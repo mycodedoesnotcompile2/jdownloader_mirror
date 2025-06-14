@@ -66,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 50944 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51145 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -175,25 +175,31 @@ public class XHamsterCom extends PluginForHost {
     }
 
     /* Porn_plugin */
-    private final String          SETTING_SELECTED_VIDEO_FORMAT          = "SELECTED_VIDEO_FORMAT";
-    private final int             default_SETTING_SELECTED_VIDEO_FORMAT  = 0;
-    private final String          SETTING_FILENAME_ID                    = "Filename_id";
-    private final boolean         default_SETTING_FILENAME_ID            = true;
+    private final String          SETTING_SELECTED_VIDEO_FORMAT                             = "SELECTED_VIDEO_FORMAT";
+    private final int             default_SETTING_SELECTED_VIDEO_FORMAT                     = 0;
+    private final String          SETTING_FILENAME_ID                                       = "Filename_id";
+    private final boolean         default_SETTING_FILENAME_ID                               = true;
     /* The list of qualities/formats displayed to the user */
-    private static final String[] FORMATS                                = new String[] { "Best available", "240p", "360p", "480p", "720p", "960p", "1080p", "1440p", "2160p" };
-    public static final String    domain_premium                         = "faphouse.com";
-    public static final String    api_base_premium                       = "https://faphouse.com/api";
-    private static final String   TYPE_MOVIES                            = "(?i)^https?://[^/]+/movies/(\\d+)/([^/]+)\\.html$";
-    private static final String   TYPE_VIDEOS                            = "(?i)^https?://[^/]+/(?:[a-z]{2}/)?videos?/([A-Za-z0-9\\-]+)$";
-    private static final String   TYPE_VIDEOS_2                          = "(?i)^https?://[^/]+/videos/([a-z0-9\\-_]+)-(\\d+)$";
-    private static final String   TYPE_VIDEOS_3                          = "(?i)^https?://[^/]+/videos/([a-z0-9\\-_]+)-([A-Za-z0-9]+)$";
-    private static final String   TYPE_MOMENTS                           = "(?i)^https?://[^/]+/moments/([a-z0-9\\-_]+)-([A-Za-z0-9]+)$";
-    private final String          PROPERTY_USERNAME                      = "username";
-    private final String          PROPERTY_DATE                          = "date";
-    private final String          PROPERTY_TAGS                          = "tags";
-    private final static String   PROPERTY_VIDEOID                       = "videoid";
-    private final String          PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN = "last_used_free_domain";
-    private final String          PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL     = "premium_login_url";
+    private static final String[] FORMATS                                                   = new String[] { "Best available", "240p", "360p", "480p", "720p", "960p", "1080p", "1440p", "2160p" };
+    public static final String    domain_premium                                            = "faphouse.com";
+    public static final String    api_base_premium                                          = "https://faphouse.com/api";
+    private static final String   TYPE_MOVIES                                               = "(?i)^https?://[^/]+/movies/(\\d+)/([^/]+)\\.html$";
+    private static final String   TYPE_VIDEOS                                               = "(?i)^https?://[^/]+/(?:[a-z]{2}/)?videos?/([A-Za-z0-9\\-]+)$";
+    private static final String   TYPE_VIDEOS_2                                             = "(?i)^https?://[^/]+/videos/([a-z0-9\\-_]+)-(\\d+)$";
+    private static final String   TYPE_VIDEOS_3                                             = "(?i)^https?://[^/]+/videos/([a-z0-9\\-_]+)-([A-Za-z0-9]+)$";
+    private static final String   TYPE_MOMENTS                                              = "(?i)^https?://[^/]+/moments/([a-z0-9\\-_]+)-([A-Za-z0-9]+)$";
+    private final String          PROPERTY_USERNAME                                         = "username";
+    private final String          PROPERTY_DATE                                             = "date";
+    private final String          PROPERTY_TAGS                                             = "tags";
+    private final static String   PROPERTY_VIDEOID                                          = "videoid";
+    private final String          PROPERTY_ACCOUNT_LAST_USED_FREE_DOMAIN                    = "last_used_free_domain";
+    private final String          PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL                        = "premium_login_url";
+    /*
+     * Timestamp of when this account was a premium only account last time which means login via xhamster.com was not possible while login
+     * via faphouse.com revealed that this account was a valid premium account.
+     */
+    private final String          PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT = "timestamp_last_time_premium_only_account";
+    private static final String   COOKIE_KEY_PREMIUM                                        = "premium";
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_VIDEO_FORMAT, FORMATS, "Preferred format").setDefaultValue(default_SETTING_SELECTED_VIDEO_FORMAT));
@@ -569,6 +575,11 @@ public class XHamsterCom extends PluginForHost {
         } else {
             return false;
         }
+    }
+
+    /** Returns true if this account can only be used to login in faphouse.com and not for xhamster.com. */
+    private boolean isPremiumOnlyAccount(final Account account) {
+        return account.hasProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT);
     }
 
     @Override
@@ -1184,8 +1195,11 @@ public class XHamsterCom extends PluginForHost {
             // used in finally to restore browser redirect status.
             br.setCookiesExclusive(true);
             /**
-             * 2020-01-31: They got their free page xhamster.com and paid faphouse.com. This plugin will always try *to login into both.
-             * Free users can also login via their premium page but they just cannot watch anything or only trailers. </br>
+             * 2020-01-31: They got their free page xhamster.com and paid faphouse.com. <br>
+             * This plugin will always try to login into both. <br>
+             * Free users can also login via their premium page but they just cannot watch anything or only trailers. <br>
+             * 2025-06-13: Users can now also create sole faphouse.com accounts whose login credentials will not work for xhamster.com! A
+             * user can also have a sole faphouse.com account with working login credentials but no premium subscription.
              */
             boolean forceLogincheckFree = force;
             boolean forceLogincheckPremium = force;
@@ -1199,8 +1213,23 @@ public class XHamsterCom extends PluginForHost {
                     forceLogincheckPremium = false;
                 }
             }
-            this.loginFree(br, account, checkURL, forceLogincheckFree);
-            this.loginPremium(br, account, checkURL, forceLogincheckPremium);
+            boolean freeLoginSuccess = false;
+            if (this.isPremiumOnlyAccount(account)) {
+                logger.info("Skipping free login because this account is known to be premium only (= " + domain_premium + " only)");
+                freeLoginSuccess = false;
+            } else {
+                try {
+                    this.loginFree(br, account, checkURL, forceLogincheckFree);
+                    freeLoginSuccess = true;
+                } catch (final AccountInvalidException aie) {
+                }
+            }
+            this.loginPremium(br, account, checkURL, forceLogincheckPremium, freeLoginSuccess);
+            if (!freeLoginSuccess) {
+                account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT, System.currentTimeMillis());
+            } else {
+                account.removeProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_PREMIUM_ONLY_ACCOUNT);
+            }
             /* Fallback: Double-check to make sure that our target-URL has been accessed. */
             if (checkURL != null) {
                 final URL customCheckURL = new URL(checkURL);
@@ -1277,7 +1306,7 @@ public class XHamsterCom extends PluginForHost {
             brc.postPageRaw("/x-api", requestData);
         }
         /* First login or not a premium account? One more step required! */
-        if (!account.hasProperty(PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL)) {
+        if (this.getMagicPremiumLoginURL(account) == null) {
             if (!this.checkLoginFree(br, account, urlBeforeLogin)) {
                 /* This should never happen! */
                 throw new AccountInvalidException();
@@ -1315,7 +1344,7 @@ public class XHamsterCom extends PluginForHost {
             account.setProperty(PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL, premiumLoginLink);
         } else {
             account.removeProperty(PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL);
-            account.clearCookies("premium");
+            account.clearCookies(COOKIE_KEY_PREMIUM);
         }
         return true;
     }
@@ -1345,8 +1374,8 @@ public class XHamsterCom extends PluginForHost {
         return true;
     }
 
-    private void loginPremium(final Browser br, final Account account, final String customCheckURL, final boolean validateCookies) throws IOException, PluginException, InterruptedException {
-        final Cookies premiumCookies = account.loadCookies("premium");
+    private void loginPremium(final Browser br, final Account account, final String customCheckURL, final boolean validateCookies, final boolean xhamsterFreeLoginSuccess) throws IOException, PluginException, InterruptedException {
+        final Cookies premiumCookies = account.loadCookies(COOKIE_KEY_PREMIUM);
         if (premiumCookies != null) {
             br.setCookies(domain_premium, premiumCookies);
             if (!validateCookies) {
@@ -1354,7 +1383,7 @@ public class XHamsterCom extends PluginForHost {
             }
             if (this.checkLoginPremium(br, account, customCheckURL)) {
                 logger.info("Premium cookie login successful");
-                account.saveCookies(br.getCookies(domain_premium), "premium");
+                account.saveCookies(br.getCookies(domain_premium), COOKIE_KEY_PREMIUM);
                 return;
             } else {
                 logger.info("Premium cookie login failed");
@@ -1363,88 +1392,105 @@ public class XHamsterCom extends PluginForHost {
             }
         }
         final String magicPremiumLoginURL = getMagicPremiumLoginURL(account);
-        if (magicPremiumLoginURL == null) {
-            logger.info("Looks like this is not a premium account -> Do not attempt premium login (full login would require captcha)");
-            return;
-        }
-        /* Magic link from xhamster.com which will redirect to faphouse.com and should grant us premium login cookies. */
-        logger.info("Attempting premium login via magic link");
-        br.getPage(magicPremiumLoginURL);
-        final String redirecturl = br.getRegex("http-equiv=\"refresh\" content=\"\\d+; url=(https?://[^\"]+)").getMatch(0);
-        if (redirecturl != null) {
-            br.getPage(redirecturl);
-        } else {
-            logger.warning("Failed to find redirect to premium domain -> Possible login failure");
-        }
-        if (isLoggedinHTMLPremium(br, account)) {
-            logger.info("Premium login via magic link was successful");
-            account.saveCookies(br.getCookies(domain_premium), "premium");
-            return;
-        }
-        logger.info("Simple login via magic link failed --> Attempting advanced magic link login");
-        extendedMagicLinkLogin: if (true) {
-            final String callback_url_urlencoded = br.getRegex("callback_url=(http[^\"]+)").getMatch(0);
-            if (callback_url_urlencoded == null) {
-                logger.warning("Failed to find callback_url");
-                break extendedMagicLinkLogin;
+        if (magicPremiumLoginURL != null) {
+            /* Magic link from xhamster.com which will redirect to faphouse.com and should grant us premium login cookies. */
+            logger.info("Attempting premium login via magic link");
+            br.getPage(magicPremiumLoginURL);
+            final String redirecturl = br.getRegex("http-equiv=\"refresh\" content=\"\\d+; url=(https?://[^\"]+)").getMatch(0);
+            if (redirecturl != null) {
+                br.getPage(redirecturl);
+            } else {
+                logger.warning("Failed to find redirect to premium domain -> Possible login failure");
             }
-            final String callback_url_urldecoded = Encoding.htmlDecode(callback_url_urlencoded);
-            final String callback_url_raw = UrlQuery.parse(callback_url_urldecoded).get("url");
-            if (callback_url_raw == null) {
-                logger.warning("Failed to find callback_url_raw");
-                break extendedMagicLinkLogin;
-            }
-            final String callback_url = callback_url_raw + "&authType=2";
-            br.postPageRaw("/api/auth/xh-one-tap-frame", "{\"isSubscribedToUpdates\":0,\"callbackUrl\":\"https://faphouse.com/auth/one-tap?url=" + callback_url + "\"}");
-            final Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String status = (String) entries.get("status");
-            if (!StringUtils.equalsIgnoreCase(status, "success")) {
-                logger.warning("Failed to login");
-                break extendedMagicLinkLogin;
-            }
-            final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-            final String redirectUrl = data.get("redirectUrl").toString();
-            br.getPage(redirectUrl);
             if (isLoggedinHTMLPremium(br, account)) {
-                logger.info("Extended premium login via magic link was successful");
-                account.saveCookies(br.getCookies(domain_premium), "premium");
+                logger.info("Premium login via magic link was successful");
+                account.saveCookies(br.getCookies(domain_premium), COOKIE_KEY_PREMIUM);
                 return;
             }
+            logger.info("Simple login via magic link failed --> Attempting advanced magic link login");
+            extendedMagicLinkLogin: if (true) {
+                final String callback_url_urlencoded = br.getRegex("callback_url=(http[^\"]+)").getMatch(0);
+                if (callback_url_urlencoded == null) {
+                    logger.warning("Magic link login: Failed to find callback_url");
+                    break extendedMagicLinkLogin;
+                }
+                final String callback_url_urldecoded = Encoding.htmlDecode(callback_url_urlencoded);
+                final String callback_url_raw = UrlQuery.parse(callback_url_urldecoded).get("url");
+                if (callback_url_raw == null) {
+                    logger.warning("Magic link login: Failed to find callback_url_raw");
+                    break extendedMagicLinkLogin;
+                }
+                final String callback_url = callback_url_raw + "&authType=2";
+                br.postPageRaw("/api/auth/xh-one-tap-frame", "{\"isSubscribedToUpdates\":0,\"callbackUrl\":\"https://" + domain_premium + "/auth/one-tap?url=" + callback_url + "\"}");
+                final Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String status = (String) entries.get("status");
+                if (!StringUtils.equalsIgnoreCase(status, "success")) {
+                    logger.warning("Magic link login: Failed to login");
+                    break extendedMagicLinkLogin;
+                }
+                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+                final String redirectUrl = data.get("redirectUrl").toString();
+                br.getPage(redirectUrl);
+                if (isLoggedinHTMLPremium(br, account)) {
+                    logger.info("Extended premium login via magic link was successful");
+                    account.saveCookies(br.getCookies(domain_premium), COOKIE_KEY_PREMIUM);
+                    return;
+                }
+            }
         }
-        logger.info("Extended premium login via magic link failed --> Attempting full login");
+        logger.info("Performing full login");
         br.clearCookies(br.getHost());
         prepBr(this, br);
-        final boolean allowFullPremiumLogin = false;
+        final boolean allowFullPremiumLogin = true;
         if (!allowFullPremiumLogin) {
             logger.warning("!!DEV!! 2023-03-31: Disabled full premium login because login via magic link should work fine and full login may require captcha.");
             throw new AccountInvalidException("Account is premium but premium login failed");
         }
         logger.info("Performing full premium login");
-        /* Login premium --> Same logindata */
+        String recaptchaV2Response = "";
         br.getPage("https://" + domain_premium + "/");
-        String rcKey = br.getRegex("data-site-key=\"([^\"]+)\"").getMatch(0);
-        if (rcKey == null) {
-            /* Fallback: reCaptchaKey timestamp: 2020-08-04 */
-            rcKey = "6LfoawAVAAAAADDXDc7xDBOkr1FQqdfUrEH5Z7up";
-        }
         final Browser brc = br.cloneBrowser();
-        final String recaptchaV2Response = getCaptchaHelperHostPluginRecaptchaV2Invisible(this, brc, rcKey).getToken();
+        /* 2025-06-13: No login captcha required */
+        final boolean askForCaptcha = false;
+        if (askForCaptcha) {
+            String rcKey = br.getRegex("data-site-key=\"([^\"]+)\"").getMatch(0);
+            if (rcKey == null) {
+                /* Fallback: reCaptchaKey timestamp: 2020-08-04 */
+                rcKey = "6LfoawAVAAAAADDXDc7xDBOkr1FQqdfUrEH5Z7up";
+                logger.info("Using fallback value for reCaptchaKey: " + rcKey);
+            }
+            recaptchaV2Response = getCaptchaHelperHostPluginRecaptchaV2Invisible(this, brc, rcKey).getToken();
+        }
         final String csrftoken = br.getRegex("data-name=\"csrf-token\" content=\"([^<>\"]+)\"").getMatch(0);
         if (csrftoken != null) {
             brc.getHeaders().put("x-csrf-token", csrftoken);
         } else {
             logger.warning("Failed to find csrftoken --> Premium login might fail because of this");
         }
-        brc.postPageRaw("/api/auth/signin", String.format("{\"login\":\"%s\",\"password\":\"%s\",\"rememberMe\":\"1\",\"trackingParamsBag\":\"W10=\",\"g-recaptcha-response\":\"%s\",\"recaptcha\":\"%s\"}", account.getUser(), PluginJSonUtils.escape(account.getPass()), recaptchaV2Response, recaptchaV2Response));
-        final String userId = PluginJSonUtils.getJson(brc, "userId");
-        final String success = PluginJSonUtils.getJson(brc, "success");
-        if ("true".equalsIgnoreCase(success) && !StringUtils.isEmpty(userId)) {
-            /* Success! */
-            logger.info("Premium login successful");
-            account.saveCookies(brc.getCookies(domain_premium), "premium");
-        } else {
-            logger.info("Premium login failed");
+        /*
+         * trackingParamsBag: Use default value which when base64Decoded resolves to:
+         * {"promo_id":"","video_id":null,"studio_id":null,"producer_id":null,"orientation":"straight","ml_page":"main_page",
+         * "ml_page_value_id":null,"ml_page_value":null,"ml_page_number":null}
+         */
+        brc.postPageRaw("/api/auth/signin", String.format("{\"login\":\"%s\",\"password\":\"%s\",\"rememberMe\":\"1\",\"recaptcha\":\"%s\",\"trackingParamsBag\":\"eyJwcm9tb19pZCI6IiIsInZpZGVvX2lkIjpudWxsLCJzdHVkaW9faWQiOm51bGwsInByb2R1Y2VyX2lkIjpudWxsLCJvcmllbnRhdGlvbiI6InN0cmFpZ2h0IiwibWxfcGFnZSI6Im1haW5fcGFnZSIsIm1sX3BhZ2VfdmFsdWVfaWQiOm51bGwsIm1sX3BhZ2VfdmFsdWUiOm51bGwsIm1sX3BhZ2VfbnVtYmVyIjpudWxsfQ==\"}", PluginJSonUtils.escape(account.getUser()), PluginJSonUtils.escape(account.getPass()), recaptchaV2Response));
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        /* e.g. error response: { "errors": { "_global": [ "Invalid credentials" ] }, "userId": null, "hasGoldSubscription": false} */
+        final Object errorsO = entries.get("errors");
+        if (errorsO != null) {
             throw new AccountInvalidException();
+        }
+        if (!Boolean.TRUE.equals(entries.get("success"))) {
+            throw new AccountInvalidException();
+        }
+        logger.info("Login successful");
+        account.saveCookies(brc.getCookies(domain_premium), COOKIE_KEY_PREMIUM);
+        if (Boolean.TRUE.equals(entries.get("hasGoldSubscription"))) {
+            account.setType(AccountType.PREMIUM);
+        } else {
+            account.setType(AccountType.FREE);
+            if (!xhamsterFreeLoginSuccess) {
+                throw new AccountInvalidException("Account cannot be used for xhamster.com login and at the same time is not a " + domain_premium + " premium account which means there is no point in using it with JDownloader.");
+            }
         }
     }
 
@@ -1456,7 +1502,7 @@ public class XHamsterCom extends PluginForHost {
     /** Checks premium login status and sets AccountInfo */
     private boolean checkLoginPremium(final Browser br, final Account account, String checkURL) throws IOException {
         if (checkURL == null || !this.isPremiumURL(checkURL)) {
-            checkURL = "https://faphouse.com/en";
+            checkURL = "https://" + domain_premium + "/en";
         }
         /* Check via html */
         br.getPage(checkURL);
@@ -1496,9 +1542,9 @@ public class XHamsterCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, null, true);
         final AccountInfo ai = new AccountInfo();
-        final String magicPremiumLoginURL = getMagicPremiumLoginURL(account);
-        if (magicPremiumLoginURL != null && (AccountType.PREMIUM.equals(account.getType()) || AccountType.LIFETIME.equals(account.getType()))) {
+        if (AccountType.PREMIUM.equals(account.getType()) || AccountType.LIFETIME.equals(account.getType())) {
             /* Check vja ajax request -> json */
+            logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
              * Returns "null" if cookies are valid but this is not a premium account. </br>
