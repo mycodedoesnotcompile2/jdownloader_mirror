@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51143 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51146 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModsTo extends PluginForHost {
     public ModsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -143,7 +143,10 @@ public class ModsTo extends PluginForHost {
             if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 /**
                  * Throw exception in stable since captcha step is broken -> Redirects to main link after captcha for unknown reasons <br>
-                 * See: https://svn.jdownloader.org/issues/90590
+                 * See: https://svn.jdownloader.org/issues/90590 <br>
+                 * In browser, if you just click on the blue "Start now" button without confirming the captcha, error "Captcha thinks you
+                 * are a robot!" happens. Here we juist get redirected to the previous page so I guess something simple with the request
+                 * must be wrong.
                  */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

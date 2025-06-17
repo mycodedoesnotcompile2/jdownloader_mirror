@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 51130 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51146 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -306,17 +306,20 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
                     ret.addAll(crawlAllVideosOf(brc.cloneBrowser(), account, dupes));
                 }
             }
+            final String vkeyregex = "(?:_|-)vkey\\s*=\\s*\"(.+?)\"";
             for (final String section : new String[] { "moreData", "mostRecentVideosSection", "pornstarsVideoSection" }) {
                 final String sectionContent = findVideoSection(br, section);
-                if (sectionContent != null) {
-                    final String[] vKeys = new Regex(sectionContent, "(?:_|-)vkey\\s*=\\s*\"(.+?)\"").getColumn(0);
-                    if (vKeys != null) {
-                        viewKeys.addAll(Arrays.asList(vKeys));
-                    }
+                if (sectionContent == null) {
+                    continue;
+                }
+                final String[] vKeys = new Regex(sectionContent, vkeyregex).getColumn(0);
+                if (vKeys != null) {
+                    viewKeys.addAll(Arrays.asList(vKeys));
                 }
             }
             if (viewKeys.size() == 0) {
-                final String[] vKeysAll = br.getRegex("(?:_|-)vkey\\s*=\\s*\"(.+?)\"").getColumn(0);
+                logger.info("Failed to find section specific videos -> Crawling all videoIDs from html which in some cases may include unwanted content");
+                final String[] vKeysAll = br.getRegex(vkeyregex).getColumn(0);
                 if (vKeysAll != null) {
                     viewKeys.addAll(Arrays.asList(vKeysAll));
                 }
@@ -385,8 +388,14 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private String findVideoSection(Browser br, String section) {
-        return br.getRegex("(<ul[^>]*(?:class\\s*=\\s*\"videos[^>]*id\\s*=\\s*\"" + section + "\"|[^>]*id\\s*=\\s*\"" + section + "\"[^>]*class\\s*=\\s*\"videos[^>]).*?)(<ul\\s*class\\s*=\\s*\"videos|</ul>)").getMatch(0);
+    private String findVideoSection(final Browser br, final String section) {
+        String html = br.getRegex("(<ul[^>]*(?:class\\s*=\\s*\"videos[^>]*id\\s*=\\s*\"" + section + "\"|[^>]*id\\s*=\\s*\"" + section + "\"[^>]*class\\s*=\\s*\"videos[^>]).*?)(<ul\\s*class\\s*=\\s*\"videos|</ul>)").getMatch(0);
+        if (html != null) {
+            return html;
+        }
+        /* 2025-06-16 */
+        html = br.getRegex("<ul[^>]*>*id=\"" + Pattern.quote(section) + "\"[^>]*>(.*?)</ul>\\s*</div>\\s*</div>").getMatch(0);
+        return html;
     }
 
     private ArrayList<DownloadLink> crawlAllVideosOfAUser(final CryptedLink param, final PornHubCom hosterPlugin, final Account account) throws Exception {

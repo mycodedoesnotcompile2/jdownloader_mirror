@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51145 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51147 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -425,115 +425,139 @@ public class XHamsterGallery extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = XHamsterCom.getCorrectedURL(param.getCryptedUrl());
         br.getPage(contenturl);
-        if (br.getHttpConnection().getResponseCode() == 410 || br.containsHTML("(?i)Sorry, no photos found|error\">\\s*Gallery not found\\s*<|>\\s*Page Not Found\\s*<")) {
+        if (br.getHttpConnection().getResponseCode() == 410 || br.containsHTML("Sorry, no photos found|error\">\\s*Gallery not found\\s*<|>\\s*Page Not Found\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*This gallery is visible for")) {
+        } else if (br.containsHTML(">\\s*This gallery is visible for")) {
             throw new AccountRequiredException();
         }
-        if (br.containsHTML("(?i)>\\s*This gallery (needs|requires) password\\s*<")) {
+        final String gallery_password_regex = ">\\s*This gallery (needs|requires) password\\s*<";
+        if (br.containsHTML(gallery_password_regex)) {
             final boolean passwordHandlingBroken = true;
             if (passwordHandlingBroken) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Password-protected handling broken svn.jdownloader.org/issues/88690");
             }
-            boolean failed = true;
+            boolean success = false;
             for (int i = 1; i <= 3; i++) {
                 String passCode = getUserInput("Password?", param);
                 br.postPage(br.getURL(), "password=" + Encoding.urlEncode(passCode));
-                if (br.containsHTML(">\\s*This gallery needs password\\s*<")) {
+                if (br.containsHTML(gallery_password_regex)) {
                     logger.info("User entered invalid password: " + passCode);
                     continue;
                 } else {
-                    failed = false;
+                    success = true;
                     break;
                 }
             }
-            if (failed) {
+            if (success) {
                 throw new DecrypterException(DecrypterException.PASSWORD);
             }
         }
-        if (new Regex(br.getURL(), "/gallery/[0-9]+/[0-9]+").patternFind()) { // Single picture
+        if (new Regex(br.getURL(), "(?i)/gallery/[0-9]+/[0-9]+").patternFind()) {
+            /* Single picture */
             final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(br.getRegex("class='slideImg'\\s+src='([^']+)").getMatch(0)));
             dl.setAvailable(true);
             ret.add(dl);
             return ret;
         }
         // final String total_numberof_picsStr = br.getRegex("<h1 class=\"gr\">[^<>]+<small>\\[(\\d+) [^<>\"]+\\]</small>").getMatch(0);
-        final String total_numberof_picsStr = br.getRegex("page-title__count\">(\\d+)<").getMatch(0);
+        final String total_numberof_picsStr = br.getRegex("\"photosCount\":(\\d+)").getMatch(0);
         logger.info("total_numberof_pics: " + total_numberof_picsStr);
-        final int total_numberof_picsInt = total_numberof_picsStr != null ? Integer.parseInt(total_numberof_picsStr) : -1;
+        final int total_numberof_picsInt;
+        if (total_numberof_picsStr != null) {
+            total_numberof_picsInt = Integer.parseInt(total_numberof_picsStr);
+        } else {
+            total_numberof_picsInt = -1;
+            logger.warning("Failed to find total number of images in this gallery");
+        }
         final String galleryID = new Regex(contenturl, TYPE_PHOTO_GALLERY).getMatch(0);
-        String fpname = br.getRegex("<title>\\s*(.*?)\\s*\\-\\s*\\d+\\s*(Pics|Bilder)\\s*(?:\\-|\\|)\\s*xHamster(\\.com|\\.xxx|\\.desi|\\.one)?\\s*</title>").getMatch(0);
-        if (fpname == null) {
-            fpname = br.getRegex("<title>(.*?)\\s*>\\s*").getMatch(0);
+        String title = br.getRegex("<title>\\s*(.*?)\\s*\\-\\s*\\d+\\s*(Pics|Bilder)\\s*(?:\\-|\\|)\\s*xHamster(\\.com|\\.xxx|\\.desi|\\.one)?\\s*</title>").getMatch(0);
+        if (title == null) {
+            title = br.getRegex("<title>(.*?)</title>").getMatch(0);
         }
         /*
          * 2020-05-12: They often have different galleries with the exact same title --> Include galleryID so we do not get multiple
          * packages with the same title --> Then gets auto merged by default
          */
-        if (fpname != null && !fpname.contains(galleryID)) {
-            fpname += "_" + galleryID;
-        } else if (fpname == null) {
+        if (title != null && !title.contains(galleryID)) {
+            title = Encoding.htmlDecode(title).trim();
+            title += "_" + galleryID;
+        } else if (title == null) {
             /* Final fallback */
-            fpname = galleryID;
+            title = galleryID;
         }
         /* Add name of uploader to the beginning of our packagename if possible */
         final String uploaderName = br.getRegex("/users/[^\"]+\"[^>]*class=\"link\">([^<>\"]+)<").getMatch(0);
-        if (uploaderName != null && !fpname.contains(uploaderName)) {
-            fpname = uploaderName + " - " + fpname;
+        if (uploaderName != null && !title.contains(uploaderName)) {
+            title = uploaderName + " - " + title;
         }
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(Encoding.htmlDecode(fpname.trim()));
-        int pageIndex = 1;
-        int imageIndex = 1;
-        Boolean next = true;
-        while (next) {
+        fp.setName(Encoding.htmlDecode(title).trim());
+        int page = 1;
+        int image_position = 1;
+        final HashSet<String> dupes = new HashSet<String>();
+        pagination: while (!this.isAbort()) {
+            int numberof_new_items_this_page = 0;
             String allLinks = br.getRegex("class='iListing'>(.*?)id='galleryInfoBox'>").getMatch(0);
             if (allLinks == null) {
                 allLinks = br.getRegex("id='imgSized'(.*?)gid='\\d+").getMatch(0);
             }
-            logger.info("Crawling page " + pageIndex);
+            logger.info("Crawling page " + page);
             final String json_source = br.getRegex("\"photos\":(\\[\\{.*?\\}\\])").getMatch(0);
             // logger.info("json_source: " + json_source);
             if (json_source != null) {
                 final List<Object> lines = (List) JavaScriptEngineFactory.jsonToJavaObject(json_source);
                 for (final Object line : lines) {
                     // logger.info("line: " + line);
-                    if (line instanceof Map) {
-                        final Map<String, Object> entries = (Map<String, Object>) line;
-                        final String imageURL = (String) entries.get("imageURL");
-                        if (imageURL != null) {
-                            // logger.info("imageURL: " + imageURL);
-                            final DownloadLink dl = createDownloadlink(imageURL);
-                            final String extension = getFileNameExtensionFromString(imageURL, ".jpg");
-                            if (total_numberof_picsStr != null) {
-                                dl.setFinalFileName(StringUtils.fillPre(Integer.toString(imageIndex), "0", total_numberof_picsStr.length()) + "_" + total_numberof_picsStr + extension);
-                            } else {
-                                dl.setFinalFileName(Integer.toString(imageIndex) + extension);
-                            }
-                            imageIndex++;
-                            dl.setAvailable(true);
-                            dl._setFilePackage(fp);
-                            distribute(dl);
-                            ret.add(dl);
-                        }
+                    if (!(line instanceof Map)) {
+                        continue;
                     }
+                    final Map<String, Object> entries = (Map<String, Object>) line;
+                    final String imageURL = (String) entries.get("imageURL");
+                    if (imageURL == null) {
+                        continue;
+                    }
+                    if (!dupes.add(imageURL)) {
+                        /* Skip dupes */
+                        continue;
+                    }
+                    numberof_new_items_this_page++;
+                    final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageURL));
+                    final String extension = getFileNameExtensionFromString(imageURL, ".jpg");
+                    if (total_numberof_picsStr != null) {
+                        dl.setFinalFileName(StringUtils.fillPre(Integer.toString(image_position), "0", total_numberof_picsStr.length()) + "_" + total_numberof_picsStr + extension);
+                    } else {
+                        dl.setFinalFileName(Integer.toString(image_position) + extension);
+                    }
+                    image_position++;
+                    dl.setAvailable(true);
+                    dl._setFilePackage(fp);
+                    distribute(dl);
+                    ret.add(dl);
                 }
             }
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
-                logger.info("Decryption aborted by user");
+                logger.info("Stopping because: Aborted by user");
                 break;
             }
-            String nextPage = br.getRegex("data-page=\"next\" href=\"([^<>\"]*)\"").getMatch(0);
-            if (!StringUtils.isEmpty(nextPage) && nextPage != null) {
-                logger.info("Getting page " + nextPage);
-                br.getPage(nextPage);
-                if (br.getHttpConnection().getResponseCode() == 452 || br.containsHTML("(?i)>\\s*Page Not Found\\s*<")) {
-                    break;
-                }
-            } else {
-                next = false;
+            final String nextPage = br.getRegex("href=\"([^\"]+)\" rel=\"next\"[^>]*>").getMatch(0);
+            if (StringUtils.isEmpty(nextPage)) {
+                logger.info("Stopping because: Reached end");
+                break pagination;
+            } else if (total_numberof_picsInt != -1 && ret.size() >= total_numberof_picsInt) {
+                logger.info("Stopping because: Found number of expected images");
+                break pagination;
+            } else if (numberof_new_items_this_page == 0) {
+                /* Last resort fail-safe to prevent infinite loops */
+                logger.info("Stopping because: Failed to find any new items on current page");
+                break pagination;
             }
-            pageIndex++;
+            logger.info("Getting page " + nextPage);
+            br.getPage(nextPage);
+            if (br.getHttpConnection().getResponseCode() == 452 || br.containsHTML(">\\s*Page Not Found\\s*<")) {
+                break;
+            }
+            page++;
         }
         if (total_numberof_picsInt != -1 && ret.size() < total_numberof_picsInt) {
             logger.warning("Seems like not all images have been found");
@@ -541,10 +565,12 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret;
     }
 
+    @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
     }
 
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

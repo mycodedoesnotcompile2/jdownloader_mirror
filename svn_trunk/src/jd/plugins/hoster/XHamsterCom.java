@@ -66,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51145 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51146 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -1441,11 +1441,6 @@ public class XHamsterCom extends PluginForHost {
         logger.info("Performing full login");
         br.clearCookies(br.getHost());
         prepBr(this, br);
-        final boolean allowFullPremiumLogin = true;
-        if (!allowFullPremiumLogin) {
-            logger.warning("!!DEV!! 2023-03-31: Disabled full premium login because login via magic link should work fine and full login may require captcha.");
-            throw new AccountInvalidException("Account is premium but premium login failed");
-        }
         logger.info("Performing full premium login");
         String recaptchaV2Response = "";
         br.getPage("https://" + domain_premium + "/");
