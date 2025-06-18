@@ -68,7 +68,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51057 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51148 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1413,7 +1413,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                 ipBlockedOrAccountLimit(link, account, errorMsgURL, 30 * 60 * 1000l);
             } else if (StringUtils.containsIgnoreCase(errorMsgURL, "You have reached the maximum permitted download filesize")) {
                 ipBlockedOrAccountLimit(link, account, errorMsgURL, 30 * 60 * 1000l);
-            } else if (StringUtils.containsIgnoreCase(errorMsgURL, "File not found") || StringUtils.containsIgnoreCase(errorMsgURL, "File has been removed") || StringUtils.containsIgnoreCase(errorMsgURL, "Dosya kaldırıldı")) {
+            } else if (StringUtils.containsIgnoreCase(errorMsgURL, "File not found") || StringUtils.containsIgnoreCase(errorMsgURL, "File has been removed") || StringUtils.containsIgnoreCase(errorMsgURL, "Archivo se ha eliminado") || StringUtils.containsIgnoreCase(errorMsgURL, "Dosya kaldırıldı")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (errorMsgURL.matches("(?i).*(You must wait |Você deve esperar).*")) {
                 final long extraWaittimeMilliseconds = 1000;

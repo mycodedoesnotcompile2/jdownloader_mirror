@@ -18,14 +18,11 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.RandomUserAgent;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -40,7 +37,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51149 $", interfaceVersion = 3, names = {}, urls = {})
 public class TokyomotionNet extends PluginForHost {
     public TokyomotionNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -131,6 +132,17 @@ public class TokyomotionNet extends PluginForHost {
             /* TYPE_EMBED */
             return new Regex(link.getPluginPatternMatcher(), TYPE_EMBED).getMatch(0);
         }
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        // blocked default UA from Request Class, firefoxRevision = "76.0"
+        /*
+         * <html><body><h1>403 Forbidden</h1> Request forbidden by administrative rules. </body></html>
+         */
+        ret.getHeaders().put("User-Agent", RandomUserAgent.generateFF());
+        return ret;
     }
 
     @Override

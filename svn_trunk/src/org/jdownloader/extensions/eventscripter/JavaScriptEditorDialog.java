@@ -1,6 +1,7 @@
 package org.jdownloader.extensions.eventscripter;
 
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,6 +15,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JToolBar;
 
 import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jsyntaxpane.DefaultSyntaxKit;
 import jsyntaxpane.syntaxkits.JavaSyntaxKit;
 import net.sourceforge.htmlunit.corejs.javascript.Context;
 import net.sourceforge.htmlunit.corejs.javascript.Script;
@@ -110,7 +112,8 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
         final JavaSyntaxKit javaSyntaxKit = new JavaSyntaxKit();
         try {
             // set UI default font to JavaSyntaxKit
-            ReflectionUtils.setField(javaSyntaxKit, "DEFAULT_FONT", new JLabel().getFont());
+            final Font defaultFont = ReflectionUtils.getFieldValue(DefaultSyntaxKit.class, "DEFAULT_FONT", javaSyntaxKit, Font.class);
+            ReflectionUtils.setField(javaSyntaxKit, "DEFAULT_FONT", new JLabel().getFont().deriveFont(defaultFont.getStyle(), defaultFont.getSize()));
         } catch (Exception e) {
             LogController.CL().log(e);
             DebugMode.debugger(e);

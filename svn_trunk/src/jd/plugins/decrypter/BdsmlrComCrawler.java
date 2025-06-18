@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -44,7 +39,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BdsmlrCom;
 
-@DecrypterPlugin(revision = "$Revision: 51110 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 51149 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BdsmlrCom.class })
 public class BdsmlrComCrawler extends PluginForDecrypt {
     public BdsmlrComCrawler(PluginWrapper wrapper) {
@@ -119,7 +120,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         }
         final String searchKeyword = new Regex(contenturl, "(?i)/search/([^/]+)").getMatch(0);
         if (searchKeyword != null) {
-            logger.info("Crawling all posts from user " + username + " matching search term " + searchKeyword);
+            logger.info("Crawling all posts from user " + username + " matching search term '" + searchKeyword + "'");
         } else {
             /* Normalize url */
             contenturl = "https://" + username + "." + getHost() + "/";
@@ -138,7 +139,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         }
         final FilePackage fp = FilePackage.getInstance();
         if (searchKeyword != null) {
-            fp.setName(username + " search " + searchKeyword);
+            fp.setName(username + " search " + URLEncode.decodeURIComponent(searchKeyword));
         } else {
             fp.setName(username);
         }
@@ -171,7 +172,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
         query.appendEncoded("timenow", infinitescrollDate);
         if (searchKeyword != null) {
             query.appendEncoded("blogname", username);
-            query.appendEncoded("keyword", searchKeyword);
+            query.append("keyword", searchKeyword, false);// taken from URL, already encoded
             query.appendEncoded("last", lastPostID);
             br.postPage("/infinitesearch", query);
         } else {
@@ -192,7 +193,7 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
             query.appendEncoded("last", lastPostID);
             if (searchKeyword != null) {
                 query.appendEncoded("blogname", username);
-                query.appendEncoded("keyword", searchKeyword);
+                query.append("keyword", searchKeyword, false);// taken from URL, already encoded
                 br.postPage("/infinitesearch", query);
             } else {
                 br.postPage("/infinitepb2/" + username, query);
@@ -207,9 +208,8 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
                     final String postID = result.getStringProperty(PROPERTY_POST_ID);
                     if (!dupes.add(postID)) {
                         /**
-                         * 2023-03-31: This should never happen but it looks like it can happen. </br>
-                         * As long as the current page we're crawling contains at least one new item, the crawler will continue even if
-                         * there were some dupes.
+                         * 2023-03-31: This should never happen but it looks like it can happen. </br> As long as the current page we're
+                         * crawling contains at least one new item, the crawler will continue even if there were some dupes.
                          */
                         logger.info("Skipping dupe: " + postID);
                         numberofSkippedDuplicates++;
