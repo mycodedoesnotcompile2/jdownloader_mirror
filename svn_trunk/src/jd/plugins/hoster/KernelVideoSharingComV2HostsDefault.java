@@ -15,13 +15,19 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51149 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Exceptions;
+
+@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -147,6 +153,33 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         final ArrayList<String> domains = new ArrayList<String>();
         domains.add("motherporno.com"); // 2025-01-07
         return domains;
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
+        PluginException exception = null;
+        try {
+            final String dllink = super.getDllink(link, br);
+            if (dllink != null) {
+                return dllink;
+            }
+        } catch (final PluginException e) {
+            if (isEmbedURL(br.getURL())) {
+                throw e;
+            }
+            logger.log(e);
+            exception = e;
+        }
+        final String selfEmbed = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+/embed/[^\"]+)\"").getMatch(0);
+        if (selfEmbed == null || !canHandle(selfEmbed)) {
+            throw exception;
+        }
+        try {
+            br.getPage(selfEmbed);
+            return super.getDllink(link, br);
+        } catch (PluginException e) {
+            throw Exceptions.addSuppressed(exception, e);
+        }
     }
 
     @Override

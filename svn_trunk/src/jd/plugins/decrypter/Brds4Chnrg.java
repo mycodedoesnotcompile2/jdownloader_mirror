@@ -21,15 +21,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.FourChanConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -48,7 +39,15 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "boards.4chan.org" }, urls = { "https?://[\\w\\.]*?boards\\.(?:4chan|4channel)\\.org/[0-9a-z]{1,}/(thread/\\d+)?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.FourChanConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 51150 $", interfaceVersion = 2, names = { "boards.4chan.org" }, urls = { "https?://[\\w\\.]*?boards\\.(?:4chan|4channel)\\.org/[0-9a-z]{1,}/(thread/\\d+)?" })
 public class Brds4Chnrg extends PluginForDecrypt {
     public Brds4Chnrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -307,6 +306,7 @@ public class Brds4Chnrg extends PluginForDecrypt {
             dl.setHashInfo(HashInfo.parse(HexFormatter.byteArrayToHex(Base64.decode(md5_base64O))));
             dl.setFinalFileName(setFileName);
             dl.setProperty(DirectHTTP.FIXNAME, setFileName);
+            // dl.setProperty(DirectHTTP.PROPERTY_RATE_LIMIT, 500);
             dl.setVerifiedFileSize(fsize);
             dl.setAvailable(true);
             dl._setFilePackage(fp);

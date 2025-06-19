@@ -22,12 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -54,7 +48,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
+@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 2, names = {}, urls = {})
 public class UlozTo extends PluginForHost {
     private static final String  QUICKDOWNLOAD                  = "(?i)https?://[^/]+/quickDownload/\\d+";
     /* 2017-01-02: login API seems to be broken --> Use website as workaround */
@@ -108,10 +108,9 @@ public class UlozTo extends PluginForHost {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         /**
-         * ulozto.net = the English version of the site </br>
-         * Important: Each language version has it's own beginning URL-structure e.g.: </br>
-         * https://ulozto.net/file/<fid>/<slug> English website does not work with "/soubory/"! </br>
-         * * https://uloz.to/soubory/<fid>/<slug> </br>
+         * ulozto.net = the English version of the site </br> Important: Each language version has it's own beginning URL-structure e.g.:
+         * </br> https://ulozto.net/file/<fid>/<slug> English website does not work with "/soubory/"! </br> *
+         * https://uloz.to/soubory/<fid>/<slug> </br>
          */
         ret.add(new String[] { "uloz.to", "ulozto.sk", "ulozto.cz", "ulozto.net", "zachowajto.pl" });
         ret.add(new String[] { "pinkfile.cz", "pornfile.cz", "pornfile.ulozto.net" });
@@ -213,7 +212,7 @@ public class UlozTo extends PluginForHost {
         if (contentURL.matches(QUICKDOWNLOAD)) {
             return AvailableStatus.TRUE;
         } else if (contentURL.matches("(?i)https?://[^/]+/(podminky|tos)/[^/]+")) {
-            return AvailableStatus.FALSE;
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String directDownloadURL = handleDownloadUrl(link, isDownload);
         if (directDownloadURL != null) {
@@ -294,8 +293,7 @@ public class UlozTo extends PluginForHost {
     }
 
     /**
-     * Accesses downloadurl and checks for content. </br>
-     * Returns final downloadurl.
+     * Accesses downloadurl and checks for content. </br> Returns final downloadurl.
      */
     private String handleDownloadUrl(final DownloadLink link, final boolean isDownload) throws Exception {
         br.getPage(this.getContentURL(link));
@@ -520,9 +518,9 @@ public class UlozTo extends PluginForHost {
                     final String redirectToSecondCaptcha = PluginJSonUtils.getJson(br, "redirectDialogContent");
                     if (redirectToSecondCaptcha != null) {
                         /**
-                         * 2021-02-11: Usually: /download-dialog/free/limit-exceeded?fileSlug=<FUID>&repeated=0&nocaptcha=0 </br>
-                         * This can happen after downloading some files. The user is allowed to download more but has to solve two captchas
-                         * in a row to do so!
+                         * 2021-02-11: Usually: /download-dialog/free/limit-exceeded?fileSlug=<FUID>&repeated=0&nocaptcha=0 </br> This can
+                         * happen after downloading some files. The user is allowed to download more but has to solve two captchas in a row
+                         * to do so!
                          */
                         br.getPage(redirectToSecondCaptcha);
                         final Form f = br.getFormbyActionRegex(".*limit-exceeded.*");
@@ -800,7 +798,9 @@ public class UlozTo extends PluginForHost {
         if (this.isPrivateFile(br)) {
             throw new AccountRequiredException("Private file");
         }
-        if (br.containsHTML("Stránka nenalezena")) {
+        if (br.containsHTML(">\\s*File does not exist\\s*<") || br.containsHTML(">\\s*Soubor neexistuje\\s*<") || br.containsHTML(">\\s*Súbor neexistuje\\s*<")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("Stránka nenalezena")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("dla_backend/uloz\\.to\\.overloaded\\.html")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "No free slots available", 10 * 60 * 1000l);
@@ -937,9 +937,8 @@ public class UlozTo extends PluginForHost {
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /**
-             * 2023-04-18: Debug test </br>
-             * This is their Web-API. It provides slightly less information than the website via html and the API key may change at any
-             * time.
+             * 2023-04-18: Debug test </br> This is their Web-API. It provides slightly less information than the website via html and the
+             * API key may change at any time.
              */
             br.getPage("/p-api/get-api-current-user-token");
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);

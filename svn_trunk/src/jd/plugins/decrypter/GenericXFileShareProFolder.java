@@ -23,13 +23,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -54,8 +47,15 @@ import jd.plugins.hoster.FileupOrg;
 import jd.plugins.hoster.TakefileLink;
 import jd.plugins.hoster.UploadBoyCom;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 50605 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51150 $", interfaceVersion = 2, names = {}, urls = {})
 public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
     private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "youwatch.org", "salefiles.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.com", "filefox.cc", "cosmobox.org", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "rapidbytez.com", "filextras.com" };
     /* This list contains all hosts which need special Patterns (see below) - all other XFS hosts have the same folder patterns! */
@@ -88,6 +88,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         for (String[] takeFileVirtual : TakefileLink.getVirtualPluginDomains()) {
             ret.add(takeFileVirtual[0]);
         }
+        ret.add("nelion.me");
         return ret.toArray(new String[0]);
     }
 
@@ -123,10 +124,13 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         ret.add("https?://(?:www\\.)?file\\.al/public/\\d+/.+");
         /* 10gb.vn */
         ret.add("https?://(?:www\\.)?10gb\\.vn/(f/[a-z0-9]{32}|users/.+)");
-        ret.add("https?://(?:www\\.)?takefile\\.link/folder/[a-f0-9\\-]+");
-        for (String[] takeFileVirtual : TakefileLink.getVirtualPluginDomains()) {
-            ret.add("https?://" + Pattern.quote(takeFileVirtual[0]) + "/folder/[a-f0-9\\-]+");
+        {
+            ret.add("https?://(?:www\\.)?takefile\\.link/folder/[a-f0-9\\-]+");
+            for (String[] takeFileVirtual : TakefileLink.getVirtualPluginDomains()) {
+                ret.add("https?://" + Pattern.quote(takeFileVirtual[0]) + "/folder/[a-f0-9\\-]+");
+            }
         }
+        ret.add("https?://(?:www\\.)?nelion\\.me/go/[a-z0-9]+");
         return ret.toArray(new String[0]);
     }
 
