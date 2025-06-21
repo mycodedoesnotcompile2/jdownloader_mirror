@@ -54,7 +54,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
-@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51151 $", interfaceVersion = 2, names = {}, urls = {})
 public class UlozTo extends PluginForHost {
     private static final String  QUICKDOWNLOAD                  = "(?i)https?://[^/]+/quickDownload/\\d+";
     /* 2017-01-02: login API seems to be broken --> Use website as workaround */
@@ -113,7 +113,7 @@ public class UlozTo extends PluginForHost {
          * https://uloz.to/soubory/<fid>/<slug> </br>
          */
         ret.add(new String[] { "uloz.to", "ulozto.sk", "ulozto.cz", "ulozto.net", "zachowajto.pl" });
-        ret.add(new String[] { "pinkfile.cz", "pornfile.cz", "pornfile.ulozto.net" });
+        ret.add(new String[] { "pornfile.ulozto.net" });
         return ret;
     }
 

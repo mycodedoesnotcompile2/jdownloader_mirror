@@ -433,10 +433,18 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
             return super.processKeyBinding(stroke, evt, condition, pressed);
         }
         switch (evt.getKeyCode()) {
-        case KeyEvent.VK_ENTER:
-        case KeyEvent.VK_BACK_SPACE:
         case KeyEvent.VK_DELETE:
-            EnabledAction action = new EnabledAction();
+        case KeyEvent.VK_BACK_SPACE:
+            if (org.jdownloader.settings.staticreferences.CFG_GUI.CFG.isLinkgrabberSidebarDeleteHotkeyEnabled()) {
+                break;
+            } else {
+                final EnabledAction action = new EnabledAction();
+                action.requestUpdate(null);
+                action.actionPerformed(null);
+                return true;
+            }
+        case KeyEvent.VK_ENTER:
+            final EnabledAction action = new EnabledAction();
             action.requestUpdate(null);
             action.actionPerformed(null);
             return true;
@@ -456,6 +464,8 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
             if (evt.isMetaDown() || evt.isControlDown()) {
                 return true;
             }
+        default:
+            break;
         }
         return super.processKeyBinding(stroke, evt, condition, pressed);
     }

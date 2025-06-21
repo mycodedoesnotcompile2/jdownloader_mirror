@@ -45,7 +45,7 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51151 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -238,6 +238,8 @@ public class Offline extends PluginForHost {
             ret.add(new String[] { "nippyfile.com" });
             ret.add(new String[] { "yolobit.com" });
         }
+        /* UlozTo */
+        ret.add(new String[] { "pinkfile.cz", "pornfile.cz" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

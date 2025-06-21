@@ -273,6 +273,13 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     @DefaultBooleanValue(false)
     @AboutConfig
+    @DescriptionForConfigEntry("If true, you can easily delete selected/matching filter with delete hotkey")
+    boolean isLinkgrabberSidebarDeleteHotkeyEnabled();
+
+    void setLinkgrabberSidebarDeleteHotkeyEnabled(boolean b);
+
+    @DefaultBooleanValue(false)
+    @AboutConfig
     public boolean isPasswordProtectionEnabled();
 
     @AboutConfig
