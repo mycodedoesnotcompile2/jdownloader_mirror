@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51018 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51155 $", interfaceVersion = 3, names = {}, urls = {})
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -64,11 +64,44 @@ public class JubaGetCom extends PluginForHost {
         return this.getHost() + "directlink";
     }
 
-    private static MultiHosterManagement mhm = new MultiHosterManagement("juba-get.com");
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "jubaget.com", "juba-get.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private static MultiHosterManagement mhm = new MultiHosterManagement("jubaget.com");
 
     public JubaGetCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + getHost() + "/plans");
+    }
+
+    @Override
+    public String rewriteHost(String host) {
+        return this.rewriteHost(getPluginDomains(), host, this.getHost());
     }
 
     @Override
@@ -152,7 +185,6 @@ public class JubaGetCom extends PluginForHost {
                 valid = true;
                 return true;
             } else {
-                link.removeProperty(getDirecturlProperty());
                 brc.followConnection(true);
                 throw new IOException();
             }
@@ -219,7 +251,7 @@ public class JubaGetCom extends PluginForHost {
                 continue;
             }
             final MultiHostHost mhost;
-            /* Some small corrections needed, because their website is horrible. */
+            /* Some small corrections needed, because their website is horrible to parse. */
             if (hostWithoutTLD.equalsIgnoreCase("DropDownload")) {
                 mhost = new MultiHostHost("drop.download");
             } else if (hostWithoutTLD.equalsIgnoreCase("FreeDLink")) {
@@ -280,9 +312,11 @@ public class JubaGetCom extends PluginForHost {
                 }
                 br.getPage(loginCheckURL);
                 if (isLoggedIN(br)) {
+                    logger.info("Cookie login successful");
                     account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
                 }
+                logger.info("Cookie login failed");
                 account.clearCookies("");
                 br.clearCookies(br.getHost());
             }

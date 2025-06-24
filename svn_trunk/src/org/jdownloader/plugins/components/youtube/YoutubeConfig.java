@@ -428,6 +428,7 @@ public interface YoutubeConfig extends PluginConfigInterface {
     void setPlaylistDupeDetectionMode(YoutubeConfig.PlaylistDupeDetectionMode mode);
 
     @AboutConfig
+    @DescriptionForConfigEntry("Subtitle Variant Mode - Controls how downloaded subtitle files are processed to match their corresponding video files.\r\n\r\nDISABLED: Subtitle files are left with their original filenames as downloaded, with no additional processing or renaming.\r\n\r\nCOPY_AND_KEEP: Subtitle files are copied and renamed to match their associated video files (e.g., \"Video Title.English.srt\"), while the original subtitle files are preserved. This creates both the original and the renamed versions.\r\n\r\nCOPY_AND_DELETE: Subtitle files are renamed to match their associated video files and the original subtitle files are deleted after successful processing. This results in only the renamed subtitle files that correspond to video filenames.\r\n\r\nThe renamed subtitle files use the video's base filename with the subtitle language appended (when available), making them compatible with media players that automatically load subtitles based on matching filenames.")
     @DefaultFactory(DefaultConvertSubtitleVariantMode.class)
     YoutubeConfig.SubtitleVariantMode getSubtitleVariantMode();
 

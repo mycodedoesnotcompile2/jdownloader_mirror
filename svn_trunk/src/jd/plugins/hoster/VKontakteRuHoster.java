@@ -51,6 +51,7 @@ import jd.controlling.faviconcontroller.FavIcons;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.Browser;
 import jd.http.Browser.BrowserException;
+import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.SimpleFTP;
@@ -77,7 +78,7 @@ import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
 @PluginDependencies(dependencies = { VKontakteRu.class })
-@HostPlugin(revision = "$Revision: 50582 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51155 $", interfaceVersion = 2, names = {}, urls = {})
 /* Most of all links are coming from a crawler plugin. */
 public class VKontakteRuHoster extends PluginForHost {
     /* Current main domain */
@@ -138,6 +139,8 @@ public class VKontakteRuHoster extends PluginForHost {
     public static final String  PROPERTY_GENERAL_mainlink                                                   = "mainlink";
     /* Can be given for any content if it is part of a wall post */
     public static String        PROPERTY_GENERAL_wall_post_id                                               = "wall_post_id";
+    /* Account properties */
+    public static final String  PROPERTY_ACCOUNT_VK_VIDEO_SUPPORT                                           = "vk_video_support";
     /* For single photos */
     public static final String  PROPERTY_PHOTOS_directurls_fallback                                         = "directurls_fallback";
     public static final String  PROPERTY_PHOTOS_photo_list_id                                               = "photo_list_id";
@@ -570,8 +573,6 @@ public class VKontakteRuHoster extends PluginForHost {
                         }
                     }
                 }
-                /* 2016-10-07: Implemented to avoid host-side block although results tell me that this does not improve anything. */
-                setHeaderRefererPhoto(this.br);
                 final String filename = photoGetFinalFilename(getPhotoID(link), null, finalurl);
                 if (filename != null) {
                     link.setFinalFileName(filename);
@@ -876,11 +877,6 @@ public class VKontakteRuHoster extends PluginForHost {
         br.getHeaders().put("Origin", "https://vk.com");
     }
 
-    public static void setHeaderRefererPhoto(final Browser br) {
-        /* TODO: This is wrong! Use the main URL/Content-URL instead! */
-        br.getHeaders().put("Referer", "https://" + DOMAIN + "/al_photos.php");
-    }
-
     private static Map<String, String> LOCK_429 = new HashMap<String, String>();
 
     public static void handleTooManyRequests(final Plugin plugin, final Browser br) throws Exception {
@@ -928,10 +924,15 @@ public class VKontakteRuHoster extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(br, account, true);
+        final AccountInfo ai = new AccountInfo();
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
+        if (account.hasProperty(PROPERTY_ACCOUNT_VK_VIDEO_SUPPORT)) {
+            ai.setStatus(account.getType().getLabel() + " | VKVideo.ru support: Yes");
+        } else {
+            ai.setStatus(account.getType().getLabel() + " | VKVideo.ru support: No");
+        }
         return ai;
     }
 
@@ -1229,7 +1230,7 @@ public class VKontakteRuHoster extends PluginForHost {
                     /* Do not validate login cookies */
                     return;
                 }
-                if (checkCookieLogin(br, account)) {
+                if (checkCookieLogin(br, account, userCookies)) {
                     /* Success! */
                     return;
                 }
@@ -1248,7 +1249,7 @@ public class VKontakteRuHoster extends PluginForHost {
                     /* Do not validate login cookies */
                     return;
                 }
-                if (checkCookieLogin(br, account)) {
+                if (checkCookieLogin(br, account, cookies)) {
                     return;
                 } else {
                     br.clearCookies(null);
@@ -1294,7 +1295,7 @@ public class VKontakteRuHoster extends PluginForHost {
                 logger.warning("Failed to find vkID");
             }
             /* Save cookies */
-            account.saveCookies(br.getCookies(DOMAIN), "");
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -1316,34 +1317,63 @@ public class VKontakteRuHoster extends PluginForHost {
         }
     }
 
-    private boolean checkCookieLogin(final Browser br, final Account account) throws Exception {
+    private boolean checkCookieLogin(final Browser br, final Account account, final Cookies sourceCookies) throws Exception {
         /* Important: Added cookies may only be valid for the main domain OR the main video domain. */
-        final String[] urls = new String[2];
-        urls[0] = getBaseURL();
-        urls[1] = getBaseURLVideo();
-        for (final String url : urls) {
-            br.getPage(url);
-            handleTooManyRequests(this, br);
-            // non language, check
-            if (isLoggedinHTML(br)) {
-                logger.info("Cookie login successful for: " + url);
-                // language set in user profile, so after 'login' OR 'login check' it could be changed!
-                setCookie(br, "remixlang", "3");
-                final String vkID = regExVKAccountID(br);
-                if (vkID != null) {
-                    account.setProperty(PROPERTY_ACCOUNT_VK_ID, vkID);
+        final String[] urls;
+        final List<Cookie> vkvideoCookies = new ArrayList<Cookie>();
+        for (final Cookie cookie : sourceCookies.getCookies()) {
+            if (cookie.getHost().equalsIgnoreCase("vkvideo.ru")) {
+                vkvideoCookies.add(cookie);
+            }
+        }
+        /**
+         * accessing vkvideo.ru without vkvideo.ru login cookies may result in http response 429. <br>
+         * As a workaround we only check for vkvideo.ru login validity if the user has vkvideo.ru cookies.
+         */
+        if (!vkvideoCookies.isEmpty()) {
+            urls = new String[2];
+            /* The order is important! First check for vkvideo, then vk.com! */
+            urls[0] = getBaseURLVideo();
+            urls[1] = getBaseURL();
+        } else {
+            urls = new String[1];
+            urls[0] = getBaseURL();
+        }
+        final int[] allowed_response_codes_before = br.getAllowedResponseCodes();
+        br.setAllowedResponseCodes(429);
+        try {
+            for (final String url : urls) {
+                br.getPage(url);
+                handleTooManyRequests(this, br);
+                if (!isLoggedinHTML(br)) {
+                    logger.info("Cookies invalid for: " + url);
+                    Thread.sleep(1000l);
+                    continue;
+                }
+                final String user_id = regExVKAccountID(br);
+                logger.info("Cookie login successful for: " + url + " | user_id=" + user_id);
+                if (user_id != null) {
+                    account.setProperty(PROPERTY_ACCOUNT_VK_ID, user_id);
                 } else {
                     logger.warning("Failed to find vkID");
                 }
+                // language set in user profile, so after 'login' OR 'login check' it could be changed!
+                setCookie(br, "remixlang", "3");
                 /* Refresh timestamp */
-                account.saveCookies(br.getCookies(DOMAIN), "");
+                account.saveCookies(br.getCookies(br.getHost()), "");
+                if (br.getHost().equalsIgnoreCase("vkvideo.ru")) {
+                    account.setProperty(PROPERTY_ACCOUNT_VK_VIDEO_SUPPORT, true);
+                } else {
+                    account.removeProperty(PROPERTY_ACCOUNT_VK_VIDEO_SUPPORT);
+                }
                 return true;
             }
-            logger.info("Cookies invalid for: " + url);
+            /* Delete cookies / Headers to perform a full login */
+            logger.info("Cookie login failed");
+            return false;
+        } finally {
+            br.setAllowedResponseCodes(allowed_response_codes_before);
         }
-        /* Delete cookies / Headers to perform a full login */
-        logger.info("Cookie login failed");
-        return false;
     }
 
     private static boolean isLoggedinHTML(final Browser br) {
@@ -1739,7 +1769,8 @@ public class VKontakteRuHoster extends PluginForHost {
 
     @Override
     public FEATURE[] getFeatures() {
-        return new FEATURE[] { FEATURE.FAVICON, FEATURE.COOKIE_LOGIN_OPTIONAL };
+        /* 2025-06-23: Only cookie login is allowed/possible now */
+        return new FEATURE[] { FEATURE.FAVICON, FEATURE.COOKIE_LOGIN_ONLY };
     }
 
     @Override

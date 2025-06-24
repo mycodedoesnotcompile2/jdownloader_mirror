@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -39,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51155 $", interfaceVersion = 3, names = {}, urls = {})
 public class UlozToFolder extends PluginForDecrypt {
     public UlozToFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +49,6 @@ public class UlozToFolder extends PluginForDecrypt {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         /* ulozto.net = the english version of the site */
         ret.add(new String[] { "uloz.to", "ulozto.sk", "ulozto.cz", "ulozto.net", "zachowajto.pl" });
-        ret.add(new String[] { "pornfile.cz", "pornfile.ulozto.net" });
         return ret;
     }
 

@@ -19,15 +19,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Exceptions;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Exceptions;
-
-@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51153 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -174,6 +174,11 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         if (selfEmbed == null || !canHandle(selfEmbed)) {
             throw exception;
         }
+        /**
+         * 2025-06-23: e.g. cluset.com <br>
+         * /videos/11045/anmacherinnen-7-gluhende-fotzchen/
+         */
+        logger.info("Processing selfembed");
         try {
             br.getPage(selfEmbed);
             return super.getDllink(link, br);

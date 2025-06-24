@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51081 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51153 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -433,11 +433,11 @@ public class TbCmV2 extends PluginForDecrypt {
                 if (StringUtils.equalsIgnoreCase(channelTabName, "playlists")) {
                     final String title = "All playlists of channel/user " + usernameOrChannelID;
                     if (playListAction == IfUrlisAPlaylistAction.ASK) {
-                        String messageDialogText = "<html>JDownloader does not support crawling all playlists of a channel/user!";
+                        String messageDialogText = "<html>JDownloader does not support crawling all playlists of a channel!";
                         messageDialogText += "<br>What would you like JDownloader to do instead?";
-                        messageDialogText += "<br><a href=\"https://support.jdownloader.org/knowledgebase/article/collect-and-download-links-from-unsupported-websites\">Hint on how to collect & add all playlists of a channel/profile</a>";
-                        messageDialogText += "<br>If you wish to hide this dialog, you can pre-select your preferred option under Settings -> Plugins -> youtube.com.</html>";
-                        final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_HTML, title, messageDialogText, null, "Crawl channel/user videos instead", "Do nothing") {
+                        messageDialogText += "<br><a href=\"https://support.jdownloader.org/knowledgebase/article/collect-and-download-links-from-unsupported-websites\">Hint on how to collect & add all playlists of a YouTube channel</a>";
+                        messageDialogText += "<br>If you wish to hide this dialog, you can pre-select your preferred action under Settings -> Plugins -> youtube.com.</html>";
+                        final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_HTML, title, messageDialogText, null, "Crawl channel videos instead", "Do nothing") {
                             @Override
                             public ModalityType getModalityType() {
                                 return ModalityType.MODELESS;

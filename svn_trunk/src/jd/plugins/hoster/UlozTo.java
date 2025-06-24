@@ -22,6 +22,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -48,13 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
-@HostPlugin(revision = "$Revision: 51151 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51155 $", interfaceVersion = 2, names = {}, urls = {})
 public class UlozTo extends PluginForHost {
     private static final String  QUICKDOWNLOAD                  = "(?i)https?://[^/]+/quickDownload/\\d+";
     /* 2017-01-02: login API seems to be broken --> Use website as workaround */
@@ -68,7 +68,7 @@ public class UlozTo extends PluginForHost {
 
     public UlozTo(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://uloz.to/kredit");
+        this.enablePremium("https://" + getHost() + "/kredit");
     }
 
     @Override
@@ -108,12 +108,12 @@ public class UlozTo extends PluginForHost {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         /**
-         * ulozto.net = the English version of the site </br> Important: Each language version has it's own beginning URL-structure e.g.:
-         * </br> https://ulozto.net/file/<fid>/<slug> English website does not work with "/soubory/"! </br> *
-         * https://uloz.to/soubory/<fid>/<slug> </br>
+         * ulozto.net = the English version of the site </br>
+         * Important: Each language version has it's own beginning URL-structure e.g.: </br>
+         * https://ulozto.net/file/<fid>/<slug> English website does not work with "/soubory/"! </br>
+         * * https://uloz.to/soubory/<fid>/<slug> </br>
          */
         ret.add(new String[] { "uloz.to", "ulozto.sk", "ulozto.cz", "ulozto.net", "zachowajto.pl" });
-        ret.add(new String[] { "pornfile.ulozto.net" });
         return ret;
     }
 
@@ -146,12 +146,12 @@ public class UlozTo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://ulozto.net/tos/terms-of-service";
+        return "https://" + getHost() + "/tos/terms-of-service";
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     protected static String getDownloadModeDirectlinkProperty(final Account account) {
@@ -293,7 +293,8 @@ public class UlozTo extends PluginForHost {
     }
 
     /**
-     * Accesses downloadurl and checks for content. </br> Returns final downloadurl.
+     * Accesses downloadurl and checks for content. </br>
+     * Returns final downloadurl.
      */
     private String handleDownloadUrl(final DownloadLink link, final boolean isDownload) throws Exception {
         br.getPage(this.getContentURL(link));
@@ -361,7 +362,7 @@ public class UlozTo extends PluginForHost {
     /** Handles special redirects e.g. after submitting 'Age restricted' Form. */
     private void handleRedirect() throws Exception {
         for (int i = 0; i <= i; i++) {
-            final String continuePage = br.getRegex("(?i)<p><a href=\"(http://.*?)\">Please click here to continue</a>").getMatch(0);
+            final String continuePage = br.getRegex("<p>\\s*<a href=\"(http://.*?)\">Please click here to continue</a>").getMatch(0);
             if (continuePage != null) {
                 br.getPage(continuePage);
             } else {
@@ -518,9 +519,9 @@ public class UlozTo extends PluginForHost {
                     final String redirectToSecondCaptcha = PluginJSonUtils.getJson(br, "redirectDialogContent");
                     if (redirectToSecondCaptcha != null) {
                         /**
-                         * 2021-02-11: Usually: /download-dialog/free/limit-exceeded?fileSlug=<FUID>&repeated=0&nocaptcha=0 </br> This can
-                         * happen after downloading some files. The user is allowed to download more but has to solve two captchas in a row
-                         * to do so!
+                         * 2021-02-11: Usually: /download-dialog/free/limit-exceeded?fileSlug=<FUID>&repeated=0&nocaptcha=0 </br>
+                         * This can happen after downloading some files. The user is allowed to download more but has to solve two captchas
+                         * in a row to do so!
                          */
                         br.getPage(redirectToSecondCaptcha);
                         final Form f = br.getFormbyActionRegex(".*limit-exceeded.*");
@@ -937,8 +938,9 @@ public class UlozTo extends PluginForHost {
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /**
-             * 2023-04-18: Debug test </br> This is their Web-API. It provides slightly less information than the website via html and the
-             * API key may change at any time.
+             * 2023-04-18: Debug test </br>
+             * This is their Web-API. It provides slightly less information than the website via html and the API key may change at any
+             * time.
              */
             br.getPage("/p-api/get-api-current-user-token");
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);

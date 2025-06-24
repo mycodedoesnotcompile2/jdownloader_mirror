@@ -62,10 +62,16 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.RedditComCrawler;
 
-@HostPlugin(revision = "$Revision: 50396 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51155 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditCom extends PluginForHost {
     public RedditCom(PluginWrapper wrapper) {
         super(wrapper);
+        /**
+         * Why we do not have Reddit account support in stable: <br>
+         * - NSFW content is accessible via API even without account <br>
+         * - Overall account usage is not required to download reddit content. It's only useful for e.g. downloading the users own saved
+         * posts.
+         */
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             this.enablePremium("https://www.reddit.com/register/");
         }
