@@ -22,11 +22,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -42,7 +37,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49287 $", interfaceVersion = 2, names = { "workupload.com" }, urls = { "https?://(?:www\\.|en\\.)?workupload\\.com/(?:file|start|report)/([A-Za-z0-9]+)" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+
+@HostPlugin(revision = "$Revision: 51162 $", interfaceVersion = 2, names = { "workupload.com" }, urls = { "https?://(?:www\\.|en\\.)?workupload\\.com/(?:file|start|report)/([A-Za-z0-9]+)" })
 public class WorkuploadCom extends PluginForHost {
     public WorkuploadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,11 +116,11 @@ public class WorkuploadCom extends PluginForHost {
             }
         } else {
             link.setPasswordProtected(false);
-            String filename = br.getRegex("<td>\\s*Dateiname\\s*:\\s*</td><td>([^<>\"]*?)<").getMatch(0);
+            String filename = br.getRegex("<td>\\s*Dateiname\\s*:\\s*(?:&nbsp;)?\\s*</td><td[^>]*>\\s*([^<>\"]*?)\\s*<").getMatch(0);
             if (filename == null) {
                 filename = br.getRegex("class=\"intro\">[\n\t\r ]*?<b>([^<>\"]+)</b>").getMatch(0);
             }
-            String filesize = br.getRegex("<td>\\s*Dateigröße:\\s*</td><td>([^<>\"]*?)<").getMatch(0);
+            String filesize = br.getRegex("<td>\\s*Dateigröße:\\s*(?:&nbsp;)?\\s*</td><td[^>]*>\\s*([^<>\"]*?)\\s*<").getMatch(0);
             if (filename == null || filesize == null) {
                 Regex filenameSize = br.getRegex("<p class=\"intro\">[\n\t\r ]*?<b>(.*?)</b>[^\n\t\r <>\"]*?(\\d+(?:\\.\\d+)? ?(KB|MB|GB))[^\n\t\r <>\"]*?");
                 if (filename == null) {
@@ -199,6 +199,9 @@ public class WorkuploadCom extends PluginForHost {
             brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
             getPage(brc, new GetRequest(brc.getURL("/api/file/getDownloadServer/" + fileID).toExternalForm()));
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.FALSE.equals(entries.get("success"))) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Download currently unavailable", 30 * 60 * 1000l);
+            }
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             dllink = data.get("url").toString();
             if (StringUtils.isEmpty(dllink)) {
