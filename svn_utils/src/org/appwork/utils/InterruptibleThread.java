@@ -20,6 +20,14 @@ public class InterruptibleThread extends Thread {
         return this;
     }
 
+    /**
+     * @see java.lang.Thread#start()
+     */
+    @Override
+    public synchronized void start() {
+        super.start();
+    }
+
     public InterruptibleThread joinThread() throws InterruptedException {
         join();
         return this;

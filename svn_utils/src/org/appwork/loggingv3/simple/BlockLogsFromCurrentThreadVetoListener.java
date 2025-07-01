@@ -44,13 +44,25 @@ public class BlockLogsFromCurrentThreadVetoListener implements LogVetoListener {
     protected final LogV3Level[] blockedLevels;
 
     /**
+     * @return the blockedLevels
+     */
+    public LogV3Level[] getBlockedLevels() {
+        return blockedLevels;
+    }
+
+    /**
      *
      */
     public BlockLogsFromCurrentThreadVetoListener(LogV3Level... levels) {
         this.blockedLevels = levels;
     }
 
-    protected final Thread thread = Thread.currentThread();
+    public BlockLogsFromCurrentThreadVetoListener(Thread th, LogV3Level... levels) {
+        this.blockedLevels = levels;
+        thread = th;
+    }
+
+    protected Thread thread = Thread.currentThread();
 
     @Override
     public boolean blockLogPublishing(SimpleLoggerFactory simpleLoggerFactory, Sink sink, LogRecord2 record) {

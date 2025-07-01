@@ -19,15 +19,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Exceptions;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51153 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Exceptions;
+
+@HostPlugin(revision = "$Revision: 51164 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -198,7 +198,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
 
     @Override
     protected boolean preferTitleHTML() {
-        if ("bigwank.com".equals(getHost()) || "fpo.xxx".equals(getHost())) {
+        if ("bigwank.com".equals(getHost()) || "fpo.xxx".equals(getHost()) | "cluset.com".equals(getHost())) {
             return true;
         } else {
             return super.preferTitleHTML();
