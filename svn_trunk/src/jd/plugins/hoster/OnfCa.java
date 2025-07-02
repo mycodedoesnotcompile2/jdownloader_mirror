@@ -17,11 +17,6 @@ package jd.plugins.hoster;
 
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -32,7 +27,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49100 $", interfaceVersion = 3, names = { "onf.ca", "nfb.ca" }, urls = { "https?://(?:www\\.)?onf\\.ca/film/([a-z0-9\\-_]+)", "https?://(?:www\\.)?nfb\\.ca/film/([a-z0-9\\-_]+)" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+
+@HostPlugin(revision = "$Revision: 51170 $", interfaceVersion = 3, names = { "onf.ca", "nfb.ca" }, urls = { "https?://(?:www\\.)?onf\\.ca/film/([a-z0-9\\-_]+)", "https?://(?:www\\.)?nfb\\.ca/film/([a-z0-9\\-_]+)" })
 public class OnfCa extends PluginForHost {
     public OnfCa(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,16 +89,18 @@ public class OnfCa extends PluginForHost {
         /* Double-check */
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("id=\"MESSAGE_GEOBLOCKED\"")) {
+        } else if (br.containsHTML("id\\s*=\\s*\"MESSAGE_GEOBLOCKED\"")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "GEO-blocked");
         }
-        final String hlsMaster = br.getRegex("source\\s*:\\s*'(https?://[^<>\"\\']+\\.m3u8)").getMatch(0);
+        final String hlsMaster = br.getRegex("\"?source\"?\\s*:\\s*(\"|')(https?://[^<>\"\\']+\\.m3u8)").getMatch(1);
         if (hlsMaster == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.getPage(hlsMaster);
-        br.getPage(hlsMaster);
         final HlsContainer hlsBest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+        if (hlsBest == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         checkFFmpeg(link, "Download a HLS Stream");
         dl = new HLSDownloader(link, br, hlsBest.getDownloadurl());
         dl.startDownload();

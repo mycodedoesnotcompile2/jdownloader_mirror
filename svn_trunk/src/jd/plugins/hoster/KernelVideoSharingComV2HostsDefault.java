@@ -19,15 +19,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Exceptions;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Exceptions;
-
-@HostPlugin(revision = "$Revision: 51164 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51171 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -145,6 +145,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "xhand.net" });
         ret.add(new String[] { "megatube.xxx" });
         ret.add(new String[] { "cluset.com" });
+        ret.add(new String[] { "bootyexpo.net" });
         return ret;
     }
 
@@ -199,6 +200,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
     @Override
     protected boolean preferTitleHTML() {
         if ("bigwank.com".equals(getHost()) || "fpo.xxx".equals(getHost()) | "cluset.com".equals(getHost())) {
+            /* cluset.com example with bad title in URL: /videos/10824/100038/ */
             return true;
         } else {
             return super.preferTitleHTML();

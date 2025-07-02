@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51156 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51171 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -240,6 +240,11 @@ public class Offline extends PluginForHost {
         }
         /* UlozTo */
         ret.add(new String[] { "pornfile.ulozto.net", "pinkfile.cz", "pornfile.cz" });
+        ret.add(new String[] { "oboom.io" });
+        ret.add(new String[] { "oceanoffile.com" });
+        ret.add(new String[] { "orgasm.com" });
+        ret.add(new String[] { "streamvid.net" });
+        ret.add(new String[] { "metaraid.io" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

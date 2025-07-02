@@ -13,15 +13,10 @@ import org.jdownloader.plugins.config.Type;
 @PluginHost(host = "kemono.su", type = Type.CRAWLER)
 public interface KemonoPartyConfig extends PluginConfigInterface {
     final String                    text_CrawlHttpLinksFromPostContent = "Crawl http links in post text?";
-    final String                    text_PerPostURLPackage             = "Place each post results into separate package?";
     final String                    text_TextCrawlMode                 = "When to add post text content as .txt file:";
     public static final TRANSLATION TRANSLATION                        = new TRANSLATION();
 
     public static class TRANSLATION {
-        public String getisPerPostURLPackageEnabled_label() {
-            return text_PerPostURLPackage;
-        }
-
         public String getCrawlHttpLinksFromPostContent_label() {
             return text_CrawlHttpLinksFromPostContent;
         }
@@ -32,6 +27,10 @@ public interface KemonoPartyConfig extends PluginConfigInterface {
 
         public String getEnableProfileCrawlerAdvancedDupeFiltering_label() {
             return "Profile crawler: Enable advanced filtering of duplicates via sha256 hash?";
+        }
+
+        public String getPerPostURLPackageEnabled_label() {
+            return "Profile crawler: Place each post results into separate package?";
         }
     }
 
@@ -82,7 +81,6 @@ public interface KemonoPartyConfig extends PluginConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry(text_PerPostURLPackage)
     @Order(40)
     boolean isPerPostURLPackageEnabled();
 

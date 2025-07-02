@@ -22,7 +22,9 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+
+@HostPlugin(revision = "$Revision: 51169 $", interfaceVersion = 3, names = {}, urls = {})
 public class OkXxx extends KernelVideoSharingComV2 {
     public OkXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -50,6 +52,15 @@ public class OkXxx extends KernelVideoSharingComV2 {
             ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:video/\\d+/|embed/\\d+)");
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    protected String getFUIDFromURL(String url) {
+        final String ret = new Regex(url, "/(?:video|embed)/(\\d+)").getMatch(0);
+        if (ret != null) {
+            return ret;
+        }
+        return super.getFUIDFromURL(url);
     }
 
     @Override

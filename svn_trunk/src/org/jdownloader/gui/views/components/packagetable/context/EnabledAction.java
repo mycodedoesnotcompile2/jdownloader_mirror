@@ -3,7 +3,7 @@ package org.jdownloader.gui.views.components.packagetable.context;
 import java.awt.event.ActionEvent;
 import java.util.List;
 
-import javax.swing.ImageIcon;
+import javax.swing.Icon;
 
 import jd.controlling.TaskQueue;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -63,10 +63,10 @@ public class EnabledAction extends CustomizableTableContextAppAction implements 
         ALL_DISABLED(true, getCheckBoxedIcon("select", false, true)),
         MIXED_ENABLE(true, getCheckBoxedIcon("select", true, false)),
         MIXED_DISABLE(false, getCheckBoxedIcon("select", false, false));
-        private final ImageIcon icon;
-        private final boolean   enable;
+        private final Icon    icon;
+        private final boolean enable;
 
-        private State(boolean enable, ImageIcon icon) {
+        private State(boolean enable, Icon icon) {
             this.icon = icon;
             this.enable = enable;
         }
