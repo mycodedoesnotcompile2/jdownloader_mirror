@@ -42,7 +42,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "bibeltv.de" }, urls = { "https?://(?:www\\.)?bibeltv\\.de/mediathek/(videos/crn/\\d+|videos/([a-z0-9\\-]+-\\d+|\\d+-[a-z0-9\\-]+))" })
+@HostPlugin(revision = "$Revision: 51172 $", interfaceVersion = 3, names = { "bibeltv.de" }, urls = { "https?://(?:www\\.)?bibeltv\\.de/mediathek/(videos/crn/\\d+|videos/([a-z0-9\\-]+-\\d+|\\d+-[a-z0-9\\-]+))" })
 public class BibeltvDe extends PluginForHost {
     public BibeltvDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -282,7 +282,7 @@ public class BibeltvDe extends PluginForHost {
             // br2.getHeaders().put("Authorization", key);
             PostRequest r = new PostRequest(link.getPluginPatternMatcher());
             r.setContentType("text/plain;charset=UTF-8");
-            r.setPostDataString("[" + internalVideoID + "]");
+            r.setPostDataString("[" + internalVideoID + ",\"" + fid + "\"]");
             r.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "text/x-component");
             r.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.bibeltv.de");
             // TODO: find Next-Action value

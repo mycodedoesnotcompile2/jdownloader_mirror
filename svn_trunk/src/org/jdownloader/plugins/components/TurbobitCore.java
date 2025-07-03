@@ -12,10 +12,24 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
-import jd.config.Property;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.Request;
@@ -39,30 +53,9 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 import jd.plugins.download.HashInfo;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
-@HostPlugin(revision = "$Revision: 51017 $", interfaceVersion = 2, names = {}, urls = {})
-public class TurbobitCore extends antiDDoSForHost {
-    /**
-     * TODO: Check if we already got errorhandling for this kind of error http://turbobit.net/error/download/dcount/xxxtesst --> "
-     *
-     * An amount of maximum downloads for this link has been exceeded "
-     *
-     * When adding new domains here also add them to the turbobit.net decrypter (TurboBitNetFolder)
-     *
-     */
+@HostPlugin(revision = "$Revision: 51174 $", interfaceVersion = 2, names = {}, urls = {})
+public abstract class TurbobitCore extends antiDDoSForHost {
     /* Settings */
-    // private static final String SETTING_JAC = "SETTING_JAC";
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
     public static final String             SETTING_PREFERRED_DOMAIN                      = "SETTING_PREFERRED_DOMAIN";
     private static String                  PROPERTY_DOWNLOADLINK_checked_atleast_onetime = "checked_atleast_onetime";
@@ -70,6 +63,7 @@ public class TurbobitCore extends antiDDoSForHost {
     private static final boolean           prefer_single_linkcheck_via_mass_linkchecker  = true;
     private static final String            TYPE_premiumRedirectLinks                     = "(?i)(?:https?://[^/]+/)?/?download/redirect/[A-Za-z0-9]+/([a-z0-9]+)";
     private static Map<String, AtomicLong> hostLastPremiumCaptchaProcessedTimestampMap   = new HashMap<String, AtomicLong>();
+    /* Properties */
 
     /**
      * Override this to define a list of dead domains which should be avoided / when present in added URLs, main domain should be preferred.
@@ -78,10 +72,62 @@ public class TurbobitCore extends antiDDoSForHost {
         return null;
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private static AtomicReference<String> userAgent = new AtomicReference<String>(null);
+
+    private Browser prepBrowserGeneral(final Browser brc, String UA) {
+        if (UA == null) {
+            userAgent.compareAndSet(null, UserAgents.stringUserAgent());
+            UA = userAgent.get();
+        }
+        brc.getHeaders().put("Pragma", null);
+        brc.getHeaders().put("Cache-Control", null);
+        brc.getHeaders().put("Accept-Charset", null);
+        brc.getHeaders().put("Accept", "text/html, application/xhtml+xml, */*");
+        brc.getHeaders().put("Accept-Language", "en-EN");
+        brc.getHeaders().put("User-Agent", UA);
+        brc.getHeaders().put("Referer", null);
+        brc.setCustomCharset("UTF-8");
+        brc.setCookie(getMainpage(), "JD", "1");
+        brc.setCookie(getMainpage(), "set_user_lang_change", "en");
+        brc.setCookie(getMainpage(), "user_lang", "en"); // 2025-07-02
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* Prefer new website version in IDE -> For developers */
+            brc.setCookie(getMainpage(), "site_version", "2");
+        } else {
+            /* Stable: Try to enforce usage of current/old website version */
+            brc.setCookie(getMainpage(), "site_version", "1");
+        }
+        return brc;
+    }
+
+    /** Only call this if a valid APIKey is available!! */
+    private Browser prepBrowserAPI(final Browser prepBr, String UA) {
+        prepBrowserGeneral(prepBr, UA);
+        prepBr.getHeaders().put("X-API-KEY", this.getAPIKey());
+        return prepBr;
+    }
+
+    private Browser prepBrowserWebsite(final Browser prepBr, String UA) {
+        prepBrowserGeneral(prepBr, UA);
+        return prepBr;
+    }
+
     public TurbobitCore(final PluginWrapper wrapper) {
         super(wrapper);
         setConfigElements();
-        enablePremium("https://" + this.getHost() + "/turbo/v2/");
+        enablePremium("https://" + getHost() + "/turbo/v2/");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     @Override
@@ -99,6 +145,8 @@ public class TurbobitCore extends antiDDoSForHost {
         return true;
     }
 
+    protected abstract boolean allowWebsiteV2Handling();
+
     /**
      * 2019-05-11: There is also an API-version of this but it seems like it only returns online/offline - no filename/filesize:
      * https://hitfile.net/linkchecker/api
@@ -110,20 +158,19 @@ public class TurbobitCore extends antiDDoSForHost {
         }
         /**
          * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
-         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
-         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
-         * short amount of time!
+         * filesize is not known already. This will speedup the linkcheck! </br>
+         * Disabled = Check for filesize via single-linkcheck even first time links get added as long as no filesize is given. This will
+         * slow down the linkcheck and cause more http requests in a short amount of time!
          */
         final boolean fastLinkcheck = isFastLinkcheckEnabled();
-        final ArrayList<DownloadLink> deepChecks = new ArrayList<DownloadLink>();
+        final List<DownloadLink> deepChecks = new ArrayList<DownloadLink>();
         try {
             final Browser br_linkcheck = createNewBrowserInstance();
             prepBrowserWebsite(br_linkcheck, null);
             br_linkcheck.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             br_linkcheck.setCookiesExclusive(true);
-            br_linkcheck.setFollowRedirects(true);
             final StringBuilder sb = new StringBuilder();
-            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            final List<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
             getPage(br_linkcheck, "https://" + getConfiguredDomain() + "/linkchecker");
             while (true) {
@@ -240,7 +287,6 @@ public class TurbobitCore extends antiDDoSForHost {
     public AvailableStatus requestFileInformation_Web(final DownloadLink link) throws Exception {
         /* premium links should not be accessed here, we will just return true */
         setBrowserExclusive();
-        br.setFollowRedirects(true);
         prepBrowserWebsite(br, userAgent.get());
         accessContentURL(br, link);
         if (isFileOfflineWebsite(br)) {
@@ -267,7 +313,7 @@ public class TurbobitCore extends antiDDoSForHost {
         }
         if (fileSize == null) {
             /* E.g. for hitfile.net, filesize is in brakets '(")(")' */
-            fileSize = br.getRegex("class\\s*=\\s*\"file-size\"\\s*>\\s*\\(?\\s*([^<>\"]*?)\\s*\\)?\\s*<").getMatch(0);
+            fileSize = br.getRegex("class\\s*=\\s*\"file-size\"\\s*>\\s*\\(?\\s*([^<]*?)\\s*\\)?\\s*<").getMatch(0);
         }
         if (fileName != null) {
             link.setName(fileName);
@@ -289,12 +335,14 @@ public class TurbobitCore extends antiDDoSForHost {
         return br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(<div class=\"code-404\">404</div>|Файл не найден\\. Возможно он был удален\\.<br|(?:Document|File|Page)\\s*(was)?\\s*not found|It could possibly be deleted\\.)");
     }
 
-    /** 2019-05-09: Seems like API can only be used to check self uploaded content - <b>it is useless for us</b>! */
+    /**
+     * 2019-05-09: Seems like API can only be used to check self uploaded content! <br>
+     * <b>It is useless for us!!</b>
+     */
     public AvailableStatus requestFileInformation_API(final DownloadLink link) throws Exception {
         if (true) {
             return AvailableStatus.UNCHECKABLE;
         }
-        br.setFollowRedirects(true);
         prepBrowserAPI(br, userAgent.get());
         getPage("https://turbobit.net/v001/files/" + this.getLinkID(link));
         return AvailableStatus.UNCHECKABLE;
@@ -302,47 +350,55 @@ public class TurbobitCore extends antiDDoSForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        login(account, true);
         final AccountInfo ai = new AccountInfo();
-        if (!account.getUser().matches(".+@.+\\..+")) {
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nBitte gib deine E-Mail Adresse ins Benutzername Feld ein!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlease enter your e-mail address in the username field!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        }
-        try {
-            login(account, true);
-        } catch (final PluginException e) {
-            if (br.containsHTML("Our service is currently unavailable in your country\\.")) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nWebsite is currently unavailable in your country!\r\nDiese webseite ist in deinem Land momentan nicht verfügbar!", PluginException.VALUE_ID_PREMIUM_DISABLE, e);
-            } else {
-                throw e;
-            }
-        }
         ai.setUnlimitedTraffic();
-        // >Turbo access till 27.09.2015</span>
-        String expire = br.getRegex(">\\s*Turbo access till\\s*(.*?)\\s*</span>").getMatch(0);
-        if (expire == null) {
-            /* 2019-05-22: hitfile.net */
-            expire = br.getRegex("'/premium(?:/info)?'\\s*>\\s*(\\d+\\.\\d+\\.\\d+)\\s*<").getMatch(0);
-        }
-        if (expire != null) {
-            long endBlockingTime = -1;
-            if (br.containsHTML("<span class='glyphicon glyphicon-ok banturbo'>") || (endBlockingTime = getBlockingEndTime(br, account)) > 0) {
-                if (endBlockingTime > 0) {
-                    final String readableTime = new SimpleDateFormat("yyyy-MM-dd' 'HH':'mm':'ss", Locale.ENGLISH).format(new Date(endBlockingTime));
-                    final long wait = Math.max(5 * 60 * 1000l, Math.min(endBlockingTime - System.currentTimeMillis(), 30 * 60 * 1000l));
-                    throw new AccountUnavailableException("You have reached limit of premium downloads:" + readableTime, wait);
-                } else {
-                    throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
-                }
+        if (allowWebsiteV2Handling()) {
+            final Map<String, Object> entries;
+            if (br.getURL().endsWith("/api/user/info")) {
+                entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            } else {
+                entries = getUserInformationWebsiteV2(br);
             }
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(expire.trim(), "dd.MM.yyyy", Locale.ENGLISH));
-            account.setType(AccountType.PREMIUM);
+            final Map<String, Object> entries_premium = (Map<String, Object>) entries.get("premium");
+            final String status = entries_premium.get("status").toString();
+            if (status.equalsIgnoreCase("inactive")) {
+                account.setType(AccountType.FREE);
+            } else {
+                /* TODO: Implementation of this websiteV2 part is missing */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         } else {
-            account.setType(AccountType.FREE);
+            // >Turbo access till 27.09.2015</span>
+            String expire = br.getRegex(">\\s*Turbo access till\\s*(.*?)\\s*</span>").getMatch(0);
+            if (expire == null) {
+                /* 2019-05-22: hitfile.net */
+                expire = br.getRegex("'/premium(?:/info)?'\\s*>\\s*(\\d+\\.\\d+\\.\\d+)\\s*<").getMatch(0);
+            }
+            if (expire != null) {
+                long endBlockingTime = -1;
+                if (br.containsHTML("<span class='glyphicon glyphicon-ok banturbo'>") || (endBlockingTime = getBlockingEndTime(br, account)) > 0) {
+                    if (endBlockingTime > 0) {
+                        final String readableTime = new SimpleDateFormat("yyyy-MM-dd' 'HH':'mm':'ss", Locale.ENGLISH).format(new Date(endBlockingTime));
+                        final long wait = Math.max(5 * 60 * 1000l, Math.min(endBlockingTime - System.currentTimeMillis(), 30 * 60 * 1000l));
+                        throw new AccountUnavailableException("You have reached limit of premium downloads:" + readableTime, wait);
+                    } else {
+                        throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
+                    }
+                }
+                ai.setValidUntil(TimeFormatter.getMilliSeconds(expire.trim(), "dd.MM.yyyy", Locale.ENGLISH));
+                account.setType(AccountType.PREMIUM);
+            } else {
+                account.setType(AccountType.FREE);
+            }
         }
         return ai;
+    }
+
+    private Map<String, Object> getUserInformationWebsiteV2(final Browser br) throws IOException {
+        br.getPage("https://app." + getHost() + "/api/user/info");
+        final Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        return entries;
     }
 
     protected static long getBlockingEndTime(final Browser br, final Account account) {
@@ -484,7 +540,8 @@ public class TurbobitCore extends antiDDoSForHost {
     }
 
     /**
-     * Fills in captchaForm. </br> DOES NOT SEND CAPTCHA-FORM!!
+     * Fills in captchaForm. </br>
+     * DOES NOT SEND CAPTCHA-FORM!!
      */
     protected boolean processCaptchaForm(final DownloadLink link, final Account account, final Form captchaform, final Browser br, final boolean optionalCaptcha) throws PluginException, InterruptedException {
         if (containsHCaptcha(br)) {
@@ -809,9 +866,8 @@ public class TurbobitCore extends antiDDoSForHost {
             }
             if (dl == null) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadlink");
-            } else {
-                dl.startDownload();
             }
+            dl.startDownload();
         }
     }
 
@@ -848,7 +904,6 @@ public class TurbobitCore extends antiDDoSForHost {
         }
         boolean success = false;
         final boolean previousFollowRedirectState = br.isFollowingRedirects();
-        br.setFollowRedirects(true);
         try {
             switch (downloadType) {
             case ACCOUNT_PREMIUM:
@@ -954,54 +1009,31 @@ public class TurbobitCore extends antiDDoSForHost {
         return false;
     }
 
-    private static AtomicReference<String> userAgent = new AtomicReference<String>(null);
-
-    private Browser prepBrowserGeneral(final Browser prepBr, String UA) {
-        if (UA == null) {
-            userAgent.compareAndSet(null, UserAgents.stringUserAgent());
-            UA = userAgent.get();
-        }
-        prepBr.getHeaders().put("Pragma", null);
-        prepBr.getHeaders().put("Cache-Control", null);
-        prepBr.getHeaders().put("Accept-Charset", null);
-        prepBr.getHeaders().put("Accept", "text/html, application/xhtml+xml, */*");
-        prepBr.getHeaders().put("Accept-Language", "en-EN");
-        prepBr.getHeaders().put("User-Agent", UA);
-        prepBr.getHeaders().put("Referer", null);
-        prepBr.setCustomCharset("UTF-8");
-        prepBr.setCookie(getMainpage(), "JD", "1");
-        prepBr.setCookie(getMainpage(), "set_user_lang_change", "en");
-        return prepBr;
-    }
-
-    /** Only call this if a valid APIKey is available!! */
-    private Browser prepBrowserAPI(final Browser prepBr, String UA) {
-        prepBrowserGeneral(prepBr, UA);
-        prepBr.getHeaders().put("X-API-KEY", this.getAPIKey());
-        return prepBr;
-    }
-
-    private Browser prepBrowserWebsite(final Browser prepBr, String UA) {
-        prepBrowserGeneral(prepBr, UA);
-        return prepBr;
-    }
-
     private void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                setBrowserExclusive();
-                /*
-                 * we have to reuse old UA, else the cookie will become invalid
-                 */
-                String ua = account.getStringProperty("UA");
-                prepBrowserWebsite(br, ua);
-                br.setFollowRedirects(true);
-                final Cookies cookies = account.loadCookies("");
-                getPage(this.getMainpage());
-                final String curr_domain = br.getHost();
-                if (cookies != null) {
-                    logger.info("Attempting cookie login");
-                    br.setCookies(curr_domain, cookies);
+            setBrowserExclusive();
+            /*
+             * We have to reuse old User-Agent, else the cookie will become invalid
+             */
+            final Cookies cookies = account.loadCookies("");
+            String ua = cookies != null ? account.getStringProperty("UA") : null;
+            prepBrowserWebsite(br, ua);
+            getPage(this.getMainpage());
+            final String curr_domain = br.getHost();
+            if (cookies != null) {
+                logger.info("Attempting cookie login");
+                br.setCookies(curr_domain, cookies);
+                if (allowWebsiteV2Handling()) {
+                    try {
+                        getUserInformationWebsiteV2(br);
+                        logger.info("Cookie login successful");
+                        /* Set new cookie timestamp */
+                        br.setCookies(curr_domain, cookies);
+                        return;
+                    } catch (final JSonMapperException ignore) {
+                        logger.info("Cookie login failed");
+                    }
+                } else {
                     /* Request same URL again, this time with cookies set */
                     getPage(br.getURL());
                     if (isLoggedIN(br)) {
@@ -1010,21 +1042,23 @@ public class TurbobitCore extends antiDDoSForHost {
                         br.setCookies(curr_domain, cookies);
                         return;
                     }
-                    logger.info("cookie login failed: Full login is required");
+                    logger.info("Cookie login failed");
                     if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         logger.warning("Cookie login failed MAKE SURE THAT YOU RE-USED THE SAME USER-AGENT AS USED FOR THE FIRST LOGIN ELSE COOKIE LOGIN WILL NOT WORK!!!");
                     }
                 }
-                /* lets set a new User-Agent */
-                logger.info("Performing full login");
-                prepBrowserWebsite(br, null);
-                getPage("https://" + curr_domain + "/login");
-                Form loginform = findAndPrepareLoginForm(br, account);
+            }
+            /* lets set a new User-Agent */
+            logger.info("Performing full login");
+            prepBrowserWebsite(br, null);
+            getPage("https://" + curr_domain + "/login");
+            boolean requiredLoginCaptcha = false;
+            Form loginform = findAndPrepareLoginForm(br, account);
+            if (loginform != null) {
                 submitForm(loginform);
-                boolean requiredLoginCaptcha = false;
-                if (findLoginForm(br, account) != null) {
+                loginform = findAndPrepareLoginForm(br, account);
+                if (loginform != null) {
                     /* Check for stupid login captcha */
-                    loginform = findAndPrepareLoginForm(br, account);
                     DownloadLink link = getDownloadLink();
                     if (link == null) {
                         link = new DownloadLink(this, "Account", account.getHoster(), getMainpage(), true);
@@ -1049,25 +1083,29 @@ public class TurbobitCore extends antiDDoSForHost {
                 universalLoginErrorhandling(br);
                 handlePremiumActivation(br, account);
                 if (!isLoggedIN(br)) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen? Versuche folgendes:\r\n1. Falls dein Passwort Sonderzeichen enthält, ändere es (entferne diese) und versuche es erneut!\r\n2. Gib deine Zugangsdaten per Hand (ohne kopieren/einfügen) ein.\r\n3. Gehe auf folgende Seite, deaktiviere den Login Captcha Schutz deines Accounts und versuche es erneut: " + account.getHoster() + "/user/settings", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nYou're sure that the username and password you entered are correct? Some hints:\r\n1. If your password contains special characters, change it (remove them) and try again!\r\n2. Type in your username/password by hand without copy & paste.\r\n3. Access the following site and disable the login captcha protection of your account and try again: " + account.getHoster() + "/user/settings", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
+                    throw new AccountInvalidException();
                 }
                 if (requiredLoginCaptcha) {
                     /* Display hint to user on how to disable login captchas. */
                     showLoginCaptchaInformation(account);
                 }
-                account.saveCookies(br.getCookies(curr_domain), "");
-                account.setProperty("UA", userAgent.get());
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.setProperty("UA", Property.NULL);
-                    account.clearCookies("");
+            } else if (allowWebsiteV2Handling()) {
+                /* Assume that we are on website version 2.0 (aka new.turbobit.net/login) */
+                final Map<String, Object> postdata = new HashMap<String, Object>();
+                postdata.put("email", account.getUser());
+                postdata.put("password", account.getPass());
+                postdata.put("captcha", true);
+                postdata.put("g-recaptcha-response", "");
+                postdata.put("g-captcha-index", 4);
+                br.postPageRaw("https://app." + br.getHost(false) + "/api/auth/login", JSonStorage.serializeToJson(postdata));
+                final Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String error_name = (String) entries.get("error_name");
+                if (error_name != null) {
+                    throw new AccountInvalidException(error_name);
                 }
-                throw e;
             }
+            account.saveCookies(br.getCookies(curr_domain), "");
+            account.setProperty("UA", userAgent.get());
         }
     }
 
@@ -1158,18 +1196,13 @@ public class TurbobitCore extends antiDDoSForHost {
         if (account == null) {
             return null;
         }
-        final Form loginForm = findLoginForm(br, account);
-        if (loginForm != null) {
-            loginForm.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
-            loginForm.put("user%5Bpass%5D", Encoding.urlEncode(account.getPass()));
-            return loginForm;
-        } else {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        final Form loginForm = br.getFormbyAction("/user/login");
+        if (loginForm == null) {
+            return null;
         }
-    }
-
-    private Form findLoginForm(Browser br, final Account account) {
-        return br.getFormbyAction("/user/login");
+        loginForm.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
+        loginForm.put("user%5Bpass%5D", Encoding.urlEncode(account.getPass()));
+        return loginForm;
     }
 
     public static void universalLoginErrorhandling(final Browser br) throws PluginException {

@@ -172,14 +172,22 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
         }
     }
 
+    private String cleanupPackageName(final RemoteAPIRequest request, final String name) throws IOException {
+        if (StringUtils.isEmpty(name)) {
+            return name;
+        }
+        final String ret = name.replaceFirst("\\s*-\\s*[a-z0-9\\-]+\\.[a-z]{2,3}\\s*$", "");
+        return ret;
+    }
+
     private String getPackageName(final RemoteAPIRequest request) throws IOException {
         String ret = request.getParameterbyKey("package");
         if (StringUtils.isNotEmpty(ret)) {
-            return ret;
+            return cleanupPackageName(request, ret);
         }
         ret = request.getParameterbyKey("source");
         if (ret != null && !ret.matches("^([a-z0-9\\-]+\\.){1,}[a-z0-9]+$") && StringUtils.containsIgnoreCase(request.getParameterbyKey("passwords"), "filecrypt.cc")) {
-            return ret;
+            return cleanupPackageName(request, ret);
         }
         return null;
     }

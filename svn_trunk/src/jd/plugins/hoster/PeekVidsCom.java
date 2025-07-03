@@ -23,6 +23,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -45,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48525 $", interfaceVersion = 2, names = { "peekvids.com" }, urls = { "https?://(?:www\\.)?peekvids\\.com/(?:watch\\?v=|v/)([A-Za-z0-9\\-_]+)(?:/[A-Za-z0-9\\-_]+)?" })
+@HostPlugin(revision = "$Revision: 51173 $", interfaceVersion = 2, names = { "peekvids.com" }, urls = { "https?://(?:www\\.)?peekvids\\.com/(?:watch\\?v=|v/)([A-Za-z0-9\\-_]+)(?:/[A-Za-z0-9\\-_]+)?" })
 public class PeekVidsCom extends PluginForHost {
     public PeekVidsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -199,27 +200,26 @@ public class PeekVidsCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         flashvars = Encoding.htmlDecode(flashvars);
-        int counter = 0;
         for (final String quality : qualities) {
             // dllink = new Regex(flashvars, "\\[" + quality + "\\]=(http[^<>\"]*?)\\&").getMatch(0);
             dllink = new Regex(flashvars, "data-(?:hls-)?src" + quality + "=\"(http[^<>\"]*?)\"").getMatch(0);
-            if (dllink != null) {
-                counter++;
-                if (dllink.contains(".m3u8")) {
-                    /* Do not check hls URLs */
-                    break;
-                } else {
-                    if (checkDirectLink()) {
-                        if (filesize > 0) {
-                            link.setVerifiedFileSize(filesize);
-                        }
-                        break;
+            if (dllink == null) {
+                continue;
+            }
+            if (dllink.contains(".m3u8")) {
+                /* Do not check hls URLs */
+                break;
+            } else {
+                if (checkDirectLink()) {
+                    if (filesize > 0) {
+                        link.setVerifiedFileSize(filesize);
                     }
+                    break;
                 }
             }
         }
-        if (dllink == null && counter == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (dllink == null) {
+            dllink = br.getRegex("<source src=\"(https?://[^\"]+)\"[^<]*type=\"application/x-mpegURL\"").getMatch(0);
         }
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
@@ -269,9 +269,19 @@ public class PeekVidsCom extends PluginForHost {
             /* Very rare case! */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 10 * 60 * 1000l);
         }
-        if (dllink.contains(".m3u8")) {
+        dllink = Encoding.htmlOnlyDecode(dllink);
+        if (StringUtils.containsIgnoreCase(dllink, ".m3u8")) {
             /* HLS download - new since 2020-04-22 */
             checkFFmpeg(link, "Download a HLS Stream");
+            if (StringUtils.containsIgnoreCase(dllink, "master.m3u8")) {
+                /* Find best quality */
+                br.getPage(dllink);
+                final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+                if (hlsbest == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                dllink = hlsbest.getDownloadurl();
+            }
             dl = new HLSDownloader(link, br, dllink);
         } else {
             /* http download */

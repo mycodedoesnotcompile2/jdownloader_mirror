@@ -29,7 +29,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 45698 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51174 $", interfaceVersion = 2, names = {}, urls = {})
 public class HitFileNet extends TurbobitCore {
     public HitFileNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,5 +86,10 @@ public class HitFileNet extends TurbobitCore {
     @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return TurbobitCoreConfigHitfileNet.class;
+    }
+
+    @Override
+    protected boolean allowWebsiteV2Handling() {
+        return true;
     }
 }

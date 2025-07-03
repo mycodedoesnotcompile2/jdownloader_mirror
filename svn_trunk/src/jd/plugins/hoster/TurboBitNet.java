@@ -23,12 +23,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.HostPlugin;
-
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.TurbobitCore;
@@ -37,7 +31,13 @@ import org.jdownloader.plugins.components.config.TurbobitCoreConfigTurbobitNet.P
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 50950 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.HostPlugin;
+
+@HostPlugin(revision = "$Revision: 51174 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurboBitNet extends TurbobitCore {
     public TurboBitNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -158,5 +158,10 @@ public class TurboBitNet extends TurbobitCore {
     @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return TurbobitCoreConfigTurbobitNet.class;
+    }
+
+    @Override
+    protected boolean allowWebsiteV2Handling() {
+        return true;
     }
 }
