@@ -27,10 +27,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51171 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
+        if ("bootyexpo.net".equals(getHost())) {
+            // account required for higher qualities, see https://board.jdownloader.org/showthread.php?t=97550
+            enablePremium();
+        }
     }
 
     /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */

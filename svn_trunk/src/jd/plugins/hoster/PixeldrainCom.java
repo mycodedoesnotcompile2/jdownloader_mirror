@@ -15,9 +15,11 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -56,7 +58,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51152 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,13 +107,53 @@ public class PixeldrainCom extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    /* Docs: https://pixeldrain.com/api */
-    public static final String  API_BASE                                      = "https://pixeldrain.com/api";
     private static final String PROPERTY_CAPTCHA_REQUIRED                     = "captcha_required";
     private static final String PROPERTY_ACCOUNT_HAS_SHOWN_APIKEY_HELP_DIALOG = "has_shown_apikey_help_dialog";
 
-    private String getAPIURLUser() {
-        return API_BASE + "/user";
+    private String getAPIURLUser() throws PluginException, IOException {
+        return getAPIBase(this) + "/user";
+    }
+
+    private static AtomicReference<Object> API_BASE = new AtomicReference<Object>();
+
+    /* Docs: https://pixeldrain.com/api */
+    public static String getAPIBase(Plugin plugin) throws PluginException, IOException {
+        Object ret = API_BASE.get();
+        if (ret instanceof String) {
+            return (String) ret;
+        }
+        synchronized (API_BASE) {
+            ret = API_BASE.get();
+            if (ret instanceof String) {
+                return (String) ret;
+            }
+            for (String host : plugin.siteSupportedNames()) {
+                try {
+                    final String apiBase = "https://" + host + "/api";
+                    final Browser br = plugin.createNewBrowserInstance();
+                    br.setFollowRedirects(true);
+                    br.getPage(apiBase + "/file/BLOCK_CHECK/info");
+                    if (br.containsHTML(">\\s*Object not found\\s*<")) {
+                        /* 2025-07-03: Spanish ISP block */
+                        // <html><body>Object not found</body></html>
+                        // See: https://board.jdownloader.org/showthread.php?t=97560
+                        throw new IOException("Blocked!");
+                    }
+                    final Map<String, Object> response = plugin.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    /* Check for valid/expected json response */
+                    if (response.get("success") instanceof Boolean && response.get("value") instanceof String) {
+                        // {"success":false,"value":"not_found","message":"The entity you requested could not be found"}
+                        plugin.getLogger().info("Auto detected api base:" + apiBase);
+                        API_BASE.set(apiBase);
+                        return getAPIBase(plugin);
+                    }
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } catch (Exception e) {
+                    plugin.getLogger().log(e);
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Blocked by ISP? See: pixeldrain.com/about#toc_8", 30 * 60 * 1000l);
+        }
     }
 
     @Override
@@ -260,7 +302,7 @@ public class PixeldrainCom extends PluginForHost {
                      * In this case, no http request is needed.
                      */
                     if (sb.length() > 0) {
-                        br.getPage(API_BASE + "/file/" + sb.toString() + "/info");
+                        br.getPage(getAPIBase(this) + "/file/" + sb.toString() + "/info");
                         final Object response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
                         if (response instanceof List) {
                             items = (List<Map<String, Object>>) response;
@@ -419,7 +461,7 @@ public class PixeldrainCom extends PluginForHost {
                 query.appendEncoded("recaptcha_response", recaptchaV2Response);
             }
             /* That link shall be direct-downloadable. */
-            dllink = API_BASE + "/file/" + this.getFID(link) + "?" + query.toString();
+            dllink = getAPIBase(this) + "/file/" + this.getFID(link) + "?" + query.toString();
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!looksLikeDownloadableContent(dl.getConnection())) {
@@ -483,7 +525,7 @@ public class PixeldrainCom extends PluginForHost {
              * Once one of these limits is hit, a captcha will be required for downloading.</br>
              * These captchas can be avoided by using free/paid accounts.
              */
-            br.getPage(API_BASE + "/misc/rate_limits");
+            br.getPage(getAPIBase(this) + "/misc/rate_limits");
             /* E.g. {"download_limit":10000,"download_limit_used":0,"transfer_limit":6000000000,"transfer_limit_used":0} */
             /* See also: https://pixeldrain.com/home#pro */
             final Map<String, Object> freelimits = this.checkErrors(br, null, account);
@@ -674,7 +716,11 @@ public class PixeldrainCom extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + getHost() + "/user/connect_app?app=jdownloader";
+        try {
+            return "https://" + getAPIBase(this) + "/user/connect_app?app=jdownloader";
+        } catch (Exception e) {
+            return "https://" + getHost() + "/user/connect_app?app=jdownloader";
+        }
     }
 
     @Override

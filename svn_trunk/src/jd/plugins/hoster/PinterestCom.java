@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PinterestComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50760 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
 public class PinterestCom extends PluginForHost {
     public PinterestCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,19 +136,16 @@ public class PinterestCom extends PluginForHost {
         this.setBrowserExclusive();
         /* 2021-03-02: PINs may redirect to other PINs in very rare cases -> Handle that */
         br.getPage(link.getPluginPatternMatcher());
-        String redirect = br.getRegex("window\\.location\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+        PinterestComDecrypter.checkSinglePINOffline(br);
+        String redirect = br.getRegex("window\\.location\\s*=\\s*\"([^\"]+)").getMatch(0);
         if (redirect != null) {
             /* We want the full URL. */
-            redirect = br.getURL(redirect).toString();
+            redirect = br.getURL(redirect).toExternalForm();
         }
-        if (!new Regex(br.getURL(), PinterestComDecrypter.PATTERN_PIN).patternFind()) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (redirect != null && new Regex(redirect, PinterestComDecrypter.PATTERN_PIN).patternFind() && !redirect.contains(pinID)) {
+        if (redirect != null && new Regex(redirect, PinterestComDecrypter.PATTERN_PIN).patternFind() && !redirect.contains(pinID)) {
             final String newPinID = getPinID(redirect);
             logger.info("Old pinID: " + pinID + " | New pinID: " + newPinID + " | New URL: " + redirect);
-            link.setPluginPatternMatcher(redirect);
-        } else if (redirect != null && redirect.contains("show_error=true")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            // link.setPluginPatternMatcher(redirect);
         }
         Map<String, Object> pinMap;
         final Account account = AccountController.getInstance().getValidAccount(this);

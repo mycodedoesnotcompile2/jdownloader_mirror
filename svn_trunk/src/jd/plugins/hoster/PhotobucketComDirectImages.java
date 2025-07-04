@@ -32,7 +32,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50619 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51177 $", interfaceVersion = 3, names = {}, urls = {})
 /** Helper plugin to download image hotlinks from photobucket.com without serverside "watermark protection". */
 public class PhotobucketComDirectImages extends PluginForHost {
     public PhotobucketComDirectImages(PluginWrapper wrapper) {
@@ -109,7 +109,9 @@ public class PhotobucketComDirectImages extends PluginForHost {
 
     @Override
     protected void throwConnectionExceptions(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
-        if (con.getResponseCode() == 404) {
+        if (con.getResponseCode() == 403) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403: Image is currently unavailable");
+        } else if (con.getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Server error 404");
         }
         super.throwConnectionExceptions(br, con);
