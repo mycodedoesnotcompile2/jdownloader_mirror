@@ -30,7 +30,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51181 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixRouteCom extends XFileSharingProBasic {
     public PixRouteCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -146,5 +146,11 @@ public class PixRouteCom extends XFileSharingProBasic {
     public boolean isImagehoster() {
         /* 2019-07-02: Special */
         return true;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_alt() {
+        /* 2025-07-04: Not supported anymore */
+        return false;
     }
 }

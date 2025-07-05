@@ -27,20 +27,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -68,7 +54,21 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51177 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51182 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -97,11 +97,9 @@ public class XHamsterCom extends PluginForHost {
             }
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br>
-         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
-         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br>
-         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
+         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -827,34 +825,34 @@ public class XHamsterCom extends PluginForHost {
     public String getDllink(final Browser br) throws IOException, PluginException {
         final SubConfiguration cfg = getPluginConfig();
         final int selected_format = cfg.getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, default_SETTING_SELECTED_VIDEO_FORMAT);
-        int selectedQualityHeight = -1;
+        Integer selectedQualityHeight = null;
         final List<String> qualities = new ArrayList<String>();
         switch (selected_format) {
         /* Fallthrough to automatically choose the next best quality */
         default:
+        case 0:// best
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : -1;
         case 7:
             qualities.add("2160p");
-            selectedQualityHeight = 2160;
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 2160;
         case 6:
             qualities.add("1440p");
-            selectedQualityHeight = 1440;
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 1440;
         case 5:
             qualities.add("1080p");
-            selectedQualityHeight = 1080;
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 1080;
         case 4:
             qualities.add("960p");
-            selectedQualityHeight = 960;
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 960;
         case 3:
             qualities.add("720p");
-            selectedQualityHeight = 720;
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 720;
         case 2:
             qualities.add("480p");
-            selectedQualityHeight = 480;
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 480;
         case 1:
             qualities.add("240p");
-            selectedQualityHeight = 240;
-        case 0:
-            selectedQualityHeight = -1;
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 240;
         }
         int chosenQualityHeight = -1;
         String chosenQualityDownloadurl = null;
@@ -905,8 +903,6 @@ public class XHamsterCom extends PluginForHost {
                         chosenQualityDownloadurl = url;
                         return url;
                     }
-                }
-                if (chosenQualityDownloadurl == null && bestProgressiveQualityDownloadurl != null) {
                 }
             }
             if (chosenQualityDownloadurl == null && bestProgressiveQualityDownloadurl == null) {
@@ -1620,10 +1616,9 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br>
-             * Redirects to mainpage if cookies are invalid. </br>
-             * Return json if cookies are valid. </br>
-             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
+             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
+             * user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */
