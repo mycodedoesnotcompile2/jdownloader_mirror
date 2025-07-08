@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornktuBe extends KernelVideoSharingComV2 {
     public PornktuBe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -90,7 +90,7 @@ public class PornktuBe extends KernelVideoSharingComV2 {
 
     @Override
     protected boolean isOfflineWebsite(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*Video removed at request of the owner")) {
+        if (br.containsHTML(">\\s*Video removed at request of the owner")) {
             /* 2021-11-23: Special */
             return true;
         } else if (super.isOfflineWebsite(br)) {

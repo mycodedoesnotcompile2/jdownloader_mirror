@@ -22,6 +22,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
@@ -53,7 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51181 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51188 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -152,14 +153,14 @@ public abstract class TurbobitCore extends PluginForHost {
         final boolean fastLinkcheck = isFastLinkcheckEnabled();
         final List<DownloadLink> linksForDeepCheck = new ArrayList<DownloadLink>();
         try {
-            final Browser br_linkcheck = createNewBrowserInstance();
-            prepBrowserWebsiteV1(br_linkcheck);
-            br_linkcheck.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            br_linkcheck.setCookiesExclusive(true);
+            final Browser brc = createNewBrowserInstance();
+            prepBrowserWebsiteV1(brc);
+            brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            brc.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();
             final List<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
-            br_linkcheck.getPage("https://" + getConfiguredDomain() + "/linkchecker?site_version=1&from_mirror=1");
+            brc.getPage("https://" + getConfiguredDomain() + "/linkchecker?site_version=1&from_mirror=1");
             while (true) {
                 links.clear();
                 while (true) {
@@ -182,20 +183,17 @@ public abstract class TurbobitCore extends PluginForHost {
                  * '/linkchecker/csv' is the official "API" method but this will only return fileID and online/offline - not even the
                  * filename
                  */
-                br_linkcheck.postPage("https://" + br_linkcheck.getHost() + "/linkchecker/check", sb.toString());
+                brc.postPage("https://" + brc.getHost() + "/linkchecker/check", sb.toString());
                 for (final DownloadLink link : links) {
-                    final Regex fileInfo = br_linkcheck.getRegex("<td>" + getFUID(link) + "</td>\\s*<td>([^<]+)</td>\\s*<td style=\"text-align:center;\">(?:[\t\n\r ]*)?<img src=\"(?:[^\"]+)?/(done|error)\\.png\"");
-                    if (fileInfo.getMatches() == null || fileInfo.getMatches().length == 0) {
-                        /*
-                         * 2020-01-27: E.g. "<p>Number of requests exceeded the limit. Please wait 5 minutes to check links again</p></div>"
-                         */
-                        link.setAvailableStatus(AvailableStatus.UNCHECKED);
-                        logger.warning("Unable to check link: " + link.getPluginPatternMatcher());
+                    final String file_id = getFUID(link);
+                    if (brc.containsHTML("<td>" + file_id + "</td>\\s*<td>\\s*</td>\\s*<td[^>]*>\\s*<img src=\"[^\"]*/error\\.png")) {
+                        /* File is offline */
+                        link.setAvailable(false);
                     } else {
-                        if (fileInfo.getMatch(1).equals("error")) {
-                            link.setAvailable(false);
-                        } else {
-                            final String name = fileInfo.getMatch(0);
+                        final Regex fileInfo = brc.getRegex("<td>" + file_id + "</td>\\s*(<td>([^<]+)</td>\\s*)?<td style=\"text-align:center;\">\\s*<img src=\"[^\"]*/(done|error)\\.png\"");
+                        if (fileInfo.patternFind()) {
+                            /* File is online */
+                            final String name = fileInfo.getMatch(1);
                             link.setAvailable(true);
                             link.setFinalFileName(Encoding.htmlDecode(name).trim());
                             final boolean checkedBeforeAlready = link.getBooleanProperty(PROPERTY_DOWNLOADLINK_checked_atleast_onetime, false);
@@ -204,6 +202,13 @@ public abstract class TurbobitCore extends PluginForHost {
                             }
                             /* Allows it to look for the filesize on 2nd linkcheck. */
                             link.setProperty(PROPERTY_DOWNLOADLINK_checked_atleast_onetime, true);
+                        } else {
+                            /*
+                             * 2020-01-27: E.g.
+                             * "<p>Number of requests exceeded the limit. Please wait 5 minutes to check links again</p></div>"
+                             */
+                            link.setAvailableStatus(AvailableStatus.UNCHECKED);
+                            logger.warning("Unable to check link: " + link.getPluginPatternMatcher());
                         }
                     }
                 }
@@ -429,8 +434,14 @@ public abstract class TurbobitCore extends PluginForHost {
         ai.setStatus(account.getType().getLabel() + " | Monthly traffic left: " + monthlyTrafficLeftInfo);
     }
 
+    /**
+     * Alternative way to check if we're logged in: https://app.turbobit.net/api/site-data <br>
+     * {"country":{"id":12345,"code":"de"},"defaultLanguage":"en","userFingerprint":"REDACTED","user":{"login":"xxx@xxy.org","premium":{"status":"active","expiredAt":"2025-01-01
+     * 01:01:01"}},"contacts":{"supportEmail":"REDACTED","abuseEmail":"REDACTED","helpUrl":"https:\/\/trbt.cc\/zendesk\/redirect?path=https:\/\/turbobit-net.zendesk.com","dmcaUrl":"\/\/www.dmca.com\/Protection\/Status.aspx?ID=REDACTED&refurl=https:\/\/app.turbobit.net\/rules\/abuse","help2Url":"https:\/\/help2.turbobit.net\/hc\/en-us"},"correctUrl":null,"siteV2Available":true,"shortDomain":"trbt.cc"}
+     */
     private Map<String, Object> getUserInformationWebsiteV2(final Browser br, final Account account) throws IOException, PluginException {
         br.getPage(getWebsiteV2Base() + "/api/user/info");
+        /* 2025-07-07: Redirects to this page when we are not logged in: https://app.turbobit.net?login=true */
         final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
         return entries;
     }
@@ -1118,18 +1129,15 @@ public abstract class TurbobitCore extends PluginForHost {
                 logger.info("Attempting cookie login");
                 br.setCookies(curr_domain, cookies);
                 if (allowWebsiteV2Handling()) {
-                    /**
-                     * Alternative way to check if we're logged in: https://app.turbobit.net/api/site-data <br>
-                     * {"country":{"id":12345,"code":"de"},"defaultLanguage":"en","userFingerprint":"REDACTED","user":{"login":"xxx@xxy.org","premium":{"status":"active","expiredAt":"2025-01-01
-                     * 01:01:01"}},"contacts":{"supportEmail":"REDACTED","abuseEmail":"REDACTED","helpUrl":"https:\/\/trbt.cc\/zendesk\/redirect?path=https:\/\/turbobit-net.zendesk.com","dmcaUrl":"\/\/www.dmca.com\/Protection\/Status.aspx?ID=REDACTED&refurl=https:\/\/app.turbobit.net\/rules\/abuse","help2Url":"https:\/\/help2.turbobit.net\/hc\/en-us"},"correctUrl":null,"siteV2Available":true,"shortDomain":"trbt.cc"}
-                     */
+                    br.clearCookies(null);
                     try {
                         final Map<String, Object> entries = getUserInformationWebsiteV2(br, account);
                         logger.info("Cookie login successful");
                         /* Set new cookie timestamp */
                         br.setCookies(curr_domain, cookies);
                         return entries;
-                    } catch (final JSonMapperException ignore) {
+                    } catch (final PluginException ignore) {
+                        logger.log(ignore);
                         logger.info("Cookie login failed");
                     }
                 } else {
@@ -1156,7 +1164,8 @@ public abstract class TurbobitCore extends PluginForHost {
             if (loginform != null) {
                 br.submitForm(loginform);
                 loginform = findAndPrepareLoginForm(br, account);
-                if (loginform != null) {
+                if (!isLoggedIN(br) && loginform != null) {
+                    logger.info("Loginform is present again after login attempt");
                     /* Check for stupid login captcha */
                     DownloadLink link = getDownloadLink();
                     if (link == null) {
@@ -1201,8 +1210,11 @@ public abstract class TurbobitCore extends PluginForHost {
                         // same as account password?
                         predefinedpremiumkey = account.getPass();
                     }
-                    br.postPage("/payments/premium/process", "premium=" + URLEncode.encodeRFC2396(predefinedpremiumkey) + "&email=" + URLEncode.encodeRFC2396(predefinedemail));
-                    final Map<String, Object> response = restoreFromString(br.toString(), TypeRef.MAP);
+                    final UrlQuery loginquery = new UrlQuery();
+                    loginquery.appendEncoded("premium", predefinedpremiumkey);
+                    loginquery.appendEncoded("email", URLEncode.encodeRFC2396(predefinedemail));
+                    br.postPage("/payments/premium/process", loginquery);
+                    final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     if (Boolean.TRUE.equals(response.get("success"))) {
                         final String redirect = (String) response.get("redirect");
                         if (redirect != null) {

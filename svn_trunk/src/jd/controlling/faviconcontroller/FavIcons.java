@@ -170,11 +170,15 @@ public class FavIcons {
             }
             if (image != null) {
                 try {
-                    if (REFRESHED_ICONS.add(host)) {
+                    refreshIcon: if (REFRESHED_ICONS.add(host)) {
                         if ("file".equalsIgnoreCase(url.getProtocol())) {
                             final File file = new File(url.toURI());
+                            if (file.isFile() && !file.canWrite()) {
+                                // do not refresh write protected files
+                                break refreshIcon;
+                            }
                             final long lastModified = file.lastModified();
-                            if ((lastModified > 0 && System.currentTimeMillis() - lastModified > REFRESH_TIMEOUT) && file.exists()) {
+                            if ((lastModified > 0 && System.currentTimeMillis() - lastModified > REFRESH_TIMEOUT) && file.isFile()) {
                                 file.setLastModified(System.currentTimeMillis());// avoid retry before expired
                                 if (updatePermission) {
                                     add(host, requestor);

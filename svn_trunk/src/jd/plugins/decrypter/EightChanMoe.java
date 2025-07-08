@@ -27,6 +27,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Cookie;
+import jd.http.Request;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -42,9 +43,10 @@ import jd.plugins.hoster.DirectHTTP;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.EightChanMoeConfig;
+import org.jdownloader.plugins.components.config.EightChanMoeConfig.POSTANCHORMODE;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 51151 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51187 $", interfaceVersion = 2, names = {}, urls = {})
 public class EightChanMoe extends PluginForDecrypt {
     /**
      * https://gitgud.io/LynxChan/LynxChan/-/blob/master/doc/Json.txt
@@ -91,12 +93,20 @@ public class EightChanMoe extends PluginForDecrypt {
     }
 
     private static final String TYPE_THREAD = "https?://([^/]+)/([^/]+)/res/(\\d+)\\.html(#q?(\\d+))?";
+    private EightChanMoeConfig  config      = null;
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
+        config = PluginJsonConfig.get(this.getConfigInterface());
         if (param.getCryptedUrl().matches(TYPE_THREAD)) {
             return crawlSingleThreadAPI(param);
         }
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    }
+
+    @Override
+    public void clean() {
+        super.clean();
+        config = null;
     }
 
     private Browser prepBrAPI(final Browser br) {
@@ -135,7 +145,7 @@ public class EightChanMoe extends PluginForDecrypt {
     }
 
     private List<DownloadLink> parseFiles(final Browser br, List<Map<String, Object>> files) throws PluginException, IOException {
-        final boolean preferServerFilenames = PluginJsonConfig.get(this.getConfigInterface()).isPreferServerFilenamesOverPluginDefaultFilenames();
+        final boolean preferServerFilenames = config.isPreferServerFilenamesOverPluginDefaultFilenames();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (files == null || files.size() == 0) {
             return ret;
@@ -162,17 +172,17 @@ public class EightChanMoe extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlSingleThreadAPI(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
+    private ArrayList<DownloadLink> parseResponse(final CryptedLink param, final Request request, POSTANCHORMODE postMode) throws IOException, PluginException, DecrypterRetryException {
         final String boardDomain = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(0);
         final String boardShort = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(1);
         final String threadID = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(2);
-        final String requestedPostId = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(4);
+        String requestedPostId = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(4);
+        if (POSTANCHORMODE.THREAD.equals(postMode)) {
+            requestedPostId = null;
+        }
         if (boardDomain == null || boardShort == null || threadID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        prepBrAPI(this.br);
-        getPage(br, "https://" + boardDomain + "/" + boardShort + "/res/" + threadID + ".json");
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -195,13 +205,7 @@ public class EightChanMoe extends PluginForDecrypt {
                 ret.addAll(postItems);
             }
         }
-        if (ret.size() == 0) {
-            if (requestedPostId != null) {
-                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "EMPTY_THREAD_POST" + threadID + "_" + requestedPostId, "Thread " + threadID + " doesn't contain any media for post " + requestedPostId);
-            } else {
-                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "EMPTY_THREAD" + threadID, "Thread " + threadID + " doesn't contain any media");
-            }
-        } else {
+        if (ret.size() > 0) {
             final FilePackage fp = FilePackage.getInstance();
             if (requestedPostId != null) {
                 fp.setName(getHost() + " - " + boardName + " - " + threadID + " - " + requestedPostId);
@@ -209,6 +213,31 @@ public class EightChanMoe extends PluginForDecrypt {
                 fp.setName(getHost() + " - " + boardName + " - " + threadID);
             }
             fp.addLinks(ret);
+        }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> crawlSingleThreadAPI(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
+        final String boardDomain = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(0);
+        final String boardShort = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(1);
+        final String threadID = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(2);
+        final String requestedPostId = new Regex(param.getCryptedUrl(), TYPE_THREAD).getMatch(4);
+        if (boardDomain == null || boardShort == null || threadID == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        prepBrAPI(this.br);
+        getPage(br, "https://" + boardDomain + "/" + boardShort + "/res/" + threadID + ".json");
+        final POSTANCHORMODE postMode = config.getPostAnchorMode();
+        ArrayList<DownloadLink> ret = parseResponse(param, br.getRequest(), postMode);
+        if (ret.size() == 0 && POSTANCHORMODE.POST_OR_THREAD.equals(postMode)) {
+            ret = parseResponse(param, br.getRequest(), POSTANCHORMODE.THREAD);
+        }
+        if (ret.size() == 0) {
+            if (requestedPostId != null) {
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "EMPTY_THREAD_POST" + threadID + "_" + requestedPostId, "Thread " + threadID + " doesn't contain any media for post " + requestedPostId);
+            } else {
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "EMPTY_THREAD" + threadID, "Thread " + threadID + " doesn't contain any media");
+            }
         }
         return ret;
     }
