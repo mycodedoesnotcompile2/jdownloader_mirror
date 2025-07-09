@@ -79,7 +79,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51168 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51189 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1017,7 +1017,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
 
     protected String regexNormalTitleWebsite(final Browser br) {
         String best = null;
-        final String header = br.getRegex("<h(?:1|2)>\\s*(.*?)\\s*</h(?:1|2)>").getMatch(0);
+        final String header = br.getRegex("<h(1|2)[^>]*>\\s*(.*?)\\s*</h\\1>").getMatch(1);
         if (StringUtils.isNotEmpty(header)) {
             best = header;
         }
@@ -1029,7 +1029,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (best == null || (ogTitle != null && ogTitle.length() < best.length())) {
             best = ogTitle;
         }
-        String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        String title = br.getRegex("<title[^>]*>([^<]+)</title>").getMatch(0);
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
             /* Remove "mytitle - domain.tld" and similar */

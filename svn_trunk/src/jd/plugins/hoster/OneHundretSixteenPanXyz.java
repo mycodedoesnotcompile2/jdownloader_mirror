@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51188 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51191 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,6 +54,8 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             this.enablePremium("https://www." + getHost() + "/vip");
         }
     }
+
+    private static final String PROPERTY_INTERNAL_FILE_ID = "internal_file_id";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -93,9 +95,13 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
 
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String fid = getFID(link);
-        if (fid != null) {
-            return this.getHost() + "://" + fid;
+        /* Prefer internal file_id (only numbers) over alphanumeric file_id from URL. */
+        String file_id = link.getStringProperty(PROPERTY_INTERNAL_FILE_ID);
+        if (file_id == null) {
+            file_id = getFID(link);
+        }
+        if (file_id != null) {
+            return this.getHost() + "://" + file_id;
         } else {
             return super.getLinkID(link);
         }
@@ -107,6 +113,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
+        // TODO: Check this value
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
@@ -121,6 +128,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
+        // TODO: Check this value
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
@@ -135,13 +143,25 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformation(link, null);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        final String fid = this.getFID(link);
+        if (!link.isNameSet()) {
+            link.setName(fid);
+        }
         this.setBrowserExclusive();
+        if (account != null) {
+            this.login(account, false);
+        }
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> props = getPageProps(br, link, null);
+        final Map<String, Object> entries = getParsedJsonFromHTML(br, link, null);
+        final Map<String, Object> props = (Map<String, Object>) entries.get("props");
         final Map<String, Object> file = (Map<String, Object>) props.get("file");
         final String title = file.get("file_name").toString();
         final String file_extension = file.get("file_extension").toString();
@@ -152,7 +172,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         }
         // file.get("vipfile");
         final String internal_file_id = file.get("file_id").toString();
-        link.setProperty("internal_file_id", internal_file_id);
+        link.setProperty(PROPERTY_INTERNAL_FILE_ID, internal_file_id);
         return AvailableStatus.TRUE;
     }
 
@@ -170,35 +190,58 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            if (account == null || account.getType() != AccountType.PREMIUM) {
+            this.requestFileInformation(link, account);
+            final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)").getMatch(0);
+            if (csrftoken == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            if (account != null && account.getType() == AccountType.PREMIUM) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Premium download hasn't been implemented yet");
+            } else {
                 /*
                  * 2025-07-07: Free download looks to be broken -> Returns error even when correct captcha is entered:
                  * {"message":"Unauthenticated."}
                  */
-                throw new AccountRequiredException("Premium account required");
-            }
-            final String internal_file_id = link.getStringProperty("internal_file_id");
-            if (internal_file_id == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final String code = getCaptchaCode("/captcha?" + System.currentTimeMillis(), link);
-            final Random random = new Random();
-            final String[] commonResolutions = { "1920x1080", "1366x768", "1440x900", "1536x864", "1280x720", "1024x768", "1680x1050", "1600x900", "1280x1024", "1920x1200", "2560x1440", "3840x2160", "1280x800", "1152x864", "1024x600", "1400x1050", "1280x960", "1600x1200", "2560x1600", "3440x1440", "2560x1080", "1920x1440", "1280x768", "1360x768", "1440x1080" };
-            final String randomResolution = commonResolutions[random.nextInt(commonResolutions.length)];
-            final Map<String, Object> postdata = new HashMap<String, Object>();
-            final int rand_x = random.nextInt(100);
-            final int rand_y = random.nextInt(100);
-            postdata.put("captcha", code);
-            postdata.put("click_pos", rand_x + "," + rand_y);
-            postdata.put("ref", "");
-            postdata.put("screen", randomResolution);
-            postdata.put("type", "normal");
-            br.postPageRaw("/f/" + internal_file_id + "/generate-download", JSonStorage.serializeToJson(postdata));
-            final Map<String, Object> data = this.checkErrorsWebapi(br, link, account);
-            /* TODO: Add generic error handling and check for wrong captcha */
-            dllink = br.getRegex("").getMatch(0);
-            if (StringUtils.isEmpty(dllink)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                final boolean freeDownloadIsBrokenOrDisabledServerSide = true;
+                if (freeDownloadIsBrokenOrDisabledServerSide) {
+                    throw new AccountRequiredException("Premium account required");
+                }
+                // if ((account == null || account.getType() == AccountType.FREE) && freeDownloadIsBrokenOrDisabledServerSide) {
+                // throw new AccountRequiredException("Premium account required");
+                // }
+                final String internal_file_id = link.getStringProperty(PROPERTY_INTERNAL_FILE_ID);
+                if (internal_file_id == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final String code = getCaptchaCode("/captcha?" + System.currentTimeMillis(), link);
+                final Random random = new Random();
+                final String[] commonResolutions = { "1920x1080", "1366x768", "1440x900", "1536x864", "1280x720", "1024x768", "1680x1050", "1600x900", "1280x1024", "1920x1200", "2560x1440", "3840x2160", "1280x800", "1152x864", "1024x600", "1400x1050", "1280x960", "1600x1200", "2560x1600", "3440x1440", "2560x1080", "1920x1440", "1280x768", "1360x768", "1440x1080" };
+                final String randomResolution = commonResolutions[random.nextInt(commonResolutions.length)];
+                final Map<String, Object> postdata = new HashMap<String, Object>();
+                final int rand_x = random.nextInt(100);
+                final int rand_y = random.nextInt(100);
+                postdata.put("captcha", code);
+                postdata.put("click_pos", rand_x + "," + rand_y);
+                postdata.put("ref", "");
+                postdata.put("screen", randomResolution);
+                postdata.put("type", "normal");
+                br.getHeaders().put("Content-Type", "application/json");
+                br.getHeaders().put("Origin", "https://www.116pan.xyz");
+                br.getHeaders().put("x-csrf-token", csrftoken);
+                br.getHeaders().put("x-requested-with", "XMLHttpRequest");
+                /* 2025-07-07: Website sends x-csrf-token header twice with different values */
+                // br.getHeaders().put("x-xsrf-token", "");
+                /*
+                 * TODO: 2025-07-08: Fix this request for downloads without account (though at this moment anonymous downloads are
+                 * broken/disabled anyways so this has no priority)
+                 */
+                br.postPageRaw("/f/" + internal_file_id + "/generate-download", JSonStorage.serializeToJson(postdata));
+                final Map<String, Object> data = this.checkErrorsWebapi(br, link, account);
+                /* TODO: Add generic error handling and check for wrong captcha */
+                dllink = br.getRegex("").getMatch(0);
+                if (StringUtils.isEmpty(dllink)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
         }
         try {
@@ -253,7 +296,8 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
                     logger.info("Cookie login successful");
                     /* Refresh cookie timestamp */
                     account.saveCookies(br.getCookies(br.getHost()), "");
-                    return this.getPageProps(br, null, account);
+                    final Map<String, Object> entries = this.getParsedJsonFromHTML(br, null, account);
+                    return (Map<String, Object>) entries.get("props");
                 } else {
                     logger.info("Cookie login failed");
                     br.clearCookies(null);
@@ -261,32 +305,27 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             }
             logger.info("Performing full login");
             br.getPage("https://www." + this.getHost() + "/login");
-            final Map<String, Object> props_before_login = checkErrorsWebapi(br, null, account);
-            final String x_inertia_version = props_before_login.get("version").toString();
+            final Map<String, Object> entries_before_login = getParsedJsonFromHTML(br, null, account);
+            final String x_inertia_version = entries_before_login.get("version").toString();
             final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)").getMatch(0);
             if (csrftoken == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final String code = getCaptchaCode("/captcha/default?" + System.currentTimeMillis(), this.getDownloadLink());
-            if (!code.matches("\\d+")) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Invalid captcha format: Only numbers are allowed");
-            }
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("captcha", code);
             postdata.put("login", account.getUser());
             postdata.put("password", account.getPass());
             postdata.put("remember", true);
-            // br.setAllowedResponseCodes(419);
             br.getHeaders().put("Content-Type", "application/json");
             br.getHeaders().put("Origin", "https://www.116pan.xyz");
             br.getHeaders().put("x-csrf-token", csrftoken);
-            /* 2025-07-07: Browser sends true, we use false */
             br.getHeaders().put("x-inertia", "true");
             br.getHeaders().put("x-inertia-version", x_inertia_version);
             br.getHeaders().put("x-requested-with", "XMLHttpRequest");
             /* 2025-07-07: Website sends x-csrf-token header twice with different values */
             // br.getHeaders().put("x-xsrf-token", "");
-            // br.setAllowedResponseCodes(409);
+            /* Returns response code "419 unknown status" if a required header is missing */
             br.postPageRaw("/login", JSonStorage.serializeToJson(postdata));
             final Map<String, Object> props_after_login = checkErrorsWebapi(br, null, account);
             final String errorMsg = (String) props_after_login.get("captchaError");
@@ -304,11 +343,12 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
     }
 
     /** Find json in html and return map "props" in parsed json. */
-    private Map<String, Object> getPageProps(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+    private Map<String, Object> getParsedJsonFromHTML(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         String json = br.getRegex("data-page=\"([^\"]+)").getMatch(0);
         json = Encoding.htmlOnlyDecode(json);
         final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-        return (Map<String, Object>) entries.get("props");
+        checkErrorsWebapi(entries, link, account);
+        return entries;
     }
 
     private Map<String, Object> checkErrorsWebapi(final Browser br, final DownloadLink link, final Account account) throws PluginException {
@@ -326,30 +366,36 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
                 throw new AccountUnavailableException(errortext, waitmillis);
             }
         }
-        final Map<String, Object> props = (Map<String, Object>) entries.get("props");
-        // TODO: Implement error handling
-        // final String error_message = (String) entries.get("message");
-        final String error_name = (String) entries.get("blablub_TODO");
-        if (error_name == null) {
+        return checkErrorsWebapi(entries, link, account);
+    }
+
+    private Map<String, Object> checkErrorsWebapi(final Map<String, Object> entries, final DownloadLink link, final Account account) throws PluginException {
+        // TODO: Implement more error handling
+        final String error_msg = (String) entries.get("message");
+        if (error_msg == null) {
             /* No error */
+            final Map<String, Object> props = (Map<String, Object>) entries.get("props");
             return props;
         }
-        return null;
-        // if (error_name.equalsIgnoreCase("file_is_not_available_for_download")) {
-        // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        // }
-        // if (link == null) {
-        // /* Account related error e.g. password_incorrect, invalid_captcha */
-        // throw new AccountInvalidException(error_name);
-        // } else {
-        // throw new PluginException(LinkStatus.ERROR_FATAL, error_name);
-        // }
+        if (Boolean.TRUE.equals(entries.get("captcha_error"))) {
+            /*
+             * Captcha error on download attempt:
+             * {"success":false,"message":"\u9a8c\u8bc1\u7801\u9519\u8bef\uff0c\u8bf7\u91cd\u65b0\u8f93\u5165","captcha_error":true}
+             */
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA, error_msg);
+        }
+        if (link == null) {
+            /* Account related error e.g. password_incorrect, invalid_captcha */
+            throw new AccountInvalidException(error_msg);
+        } else {
+            throw new PluginException(LinkStatus.ERROR_FATAL, error_msg);
+        }
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> props = login(account, true);
+        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user = (Map<String, Object>) props.get("user");
         final Map<String, Object> user_download_quota = (Map<String, Object>) user.get("download_quota");
         final Number reg_time = (Number) user.get("reg_time");
@@ -367,6 +413,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             account.setType(AccountType.FREE);
         }
         if (user_download_quota != null) {
+            /* Looks to be mostly for free users. They can download X files per day. */
             final int dls_daily_limit = ((Number) user_download_quota.get("daily_limit")).intValue();
             final int dls_remaining = ((Number) user_download_quota.get("remaining")).intValue();
             if (dls_remaining <= 0) {
@@ -401,13 +448,5 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             /* Premium accounts do not have captchas */
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

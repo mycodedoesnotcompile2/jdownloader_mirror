@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50774 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51191 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,11 +115,20 @@ public class OneHundretSixteenPanCom extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final String fid = this.getFID(link);
+        if (!link.isNameSet()) {
+            link.setName(fid);
+        }
         br.getPage("https://www." + getHost() + "/viewfile.php?file_id=" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*文件不存在或已删除")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD && br.getHost().equals("116pan.com")) {
+            final String newLink = br.getRegex("window\\.location\\.href = '(https?://(?:www\\.)?116pan\\.xyz/f/[a-zA-Z0-9]+)';").getMatch(0);
+            if (newLink != null) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported redirect to new system: " + newLink);
+            }
         }
         final String filename = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
         String filesize = br.getRegex(">\\s*文件大小：([^<]+)").getMatch(0);

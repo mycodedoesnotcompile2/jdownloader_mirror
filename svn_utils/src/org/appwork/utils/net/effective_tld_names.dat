@@ -14665,6 +14665,10 @@ is-local.org
 // Submitted by Alexander Varwijk <security@getopensocial.com>
 opensocial.site
 
+// OpenAI : https://openai.com
+// Submitted by Thomas Shadwell <security@openai.com>
+*.oaiusercontent.com
+
 // OpenCraft GmbH : http://opencraft.com/
 // Submitted by Sven Marnach <sven@opencraft.com>
 opencraft.hosting
@@ -15665,8 +15669,8 @@ dnsupdate.info
 // Submitted by Gavin Brown <gavin.brown@centralnic.com>
 us.org
 
-// V.UA Domain Administrator : https://domain.v.ua/
-// Submitted by Serhii Rostilo <sergey@rostilo.kiev.ua>
+// V.UA Domain Registry: https://www.v.ua/
+// Submitted by Serhii Rostilo <admin@v.ua>
 v.ua
 
 // Val Town, Inc : https://val.town/

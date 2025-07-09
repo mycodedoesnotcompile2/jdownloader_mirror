@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -33,7 +30,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50745 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51189 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,6 +50,7 @@ public class PixhostTo extends PluginForHost {
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
+
     /* DEV NOTES */
     // Tags: pichost
     // protocol: no https
@@ -85,7 +86,7 @@ public class PixhostTo extends PluginForHost {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:show|thumbs)/((\\d+)/(\\d+)_([^/<>#]+))");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:show|thumbs|images)/((\\d+)/(\\d+)_([^/<>#]+))");
         }
         return ret.toArray(new String[0]);
     }
@@ -124,7 +125,11 @@ public class PixhostTo extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
         dllink = null;
-        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(3);
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        // file name from URL should include fileID for
+        // galleries all images may have same name but
+        // different fileID
+        final String filenameFromURL = urlinfo.getMatch(2) + "_" + urlinfo.getMatch(3);
         if (!link.isNameSet()) {
             link.setName(filenameFromURL);
         }
