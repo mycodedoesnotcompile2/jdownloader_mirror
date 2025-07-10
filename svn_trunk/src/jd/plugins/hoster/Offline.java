@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51173 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51195 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -238,8 +238,7 @@ public class Offline extends PluginForHost {
             ret.add(new String[] { "nippyfile.com" });
             ret.add(new String[] { "yolobit.com" });
         }
-        /* UlozTo */
-        ret.add(new String[] { "pornfile.ulozto.net", "pinkfile.cz", "pornfile.cz" });
+        ret.add(new String[] { "pornfile.ulozto.net", "pinkfile.cz", "pornfile.cz" }); /* UlozTo */
         ret.add(new String[] { "oboom.io" });
         ret.add(new String[] { "oceanoffile.com" });
         ret.add(new String[] { "orgasm.com" });
@@ -247,6 +246,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "metaraid.io" });
         ret.add(new String[] { "oxy.cloud", "oxy.st" });
         ret.add(new String[] { "oydisk.com" });
+        ret.add(new String[] { "poophd.com", "do0d.co", "pooop.online", "poop.com.co" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

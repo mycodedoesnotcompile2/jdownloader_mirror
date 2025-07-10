@@ -18,9 +18,11 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -34,11 +36,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51192 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51199 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
@@ -65,8 +73,14 @@ public class LixstreamCom extends PluginForHost {
          * Current list of domains can be found here: https://lixstream.com/#/file -> Select an uploaded file -> Share -> Dialog pops up ->
          * See "Choose domain"
          */
-        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "doodmv.net", "poopmv.net", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me" });
+        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videy.tv", "doodmv.net", "doodtv.net", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("poopmv.com");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -81,7 +95,7 @@ public class LixstreamCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/s/([a-zA-Z0-9]{8,})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:e|s)/([a-zA-Z0-9]{8,})");
         }
         return ret.toArray(new String[0]);
     }
@@ -100,17 +114,21 @@ public class LixstreamCom extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    @Override
-    public boolean isResumeable(final DownloadLink link, final Account account) {
-        return true;
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
     }
 
-    public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
+    private String dllink = null;
+
+    @Override
+    public void clean() {
+        super.clean();
+        dllink = null;
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        dllink = null;
         final String fid = this.getFID(link);
         final String ext_default = ".mp4";
         if (!link.isNameSet()) {
@@ -118,21 +136,53 @@ public class LixstreamCom extends PluginForHost {
             link.setName(fid + ext_default);
         }
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("Referer", link.getPluginPatternMatcher());
+        brc.getHeaders().put("Content-Type", "application/json");
+        brc.postPage("https://api.lixstreamingcaio.com/v2/s/home/resources/" + fid, "");
+        if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* 2025-07-08: TODO: Fix availablecheck and download */
-        /* 2025-07-08: Filename in h5 tag is only available for original file uploader */
-        String filename = br.getRegex("<h5[^>]*>([^<]+)</h5>").getMatch(0);
-        if (StringUtils.isEmpty(filename)) {
-            /* Mimic original website title */
-            filename = "Video #" + fid;
+        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
+        if (files.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final Map<String, Object> fileinfo = files.get(0);
+        final Number filesize = (Number) fileinfo.get("size");
+        String filename = fileinfo.get("display_name").toString();
+        filename = filename.replaceFirst("(?i)\\.m3u8$", "");
         filename = this.correctOrApplyFileNameExtension(filename, ext_default, null);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
+        }
+        if (filesize != null) {
+            link.setDownloadSize(filesize.longValue());
+        }
+        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+            final String internal_file_id = fileinfo.get("id").toString();
+            final String url_thumbnail = fileinfo.get("thumbnail").toString();
+            if (internal_file_id == null || url_thumbnail == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "This plugin is under development");
+            }
+            final String uid = new Regex(url_thumbnail, "(?i)xbox-streaming/(\\d+)").getMatch(0);
+            if (uid == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "This plugin is under development");
+            }
+            brc.getPage("/v2/s/assets/f?id=" + internal_file_id + "&uid=" + uid);
+            final Map<String, Object> downloadinfo = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String encrypted_downloadurl = downloadinfo.get("url").toString();
+            try {
+                final byte[] crypted = Base64.decode(encrypted_downloadurl);
+                final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec("GNgN1lHXIFCQd8hSEZIeqozKInQTFNXj".getBytes("UTF-8"), "AES"), new IvParameterSpec("2Xk4dLo38c9Z2Q2a".getBytes("UTF-8")));
+                byte[] plain = cipher.doFinal(crypted);
+                dllink = new String(plain, "UTF-8");
+                link.setResumeable(StringUtils.endsWithCaseInsensitive(dllink, ".mp4"));
+            } catch (Exception e) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+            }
         }
         return AvailableStatus.TRUE;
     }
@@ -144,12 +194,16 @@ public class LixstreamCom extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        String dllink = br.getRegex("").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-        this.handleConnectionErrors(br, dl.getConnection());
+        if (StringUtils.endsWithCaseInsensitive(dllink, ".mp4")) {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, getMaxChunks(link, null));
+            handleConnectionErrors(br, dl.getConnection());
+        } else {
+            checkFFmpeg(link, "Download a HLS Stream");
+            dl = new HLSDownloader(link, br, dllink);
+        }
         dl.startDownload();
     }
 

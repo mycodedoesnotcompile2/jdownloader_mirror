@@ -40,6 +40,7 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
@@ -51,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50639 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51198 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
 public class FilerNet extends PluginForHost {
     private int                 statusCode                                             = 0;
     private String              statusMessage                                          = null;
@@ -66,7 +67,9 @@ public class FilerNet extends PluginForHost {
     private static final String SETTING_ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS = "ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS";
     private static final String DISABLE_HTTPS                                          = "DISABLE_HTTPS";
     private static final String SETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS                  = "WAIT_MINUTES_ON_NO_FREE_SLOTS";
+    private static final String SETTING_WAIT_MINUTES_ON_ERROR_CODE_415                 = "SETTING_WAIT_MINUTES_ON_ERROR_CODE_415";
     private static final int    defaultSETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS           = 10;
+    private static final int    defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415          = 5;
     // API Docs: https://filer.net/api
     public static final String  API_BASE                                               = "https://api.filer.net/api";                                      // "https://filer.net/api";
     public static final String  BASE                                                   = "https://filer.net";                                              // "https://filer.net/api";
@@ -389,54 +392,41 @@ public class FilerNet extends PluginForHost {
     /* E.g. used for free account downloads */
     private void loginWebsite(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                /* Load cookies */
-                br.setCookiesExclusive(true);
-                prepBrowserWebsite(br);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    this.br.setCookies(this.getHost(), cookies);
-                    if (!force) {
-                        /* Do not validate cookies */
-                        return;
-                    }
-                    br.getPage("https://" + this.getHost());
-                    if (this.isLoggedInWebsite(br)) {
-                        logger.info("Successfully logged in via cookies");
-                        account.saveCookies(this.br.getCookies(br.getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(br.getHost());
-                    }
+            /* Load cookies */
+            br.setCookiesExclusive(true);
+            prepBrowserWebsite(br);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                br.setCookies(this.getHost(), cookies);
+                if (!force) {
+                    /* Do not validate cookies */
+                    return;
                 }
-                logger.info("Performing full login");
-                this.br.getPage("https://" + this.getHost() + "/login");
-                final Form loginform = this.br.getFormbyKey("_username");
-                if (loginform == null) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "\r\nPlugin defekt, bitte den JDownloader Support kontaktieren!");
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "\r\nPlugin broken, please contact the JDownloader Support!");
-                    }
+                br.getPage("https://" + this.getHost());
+                if (this.isLoggedInWebsite(br)) {
+                    logger.info("Successfully logged in via cookies");
+                    account.saveCookies(this.br.getCookies(br.getHost()), "");
+                    return;
+                } else {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(br.getHost());
                 }
-                loginform.put("_username", Encoding.urlEncode(account.getUser()));
-                loginform.put("_password", Encoding.urlEncode(account.getPass()));
-                loginform.remove("_remember_me");
-                loginform.put("_remember_me", "on");
-                this.br.submitForm(loginform);
-                if (!isLoggedInWebsite(br)) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder Passwort!\r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen? Versuche folgendes:\r\n1. Falls dein Passwort Sonderzeichen enthält, ändere es (entferne diese) und versuche es erneut!\r\n2. Gib deine Zugangsdaten per Hand (ohne kopieren/einfügen) ein.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username or password!\r\nYou're sure that the username and password you entered are correct? Some hints:\r\n1. If your password contains special characters, change it (remove them) and try again!\r\n2. Type in your username/password by hand without copy & paste.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
-                account.saveCookies(this.br.getCookies(br.getHost()), "");
-            } catch (final PluginException e) {
-                account.clearCookies("");
-                throw e;
             }
+            logger.info("Performing full login");
+            br.getPage("https://" + this.getHost() + "/login");
+            final Form loginform = br.getFormbyKey("_username");
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            loginform.put("_username", Encoding.urlEncode(account.getUser()));
+            loginform.put("_password", Encoding.urlEncode(account.getPass()));
+            loginform.remove("_remember_me");
+            loginform.put("_remember_me", "on");
+            br.submitForm(loginform);
+            if (!isLoggedInWebsite(br)) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -549,21 +539,21 @@ public class FilerNet extends PluginForHost {
         if (errorcodeStr != null) {
             final int errorcode = Integer.parseInt(errorcodeStr);
             if (errorcode == 415) {
-                /* 2024-02-09: This error may happen frequently thus I've lowered the wait time. */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 415", 5 * 60 * 1000l);
+                final int userConfiguredWaitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS, defaultSETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 415", userConfiguredWaitMinutes * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error " + errorcodeStr, 15 * 60 * 1000l);
             }
         }
         if (afterDownload && br.containsHTML("filer\\.net/register")) {
             errorNoFreeSlotsAvailable();
-        } else if (br.containsHTML("(?i)>\\s*Maximale Verbindungen erreicht")) {
+        } else if (br.containsHTML(">\\s*Maximale Verbindungen erreicht")) {
             errorNoFreeSlotsAvailable();
-        } else if (br.containsHTML("(?i)>\\s*Leider sind alle kostenlosen Download-Slots belegt|Im Moment sind leider alle Download-Slots für kostenlose Downloads belegt|Bitte versuche es später erneut oder behebe das Problem mit einem Premium")) {
+        } else if (br.containsHTML(">\\s*Leider sind alle kostenlosen Download-Slots belegt|Im Moment sind leider alle Download-Slots für kostenlose Downloads belegt|Bitte versuche es später erneut oder behebe das Problem mit einem Premium")) {
             /* 2020-05-01 */
             errorNoFreeSlotsAvailable();
         }
-        if (br.containsHTML("(?i)>\\s*Free Download Limit erreicht\\s*<")) {
+        if (br.containsHTML(">\\s*Free Download Limit erreicht\\s*<")) {
             final String time = br.getRegex("<span id=\"time\">(\\d+)<").getMatch(0);
             if (account != null) {
                 if (time != null) {
@@ -630,7 +620,7 @@ public class FilerNet extends PluginForHost {
         final URLConnectionAdapter con = br.openGetConnection(url);
         if (con.getResponseCode() == 401 && account != null) {
             con.disconnect();
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            throw new AccountInvalidException();
         }
         br.followConnection();
         updateStatuscode();
@@ -672,6 +662,7 @@ public class FilerNet extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS, "Enable API for free- and free account downloads?\r\nBy disabling this you will force JD to use the website instead.\r\nThis could lead to unexpected errors.").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DISABLE_HTTPS, "Use HTTP instead of HTTPS").setDefaultValue(false));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS, "Wait minutes on error 'no free slots available'", 1, 600, 1).setDefaultValue(defaultSETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_ERROR_CODE_415, "Wait minutes on error 'Error 415'", 1, 600, 1).setDefaultValue(defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415));
     }
 
     @Override
