@@ -68,7 +68,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51182 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51200 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -796,7 +796,6 @@ public class XHamsterCom extends PluginForHost {
     private int getPreferredQualityHeight() {
         final int selected_format = getPluginConfig().getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, default_SETTING_SELECTED_VIDEO_FORMAT);
         switch (selected_format) {
-        default:
         case 8:
             return 2160;
         case 7:
@@ -813,6 +812,7 @@ public class XHamsterCom extends PluginForHost {
             return 360;
         case 1:
             return 240;
+        default:
         case 0:
             return -1;
         }
@@ -827,29 +827,33 @@ public class XHamsterCom extends PluginForHost {
         final int selected_format = cfg.getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, default_SETTING_SELECTED_VIDEO_FORMAT);
         Integer selectedQualityHeight = null;
         final List<String> qualities = new ArrayList<String>();
+        /* TODO: selected quality not available -> it would be better to choose next best instead of best */
         switch (selected_format) {
         /* Fallthrough to automatically choose the next best quality */
         default:
         case 0:// best
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : -1;
-        case 7:
+        case 8:
             qualities.add("2160p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 2160;
-        case 6:
+        case 7:
             qualities.add("1440p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 1440;
-        case 5:
+        case 6:
             qualities.add("1080p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 1080;
-        case 4:
+        case 5:
             qualities.add("960p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 960;
-        case 3:
+        case 4:
             qualities.add("720p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 720;
-        case 2:
+        case 3:
             qualities.add("480p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 480;
+        case 2:
+            qualities.add("360p");
+            selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 360;
         case 1:
             qualities.add("240p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 240;

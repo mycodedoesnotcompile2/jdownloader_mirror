@@ -33,7 +33,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49074 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51201 $", interfaceVersion = 3, names = {}, urls = {})
 public class DropapkCom extends XFileSharingProBasic {
     public DropapkCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -52,6 +52,15 @@ public class DropapkCom extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "drop.download", "dropapk.to", "dropapk.com", "fastclick.to", "mixloads.com" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("dropapk.to");
+        deadDomains.add("fastclick.to");
+        deadDomains.add("mixloads.com");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

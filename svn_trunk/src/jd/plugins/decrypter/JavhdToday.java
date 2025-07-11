@@ -19,8 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -35,7 +33,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 50973 $", interfaceVersion = 2, names = {}, urls = {})
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51200 $", interfaceVersion = 2, names = {}, urls = {})
 public class JavhdToday extends PluginForDecrypt {
     public JavhdToday(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class JavhdToday extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "javhd.today" });
+        ret.add(new String[] { "javhd.today", "javhdz.today" });
         ret.add(new String[] { "javrave.club", "javr.club" });
         ret.add(new String[] { "javnew.net" });
         return ret;
@@ -71,7 +71,7 @@ public class JavhdToday extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/.+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!blogs).+");
         }
         return ret.toArray(new String[0]);
     }

@@ -21,10 +21,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
@@ -44,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51202 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,10 +83,21 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_OLD = Pattern.compile("https?://(?:www\\.)?116pan\\.com/(?:download|viewfile)\\.php\\?file_id=(\\d+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/f/([A-Za-z0-9]{6,})");
+            String pattern = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/f/([A-Za-z0-9]{6,})";
+            /**
+             * TODO: After 2025-07-10, check if they've turned off 116pan.com and migrated all items to 116pan.xyz. <br>
+             * If they did so, enable this migration pattern for stable. <br>
+             * Also override rewriteHost so that existing 116pan.com domain links will change to 116pan.xyz in JD GUI.
+             */
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                pattern += "|" + PATTERN_OLD.pattern();
+            }
+            ret.add(pattern);
         }
         return ret.toArray(new String[0]);
     }
@@ -155,6 +168,24 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (new Regex(br.getURL(), PATTERN_OLD).patternFind()) {
+            /**
+             * Migrate old 116pan.com links to new 116pan.xyz links if possible. <br>
+             * This migration has been started by 116pan on 2025-07-11.
+             */
+            if (br.containsHTML(">\\s*文件不存在或已删除")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final String newLink = br.getRegex("window\\.location\\.href = '(https?://(www\\.)?116pan\\.xyz/f/[A-Za-z0-9]{6,})';").getMatch(0);
+            if (newLink == null) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Migration from 116pan.com to 116pan.xyz failed?");
+            }
+            br.getPage(newLink);
+            if (this.br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            link.setPluginPatternMatcher(newLink);
         }
         final Map<String, Object> entries = getParsedJsonFromHTML(br, link, null);
         final Map<String, Object> props = (Map<String, Object>) entries.get("props");

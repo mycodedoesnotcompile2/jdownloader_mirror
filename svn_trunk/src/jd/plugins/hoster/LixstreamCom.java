@@ -24,6 +24,13 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -36,14 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51199 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51201 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,7 @@ public class LixstreamCom extends PluginForHost {
          * Current list of domains can be found here: https://lixstream.com/#/file -> Select an uploaded file -> Share -> Dialog pops up ->
          * See "Choose domain"
          */
-        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videy.tv", "doodmv.net", "doodtv.net", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net" });
+        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "doodmv.net", "doodtv.net", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net" });
         return ret;
     }
 
@@ -140,7 +140,9 @@ public class LixstreamCom extends PluginForHost {
         brc.getHeaders().put("Referer", link.getPluginPatternMatcher());
         brc.getHeaders().put("Content-Type", "application/json");
         brc.postPage("https://api.lixstreamingcaio.com/v2/s/home/resources/" + fid, "");
-        if (brc.getHttpConnection().getResponseCode() == 404) {
+        if (brc.getHttpConnection().getResponseCode() == 400) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server issues (error 400)", 15 * 60 * 1000l);
+        } else if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -151,24 +153,22 @@ public class LixstreamCom extends PluginForHost {
         final Map<String, Object> fileinfo = files.get(0);
         final Number filesize = (Number) fileinfo.get("size");
         String filename = fileinfo.get("display_name").toString();
+        /* Small filename correction: Some video files' names end with ".m3u8" -> Remove that suffix */
         filename = filename.replaceFirst("(?i)\\.m3u8$", "");
         filename = this.correctOrApplyFileNameExtension(filename, ext_default, null);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
         }
-        if (filesize != null) {
-            link.setDownloadSize(filesize.longValue());
-        }
         if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
             final String internal_file_id = fileinfo.get("id").toString();
             final String url_thumbnail = fileinfo.get("thumbnail").toString();
             if (internal_file_id == null || url_thumbnail == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "This plugin is under development");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final String uid = new Regex(url_thumbnail, "(?i)xbox-streaming/(\\d+)").getMatch(0);
             if (uid == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "This plugin is under development");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             brc.getPage("/v2/s/assets/f?id=" + internal_file_id + "&uid=" + uid);
             final Map<String, Object> downloadinfo = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -182,6 +182,16 @@ public class LixstreamCom extends PluginForHost {
                 link.setResumeable(StringUtils.endsWithCaseInsensitive(dllink, ".mp4"));
             } catch (Exception e) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+            }
+        }
+        if (filesize != null) {
+            if (StringUtils.endsWithCaseInsensitive(dllink, ".mp4")) {
+                /* Progressive video stream download -> We know the expected file size 100% -> Set verified filesize */
+                link.setVerifiedFileSize(filesize.longValue());
+            } else {
+                /* HLS stream download -> We do not know the precise file size that we expect. */
+                link.setVerifiedFileSize(-1);
+                link.setDownloadSize(filesize.longValue());
             }
         }
         return AvailableStatus.TRUE;

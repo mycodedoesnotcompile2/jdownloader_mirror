@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51198 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51201 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
 public class FilerNet extends PluginForHost {
     private int                 statusCode                                             = 0;
     private String              statusMessage                                          = null;
@@ -66,9 +66,9 @@ public class FilerNet extends PluginForHost {
     private static final String DIRECT_API                                             = "directlinkApi";
     private static final String SETTING_ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS = "ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS";
     private static final String DISABLE_HTTPS                                          = "DISABLE_HTTPS";
-    private static final String SETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS                  = "WAIT_MINUTES_ON_NO_FREE_SLOTS";
+    private static final String SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS            = "WAIT_MINUTES_ON_NO_FREE_SLOTS";
     private static final String SETTING_WAIT_MINUTES_ON_ERROR_CODE_415                 = "SETTING_WAIT_MINUTES_ON_ERROR_CODE_415";
-    private static final int    defaultSETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS           = 10;
+    private static final int    defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS     = 10;
     private static final int    defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415          = 5;
     // API Docs: https://filer.net/api
     public static final String  API_BASE                                               = "https://api.filer.net/api";                                      // "https://filer.net/api";
@@ -293,7 +293,7 @@ public class FilerNet extends PluginForHost {
     }
 
     private void errorNoFreeSlotsAvailable() throws PluginException {
-        final int waitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS, defaultSETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS);
+        final int waitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS, defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS);
         throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "No free slots available, wait or buy premium!", waitMinutes * 60 * 1000l);
     }
 
@@ -539,7 +539,7 @@ public class FilerNet extends PluginForHost {
         if (errorcodeStr != null) {
             final int errorcode = Integer.parseInt(errorcodeStr);
             if (errorcode == 415) {
-                final int userConfiguredWaitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS, defaultSETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS);
+                final int userConfiguredWaitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS, defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 415", userConfiguredWaitMinutes * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error " + errorcodeStr, 15 * 60 * 1000l);
@@ -661,7 +661,7 @@ public class FilerNet extends PluginForHost {
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS, "Enable API for free- and free account downloads?\r\nBy disabling this you will force JD to use the website instead.\r\nThis could lead to unexpected errors.").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DISABLE_HTTPS, "Use HTTP instead of HTTPS").setDefaultValue(false));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS, "Wait minutes on error 'no free slots available'", 1, 600, 1).setDefaultValue(defaultSETTING_WAIT_MINUTES_ON_NO_FREE_SLOTS));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS, "Wait minutes on error 'No free slots available'", 1, 600, 1).setDefaultValue(defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_ERROR_CODE_415, "Wait minutes on error 'Error 415'", 1, 600, 1).setDefaultValue(defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415));
     }
 
