@@ -18,6 +18,7 @@ package jd.plugins.download;
 import java.awt.Color;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.storage.config.JsonConfig;
@@ -86,8 +87,8 @@ abstract public class DownloadInterface {
         return null;
     };
 
-    protected static final ArrayList<AtomicBoolean> HASHCHECK_QEUEU            = new ArrayList<AtomicBoolean>();
-    protected static final int                      MAX_CONCURRENT_HASH_CHECKS = JsonConfig.create(GeneralSettings.class).getMaxConcurrentHashChecks();
+    protected static final List<AtomicBoolean> HASHCHECK_QUEUE            = new ArrayList<AtomicBoolean>();
+    protected static final int                 MAX_CONCURRENT_HASH_CHECKS = JsonConfig.create(GeneralSettings.class).getMaxConcurrentHashChecks();
 
     protected HashResult getHashResult(Downloadable downloadable, File file) throws InterruptedException {
         if (!downloadable.isHashCheckEnabled()) {
@@ -100,9 +101,9 @@ abstract public class DownloadInterface {
         final int maxConcurrent = MAX_CONCURRENT_HASH_CHECKS;
         final int nextWaitIndex = maxConcurrent - 1;
         AtomicBoolean waitLock = new AtomicBoolean(false);
-        synchronized (HASHCHECK_QEUEU) {
-            HASHCHECK_QEUEU.add(waitLock);
-            waitLock.set(HASHCHECK_QEUEU.indexOf(waitLock) > nextWaitIndex);
+        synchronized (HASHCHECK_QUEUE) {
+            HASHCHECK_QUEUE.add(waitLock);
+            waitLock.set(HASHCHECK_QUEUE.indexOf(waitLock) > nextWaitIndex);
         }
         try {
             final PluginProgress hashWait = new HashCheckPluginProgress(null, Color.YELLOW.darker().darker(), null);
@@ -129,11 +130,11 @@ abstract public class DownloadInterface {
                 downloadable.removePluginProgress(hashWait);
             }
         } finally {
-            synchronized (HASHCHECK_QEUEU) {
-                final boolean callNext = HASHCHECK_QEUEU.indexOf(waitLock) <= nextWaitIndex;
-                HASHCHECK_QEUEU.remove(waitLock);
-                if (HASHCHECK_QEUEU.size() > nextWaitIndex && callNext) {
-                    waitLock = HASHCHECK_QEUEU.get(nextWaitIndex);
+            synchronized (HASHCHECK_QUEUE) {
+                final boolean callNext = HASHCHECK_QUEUE.indexOf(waitLock) <= nextWaitIndex;
+                HASHCHECK_QUEUE.remove(waitLock);
+                if (HASHCHECK_QUEUE.size() > nextWaitIndex && callNext) {
+                    waitLock = HASHCHECK_QUEUE.get(nextWaitIndex);
                 } else {
                     waitLock = null;
                 }

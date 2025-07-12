@@ -64,11 +64,12 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51200 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51208 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -1216,6 +1217,8 @@ public class XHamsterCom extends PluginForHost {
                 throw new AccountRequiredException("Paid content");
             } else if (isPremiumURL) {
                 throw new AccountRequiredException("Paid content & trailer download failed");
+            } else if (br.containsHTML("\"ageVerificationNeeded\"\\s*:\\s*true")) {
+                throw new AccountRequiredException("Age verification needed");
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -1223,25 +1226,35 @@ public class XHamsterCom extends PluginForHost {
         if (StringUtils.containsIgnoreCase(dllink, ".m3u8")) {
             /* 2021-02-01: HLS download */
             br.getPage(this.dllink);
-            final int preferredVideoQualityHeight = getPreferredQualityHeight();
+            final String m3u8URL;
             final List<HlsContainer> hlsContainers = HlsContainer.getHlsQualities(this.br);
-            HlsContainer preferredQuality = null;
-            for (final HlsContainer container : hlsContainers) {
-                if (container.getHeight() == preferredVideoQualityHeight) {
-                    logger.info("Found preferred quality: " + preferredVideoQualityHeight);
-                    preferredQuality = container;
-                    break;
+            if (hlsContainers.size() == 0) {
+                final List<M3U8Playlist> m3u8 = M3U8Playlist.parseM3U8(this.br);
+                if (m3u8.size() == 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-            }
-            final HlsContainer chosenQuality;
-            if (preferredQuality != null) {
-                chosenQuality = preferredQuality;
+                m3u8URL = dllink;
             } else {
-                /* Best quality */
-                chosenQuality = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+                HlsContainer chosenQuality = null;
+                final int preferredVideoQualityHeight = getPreferredQualityHeight();
+                for (final HlsContainer container : hlsContainers) {
+                    if (container.getHeight() == preferredVideoQualityHeight) {
+                        logger.info("Found preferred quality: " + preferredVideoQualityHeight);
+                        chosenQuality = container;
+                        break;
+                    }
+                }
+                if (chosenQuality == null) {
+                    /* Best quality */
+                    chosenQuality = HlsContainer.findBestVideoByBandwidth(hlsContainers);
+                }
+                m3u8URL = chosenQuality.getStreamURL();
+            }
+            if (m3u8URL == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, chosenQuality.getDownloadurl());
+            dl = new HLSDownloader(link, br, m3u8URL);
             dl.startDownload();
         } else {
             boolean resume = true;

@@ -23,6 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -86,8 +89,9 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 51200 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51207 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1058,27 +1062,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-        try {
-            /* Check if response is plaintext and contains any known error messages. */
-            final byte[] probe = urlConnection.peek(32);
-            if (probe.length > 0) {
-                final String probeContext = new String(probe, "UTF-8");
-                final Request clone = urlConnection.getRequest().cloneRequest();
-                clone.setHtmlCode(probeContext);
-                final Browser br = createNewBrowserInstance();
-                br.setRequest(clone);
-                try {
-                    // TODO: extract the html checks into own method to avoid Browser instance
-                    checkServerErrors(br, getDownloadLink(), null);
-                } catch (PluginException e) {
-                    logger.log(e);
-                    return false;
-                }
+    try {
+        /* Check if response is plaintext and contains any known error messages. */
+        final byte[] probe = urlConnection.peek(32);
+        if (probe.length > 0) {
+            final String probeContext = new String(probe, "UTF-8");
+            final Request clone = urlConnection.getRequest().cloneRequest();
+            clone.setHtmlCode(probeContext);
+            final Browser br = createNewBrowserInstance();
+            br.setRequest(clone);
+            try {
+                // TODO: extract the html checks into own method to avoid Browser instance
+                checkServerErrors(br, getDownloadLink(), null);
+            } catch (PluginException e) {
+                logger.log(e);
+                return false;
             }
-        } catch (IOException e) {
-            logger.log(e);
         }
-        return true;
+    } catch (IOException e) {
+        logger.log(e);
+    }
+    return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -3414,7 +3418,37 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /*
                  * Important: Do not use "Plugin.restoreFromString" here as the input of this can also be js structure and not only json!!
                  */
-                final List<Object> ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
+                List<Object> ressourcelist = null;
+                Map<String, String> references = new HashMap<String, String>();
+                while (true) {
+                    try {
+                        if (references.size() > 0) {
+                            final ScriptEngineManager mgr = JavaScriptEngineFactory.getScriptEngineManager(this);
+                            final ScriptEngine engine = mgr.getEngineByName("JavaScript");
+                            for (Entry<String, String> reference : references.entrySet()) {
+                                engine.eval("var " + reference.getKey() + "=" + reference.getValue() + ";");
+                            }
+                            engine.eval("var response=" + jssource + ";");
+                            ressourcelist = (List<Object>) JavaScriptEngineFactory.toMap(engine.get("response"));
+                        } else {
+                            ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
+                        }
+                        break;
+                    } catch (Exception e) {
+                        // VidhideCom -> playrecord.biz
+                        final EcmaError ee = Exceptions.getInstanceof(e, EcmaError.class);
+                        final String undefined = ee == null ? null : new Regex(ee.getMessage(), "ReferenceError\\s*:\\s*\"(.*?)\"\\s*(is not defined|n'est pas défini|未定义)?").getMatch(0);
+                        if (undefined == null || references.containsKey(undefined)) {
+                            throw e;
+                        }
+                        final String value = new Regex(src, "var\\s*" + Pattern.quote(undefined) + "\\s*=\\s*(\\{.*?\\})\\s*;").getMatch(0);
+                        if (value == null) {
+                            throw e;
+                        }
+                        references.put(undefined, value);
+                        getLogger().log(e);
+                    }
+                }
                 final boolean onlyOneQualityAvailable = ressourcelist.size() == 1;
                 final int userSelectedQuality = getPreferredStreamQuality();
                 if (userSelectedQuality == -1) {

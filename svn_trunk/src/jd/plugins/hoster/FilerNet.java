@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51201 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51203 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
 public class FilerNet extends PluginForHost {
     private int                 statusCode                                             = 0;
     private String              statusMessage                                          = null;
@@ -539,7 +539,7 @@ public class FilerNet extends PluginForHost {
         if (errorcodeStr != null) {
             final int errorcode = Integer.parseInt(errorcodeStr);
             if (errorcode == 415) {
-                final int userConfiguredWaitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS, defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS);
+                final int userConfiguredWaitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_CODE_415, defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 415", userConfiguredWaitMinutes * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error " + errorcodeStr, 15 * 60 * 1000l);

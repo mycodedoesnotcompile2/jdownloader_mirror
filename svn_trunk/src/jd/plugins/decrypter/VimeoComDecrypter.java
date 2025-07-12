@@ -29,18 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.containers.VimeoContainer;
-import org.jdownloader.plugins.components.containers.VimeoContainer.Quality;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -68,7 +56,19 @@ import jd.plugins.hoster.VimeoCom;
 import jd.plugins.hoster.VimeoCom.VIMEO_URL_TYPE;
 import jd.plugins.hoster.VimeoCom.WrongRefererException;
 
-@DecrypterPlugin(revision = "$Revision: 50086 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.containers.VimeoContainer;
+import org.jdownloader.plugins.components.containers.VimeoContainer.Quality;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51208 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimeoComDecrypter extends PluginForDecrypt {
     private final String type_player_private_external_direct = "(?i)https?://player\\.vimeo.com/external/\\d+\\.(source|hd|sd)\\.(mp4|mov|wmv|avi|flv).+";
     private final String type_player_private_play_direct     = "(?i)https?://player\\.vimeo.com/play/\\d+.+";
@@ -685,7 +685,7 @@ public class VimeoComDecrypter extends PluginForDecrypt {
                 boolean tryAlternativeMetaInfos = true;
                 try {
                     final String json = VimeoCom.getJsonFromHTML(this, this.br);
-                    final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
+                    final Map<String, Object> entries = json == null ? null : JavaScriptEngineFactory.jsonToJavaMap(json);
                     if (entries != null) {
                         if (StringUtils.containsIgnoreCase(br.getURL(), "api.vimeo.com")) {
                             title = (String) entries.get("name");

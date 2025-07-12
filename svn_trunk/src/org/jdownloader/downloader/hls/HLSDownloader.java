@@ -1,6 +1,8 @@
 package org.jdownloader.downloader.hls;
 
 import java.awt.Color;
+import java.awt.Image;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -31,6 +33,7 @@ import java.util.regex.Matcher;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.imageio.ImageIO;
 
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
@@ -69,9 +72,11 @@ import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.EmptyInputStream;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.LimitedInputStream;
+import org.appwork.utils.net.NoClosingInputStream;
 import org.appwork.utils.net.SkippingLimitedOutputStream;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
@@ -1353,6 +1358,7 @@ public class HLSDownloader extends DownloadInterface {
                                     URLConnectionAdapter connection = null;
                                     boolean closeConnection = true;
                                     boolean updateTimestamp = true;
+                                    int skippedBytes = 0;
                                     try {
                                         ffmpeg.updateLastUpdateTimestamp(getRequest.getConnectTimeout() + getRequest.getReadTimeout() + timeoutBuffer);
                                         connection = br.openRequestConnection(getRequest);
@@ -1361,6 +1367,40 @@ public class HLSDownloader extends DownloadInterface {
                                         } else if (connection.getResponseCode() != 200 && connection.getResponseCode() != 206) {
                                             throw new IOException("ResponseCode(" + connection.getResponseCode() + ") must be 200 or 206!");
                                         } else {
+                                            if (StringUtils.contains(connection.getContentType(), "image/png") || StringUtils.contains(connection.getContentType(), "image/jpeg") || StringUtils.contains(connection.getContentType(), "image/gif")) {
+                                                // try to skip fake png/jpg image in front of video segment
+                                                if (false) {
+                                                    final CountingInputStream cis = new CountingInputStream(new NoClosingInputStream(connection.getInputStream()));
+                                                    final Image image = ImageIO.read(cis);
+                                                    skippedBytes = (int) cis.transferedBytes();
+                                                    requestLogger.info("Skip fake image(read image method:" + skippedBytes + " bytes)");
+                                                } else {
+                                                    final byte[] peekBytes = connection.peek(100);
+                                                    for (int index = 0; index < peekBytes.length - 1; index++) {
+                                                        if (peekBytes[index] == 0x47 && peekBytes[index + 1] == 0x40) {
+                                                            requestLogger.info("Skip fake image(seek method:" + index + " bytes)");
+                                                            final DataInputStream dis = new DataInputStream(connection.getInputStream());
+                                                            dis.readFully(new byte[index]);
+                                                            skippedBytes = index;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (skippedBytes == 0) {
+                                                        if (StringUtils.contains(connection.getContentType(), "image/png")) {
+                                                            // skip png header
+                                                            skippedBytes = 8;
+                                                        } else if (StringUtils.contains(connection.getContentType(), "image/gif")) {
+                                                            // skip gif header
+                                                            skippedBytes = 6;
+                                                        }
+                                                        if (skippedBytes > 0) {
+                                                            requestLogger.info("Skip fake image(skip header method:" + skippedBytes + " bytes)");
+                                                            final DataInputStream dis = new DataInputStream(connection.getInputStream());
+                                                            dis.readFully(new byte[skippedBytes]);
+                                                        }
+                                                    }
+                                                }
+                                            }
                                             closeConnection = false;
                                         }
                                     } catch (IOException e) {
@@ -1395,6 +1435,7 @@ public class HLSDownloader extends DownloadInterface {
                                         } else {
                                             length = connection.getCompleteContentLength();
                                         }
+                                        length = length - skippedBytes;
                                         if (requestOutputStream == null) {
                                             // final String acceptRanges =
                                             // connection.getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCEPT_RANGES);

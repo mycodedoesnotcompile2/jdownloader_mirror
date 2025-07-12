@@ -24,7 +24,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
@@ -33,7 +32,6 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -43,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51201 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51206 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -126,15 +124,18 @@ public class LixstreamCom extends PluginForHost {
         dllink = null;
     }
 
+    private final String ext_default = ".mp4";
+
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        final String fid = this.getFID(link);
+        return fid + ext_default;
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         dllink = null;
         final String fid = this.getFID(link);
-        final String ext_default = ".mp4";
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(fid + ext_default);
-        }
         this.setBrowserExclusive();
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("Referer", link.getPluginPatternMatcher());
@@ -145,7 +146,7 @@ public class LixstreamCom extends PluginForHost {
         } else if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
         if (files.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -156,9 +157,9 @@ public class LixstreamCom extends PluginForHost {
         /* Small filename correction: Some video files' names end with ".m3u8" -> Remove that suffix */
         filename = filename.replaceFirst("(?i)\\.m3u8$", "");
         filename = this.correctOrApplyFileNameExtension(filename, ext_default, null);
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
+        link.setFinalFileName(filename);
+        if (filesize != null) {
+            link.setDownloadSize(filesize.longValue());
         }
         if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
             final String internal_file_id = fileinfo.get("id").toString();
@@ -171,7 +172,7 @@ public class LixstreamCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             brc.getPage("/v2/s/assets/f?id=" + internal_file_id + "&uid=" + uid);
-            final Map<String, Object> downloadinfo = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> downloadinfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final String encrypted_downloadurl = downloadinfo.get("url").toString();
             try {
                 final byte[] crypted = Base64.decode(encrypted_downloadurl);
@@ -179,19 +180,14 @@ public class LixstreamCom extends PluginForHost {
                 cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec("GNgN1lHXIFCQd8hSEZIeqozKInQTFNXj".getBytes("UTF-8"), "AES"), new IvParameterSpec("2Xk4dLo38c9Z2Q2a".getBytes("UTF-8")));
                 byte[] plain = cipher.doFinal(crypted);
                 dllink = new String(plain, "UTF-8");
-                link.setResumeable(StringUtils.endsWithCaseInsensitive(dllink, ".mp4"));
+                final boolean isProgressiveVideoStreamDownload = StringUtils.endsWithCaseInsensitive(dllink, ".mp4");
+                link.setResumeable(isProgressiveVideoStreamDownload);
+                if (filesize != null && isProgressiveVideoStreamDownload) {
+                    /* Progressive video stream download -> We know the expected file size 100% -> Set verified filesize */
+                    link.setVerifiedFileSize(filesize.longValue());
+                }
             } catch (Exception e) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
-            }
-        }
-        if (filesize != null) {
-            if (StringUtils.endsWithCaseInsensitive(dllink, ".mp4")) {
-                /* Progressive video stream download -> We know the expected file size 100% -> Set verified filesize */
-                link.setVerifiedFileSize(filesize.longValue());
-            } else {
-                /* HLS stream download -> We do not know the precise file size that we expect. */
-                link.setVerifiedFileSize(-1);
-                link.setDownloadSize(filesize.longValue());
             }
         }
         return AvailableStatus.TRUE;
@@ -214,6 +210,8 @@ public class LixstreamCom extends PluginForHost {
             checkFFmpeg(link, "Download a HLS Stream");
             dl = new HLSDownloader(link, br, dllink);
         }
+        /* 2025-07-11: Prevent upper handling from using a filename from URL over the one we've set. */
+        dl.setAllowFilenameFromURL(false);
         dl.startDownload();
     }
 
