@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51206 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51209 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,7 @@ public class LixstreamCom extends PluginForHost {
          * Current list of domains can be found here: https://lixstream.com/#/file -> Select an uploaded file -> Share -> Dialog pops up ->
          * See "Choose domain"
          */
-        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "doodmv.net", "doodtv.net", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net" });
+        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "doodmv.com", "doodmv.net", "doodtv.net", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net" });
         return ret;
     }
 
@@ -159,6 +159,10 @@ public class LixstreamCom extends PluginForHost {
         filename = this.correctOrApplyFileNameExtension(filename, ext_default, null);
         link.setFinalFileName(filename);
         if (filesize != null) {
+            /*
+             * Set file size here before obtaining stream-downloadlink down below so that in case an exception happens down below, it is
+             * thrown.
+             */
             link.setDownloadSize(filesize.longValue());
         }
         if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {

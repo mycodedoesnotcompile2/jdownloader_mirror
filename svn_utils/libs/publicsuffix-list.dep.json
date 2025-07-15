@@ -1154,11 +1154,29 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "version":"2025.177.0 9ae55199aa39694b19b7791d2e7b0b7592b3bdd7"
+    },
+    {
+      "changes":"2025.186.0 968c2cce548037261cd6b9c41bffc90138ed7e6f\t: Update v.ua in public_suffix_list.dat (#2511)\r\n2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b\t: Add *.oaiusercontent.com to the PSL. (#2516)",
+      "date":"2025-07-08T15:54:26.890+02:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"1dfa2687264b375caef68a533c3c9a32ac3c3b618775a8a721f7dbefd4efd4ba"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b"
     }
   ],
   "installed":{
-    "changes":"2025.186.0 968c2cce548037261cd6b9c41bffc90138ed7e6f\t: Update v.ua in public_suffix_list.dat (#2511)\r\n2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b\t: Add *.oaiusercontent.com to the PSL. (#2516)",
-    "date":"2025-07-08T15:54:26.890+02:00",
+    "changes":"2025.190.0 c38a2f8e8862ad65d91af25dee90002c61329953\t: util: gTLD data autopull updates for 2025-07-09T15:20:49 UTC (#2526)\n\nCo-authored-by: GitHub <noreply@github.com>",
+    "date":"2025-07-14T10:19:18.166+02:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -1263,7 +1281,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"1dfa2687264b375caef68a533c3c9a32ac3c3b618775a8a721f7dbefd4efd4ba"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"effcd21e71ff852f959f15172dc5e8b684ace0a853a8da647867bf5fdaf15200"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1273,7 +1291,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2025.189.0 c7c94ecdc6b47b8cdd69f08c9771e1a20c4b516b"
+    "version":"2025.190.0 c38a2f8e8862ad65d91af25dee90002c61329953"
   },
   "minJRE":null,
   "provider":"github-clone",

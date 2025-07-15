@@ -56,7 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51195 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51210 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -603,11 +603,18 @@ public class DoodstreamCom extends XFileSharingProBasic {
             return null;
         }
         /* 2022-07-08: 5 seconds of pre-download-wait is skippable */
-        final boolean skipWaittime = true;
+        final boolean skipWaittime = false;
         if (!skipWaittime) {
-            this.waitTime(link, Time.systemIndependentCurrentJVMTimeMillis());
-            logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
-            this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
+            final String waitSecondsStr = brc.getRegex("id=\"seconds\"[^>]*>(\\d{1,2})<").getMatch(0);
+            if (waitSecondsStr == null) {
+                logger.warning("Failed to find pre download wait time -> Fallback to default");
+                this.waitTime(link, Time.systemIndependentCurrentJVMTimeMillis());
+                logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
+                this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
+            } else {
+                final int waitSeconds = Integer.parseInt(waitSecondsStr);
+                this.sleep(waitSeconds * 1001l, link);
+            }
         }
         getPage(brc, continueURL);
         /* 2019-08-29: This Form may sometimes be given e.g. deltabit.co */

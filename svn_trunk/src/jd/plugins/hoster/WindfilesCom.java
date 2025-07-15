@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51044 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51209 $", interfaceVersion = 3, names = {}, urls = {})
 public class WindfilesCom extends PluginForHost {
     public WindfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,12 +108,19 @@ public class WindfilesCom extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformation(link, null);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         if (!link.isNameSet()) {
             /* Fallback */
             link.setName(this.getFID(link));
         }
         this.setBrowserExclusive();
+        if (account != null) {
+            this.login(account, false);
+        }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -141,7 +148,7 @@ public class WindfilesCom extends PluginForHost {
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
-            requestFileInformation(link);
+            requestFileInformation(link, account);
             final String waitSecondsStr = br.getRegex("const counterTime = (\\d+);").getMatch(0);
             final String nextStep = br.getRegex("\"(/download/slow/[^\"]+)").getMatch(0);
             if (StringUtils.isEmpty(nextStep)) {

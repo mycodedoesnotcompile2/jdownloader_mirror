@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -33,9 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51200 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51210 $", interfaceVersion = 2, names = {}, urls = {})
 public class JavhdToday extends PluginForDecrypt {
     public JavhdToday(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,7 @@ public class JavhdToday extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!blogs).+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/\\d+/[\\w-]+/");
         }
         return ret.toArray(new String[0]);
     }
@@ -82,7 +82,9 @@ public class JavhdToday extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
         br.getPage(contenturl);
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("404 Not Found\\s*<|Page not found")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("404 Not Found\\s*<|Page not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String urlSlug = new Regex(br.getURL(), "/([\\w-]+)/?$").getMatch(0);

@@ -1343,10 +1343,12 @@ public class FlexiJSonMapper {
                     try {
                         access = getReferencesAccess(setter.getMethod().getDeclaringClass(), setter.key);
                         json = this.resolveValue(json, cType, access, null);
+                    } catch (FlexiMapperException e) {
+                        return this.returnFallbackOrThrowException(e);
                     } catch (final NoSuchMethodException e) {
-                        throw new FlexiMapperException(json, cType, null, e);
+                        return this.returnFallbackOrThrowException(new FlexiMapperException(json, cType, null, e));
                     } catch (CannotResolvePathException e) {
-                        throw new FlexiMapperException(json, cType, null, e);
+                        return this.returnFallbackOrThrowException(new FlexiMapperException(json, cType, null, e));
                     }
                 }
             }
@@ -1831,6 +1833,7 @@ public class FlexiJSonMapper {
         StringBuilder newText = null;
         StringBuilder jsPathBuilder = new StringBuilder();
         int validatedUnescapes = -1;
+        char marker = getRefMarker();
         int escapes = 0;
         NEXT_CHAR: for (int i = 0; i < chars.length; i++) {
             char c = chars[i];
@@ -1874,7 +1877,7 @@ public class FlexiJSonMapper {
                     if (newText != null) {
                         newText.append(c);
                     }
-                    if (c == '$') {
+                    if (c == marker) {
                         if (remaining > 0 && chars[i + 1] == '{') {
                             // start tag reached
                             if (newText == null) {
@@ -1899,17 +1902,17 @@ public class FlexiJSonMapper {
                     }
                 }
             } finally {
-                if (c == '$') {
+                if (c == marker) {
                     escapes++;
                 } else {
                     escapes = 0;
                 }
             }
         }
-        if (inVariable) {
-            newText.append('$').append('{').append(jsPathBuilder);
-        }
         if (newText != null) {
+            if (inVariable) {
+                newText.append(marker).append('{').append(jsPathBuilder);
+            }
             return createFlexiJSonValue(newText.toString());
         }
         // final Pattern pat = Pattern.compile("\\$\\{[\\w\\.\\d\\[\\]]+(#p\\d+)?}");
@@ -1920,6 +1923,13 @@ public class FlexiJSonMapper {
         // refs.add(path);
         // }
         return value;
+    }
+
+    /**
+     * @return
+     */
+    private char getRefMarker() {
+        return '~';
     }
 
     /**

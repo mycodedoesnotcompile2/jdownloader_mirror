@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -70,7 +70,7 @@ public class DeserTests extends AWTest {
         } catch (org.appwork.storage.commonInterface.SerializerException e) {
             // expected
         }
-        String result = test("{\"a\":\"line1\\r\\nline2\"}", "", TypeRef.HASHMAP, SC.SINGLE_LINE);
+        String result = test("{\"a\":\"line1统一码\\r\\nline2\"}", "", TypeRef.HASHMAP, SC.SINGLE_LINE);
         assertTrue(result.split("[\r\n]+").length == 1);
         Set<String> HASH_TEST = new HashSet<String>();
         for (SerializerInterface c : serializers) {
@@ -112,16 +112,32 @@ public class DeserTests extends AWTest {
      */
     private <T> String test(String input, String expected, TypeRef<T> type, Object... context) throws Exception {
         T first = null;
-        for (SerializerInterface s : serializers) {
-            T res = s.fromString(input, type, context);
-            if (first == null) {
-                first = res;
-            } else {
-                assertEqualsDeep(first, res);
+        if (true) {
+            for (SerializerInterface s : serializers) {
+                T res = s.fromString(input, type, context);
+                if (first == null) {
+                    first = res;
+                } else {
+                    assertEqualsDeep(first, res);
+                }
             }
         }
         first = null;
         for (BOM bom : BOM.values()) {
+            first = null;
+            for (SerializerInterface s : serializers) {
+                final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                bos.write(bom.getBOM());
+                bos.write(input.getBytes(bom.getCharSet()));
+                final String jsonString = new String(bos.toByteArray(), bom.getCharSet());
+                T res = s.fromString(jsonString, type, context);
+                if (first == null) {
+                    first = res;
+                } else {
+                    assertEqualsDeep(first, res);
+                }
+            }
+            first = null;
             for (SerializerInterface s : serializers) {
                 final ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 bos.write(bom.getBOM());

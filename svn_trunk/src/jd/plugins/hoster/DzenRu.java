@@ -20,13 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -34,10 +27,18 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50600 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
 public class DzenRu extends PluginForHost {
     public DzenRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -167,30 +168,16 @@ public class DzenRu extends PluginForHost {
             link.setProperty(PROPERTY_HLS_MASTER, hlsMaster);
         }
         /* Scan for more metadata */
-        final String[] otherJsons = br.getRegex("<script type=\"application/ld\\+json\"[^>]*>(\\{.*?)</script>").getColumn(0);
-        if (otherJsons != null && otherJsons.length > 0) {
-            Map<String, Object> schemaOrgVideoObject = null;
-            for (final String otherJson : otherJsons) {
-                try {
-                    final Map<String, Object> root = restoreFromString(otherJson, TypeRef.MAP);
-                    final String atContext = (String) root.get("@context");
-                    if (StringUtils.equalsIgnoreCase(atContext, "http://schema.org")) {
-                        schemaOrgVideoObject = root;
-                        break;
-                    }
-                } catch (final Throwable e) {
-                }
+        final Map<String, Object> schemaOrgVideoObject = ((PluginBrowser) br).getVideoObject();
+        if (schemaOrgVideoObject != null) {
+            if (StringUtils.isEmpty(title)) {
+                title = (String) schemaOrgVideoObject.get("name");
             }
-            if (schemaOrgVideoObject != null) {
-                if (StringUtils.isEmpty(title)) {
-                    title = (String) schemaOrgVideoObject.get("name");
-                }
-                if (StringUtils.isEmpty(dateFormatted)) {
-                    dateFormatted = (String) schemaOrgVideoObject.get("uploadDate");
-                }
-                if (StringUtils.isEmpty(description)) {
-                    description = (String) schemaOrgVideoObject.get("description");
-                }
+            if (StringUtils.isEmpty(dateFormatted)) {
+                dateFormatted = (String) schemaOrgVideoObject.get("uploadDate");
+            }
+            if (StringUtils.isEmpty(description)) {
+                description = (String) schemaOrgVideoObject.get("description");
             }
         }
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
@@ -209,8 +196,8 @@ public class DzenRu extends PluginForHost {
         } else {
             /* Inaccurate file size */
             /**
-             * Very cheap way of calculating rough filesize using bandwidth of 1080p version and duration of the video. </br>
-             * (And yes, not all videos are available in 1080p and real bandwidth may vary.)
+             * Very cheap way of calculating rough filesize using bandwidth of 1080p version and duration of the video. </br> (And yes, not
+             * all videos are available in 1080p and real bandwidth may vary.)
              */
             final Number durationSeconds = (Number) videomap.get("duration");
             if (durationSeconds != null) {

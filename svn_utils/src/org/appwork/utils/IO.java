@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -247,11 +247,10 @@ public class IO {
 
     public static enum BOM {
         UTF8(new byte[] { (byte) 239, (byte) 187, (byte) 191 }, "UTF-8"),
-        UTF16BE(new byte[] { (byte) 254, (byte) 255 }, "UTF-16BE"),
-        UTF16LE(new byte[] { (byte) 255, (byte) 254 }, "UTF-16LE"),
-        UTF32BE(new byte[] { (byte) 0, (byte) 0, (byte) 254, (byte) 255 }, "UTF-32BE"),
-        UTF32LE(new byte[] { (byte) 0, (byte) 0, (byte) 255, (byte) 254 }, "UTF-32LE");
-
+        UTF16BE(new byte[] { (byte) 0xfe, (byte) 0xff }, "UTF-16BE"),
+        UTF16LE(new byte[] { (byte) 0xff, (byte) 0xfe }, "UTF-16LE"), // also see x-UTF-16LE-BOM, writes out BOM
+        UTF32BE(new byte[] { (byte) 0, (byte) 0, (byte) 0xfe, (byte) 0xff }, "UTF-32BE"), // also see X-UTF-32BE-BOM, writes out BOM
+        UTF32LE(new byte[] { (byte) 0xff, (byte) 0xfe, (byte) 0, (byte) 0 }, "UTF-32LE");// also see X-UTF-32LE-BOM, writes OUT BOM
         public static class BOMInputStream extends FilterInputStream {
             private final BOM bom;
 
@@ -288,6 +287,11 @@ public class IO {
         public static BOM get(final byte[] bytes) {
             for (final BOM bom : BOM.values()) {
                 if (bom.startsWith(bytes)) {
+                    if (UTF16LE == bom && UTF32LE.startsWith(bytes)) {
+                        // UTF16LE and UTF32LE start with same 2 bytes, so check if UTF32LE matches
+                        // WARNING: bytes array must not be zero value initialized
+                        return UTF32LE;
+                    }
                     return bom;
                 }
             }
@@ -307,10 +311,11 @@ public class IO {
         }
 
         public static BOMInputStream wrap(final InputStream is) throws IOException {
-            final byte[] peekBuf = new byte[4];
+            // avoid zero value initalized array due to false positive UTF32LE BOM detection
+            final byte[] peekBuf = new byte[] { 127, 127, 127, 127 };
             int peekIndex = 0;
             BOM bom = null;
-            while (peekIndex < peekBuf.length && bom == null) {
+            while (peekIndex < peekBuf.length) {
                 final int read = is.read();
                 if (read == -1) {
                     break;
@@ -416,7 +421,7 @@ public class IO {
     /*
      * this function reads a line from a bufferedinputstream up to a maxLength. in case the line is longer than maxLength the rest of the
      * line is read but not returned
-     *
+     * 
      * this function skips emtpy lines
      */
     public static byte[] readFile(final File ressource, final int maxSize) throws IOException {
