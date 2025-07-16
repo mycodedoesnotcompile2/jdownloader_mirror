@@ -147,35 +147,35 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char                 SQUARE_BRACKET_CLOSE              = ']';
+    private static final char SQUARE_BRACKET_CLOSE = ']';
     /**
      *
      */
-    private static final char                 CURLY_BRACKET_CLOSE               = '}';
+    private static final char CURLY_BRACKET_CLOSE  = '}';
     /**
      *
      */
-    private static final char                 COLON                             = ':';
+    private static final char COLON                = ':';
     /**
      *
      */
-    private static final char                 ASTERISK                          = '*';
+    private static final char ASTERISK             = '*';
     /**
      *
      */
-    private static final char                 SLASH                             = '/';
+    private static final char SLASH                = '/';
     /**
      *
      */
-    private static final char                 SQUARE_BRACKET_OPEN               = '[';
+    private static final char SQUARE_BRACKET_OPEN  = '[';
     /**
      *
      */
-    private static final char                 CURLY_BRACKET_OPEN                = '{';
+    private static final char CURLY_BRACKET_OPEN   = '{';
     /**
      *
      */
-    private static final char                 COMMA                             = ',';
+    private static final char COMMA                = ',';
 
     public class NumberParser {
         /**
@@ -957,6 +957,7 @@ public class FlexiJSONParser {
                     } else {
                         pbReader.unread(bomCheck);
                     }
+                    parser.reader = pbReader;
                 }
                 return pbReader;
             }

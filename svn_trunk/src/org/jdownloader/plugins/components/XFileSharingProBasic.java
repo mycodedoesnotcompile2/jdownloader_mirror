@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51210 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51213 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2665,9 +2665,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         checkErrors(br, continueURL, link, account, false);
         final Form download1 = br.getFormByInputFieldKeyValue("op", "download_orig");
         if (download1 != null) {
+            final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
             handleCaptcha(link, br, download1);
-            logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
-            this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
+            final int extraWaitSeconds = getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds();
+            if (extraWaitSeconds > 0) {
+                logger.info("Waiting extra wait seconds: " + extraWaitSeconds);
+                this.waitTime(link, timeBefore, extraWaitSeconds);
+            }
             submitForm(br, download1);
             checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
         }
@@ -2807,6 +2811,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Handles all kinds of captchas, also login-captcha - fills captcha answer into given captchaForm. */
     public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
         /* Captcha START */
+        final String reCaptchaKey = captchaForm.getRegex("data-sitekey=\"([^\"]+)").getMatch(0);
         if (new Regex(getCorrectBR(br), Pattern.compile("\\$\\.post\\(\\s*\"/ddl\"", Pattern.CASE_INSENSITIVE)).patternFind()) {
             /* 2019-06-06: Rare case */
             final String captchaResponse;
@@ -2866,6 +2871,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (handleHCaptcha(link, br, captchaForm)) {
             }
         } else if (containsRecaptchaV2Class(getCorrectBR(br))) {
+            if (handleRecaptchaV2(link, br, captchaForm)) {
+            }
+        } else if (reCaptchaKey != null) {
+            /* 2025-07-15: Detected reCaptcha within form e.g. dropload.io when called via getDllinkViaOfficialVideoDownloadNew */
             if (handleRecaptchaV2(link, br, captchaForm)) {
             }
         } else {
@@ -3788,7 +3797,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Handles pre download (pre-captcha) waittime.
+     * Handles pre download (pre-captcha) wait time.
      */
     protected void waitTime(final DownloadLink link, final long timeBefore) throws PluginException {
         /* Ticket Time */
@@ -3805,26 +3814,29 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return;
         }
         logger.info("Found waittime, parsing waittime: " + waitStr);
-        int wait = Integer.parseInt(waitStr);
-        if (wait == 0) {
-            logger.info("Strange: Found waittime of zero seconds in HTML");
+        final int waitSeconds = Integer.parseInt(waitStr);
+        waitTime(link, timeBefore, waitSeconds);
+    }
+
+    protected void waitTime(final DownloadLink link, final long timeBefore, int waitSeconds) throws PluginException {
+        if (waitSeconds <= 0) {
+            logger.info("Strange: Got 0 wait seconds");
             return;
         }
         /*
          * Check how much time has passed during eventual captcha event before this function has been called and see how much time is left
          * to wait.
          */
-        final int extraWaitSeconds = 1;
-        int passedTime = (int) ((Time.systemIndependentCurrentJVMTimeMillis() - timeBefore) / 1000) - extraWaitSeconds;
-        wait -= passedTime;
+        int passedTime = (int) ((Time.systemIndependentCurrentJVMTimeMillis() - timeBefore) / 1000);
+        waitSeconds -= passedTime;
         if (passedTime > 0) {
             /* This usually means that the user had to solve a captcha which cuts down the remaining time we have to wait. */
             logger.info("Total passed time during captcha: " + passedTime);
         }
-        if (wait > 0) {
-            logger.info("Waiting final waittime: " + wait);
-            sleep(wait * 1000l, link);
-        } else if (wait < wait - extraWaitSeconds) {
+        if (waitSeconds > 0) {
+            logger.info("Waiting final waittime: " + waitSeconds);
+            sleep(waitSeconds * 1000l, link);
+        } else if (waitSeconds < waitSeconds) {
             /* User needed more time to solve the captcha so there is no waittime left :) */
             logger.info("Congratulations: Time to solve captcha was higher than waittime --> No waittime left");
         } else {

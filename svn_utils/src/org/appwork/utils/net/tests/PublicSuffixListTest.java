@@ -34,6 +34,7 @@
 package org.appwork.utils.net.tests;
 
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 import org.appwork.utils.net.PublicSuffixList;
 
@@ -42,6 +43,7 @@ import org.appwork.utils.net.PublicSuffixList;
  * @date Mar 28, 2022
  *
  */
+@TestDependency({ "org.appwork.utils.net.PublicSuffixList" })
 public class PublicSuffixListTest extends AWTest {
     public static void main(String[] args) {
         run();

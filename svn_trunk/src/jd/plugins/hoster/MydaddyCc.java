@@ -24,6 +24,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.DebugMode;
+import org.jdownloader.plugins.components.config.MydaddyCcConfig;
+import org.jdownloader.plugins.components.config.MydaddyCcConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -36,14 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.DebugMode;
-import org.jdownloader.plugins.components.config.MydaddyCcConfig;
-import org.jdownloader.plugins.components.config.MydaddyCcConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51213 $", interfaceVersion = 3, names = {}, urls = {})
 public class MydaddyCc extends PluginForHost {
     public MydaddyCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,7 +89,6 @@ public class MydaddyCc extends PluginForHost {
     /* Connection stuff */
     private static final boolean  free_resume             = true;
     private static final int      free_maxchunks          = 0;
-    private static final int      free_maxdownloads       = -1;
     private String                dllink                  = null;
     protected static final String PROPERTY_CHOSEN_QUALITY = "chosen_quality";
     public static final String    PROPERTY_ACTRESS_NAME   = "actress_name";
@@ -97,7 +96,7 @@ public class MydaddyCc extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://mydaddy.cc/";
+        return "https://" + getHost() + "/";
     }
 
     @Override
@@ -281,7 +280,7 @@ public class MydaddyCc extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

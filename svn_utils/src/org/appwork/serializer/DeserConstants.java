@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,68 +32,21 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.flexijson.tests;
+package org.appwork.serializer;
 
-import org.appwork.storage.Storable;
-import org.appwork.storage.StorableDoc;
-import org.appwork.storage.flexijson.FlexiJSONParser;
-import org.appwork.storage.flexijson.FlexiJSonObject;
-import org.appwork.storage.flexijson.FlexiUtils;
-import org.appwork.storage.flexijson.ParsingError;
-import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
-import org.appwork.testframework.AWTest;
+import org.appwork.testframework.AWTestValidateClassReference;
 
 /**
  * @author thomas
- * @date 06.07.2022
+ * @date 15.07.2025
  *
  */
-public class FlexiUtilsTest extends AWTest {
-    public static void main(String[] args) {
-        run();
-    }
-
-    @StorableDoc("Enum Class Anno")
-    public static enum TestEnum {
-        @StorableDoc("A comment")
-        A,
-        @StorableDoc("b comment")
-        B
-    }
-
-    public static class PropTest implements Storable {
-        /**
-         *
-         */
-        public PropTest() {
-            // TODO Auto-generated constructor stub
-        }
-
-        private TestEnum en = TestEnum.A;
-
-        @StorableDoc("Property Storable")
-        public TestEnum getEn() {
-            return en;
-        }
-
-        public void setEn(TestEnum en) {
-            this.en = en;
-        }
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.testframework.TestInterface#runTest()
-     */
-    @Override
-    public void runTest() throws Exception {
-        // if we ignore duplicate key errors, we should have all elements in the object
-        FlexiJSonObject node = (FlexiJSonObject) new FlexiJSONParser("{a:true,a:false}").ignoreIssues(FlexiJSONParser.IGNORE_LIST_ENSURE_CORRECT_VALUES).addIgnoreIssues(ParsingError.ERROR_DUPLICATED_KEY_PROPERTY).parse();
-        assertThat(node.size()).isNumber(2);
-        String result = new FlexiJSonStringBuilder().toJSONString(node);
-        assertEquals("{\"a\":true,\"a\":false}", result);
-        assertEquals(FlexiUtils.serializeConfigStorable(TestEnum.A), "\"A\"/* A comment */");
-        assertEquals(FlexiUtils.serializeConfigStorable(new PropTest()), "{\r\n  /*\r\n   * Enum Class Anno\r\n   * Property Storable\r\n   * Type: TestEnum-Enum\r\n   * Options: \r\n   *    A: A comment\r\n   *    B: b comment\r\n   */\r\n  \"en\":\"A\"/* A comment */\r\n}");
-    }
+public class DeserConstants {
+    public static final String    AWU_SERIALIZER_CLASS = "AWU_SERIALIZER_CLASS";
+    public static final String    DESER_SIMPLE         = "Deser-Simple";
+    public static final String    DESER_FLEXI          = "Deser-Flexi";
+    @AWTestValidateClassReference
+    protected static final String CLASS_SIMPLE         = "org.appwork.storage.SimpleSerializer";
+    @AWTestValidateClassReference
+    protected static final String CLASS_FLEXI          = "org.appwork.storage.flexijson.FlexiSerializer";
 }

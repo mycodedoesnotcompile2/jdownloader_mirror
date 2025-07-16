@@ -29,7 +29,10 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
+import org.jdownloader.gui.views.components.packagetable.columns.CommentColumn;
+import org.jdownloader.gui.views.downloads.columns.AvailabilityColumn;
 import org.jdownloader.gui.views.downloads.columns.FileColumn;
+import org.jdownloader.gui.views.downloads.columns.FileSizeColumn;
 import org.jdownloader.gui.views.linkgrabber.columns.UrlColumn;
 import org.jdownloader.images.AbstractIcon;
 
@@ -101,6 +104,44 @@ public class LinkURLEditor<PackageType extends AbstractPackageNode<ChildrenType,
                         return false;
                     }
 
+                });
+                addColumn(new FileSizeColumn() {
+                    @Override
+                    public boolean isEnabled(AbstractNode obj) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean isDefaultVisible() {
+                        return false;
+                    }
+                });
+                addColumn(new AvailabilityColumn() {
+                    @Override
+                    public boolean isEnabled(AbstractNode obj) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean isDefaultVisible() {
+                        return false;
+                    }
+                });
+                addColumn(new CommentColumn() {
+                    @Override
+                    public boolean isEnabled(AbstractNode obj) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean isDefaultVisible() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isEditable(AbstractNode obj) {
+                        return false;
+                    }
                 });
 
             }

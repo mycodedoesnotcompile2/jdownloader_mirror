@@ -56,7 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51210 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51216 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -609,8 +609,9 @@ public class DoodstreamCom extends XFileSharingProBasic {
             if (waitSecondsStr == null) {
                 logger.warning("Failed to find pre download wait time -> Fallback to default");
                 this.waitTime(link, Time.systemIndependentCurrentJVMTimeMillis());
-                logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
-                this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
+                final int waitSeconds = getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds();
+                logger.info("Waiting extra wait seconds: " + waitSeconds);
+                this.sleep(waitSeconds * 1000l, link);
             } else {
                 final int waitSeconds = Integer.parseInt(waitSecondsStr);
                 this.sleep(waitSeconds * 1001l, link);

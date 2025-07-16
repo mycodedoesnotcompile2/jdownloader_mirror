@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher StraÃŸe 117
- *         90763 FÃ¼rth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -309,11 +309,11 @@ public class CompiledType {
                 } else if (((WildcardType) type).getUpperBounds().length == 1 && ((WildcardType) type).getLowerBounds().length == 0) {
                     sb.append(rule.getNameForUnspecifiedGeneric() + " extends " + CompiledType.create(((WildcardType) type).getUpperBounds()[0]).toString(rule));
                 } else {
-                    sb.append(((WildcardType) type).toString());
+                    sb.append(type.toString());
                 }
             } else if (type instanceof TypeVariable) {
                 Type[] bounds = ((TypeVariable) type).getBounds();
-                sb.append(((TypeVariable) type).toString());
+                sb.append(type.toString());
             } else {
                 LogV3.log(new Exception("Unknown type " + type));
                 sb.append("Unknown Type");
@@ -324,9 +324,9 @@ public class CompiledType {
                 sb.append(rule.getCollectionName(this, raw));
             } else if (Map.class.isAssignableFrom(raw)) {
                 sb.append(rule.getMapName(this, raw));
-            } else if (((Class) raw).isArray()) {
+            } else if (raw.isArray()) {
                 sb.append(rule.getArrayName(this, raw));
-            } else if (((Class) raw).isEnum()) {
+            } else if (raw.isEnum()) {
                 sb.append(rule.getEnumName(this, raw));
             } else if (Clazz.isPrimitive(raw)) {
                 switch (rule.getPrimitiveWrapperStrategy()) {

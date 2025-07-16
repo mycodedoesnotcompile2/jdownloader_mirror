@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.KeyValueStringEntry;
 import org.appwork.utils.parser.UrlQuery;
 
@@ -46,6 +47,7 @@ import org.appwork.utils.parser.UrlQuery;
  * @date 04.02.2022
  *
  */
+@TestDependency({ "org.appwork.utils.parser.UrlQuery" })
 public class UrlQueryTest extends AWTest {
     public static void main(String[] args) {
         run();
@@ -62,13 +64,11 @@ public class UrlQueryTest extends AWTest {
             UrlQuery parsed = UrlQuery.parse("http://domain_with_underscore.de/?query=true");
             assertEquals(parsed.get("query"), "true");
             assertEquals(parsed.list().size(), 1);
-
         }
         {
             UrlQuery parsed = UrlQuery.parse("domain_with_underscore.de/?query=true");
             assertEquals(parsed.get("query"), "true");
             assertEquals(parsed.list().size(), 1);
-
         }
         {
             UrlQuery parsed = UrlQuery.parse("st=0&rt=SO&pv=12&cv=20210716001&pkh=c4622595eb512a&app=AWAdminTool&os=WINDOWS&osr=WINDOWS_10&arch=X86&os64=1&jvm64=1&java=18261012&uid=&hidNew=027ef5524a37b04ac638660eac27102f38811af717d1b99eca490a06bf535de&hidSta=0044f0990e5da993d314db308328261e140782fb32db43a&ct=ALPHA&rg=null&cBuild=&gui=0&repos=&mcnt=311820&rcnt=1494&scnt=1115&stm=1643707780775&bc=46&rc=0&bt=1640685241000&ut=3297989953&sit=1595088146755&cycle=739&csVer=1639060415000&csDep=&csPro=&awfcxz=1&rev=46&lng=en&chlg=1&jdiff=1&dst=-1&dedup=INTER&1643983194392.1643983195370");
@@ -78,9 +78,6 @@ public class UrlQueryTest extends AWTest {
                     new TypeRef<ArrayList<KeyValueStringEntry>>() {
                     });
             assertEqualsDeep(parsed.list(), correct);
-
         }
-
     }
-
 }

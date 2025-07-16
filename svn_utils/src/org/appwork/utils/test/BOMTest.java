@@ -35,9 +35,9 @@ package org.appwork.utils.test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
-import java.nio.charset.UnsupportedCharsetException;
 
 import org.appwork.storage.flexijson.FlexiParserException;
 import org.appwork.testframework.AWTest;
@@ -53,38 +53,40 @@ public class BOMTest extends AWTest {
         run();
     }
 
+    private static byte[] toBOMByteArray(final String string, IO.BOM bom) throws IOException {
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        bos.write(bom.getBOM());
+        bos.write(string.getBytes(bom.getCharSet()));
+        return bos.toByteArray();
+    }
+
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
     public void runTest() throws Exception {
         final String normal = "Dies ist ein Test ÖÄÜ 😊 统一码";
         for (IO.BOM bom : IO.BOM.values()) {
-            final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            bos.write(bom.getBOM());
-            bos.write(normal.getBytes(bom.getCharSet()));
-            final String check = IO.readInputStreamToString(new ByteArrayInputStream(bos.toByteArray()));
+            final String check = IO.readInputStreamToString(new ByteArrayInputStream(toBOMByteArray(normal, bom)));
             if (!normal.equals(check)) {
                 throw new Exception("failed:" + bom + "|" + check);
             }
         }
         for (String charSetString : new String[] { "UTF-8", "UTF-16", "x-UTF-16LE-BOM", "X-UTF-32BE-BOM", "X-UTF-32LE-BOM" }) {
             final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            final Charset charSet;
-            try {
-                charSet = Charset.forName(charSetString);
-            } catch (UnsupportedCharsetException ignore) {
-                System.out.println("Ignore unsupported:" + ignore.getMessage());
-                continue;
-            }
+            final Charset charSet = Charset.forName(charSetString);
             bos.write(normal.getBytes(charSet));
             final String check = IO.readInputStreamToString(new ByteArrayInputStream(bos.toByteArray()));
             if (!normal.equals(check)) {
                 throw new Exception("failed:" + charSet + "|" + check);
             }
         }
+        assertEqualsDeep(normal.getBytes("UTF-16"), toBOMByteArray(normal, IO.BOM.UTF16BE));
+        assertEqualsDeep(normal.getBytes("x-UTF-16LE-BOM"), toBOMByteArray(normal, IO.BOM.UTF16LE));
+        assertEqualsDeep(normal.getBytes("X-UTF-32BE-BOM"), toBOMByteArray(normal, IO.BOM.UTF32BE));
+        assertEqualsDeep(normal.getBytes("X-UTF-32LE-BOM"), toBOMByteArray(normal, IO.BOM.UTF32LE));
         for (final String test : new String[] { "", "1", "12", "123", "1234" }) {
             final String check = IO.readInputStreamToString(new ByteArrayInputStream(test.getBytes("UTF-8")));
             if (!test.equals(check)) {

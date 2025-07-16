@@ -247,7 +247,7 @@ public class IO {
 
     public static enum BOM {
         UTF8(new byte[] { (byte) 239, (byte) 187, (byte) 191 }, "UTF-8"),
-        UTF16BE(new byte[] { (byte) 0xfe, (byte) 0xff }, "UTF-16BE"),
+        UTF16BE(new byte[] { (byte) 0xfe, (byte) 0xff }, "UTF-16BE"), // also see UTF-16, writes out BOM
         UTF16LE(new byte[] { (byte) 0xff, (byte) 0xfe }, "UTF-16LE"), // also see x-UTF-16LE-BOM, writes out BOM
         UTF32BE(new byte[] { (byte) 0, (byte) 0, (byte) 0xfe, (byte) 0xff }, "UTF-32BE"), // also see X-UTF-32BE-BOM, writes out BOM
         UTF32LE(new byte[] { (byte) 0xff, (byte) 0xfe, (byte) 0, (byte) 0 }, "UTF-32LE");// also see X-UTF-32LE-BOM, writes OUT BOM
@@ -421,7 +421,7 @@ public class IO {
     /*
      * this function reads a line from a bufferedinputstream up to a maxLength. in case the line is longer than maxLength the rest of the
      * line is read but not returned
-     * 
+     *
      * this function skips emtpy lines
      */
     public static byte[] readFile(final File ressource, final int maxSize) throws IOException {

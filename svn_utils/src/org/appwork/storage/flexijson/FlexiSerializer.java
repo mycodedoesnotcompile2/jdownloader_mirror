@@ -235,7 +235,7 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
         return ret;
     }
 
-    public void setIgnoreIssuesByContext(FlexiJSONParser ret, Object... context) {
+    protected void setIgnoreIssuesByContext(FlexiJSONParser ret, Object... context) {
         for (Object o : context) {
             if (o == SC.NON_STRICT) {
                 ret.addIgnoreIssues(FlexiJSONParser.IGNORE_LIST_ENSURE_CORRECT_VALUES);

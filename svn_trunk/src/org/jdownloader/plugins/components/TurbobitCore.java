@@ -19,7 +19,6 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -54,7 +53,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51188 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51217 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -365,16 +364,16 @@ public abstract class TurbobitCore extends PluginForHost {
             }
             final Map<String, Object> entries_premium = (Map<String, Object>) entries.get("premium");
             final String status = entries_premium.get("status").toString();
-            if (status.equalsIgnoreCase("active")) {
+            if (status.equalsIgnoreCase("banned")) {
+                account.setType(AccountType.PREMIUM);
+                // for example:Status: Banned. You have reached the limit of your daily traffic quota
+                getAndSetPremiumInformationWebsiteV1_in_website_v2_handling(account, ai);
+                throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
+            } else if (status.equalsIgnoreCase("active")) {
                 account.setType(AccountType.PREMIUM);
                 final String expiredateStr = entries_premium.get("expiredAt").toString();
                 ai.setValidUntil(TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
-                try {
-                    getAndSetPremiumTrafficInformationWebsiteV1(account, ai);
-                } catch (final Exception e) {
-                    logger.log(e);
-                    logger.warning("Exception happened during obtaining premium traffic");
-                }
+                getAndSetPremiumInformationWebsiteV1_in_website_v2_handling(account, ai);
             } else {
                 account.setType(AccountType.FREE);
             }
@@ -386,19 +385,9 @@ public abstract class TurbobitCore extends PluginForHost {
                 expire = br.getRegex("'/premium(?:/info)?'\\s*>\\s*(\\d+\\.\\d+\\.\\d+)\\s*<").getMatch(0);
             }
             if (expire != null) {
-                long endBlockingTime = -1;
-                if (br.containsHTML("<span class='glyphicon glyphicon-ok banturbo'>") || (endBlockingTime = getBlockingEndTime(br, account)) > 0) {
-                    if (endBlockingTime > 0) {
-                        final String readableTime = new SimpleDateFormat("yyyy-MM-dd' 'HH':'mm':'ss", Locale.ENGLISH).format(new Date(endBlockingTime));
-                        final long wait = Math.max(5 * 60 * 1000l, Math.min(endBlockingTime - System.currentTimeMillis(), 30 * 60 * 1000l));
-                        throw new AccountUnavailableException("You have reached limit of premium downloads:" + readableTime, wait);
-                    } else {
-                        throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
-                    }
-                }
                 ai.setValidUntil(TimeFormatter.getMilliSeconds(expire.trim(), "dd.MM.yyyy", Locale.ENGLISH), br);
                 account.setType(AccountType.PREMIUM);
-                getAndSetPremiumTrafficInformationWebsiteV1(account, ai);
+                getAndSetPremiumInformationWebsiteV1(account, ai);
             } else {
                 account.setType(AccountType.FREE);
             }
@@ -406,14 +395,30 @@ public abstract class TurbobitCore extends PluginForHost {
         return ai;
     }
 
-    /** Only call this for premium accounts!! */
-    private void getAndSetPremiumTrafficInformationWebsiteV1(final Account account, final AccountInfo ai) throws IOException {
+    private void getAndSetPremiumInformationWebsiteV1_in_website_v2_handling(final Account account, final AccountInfo ai) throws AccountUnavailableException {
+        try {
+            getAndSetPremiumInformationWebsiteV1(account, ai);
+        } catch (final AccountUnavailableException e) {
+            throw e;
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.warning("Exception happened during obtaining premium traffic");
+        }
+    }
+
+    /**
+     * Only call this for premium accounts!!
+     *
+     * @throws AccountUnavailableException
+     */
+    private void getAndSetPremiumInformationWebsiteV1(final Account account, final AccountInfo ai) throws IOException, AccountUnavailableException {
         if (account.getType() != AccountType.PREMIUM) {
             logger.warning("DEVELOPER MISTAKE!! ONLY CALL THIS FUNCTION FOR PREMIUM ACCOUNTS!!");
         }
         logger.info("Obtaining premium traffic information");
-        br.getPage("https://" + br.getHost(false) + "/premium/info?site_version=1&from_mirror=1");
-        final Regex traffic_daily = br.getRegex("The rest of the traffic until the end of the day:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/day\\)");
+        final Browser brc = br.cloneBrowser();
+        brc.getPage("https://" + br.getHost(false) + "/premium/info?site_version=1&from_mirror=1");
+        final Regex traffic_daily = brc.getRegex("The rest of the traffic until the end of the day:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/day\\)");
         if (traffic_daily.patternFind()) {
             final long traffic_daily_left = SizeFormatter.getSize(traffic_daily.getMatch(0));
             final long traffic_daily_max = SizeFormatter.getSize(traffic_daily.getMatch(1));
@@ -422,7 +427,7 @@ public abstract class TurbobitCore extends PluginForHost {
         } else {
             logger.warning("Failed to find daily traffic left information");
         }
-        final Regex traffic_monthly = br.getRegex("The rest of the monthly traffic:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/month\\)");
+        final Regex traffic_monthly = brc.getRegex("The rest of the monthly traffic:\\s*<b>(\\d+[^<]+)</b>\\s*\\(of (\\d+[^<]+)/month\\)");
         String monthlyTrafficLeftInfo = "N/A";
         if (traffic_monthly.patternFind()) {
             final String traffic_monthly_left = traffic_monthly.getMatch(0);
@@ -432,12 +437,34 @@ public abstract class TurbobitCore extends PluginForHost {
             logger.warning("Failed to find monthly traffic left information");
         }
         ai.setStatus(account.getType().getLabel() + " | Monthly traffic left: " + monthlyTrafficLeftInfo);
+        final long dateEndTime = getDateEndTimeWebsiteV1(brc, account);
+        if (dateEndTime != -1) {
+            ai.setValidUntil(dateEndTime);
+        }
+        Long endBlockingTime = null;
+        if (brc.containsHTML("<span class='glyphicon glyphicon-ok banturbo'>") || (endBlockingTime = getBlockingEndTime(brc, account)) > 0) {
+            if (endBlockingTime == null) {
+                endBlockingTime = getBlockingEndTime(brc, account);
+            }
+            if (endBlockingTime > 0) {
+                final String readableTime = new SimpleDateFormat("yyyy-MM-dd' 'HH':'mm':'ss", Locale.ENGLISH).format(new Date(endBlockingTime));
+                final long wait = Math.max(5 * 60 * 1000l, Math.min(endBlockingTime - System.currentTimeMillis(), 30 * 60 * 1000l));
+                throw new AccountUnavailableException("You have reached limit of premium downloads:" + readableTime, wait);
+            } else {
+                throw new AccountUnavailableException("You have reached limit of premium downloads", 30 * 60 * 1000l);
+            }
+        }
     }
 
     /**
      * Alternative way to check if we're logged in: https://app.turbobit.net/api/site-data <br>
-     * {"country":{"id":12345,"code":"de"},"defaultLanguage":"en","userFingerprint":"REDACTED","user":{"login":"xxx@xxy.org","premium":{"status":"active","expiredAt":"2025-01-01
-     * 01:01:01"}},"contacts":{"supportEmail":"REDACTED","abuseEmail":"REDACTED","helpUrl":"https:\/\/trbt.cc\/zendesk\/redirect?path=https:\/\/turbobit-net.zendesk.com","dmcaUrl":"\/\/www.dmca.com\/Protection\/Status.aspx?ID=REDACTED&refurl=https:\/\/app.turbobit.net\/rules\/abuse","help2Url":"https:\/\/help2.turbobit.net\/hc\/en-us"},"correctUrl":null,"siteV2Available":true,"shortDomain":"trbt.cc"}
+     * {"country":{"id":12345,"code":"de"},"defaultLanguage":"en","userFingerprint":"REDACTED","user":{"login":"xxx@xxy.org","premium":{
+     * "status":"active","expiredAt":"2025-01-01
+     * 01:01:01"}},"contacts":{"supportEmail":"REDACTED","abuseEmail":"REDACTED","helpUrl":"https:\
+     * /\/trbt.cc\/zendesk\/redirect?path=https:\
+     * /\/turbobit-net.zendesk.com","dmcaUrl":"\/\/www.dmca.com\/Protection\/Status.aspx?ID=REDACTED
+     * &refurl=https:\/\/app.turbobit.net\/rules
+     * \/abuse","help2Url":"https:\/\/help2.turbobit.net\/hc\/en-us"},"correctUrl":null,"siteV2Available":true,"shortDomain":"trbt.cc"}
      */
     private Map<String, Object> getUserInformationWebsiteV2(final Browser br, final Account account) throws IOException, PluginException {
         br.getPage(getWebsiteV2Base() + "/api/user/info");
@@ -447,13 +474,28 @@ public abstract class TurbobitCore extends PluginForHost {
     }
 
     protected static long getBlockingEndTime(final Browser br, final Account account) {
-        final String[] endTimes = br.getRegex("Blocking end time\\s*:\\s*(\\d{4}-\\d{2}-\\d{2}\\s*\\d{2}:\\d{2}:\\d{2})\\s*<").getColumn(0);
+        final String[] endTimes = br.getRegex("(?:Ban|Blocking) end (?:date|time)\\s*:\\s*(?:</span>)?\\s*(?:<b>)?\\s*(\\d{4}-\\d{2}-\\d{2}\\s*\\d{2}:\\d{2}:\\d{2})\\s*<").getColumn(0);
         if (endTimes == null || endTimes.length == 0) {
             return -1;
         }
         final long now = System.currentTimeMillis();
         for (final String endTime : endTimes) {
             final long timeStamp = TimeFormatter.getMilliSeconds(endTime, "yyyy-MM-dd' 'HH':'mm':'ss", Locale.ENGLISH);
+            if (timeStamp > 0 && timeStamp > now) {
+                return timeStamp;
+            }
+        }
+        return -1;
+    }
+
+    protected static long getDateEndTimeWebsiteV1(final Browser br, final Account account) {
+        final String[] endTimes = br.getRegex("Date end\\s*:\\s*(?:<b>)?\\s*(\\d{2}\\.\\d{2}\\.\\d{4}\\s*\\d{2}:\\d{2})\\s*<").getColumn(0);
+        if (endTimes == null || endTimes.length == 0) {
+            return -1;
+        }
+        final long now = System.currentTimeMillis();
+        for (final String endTime : endTimes) {
+            final long timeStamp = TimeFormatter.getMilliSeconds(endTime, "dd'.'MM'.'yyyy' 'HH':'mm", Locale.ENGLISH);
             if (timeStamp > 0 && timeStamp > now) {
                 return timeStamp;
             }
@@ -1212,7 +1254,7 @@ public abstract class TurbobitCore extends PluginForHost {
                     }
                     final UrlQuery loginquery = new UrlQuery();
                     loginquery.appendEncoded("premium", predefinedpremiumkey);
-                    loginquery.appendEncoded("email", URLEncode.encodeRFC2396(predefinedemail));
+                    loginquery.appendEncoded("email", predefinedemail);
                     br.postPage("/payments/premium/process", loginquery);
                     final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     if (Boolean.TRUE.equals(response.get("success"))) {

@@ -53,13 +53,14 @@ import jd.utils.locale.JDL;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51004 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 51212 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -385,7 +386,6 @@ public class MediafireCom extends PluginForHost {
             }
             this.handlePW(link);
             finalDownloadurl = br.getRegex("kNO\\s*=\\s*\"(https?://.*?)\"").getMatch(0);
-            logger.info("Kno= " + finalDownloadurl);
             if (finalDownloadurl == null) {
                 /* pw protected files can directly redirect to download */
                 finalDownloadurl = br.getRedirectLocation();
@@ -395,6 +395,10 @@ public class MediafireCom extends PluginForHost {
                 if (finalDownloadurl == null) {
                     finalDownloadurl = br.getRegex("(" + MediafireComFolder.TYPE_DIRECT + ")").getMatch(0);
                 }
+            }
+            if (finalDownloadurl == null) {
+                final String data_scrambled_url = br.getRegex("data-scrambled-url\\s*=\\s*\"(.*?)\"").getMatch(0);
+                finalDownloadurl = data_scrambled_url == null ? null : Base64.decodeToString(data_scrambled_url);
             }
         }
         if (StringUtils.isEmpty(finalDownloadurl)) {

@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51195 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51225 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -247,6 +247,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "oxy.cloud", "oxy.st" });
         ret.add(new String[] { "oydisk.com" });
         ret.add(new String[] { "poophd.com", "do0d.co", "pooop.online", "poop.com.co" });
+        ret.add(new String[] { "cyphershare.net" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }
@@ -276,12 +277,14 @@ public class Offline extends PluginForHost {
 
     @Override
     public boolean checkLinks(final DownloadLink[] items) {
-        if (items != null) {
-            for (final DownloadLink link : items) {
-                link.setAvailable(false);
-                if (StringUtils.isEmpty(link.getComment())) {
-                    link.setComment(getErrorMessage(link, null));
-                }
+        if (items == null) {
+            /* Early return */
+            return true;
+        }
+        for (final DownloadLink link : items) {
+            link.setAvailable(false);
+            if (StringUtils.isEmpty(link.getComment())) {
+                link.setComment(getErrorMessage(link, null));
             }
         }
         return true;

@@ -44,6 +44,8 @@ import org.appwork.storage.SimpleSerializer;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.commonInterface.SerializerInterface;
 import org.appwork.storage.config.test.TestObject;
+import org.appwork.storage.flexijson.FlexiJSONParser;
+import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiSerializer;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.IO.BOM;
@@ -58,11 +60,13 @@ public class DeserTests extends AWTest {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
     public void runTest() throws Exception {
+        String jsonWithBOM = "\uFEFF{\"name\":\"Thomas\",\"role\":\"Entwickler\"}";
+        FlexiJSonNode myNode = new FlexiJSONParser(jsonWithBOM).parse();
         serializers = new SerializerInterface[] { new FlexiSerializer(), new SimpleSerializer() };
         try {
             test("{\"a\":\"line1\\r\\nline2\"}", "", TypeRef.HASHMAP, SC.SINGLE_LINE, SC.READABLE);

@@ -50,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Time;
@@ -73,6 +74,7 @@ import org.appwork.utils.singleapp.UncheckableInstanceException;
  * @date May 29, 2019
  *
  */
+@TestDependency({ "org.appwork.utils.singleapp.IncommingMessageListener" })
 public class TestSingleInstance extends AWTest {
     /**
      *

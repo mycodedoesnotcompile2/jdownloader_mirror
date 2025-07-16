@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51202 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51216 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,6 +73,17 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         ret.add(new String[] { "116pan.xyz" }); // formerly known as 116pan.com
         return ret;
     }
+    // @Override
+    // public String rewriteHost(final String host) {
+    // if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+    // return super.rewriteHost(host);
+    // }
+    // if (host == null || host.equalsIgnoreCase("116pan.com")) {
+    // return this.getHost();
+    // } else {
+    // return super.rewriteHost(host);
+    // }
+    // }
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());

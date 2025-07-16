@@ -1353,14 +1353,16 @@ public class FlexiJSonMapper {
                 }
             }
             cType = this.guessTypeForObject(json, cType, setter);
-            if (cType.isInstanceOf(FlexiJSonObject.class) && json instanceof FlexiJSonObject) {
+            if (cType.type == json.getClass()) {
+                if (!cType.isInstanceOf(FlexiJSonNode.class)) {
+                    DebugMode.debugger("Should never happen!");
+                }
+                // we tried to map to FlexiNodes Nodes
                 return json;
-            } else if (cType.isInstanceOf(FlexiJSonArray.class) && json instanceof FlexiJSonArray) {
-                return json;
-            } else if (cType.isInstanceOf(FlexiJSonValue.class) && json instanceof FlexiJSonValue) {
-                return json;
-            } else if (cType.isInstanceOf(FlexiJSonNode.class) && json instanceof FlexiJSonNode) {
-                return json;
+            }
+            if (cType.isInstanceOf(FlexiJSonNode.class)) {
+                // extended Node elements like ExtFlexiJsonObject
+                throw new WTFException("Not Supported!");
             }
             final Object mapped = this.handleMapperJsonNodeToObject(json, cType, setter);
             if (mapped != json) {
@@ -1854,9 +1856,11 @@ public class FlexiJSonMapper {
                         FlexiJSonNode replacement = resolve(toResolve, value, fieldType, valuePath, loopCheck, access);
                         if (fieldType.isString() || fieldType.isObject()) {
                             if (replacement != null && replacement instanceof FlexiJSonValue) {
-                                if (i == chars.length - 1) {
+                                if (i == chars.length - 1 && newText.length() == 0) {
                                     if (((FlexiJSonValue) replacement).getType() == ValueType.STRING) {
                                         return replacement;
+                                    } else {
+                                        DebugMode.debugger();
                                     }
                                 } else {
                                     newText.append(String.valueOf(((FlexiJSonValue) replacement).getValue()));
@@ -2056,7 +2060,7 @@ public class FlexiJSonMapper {
     protected FlexiJSonNode onUnresolvableReference(String path) {
         // TODO: Handling of forbidden references
         // DebugMode.debugger();
-        return createFlexiJSonValue("${" + path + "}");
+        return createFlexiJSonValue(getRefMarker() + "{" + path + "}");
     }
 
     private ThreadLocal<FlexiMapperContext> context = new ThreadLocal<FlexiMapperContext>();

@@ -2,6 +2,9 @@ package org.jdownloader.gui.views.linkgrabber.contextmenu;
 
 import javax.swing.KeyStroke;
 
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.contextmenu.ActionData;
@@ -39,9 +42,6 @@ import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTableModel;
 import org.jdownloader.gui.views.linkgrabber.actions.MergeSameNamedPackagesAction;
 import org.jdownloader.gui.views.linkgrabber.bottombar.IncludedSelectionSetup;
-
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
 
 public class MenuManagerLinkgrabberTableContext extends ContextMenuManager<CrawledPackage, CrawledLink> {
     private static final MenuManagerLinkgrabberTableContext INSTANCE = new MenuManagerLinkgrabberTableContext();
@@ -168,13 +168,13 @@ public class MenuManagerLinkgrabberTableContext extends ContextMenuManager<Crawl
     private MenuItemData createPriorityMenu() {
         PriorityMenuContainer priority;
         priority = new PriorityMenuContainer();
-        priority.add(new MenuItemData(new ActionData(PriorityLowestAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityLowerAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityLowAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityDefaultAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityHighAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityHigherAction.class)));
         priority.add(new MenuItemData(new ActionData(PriorityHighestAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityHigherAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityHighAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityDefaultAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityLowAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityLowerAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityLowestAction.class)));
         return priority;
     }
 
