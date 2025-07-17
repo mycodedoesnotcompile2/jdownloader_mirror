@@ -18,7 +18,7 @@
 		<mkdir dir="${cls}" />
 		  <delete dir="${cls}" />
 		  <mkdir dir="${cls}" />
-		<javac srcdir="${src}" nowarn="on" excludes="**/test/**" destdir="${cls}" encoding="UTF-8" source="1.6" target="1.6" >
+                <javac srcdir="${src}" nowarn="on" excludes="**/test/**" destdir="${cls}" encoding="UTF-8" source="1.8" target="1.8" >
 			 <classpath refid="classpath" />
 			
 			</javac>
