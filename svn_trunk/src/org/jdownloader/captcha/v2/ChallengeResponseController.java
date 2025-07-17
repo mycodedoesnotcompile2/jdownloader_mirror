@@ -8,6 +8,12 @@ import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
+
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
@@ -20,6 +26,7 @@ import org.jdownloader.captcha.blacklist.BlacklistEntry;
 import org.jdownloader.captcha.blacklist.CaptchaBlackList;
 import org.jdownloader.captcha.event.ChallengeResponseEvent;
 import org.jdownloader.captcha.event.ChallengeResponseEventSender;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaDialogSolver;
 import org.jdownloader.captcha.v2.challenge.keycaptcha.jac.KeyCaptchaJACSolver;
@@ -27,6 +34,7 @@ import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComSolver;
+import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
 import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSolver;
@@ -48,12 +56,7 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
+import org.jdownloader.updatev2.UpdateController;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
@@ -228,6 +231,15 @@ public class ChallengeResponseController {
     }
 
     public <T> SolverJob<T> handle(final Challenge<T> c) throws InterruptedException, SkipException {
+        if (c instanceof AbstractBrowserChallenge) {
+            if (c instanceof RecaptchaV2Challenge) {
+                UpdateController.getInstance().addFeedback("rc");
+            } else if (c instanceof HCaptchaChallenge) {
+                UpdateController.getInstance().addFeedback("hc");
+            } else if (c instanceof CloudflareTurnstileChallenge) {
+                UpdateController.getInstance().addFeedback("tc");
+            }
+        }
         LogSource logger = LogController.getInstance().getPreviousThreadLogSource();
         if (logger == null) {
             logger = this.logger;

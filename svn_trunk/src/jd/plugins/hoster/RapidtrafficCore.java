@@ -33,8 +33,8 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51174 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapidtrafficCore extends PluginForHost {
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -74,7 +74,7 @@ public abstract class RapidtrafficCore extends PluginForHost {
     }
 
     private String getBaseURL() {
-        return "http://" + this.getHost() + "/";
+        return "https://www." + this.getHost() + "/";
     }
 
     public void init() {
@@ -92,7 +92,7 @@ public abstract class RapidtrafficCore extends PluginForHost {
                         return;
                     }
                     logger.info("Verifying cookies...");
-                    br.getPage(this.getBaseURL() + "konto");
+                    br.getPage(this.getBaseURL() + "files");
                     if (this.isLoggedIN(br)) {
                         logger.info("Cookie login successful");
                         account.saveCookies(br.getCookies(br.getHost()), "");
@@ -102,11 +102,13 @@ public abstract class RapidtrafficCore extends PluginForHost {
                     }
                 }
                 logger.info("Performing full login");
-                br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
-                br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
                 br.setAcceptLanguage("pl-PL,pl;q=0.8,en-US;q=0.6,en;q=0.4");
-                br.postPage(getBaseURL() + "index.php", "v=konto%7Cmain&c=aut&f=loginUzt&friendlyredir=1&usr_login=" + Encoding.urlEncode(account.getUser()) + "&usr_pass=" + Encoding.urlEncode(account.getPass()));
+                br.getPage(getBaseURL());
+                PostRequest post = br.createPostRequest(getBaseURL() + "login", "redirect=&fr=1&login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
+                post.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                post.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                post.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+                br.getPage(post);
                 if (!this.isLoggedIN(br)) {
                     if (br.containsHTML("Podano nieprawidłową parę login - hasło lub konto nie zostało aktywowane")) {
                         throw new PluginException(LinkStatus.ERROR_PREMIUM, getPhrase("INVALID_LOGIN"), PluginException.VALUE_ID_PREMIUM_DISABLE);
@@ -126,7 +128,7 @@ public abstract class RapidtrafficCore extends PluginForHost {
 
     private boolean isLoggedIN(final Browser br) {
         /* Check for presence of 'logout' button. */
-        if (br.containsHTML("'/wyloguj'")) {
+        if (br.containsHTML(">\\s*Wyloguj\\s*<") || br.containsHTML("/logout")) {
             return true;
         } else {
             return false;
@@ -135,24 +137,19 @@ public abstract class RapidtrafficCore extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        String validUntil = null;
+        String validuntilStr = null;
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        if (br.getRequest() == null || !br.getURL().contains("konto")) {
-            br.getPage("/konto");
+        if (br.getRequest() == null || !br.getURL().contains("files")) {
+            br.getPage("/files");
         }
-        final String hosterNamesRaw = br.getRegex("(?i)Tutaj wklej linki do plików z <strong>(.*)</strong>, które chcesz ściągnąć").getMatch(0);
-        if (hosterNamesRaw == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
-        }
-        final String hosterNames = " " + hosterNamesRaw + ",";
-        final String[] hostDomains = new Regex(hosterNames, " ([^,<>\"]*?),").getColumn(0);
+        final String[] hostDomains = br.getRegex("\"host-link\"[^>]*>\\s*([a-z0-9\\.\\-]+)").getColumn(0);
         if (hostDomains == null || hostDomains.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
         }
         final ArrayList<String> supportedHosts = new ArrayList<String>(Arrays.asList(hostDomains));
         ai.setMultiHostSupport(this, supportedHosts);
-        String transferLeftStr = br.getRegex("(?i)Pozostały transfer: <b>(-?\\d+\\.\\d+ [GM]B)</b>").getMatch(0).replace(".", ",");
+        String transferLeftStr = br.getRegex("Pozostały transfer\\s*</div>\\s*<div[^>]*>\\s*(-?[0-9\\.]+\\s*[GM]B)\\s*<").getMatch(0);
         String trafficLeftHumanReadable = "Unknown";
         if (transferLeftStr != null) {
             transferLeftStr = transferLeftStr.replace(".", ",").trim();
@@ -168,19 +165,19 @@ public abstract class RapidtrafficCore extends PluginForHost {
             trafficLeftHumanReadable = SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftLong);
         }
         /* Inactive --> Free account --> Free accounts can still have leftover "traffic left" values though (can be negative values). */
-        if (br.containsHTML("(?i)Konto ważne do\\s*:\\s*<b>\\s*nieaktywne\\s*</b>")) {
+        validuntilStr = br.getRegex("Konto ważne do\\s*:\\s*<b>(\\d{4}\\-\\d{2}\\-\\d{2})</b>").getMatch(0);
+        if (br.containsHTML("Konto ważne do\\s*:\\s*<b>\\s*nieaktywne\\s*</b>")) {
+            logger.info("Looks like free account");
+        }
+        if (validuntilStr != null) {
+            account.setType(AccountType.PREMIUM);
+            ai.setUnlimitedTraffic();
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(validuntilStr, "yyyy-MM-dd", Locale.ENGLISH));
+            ai.setStatus(getPhrase("PREMIUM") + " (" + getPhrase("TRAFFIC_LEFT") + ": " + trafficLeftHumanReadable + ")");
+        } else {
             ai.setExpired(true);
             account.setType(AccountType.FREE);
             ai.setTrafficLeft(0);
-        } else {
-            validUntil = br.getRegex("(?i)Konto ważne do\\s*:\\s*<b>(\\d{4}\\-\\d{2}\\-\\d{2})</b>").getMatch(0);
-            if (validUntil == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            account.setType(AccountType.PREMIUM);
-            ai.setUnlimitedTraffic();
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(validUntil, "yyyy-MM-dd", Locale.ENGLISH));
-            ai.setStatus(getPhrase("PREMIUM") + " (" + getPhrase("TRAFFIC_LEFT") + ": " + trafficLeftHumanReadable + ")");
         }
         return ai;
     }
@@ -249,7 +246,7 @@ public abstract class RapidtrafficCore extends PluginForHost {
             showMessage(link, "Phase 3/4: Generating Link");
             br.postPage(getBaseURL() + "index.php", postData);
             sleep(2 * 1000l, link);
-            generatedLink = br.getRegex("(?i)<h2>Wygenerowane linki bezpośrednie</h2><textarea rows='1' style='width: 650px; height: 40px'>(.*)</textarea>").getMatch(0);
+            generatedLink = br.getRegex("<h2>Wygenerowane linki bezpośrednie</h2><textarea rows='1' style='width: 650px; height: 40px'>(.*)</textarea>").getMatch(0);
             if (generatedLink == null) {
                 getMultiHosterManagement().handleErrorGeneric(account, link, "Failed to find final downloadurl", 50, 3 * 60 * 1000l);
             }

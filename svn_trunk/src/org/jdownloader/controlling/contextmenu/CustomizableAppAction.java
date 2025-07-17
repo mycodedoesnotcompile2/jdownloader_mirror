@@ -1,23 +1,22 @@
 package org.jdownloader.controlling.contextmenu;
 
-import java.awt.AlphaComposite;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.Action;
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.KeyStroke;
 
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.components.CheckBoxIcon;
+import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.GetterSetter;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
+import org.appwork.utils.images.TransparentIcon;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.actions.AppAction;
@@ -55,8 +54,8 @@ public abstract class CustomizableAppAction extends AppAction {
         return root._getOwner();
     }
 
-    protected static ImageIcon getCheckBoxedIcon(String string, boolean selected, boolean enabled) {
-        return new ImageIcon(ImageProvider.merge(NewTheme.I().getIcon(string, 18), new CheckBoxIcon(selected, enabled), -2, -2, 6, 6, null, AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.75f)));
+    protected static Icon getCheckBoxedIcon(String string, boolean selected, boolean enabled) {
+        return new ExtMergedIcon(NewTheme.I().getIcon(string, 18), -2, -2).add(new TransparentIcon(new CheckBoxIcon(14, selected, enabled), 0.75f), 6, 6);
     }
 
     private long lastRequestUpdate;

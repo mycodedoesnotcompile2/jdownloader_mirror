@@ -91,7 +91,7 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
     /**
      *
      */
-    private static final String[] REQUIRED_PROPERTIES = new String[] { "ProcessId", "CommandLine", "CreationDate", "ExecutablePath", "Name" };
+    private static final String[] REQUIRED_PROPERTIES = new String[] { "ProcessId", "CommandLine", "CreationDate", "ExecutablePath", "Name", "ParentProcessId" };
 
     /**
      * @throws InterruptedException
@@ -102,7 +102,6 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
     @Override
     public List<ProcessInfo> listByPath(String path) throws IOException, InterruptedException {
         try {
-            // "SELECT * from Win32_Process where ExecutablePath like '%" + path + "%'"
             String where = "";
             if (path != null) {
                 where = " where ExecutablePath = '" + JNAWMIUtils.escape(path) + "'";
@@ -233,6 +232,9 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         pi.setId(((Number) p.get("ProcessId")).intValue() + "-" + timestamp + (String) p.get("CommandLine"));
         pi.setExecutablePath((String) p.get("ExecutablePath"));
         pi.setExecutableName((String) p.get("Name"));
+        if (p.get("ParentProcessId") != null) {
+            pi.setParentPid(((Number) p.get("ParentProcessId")).intValue());
+        }
         if (StringUtils.isNotEmpty(timestamp)) {
             pi.setCreationTime(parseCreationTime(timestamp));
         }

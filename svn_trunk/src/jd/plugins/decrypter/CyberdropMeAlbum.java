@@ -24,6 +24,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
+import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -39,18 +47,28 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51104 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51227 $", interfaceVersion = 3, names = {}, urls = {})
 public class CyberdropMeAlbum extends PluginForDecrypt {
     public CyberdropMeAlbum(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    /**
+     * Those are all file-extensions which are whitelisted according to their upload form on the main page plus some video extensions. </br>
+     * Last updated: 2023-08-09
+     */
+    private static final String EXTENSIONS                     = "(?i)(?:mp4|m4v|mp3|mov|jpe?g|zip|rar|png|gif|ts|webp|bmp|tiff?|[a-z0-9]{3})";
+    public static final Pattern PATTERN_ALBUM                  = Pattern.compile("/a/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final String  TYPE_FS                        = "(?i)https?://fs-(\\d+)\\.[^/]+/(.*?\\." + EXTENSIONS + ")";
+    public static final Pattern PATTERN_SINGLE_FILE            = Pattern.compile("/(?:e|f)/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_SINGLE_FILE_SHORT_LINK = Pattern.compile("/([^/]+)$", Pattern.CASE_INSENSITIVE);
+    private PluginForHost       plugin                         = null;
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public final static String MAIN_CYBERDROP_DOMAIN = "cyberdrop.me";
@@ -79,33 +97,22 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    /**
-     * Those are all file-extensions which are whitelisted according to their upload form on the main page plus some video extensions. </br>
-     * Last updated: 2023-08-09
-     */
-    private static final String EXTENSIONS = "(?i)(?:mp4|m4v|mp3|mov|jpe?g|zip|rar|png|gif|ts|webp|bmp|tiff?|[a-z0-9]{3})";
-
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_ALBUM.pattern() + "|" + PATTERN_SINGLE_FILE.pattern() + ")";
+            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_ALBUM.pattern() + "|" + PATTERN_SINGLE_FILE.pattern() + "|" + PATTERN_SINGLE_FILE_SHORT_LINK.pattern() + ")";
             regex += "|https?://fs-\\d+\\." + buildHostsPatternPart(domains) + "/.*?\\." + EXTENSIONS;// TYPE_FS
             ret.add(regex);
         }
         return ret.toArray(new String[0]);
     }
 
-    public static final Pattern PATTERN_ALBUM       = Pattern.compile("/a/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-    public static final String  TYPE_FS             = "(?i)https?://fs-(\\d+)\\.[^/]+/(.*?\\." + EXTENSIONS + ")";
-    public static final Pattern PATTERN_SINGLE_FILE = Pattern.compile("/(?:e|f)/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-    private PluginForHost       plugin              = null;
-
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String contenturl = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         final String singleFileURL = isSingleMediaURL(contenturl);
-        final Regex singlefle = new Regex(contenturl, CyberdropMeAlbum.PATTERN_SINGLE_FILE);
-        if (singlefle.patternFind()) {
+        String path = new URL(contenturl).getPath();
+        if (new Regex(path, CyberdropMeAlbum.PATTERN_SINGLE_FILE).patternFind()) {
             /* Single file -> Handle via hosterplugin */
             this.ensureInitHosterplugin();
             final DownloadLink singlefile = this.createDownloadlink(contenturl);
@@ -114,7 +121,7 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
         } else if (singleFileURL != null) {
             /* Single direct downloadable file -> Handle via hosterplugin */
             add(ret, null, param.getCryptedUrl(), null, null, null, null);
-        } else if (new Regex(param.getCryptedUrl(), PATTERN_ALBUM).patternFind()) {
+        } else if (new Regex(path, PATTERN_ALBUM).patternFind()) {
             /* Most likely we have an album or similar: One URL which leads to more URLs. */
             String contentURL = param.getCryptedUrl();
             final String hostFromAddedURLWithoutSubdomain = new URL(contentURL).getHost();
@@ -124,13 +131,12 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
                 logger.info("Corrected domain in added URL: " + hostFromAddedURLWithoutSubdomain + " --> " + getHost());
             }
             final HashSet<String> dups = new HashSet<String>();
-            br.setFollowRedirects(true);
             br.getPage(contentURL);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             /* Double-check for offline / empty album. */
-            final String albumID = new Regex(br.getURL(), PATTERN_ALBUM).getMatch(0);
+            final String albumID = new Regex(br._getURL().getPath(), PATTERN_ALBUM).getMatch(0);
             int numberofFiles = -1;
             final String numberofFilesStr = br.getRegex("id=\"totalFilesAmount\"[^>]*>\\s*(\\d+)").getMatch(0);
             if (numberofFilesStr != null) {
@@ -215,6 +221,20 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
                 fp.setComment(albumDescription);
             }
             fp.addLinks(ret);
+        } else if (new Regex(path, CyberdropMeAlbum.PATTERN_SINGLE_FILE_SHORT_LINK).patternFind()) {
+            br.setFollowRedirects(false);
+            br.getPage(contenturl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final String redirect = br.getRedirectLocation();
+            if (redirect == null) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (!new Regex(new URL(redirect).getPath(), CyberdropMeAlbum.PATTERN_SINGLE_FILE).patternFind()) {
+                logger.warning("Redirect to unknown/unsupported format -> Assume that this link is offline");
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            ret.add(this.createDownloadlink(redirect));
         } else {
             /* Invalid URL -> Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -273,8 +293,8 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
     }
 
     /**
-     * Returns URL if given URL looks like it is pointing to a single file. </br> Returns null if given URL-structure is unknown or does not
-     * seem to point to a single file.
+     * Returns URL if given URL looks like it is pointing to a single file. </br>
+     * Returns null if given URL-structure is unknown or does not seem to point to a single file.
      */
     private String isSingleMediaURL(final String url) {
         if (url == null) {

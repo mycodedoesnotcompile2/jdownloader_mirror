@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51192 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidzyOrg extends XFileSharingProBasic {
     public VidzyOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -108,5 +109,19 @@ public class VidzyOrg extends XFileSharingProBasic {
     @Override
     protected boolean isVideohoster_enforce_video_filename() {
         return true;
+    }
+
+    @Override
+    public String getLoginURL() {
+        return getMainPage() + "/auth/login";
+    }
+
+    @Override
+    public boolean isLoggedin(final Browser brc) {
+        if (brc.containsHTML("/auth/logout\"")) {
+            return true;
+        } else {
+            return super.isLoggedin(brc);
+        }
     }
 }

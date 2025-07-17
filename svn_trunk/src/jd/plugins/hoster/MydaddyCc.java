@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.plugins.components.config.MydaddyCcConfig;
 import org.jdownloader.plugins.components.config.MydaddyCcConfig.PreferredStreamQuality;
@@ -41,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50429 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51213 $", interfaceVersion = 3, names = {}, urls = {})
 public class MydaddyCc extends PluginForHost {
     public MydaddyCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,7 +89,6 @@ public class MydaddyCc extends PluginForHost {
     /* Connection stuff */
     private static final boolean  free_resume             = true;
     private static final int      free_maxchunks          = 0;
-    private static final int      free_maxdownloads       = -1;
     private String                dllink                  = null;
     protected static final String PROPERTY_CHOSEN_QUALITY = "chosen_quality";
     public static final String    PROPERTY_ACTRESS_NAME   = "actress_name";
@@ -95,7 +96,7 @@ public class MydaddyCc extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://mydaddy.cc/";
+        return "https://" + getHost() + "/";
     }
 
     @Override
@@ -128,6 +129,14 @@ public class MydaddyCc extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
+        if (br.containsHTML(">\\s*This domain has been blocked\\s*<")) {
+            // TODO: maybe own property for this?
+            final String ref = link.getOriginUrl();
+            if (ref != null) {
+                br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + new URL(ref).getHost());
+                br.getPage(link.getPluginPatternMatcher());
+            }
+        }
         if (br.getHttpConnection().getResponseCode() == 404 || this.br.toString().length() < 500) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -271,7 +280,7 @@ public class MydaddyCc extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

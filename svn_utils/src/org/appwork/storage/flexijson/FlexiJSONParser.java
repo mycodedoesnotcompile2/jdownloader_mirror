@@ -36,10 +36,12 @@ package org.appwork.storage.flexijson;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PushbackReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.lang.ref.WeakReference;
 import java.math.BigInteger;
+import java.nio.CharBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -145,35 +147,35 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char                 SQUARE_BRACKET_CLOSE              = ']';
+    private static final char SQUARE_BRACKET_CLOSE = ']';
     /**
      *
      */
-    private static final char                 CURLY_BRACKET_CLOSE               = '}';
+    private static final char CURLY_BRACKET_CLOSE  = '}';
     /**
      *
      */
-    private static final char                 COLON                             = ':';
+    private static final char COLON                = ':';
     /**
      *
      */
-    private static final char                 ASTERISK                          = '*';
+    private static final char ASTERISK             = '*';
     /**
      *
      */
-    private static final char                 SLASH                             = '/';
+    private static final char SLASH                = '/';
     /**
      *
      */
-    private static final char                 SQUARE_BRACKET_OPEN               = '[';
+    private static final char SQUARE_BRACKET_OPEN  = '[';
     /**
      *
      */
-    private static final char                 CURLY_BRACKET_OPEN                = '{';
+    private static final char CURLY_BRACKET_OPEN   = '{';
     /**
      *
      */
-    private static final char                 COMMA                             = ',';
+    private static final char COMMA                = ',';
 
     public class NumberParser {
         /**
@@ -940,13 +942,70 @@ public class FlexiJSONParser {
         initParsers();
     }
 
+    private static Reader wrap(final FlexiJSONParser parser, final Reader reader) {
+        return new Reader() {
+            volatile PushbackReader pbReader = null;
+
+            private Reader getReader() throws IOException {
+                if (pbReader == null) {
+                    pbReader = new PushbackReader(reader, 4);
+                    final int bomCheck = pbReader.read();
+                    if (bomCheck == 0xfeff) {
+                        // UTF16BE
+                    } else if (bomCheck == 0xfffe) {
+                        // UTF16LE
+                    } else {
+                        pbReader.unread(bomCheck);
+                    }
+                    parser.reader = pbReader;
+                }
+                return pbReader;
+            }
+
+            @Override
+            public int read() throws IOException {
+                return getReader().read();
+            }
+
+            @Override
+            public int read(char[] cbuf) throws IOException {
+                return getReader().read(cbuf);
+            }
+
+            @Override
+            public int read(CharBuffer target) throws IOException {
+                return getReader().read(target);
+            }
+
+            @Override
+            public boolean ready() throws IOException {
+                return getReader().ready();
+            }
+
+            @Override
+            public int read(char[] cbuf, int off, int len) throws IOException {
+                return getReader().read(cbuf, off, len);
+            }
+
+            @Override
+            public void close() throws IOException {
+                getReader().close();
+            }
+        };
+    }
+
     private static Reader wrap(final FlexiJSONParser parser, final InputStream is) {
         return new Reader() {
             volatile Reader reader = null;
 
             private Reader getReader() throws IOException {
                 if (reader == null) {
-                    final BOMInputStream bis = IO.BOM.wrap(is);
+                    final BOMInputStream bis;
+                    if (is instanceof BOMInputStream) {
+                        bis = (BOMInputStream) is;
+                    } else {
+                        bis = IO.BOM.wrap(is);
+                    }
                     final BOM bom = bis.getBOM();
                     if (bom != null) {
                         reader = new InputStreamReader(bis, bom.getCharSet());
@@ -956,6 +1015,26 @@ public class FlexiJSONParser {
                     parser.reader = reader;
                 }
                 return reader;
+            }
+
+            @Override
+            public int read() throws IOException {
+                return getReader().read();
+            }
+
+            @Override
+            public int read(char[] cbuf) throws IOException {
+                return getReader().read(cbuf);
+            }
+
+            @Override
+            public int read(CharBuffer target) throws IOException {
+                return getReader().read(target);
+            }
+
+            @Override
+            public boolean ready() throws IOException {
+                return getReader().ready();
             }
 
             @Override
@@ -974,7 +1053,7 @@ public class FlexiJSONParser {
      * @param bufferedReader
      */
     public FlexiJSONParser(Reader reader) {
-        this.reader = reader;
+        this.reader = wrap(this, reader);
         sb = new StringBuilder();
         sb2 = new StringBuilder();
         initParsers();

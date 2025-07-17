@@ -35,10 +35,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -46,7 +46,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
 public class ServusCom extends PluginForHost {
     public ServusCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -245,17 +245,16 @@ public class ServusCom extends PluginForHost {
                      * json will only be available for content which is already streamable not e.g. for content which hasn't been released
                      * yet!
                      */
-                    final String json = br.getRegex("<script type=\"application/ld\\+json\">([^<]+VideoObject[^<]+)</script>").getMatch(0);
-                    if (json != null) {
+                    final Map<String, Object> videoObject = ((PluginBrowser) br).getVideoObject();
+                    if (videoObject != null) {
                         link.setProperty(PROPERTY_HAS_TRIED_TO_CRAWL_RELEASE_DATE, true);
-                        final Map<String, Object> websiteData = restoreFromString(json, TypeRef.MAP);
                         if (StringUtils.isEmpty(title)) {
-                            title = (String) websiteData.get("name");
+                            title = (String) videoObject.get("name");
                         }
                         if (StringUtils.isEmpty(description)) {
-                            description = (String) websiteData.get("description");
+                            description = (String) videoObject.get("description");
                         }
-                        date = (String) websiteData.get("uploadDate");
+                        date = (String) videoObject.get("uploadDate");
                     }
                 } catch (final Throwable e) {
                     logger.log(e);

@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51188 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -922,7 +922,7 @@ public class RapidGatorNet extends PluginForHost {
             }
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 /* For developers: Display more information in GUI. */
-                ai.setStatus(account.getType().getLabel() + " | Status: " + usermap.get("state_label"));
+                ai.setStatus(account.getType().getLabel() + " | Status for devs: " + usermap.get("state_label"));
             }
             return ai;
         }

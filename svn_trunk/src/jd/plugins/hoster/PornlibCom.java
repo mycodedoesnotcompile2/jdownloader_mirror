@@ -19,7 +19,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -29,12 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornlibCom extends PluginForHost {
     public PornlibCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,16 +46,22 @@ public class PornlibCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "pornlib.com" });
         return ret;
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static String[] getAnnotationNames() {
@@ -104,8 +110,11 @@ public class PornlibCom extends PluginForHost {
             link.setName(this.getTitleURL(link).replace("-", " ").trim() + ".mp4");
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getPage("https://www." + this.getHost() + "/player_config_json/?vid=" + this.getFID(link) + "&aid=0&domain_id=0&embed=0&ref=null&check_speed=0");
+        final String fid = this.getFID(link);
+        /* 2025-07-07: Accept header is required otherwise server will answer with content "[]". */
+        br.getHeaders().put("Referer", link.getPluginPatternMatcher()); // Optional
+        br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01"); // Required
+        br.getPage("https://www." + this.getHost() + "/player_config_json/?vid=" + fid + "&aid=0&domain_id=0&embed=0&ref=null&check_speed=0");
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!br.getRequest().getHtmlCode().startsWith("{")) {
@@ -168,7 +177,7 @@ public class PornlibCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

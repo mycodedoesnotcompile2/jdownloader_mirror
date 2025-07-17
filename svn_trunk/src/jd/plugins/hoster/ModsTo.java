@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
@@ -36,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51146 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51155 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModsTo extends PluginForHost {
     public ModsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -140,21 +139,15 @@ public class ModsTo extends PluginForHost {
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link);
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                /**
-                 * Throw exception in stable since captcha step is broken -> Redirects to main link after captcha for unknown reasons <br>
-                 * See: https://svn.jdownloader.org/issues/90590 <br>
-                 * In browser, if you just click on the blue "Start now" button without confirming the captcha, error "Captcha thinks you
-                 * are a robot!" happens. Here we juist get redirected to the previous page so I guess something simple with the request
-                 * must be wrong.
-                 */
+            final String fid = this.getFID(link);
+            String hash = br.getRegex("name=\"hash\" value=\"([^\"]+)").getMatch(0);
+            if (hash == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final String fid = this.getFID(link);
             final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br);
             final String cfTurnstileResponse = ts.getToken();
-            br.getPage("/file/" + fid + "?cf-turnstile-response=" + Encoding.urlEncode(cfTurnstileResponse));
-            String hash = br.getRegex("name=\"hash\" value=\"([^\"]+)").getMatch(0);
+            br.getPage("/file/" + fid + "?cf-turnstile-response=" + Encoding.urlEncode(cfTurnstileResponse) + "&hash=" + Encoding.urlEncode(hash));
+            hash = br.getRegex("name=\"hash\" value=\"([^\"]+)").getMatch(0);
             if (hash == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -166,10 +159,11 @@ public class ModsTo extends PluginForHost {
             }
             hash = Encoding.htmlDecode(hash);
             br.getPage("/start/" + fid + "?hash=" + Encoding.urlEncode(hash));
-            final String dllink = br.getRegex("<a\\s*id=\"download-link\"[^>]*href=\"(https://[^\"]+)").getMatch(0);
+            String dllink = br.getRegex("<a\\s*id=\"download-link\"[^>]*href=\"(https://[^\"]+)").getMatch(0);
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            dllink = Encoding.htmlOnlyDecode(dllink);
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             this.handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());

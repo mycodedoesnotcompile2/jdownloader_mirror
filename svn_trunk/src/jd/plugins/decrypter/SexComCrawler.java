@@ -22,6 +22,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -30,19 +34,15 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51181 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexComCrawler extends PornEmbedParser {
     public SexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,6 +76,7 @@ public class SexComCrawler extends PornEmbedParser {
     private static final String PATTERN_RELATIVE_EXTERN_REDIRECT = "(?i)/link/out\\?id=\\d+";
     private static final String PATTERN_RELATIVE_USER            = "(?i)/user/([a-z0-9\\-]+)/([a-z0-9\\-]+)/";
     private static final String PATTERN_RELATIVE_PIN             = "(?i)/pin/\\d+(-[a-z0-9\\-]+)?/";
+    private static final String PATTERN_RELATIVE_PIN_NEW         = "(?i)/[a-z]{2}/pics/\\d+";
     private static final String PATTERN_RELATIVE_PICTURE         = "(?i)/picture/\\d+/?";
     private static final String PATTERN_RELATIVE_GIFS            = "(?i)/(?:[a-z]{2}/)?gifs/\\d+/?";
     private static final String PATTERN_RELATIVE_SHORT           = "(?i)/(?:[a-z]{2}/)?shorts/(?:creator/)?(([\\w\\-]+)/video/([\\w\\-]+))";
@@ -83,7 +84,7 @@ public class SexComCrawler extends PornEmbedParser {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_RELATIVE_SHORT + "|" + PATTERN_RELATIVE_USER + "|" + PATTERN_RELATIVE_PIN + "|" + PATTERN_RELATIVE_PICTURE + "|" + PATTERN_RELATIVE_GIFS + "|" + PATTERN_RELATIVE_EXTERN_REDIRECT + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_RELATIVE_SHORT + "|" + PATTERN_RELATIVE_USER + "|" + PATTERN_RELATIVE_PIN + "|" + PATTERN_RELATIVE_PIN_NEW + "|" + PATTERN_RELATIVE_PICTURE + "|" + PATTERN_RELATIVE_GIFS + "|" + PATTERN_RELATIVE_EXTERN_REDIRECT + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -192,7 +193,7 @@ public class SexComCrawler extends PornEmbedParser {
             fp.setPackageKey("sex_com_shorts://" + shortspath);
             fp.addLinks(ret);
             return ret;
-        } else if (new Regex(br.getURL(), PATTERN_RELATIVE_PIN).patternFind() || new Regex(br.getURL(), PATTERN_RELATIVE_GIFS).patternFind()) {
+        } else if (new Regex(br.getURL(), PATTERN_RELATIVE_PIN).patternFind() || new Regex(br.getURL(), PATTERN_RELATIVE_PIN_NEW).patternFind() || new Regex(br.getURL(), PATTERN_RELATIVE_GIFS).patternFind()) {
             /* "PIN" item */
             title = br.getRegex("<title>\\s*([^<>\"]*?)\\s*(?:\\|?\\s*(Sex Videos and Pictures|Gif)\\s*\\|\\s*Sex\\.com)?\\s*</title>").getMatch(0);
             if (title == null || title.length() <= 2) {
@@ -220,6 +221,10 @@ public class SexComCrawler extends PornEmbedParser {
             }
             externID = br.getRegex("<link rel=\"image_src\" href=\"(http[^<>\"]*?)\"").getMatch(0);
             if (externID == null) {
+                /* 2025-07-04: For normal/.jpg images */
+                externID = br.getRegex("=\"pin-carousel-image\" src=\"(https?://[^\"]+)").getMatch(0);
+            }
+            if (externID == null) {
                 // For .gif images
                 externID = br.getRegex("<link rel=\"preload\" as=\"image\" href=\"(http[^<>\"]*?\\.gif)\"").getMatch(0);
             }
@@ -227,22 +232,23 @@ public class SexComCrawler extends PornEmbedParser {
             if (externID == null) {
                 externID = br.getRegex("<div class=\"image_frame\"[^<>]*>\\s*(?:<[^<>]*>)?\\s*<img alt=[^<>]*?src=\"(https?://[^<>\"]*?)\"").getMatch(0);
             }
-            if (externID != null) {
-                /* Fix encoding */
-                externID = Encoding.htmlOnlyDecode(externID);
-                final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(externID));
-                // final String filePath = new URL(externID).getPath();
-                dl.setContentUrl(contenturl);
-                dl.setFinalFileName(this.applyFilenameExtension(title, ".webp"));
-                /* 2023-01-04: Add custom header to prefer .webp image (same way browser is doing it). */
-                final ArrayList<String[]> customHeaders = new ArrayList<String[]>();
-                customHeaders.add(new String[] { "Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" });
-                dl.setProperty(DirectHTTP.PROPERTY_HEADERS, customHeaders);
-                dl.setAvailable(true);
-                ret.add(dl);
-                return ret;
+            if (externID == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            throw new DecrypterException("Decrypter broken for link: " + param.getCryptedUrl());
+            /* Fix encoding */
+            externID = Encoding.htmlOnlyDecode(externID);
+            final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(externID));
+            final String ext = Plugin.getFileNameExtensionFromURL(externID, ".webp");
+            // final String filePath = new URL(externID).getPath();
+            dl.setContentUrl(contenturl);
+            dl.setFinalFileName(this.applyFilenameExtension(title, ext));
+            /* 2023-01-04: Add custom header to prefer .webp image (same way browser is doing it). */
+            final ArrayList<String[]> customHeaders = new ArrayList<String[]>();
+            customHeaders.add(new String[] { "Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" });
+            dl.setProperty(DirectHTTP.PROPERTY_HEADERS, customHeaders);
+            dl.setAvailable(true);
+            ret.add(dl);
+            return ret;
         } else {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

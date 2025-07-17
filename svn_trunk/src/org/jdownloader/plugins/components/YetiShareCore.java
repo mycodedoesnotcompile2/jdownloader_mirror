@@ -14,6 +14,32 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.StorageException;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -42,33 +68,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.StorageException;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51148 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51205 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -230,7 +230,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * Raturns URL to alternative page from which content information can be obtained. </br> Structure: https://domain.tld/<fuid>~i
+     * Raturns URL to alternative page from which content information can be obtained. </br>
+     * Structure: https://domain.tld/<fuid>~i
      */
     protected String getInfoPageURL(final DownloadLink link) {
         final String url = this.getContentURL(link);
@@ -311,12 +312,12 @@ public abstract class YetiShareCore extends antiDDoSForHost {
 
     /**
      * @return true: Implies that website will show filename & filesize via website.tld/<fuid>~i <br />
-     *         Most YetiShare websites support this kind of linkcheck! </br> false: Implies that website does NOT show filename & filesize
-     *         via website.tld/<fuid>~i. <br />
+     *         Most YetiShare websites support this kind of linkcheck! </br>
+     *         false: Implies that website does NOT show filename & filesize via website.tld/<fuid>~i. <br />
      *         default: true
      */
     public boolean supports_availablecheck_over_info_page(final DownloadLink link) {
-        return true;
+        return link.getTempProperties().getBooleanProperty(getHost() + ".supports_availablecheck_over_info_page", Boolean.TRUE);
     }
 
     /**
@@ -349,7 +350,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * Enforces old, non-ajax login-method. </br> This is only rarely needed e.g. filemia.com </br> default = false
+     * Enforces old, non-ajax login-method. </br>
+     * This is only rarely needed e.g. filemia.com </br>
+     * default = false
      */
     @Deprecated
     protected boolean enforce_old_login_method() {
@@ -397,7 +400,17 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             if (supports_availablecheck_over_info_page(link) && !isDownload) {
                 getPage(getInfoPageURL(link));
                 /* Offline check is unsafe which is why we need to check for other errors first! */
-                this.checkErrors(br, link, account);
+                try {
+                    this.checkErrors(br, link, account);
+                } catch (AccountRequiredException e) {
+                    final String errorMsgURL = this.getErrorMsgURL(br);
+                    if (errorMsgURL != null && StringUtils.startsWithCaseInsensitive(errorMsgURL, "File is not publicly available") || StringUtils.containsIgnoreCase(errorMsgURL, "Plik nie jest publicznie")) {
+                        /* 2025-07-11: E.g. https://board.jdownloader.org/showthread.php?t=93369 , filehost rapidshare.io */
+                        link.getTempProperties().setProperty(getHost() + ".supports_availablecheck_over_info_page", Boolean.FALSE);
+                        return requestFileInformationWebsite(link, account, isDownload);
+                    }
+                    throw e;
+                }
                 /* Offline errorhandling */
                 if (!br.getURL().contains("~i") || br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -412,9 +425,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                     link.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(fileInfo[1].replace(",", ""))));
                 }
                 /**
-                 * Additional offline check. Useful for websites which still provide filename & filesize for offline files. </br> This can
-                 * only happen on special file information page! </br> Some websites enforce a specific language so there is no other way
-                 * but to add traits for multiple languages.
+                 * Additional offline check. Useful for websites which still provide filename & filesize for offline files. </br>
+                 * This can only happen on special file information page! </br>
+                 * Some websites enforce a specific language so there is no other way but to add traits for multiple languages.
                  */
                 if (br.containsHTML(">\\s*Status\\s*:?\\s*</[^>]*>\\s*<[^>]*>\\s*(Deleted|Usunięto|Usunięty|Silindi|Çöp)\\s*</")) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -474,7 +487,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                 } while (attemptNumber <= 1);
                 if (hasGoneThroughVerifiedLoginOnce) {
                     /**
-                     * Only try once! </br> We HAVE to be logged in at this stage!
+                     * Only try once! </br>
+                     * We HAVE to be logged in at this stage!
                      */
                     this.loggedInOrException(this.br, account);
                 }
@@ -516,8 +530,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
 
     /**
      * Tries to find filename and filesize inside html. On Override, make sure to first use your special RegExes e.g. fileInfo[0]="bla",
-     * THEN, if needed, call super.scanInfo(fileInfo). </br> fileInfo[0] = filename, fileInfo[1] = filesize </br> TODO: 2021-11-19: Clean
-     * this up - it is a mess!
+     * THEN, if needed, call super.scanInfo(fileInfo). </br>
+     * fileInfo[0] = filename, fileInfo[1] = filesize </br>
+     * TODO: 2021-11-19: Clean this up - it is a mess!
      */
     public String[] scanInfo(final DownloadLink link, final String[] fileInfo) {
         /* New YetiShare versions are using the same layout for "/<fuid>" and "/<fuid>~i" pages. */
@@ -969,8 +984,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * API file operations usually requires us to have the internal ID of files. </br> Most of all times we don't have this but if a website
-     * is using the "new" YetiShare script version and files were added as part of a folder, we do have these internal fileIDs available!
+     * API file operations usually requires us to have the internal ID of files. </br>
+     * Most of all times we don't have this but if a website is using the "new" YetiShare script version and files were added as part of a
+     * folder, we do have these internal fileIDs available!
      */
     protected String getStoredInternalFileID(final DownloadLink link) {
         return link.getStringProperty(PROPERTY_INTERNAL_FILE_ID);
@@ -1091,8 +1107,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * In some cases, URL may contain filename which can be used as fallback e.g. 'https://host.tld/<fuid>/<filename>'. </br> Example host
-     * which has URLs that contain filenames: freefile.me, letsupload.co
+     * In some cases, URL may contain filename which can be used as fallback e.g. 'https://host.tld/<fuid>/<filename>'. </br>
+     * Example host which has URLs that contain filenames: freefile.me, letsupload.co
      */
     public String getFilenameFromURL(final DownloadLink link) {
         final String result;
@@ -1314,9 +1330,10 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                 /* This is the safest method to find out which error happened. */
                 /**
                  * Checks for errormessages inside the current browsers' URL and also for errors based on the current browsers' URL
-                 * structure. </br> It was intended to replace this with checkErrorsLanguageIndependant but this doesn't work out as
-                 * different templates/versions of YetiShare are using different errors and not all have their full language keys available.
-                 * </br> Newer versions of YetiShare do not provide any language keys at all but provide mostly English errors inside URLs
+                 * structure. </br>
+                 * It was intended to replace this with checkErrorsLanguageIndependant but this doesn't work out as different
+                 * templates/versions of YetiShare are using different errors and not all have their full language keys available. </br>
+                 * Newer versions of YetiShare do not provide any language keys at all but provide mostly English errors inside URLs
                  * ("?e=...").
                  */
                 final String errorkey = (String) errorMap.get("error_key");
@@ -1350,7 +1367,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                     /* Very very rare case */
                     logger.info("This file can only be downloaded by the initial uploader");
                     throw new AccountRequiredException(errorMsgURL);
-                }/** Limit errorhandling */
+                } /** Limit errorhandling */
                 else if (errorkey.equalsIgnoreCase(error_you_have_reached_the_download_limit)) {
                     ipBlockedOrAccountLimit(link, account, errorMsgURL, default_waittime);
                 } else if (errorkey.equalsIgnoreCase(error_you_have_reached_the_download_limit_this_file)) {
@@ -1394,13 +1411,15 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             logger.info("Trying to identify errormessage by error parameter from URL");
             /**
              * Checks for errormessages inside the current browsers' URL and also for errors based on the current browsers' URL structure.
-             * </br> It was intended to replace this with checkErrorsLanguageIndependant but this doesn't work out as different
-             * templates/versions of YetiShare are using different errors and not all have their full language keys available. </br> Newer
-             * versions of YetiShare do not provide any language keys at all but provide mostly English errors inside URLs ("?e=...").
+             * </br>
+             * It was intended to replace this with checkErrorsLanguageIndependant but this doesn't work out as different templates/versions
+             * of YetiShare are using different errors and not all have their full language keys available. </br>
+             * Newer versions of YetiShare do not provide any language keys at all but provide mostly English errors inside URLs ("?e=...").
              */
             /**
-             * ENGLISH [and misc] errors. </br> If we know a lot of error messages in one particular language, put them in an extra block of
-             * code to avoid creating a huge mess.
+             * ENGLISH [and misc] errors. </br>
+             * If we know a lot of error messages in one particular language, put them in an extra block of code to avoid creating a huge
+             * mess.
              */
             if (StringUtils.containsIgnoreCase(errorMsgURL, "You have reached the maximum concurrent downloads")) {
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Max. simultan downloads limit reached, wait to start more downloads", 1 * 60 * 1000l);
@@ -1408,12 +1427,13 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Could not open file for reading'", 60 * 60 * 1000l);
             } else if (new Regex(errorMsgURL, "(?i).*File is not publicly available.*").patternFind()) {
                 /* Private file -> Only owner can download it. */
+                /* also for "File has been removed due to inactivity" when checking via info page */
                 throw new AccountRequiredException(errorMsgURL);
             } else if (StringUtils.containsIgnoreCase(errorMsgURL, "You have reached the maximum permitted downloads in")) {
                 ipBlockedOrAccountLimit(link, account, errorMsgURL, 30 * 60 * 1000l);
             } else if (StringUtils.containsIgnoreCase(errorMsgURL, "You have reached the maximum permitted download filesize")) {
                 ipBlockedOrAccountLimit(link, account, errorMsgURL, 30 * 60 * 1000l);
-            } else if (StringUtils.containsIgnoreCase(errorMsgURL, "File not found") || StringUtils.containsIgnoreCase(errorMsgURL, "File has been removed") || StringUtils.containsIgnoreCase(errorMsgURL, "Archivo se ha eliminado") || StringUtils.containsIgnoreCase(errorMsgURL, "Dosya kaldırıldı")) {
+            } else if (StringUtils.containsIgnoreCase(errorMsgURL, "File not found") || StringUtils.containsIgnoreCase(errorMsgURL, "File has been removed") || StringUtils.containsIgnoreCase(errorMsgURL, "Archivo se ha eliminado")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (errorMsgURL.matches("(?i).*(You must wait |Você deve esperar).*")) {
                 final long extraWaittimeMilliseconds = 1000;
@@ -1453,7 +1473,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                 // throw new AccountRequiredException(errorMsgURL);
                 /**
                  * 2024-03-26: This happens when requesting file via "<fileID>~i" but when accessing it normally this error will change to
-                 * "Plik został usunięty z powodu braku aktywności" or a different one. </br> --> Treat this as offline.
+                 * "Plik został usunięty z powodu braku aktywności" or a different one. </br>
+                 * --> Treat this as offline.
                  */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
             } else if (StringUtils.containsIgnoreCase(errorMsgURL, "Nie znaleziono pliku")) {
@@ -1464,7 +1485,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
             }
             /* TURKISH errors */
-            if (StringUtils.containsIgnoreCase(errorMsgURL, "Dosya bulunamadı")) {
+            if (StringUtils.containsIgnoreCase(errorMsgURL, "Dosya bulunamadı") || StringUtils.containsIgnoreCase(errorMsgURL, "Dosya kaldırıldı")) {
                 /* File offline */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
             }
@@ -1482,7 +1503,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             throw new AccountRequiredException();
         }
         /* Check errirs inside HTML code */
-        if (br.containsHTML("(?i)Error: Too many concurrent download requests")) {
+        if (br.containsHTML("Error: Too many concurrent download requests")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting new downloads", 3 * 60 * 1000l);
         } else if (br.containsHTML(">\\s*File is not publicly available")) {
             /*
@@ -1565,8 +1586,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * @return true = file is offline, false = file is online </br> Be sure to always call checkErrors before calling this! </br> Do not
-     *         call this on file info page (URL ending with "~i")!
+     * @return true = file is offline, false = file is online </br>
+     *         Be sure to always call checkErrors before calling this! </br>
+     *         Do not call this on file info page (URL ending with "~i")!
      * @throws Exception
      */
     protected boolean isOfflineWebsite(final Browser br, final DownloadLink link) throws Exception {
@@ -1660,8 +1682,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * If set to true, {@link #getProtocol()} will prefer https over http even if {@link #supports_https()} is set to return false. </br> If
-     * set to false, {@link #getProtocol()} will only rely on {@link #supports_https()}.
+     * If set to true, {@link #getProtocol()} will prefer https over http even if {@link #supports_https()} is set to return false. </br>
+     * If set to false, {@link #getProtocol()} will only rely on {@link #supports_https()}.
      */
     protected boolean allowGetProtocolHttpsAutoHandling(final String url) {
         return true;
@@ -1744,11 +1766,11 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * Access any YetiShare website via browser before and call this once to auto set flag for new YetiShare version! </br> New version =
-     * YetiShare 5.0 and above, see: https://yetishare.com/release_history.html
+     * Access any YetiShare website via browser before and call this once to auto set flag for new YetiShare version! </br>
+     * New version = YetiShare 5.0 and above, see: https://yetishare.com/release_history.html
      */
     protected void parseAndSetYetiShareVersion(final Browser br, final Account account) {
-        if (br.containsHTML("(?i)https?://[^/]+/(account|register|account/login|account/logout)\"")) {
+        if (br.containsHTML("https?://[^/]+/(account|register|account/login|account/logout)\"")) {
             this.getPluginConfig().setProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, true);
             if (account != null) {
                 account.setProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, true);
@@ -1797,7 +1819,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * @return true: Cookies were validated</br> false: Cookies were not validated
+     * @return true: Cookies were validated</br>
+     *         false: Cookies were not validated
      */
     public boolean loginWebsite(final Account account, boolean force) throws Exception {
         synchronized (account) {
@@ -1921,8 +1944,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
 
     public boolean isLoggedin(final Browser br, final Account account) throws PluginException {
         /**
-         * User is logged in when: 1. Logout button is visible or </br> 2. When "Account Overview" Buttons is visible e.g. when on mainpage
-         * or trying to download a file.
+         * User is logged in when: 1. Logout button is visible or </br>
+         * 2. When "Account Overview" Buttons is visible e.g. when on mainpage or trying to download a file.
          */
         if (br.containsHTML(Pattern.quote(this.getAccountNameSpaceLogout(account)) + "\"")) {
             return true;
@@ -2017,8 +2040,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * Tries to auto-find API keys in website HTML code and return account information from API! </br> If this returns something which is
-     * not null, that account information will be used and not the one obtained via website.
+     * Tries to auto-find API keys in website HTML code and return account information from API! </br>
+     * If this returns something which is not null, that account information will be used and not the one obtained via website.
      */
     protected AccountInfo fetchAccountInfoWebsiteAPI(final Browser brc, final Account account) {
         try {
@@ -2069,8 +2092,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                             }
                         }
                         /**
-                         * Required minimum fields are: firstame,lastname, emailAddress,key1,key2,submitme. </br> We'll remove all other
-                         * fields as we do not want to mistakenly change any of the users' account settings!
+                         * Required minimum fields are: firstame,lastname, emailAddress,key1,key2,submitme. </br>
+                         * We'll remove all other fields as we do not want to mistakenly change any of the users' account settings!
                          */
                         final String[] keysToRemove = new String[] { "marketingEmails", "privateFileStatistics", "isPublic", "title", "password", "passwordConfirm", "fileReferrerWhitelist", "watermarkPosition", "watermarkPadding" };
                         for (final String fieldKeyToRemove : keysToRemove) {
@@ -2105,10 +2128,11 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                     logger.log(e);
                     /**
                      * Failure: Happens most likely due to missing API permissions e.g. user can create API keys but it's not an "uploader
-                     * account" thus he cannot do anything with the API. </br> Example: {"response":"Your account level does not have access
-                     * to the file upload API. Please contact site support for more information.","_status":"error","_datetime":"2022-09-29
-                     * 22:30:17"} </br> {"status":"error","response":"Could not authenticate user. The key pair may be invalid or your
-                     * account may be locked from too many failed logins.","_datetime":"2022-10-07 16:32:48"}
+                     * account" thus he cannot do anything with the API. </br>
+                     * Example: {"response":"Your account level does not have access to the file upload API. Please contact site support for
+                     * more information.","_status":"error","_datetime":"2022-09-29 22:30:17"} </br>
+                     * {"status":"error","response":"Could not authenticate user. The key pair may be invalid or your account may be locked
+                     * from too many failed logins.","_datetime":"2022-10-07 16:32:48"}
                      */
                     logger.info("API handling inside website handling failed! In most of all cases this means that the website owner only enabled API usage for specific users and only for uploading files.");
                     logger.info("@@Developer: Consider disabling API usage in website mode completely via TODO");
@@ -2328,8 +2352,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
 
     /**
      * true = API will be used for downloading whenever possible (usually, a special internal fileID is required to download files via API).
-     * </br> This ID is also used for some website requests but this method is not related to website requests!! </br> Only use this after
-     * testing!
+     * </br>
+     * This ID is also used for some website requests but this method is not related to website requests!! </br>
+     * Only use this after testing!
      */
     protected boolean supportsAPIDownloads(final DownloadLink link, final Account account) {
         return false;
@@ -2398,7 +2423,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * According to: https://fhscript.com/api#account-info </br> and: https://fhscript.com/api#account-package </br>
+     * According to: https://fhscript.com/api#account-info </br>
+     * and: https://fhscript.com/api#account-package </br>
      */
     protected AccountInfo fetchAccountInfoAPI(final Browser br, final Account account, final String key1, final String key2) throws Exception {
         final Map<String, Object> loginResp = this.loginAPI(br, account, key1, key2);
@@ -2624,8 +2650,9 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * https://fhscript.com/api#file-download </br> This API call only works with self-uploaded files and/or whenever the internal fileID is
-     * given --> Most of all times it is of no use for us!
+     * https://fhscript.com/api#file-download </br>
+     * This API call only works with self-uploaded files and/or whenever the internal fileID is given --> Most of all times it is of no use
+     * for us!
      */
     protected void handleDownloadAPI(final DownloadLink link, final Account account, final String apikey1, final String apikey2) throws StorageException, Exception {
         final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
@@ -2668,8 +2695,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /**
-     * Handles API errormessages. </br> We usually can't use this API for downloading thus all Exceptions will be account related (as of
-     * 2021-04-22)
+     * Handles API errormessages. </br>
+     * We usually can't use this API for downloading thus all Exceptions will be account related (as of 2021-04-22)
      */
     protected Object checkErrorsAPI(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         Map<String, Object> entries = null;

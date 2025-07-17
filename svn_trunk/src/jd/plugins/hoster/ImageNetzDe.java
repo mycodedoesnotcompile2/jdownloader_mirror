@@ -18,9 +18,14 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -34,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ImagenetzDeCrawler;
 
-@HostPlugin(revision = "$Revision: 48287 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51193 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { ImagenetzDeCrawler.class })
 public class ImageNetzDe extends PluginForHost {
     public ImageNetzDe(PluginWrapper wrapper) {
@@ -42,8 +47,15 @@ public class ImageNetzDe extends PluginForHost {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "https://www.imagenetz.de/agb.php";
+        return "https://www." + getHost() + "/agb.php";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -70,7 +82,7 @@ public class ImageNetzDe extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -84,13 +96,12 @@ public class ImageNetzDe extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/(.+)").getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), "(?i)https?://[^/]+/(.+)").getMatch(0);
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        this.br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         ImagenetzDeCrawler.checkOffline(br, this.getFID(link));
         return AvailableStatus.TRUE;
@@ -102,7 +113,7 @@ public class ImageNetzDe extends PluginForHost {
         if (filename == null) {
             filename = br.getRegex("data-title=\"([^<>\"]+)\"").getMatch(0);
         }
-        if (filename == null && !br.containsHTML("class='dwnin'")) {
+        if (filename == null && !br.containsHTML("/abuse\\.php\\?sk=")) {
             /* E.g. https://www.imagenetz.de/contact */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -125,12 +136,46 @@ public class ImageNetzDe extends PluginForHost {
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        long passedMillis = 0;
+        if (br.containsHTML("pwd-protected")) {
+            final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
+            link.setPasswordProtected(true);
+            String passCode = link.getDownloadPassword();
+            if (passCode == null) {
+                passCode = getUserInput("Password?", link);
+            }
+            final UrlQuery pwquery = new UrlQuery();
+            pwquery.appendEncoded("action", "verifyPwd");
+            pwquery.appendEncoded("downloadLink", dllink);
+            pwquery.appendEncoded("pwd", passCode);
+            final Browser brc = br.cloneBrowser();
+            brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
+            brc.postPage("/functions.ajax.php", pwquery);
+            final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (entries.get("verified").toString().equals("0")) {
+                /* e.g. {"error":"Das Kennwort stimmt nicht.","verified":0} */
+                link.setDownloadPassword(null);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            }
+            /* Success e.g. {"error":false,"verified":1} */
+            link.setDownloadPassword(passCode);
+            passedMillis = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
+        } else {
+            link.setPasswordProtected(false);
+        }
         final String waitSecondsStr = br.getRegex("d='dlCD'><span>(\\d+)<").getMatch(0);
+        final int waitSeconds;
         if (waitSecondsStr != null) {
-            this.sleep(Integer.parseInt(waitSecondsStr) * 1000l, link);
+            waitSeconds = Integer.parseInt(waitSecondsStr);
         } else {
             /* 2020-09-09: Static pre-download-waittime */
-            this.sleep(3000l, link);
+            waitSeconds = 3;
+            logger.warning("Failed to extract pre download wait time from html code -> Fallback to default value: " + waitSeconds);
+        }
+        /* Subtract the time user eventually needed to enter download password. */
+        final long waitMillis = waitSeconds * 1001 - passedMillis;
+        if (waitMillis > 0) {
+            this.sleep(waitMillis, link);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {

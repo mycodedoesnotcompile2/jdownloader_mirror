@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49151 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51176 $", interfaceVersion = 3, names = {}, urls = {})
 public class PervclipsCom extends KernelVideoSharingComV2 {
     public PervclipsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -82,10 +82,14 @@ public class PervclipsCom extends KernelVideoSharingComV2 {
                 officialDownloadurl = Encoding.htmlOnlyDecode(officialDownloadurl);
             }
             return officialDownloadurl;
-        } else {
-            /* Fallback */
-            return super.getDllink(link, br);
         }
+        /* 2025-07-03: Special to prevent upper code from returning value of "event_reporting2" which leads to a tracking pixel. */
+        final String stream_url = br.getRegex("video_url:\\s*'(https[^'\"]+)").getMatch(0);
+        if (stream_url != null) {
+            return stream_url;
+        }
+        /* Fallback */
+        return super.getDllink(link, br);
     }
 
     @Override
@@ -94,5 +98,14 @@ public class PervclipsCom extends KernelVideoSharingComV2 {
             return null;
         }
         return this.getProtocol() + "www." + host + "/tube/videos/" + urlSlug + "/";
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        if (br.containsHTML(">\\s*The video has been deleted")) {
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
+        }
     }
 }

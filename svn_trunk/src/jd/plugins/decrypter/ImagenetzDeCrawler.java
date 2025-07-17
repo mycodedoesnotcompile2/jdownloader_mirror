@@ -17,8 +17,8 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
@@ -35,10 +35,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ImageNetzDe;
 
-@DecrypterPlugin(revision = "$Revision: 48287 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51193 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagenetzDeCrawler extends PluginForDecrypt {
     public ImagenetzDeCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -64,42 +71,51 @@ public class ImagenetzDeCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(filesgroup/[a-f0-9]{32}\\.html|download/[a-f0-9]{32}\\.html|[A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        final boolean isFolderLink = StringUtils.contains(contenturl, "filesgroup");
+        br.getPage(contenturl);
         checkOffline(br, folderID);
         final ImageNetzDe hosterplugin = (ImageNetzDe) this.getNewPluginForHostInstance(this.getHost());
-        final String[] filelinks = br.getRegex("href='(https?://(?:www\\.)?imagenetz.de/[A-Za-z0-9]+)' class='btn btn-success btn-download-file'").getColumn(0);
+        final String[] filelinks = br.getRegex("gDownloadLink' value='(https?://(?:www\\.)?imagenetz\\.de/[A-Za-z0-9]+)'").getColumn(0);
+        if (isFolderLink && (filelinks == null || filelinks.length == 0)) {
+            /* We know that this is a folder link and got no results -> Website must have changed and thus crawler is broken */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         if (filelinks != null && filelinks.length > 0) {
-            String fpName = br.getRegex("<h3 class='panel-title text-strong'[^>]*>([^<]+)</h3>").getMatch(0);
+            final String[][] filenamesAndSizes = br.getRegex("href=\"#file\\d+\"[^>]*>([^<]+)<small>([^<]+)</small>").getMatches();
+            if (filenamesAndSizes == null || filenamesAndSizes.length == 0) {
+                logger.warning("Failed to find filename/filesize information");
+            }
+            String folder_title = br.getRegex("<h3 class='panel-title text-strong'[^>]*>([^<]+)</h3>").getMatch(0);
+            int index = 0;
             for (final String singleLink : filelinks) {
-                final Regex fileinfo = br.getRegex(">([^<]+)</strong></td>\\s*<td class='text-muted text-right'>([^<]+)</td>\\s*<td class='text-right'><a href='" + Pattern.quote(singleLink));
-                final String filename = fileinfo.getMatch(0);
-                final String filesizeStr = fileinfo.getMatch(1);
                 final DownloadLink file = new DownloadLink(hosterplugin, this.getHost(), singleLink);
-                if (filename != null) {
-                    file.setName(filename);
-                }
-                if (filesizeStr != null) {
+                if (filenamesAndSizes != null && filenamesAndSizes.length == filelinks.length) {
+                    final String[] this_file_info = filenamesAndSizes[index];
+                    final String filename = this_file_info[0];
+                    final String filesizeStr = this_file_info[1];
+                    file.setName(Encoding.htmlDecode(filename).trim());
                     file.setDownloadSize(SizeFormatter.getSize(filesizeStr));
                 }
                 file.setAvailable(true);
                 ret.add(file);
+                index++;
             }
-            if (fpName != null) {
+            if (folder_title != null) {
                 final FilePackage fp = FilePackage.getInstance();
-                fp.setName(Encoding.htmlDecode(fpName).trim());
+                fp.setName(Encoding.htmlDecode(folder_title).trim());
                 fp.addLinks(ret);
             }
         } else {
-            /* Looks like single file */
+            /* Looks like single file or invalid/offline link */
             final DownloadLink file = new DownloadLink(hosterplugin, this.getHost(), br.getURL());
             ImageNetzDe.parseFileInfo(br, file);
             file.setAvailable(true);

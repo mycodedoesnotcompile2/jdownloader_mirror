@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50568 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51152 $", interfaceVersion = 3, names = {}, urls = {})
 public class MvpdjCom extends PluginForHost {
     public MvpdjCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,10 +114,6 @@ public class MvpdjCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
-    }
-
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         dllink = null;
         final String extDefault = ".mp3";
         final String fid = this.getFID(link);
@@ -182,7 +178,7 @@ public class MvpdjCom extends PluginForHost {
         }
         if (dllink != null) {
             dllink = br.getURL(dllink).toExternalForm();
-            if (!isDownload) {
+            if (this.getPluginEnvironment() != PluginEnvironment.DOWNLOAD && !link.isSizeSet()) {
                 /* 2024-04-26: Use new browser instance here as this may return response 404 if a referer value is set. */
                 final Browser br2 = new Browser();
                 // In case the link redirects to the finallink
@@ -219,7 +215,7 @@ public class MvpdjCom extends PluginForHost {
     }
 
     public void handleDownload(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         if (StringUtils.isEmpty(this.dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

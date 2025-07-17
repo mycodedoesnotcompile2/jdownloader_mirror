@@ -103,7 +103,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
     private long             lastHidden  = 0;
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.MouseListener#mouseEntered(java.awt.event.MouseEvent)
      */
     private int              changeDelay = 500;
@@ -118,6 +118,9 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      * .
      */
     private ToolTipController() {
+        if (Application.isHeadless()) {
+            return;
+        }
         // we need the edtinit here, because we would get a kind-of-deadlock during class init and singleton init.
         new EDTRunner() {
             @Override
@@ -182,7 +185,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.swing.event.AWTEventListener#onAWTEventAfterDispatch(java .awt.AWTEvent)
      */
     @Override
@@ -210,7 +213,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.MouseListener#mouseClicked(java.awt.event.MouseEvent)
      */
     @Override
@@ -219,7 +222,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.MouseMotionListener#mouseDragged(java.awt.event.MouseEvent )
      */
     @Override
@@ -253,7 +256,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.MouseListener#mouseExited(java.awt.event.MouseEvent)
      */
     @Override
@@ -266,7 +269,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.MouseMotionListener#mouseMoved(java.awt.event.MouseEvent)
      */
     @Override
@@ -345,7 +348,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.beans.PropertyChangeListener#propertyChange(java.beans. PropertyChangeEvent)
      */
     @Override
@@ -580,7 +583,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.WindowFocusListener#windowGainedFocus(java.awt.event. WindowEvent)
      */
     @Override
@@ -589,7 +592,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.WindowFocusListener#windowLostFocus(java.awt.event.WindowEvent )
      */
     @Override
@@ -599,7 +602,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.MouseListener#mousePressed(java.awt.event.MouseEvent)
      */
     @Override
@@ -608,7 +611,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.awt.event.MouseListener#mouseReleased(java.awt.event.MouseEvent)
      */
     @Override

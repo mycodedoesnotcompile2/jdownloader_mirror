@@ -15,27 +15,11 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -56,7 +40,25 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+
+@HostPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,7 +86,7 @@ public class PixeldrainCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "pixeldrain.com", "pixeldra.in" });
+        ret.add(new String[] { "pixeldrain.com", "pixeldrain.net", "pixeldra.in" });
         return ret;
     }
 
@@ -105,13 +107,53 @@ public class PixeldrainCom extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    /* Docs: https://pixeldrain.com/api */
-    public static final String  API_BASE                                      = "https://pixeldrain.com/api";
     private static final String PROPERTY_CAPTCHA_REQUIRED                     = "captcha_required";
     private static final String PROPERTY_ACCOUNT_HAS_SHOWN_APIKEY_HELP_DIALOG = "has_shown_apikey_help_dialog";
 
-    private String getAPIURLUser() {
-        return API_BASE + "/user";
+    private String getAPIURLUser() throws PluginException, IOException {
+        return getAPIBase(this) + "/user";
+    }
+
+    private static AtomicReference<Object> API_BASE = new AtomicReference<Object>();
+
+    /* Docs: https://pixeldrain.com/api */
+    public static String getAPIBase(Plugin plugin) throws PluginException, IOException {
+        Object ret = API_BASE.get();
+        if (ret instanceof String) {
+            return (String) ret;
+        }
+        synchronized (API_BASE) {
+            ret = API_BASE.get();
+            if (ret instanceof String) {
+                return (String) ret;
+            }
+            for (String host : plugin.siteSupportedNames()) {
+                try {
+                    final String apiBase = "https://" + host + "/api";
+                    final Browser br = plugin.createNewBrowserInstance();
+                    br.setFollowRedirects(true);
+                    br.getPage(apiBase + "/file/BLOCK_CHECK/info");
+                    if (br.containsHTML(">\\s*Object not found\\s*<")) {
+                        /* 2025-07-03: Spanish ISP block */
+                        // <html><body>Object not found</body></html>
+                        // See: https://board.jdownloader.org/showthread.php?t=97560
+                        throw new IOException("Blocked!");
+                    }
+                    final Map<String, Object> response = plugin.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    /* Check for valid/expected json response */
+                    if (response.get("success") instanceof Boolean && response.get("value") instanceof String) {
+                        // {"success":false,"value":"not_found","message":"The entity you requested could not be found"}
+                        plugin.getLogger().info("Auto detected api base:" + apiBase);
+                        API_BASE.set(apiBase);
+                        return getAPIBase(plugin);
+                    }
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } catch (Exception e) {
+                    plugin.getLogger().log(e);
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Blocked by ISP? See: pixeldrain.com/about#toc_8", 30 * 60 * 1000l);
+        }
     }
 
     @Override
@@ -132,7 +174,8 @@ public class PixeldrainCom extends PluginForHost {
     public int getMaxChunks(final DownloadLink link, final Account account) {
         if (this.isLinktypeFilesystem(link)) {
             /**
-             * Premium link -> No limit </br> Links which can basically be downloaded like a premium user but for free -> No limit
+             * Premium link -> No limit </br>
+             * Links which can basically be downloaded like a premium user but for free -> No limit
              */
             return 0;
         } else if (account != null && AccountType.PREMIUM.equals(account.getType())) {
@@ -169,7 +212,8 @@ public class PixeldrainCom extends PluginForHost {
     }
 
     /**
-     * Returns true for direct downloadable 'filesystem' single file URL. </br> User docs: https://pixeldrain.com/filesystem
+     * Returns true for direct downloadable 'filesystem' single file URL. </br>
+     * User docs: https://pixeldrain.com/filesystem
      */
     private boolean isLinktypeFilesystem(final DownloadLink link) {
         if (getFilesystemFileID(link) != null) {
@@ -254,10 +298,11 @@ public class PixeldrainCom extends PluginForHost {
                     List<Map<String, Object>> items = null;
                     /**
                      * If the StringBuilder item is empty this means that currently we got only items which cannot be mass-linkchecked.
-                     * </br> In this case, no http request is needed.
+                     * </br>
+                     * In this case, no http request is needed.
                      */
                     if (sb.length() > 0) {
-                        br.getPage(API_BASE + "/file/" + sb.toString() + "/info");
+                        br.getPage(getAPIBase(this) + "/file/" + sb.toString() + "/info");
                         final Object response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
                         if (response instanceof List) {
                             items = (List<Map<String, Object>>) response;
@@ -364,8 +409,9 @@ public class PixeldrainCom extends PluginForHost {
             link.setProperty(speedLimitPropertyKey, speedLimit);
         }
         /**
-         * Check if file has been abused. </br> We are checking this just here at the end because file information for such files can still
-         * be available and we want to provide as much information to the user as possible.
+         * Check if file has been abused. </br>
+         * We are checking this just here at the end because file information for such files can still be available and we want to provide
+         * as much information to the user as possible.
          */
         final String abuse_type = (String) data.get("abuse_type");
         if (!StringUtils.isEmpty(abuse_type)) {
@@ -400,8 +446,8 @@ public class PixeldrainCom extends PluginForHost {
             final PixeldrainConfig cfg = PluginJsonConfig.get(getConfigInterface());
             if (isTransferLimitReached(link, account) && cfg.getActionOnSpeedLimitReached() == ActionOnSpeedLimitReached.TRIGGER_RECONNECT_TO_CHANGE_IP) {
                 /**
-                 * User prefers to perform reconnect to be able to download without speedlimit again. </br> 2022-07-19: Speedlimit sits only
-                 * on IP, not on account but our upper system will of not do reconnects for accounts atm.
+                 * User prefers to perform reconnect to be able to download without speedlimit again. </br>
+                 * 2022-07-19: Speedlimit sits only on IP, not on account but our upper system will of not do reconnects for accounts atm.
                  */
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessageSpeedLimited(), getWaittimeErrorSpeedLimited());
             }
@@ -415,7 +461,7 @@ public class PixeldrainCom extends PluginForHost {
                 query.appendEncoded("recaptcha_response", recaptchaV2Response);
             }
             /* That link shall be direct-downloadable. */
-            dllink = API_BASE + "/file/" + this.getFID(link) + "?" + query.toString();
+            dllink = getAPIBase(this) + "/file/" + this.getFID(link) + "?" + query.toString();
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!looksLikeDownloadableContent(dl.getConnection())) {
@@ -453,8 +499,9 @@ public class PixeldrainCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         /**
          * 2021-01-15: (Free) Accounts = No captcha required for downloading (usually not even via anonymous files but captchas can
-         * sometimes be required for files with high traffic). </br> There are also "Donator" Accounts (at this moment we don't try to
-         * differ between them) but the download process is no different when using those!
+         * sometimes be required for files with high traffic). </br>
+         * There are also "Donator" Accounts (at this moment we don't try to differ between them) but the download process is no different
+         * when using those!
          */
         final Map<String, Object> user = login(account, true);
         /* User will always only have one running subscription. */
@@ -474,11 +521,11 @@ public class PixeldrainCom extends PluginForHost {
             account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
             account.setAllowReconnectToResetLimits(true);
             /**
-             * Global limits and limits for (anonymous) users can be checked here: https://pixeldrain.com/api/misc/rate_limits </br> Once
-             * one of these limits is hit, a captcha will be required for downloading.</br> These captchas can be avoided by using free/paid
-             * accounts.
+             * Global limits and limits for (anonymous) users can be checked here: https://pixeldrain.com/api/misc/rate_limits </br>
+             * Once one of these limits is hit, a captcha will be required for downloading.</br>
+             * These captchas can be avoided by using free/paid accounts.
              */
-            br.getPage(API_BASE + "/misc/rate_limits");
+            br.getPage(getAPIBase(this) + "/misc/rate_limits");
             /* E.g. {"download_limit":10000,"download_limit_used":0,"transfer_limit":6000000000,"transfer_limit_used":0} */
             /* See also: https://pixeldrain.com/home#pro */
             final Map<String, Object> freelimits = this.checkErrors(br, null, account);
@@ -573,8 +620,9 @@ public class PixeldrainCom extends PluginForHost {
             throw new AccountInvalidException(message);
         } else if (value.equalsIgnoreCase("out_of_transfer")) {
             /**
-             * Typically for 'filesystem' links: </br> This happens if the user who has provided that link has run out of traffic. </br> The
-             * link can be downloaded once the uploader has more traffic available or if the user who wants to download it has premium
+             * Typically for 'filesystem' links: </br>
+             * This happens if the user who has provided that link has run out of traffic. </br>
+             * The link can be downloaded once the uploader has more traffic available or if the user who wants to download it has premium
              * traffic.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message, 2 * 60 * 60 * 1000);
@@ -668,7 +716,11 @@ public class PixeldrainCom extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + getHost() + "/user/connect_app?app=jdownloader";
+        try {
+            return "https://" + getAPIBase(this) + "/user/connect_app?app=jdownloader";
+        } catch (Exception e) {
+            return "https://" + getHost() + "/user/connect_app?app=jdownloader";
+        }
     }
 
     @Override

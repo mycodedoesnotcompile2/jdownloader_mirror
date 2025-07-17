@@ -175,6 +175,13 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
         }
     }
 
+    /**
+     * @return the vetoListener
+     */
+    public Set<LogVetoListener> getVetoListeners() {
+        return vetoListener == null ? null : Collections.unmodifiableSet(vetoListener);
+    }
+
     public boolean removeVetoListener(final LogVetoListener logVetoListener) {
         synchronized (this) {
             if (this.vetoListener != null && logVetoListener != null) {

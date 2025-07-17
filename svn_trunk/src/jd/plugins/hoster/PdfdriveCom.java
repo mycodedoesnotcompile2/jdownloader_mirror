@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49111 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51173 $", interfaceVersion = 3, names = {}, urls = {})
 public class PdfdriveCom extends PluginForHost {
     public PdfdriveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,7 @@ public class PdfdriveCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.pdfdrive.com/home/terms";
+        return "https://www." + getHost() + "/home/terms";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -164,6 +164,8 @@ public class PdfdriveCom extends PluginForHost {
             } else if (br.getRequest().getHtmlCode().length() <= 100) {
                 /* Text errormessage e.g. 'Preview not available for this file, try downloading instead' --> Broken file/download */
                 throw new PluginException(LinkStatus.ERROR_FATAL, br.getRequest().getHtmlCode());
+            } else if (br.containsHTML("welib.org")) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "External welib.org downloads are not supported");
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

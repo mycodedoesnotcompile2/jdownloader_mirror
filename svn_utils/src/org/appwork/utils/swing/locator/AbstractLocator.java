@@ -123,7 +123,8 @@ public abstract class AbstractLocator implements Locator {
             }
         }
         final Rectangle bounds = SwingUtils.getUsableScreenBounds(biggestInteresctionScreen);
-        if (CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_8)) {
+        // seems like this is not the case for windows 11 (tested on jre 11 and 1.8)
+        if (CrossSystem.getOS().isMinimum(OperatingSystem.WINDOWS_8) && CrossSystem.getOS().isMaximum(OperatingSystem.WINDOWS_10)) {
             /*
              * IT seems that for windows 10 (i guess 8 as well) windows have a huge border (Probably the shadow).<br> That results in a
              * strange behaviour:<br> screen specs: with bounds 0 0 1920 1080 the window is in the top left corner. The window's content

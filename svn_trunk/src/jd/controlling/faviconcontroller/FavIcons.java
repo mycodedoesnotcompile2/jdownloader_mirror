@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,6 +34,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
@@ -53,6 +55,7 @@ import org.appwork.shutdown.ShutdownEvent;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Application;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
@@ -170,11 +173,15 @@ public class FavIcons {
             }
             if (image != null) {
                 try {
-                    if (REFRESHED_ICONS.add(host)) {
+                    refreshIcon: if (REFRESHED_ICONS.add(host)) {
                         if ("file".equalsIgnoreCase(url.getProtocol())) {
                             final File file = new File(url.toURI());
+                            if (file.isFile() && !file.canWrite()) {
+                                // do not refresh write protected files
+                                break refreshIcon;
+                            }
                             final long lastModified = file.lastModified();
-                            if ((lastModified > 0 && System.currentTimeMillis() - lastModified > REFRESH_TIMEOUT) && file.exists()) {
+                            if ((lastModified > 0 && System.currentTimeMillis() - lastModified > REFRESH_TIMEOUT) && file.isFile()) {
                                 file.setLastModified(System.currentTimeMillis());// avoid retry before expired
                                 if (updatePermission) {
                                     add(host, requestor);
@@ -697,7 +704,18 @@ public class FavIcons {
             while (retryFlag) {
                 retryFlag = false;
                 try {
-                    favBr.getPage(website);
+                    try {
+                        favBr.getPage(website);
+                    } catch (BrowserException e) {
+                        if (!Exceptions.containsInstanceOf(e, UnknownHostException.class)) {
+                            throw e;
+                        }
+                        final String unknownHost = Browser.getHost(website, true);
+                        if (!StringUtils.startsWithCaseInsensitive(host, "www.")) {
+                            final String wwwSubdomain = website.replaceFirst("//" + Pattern.quote(unknownHost), "//www." + unknownHost);
+                            favBr.getPage(wwwSubdomain);
+                        }
+                    }
                     if (favBr.getRedirectLocation() != null) {
                         favBr.followRedirect(true);
                         if (!isSameDomain(favBr, host, siteSupportedNames)) {

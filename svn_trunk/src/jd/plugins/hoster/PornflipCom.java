@@ -25,6 +25,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hds.HDSDownloader;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hds.HDSContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -48,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47708 $", interfaceVersion = 3, names = { "playvids.com", "pornflip.com" }, urls = { "http://playviddecrypted\\.com/\\d+", "http://playviddecrypted\\.com/\\d+" })
+@HostPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = { "playvids.com", "pornflip.com" }, urls = { "http://playviddecrypted\\.com/\\d+", "http://playviddecrypted\\.com/\\d+" })
 public class PornflipCom extends PluginForHost {
     public PornflipCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -315,13 +316,24 @@ public class PornflipCom extends PluginForHost {
         return videosource;
     }
 
-    public static LinkedHashMap<String, String> getQualities(final Browser br) {
+    public static LinkedHashMap<String, String> getQualities(final Browser br) throws Exception {
+        final LinkedHashMap<String, String> foundqualities = new LinkedHashMap<String, String>();
+        String hlsMaster = br.getRegex("source src=\"(https://[^\"]+)\" type=\"application/x-mpegURL\"").getMatch(0);
+        if (hlsMaster != null) {
+            /* 2025-07-07 */
+            hlsMaster = Encoding.htmlOnlyDecode(hlsMaster);
+            br.getPage(hlsMaster);
+            /* Get all HLS qualities */
+            final List<HlsContainer> hlscontainers = HlsContainer.getHlsQualities(br);
+            for (final HlsContainer hlscontainer : hlscontainers) {
+                foundqualities.put("data-hls-src" + hlscontainer.getHeight(), hlscontainer.getDownloadurl());
+            }
+        }
         final String videosource = getVideosource(br);
         if (videosource == null) {
             return null;
         }
-        final LinkedHashMap<String, String> foundqualities = new LinkedHashMap<String, String>();
-        /** Decrypt qualities START */
+        /** Crawl qualities START */
         /** First, find all available qualities */
         final String[] qualities = { "hds_manifest", "hds_manifest_720", "hds_manifest_480", "hds_manifest_360", "2160p", "1080p", "720p", "480p", "360p", "data-hls-src1080", "data-hls-src720", "data-hls-src360", "data-hls-src480" };
         for (final String quality : qualities) {
@@ -330,7 +342,7 @@ public class PornflipCom extends PluginForHost {
                 foundqualities.put(quality, currentQualityUrl);
             }
         }
-        /** Decrypt qualities END */
+        /** Crawl qualities END */
         return foundqualities;
     }
 

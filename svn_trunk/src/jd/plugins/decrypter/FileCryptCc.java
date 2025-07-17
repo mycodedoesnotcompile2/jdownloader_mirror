@@ -63,7 +63,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51002 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51173 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -467,7 +467,7 @@ public class FileCryptCc extends PluginForDecrypt {
                     logger.info("Password attempt: " + passwordCounter + " / " + maxPasswordRetries);
                     Form passwordForm = null;
                     /* Place current password field value on position [0]! */
-                    final String[] possiblePasswordFieldKeys = new String[] { "pssw", "password__" };
+                    final String[] possiblePasswordFieldKeys = new String[] { "password", "pssw", "password__" };
                     String passwordFieldKey = null;
                     final Form[] allForms = br.getForms();
                     if (allForms != null && allForms.length != 0) {

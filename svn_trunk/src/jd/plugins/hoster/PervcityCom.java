@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48030 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = {}, urls = {})
 public class PervcityCom extends PluginForHost {
     public PervcityCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,13 +97,11 @@ public class PervcityCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME                  = true;
-    private static final int     FREE_MAXCHUNKS               = 0;
-    private static final int     FREE_MAXDOWNLOADS            = -1;
-    private static final boolean ACCOUNT_PREMIUM_RESUME       = true;
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS    = 0;
-    private static final int     ACCOUNT_PREMIUM_MAXDOWNLOADS = -1;
-    private String               dllink                       = null;
+    private static final boolean FREE_RESUME               = true;
+    private static final int     FREE_MAXCHUNKS            = 0;
+    private static final boolean ACCOUNT_PREMIUM_RESUME    = true;
+    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = 0;
+    private String               dllink                    = null;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -244,7 +242,7 @@ public class PervcityCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     private void login(final Account account, final boolean verifyCookies) throws Exception {
@@ -376,7 +374,7 @@ public class PervcityCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

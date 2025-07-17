@@ -24,6 +24,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -45,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50774 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51221 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,14 +116,48 @@ public class OneHundretSixteenPanCom extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final String fid = this.getFID(link);
+        if (!link.isNameSet()) {
+            link.setName(fid);
+        }
         br.getPage("https://www." + getHost() + "/viewfile.php?file_id=" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*文件不存在或已删除")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String filename = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
+        String filename = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
         String filesize = br.getRegex(">\\s*文件大小：([^<]+)").getMatch(0);
+        if (br.getHost().equals("116pan.com")) {
+            /* 2025-07-15: Some migration helper code for migration from 116pan.com to 116pan.xyz */
+            final String newLink = br.getRegex("window\\.location\\.href = '(https?://(?:www\\.)?116pan\\.xyz/f/[a-zA-Z0-9]+)';").getMatch(0);
+            if (newLink != null) {
+                if (filesize == null) {
+                    /* Grab filesize from html tag "keywords" or "description" */
+                    filesize = br.getRegex("(\\d+.\\d{1,2} M)").getMatch(0);
+                }
+                if (filename == null) {
+                    /* Grab filename from html tag "description" */
+                    filename = br.getRegex("name=\"description\" content=\"([^\"]+)免费高速网盘下载，").getMatch(0);
+                }
+                // if (StringUtils.isEmpty(link.getComment())) {
+                // link.setComment("New link: " + newLink);
+                // }
+                if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+                    // throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported redirect to new system: " + newLink + " -> Manually
+                    // re-add this link to JDownloader to be able to download this file");
+                    try {
+                        final PluginForHost newPlugin = getNewPluginForHostInstance("116pan.xyz").getLazyP().getPrototype(null);
+                        link.setDefaultPlugin(newPlugin);
+                        link.setHost(newPlugin.getHost());
+                        link.setPluginPatternMatcher(newLink);
+                        link.setDomainInfo(null);
+                        throw new PluginException(LinkStatus.ERROR_RETRY, "Retry link that has been migrated from 116pan.com to 116pan.xyz");
+                    } catch (UpdateRequiredClassNotFoundException e) {
+                        getLogger().log(e);
+                    }
+                }
+            }
+        }
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename).trim());
         }

@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -36,7 +34,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SendCm;
 
-@DecrypterPlugin(revision = "$Revision: 50410 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.formatter.SizeFormatter;
+
+@DecrypterPlugin(revision = "$Revision: 51189 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SendCm.class })
 public class SendCmFolder extends PluginForDecrypt {
     public SendCmFolder(PluginWrapper wrapper) {
@@ -129,6 +129,7 @@ public class SendCmFolder extends PluginForDecrypt {
                 logger.info("Stopping because: Reached end?");
                 break pagination;
             }
+            br.getPage(nextPageUrl);
         } while (!this.isAbort());
         return ret;
     }

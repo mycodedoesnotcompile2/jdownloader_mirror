@@ -42,6 +42,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
@@ -86,7 +87,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51224 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -340,7 +341,7 @@ public class PornHubCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.pornhub.com/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
     public static Object RNKEYLOCK = new Object();
@@ -476,7 +477,8 @@ public class PornHubCom extends PluginForHost {
                 throw new AccountUnavailableException(text, 30 * 60 * 1000);
             }
         }
-        if (StringUtils.containsIgnoreCase(br.getURL(), "/premium/login")) {
+        if (link != null && StringUtils.containsIgnoreCase(br.getURL(), "/premium/login")) {
+            /* Important: Only check for this in download context, not during account-check! */
             throw new AccountRequiredException();
         } else if (isFlagged(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Video has been flagged");
@@ -509,6 +511,7 @@ public class PornHubCom extends PluginForHost {
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        dlUrl = null;
         prepBr(br);
         final String source_url = link.getStringProperty("mainlink");
         String viewKey = null;
@@ -523,11 +526,6 @@ public class PornHubCom extends PluginForHost {
         String server_filename = null;
         boolean isVideo = false;
         final String quality = link.getStringProperty(PROPERTY_QUALITY);
-        /*
-         * TODO account handling: Prefer account from handlePremium to be sure not to use ANY account for downloading but the account the
-         * upper handling is using!
-         */
-        dlUrl = null;
         boolean cachedURLFlag = false;
         if (link.getPluginPatternMatcher().matches(type_photo)) {
             final String linkHost = Browser.getHost(link.getPluginPatternMatcher());
@@ -666,6 +664,10 @@ public class PornHubCom extends PluginForHost {
         }
         if (this.dlUrl == null) {
             logger.warning("Failed to get fresh directurl: " + format + "/" + quality);
+            /* Check if we got a clue on why we cannot find our target-quality */
+            if (quality != null && quality.matches("\\d+") && Integer.parseInt(quality) > 1080 && (account == null || account.getType() == AccountType.FREE)) {
+                throw new AccountRequiredException("Paid account required to generate fresh directurl for videos > " + quality + "p");
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         logger.warning("Check fresh directurl: " + format + "/" + quality + "/" + dlUrl);
@@ -1430,6 +1432,16 @@ public class PornHubCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         synchronized (account) {
             login(account, true);
+            if (account.getType() == AccountType.PREMIUM) {
+                /* Find premium expire/rebill date */
+                br.getPage("https://" + getConfiguredDomainLoginPremium(this.getHost()) + "/user/manage/cancel-ach");
+                final String expireDate = br.getRegex("Next Rebill Date:\\s*(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+                if (expireDate != null) {
+                    ai.setValidUntil(TimeFormatter.getMilliSeconds(expireDate, "yyyy-MM-dd", Locale.ENGLISH), br);
+                } else {
+                    logger.warning("Failed to find premium expire/rebill date");
+                }
+            }
             return ai;
         }
     }

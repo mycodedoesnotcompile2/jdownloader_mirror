@@ -56,7 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51126 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51216 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -77,7 +77,6 @@ public class DoodstreamCom extends XFileSharingProBasic {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "dood.re", "doods.pro", "dood.so", "doodstream.com", "dood.to", "doodapi.com", "dood.watch", "dood.cx", "doodstream.co", "dood.la", "dood.ws", "dood.pm", "dood.sh", "dood.one", "dood.tech", "dood.wf", "dood.yt", "dooood.com", "ds2play.com", "ds2video.com", "d0o0d.com", "do0od.com", "d0000d.com", "d000d.com", "dood.li", "dood.work", "dooodster.com", "vidply.com", "do7go.com", "all3do.com", "doply.net", "vide0.net" });
-        ret.add(new String[] { "poophd.com", "do0d.co", "pooop.online", "poop.com.co" });
         return ret;
     }
 
@@ -604,11 +603,19 @@ public class DoodstreamCom extends XFileSharingProBasic {
             return null;
         }
         /* 2022-07-08: 5 seconds of pre-download-wait is skippable */
-        final boolean skipWaittime = true;
+        final boolean skipWaittime = false;
         if (!skipWaittime) {
-            this.waitTime(link, Time.systemIndependentCurrentJVMTimeMillis());
-            logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
-            this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
+            final String waitSecondsStr = brc.getRegex("id=\"seconds\"[^>]*>(\\d{1,2})<").getMatch(0);
+            if (waitSecondsStr == null) {
+                logger.warning("Failed to find pre download wait time -> Fallback to default");
+                this.waitTime(link, Time.systemIndependentCurrentJVMTimeMillis());
+                final int waitSeconds = getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds();
+                logger.info("Waiting extra wait seconds: " + waitSeconds);
+                this.sleep(waitSeconds * 1000l, link);
+            } else {
+                final int waitSeconds = Integer.parseInt(waitSecondsStr);
+                this.sleep(waitSeconds * 1001l, link);
+            }
         }
         getPage(brc, continueURL);
         /* 2019-08-29: This Form may sometimes be given e.g. deltabit.co */

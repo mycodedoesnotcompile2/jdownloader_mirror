@@ -37,6 +37,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -104,22 +120,6 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
-
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
 public class YoutubeHelper {
     static {
@@ -1529,7 +1529,13 @@ public class YoutubeHelper {
                 } catch (Exception e) {
                     final String undefined = new Regex(e.getMessage(), "ReferenceError\\s*:\\s*\"(.*?)\"\\s*(is not defined|n'est pas défini|未定义)?").getMatch(0);
                     if (undefined != null && !additionalMap.containsKey(undefined)) {
-                        final String reference = new Regex(ensurePlayerSource(), "(var\\s*" + Pattern.quote(undefined) + ".*?;)[\\s\r\n]*\\w+\\s*=\\s*function", Pattern.DOTALL).getMatch(0);
+                        String reference = new Regex(ensurePlayerSource(), "(var\\s*" + Pattern.quote(undefined) + ".*?;)[\\s\r\n]*\\w+\\s*=\\s*function", Pattern.DOTALL).getMatch(0);
+                        if (reference != null) {
+                            final String split = new Regex(reference, "(.+\\.split\\(\";\"\\))\\s*,").getMatch(0);
+                            if (split != null) {
+                                reference = split + ";";
+                            }
+                        }
                         if (reference != null) {
                             additionalMap.put(undefined, reference);
                             continue;
@@ -1676,6 +1682,12 @@ public class YoutubeHelper {
                         String ref = new Regex(html5PlayerSource, "var\\s+" + Pattern.quote(ee) + "\\s*=\\s*\\{.*?\\};", Pattern.DOTALL).getMatch(-1);
                         if (ref == null) {
                             ref = new Regex(html5PlayerSource, "(var\\s*" + Pattern.quote(ee) + ".*?;)[\\s\r\n]*\\w+\\s*=\\s*function", Pattern.DOTALL).getMatch(0);
+                        }
+                        if (ref != null) {
+                            final String split = new Regex(ref, "(.+\\.split\\(\";\"\\))\\s*,").getMatch(0);
+                            if (split != null) {
+                                ref = split + ";";
+                            }
                         }
                         if (ref != null) {
                             all = ref + "\r\n" + all;

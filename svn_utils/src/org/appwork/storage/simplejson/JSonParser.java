@@ -74,11 +74,27 @@ public class JSonParser {
     }
 
     public JSonParser(final String json, boolean naNAllowed) {
-        str = json;
+        str = wrap(this, json);
         sb = new StringBuilder();
         sb2 = new StringBuilder();
         counter = 0;
         this.naNAllowed = naNAllowed;
+    }
+
+    private static String wrap(final JSonParser parser, final String string) {
+        if (string == null || string.length() == 0) {
+            return null;
+        }
+        final char bomCheck = string.charAt(0);
+        if (bomCheck == 0xfeff) {
+            // UTF-16BE
+            return string.substring(1);
+        } else if (bomCheck == 0xfffe) {
+            // UTF-16LE
+            return string.substring(1);
+        } else {
+            return string;
+        }
     }
 
     protected ParserException bam(final String expected, Object path) {

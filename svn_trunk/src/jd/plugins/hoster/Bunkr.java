@@ -11,14 +11,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -37,7 +29,15 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 51072 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51164 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -620,7 +620,8 @@ public class Bunkr extends PluginForHost {
         brc.getHeaders().put("Content-Type", "application/json");
         /* Same request also works with the other fileID ([A-Za-z0-9]{8}) as parameter "slug" on current browser domain. */
         if (internalFileID != null) {
-            brc.postPageRaw("https://get.bunkrr.su/api/_001", "{\"id\":\"" + internalFileID + "\"}");
+            // brc.postPageRaw("https://get.bunkrr.su/api/_001", "{\"id\":\"" + internalFileID + "\"}");
+            brc.postPageRaw("https://apidl.bunkr.ru/api/_001_v2", "{\"id\":\"" + internalFileID + "\"}");
         } else if (slug != null) {
             /*
              * Fallback -> They are using this to obtain video streaming URLs but those URLs also just lead to the original file that we

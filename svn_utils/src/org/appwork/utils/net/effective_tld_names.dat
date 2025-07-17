@@ -6789,7 +6789,7 @@ org.zw
 
 // newGTLDs
 
-// List of new gTLDs imported from https://www.icann.org/resources/registries/gtlds/v2/gtlds.json on 2025-05-17T15:16:58Z
+// List of new gTLDs imported from https://www.icann.org/resources/registries/gtlds/v2/gtlds.json on 2025-07-09T15:20:49Z
 // This list is auto-generated, don't edit it manually.
 // aaa : American Automobile Association, Inc.
 // https://www.iana.org/domains/root/db/aaa.html
@@ -7003,7 +7003,7 @@ arab
 // https://www.iana.org/domains/root/db/aramco.html
 aramco
 
-// archi : Identity Digital Limited
+// archi : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/archi.html
 archi
 
@@ -7183,7 +7183,7 @@ best
 // https://www.iana.org/domains/root/db/bestbuy.html
 bestbuy
 
-// bet : Identity Digital Limited
+// bet : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/bet.html
 bet
 
@@ -7211,11 +7211,11 @@ bing
 // https://www.iana.org/domains/root/db/bingo.html
 bingo
 
-// bio : Identity Digital Limited
+// bio : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/bio.html
 bio
 
-// black : Identity Digital Limited
+// black : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/black.html
 black
 
@@ -7235,7 +7235,7 @@ blog
 // https://www.iana.org/domains/root/db/bloomberg.html
 bloomberg
 
-// blue : Identity Digital Limited
+// blue : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/blue.html
 blue
 
@@ -8331,7 +8331,7 @@ glass
 // https://www.iana.org/domains/root/db/gle.html
 gle
 
-// global : Identity Digital Limited
+// global : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/global.html
 global
 
@@ -8407,7 +8407,7 @@ graphics
 // https://www.iana.org/domains/root/db/gratis.html
 gratis
 
-// green : Identity Digital Limited
+// green : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/green.html
 green
 
@@ -8566,6 +8566,10 @@ hosting
 // hot : Amazon Registry Services, Inc.
 // https://www.iana.org/domains/root/db/hot.html
 hot
+
+// hotel : HOTEL Top-Level-Domain S.a.r.l
+// https://www.iana.org/domains/root/db/hotel.html
+hotel
 
 // hotels : Booking.com B.V.
 // https://www.iana.org/domains/root/db/hotels.html
@@ -8811,7 +8815,7 @@ kia
 // https://www.iana.org/domains/root/db/kids.html
 kids
 
-// kim : Identity Digital Limited
+// kim : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/kim.html
 kim
 
@@ -8939,7 +8943,7 @@ lego
 // https://www.iana.org/domains/root/db/lexus.html
 lexus
 
-// lgbt : Identity Digital Limited
+// lgbt : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/lgbt.html
 lgbt
 
@@ -8995,7 +8999,7 @@ live
 // https://www.iana.org/domains/root/db/living.html
 living
 
-// llc : Identity Digital Limited
+// llc : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/llc.html
 llc
 
@@ -9031,7 +9035,7 @@ london
 // https://www.iana.org/domains/root/db/lotte.html
 lotte
 
-// lotto : Identity Digital Limited
+// lotto : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/lotto.html
 lotto
 
@@ -9475,7 +9479,7 @@ oracle
 // https://www.iana.org/domains/root/db/orange.html
 orange
 
-// organic : Identity Digital Limited
+// organic : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/organic.html
 organic
 
@@ -9535,7 +9539,7 @@ pay
 // https://www.iana.org/domains/root/db/pccw.html
 pccw
 
-// pet : Identity Digital Limited
+// pet : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/pet.html
 pet
 
@@ -9599,7 +9603,7 @@ pin
 // https://www.iana.org/domains/root/db/ping.html
 ping
 
-// pink : Identity Digital Limited
+// pink : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/pink.html
 pink
 
@@ -9639,7 +9643,7 @@ pnc
 // https://www.iana.org/domains/root/db/pohl.html
 pohl
 
-// poker : Identity Digital Limited
+// poker : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/poker.html
 poker
 
@@ -9679,7 +9683,7 @@ prof
 // https://www.iana.org/domains/root/db/progressive.html
 progressive
 
-// promo : Identity Digital Limited
+// promo : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/promo.html
 promo
 
@@ -9751,7 +9755,7 @@ realty
 // https://www.iana.org/domains/root/db/recipes.html
 recipes
 
-// red : Identity Digital Limited
+// red : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/red.html
 red
 
@@ -10067,7 +10071,7 @@ shell
 // https://www.iana.org/domains/root/db/shia.html
 shia
 
-// shiksha : Identity Digital Limited
+// shiksha : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/shiksha.html
 shiksha
 
@@ -10107,7 +10111,7 @@ singles
 // https://www.iana.org/domains/root/db/site.html
 site
 
-// ski : Identity Digital Limited
+// ski : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/ski.html
 ski
 
@@ -10679,7 +10683,7 @@ wanggou
 // https://www.iana.org/domains/root/db/watch.html
 watch
 
-// watches : Identity Digital Limited
+// watches : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/watches.html
 watches
 
@@ -10859,7 +10863,7 @@ xin
 // https://www.iana.org/domains/root/db/xn--5tzm5g.html
 网站
 
-// xn--6frz82g : Identity Digital Limited
+// xn--6frz82g : Identity Digital Domains Limited
 // https://www.iana.org/domains/root/db/xn--6frz82g.html
 移动
 
@@ -11299,9 +11303,10 @@ adobeaemcloud.com
 aem.live
 hlx.live
 adobeaemcloud.net
+aem.network
 aem.page
 hlx.page
-hlx3.page
+aem.reviews
 
 // Adobe Developer Platform : https://developer.adobe.com
 // Submitted by Jesse MacFadyen<jessem@adobe.com>
@@ -13645,6 +13650,7 @@ goip.de
 // Submitted by Shannon McCabe <public-suffix-editors@google.com>
 *.hosted.app
 *.run.app
+*.mtls.run.app
 web.app
 *.0emm.com
 appspot.com
@@ -13901,6 +13907,7 @@ botdash.xyz
 // Submitted by Henrik Willert <security@ionos.com>
 apps-1and1.com
 live-website.com
+webspace-host.com
 apps-1and1.net
 websitebuilder.online
 app-ionos.space
@@ -14231,6 +14238,10 @@ barsy.support
 barsy.uk
 barsy.co.uk
 barsyonline.co.uk
+
+// Lutra : https://lutra.ai
+// Submitted by Joshua Newman <public-suffix-list@lutra.ai>
+*.lutrausercontent.com
 
 // Luyani Inc. : https://luyani.com/
 // Submitted by Umut Gumeli <public-suffix-list@luyani.com>
@@ -14653,6 +14664,10 @@ is-local.org
 // Open Social : https://www.getopensocial.com/
 // Submitted by Alexander Varwijk <security@getopensocial.com>
 opensocial.site
+
+// OpenAI : https://openai.com
+// Submitted by Thomas Shadwell <security@openai.com>
+*.oaiusercontent.com
 
 // OpenCraft GmbH : http://opencraft.com/
 // Submitted by Sven Marnach <sven@opencraft.com>
@@ -15108,32 +15123,53 @@ logoip.com
 logoip.de
 
 // Scaleway : https://www.scaleway.com/
-// Submitted by Rémy Léone <rleone@scaleway.com>
+// Submitted by Scaleway PSL Maintainer <psl-maintainers@scaleway.com>
 fr-par-1.baremetal.scw.cloud
 fr-par-2.baremetal.scw.cloud
 nl-ams-1.baremetal.scw.cloud
 cockpit.fr-par.scw.cloud
+ddl.fr-par.scw.cloud
+dtwh.fr-par.scw.cloud
 fnc.fr-par.scw.cloud
 functions.fnc.fr-par.scw.cloud
+ifr.fr-par.scw.cloud
 k8s.fr-par.scw.cloud
 nodes.k8s.fr-par.scw.cloud
+kafk.fr-par.scw.cloud
+mgdb.fr-par.scw.cloud
+rdb.fr-par.scw.cloud
 s3.fr-par.scw.cloud
 s3-website.fr-par.scw.cloud
+scbl.fr-par.scw.cloud
 whm.fr-par.scw.cloud
 priv.instances.scw.cloud
 pub.instances.scw.cloud
 k8s.scw.cloud
 cockpit.nl-ams.scw.cloud
+ddl.nl-ams.scw.cloud
+dtwh.nl-ams.scw.cloud
+ifr.nl-ams.scw.cloud
 k8s.nl-ams.scw.cloud
 nodes.k8s.nl-ams.scw.cloud
+kafk.nl-ams.scw.cloud
+mgdb.nl-ams.scw.cloud
+rdb.nl-ams.scw.cloud
 s3.nl-ams.scw.cloud
 s3-website.nl-ams.scw.cloud
+scbl.nl-ams.scw.cloud
 whm.nl-ams.scw.cloud
 cockpit.pl-waw.scw.cloud
+ddl.pl-waw.scw.cloud
+dtwh.pl-waw.scw.cloud
+ifr.pl-waw.scw.cloud
 k8s.pl-waw.scw.cloud
 nodes.k8s.pl-waw.scw.cloud
+kafk.pl-waw.scw.cloud
+mgdb.pl-waw.scw.cloud
+rdb.pl-waw.scw.cloud
 s3.pl-waw.scw.cloud
 s3-website.pl-waw.scw.cloud
+scbl.pl-waw.scw.cloud
 scalebook.scw.cloud
 smartlabeling.scw.cloud
 dedibox.fr
@@ -15284,6 +15320,14 @@ srht.site
 // Submitted by Antonis Kalipetis <akalipetis@sourcelair.com>
 apps.lair.io
 *.stolos.io
+
+// sourceWAY GmbH : https://sourceway.de
+// Submitted by Richard Reiber <mail@sourceway.de>
+4.at
+my.at
+my.de
+*.nxa.eu
+nx.gw
 
 // SpeedPartner GmbH : https://www.speedpartner.de/
 // Submitted by Stefan Neufeind <info@speedpartner.de>
@@ -15625,8 +15669,8 @@ dnsupdate.info
 // Submitted by Gavin Brown <gavin.brown@centralnic.com>
 us.org
 
-// V.UA Domain Administrator : https://domain.v.ua/
-// Submitted by Serhii Rostilo <sergey@rostilo.kiev.ua>
+// V.UA Domain Registry: https://www.v.ua/
+// Submitted by Serhii Rostilo <admin@v.ua>
 v.ua
 
 // Val Town, Inc : https://val.town/
@@ -15635,11 +15679,12 @@ val.run
 web.val.run
 
 // Vercel, Inc : https://vercel.com/
-// Submitted by Max Leiter <security@vercel.com>
+// Submitted by Laurens Duijvesteijn <security@vercel.com>
 vercel.app
 v0.build
 vercel.dev
 vusercontent.net
+vercel.run
 now.sh
 
 // VeryPositive SIA : http://very.lv
@@ -15649,6 +15694,10 @@ now.sh
 // Virtual-Info : https://www.virtual-info.info/
 // Submitted by Adnan RIHAN <hostmaster@v-info.info>
 v-info.info
+
+// VistaBlog : https://vistablog.ir/
+// Submitted by Hossein Piri <info@vistablog.ir>
+vistablog.ir
 
 // Viva Republica, Inc. : https://toss.im/
 // Submitted by Deus Team <deus@toss.im>

@@ -8,9 +8,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -86,6 +89,24 @@ public class UpdateController implements UpdateCallbackInterface {
 
     public LogSource getLogger() {
         return logger;
+    }
+
+    private final Map<String, AtomicInteger> feedbackCounter = new HashMap<String, AtomicInteger>();
+
+    public void addFeedback(final String... keys) {
+        synchronized (feedbackCounter) {
+            for (final String key : keys) {
+                if (StringUtils.isEmpty(key)) {
+                    continue;
+                }
+                final AtomicInteger counter = feedbackCounter.get(key);
+                if (counter == null) {
+                    feedbackCounter.put(key, new AtomicInteger(1));
+                } else {
+                    counter.incrementAndGet();
+                }
+            }
+        }
     }
 
     private UpdateSettings settings;
@@ -639,9 +660,27 @@ public class UpdateController implements UpdateCallbackInterface {
         runUpdateChecker(false);
     }
 
+    private void appendFeedback(StringBuilder sb) {
+        synchronized (feedbackCounter) {
+            for (final Entry<String, AtomicInteger> entry : feedbackCounter.entrySet()) {
+                final int count = entry.getValue().getAndSet(0);
+                if (count > 0) {
+                    sb.append("&fbc_" + URLEncode.encodeURIComponent(entry.getKey()) + "=" + count);
+                }
+            }
+        }
+    }
+
     @Override
     public void append(StringBuilder sb) {
         if (sb != null && !new Regex(sb, ".*app=JDU.*").matches()) {
+            try {
+                if (new Regex(sb, "/pkg").patternFind()) {
+                    appendFeedback(sb);
+                }
+            } catch (Throwable e) {
+                logger.log(e);
+            }
             boolean hwDebug = false;
             if (Boolean.FALSE.equals(getExtractionLibrary())) {
                 try {

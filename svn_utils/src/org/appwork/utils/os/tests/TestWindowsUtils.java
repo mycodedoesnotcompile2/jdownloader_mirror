@@ -45,7 +45,6 @@ import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Time;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
-import org.appwork.utils.swing.dialog.Dialog;
 
 import com.sun.jna.platform.win32.Advapi32Util.Account;
 import com.sun.jna.platform.win32.WinDef.INT_PTR;
@@ -134,7 +133,8 @@ public class TestWindowsUtils extends AWTest {
         if (!CrossSystem.isWindows()) {
             return;
         }
-        Dialog.I().showMessageDialog("The TestWindowUtils Test will now try to start cmd.exe via UAC");
+        // Dialog.I().showMessageDialog("The TestWindowUtils Test will now try to start cmd.exe via UAC");
+        logInfoAnyway("The TestWindowUtils Test will now try to start cmd.exe via UAC");
         // Test startElevatedProcess
         long started = Time.now();
         INT_PTR processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100000", "heise.de" }, null, false);

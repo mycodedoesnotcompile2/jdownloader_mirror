@@ -73,7 +73,7 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 50735 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 51216 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -251,7 +251,7 @@ public class LinkSnappyCom extends PluginForHost {
             final Map<String, Object> hosterMapResponse = this.handleErrors(br, null, account);
             final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
             /* Connection info map */
-            final HashMap<String, Map<String, Object>> allHosterInfoMap = new HashMap<String, Map<String, Object>>();
+            final Map<String, Map<String, Object>> allHosterInfoMap = new HashMap<String, Map<String, Object>>();
             final Map<String, Object> hosterMap = (Map<String, Object>) hosterMapResponse.get("return");
             final Iterator<Entry<String, Object>> it = hosterMap.entrySet().iterator();
             while (it.hasNext()) {

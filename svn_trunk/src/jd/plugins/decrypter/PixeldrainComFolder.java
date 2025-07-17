@@ -20,10 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
@@ -40,7 +36,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PixeldrainCom;
 
-@DecrypterPlugin(revision = "$Revision: 49100 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+
+@DecrypterPlugin(revision = "$Revision: 51179 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixeldrainCom.class })
 public class PixeldrainComFolder extends PluginForDecrypt {
     public PixeldrainComFolder(PluginWrapper wrapper) {
@@ -84,7 +84,7 @@ public class PixeldrainComFolder extends PluginForDecrypt {
         this.br = hosterplugin.createNewBrowserInstance();
         if (listregex.patternFind()) {
             final String listID = listregex.getMatch(0);
-            br.getPage(PixeldrainCom.API_BASE + "/list/" + listID);
+            br.getPage(PixeldrainCom.getAPIBase(this) + "/list/" + listID);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 /* 2020-10-01: E.g. {"success":false,"value":"not_found","message":"The entity you requested could not be found"} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -129,8 +129,7 @@ public class PixeldrainComFolder extends PluginForDecrypt {
             fp.addLinks(ret);
         } else if (folderregex.patternFind()) {
             /**
-             * 2024-06-10: This is new. It's not yet documented in their API docs. </br>
-             * User docs: https://pixeldrain.com/filesystem
+             * 2024-06-10: This is new. It's not yet documented in their API docs. </br> User docs: https://pixeldrain.com/filesystem
              */
             final String urlWithoutParams = URLHelper.getUrlWithoutParams(param.getCryptedUrl());
             final Regex urlWithoutParamsRegex = new Regex(urlWithoutParams, PATTERN_FOLDER);
@@ -139,7 +138,7 @@ public class PixeldrainComFolder extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* Append "?stat" so even if we got a direct-URL we will get a json response and not a file. */
-            br.getPage(PixeldrainCom.API_BASE + "/filesystem/" + folderPath + "?stat");
+            br.getPage(PixeldrainCom.getAPIBase(this) + "/filesystem/" + folderPath + "?stat");
             if (br.getHttpConnection().getResponseCode() == 404) {
                 /* E.g. {"success":false,"value":"not_found","message":"The entity you requested could not be found"} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

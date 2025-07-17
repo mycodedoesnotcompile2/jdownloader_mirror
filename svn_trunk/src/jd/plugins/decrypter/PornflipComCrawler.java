@@ -48,7 +48,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.PornflipCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 47708 $", interfaceVersion = 3, names = { "playvids.com", "pornflip.com" }, urls = { "https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+", "https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = { "playvids.com", "pornflip.com" }, urls = { "https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+", "https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+" })
 public class PornflipComCrawler extends PluginForDecrypt {
     public PornflipComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,7 @@ public class PornflipComCrawler extends PluginForDecrypt {
 
     @SuppressWarnings({ "static-access", "deprecation" })
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> crawledlinks = new ArrayList<DownloadLink>();
         videoID = new Regex(param.getCryptedUrl(), "(?:watch(?:\\?v=|/)|embed/|v/)([A-Za-z0-9\\-_]+)").getMatch(0);
         if (videoID == null) {
             videoID = new Regex(param.getCryptedUrl(), "https?://[^/]+/(?:[a-z]{2})?([A-Za-z0-9\\-_]+)").getMatch(0);
@@ -196,7 +196,7 @@ public class PornflipComCrawler extends PluginForDecrypt {
         for (List<DownloadLink> list : results.values()) {
             for (DownloadLink link : list) {
                 fp.add(link);
-                decryptedLinks.add(link);
+                crawledlinks.add(link);
                 final String qualityStr = new Regex(link.getFinalFileName(), "(\\d+)\\.mp4").getMatch(0);
                 if (qualityStr != null) {
                     final int qualityTmp = Integer.parseInt(qualityStr);
@@ -208,10 +208,10 @@ public class PornflipComCrawler extends PluginForDecrypt {
             }
         }
         if (best && bestDownloadurl != null) {
-            decryptedLinks.clear();
-            decryptedLinks.add(bestDownloadurl);
+            crawledlinks.clear();
+            crawledlinks.add(bestDownloadurl);
         }
-        return decryptedLinks;
+        return crawledlinks;
     }
 
     @SuppressWarnings("deprecation")
@@ -301,9 +301,7 @@ public class PornflipComCrawler extends PluginForDecrypt {
         }
     }
 
-    /**
-     * JD2 CODE: DO NOIT USE OVERRIDE FÒR COMPATIBILITY REASONS!!!!!
-     */
+    @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
     }
@@ -324,7 +322,7 @@ public class PornflipComCrawler extends PluginForDecrypt {
         return true;
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

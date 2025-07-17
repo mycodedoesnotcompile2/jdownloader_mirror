@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -36,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50987 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51201 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +54,18 @@ public class StreamwishCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com", "streamhg.com", "hlsflex.com", "swiftplayers.com" });
+        ret.add(new String[] { "streamwish.com", "streamwish.to", "awish.pro", "embedwish.com", "wishembed.pro", "vidcloud.top", "gdplry.online", "jwplayerhls.com", "wishonly.site", "dwish.pro", "cloudwish.xyz", "playerwish.com", "rapidplayers.com", "streamhg.com", "hlsflex.com", "swiftplayers.com", "ultpreplayer.com", "recordplay.biz", "hgplaycdn.com", "hailindihg.com" });
+        /** Tags for developers: streamwish, awish, sexbjcam.com */
+        /**
+         * Related links for developers: <br>
+         * https://board.jdownloader.org/showthread.php?t=97597
+         */
+        /**
+         * Additional infos for developers: <br>
+         * jwplayer.key="ITWMv7t88JGzI0xPwW8I0+LveiXX9SWbfdmt0ArUSyc=" <br>
+         * -> Use this key to match domains which you believe belong into this plugin. <br>
+         * Date when this key was last updated in this comment: 2025-07-09
+         */
         return ret;
     }
 
@@ -192,6 +204,15 @@ public class StreamwishCom extends XFileSharingProBasic {
         } else {
             return super.getFUIDFromURL(link);
         }
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        /* There are problems with downloading in ipv4/6 mixed mode -> Use IPV4 only */
+        br.setIPVersion(IPVERSION.IPV4_ONLY);
+        return br;
     }
 
     @Override

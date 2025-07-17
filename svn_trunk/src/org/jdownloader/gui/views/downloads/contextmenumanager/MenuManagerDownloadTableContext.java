@@ -169,13 +169,13 @@ public class MenuManagerDownloadTableContext extends ContextMenuManager<FilePack
     private MenuItemData createPriorityMenu() {
         PriorityMenuContainer priority;
         priority = new PriorityMenuContainer();
-        priority.add(new MenuItemData(new ActionData(PriorityLowestAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityLowerAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityLowAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityDefaultAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityHighAction.class)));
-        priority.add(new MenuItemData(new ActionData(PriorityHigherAction.class)));
         priority.add(new MenuItemData(new ActionData(PriorityHighestAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityHigherAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityHighAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityDefaultAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityLowAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityLowerAction.class)));
+        priority.add(new MenuItemData(new ActionData(PriorityLowestAction.class)));
         return priority;
     }
 

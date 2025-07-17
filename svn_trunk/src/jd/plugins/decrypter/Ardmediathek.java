@@ -42,6 +42,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.MediathekHelper;
@@ -72,7 +73,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51150 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -758,6 +759,7 @@ public class Ardmediathek extends PluginForDecrypt {
         Map<String, Object> ndrJsonObject = null;
         String embedJson = br.getRegex("data-type\\s*=\\s*\"video\"\\s*data-config\\s*=\\s*\"(.*?)\">\\s*<div").getMatch(0);
         if (embedJson != null) {
+            /* E.g. https://www.ndr.de/fernsehen/sendungen/schleswig-holstein_magazin/Schleswig-Holstein-Magazin,sendung1544068.html */
             embedJson = Encoding.htmlOnlyDecode(embedJson);
             ndrJsonObject = restoreFromString(embedJson, TypeRef.MAP);
             ndrJsonObject = (Map<String, Object>) ndrJsonObject.get("mc");
@@ -1659,7 +1661,10 @@ public class Ardmediathek extends PluginForDecrypt {
         final Map<String, Object> meta = (Map<String, Object>) root.get("meta");
         String title = (String) meta.get("title");
         if (StringUtils.isEmpty(title)) {
-            title = br.getRegex("@type\"\\s*:\\s*\"VideoObject\"\\s*,\\s*\"name\"\\s*:\\s*\"(.*?)\"\\s*,").getMatch(0);
+            final Map<String, Object> videoObject = ((PluginBrowser) br).getVideoObject();
+            if (videoObject != null) {
+                title = (String) videoObject.get("name");
+            }
             if (StringUtils.isEmpty(title)) {
                 title = br.getRegex("<meta\\s*name\\s*=\\s*\"title\"\\s*content\\s*=\\s*\"(.*?)\"\\s*/>").getMatch(0);
             }

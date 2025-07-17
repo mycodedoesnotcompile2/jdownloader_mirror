@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -61,6 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -77,7 +79,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51104 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51189 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1015,7 +1017,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
 
     protected String regexNormalTitleWebsite(final Browser br) {
         String best = null;
-        final String header = br.getRegex("<h(?:1|2)>\\s*(.*?)\\s*</h(?:1|2)>").getMatch(0);
+        final String header = br.getRegex("<h(1|2)[^>]*>\\s*(.*?)\\s*</h\\1>").getMatch(1);
         if (StringUtils.isNotEmpty(header)) {
             best = header;
         }
@@ -1027,7 +1029,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         if (best == null || (ogTitle != null && ogTitle.length() < best.length())) {
             best = ogTitle;
         }
-        String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        String title = br.getRegex("<title[^>]*>([^<]+)</title>").getMatch(0);
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
             /* Remove "mytitle - domain.tld" and similar */
@@ -1799,11 +1801,17 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         }
         /* Check if chosen quality is valid / if link works. */
         URLConnectionAdapter con = null;
-        try {
+        check: try {
             final Browser brc = br.cloneBrowser();
+            brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
             brc.setFollowRedirects(true);
             brc.setAllowedResponseCodes(new int[] { 405 });
-            con = brc.openHeadConnection(downloadurl);
+            boolean deepVerification = false;
+            if (deepVerification) {
+                con = brc.openGetConnection(downloadurl);
+            } else {
+                con = brc.openHeadConnection(downloadurl);
+            }
             if (this.looksLikeHLS(con)) {
                 brc.followConnection();
                 logger.info("Found HLS stream instead of expected progressive video stream download");
@@ -1817,6 +1825,17 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 con = brc.openHeadConnection(workaroundURL);
             }
             if (this.looksLikeDownloadableContent(con)) {
+                if (deepVerification) {
+                    try {
+                        // server side broken files but doesn't work reliable as the files can be broken at any position
+                        final DataInputStream dis = new DataInputStream(con.getInputStream());
+                        dis.readFully(new byte[32767]);
+                    } catch (IOException e) {
+                        logger.log(e);
+                        logger.info("Skipping broken quality: " + chosenQuality + " | directurl: " + downloadurl);
+                        break check;
+                    }
+                }
                 /* Success */
                 link.setProperty(PROPERTY_CHOSEN_QUALITY, chosenQuality);
                 link.setDownloadSize(con.getCompleteContentLength());

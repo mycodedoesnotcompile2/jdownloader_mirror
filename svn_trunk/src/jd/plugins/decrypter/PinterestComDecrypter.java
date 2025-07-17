@@ -54,7 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50802 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -144,6 +144,9 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         final String redirect = br.getRegex("window\\.location = \"([^\"]+)").getMatch(0);
         if (StringUtils.containsIgnoreCase(redirect, "show_error=true")) {
             /* Item offline or private */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("\"httpStatus\":404")) {
+            /* 2025-07-03 e.g. ro.pinterest.com/%26hl%3Den%26sl%3Dro%26tl%3Den%26client%3Dsearch */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String[] jsons = br.getRegex("<script[^>]*type=\"application/json\">(.*?)</script>").getColumn(0);
@@ -316,8 +319,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 }
                 final String username = usermap.get("username").toString();
                 // final String userID = usermap.get("id").toString();
-                final int userPinCount = ((Integer) usermap.get("pin_count")).intValue();
-                final int userBoardCount = ((Integer) usermap.get("board_count")).intValue();
+                final int userPinCount = ((Number) usermap.get("pin_count")).intValue();
+                final int userBoardCount = ((Number) usermap.get("board_count")).intValue();
                 if (userPinCount > 0) {
                     logger.info("Crawling all loose PINs: " + userPinCount);
                     this.displayBubbleNotification("Profile " + username, "Crawling all " + userPinCount + " loose PINs of profile " + username);
@@ -471,7 +474,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             throw new IllegalArgumentException();
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String contenturl = "https://www." + this.getHost() + "/pin/" + pinID + "/";
+        final String contenturl = "https://www." + this.getHost() + "/pin/" + pinID + "/";
         final DownloadLink singlePIN = this.createDownloadlink(contenturl);
         if (enable_crawl_alternative_URL) {
             /* The more complicated way (if wished by user). */
@@ -480,21 +483,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
              * If that wasn't the case, we could rely on API-only!
              */
             br.getPage(contenturl);
-            String redirect = br.getRegex("window\\.location\\s*=\\s*\"([^\"]+)\"").getMatch(0);
-            if (redirect != null) {
-                /* We want the full URL. */
-                redirect = br.getURL(redirect).toExternalForm();
-            }
-            if (!new Regex(br.getURL(), PinterestComDecrypter.PATTERN_PIN).patternFind()) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (redirect != null && new Regex(redirect, PinterestComDecrypter.PATTERN_PIN).patternFind() && !redirect.contains(pinID)) {
-                final String newPinID = PinterestCom.getPinID(redirect);
-                logger.info("Old pinID: " + pinID + " | New pinID: " + newPinID + " | New URL: " + redirect);
-                contenturl = redirect;
-            } else if (redirect != null && redirect.contains("show_error=true")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final Map<String, Object> pinMap = getPINMap(this.br, contenturl);
+            checkSinglePINOffline(br);
+            final Map<String, Object> pinMap = getPINMap(this.br, br.getURL());
             setInfoOnDownloadLink(singlePIN, pinMap);
             final String externalURL = getAlternativeExternalURLInPINMap(pinMap);
             if (externalURL != null) {
@@ -503,6 +493,22 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         }
         ret.add(singlePIN);
         return ret;
+    }
+
+    public static void checkSinglePINOffline(final Browser br) throws PluginException, IOException {
+        String redirect = br.getRegex("window\\.location\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+        if (redirect != null) {
+            /* We want the full URL. */
+            redirect = br.getURL(redirect).toExternalForm();
+        }
+        if (!new Regex(br.getURL(), PinterestComDecrypter.PATTERN_PIN).patternFind()) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (redirect != null && redirect.contains("show_error=true")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("\"__isError\":\"PinNotFound\"")) {
+            /* 2025-07-03 e.g. /pin/679832506287009723/ */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
     }
 
     public static void setInfoOnDownloadLink(final DownloadLink dl, final Map<String, Object> map) {

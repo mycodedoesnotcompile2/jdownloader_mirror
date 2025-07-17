@@ -19,18 +19,22 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Exceptions;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.Exceptions;
-
-@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51226 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
+        if ("bootyexpo.net".equals(getHost())) {
+            // account required for higher qualities, see https://board.jdownloader.org/showthread.php?t=97550
+            enablePremium();
+        }
     }
 
     /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */
@@ -114,8 +118,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "femefun.com" });
         /* 2022-11-21 */
         ret.add(new String[] { "pervertium.com" });
-        /* 2022-11-22 */
-        ret.add(new String[] { "hotshag.com" });
         /* 2022-11-25 */
         ret.add(new String[] { "havefunporn.com" });
         /* 2022-12-22 */
@@ -145,6 +147,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "xhand.net" });
         ret.add(new String[] { "megatube.xxx" });
         ret.add(new String[] { "cluset.com" });
+        ret.add(new String[] { "bootyexpo.net" });
         return ret;
     }
 
@@ -174,6 +177,11 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         if (selfEmbed == null || !canHandle(selfEmbed)) {
             throw exception;
         }
+        /**
+         * 2025-06-23: e.g. cluset.com <br>
+         * /videos/11045/anmacherinnen-7-gluhende-fotzchen/
+         */
+        logger.info("Processing selfembed");
         try {
             br.getPage(selfEmbed);
             return super.getDllink(link, br);
@@ -193,7 +201,8 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
 
     @Override
     protected boolean preferTitleHTML() {
-        if ("bigwank.com".equals(getHost()) || "fpo.xxx".equals(getHost())) {
+        if ("bigwank.com".equals(getHost()) || "fpo.xxx".equals(getHost()) | "cluset.com".equals(getHost())) {
+            /* cluset.com example with bad title in URL: /videos/10824/100038/ */
             return true;
         } else {
             return super.preferTitleHTML();

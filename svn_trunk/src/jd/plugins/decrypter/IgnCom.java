@@ -34,6 +34,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.IgnVariant;
@@ -45,7 +46,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-@DecrypterPlugin(revision = "$Revision: 48641 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
 public class IgnCom extends PluginForDecrypt {
     public IgnCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,14 +121,13 @@ public class IgnCom extends PluginForDecrypt {
             // final String json = br.getRegex("data-video=\\'(\\{.*?\\})\\'[\t\n\r ]+").getMatch(0);
             // final String json = br.getRegex("data-settings=\"(\\{.*?\\})\"[\t\n\r ]+").getMatch(0);
             // String json = br.getRegex("video&quot;:(\\{.*?\\})\"[\t\n\r ]+").getMatch(0);
-            final String json_single_video = br.getRegex("<script type=\"application/ld\\+json\">([^<]*VideoObject[^>]*)</script>").getMatch(0);
+            final Map<String, Object> json_single_video = ((PluginBrowser) br).getVideoObject();
             final String json = br.getRegex("<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>").getMatch(0);
             if (json == null && json_single_video == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            Map<String, Object> entries = null;
             if (json_single_video != null) {
-                entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json_single_video);
+                final Map<String, Object> entries = json_single_video;
                 final String embedURL = (String) entries.get("embedUrl");
                 final String directurl = (String) entries.get("contentUrl");
                 String fileTitle = (String) entries.get("name");
@@ -148,7 +148,7 @@ public class IgnCom extends PluginForDecrypt {
                 }
             } else {
                 // json = Encoding.htmlDecode(json);
-                entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
+                Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
                 entries = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "props/pageProps");
                 final Object videoO = entries.get("video");
                 if (videoO == null) {

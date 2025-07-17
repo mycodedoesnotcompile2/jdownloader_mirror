@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -26,12 +27,11 @@ import jd.parser.html.Form;
 import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
-import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50986 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51209 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -162,19 +162,32 @@ public class KatfileCom extends XFileSharingProBasic {
 
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
-        if (br.containsHTML("(?i)/404-remove|>The file expired>The file was deleted by its owner")) {
+        if (br.containsHTML("/404-remove|>The file expired>The file was deleted by its owner")) {
             return true;
         } else {
             return super.isOffline(link, br);
         }
     }
+    // @Override
+    // protected boolean isPremiumOnlyURL(final Browser br) {
+    // final String url = br != null ? br.getURL() : null;
+    // if (url == null) {
+    // return false;
+    // } else if (StringUtils.containsIgnoreCase(url, "/?op=registration&redirect=")) {
+    // return true;
+    // } else {
+    // return super.isPremiumOnlyURL(br);
+    // }
+    // }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
-        /* 2022-11-07 */
-        if (br.containsHTML("(?i)>\\s*This file is available for Premium")) {
-            throw new AccountRequiredException();
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        if (br.containsHTML(">\\s*This file is available for Premium")) {
+            return "This file is available for Premium";
+        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/?op=registration&redirect=")) {
+            return "Account required to download this file";
+        } else {
+            return super.getPremiumOnlyErrorMessage(br);
         }
     }
 }

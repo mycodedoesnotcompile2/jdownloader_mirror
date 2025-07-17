@@ -17,9 +17,7 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jdownloader.plugins.components.config.KVSConfig;
-import org.jdownloader.plugins.components.config.KVSConfigRule34videoCom;
+import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -28,8 +26,12 @@ import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
+import jd.plugins.PluginBrowser;
 
-@HostPlugin(revision = "$Revision: 50568 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigRule34videoCom;
+
+@HostPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -60,6 +62,18 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlSlug);
+    }
+
+    @Override
+    protected String regexNormalTitleWebsite(final Browser br) {
+        final Map<String, Object> videoObject = ((PluginBrowser) br).getVideoObject();
+        if (videoObject != null) {
+            final String name = (String) videoObject.get("name");
+            if (name != null) {
+                return name;
+            }
+        }
+        return super.regexNormalTitleWebsite(br);
     }
 
     @Override

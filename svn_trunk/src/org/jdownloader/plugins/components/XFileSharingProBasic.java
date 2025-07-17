@@ -23,35 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -86,8 +59,39 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 51150 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
+
+@HostPlugin(revision = "$Revision: 51213 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -461,7 +465,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * <b> Enabling this will eventually lead to at least one additional website-request! </b> <br/>
      * DO NOT CALL THIS DIRECTLY - ALWAYS USE {@link #internal_supports_availablecheck_filename_abuse()}!!<br />
      *
-     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing. <br />
+     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing.
+     *         <br />
      *         false: Implies that website does NOT support {@link #getFnameViaAbuseLink()}. <br />
      *         default: true
      */
@@ -494,7 +499,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br />
      * CAUTION: Only set this to true if a filehost: <br />
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br />
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br />
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
+     * <br />
      * 3. Allows a lot of simultaneous connections. <br />
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br />
      * 5. Allows using a generated direct-URL at least two times.
@@ -885,7 +891,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * @return true: Link only downloadable for premium users (sometimes also for registered users). <br />
      *         false: Link is downloadable for all users.
      */
-    private boolean isPremiumOnlyURL(final Browser br) {
+    protected boolean isPremiumOnlyURL(final Browser br) {
         final String url = br != null ? br.getURL() : null;
         if (url == null) {
             return false;
@@ -1058,27 +1064,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-    try {
-        /* Check if response is plaintext and contains any known error messages. */
-        final byte[] probe = urlConnection.peek(32);
-        if (probe.length > 0) {
-            final String probeContext = new String(probe, "UTF-8");
-            final Request clone = urlConnection.getRequest().cloneRequest();
-            clone.setHtmlCode(probeContext);
-            final Browser br = createNewBrowserInstance();
-            br.setRequest(clone);
-            try {
-                // TODO: extract the html checks into own method to avoid Browser instance
-                checkServerErrors(br, getDownloadLink(), null);
-            } catch (PluginException e) {
-                logger.log(e);
-                return false;
+        try {
+            /* Check if response is plaintext and contains any known error messages. */
+            final byte[] probe = urlConnection.peek(32);
+            if (probe.length > 0) {
+                final String probeContext = new String(probe, "UTF-8");
+                final Request clone = urlConnection.getRequest().cloneRequest();
+                clone.setHtmlCode(probeContext);
+                final Browser br = createNewBrowserInstance();
+                br.setRequest(clone);
+                try {
+                    // TODO: extract the html checks into own method to avoid Browser instance
+                    checkServerErrors(br, getDownloadLink(), null);
+                } catch (PluginException e) {
+                    logger.log(e);
+                    return false;
+                }
             }
+        } catch (IOException e) {
+            logger.log(e);
         }
-    } catch (IOException e) {
-        logger.log(e);
-    }
-    return true;
+        return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -2159,7 +2165,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br />
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br />
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br />
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
+     * it)!<br />
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br/>
      *
@@ -2520,9 +2527,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* E.g. in availablecheck */
             return filesizeStr;
         }
-        /* 2019-08-29: Waittime here is possible but a rare case e.g. deltabit.co */
+        /* 2019-08-29: Wait time here is possible but a rare case e.g. deltabit.co */
         this.waitTime(link, Time.systemIndependentCurrentJVMTimeMillis());
         logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
+        /**
+         * 2020-05-22: Workaround attempt for unnerving class="err">Security error< which can sometimes appear if you're too fast in this
+         * handling. <br>
+         * This issue may have solved in newer XFS versions so we might be able to remove this extra wait in the long run.
+         */
         this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
         getPage(br, "/dl?op=download_orig&id=" + this.getFUIDFromURL(link) + "&mode=" + videoQualityStr + "&hash=" + videoHash);
         /* 2019-08-29: This Form may sometimes be given e.g. deltabit.co */
@@ -2653,9 +2665,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         checkErrors(br, continueURL, link, account, false);
         final Form download1 = br.getFormByInputFieldKeyValue("op", "download_orig");
         if (download1 != null) {
+            final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
             handleCaptcha(link, br, download1);
-            logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
-            this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
+            final int extraWaitSeconds = getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds();
+            if (extraWaitSeconds > 0) {
+                logger.info("Waiting extra wait seconds: " + extraWaitSeconds);
+                this.waitTime(link, timeBefore, extraWaitSeconds);
+            }
             submitForm(br, download1);
             checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
         }
@@ -2668,11 +2684,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return dllink;
     }
 
-    /**
-     * 2020-05-22: Workaround attempt for unnerving class="err">Security error< which can sometimes appear if you're too fast in this
-     * handling. <br>
-     * This issue may have solved in newer XFS versions so we might be able to remove this extra wait in the long run.
-     */
     protected int getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() {
         return 5;
     }
@@ -2723,7 +2734,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
+     * <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -2799,6 +2811,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Handles all kinds of captchas, also login-captcha - fills captcha answer into given captchaForm. */
     public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
         /* Captcha START */
+        final String reCaptchaKey = captchaForm.getRegex("data-sitekey=\"([^\"]+)").getMatch(0);
         if (new Regex(getCorrectBR(br), Pattern.compile("\\$\\.post\\(\\s*\"/ddl\"", Pattern.CASE_INSENSITIVE)).patternFind()) {
             /* 2019-06-06: Rare case */
             final String captchaResponse;
@@ -2858,6 +2871,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (handleHCaptcha(link, br, captchaForm)) {
             }
         } else if (containsRecaptchaV2Class(getCorrectBR(br))) {
+            if (handleRecaptchaV2(link, br, captchaForm)) {
+            }
+        } else if (reCaptchaKey != null) {
+            /* 2025-07-15: Detected reCaptcha within form e.g. dropload.io when called via getDllinkViaOfficialVideoDownloadNew */
             if (handleRecaptchaV2(link, br, captchaForm)) {
             }
         } else {
@@ -3359,7 +3376,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
         }
         if (best == null && possibleDllinks.size() > 0) {
-            best = possibleDllinks.entrySet().iterator().next();
+            logger.info("All possible image directurls have been filtered (all thumbnails?)");
         }
         if (best != null) {
             final String dllink = best.getKey();
@@ -3414,7 +3431,37 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /*
                  * Important: Do not use "Plugin.restoreFromString" here as the input of this can also be js structure and not only json!!
                  */
-                final List<Object> ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
+                List<Object> ressourcelist = null;
+                Map<String, String> references = new HashMap<String, String>();
+                while (true) {
+                    try {
+                        if (references.size() > 0) {
+                            final ScriptEngineManager mgr = JavaScriptEngineFactory.getScriptEngineManager(this);
+                            final ScriptEngine engine = mgr.getEngineByName("JavaScript");
+                            for (Entry<String, String> reference : references.entrySet()) {
+                                engine.eval("var " + reference.getKey() + "=" + reference.getValue() + ";");
+                            }
+                            engine.eval("var response=" + jssource + ";");
+                            ressourcelist = (List<Object>) JavaScriptEngineFactory.toMap(engine.get("response"));
+                        } else {
+                            ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
+                        }
+                        break;
+                    } catch (Exception e) {
+                        // VidhideCom -> playrecord.biz
+                        final EcmaError ee = Exceptions.getInstanceof(e, EcmaError.class);
+                        final String undefined = ee == null ? null : new Regex(ee.getMessage(), "ReferenceError\\s*:\\s*\"(.*?)\"\\s*(is not defined|n'est pas défini|未定义)?").getMatch(0);
+                        if (undefined == null || references.containsKey(undefined)) {
+                            throw e;
+                        }
+                        final String value = new Regex(src, "var\\s*" + Pattern.quote(undefined) + "\\s*=\\s*(\\{.*?\\})\\s*;").getMatch(0);
+                        if (value == null) {
+                            throw e;
+                        }
+                        references.put(undefined, value);
+                        getLogger().log(e);
+                    }
+                }
                 final boolean onlyOneQualityAvailable = ressourcelist.size() == 1;
                 final int userSelectedQuality = getPreferredStreamQuality();
                 if (userSelectedQuality == -1) {
@@ -3662,7 +3709,29 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Returns list of possible final image-host-downloadurl patterns. Match 0 will be used to find downloadurls in html source! */
     protected List<Pattern> getImageDownloadurlRegexes() {
         final List<Pattern> patterns = new ArrayList<Pattern>();
-        patterns.add(Pattern.compile(String.format("(https?://(?:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|%s)(?::\\d+)?(?:/img/\\d+/[^<>\"'\\[\\]]+|/img/[a-z0-9]+/[^<>\"'\\[\\]]+|/img/[^<>\"'\\[\\]]+|/i/\\d+/[^<>\"'\\[\\]]+|/i/\\d+/[^<>\"'\\[\\]]+(?!_t\\.[A-Za-z]{3,4})))", this.getDllinkHostPattern())));
+        // Base URL components
+        String protocol = "https?://";
+        String ipAddress = "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}";
+        String hostPattern = String.format("(?:%s|%s)", ipAddress, this.getDllinkHostPattern());
+        String port = "(?:\\d+)?";
+        String fileNamePattern = "[^<>\"'\\[\\]]+";
+        // Optional protocol and host for relative URLs
+        String optionalProtocolAndHost = String.format("(?:%s%s%s)?", protocol, hostPattern, port);
+        // Pattern 1: /img/{digits}/{filename}
+        String imgWithDigits = String.format("(%s/img/\\d+/%s)", optionalProtocolAndHost, fileNamePattern);
+        patterns.add(Pattern.compile(imgWithDigits));
+        // Pattern 2: /img/{alphanumeric}/{filename}, for example: picbaron.com
+        String imgWithAlphaNum = String.format("(%s/img/[a-z0-9]+/%s)", optionalProtocolAndHost, fileNamePattern);
+        patterns.add(Pattern.compile(imgWithAlphaNum));
+        // Pattern 3: /img/{filename} (direct)
+        String imgDirect = String.format("(%s/img/%s)", optionalProtocolAndHost, fileNamePattern);
+        patterns.add(Pattern.compile(imgDirect));
+        // Pattern 4: /i/{digits}/{filename}
+        String iWithDigits = String.format("(%s/i/\\d+/%s)", optionalProtocolAndHost, fileNamePattern);
+        patterns.add(Pattern.compile(iWithDigits));
+        // Pattern 5: /i/{digits}/{filename} (excluding thumbnails with _t.ext)
+        String iWithDigitsNoThumbnails = String.format("(%s/i/\\d+/%s(?!_t\\.[A-Za-z]{3,4}))", optionalProtocolAndHost, fileNamePattern);
+        patterns.add(Pattern.compile(iWithDigitsNoThumbnails));
         return patterns;
     }
 
@@ -3728,7 +3797,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Handles pre download (pre-captcha) waittime.
+     * Handles pre download (pre-captcha) wait time.
      */
     protected void waitTime(final DownloadLink link, final long timeBefore) throws PluginException {
         /* Ticket Time */
@@ -3745,26 +3814,29 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return;
         }
         logger.info("Found waittime, parsing waittime: " + waitStr);
-        int wait = Integer.parseInt(waitStr);
-        if (wait == 0) {
-            logger.info("Strange: Found waittime of zero seconds in HTML");
+        final int waitSeconds = Integer.parseInt(waitStr);
+        waitTime(link, timeBefore, waitSeconds);
+    }
+
+    protected void waitTime(final DownloadLink link, final long timeBefore, int waitSeconds) throws PluginException {
+        if (waitSeconds <= 0) {
+            logger.info("Strange: Got 0 wait seconds");
             return;
         }
         /*
          * Check how much time has passed during eventual captcha event before this function has been called and see how much time is left
          * to wait.
          */
-        final int extraWaitSeconds = 1;
-        int passedTime = (int) ((Time.systemIndependentCurrentJVMTimeMillis() - timeBefore) / 1000) - extraWaitSeconds;
-        wait -= passedTime;
+        int passedTime = (int) ((Time.systemIndependentCurrentJVMTimeMillis() - timeBefore) / 1000);
+        waitSeconds -= passedTime;
         if (passedTime > 0) {
             /* This usually means that the user had to solve a captcha which cuts down the remaining time we have to wait. */
             logger.info("Total passed time during captcha: " + passedTime);
         }
-        if (wait > 0) {
-            logger.info("Waiting final waittime: " + wait);
-            sleep(wait * 1000l, link);
-        } else if (wait < wait - extraWaitSeconds) {
+        if (waitSeconds > 0) {
+            logger.info("Waiting final waittime: " + waitSeconds);
+            sleep(waitSeconds * 1000l, link);
+        } else if (waitSeconds < waitSeconds) {
             /* User needed more time to solve the captcha so there is no waittime left :) */
             logger.info("Congratulations: Time to solve captcha was higher than waittime --> No waittime left");
         } else {
@@ -4510,7 +4582,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
+     * installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
      * apikey will usually be located here: "/?op=my_account"
@@ -4699,8 +4772,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
-                 * data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available
+                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = SizeFormatter.getSize(trafficDetails[0]);
                 final long max = SizeFormatter.getSize(trafficDetails[1]);
@@ -4711,8 +4784,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
-             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
+             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);
@@ -4806,7 +4879,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected boolean containsBlockedIPLoginMessage(final Browser br) {
-        return br != null && (br.containsHTML("(?i)>\\s*You can't login from this IP") || br.containsHTML("(?i)>\\s*Your IP is banned\\s*<"));
+        return br != null && (br.containsHTML("(?i)>\\s*You can't login from this IP") || br.containsHTML("(?i)>\\s*Your IP (is|was) banned\\s*<") || br.containsHTML("(?i)>\\s*Your IP (is|was) banned by administrator\\s*<"));
     }
 
     protected void fillWebsiteLoginForm(Browser br, Form loginform, Account account) {
@@ -4987,6 +5060,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                             /* E.g. 503 error during login */
                             this.checkErrorsLoginWebsite(br, account);
                             checkResponseCodeErrors(br.getHttpConnection());
+                            if (containsBlockedIPLoginMessage(br)) {
+                                throw new AccountInvalidException("\r\nYou can't login from this IP!\r\n");
+                            }
                             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                         }
                     }

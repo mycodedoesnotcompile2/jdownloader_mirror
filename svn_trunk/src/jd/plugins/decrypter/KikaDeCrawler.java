@@ -29,6 +29,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
@@ -36,7 +37,7 @@ import jd.plugins.hoster.DirectHTTP;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 
-@DecrypterPlugin(revision = "$Revision: 51116 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
 public class KikaDeCrawler extends PluginForDecrypt {
     public KikaDeCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +107,10 @@ public class KikaDeCrawler extends PluginForDecrypt {
         }
         String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
         if (title == null) {
-            title = br.getRegex("\"VideoObject\",\"name\":\"([^\"]+)\"").getMatch(0);
+            final Map<String, Object> videoObject = ((PluginBrowser) br).getVideoObject();
+            if (videoObject != null) {
+                title = (String) videoObject.get("name");
+            }
         }
         if (title == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

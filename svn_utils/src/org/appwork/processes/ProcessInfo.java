@@ -49,6 +49,15 @@ public class ProcessInfo {
      */
     private String id;
     private int    pid;
+    private int    parentPid = -1;
+
+    public int getParentPid() {
+        return parentPid;
+    }
+
+    public void setParentPid(int parentPid) {
+        this.parentPid = parentPid;
+    }
 
     /**
      *

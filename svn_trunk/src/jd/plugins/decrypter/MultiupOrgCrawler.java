@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -40,7 +41,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 50731 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51173 $", interfaceVersion = 2, names = {}, urls = {})
 public class MultiupOrgCrawler extends antiDDoSForDecrypt {
     // DEV NOTES:
     // DO NOT REMOVE COMPONENTS YOU DONT UNDERSTAND! When in doubt ask raztoki to fix.
@@ -69,6 +70,12 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
         return ret;
     }
 
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("multiup.org");
+        return deadDomains;
+    }
+
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
     }
@@ -91,6 +98,12 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
         String contenturl = param.getCryptedUrl();
         contenturl = contenturl.replaceFirst("(?i)/(en|fr)/", "/en/");
         contenturl = contenturl.replaceFirst("^(?i)http://", "https://");
+        final String hostFromAddedURLWithoutSubdomain = Browser.getHost(contenturl, false);
+        final List<String> deadDomains = getDeadDomains();
+        if (deadDomains != null && deadDomains.contains(hostFromAddedURLWithoutSubdomain)) {
+            contenturl = param.getCryptedUrl().replaceFirst(Pattern.quote(hostFromAddedURLWithoutSubdomain) + "/", getHost() + "/");
+            logger.info("Corrected domain in added URL: " + hostFromAddedURLWithoutSubdomain + " --> " + getHost());
+        }
         final String projectID = new Regex(contenturl, "/project/([a-f0-9]{32})").getMatch(0);
         if (projectID != null) {
             /* Crawl all file links of a "project" (like a folder of files) */

@@ -22,12 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.BangComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -43,12 +37,19 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BangCom;
 
-@DecrypterPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.BangComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BangCom.class })
 public class BangComCrawler extends PluginForDecrypt {
     public BangComCrawler(PluginWrapper wrapper) {
@@ -189,16 +190,7 @@ public class BangComCrawler extends PluginForDecrypt {
         if (account != null && br.containsHTML(">\\s*No unlocks")) {
             account.setError(AccountError.EXPIRED, 3 * 60 * 1000, "Expired trial account (no unlocks left)");
         }
-        Map<String, Object> videoObject = null;
-        final String[] jsSnippets = br.getRegex("<script type=\"application/ld\\+json\">(.*?)</script>").getColumn(0);
-        for (final String jsSnippet : jsSnippets) {
-            final Map<String, Object> entries = restoreFromString(jsSnippet, TypeRef.MAP);
-            final String type = (String) entries.get("@type");
-            if (StringUtils.equalsIgnoreCase(type, "VideoObject")) {
-                videoObject = entries;
-                break;
-            }
-        }
+        final Map<String, Object> videoObject = ((PluginBrowser) br).getVideoObject();
         if (videoObject == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

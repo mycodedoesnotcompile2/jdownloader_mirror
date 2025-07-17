@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47454 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51213 $", interfaceVersion = 3, names = {}, urls = {})
 public class DroploadIo extends XFileSharingProBasic {
     public DroploadIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -109,7 +109,10 @@ public class DroploadIo extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
-        final String betterFileTitle = new Regex(html, "<h1>([^<]+)</h1>\\s*<div class=\"videoplayer-controlbar\">").getMatch(0);
+        String betterFileTitle = new Regex(html, "<h1>([^<]+)</h1>\\s*<div class=\"videoplayer-controlbar\">").getMatch(0);
+        if (betterFileTitle == null) {
+            betterFileTitle = new Regex(html, "<h5 class=\"text-white\"[^>]*>([^<]+)</h5>").getMatch(0);
+        }
         if (betterFileTitle != null) {
             fileInfo[0] = betterFileTitle;
         }

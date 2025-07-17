@@ -17,20 +17,14 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
+import jd.http.requests.GetRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -40,7 +34,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49078 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 51215 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubsourceNet extends PluginForHost {
     public SubsourceNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,36 +121,31 @@ public class SubsourceNet extends PluginForHost {
             link.setName(titleSlug + "-" + subtitleID + ".zip");
         }
         this.setBrowserExclusive();
-        final Map<String, Object> postdata = new HashMap<String, Object>();
-        postdata.put("movie", titleSlug);
-        postdata.put("lang", languageSlug);
-        postdata.put("id", subtitleID);
         // postRequest.getHeaders().put("Accept", "application/json, text/plain, */*");
         // postRequest.getHeaders().put("Content-Type", "application/json");
-        final PostRequest post = new PostRequest("https://api.subsource.net/api/getSub");
-        post.getHeaders().put("Origin", "https://" + getHost());
-        post.getHeaders().put("Priority", "u=1, i");
-        post.getHeaders().put("Referer", "https://" + getHost() + "/");
-        post.setContentType("application/json");
-        post.setPostDataString(JSonStorage.serializeToJson(postdata));
-        getPage(br, post);
+        final GetRequest request = new GetRequest("https://api.subsource.net/v1/subtitle/" + titleSlug + "/" + languageSlug + "/" + subtitleID);
+        request.getHeaders().put("Origin", "https://" + getHost());
+        request.getHeaders().put("Priority", "u=1, i");
+        request.getHeaders().put("Referer", "https://" + getHost() + "/");
+        getPage(br, request);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> sub = (Map<String, Object>) entries.get("sub");
+        final Map<String, Object> sub = (Map<String, Object>) entries.get("subtitle");
         final String comment = (String) sub.get("commentary");
-        link.setFinalFileName(sub.get("fileName").toString());
         /* 0 = unknown filesize */
         final long filesize = ((Number) sub.get("size")).longValue();
-        // link.setDownloadSize(((Number) sub.get("size")).longValue());
         if (filesize > 0) {
-            link.setVerifiedFileSize(filesize);
+            link.setDownloadSize(filesize);
         }
         if (!StringUtils.isEmpty(comment) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(comment);
         }
-        dllink = br.getURL("/api/downloadSub/" + sub.get("downloadToken").toString()).toExternalForm();
+        dllink = br.getURL("/v1/subtitle/download/" + sub.get("download_token").toString()).toExternalForm();
+        if (link.getVerifiedFileSize() == -1 || link.getFinalFileName() == null) {
+            basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, null, null);
+        }
         return AvailableStatus.TRUE;
     }
 
@@ -196,16 +189,7 @@ public class SubsourceNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken subtitle?");
-            }
-        }
+        handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 

@@ -16,6 +16,23 @@ import java.util.List;
 
 import javax.swing.Icon;
 
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcollector.LinkOriginDetails;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.controlling.linkcrawler.CrawledLinkModifiers;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.UnknownCrawledLinkHandler;
+import jd.controlling.linkcrawler.modifier.CommentModifier;
+import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
+import jd.controlling.linkcrawler.modifier.PackageNameModifier;
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
+import jd.utils.JDUtilities;
+import net.sf.image4j.codec.ico.ICOEncoder;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.remoteapi.RemoteAPIRequest;
@@ -41,23 +58,6 @@ import org.jdownloader.api.myjdownloader.MyJDownloaderSettings;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
-
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcollector.LinkOriginDetails;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.controlling.linkcrawler.CrawledLinkModifiers;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.UnknownCrawledLinkHandler;
-import jd.controlling.linkcrawler.modifier.CommentModifier;
-import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
-import jd.controlling.linkcrawler.modifier.PackageNameModifier;
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.utils.JDUtilities;
-import net.sf.image4j.codec.ico.ICOEncoder;
 
 public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
     private final static String jdpath = JDUtilities.getJDHomeDirectoryFromEnvironment().getAbsolutePath() + File.separator + "JDownloader.jar";
@@ -172,9 +172,29 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
         }
     }
 
+    private String cleanupPackageName(final RemoteAPIRequest request, final String name) throws IOException {
+        if (StringUtils.isEmpty(name)) {
+            return name;
+        }
+        final String ret = name.replaceFirst("\\s*-\\s*[a-z0-9\\-]+\\.[a-z]{2,3}\\s*$", "");
+        return ret;
+    }
+
+    private String getPackageName(final RemoteAPIRequest request) throws IOException {
+        String ret = request.getParameterbyKey("package");
+        if (StringUtils.isNotEmpty(ret)) {
+            return cleanupPackageName(request, ret);
+        }
+        ret = request.getParameterbyKey("source");
+        if (ret != null && !ret.matches("^([a-z0-9\\-]+\\.){1,}[a-z0-9]+$") && StringUtils.containsIgnoreCase(request.getParameterbyKey("passwords"), "filecrypt.cc")) {
+            return cleanupPackageName(request, ret);
+        }
+        return null;
+    }
+
     public void addcnl(final RemoteAPIResponse response, final RemoteAPIRequest request, final CnlQueryStorable cnl) throws InternalApiException {
         try {
-            final String packageName = request.getParameterbyKey("package");
+            final String packageName = getPackageName(request);
             if (packageName != null) {
                 // Workaround: "package" can't be used as a field name in CnlQueryStorable as it's a reserved name
                 cnl.setPackageName(packageName);
@@ -288,7 +308,7 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
         String linkComment = request.getParameterbyKey("comment");
         final LinkCollectingJob job = new LinkCollectingJob(origin, urls);
         final String finalDestination = request.getParameterbyKey("dir");
-        String packageName = request.getParameterbyKey("package");
+        String packageName = getPackageName(request);
         if (source != null && !(StringUtils.startsWithCaseInsensitive(source, "http://") || StringUtils.startsWithCaseInsensitive(source, "https://"))) {
             source = null;
         }
@@ -375,7 +395,7 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
     public void add(RemoteAPIRequest request, RemoteAPIResponse response, String passwordParam, String sourceParam, String urlParam) throws InternalApiException {
         try {
             String source = null;
-            boolean keyValueParams = request.getParameterbyKey("urls") != null;
+            final boolean keyValueParams = request.getParameterbyKey("urls") != null;
             try {
                 if (keyValueParams) {
                     source = request.getParameterbyKey("source");
@@ -417,7 +437,7 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
             final LinkCollectingJob job = new LinkCollectingJob(LinkOriginDetails.getInstance(LinkOrigin.CNL, request.getRequestHeaders().getValue("user-agent")), urls);
             final String finalDestination = request.getParameterbyKey("dir");
             job.setCustomSourceUrl(source);
-            final String finalPackageName = request.getParameterbyKey("package");
+            final String finalPackageName = getPackageName(request);
             final List<CrawledLinkModifier> modifiers = new ArrayList<CrawledLinkModifier>();
             final List<CrawledLinkModifier> requiredPreModifiers = new ArrayList<CrawledLinkModifier>();
             if (StringUtils.isNotEmpty(finalDestination)) {
@@ -526,6 +546,10 @@ public class ExternInterfaceImpl implements Cnl2APIBasics, Cnl2APIFlash {
         if (url == null) {
             /* no referer available, maybe a source variable is? */
             url = request.getParameterbyKey("source");
+            if (url != null && !url.matches("^([a-z0-9\\-]+\\.){1,}[a-z0-9]+$") && StringUtils.containsIgnoreCase(request.getParameterbyKey("passwords"), "filecrypt.cc")) {
+                // workaround for filecrypt sending package name in source
+                url = "filecrypt.cc";
+            }
         }
         if (url == null) {
             url = fallbackSource;

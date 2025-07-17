@@ -20,16 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.OkRuConfig;
-import org.jdownloader.plugins.components.config.OkRuConfig.Quality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -49,7 +39,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50328 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.OkRuConfig;
+import org.jdownloader.plugins.components.config.OkRuConfig.Quality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51168 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
 public class OkRu extends PluginForHost {
     public OkRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -217,8 +217,7 @@ public class OkRu extends PluginForHost {
         } else {
             /* Prefer http - only use HLS if http is not available! */
             /**
-             * 2021-09-10: Some users also get: "ondemandHls" and "ondemandDash" </br>
-             * No idea if "ondemandHls" == "hlsManifestUrl"
+             * 2021-09-10: Some users also get: "ondemandHls" and "ondemandDash" </br> No idea if "ondemandHls" == "hlsManifestUrl"
              */
             if (userPreferredQuality != null) {
                 logger.info("Trying HLS fallback because user selected quality hasn't been found!");
@@ -293,7 +292,7 @@ public class OkRu extends PluginForHost {
         // video blocked | video not found (RU, then EN)
         if (br.containsHTML(">\\s*Видеоролик заблокирован\\s*<|>\\s*Видеоролик не найден\\s*<|>\\s*The video is blocked")) {
             return true;
-        } else if (br.containsHTML(">\\s*Video has not been found</div") || br.containsHTML(">\\s*Video hasn't been found</div")) {
+        } else if (br.containsHTML(">\\s*Video has not been found</div") || br.containsHTML(">\\s*Video hasn('|&#39;)t been found</div")) {
             return true;
         } else if (offlineBecauseOfDMCA(br)) {
             return true;
@@ -317,7 +316,7 @@ public class OkRu extends PluginForHost {
     }
 
     public static boolean offlineBecauseOfDMCA(final Browser br) {
-        return br.containsHTML(">\\s*Video has been blocked due to author's rights infingement\\s*<|>\\s*The video is blocked\\s*<|>\\s*Group, where this video was posted, has not been found");
+        return br.containsHTML(">\\s*Video has been blocked due to author('|&#39;)s rights infingement\\s*<|>\\s*The video is blocked\\s*<|>\\s*Group, where this video was posted, has not been found");
     }
 
     @Override
