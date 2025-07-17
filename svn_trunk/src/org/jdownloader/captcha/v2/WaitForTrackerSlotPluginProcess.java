@@ -8,7 +8,7 @@ import org.jdownloader.translate._JDT;
 import jd.nutils.Formatter;
 import jd.plugins.PluginProgress;
 
-public class WaitForTrackerSlotPluginProcess extends PluginProgress {
+public final class WaitForTrackerSlotPluginProcess extends PluginProgress {
     /**
      *
      */

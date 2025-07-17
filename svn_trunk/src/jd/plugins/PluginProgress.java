@@ -22,7 +22,18 @@ import javax.swing.Icon;
 import org.jdownloader.gui.views.downloads.columns.ETAColumn;
 import org.jdownloader.plugins.PluginTaskID;
 
-public abstract class PluginProgress {
+public abstract sealed class PluginProgress
+    permits jd.plugins.MovePluginProgress,
+            org.jdownloader.captcha.v2.WaitForTrackerSlotPluginProcess,
+            org.jdownloader.controlling.ffmpeg.FFMpegInstallProgress,
+            org.jdownloader.controlling.ffmpeg.FFMpegProgress,
+            org.jdownloader.extensions.extraction.ExtractionProgress,
+            org.jdownloader.gui.views.components.packagetable.context.CheckStatusAction.LinkCheckProgress,
+            org.jdownloader.plugins.CaptchaStepProgress,
+            org.jdownloader.plugins.DownloadPluginProgress,
+            org.jdownloader.plugins.HashCheckPluginProgress,
+            org.jdownloader.plugins.SleepPluginProgress,
+            org.jdownloader.plugins.UserIOProgress {
     protected volatile long total                          = 0;
     protected volatile long current                        = 0;
     protected volatile long eta                            = -1;
