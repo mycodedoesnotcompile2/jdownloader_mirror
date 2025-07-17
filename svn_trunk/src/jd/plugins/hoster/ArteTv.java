@@ -30,7 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51226 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
 public class ArteTv extends PluginForHost {
     @SuppressWarnings("deprecation")
     public ArteTv(PluginWrapper wrapper) {
@@ -87,9 +87,9 @@ public class ArteTv extends PluginForHost {
     private void connectionErrorhandling(final URLConnectionAdapter con) throws PluginException, IOException {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
+            if (con.getResponseCode() == 403) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
+            } else if (con.getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Video broken?");

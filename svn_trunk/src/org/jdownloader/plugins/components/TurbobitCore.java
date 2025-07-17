@@ -53,7 +53,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51217 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51226 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -684,13 +684,18 @@ public abstract class TurbobitCore extends PluginForHost {
                 logger.info("Available premium mirrors: " + mirrors.size() + " | Chosen mirror[" + chosenMirrorIndex + "] --> " + directlink);
             } else {
                 requestFileInformation_WebsiteV2(link, account);
-                brc.getPage(this.getWebsiteV2Base() + "/api/captcha");
+                brc.postPageRaw(this.getWebsiteV2Base() + "/api/download/free/init", "{\"fileId\":\"" + fid + "\"}");
+                final Map<String, Object> freedl = this.checkErrorsWebsiteV2(brc, link, account);
+                final Map<String, Object> freedl_ipBan = (Map<String, Object>) freedl.get("ipBan");
+                if (freedl_ipBan != null) {
+                    final int seconds = ((Number) freedl_ipBan.get("delay")).intValue();
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, seconds * 1000l);
+                }
+                brc.getPage("/api/captcha");
                 final Map<String, Object> captchainfo = this.checkErrorsWebsiteV2(brc, link, account);
                 final String reCaptchaIndex = captchainfo.get("index").toString();
                 final String reCaptchaKey = captchainfo.get("publicKey").toString();
                 final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, brc, reCaptchaKey).getToken();
-                brc.postPageRaw("/api/download/free/init", "{\"fileId\":\"" + fid + "\"}");
-                // final Map<String, Object> freedl = this.checkErrorsWebAPI(br, link, account);
                 brc.postPageRaw("/api/download/free/captcha", "{\"fileId\":\"" + fid + "\",\"g-recaptcha-response\":\"" + recaptchaV2Response + "\",\"g-captcha-index\":" + reCaptchaIndex + "}");
                 final Map<String, Object> delaymap = this.checkErrorsWebsiteV2(brc, link, account);
                 final int waitSeconds = ((Number) delaymap.get("delay")).intValue();

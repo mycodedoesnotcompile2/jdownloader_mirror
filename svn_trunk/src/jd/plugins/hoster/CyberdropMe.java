@@ -24,7 +24,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.CyberdropMeAlbum;
 
-@HostPlugin(revision = "$Revision: 49458 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51227 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CyberdropMeAlbum.class })
 public class CyberdropMe extends PluginForHost {
     public CyberdropMe(PluginWrapper wrapper) {
@@ -73,7 +73,7 @@ public class CyberdropMe extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     private String getContentURL(final DownloadLink link) {
@@ -199,7 +199,7 @@ public class CyberdropMe extends PluginForHost {
         if (con.getURL().getPath().equalsIgnoreCase("/maintenance.webm")) {
             con.disconnect();
             /* https://cyberfile.me/maintenance.webm */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Media temporarily not available due to ongoing server maintenance.", 2 * 60 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Media temporarily not available due to server maintenance.", 2 * 60 * 60 * 1000l);
         }
     }
 

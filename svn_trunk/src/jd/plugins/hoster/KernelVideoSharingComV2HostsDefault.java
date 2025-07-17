@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51226 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -118,8 +118,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "femefun.com" });
         /* 2022-11-21 */
         ret.add(new String[] { "pervertium.com" });
-        /* 2022-11-22 */
-        ret.add(new String[] { "hotshag.com" });
         /* 2022-11-25 */
         ret.add(new String[] { "havefunporn.com" });
         /* 2022-12-22 */
