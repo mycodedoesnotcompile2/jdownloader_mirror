@@ -7,7 +7,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.formatter.HexFormatter;
 
-public class HashInfo {
+public record HashInfo(String hash, TYPE type, boolean trustworthy, boolean forced) {
     public static enum TYPE {
         // order is important! see isStrongerThan/isWeakerThan
         SHA512("SHA-512", 128),
@@ -57,8 +57,6 @@ public class HashInfo {
         }
     }
 
-    private final String hash;
-
     public String getHash() {
         return hash;
     }
@@ -70,10 +68,6 @@ public class HashInfo {
     public boolean isNone() {
         return TYPE.NONE.equals(type);
     }
-
-    private final TYPE    type;
-    private final boolean trustworthy;
-    private final boolean forced;
 
     public boolean isTrustworthy() {
         return trustworthy;
@@ -152,14 +146,13 @@ public class HashInfo {
         return null;
     }
 
-    public HashInfo(final String hash, TYPE type, boolean trustworthy, boolean forced) {
+    public HashInfo {
         if (type == null) {
             throw new IllegalArgumentException("type is missing");
-        } else {
-            this.type = type;
         }
+        String calculatedHash;
         if (TYPE.NONE.equals(type)) {
-            this.hash = "";
+            calculatedHash = "";
         } else {
             final String hexHash;
             if (StringUtils.isEmpty(hash)) {
@@ -178,13 +171,15 @@ public class HashInfo {
             if (StringUtils.isEmpty(hexHash)) {
                 throw new IllegalArgumentException("hash is empty:" + type + "-" + hash);
             } else if (hexHash.length() < type.getSize()) {
-                this.hash = String.format("%0" + (type.getSize() - hexHash.length()) + "d%s", 0, hexHash);
+                calculatedHash = String.format("%0" + (type.getSize() - hexHash.length()) + "d%s", 0, hexHash);
             } else if (hexHash.length() > type.getSize()) {
                 throw new IllegalArgumentException("invalid hash size:" + type + "-" + hash);
             } else {
-                this.hash = hexHash.toLowerCase(Locale.ENGLISH);
+                calculatedHash = hexHash.toLowerCase(Locale.ENGLISH);
             }
         }
+        this.hash = calculatedHash;
+        this.type = type;
         this.trustworthy = trustworthy;
         this.forced = forced;
     }
