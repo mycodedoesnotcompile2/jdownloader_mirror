@@ -2,7 +2,7 @@ package org.jdownloader.plugins;
 
 import jd.plugins.PluginProgress;
 
-public class UserIOProgress extends PluginProgress {
+public final class UserIOProgress extends PluginProgress {
 
     private String message;
 

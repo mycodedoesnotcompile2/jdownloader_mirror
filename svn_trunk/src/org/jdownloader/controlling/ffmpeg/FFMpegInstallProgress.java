@@ -10,7 +10,7 @@ import org.jdownloader.gui.views.downloads.columns.ETAColumn;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.PluginTaskID;
 
-public class FFMpegInstallProgress extends PluginProgress {
+public final class FFMpegInstallProgress extends PluginProgress {
     private String message;
 
     @Override
