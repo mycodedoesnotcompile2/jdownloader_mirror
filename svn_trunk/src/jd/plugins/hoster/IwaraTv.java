@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.IwaraTvCrawler;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51229 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { IwaraTvCrawler.class })
 public class IwaraTv extends PluginForHost {
     public IwaraTv(PluginWrapper wrapper) {
@@ -120,7 +120,7 @@ public class IwaraTv extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.iwara.tv/";
+        return "https://www." + getHost() + "/";
     }
 
     private Browser prepBR(final Browser br) {
@@ -128,6 +128,15 @@ public class IwaraTv extends PluginForHost {
         br.setCustomCharset("UTF-8");
         br.setCookie(getHost(), "show_adult", "1");
         br.setCookie(getHost(), "has_js", "1");
+        /* 2025-07-17: Cloudflare "workaround", see https://github.com/yt-dlp/yt-dlp/issues/13699#issuecomment-3063543058 */
+        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
+        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+        br.getHeaders().put("Accept-Language", "en-US,en;q=0.9");
+        br.getHeaders().put("Sec-Fetch-Site", "none");
+        br.getHeaders().put("Sec-Fetch-Mode", "navigate");
+        br.getHeaders().put("Sec-Fetch-User", "?1");
+        br.getHeaders().put("Sec-Fetch-Dest", "document");
+        br.getHeaders().put("Upgrade-Insecure-Requests", "1");
         return br;
     }
 

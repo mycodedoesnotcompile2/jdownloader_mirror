@@ -17,11 +17,8 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -30,7 +27,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51226 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51231 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
 public class ArteTv extends PluginForHost {
     @SuppressWarnings("deprecation")
     public ArteTv(PluginWrapper wrapper) {
@@ -69,7 +70,7 @@ public class ArteTv extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 con = br.openHeadConnection(directurl);
-                connectionErrorhandling(con);
+                handleConnectionErrors(br, con);
                 if (con.getCompleteContentLength() > 0) {
                     link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
@@ -84,16 +85,14 @@ public class ArteTv extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    private void connectionErrorhandling(final URLConnectionAdapter con) throws PluginException, IOException {
-        if (!this.looksLikeDownloadableContent(con)) {
-            br.followConnection(true);
-            if (con.getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Video broken?");
-            }
+    @Override
+    protected void throwConnectionExceptions(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
+        if (con.getResponseCode() == 403) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+        } else if (con.getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Video broken?");
         }
     }
 
@@ -139,7 +138,7 @@ public class ArteTv extends PluginForHost {
         } else {
             br.setFollowRedirects(true);
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, true, 0);
-            connectionErrorhandling(dl.getConnection());
+            handleConnectionErrors(br, dl.getConnection());
             findAndSetMd5Hash(link, dl.getConnection());
             dl.startDownload();
         }
