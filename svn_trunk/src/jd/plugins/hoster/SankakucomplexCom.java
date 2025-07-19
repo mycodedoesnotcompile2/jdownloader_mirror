@@ -25,6 +25,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -46,16 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 51088 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51232 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -350,7 +350,7 @@ public class SankakucomplexCom extends PluginForHost {
             link.removeProperty(PROPERTY_IS_PREMIUMONLY);
         }
         final List<Map<String, Object>> tags = (List<Map<String, Object>>) item.get("tags");
-        if (tags != null) {
+        if (tags != null && tags.size() > 0) {
             String tagsCommaSeparated = "";
             for (final Map<String, Object> tagInfo : tags) {
                 String tag = (String) tagInfo.get("name_en");
@@ -362,11 +362,9 @@ public class SankakucomplexCom extends PluginForHost {
                 }
                 tagsCommaSeparated += tag;
             }
-            if (tagsCommaSeparated.length() > 0) {
-                link.setProperty(PROPERTY_TAGS_COMMA_SEPARATED, tagsCommaSeparated);
-                if (PluginJsonConfig.get(SankakucomplexComConfig.class).isSetCommaSeparatedTagsOfPostsAsComment()) {
-                    link.setComment(tagsCommaSeparated);
-                }
+            link.setProperty(PROPERTY_TAGS_COMMA_SEPARATED, tagsCommaSeparated);
+            if (PluginJsonConfig.get(SankakucomplexComConfig.class).isSetCommaSeparatedTagsOfPostsAsComment()) {
+                link.setComment(tagsCommaSeparated);
             }
         }
         /* 2022-12-20: We can't trust this hash for all items. */
@@ -379,7 +377,6 @@ public class SankakucomplexCom extends PluginForHost {
         }
         storeDirecturl(link, item.get("file_url").toString());
         link.setProperty(PROPERTY_SOURCE, item.get("source"));
-        link.setAvailable(true);
         final String bookTitle = link.getStringProperty(PROPERTY_BOOK_TITLE);
         final int pageNumber = link.getIntegerProperty(PROPERTY_PAGE_NUMBER, 0) + 1;
         final int pageNumberMax = link.getIntegerProperty(PROPERTY_PAGE_NUMBER_MAX, 0) + 1;
@@ -448,8 +445,8 @@ public class SankakucomplexCom extends PluginForHost {
 
     private static void prepareDownloadHeaders(final Browser br) {
         /**
-         * 2024-11-12: Do not send a referer header! </br> This is really important else we may get redirected to a dummy image. Looks to be
-         * some kind of pseudo protection.
+         * 2024-11-12: Do not send a referer header! </br>
+         * This is really important else we may get redirected to a dummy image. Looks to be some kind of pseudo protection.
          */
         br.getHeaders().put("Referer", "");
         // br.setCurrentURL(null);
@@ -479,8 +476,8 @@ public class SankakucomplexCom extends PluginForHost {
         final String errortext = "Broken or temporarily unavailable file";
         if (System.currentTimeMillis() - timestampLastTimeFileMaybeBroken <= 5 * 60 * 1000l) {
             /**
-             * Failed again in a short time even with fresh direct URL: </br> Wait longer time before retry as we've just recently tried and
-             * it failed again.
+             * Failed again in a short time even with fresh direct URL: </br>
+             * Wait longer time before retry as we've just recently tried and it failed again.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext, 5 * 60 * 1000l);
         } else {

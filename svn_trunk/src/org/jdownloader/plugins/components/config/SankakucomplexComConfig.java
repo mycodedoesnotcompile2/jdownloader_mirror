@@ -4,6 +4,7 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
+import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
@@ -34,6 +35,10 @@ public interface SankakucomplexComConfig extends PluginConfigInterface {
 
         public String getLinkcheckAccessMode_label() {
             return "Linkcheck: Access mode";
+        }
+
+        public String getCrawlerFastLinkcheckEnabled_label() {
+            return "Crawler: Enable fast linkcheck";
         }
     }
 
@@ -94,4 +99,12 @@ public interface SankakucomplexComConfig extends PluginConfigInterface {
     AccessMode getLinkcheckAccessMode();
 
     void setLinkcheckAccessMode(final AccessMode mode);
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Disabled = It will take much longer until crawled items will appear as each post will be checked individually. Only disable this if you know what you're doing! Disabling this can cause your IP to get blocked by sankakucomplex!")
+    @DefaultBooleanValue(true)
+    @Order(140)
+    boolean isCrawlerFastLinkcheckEnabled();
+
+    void setCrawlerFastLinkcheckEnabled(boolean b);
 }

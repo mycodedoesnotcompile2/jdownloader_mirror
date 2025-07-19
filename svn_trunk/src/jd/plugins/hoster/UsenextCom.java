@@ -1,23 +1,12 @@
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.controlling.proxy.AbstractProxySelectorImpl;
@@ -34,7 +23,20 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50390 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 51234 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,12 +57,24 @@ public class UsenextCom extends UseNet {
     public void update(final DownloadLink downloadLink, final Account account, long bytesTransfered) {
         final UsenetServer server = getLastUsedUsenetServer();
         /**
-         * If the "flatrate domain" is in use, do not substract traffic from users' account. </br>
-         * Only substract traffic if no domain is given or a non-flatrate domain is given.
+         * If the "flatrate domain" is in use, do not substract traffic from users' account. </br> Only substract traffic if no domain is
+         * given or a non-flatrate domain is given.
          */
         if (server == null || !StringUtils.equalsIgnoreCase(FLATRATE_DOMAIN, server.getHost())) {
             super.update(downloadLink, account, bytesTransfered);
         }
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "jd");
+        return ret;
+    }
+
+    @Override
+    public Object getFavIcon(String host) throws IOException {
+        return super.getFavIcon(host);
     }
 
     @Override
@@ -104,8 +118,10 @@ public class UsenextCom extends UseNet {
     private Map<String, Object> queryAPI(final Account account, final Browser br) throws Exception {
         /* At this point login was successful and all that's left to do is to obtain account information. */
         final String api_url = "https://janus.usenext.com";
-        final PostRequest postRequest = br.createJSonPostRequest(URLHelper.parseLocation(new URL(api_url), "/graphql"),
-                "{\"operationName\":\"DashboardInformation\",\"variables\":{},\"query\":\"query DashboardInformation {\\n  radiusData {\\n    volume {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n    extraBoost {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  cancellationInformation {\\n    isContractLocked\\n    hasWithdrawableCancellation\\n    isServiceDenied\\n    isInCancellationPeriod\\n    cancellationProcess {\\n      createDate\\n    }\\n  }\\n  currentServiceRoundUpgradeData {\\n    hasPendingUpgrade\\n    isLastUpgrade\\n    accountingPeriod {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  serviceInformation {\\n    currentServiceRound {\\n      currEndDate\\n      startDate\\n      article {\\n        id\\n        name\\n        articleTypeId\\n        priceNet\\n        priceGross\\n        volumeGb\\n        runtime\\n        runtimeUnit\\n      }\\n      invoice {\\n        id\\n        createDate\\n        uuid\\n        invoiceStatePaths {\\n          invoiceStateId\\n          isCurrent\\n        }\\n      }\\n    }\\n    nextServiceRoundBeginDate\\n    nextArticle {\\n      id\\n      name\\n      articleTypeId\\n      priceNet\\n      priceGross\\n      volumeGb\\n      runtime\\n      runtimeUnit\\n    }\\n  }\\n}\\n\"}");
+        final PostRequest postRequest = br
+                .createJSonPostRequest(
+                        URLHelper.parseLocation(new URL(api_url), "/graphql"),
+                        "{\"operationName\":\"DashboardInformation\",\"variables\":{},\"query\":\"query DashboardInformation {\\n  radiusData {\\n    volume {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n    extraBoost {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  cancellationInformation {\\n    isContractLocked\\n    hasWithdrawableCancellation\\n    isServiceDenied\\n    isInCancellationPeriod\\n    cancellationProcess {\\n      createDate\\n    }\\n  }\\n  currentServiceRoundUpgradeData {\\n    hasPendingUpgrade\\n    isLastUpgrade\\n    accountingPeriod {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  serviceInformation {\\n    currentServiceRound {\\n      currEndDate\\n      startDate\\n      article {\\n        id\\n        name\\n        articleTypeId\\n        priceNet\\n        priceGross\\n        volumeGb\\n        runtime\\n        runtimeUnit\\n      }\\n      invoice {\\n        id\\n        createDate\\n        uuid\\n        invoiceStatePaths {\\n          invoiceStateId\\n          isCurrent\\n        }\\n      }\\n    }\\n    nextServiceRoundBeginDate\\n    nextArticle {\\n      id\\n      name\\n      articleTypeId\\n      priceNet\\n      priceGross\\n      volumeGb\\n      runtime\\n      runtimeUnit\\n    }\\n  }\\n}\\n\"}");
         postRequest.getHeaders().put("x-ui-language", "en-US");
         postRequest.getHeaders().put("Origin", "https://www." + br.getHost());
         br.setCurrentURL("https://www." + br.getHost() + "/");
@@ -151,7 +167,7 @@ public class UsenextCom extends UseNet {
             }
             if (json == null) {
                 logger.info("Performing full login");
-                br.getPage("https://www." + getHost() + "/");
+                br.getPage("https://www." + getHost() + "/signin");
                 String clientID = null;
                 final String buildManifest = br.getRegex("(/_next/static/[^\"]*?buildManifest.js)\"").getMatch(0);
                 if (buildManifest != null) {
@@ -161,7 +177,7 @@ public class UsenextCom extends UseNet {
                     if (signin != null) {
                         brc = br.cloneBrowser();
                         brc.getPage("/_next/" + signin);
-                        clientID = brc.getRegex("a\\s*=\\s*\"([a-f0-9]{32})\"").getMatch(0);
+                        clientID = brc.getRegex("\\w+\\s*=\\s*\"([a-f0-9]{32})\"").getMatch(0);
                     }
                 }
                 if (clientID == null) {
@@ -222,10 +238,10 @@ public class UsenextCom extends UseNet {
     public List<UsenetServer> getAvailableUsenetServer() {
         /* Current list of servers can be found here: https://www.usenext.com/en-US/support -> See "How do I set up my newsreader" */
         final List<UsenetServer> ret = new ArrayList<UsenetServer>();
-        ret.addAll(UsenetServer.createServerList("flat.usenext.de", false, 119, 443));
-        ret.addAll(UsenetServer.createServerList("flat.usenext.de", true, 563));
-        ret.addAll(UsenetServer.createServerList("high.usenext.de", false, 119, 443));
-        ret.addAll(UsenetServer.createServerList("high.usenext.de", true, 563));
+        ret.addAll(UsenetServer.createServerList("flat.usenext.de", false, 119, 443));// speed limited to 2Mbyte/s
+        ret.addAll(UsenetServer.createServerList("flat.usenext.de", true, 563));// speed limited to 2Mbyte/s
+        ret.addAll(UsenetServer.createServerList("high.usenext.de", false, 119, 443));// max speed
+        ret.addAll(UsenetServer.createServerList("high.usenext.de", true, 563));// max speed
         /*
          * 2023-01-04: Moved entries for news.usenext.de to bottom as their FAQ does not list this entry anymore but it still seems to work.
          */

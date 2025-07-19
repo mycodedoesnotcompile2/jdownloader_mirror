@@ -21,6 +21,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -38,17 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51088 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51232 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -159,8 +158,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
-         * website mode.
+         * Some items are only visible for logged in users and are never returned via API. </br>
+         * For this reason, some user may prefer website mode.
          */
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && ACCESS_MODE_AUTO_PREFER_API_MODE)) {
             return crawlTagsPostsAPI(account, param, tags, language);
@@ -228,11 +227,18 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
-        final int maxPage = cfg.getPostTagCrawlerMaxPageLimit();
+        final int maxPageUserLimit = cfg.getPostTagCrawlerMaxPageLimit();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(tags);
         int page = 1;
         final String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>([^<]+)</span>").getMatch(0);
+        final int numberofItems;
+        if (numberofItemsStr == null) {
+            logger.warning("Failed to find expected number of items");
+            numberofItems = -1;
+        } else {
+            numberofItems = Integer.parseInt(numberofItemsStr);
+        }
         final HashSet<String> dupes = new HashSet<String>();
         int position = 1;
         pagination: do {
@@ -274,13 +280,12 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                         link.setComment(tagsCommaSeparated);
                     }
                 }
-                link.setAvailable(true);
+                if (cfg.isCrawlerFastLinkcheckEnabled()) {
+                    link.setAvailable(true);
+                }
                 link._setFilePackage(fp);
                 ret.add(link);
-                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    /* Developers / IDE-only: Do not add links during crawling. */
-                    distribute(link);
-                }
+                distribute(link);
                 position++;
             }
             String nextPageURL = br.getRegex("next-page-url=\"([^\"]+)\"").getMatch(0);
@@ -292,15 +297,18 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 throw new InterruptedException();
-            } else if (page == maxPage) {
-                logger.info("Stopping because: Reached user defined max page limit of " + maxPage);
-                this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPage + "\r\nYou can adjust this limit in the plugin settings.");
+            } else if (page == maxPageUserLimit) {
+                logger.info("Stopping because: Reached user defined max page limit of " + maxPageUserLimit);
+                this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPageUserLimit + "\r\nYou can adjust this limit in the plugin settings.");
                 break pagination;
             } else if (nextPageURL == null) {
                 logger.info("Stopping because: Reached end(?)");
                 break pagination;
             } else if (numberofNewItemsThisPage == 0) {
                 logger.info("Stopping because: Current page contains no new items");
+                break pagination;
+            } else if (numberofItems != -1 && ret.size() >= numberofItems) {
+                logger.info("Stopping because: Found all items -> " + numberofItems);
                 break pagination;
             } else {
                 /* Continue to next page */
@@ -309,11 +317,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 continue pagination;
             }
         } while (true);
-        if (numberofItemsStr != null) {
-            final int numberofItems = Integer.parseInt(numberofItemsStr);
-            if (ret.size() < numberofItems) {
-                this.displayBubbleNotification("Missing items!", "Tags: " + tags + "\r\nSome items look to be missing!\r\nFound only " + ret.size() + "/" + numberofItemsStr + " items");
-            }
+        if (ret.size() < numberofItems) {
+            this.displayBubbleNotification("Missing items!", "Tags: " + tags + "\r\nSome items look to be missing!\r\nFound only " + ret.size() + "/" + numberofItemsStr + " items");
         }
         return ret;
     }
@@ -359,6 +364,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 final DownloadLink link = this.createDownloadlink(generateSinglePostURL(postID, language, tagsUrlEncoded));
                 link.setProperty(SankakucomplexCom.PROPERTY_POSITION_NUMBER, position);
                 SankakucomplexCom.parseFileInfoAndSetFilenameAPI(this, link, post);
+                if (cfg.isCrawlerFastLinkcheckEnabled()) {
+                    link.setAvailable(true);
+                }
                 link._setFilePackage(fp);
                 ret.add(link);
                 distribute(link);
@@ -481,6 +489,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         if (StringUtils.isEmpty(bookTitle)) {
             bookTitle = (String) entries.get("name_ja");
         }
+        final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
         final List<Map<String, Object>> posts = (List<Map<String, Object>>) entries.get("posts");
         int page = 0;
         for (final Map<String, Object> post : posts) {
@@ -489,6 +498,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             link.setProperty(SankakucomplexCom.PROPERTY_PAGE_NUMBER, page);
             link.setProperty(SankakucomplexCom.PROPERTY_PAGE_NUMBER_MAX, posts.size() - 1);
             SankakucomplexCom.parseFileInfoAndSetFilenameAPI(this, link, post);
+            if (cfg.isCrawlerFastLinkcheckEnabled()) {
+                link.setAvailable(true);
+            }
             ret.add(link);
             page++;
         }

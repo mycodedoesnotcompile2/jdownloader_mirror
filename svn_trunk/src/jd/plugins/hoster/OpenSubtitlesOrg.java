@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.config.Order;
@@ -45,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.OpenSubtitlesOrg.OpenSubtitlesConfig.ActionOnCaptchaRequired;
 
-@HostPlugin(revision = "$Revision: 49584 $", interfaceVersion = 2, names = { "opensubtitles.org" }, urls = { "https?://(?:www\\.)?opensubtitles\\.org/([a-z]{2})/subtitles/(\\d+)(/([\\w-]+))?" })
+@HostPlugin(revision = "$Revision: 51232 $", interfaceVersion = 2, names = { "opensubtitles.org" }, urls = { "https?://(?:www\\.)?opensubtitles\\.org/([a-z]{2})/subtitles/(\\d+)(/([\\w-]+))?" })
 public class OpenSubtitlesOrg extends PluginForHost {
     public OpenSubtitlesOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -283,7 +282,6 @@ public class OpenSubtitlesOrg extends PluginForHost {
         @AboutConfig
         @DefaultEnumValue("PROCESS_CAPTCHA")
         @Order(10)
-        @DescriptionForConfigEntry("")
         ActionOnCaptchaRequired getActionOnCaptchaRequired();
 
         void setActionOnCaptchaRequired(final ActionOnCaptchaRequired action);

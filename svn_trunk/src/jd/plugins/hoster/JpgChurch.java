@@ -42,7 +42,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51233 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,7 @@ public class JpgChurch extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
+        ret.add(new String[] { "jpg6.su", "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
         return ret;
     }
 
@@ -114,6 +114,7 @@ public class JpgChurch extends PluginForHost {
         /* 2023-08-14: Main domain changed from jpeg.pet to jpg1.su */
         /* 2023-12-19: Main domain changed from jpg2.su to jpg3.su */
         /* 2024-09-02: Main domain changed from jpg4.su to jpg5.su */
+        /* 2025-07-18: Main domain changed from jpg5.su to jpg6.su (current main) */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

@@ -18,6 +18,10 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Locale;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -36,11 +40,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-
-@HostPlugin(revision = "$Revision: 51231 $", interfaceVersion = 3, names = { "romulation.org" }, urls = { "https?://(?:www\\.)?romulation\\.(?:net|org)/rom/([^/]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 51232 $", interfaceVersion = 3, names = { "romulation.org" }, urls = { "https?://(?:www\\.)?romulation\\.(?:net|org)/rom/([^/]+/[^/]+)" })
 public class RomulationOrg extends PluginForHost {
     public RomulationOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,13 +104,13 @@ public class RomulationOrg extends PluginForHost {
             requestFileInformation(link);
             String dllink = br.getRegex("href=\"([^\"]+)\"[^>]*>\\s*<span class=\"fas fa-download icon-download\"").getMatch(0);
             if (dllink == null) {
-                dllink = br.getRegex("\"(/roms/(?:new)?download/[^/]+/[^<>\"]+)\"").getMatch(0);
+                dllink = br.getRegex("\"(/roms/newdownload/[^/]+/[^\"]+)\"").getMatch(0);
             }
             if (dllink == null) {
                 /* Legacy / backward compatibility for the old website version which they will probably abandon some time in july 2025. */
-                dllink = br.getRegex("lass=\"game\\-header_download\">[\t\n\r ]*?<a href=\"(http[^<>\"]*?)\"").getMatch(0);
+                dllink = br.getRegex("lass=\"game\\-header_download\">\\s*<a href=\"(http[^<>\"]*?)\"").getMatch(0);
                 if (dllink == null) {
-                    dllink = br.getRegex("\"(/roms/download/[^/]+/[^<>\"]+)\"").getMatch(0);
+                    dllink = br.getRegex("\"(/roms/download/[^/]+/[^\"]+)\"").getMatch(0);
                 }
             }
             if (dllink == null) {
@@ -125,7 +125,6 @@ public class RomulationOrg extends PluginForHost {
             } else if (br.containsHTML("Sorry, this game is restricted")) {
                 throw new AccountRequiredException("Sorry, this game is restricted");
             }
-
             final String error_503_text = "Error 503: Only 1 concurrent connection is allowed for guests.";
             if (br.containsHTML(">\\s*Too many active connections")) {
                 /* If the user is using only JD for downloading, this should never happen. */
