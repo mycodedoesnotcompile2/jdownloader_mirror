@@ -14,7 +14,7 @@ import org.jdownloader.gui.views.downloads.columns.ProgressColumn;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.PluginTaskID;
 
-public class ExtractionProgress extends PluginProgress {
+public final class ExtractionProgress extends PluginProgress {
 
     protected long   lastCurrent    = -1;
     protected long   lastTotal      = -1;

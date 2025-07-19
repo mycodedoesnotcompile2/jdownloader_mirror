@@ -7,7 +7,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.PluginTaskID;
 import org.jdownloader.translate._JDT;
 
-public class MovePluginProgress extends PluginProgress {
+public final class MovePluginProgress extends PluginProgress {
 
     private File   file;
     private String msg;
