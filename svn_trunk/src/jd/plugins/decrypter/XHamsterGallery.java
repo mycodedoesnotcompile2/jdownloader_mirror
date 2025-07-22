@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51147 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51235 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,8 +98,11 @@ public class XHamsterGallery extends PluginForDecrypt {
             sb.append("photos/gallery/[0-9A-Za-z_\\-/]+-\\d+");
             sb.append("|my/favorites/videos(?:/[a-f0-9]{24}-[\\w\\-]+)?");
             sb.append("|users/[^/]+/videos");
+            sb.append("|users/[^/]+/shorts");
             sb.append("|users/[^/]+/favorites/videos");
             sb.append("|users/[^/]+/photos");
+            sb.append("|creators/[^/]+/photos");
+            sb.append("|creators/[^/]+/shorts");
             sb.append("|channels/[^/]+");
             sb.append("|(?:[^/]+/)?pornstars/[^/]+");
             sb.append("|(?:[^/]+/)?creators/[^/]+");
@@ -108,14 +112,15 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_PHOTO_GALLERY             = "(?i)https?://[^/]+/photos/gallery/[0-9A-Za-z_\\-/]+-(\\d+)";
-    private static final String TYPE_FAVORITES_OF_CURRENT_USER = "(?i)https?://[^/]+/my/favorites/videos(/[a-f0-9]{24}-([\\w\\-]+))?";
-    private static final String TYPE_VIDEOS_OF_USER            = "(?i)https?://[^/]+/users/([^/]+)/videos";
-    private static final String TYPE_VIDEOS_FAVORITES_OF_USER  = "(?i)https?://[^/]+/users/([^/]+)/favorites/videos";
-    private static final String TYPE_PHOTO_GALLERIES_OF_USER   = "(?i)https?://[^/]+/users/([^/]+)/photos";
-    private static final String TYPE_VIDEOS_OF_CHANNEL         = "(?i)https?://[^/]+/channels/([^/]+)";
-    private static final String TYPE_VIDEOS_OF_USER_PORNSTAR   = "(?i)https?://[^/]+/(?:[^/]+/)?pornstars/([^/]+)";
-    private static final String TYPE_VIDEOS_OF_USER_CREATOR    = "(?i)https?://[^/]+/(?:[^/]+/)?creators/([^/]+)";
+    private static final String TYPE_PHOTO_GALLERY                   = "(?i)https?://[^/]+/photos/gallery/[0-9A-Za-z_\\-/]+-(\\d+)";
+    private static final String TYPE_FAVORITES_OF_CURRENT_USER       = "(?i)https?://[^/]+/my/favorites/videos(/[a-f0-9]{24}-([\\w\\-]+))?";
+    private static final String TYPE_VIDEOS_OF_USER                  = "(?i)https?://[^/]+/users/([^/]+)/videos";
+    private static final String TYPE_VIDEOS_FAVORITES_OF_USER        = "(?i)https?://[^/]+/users/([^/]+)/favorites/videos";
+    private static final String TYPE_PHOTO_GALLERIES_OF_USER_CREATOR = "(?i)https?://[^/]+/(creators|users)/([^/]+)/photos";
+    private static final String TYPE_SHORTS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(creators|users)/([^/]+)/shorts";
+    private static final String TYPE_VIDEOS_OF_CHANNEL               = "(?i)https?://[^/]+/channels/([^/]+)";
+    private static final String TYPE_VIDEOS_OF_USER_PORNSTAR         = "(?i)https?://[^/]+/(?:[^/]+/)?pornstars/([^/]+)";
+    private static final String TYPE_VIDEOS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(?:[^/]+/)?creators/([^/]+)";
 
     public static String buildHostsPatternPart(String[] domains) {
         final StringBuilder pattern = new StringBuilder();
@@ -162,9 +167,12 @@ public class XHamsterGallery extends PluginForDecrypt {
         } else if (param.getCryptedUrl().matches(TYPE_FAVORITES_OF_CURRENT_USER)) {
             /* Crawl users own favorites */
             return this.crawlUserFavorites(param, account);
-        } else if (param.getCryptedUrl().matches(TYPE_PHOTO_GALLERIES_OF_USER)) {
-            /* Crawl all photo galleries of a user --> Goes back into crawler and crawler will crawl the single photos */
-            return crawlAllGalleriesOfUser(param);
+        } else if (param.getCryptedUrl().matches(TYPE_PHOTO_GALLERIES_OF_USER_CREATOR)) {
+            /* Crawl all photo galleries of a user/creator --> Goes back into crawler and crawler will crawl the single photos */
+            return crawlAllGalleriesOfUserOrCreator(param);
+        } else if (param.getCryptedUrl().matches(TYPE_SHORTS_OF_USER_CREATOR)) {
+            /* Crawl all shorts/moments of a user/creator --> Goes back into crawler and crawler will crawl the single photos */
+            return crawlAllShortsOfUserOrCreator(param);
         } else {
             /* Single Photo gallery */
             return this.crawlPhotoGallery(param);
@@ -389,8 +397,42 @@ public class XHamsterGallery extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlAllGalleriesOfUser(final CryptedLink param) throws IOException, PluginException {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_PHOTO_GALLERIES_OF_USER).getMatch(0);
+    private ArrayList<DownloadLink> crawlAllShortsOfUserOrCreator(final CryptedLink param) throws IOException, PluginException {
+        final String username = new Regex(param.getCryptedUrl(), TYPE_SHORTS_OF_USER_CREATOR).getMatch(1);
+        final String type = new Regex(param.getCryptedUrl(), TYPE_SHORTS_OF_USER_CREATOR).getMatch(0);
+        if (username == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String contenturl = XHamsterCom.getCorrectedURL(param.getCryptedUrl());
+        br.getPage(contenturl);
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(username);
+        int page = 1;
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        do {
+            logger.info("Crawling page: " + page);
+            final String[] urls = br.getRegex("(/moments/[a-z0-9-_]+)").getColumn(0);
+            for (String url : new HashSet<String>(Arrays.asList(urls))) {
+                url = br.getURL(url).toString();
+                ret.add(this.createDownloadlink(url));
+            }
+            page++;
+            final String nextpageURL = br.getRegex("(/" + type + "/" + username + "/moments/" + page + ")").getMatch(0);
+            if (nextpageURL != null) {
+                logger.info("Nextpage available: " + nextpageURL);
+                br.getPage(nextpageURL);
+            } else {
+                logger.info("No nextpage available");
+                break;
+            }
+        } while (!this.isAbort());
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> crawlAllGalleriesOfUserOrCreator(final CryptedLink param) throws IOException, PluginException {
+        final String username = new Regex(param.getCryptedUrl(), TYPE_PHOTO_GALLERIES_OF_USER_CREATOR).getMatch(1);
+        final String type = new Regex(param.getCryptedUrl(), TYPE_PHOTO_GALLERIES_OF_USER_CREATOR).getMatch(0);
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -404,12 +446,12 @@ public class XHamsterGallery extends PluginForDecrypt {
         do {
             logger.info("Crawling page: " + page);
             final String[] urls = br.getRegex("(/photos/gallery/[a-z0-9\\-]+-\\d+)").getColumn(0);
-            for (String url : urls) {
+            for (String url : new HashSet<String>(Arrays.asList(urls))) {
                 url = br.getURL(url).toString();
                 ret.add(this.createDownloadlink(url));
             }
             page++;
-            final String nextpageURL = br.getRegex("(/users/" + username + "/photos/" + page + ")").getMatch(0);
+            final String nextpageURL = br.getRegex("(/" + type + "/" + username + "/photos/" + page + ")").getMatch(0);
             if (nextpageURL != null) {
                 logger.info("Nextpage available: " + nextpageURL);
                 br.getPage(nextpageURL);

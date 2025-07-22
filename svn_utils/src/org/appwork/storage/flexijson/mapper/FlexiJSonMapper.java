@@ -1994,7 +1994,11 @@ public class FlexiJSonMapper {
                     }
                     i++;
                 }
+                JSPath refRoot = getReferenceRoot();
                 JSPath me = valuePath;
+                if (refRoot != null) {
+                    me = refRoot.append(me);
+                }
                 ArrayList<Object> add = new ArrayList<Object>();
                 if (foundWildcardAt >= 0) {
                     for (i = backToWildcard.size() - 1; i > foundWildcardAt; i--) {
@@ -2022,7 +2026,11 @@ public class FlexiJSonMapper {
                     if (!matches) {
                         throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Path not found: " + path, null);
                     }
-                    base = base.resolvePath(mustMatchWildCards);
+                    if (refRoot != null) {
+                        base = base.resolvePath(mustMatchWildCards.subPath(refRoot.size(), mustMatchWildCards.size()));
+                    } else {
+                        base = base.resolvePath(mustMatchWildCards);
+                    }
                     jsPath = JSPath.fromPathElements(add);
                 }
                 if (base == null) {
@@ -2054,6 +2062,13 @@ public class FlexiJSonMapper {
                 return onUnresolvableReference(path);
             }
         }
+        return null;
+    }
+
+    /**
+     * @return
+     */
+    public JSPath getReferenceRoot() {
         return null;
     }
 

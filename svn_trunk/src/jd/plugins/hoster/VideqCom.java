@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51195 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51235 $", interfaceVersion = 3, names = {}, urls = {})
 public class VideqCom extends PluginForHost {
     public VideqCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class VideqCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "videq.com", "videq.dev", "videq.co", "videym.pro" });
+        ret.add(new String[] { "videq.com", "videq.dev", "videq.co", "videym.pro", "videq.mom" });
         return ret;
     }
 

@@ -63,7 +63,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51173 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51235 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -712,7 +712,10 @@ public class FileCryptCc extends PluginForDecrypt {
         } else if (first_rd != null && !first_rd.matches(".*" + domainPattern + "/.*")) {
             finallink = first_rd;
         } else {
-            final String nextlink = br.getRegex("(\"|')(https?://[^/]+/index\\.php\\?Action=(G|g)o[^<>\"']+)").getMatch(1);
+            String nextlink = br.getRegex("(\"|')(https?://[^/]+/index\\.php\\?Action=(G|g)o[^<>\"']+)").getMatch(1);
+            if (nextlink == null) {
+                nextlink = br.getRegex("(\"|')(https?://[^/]+/Go/[^<>\"']+)").getMatch(1);
+            }
             if (nextlink != null) {
                 return handleLink(br, param, nextlink, round + 1);
             }
