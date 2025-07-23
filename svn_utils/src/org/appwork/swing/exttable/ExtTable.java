@@ -97,6 +97,7 @@ import org.appwork.swing.exttable.columnmenu.SearchContextAction;
 import org.appwork.swing.exttable.columns.CellHeightProvider;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
@@ -270,16 +271,29 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                     if (ExtTable.this.getTableHeader().getCursor().getType() == Cursor.getDefaultCursor().getType()) {
                         for (final MouseListener ms : ExtTable.this.getTableHeader().getMouseListeners()) {
                             if (ms instanceof javax.swing.plaf.basic.BasicTableHeaderUI.MouseInputHandler) {
-                                // ((javax.swing.plaf.basic.BasicTableHeaderUI.MouseInputHandler)ms).
-                                Field field;
-                                field = javax.swing.plaf.basic.BasicTableHeaderUI.MouseInputHandler.class.getDeclaredField("otherCursor");
-                                field.setAccessible(true);
-                                field.set(ms, Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR));
+                                // java.lang.reflect.InaccessibleObjectException: Unable to make field private java.awt.Cursor
+                                // javax.swing.plaf.basic.BasicTableHeaderUI$MouseInputHandler.otherCursor accessible: module java.desktop
+                                // does not "opens javax.swing.plaf.basic" to unnamed module @5677323c
+                                // at
+                                // java.base/java.lang.reflect.AccessibleObject.throwInaccessibleObjectException(AccessibleObject.java:391)
+                                // at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:367)
+                                // at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:315)
+                                // at java.base/java.lang.reflect.Field.checkCanSetAccessible(Field.java:183)
+                                // at java.base/java.lang.reflect.Field.setAccessible(Field.java:177)
+                                // at org.appwork.swing.exttable.ExtTable$3.mouseReleased(ExtTable.java:276)
+                                if (JavaVersion.getVersion().isLowerThan(JavaVersion.JVM_16_0)) {
+                                    Field field;
+                                    field = javax.swing.plaf.basic.BasicTableHeaderUI.MouseInputHandler.class.getDeclaredField("otherCursor");
+                                    field.setAccessible(true);
+                                    field.set(ms, Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR));
+                                } else {
+                                    // todo...
+                                }
                             }
                         }
                     }
                 } catch (final Throwable e1) {
-                    e1.printStackTrace();
+                    org.appwork.loggingv3.LogV3.log(e1);
                 }
                 // BasicTableHeaderUI.class.getField(name)
                 // ((BasicTableHeaderUI) getTableHeader())

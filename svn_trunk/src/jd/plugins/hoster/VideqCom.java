@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51235 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51238 $", interfaceVersion = 3, names = {}, urls = {})
 public class VideqCom extends PluginForHost {
     public VideqCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class VideqCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "videq.com", "videq.dev", "videq.co", "videym.pro", "videq.mom" });
+        ret.add(new String[] { "videq.com", "videq.dev", "videq.co", "videym.pro", "videq.mom", "luluv.do" });
         return ret;
     }
 
@@ -140,7 +140,14 @@ public class VideqCom extends PluginForHost {
         requestFileInformation(link);
         final String fid = this.getFID(link);
         br.getPage("https://poophd.video-src.com/vplayer?id=" + fid);
-        final String dllink = br.getRegex("\"l\",\\s*\"(https?:/[^\"]+)").getMatch(0);
+        String dllink = br.getRegex("\"l\",\\s*\"(https?:/[^\"]+)").getMatch(0);
+        if (dllink == null) {
+            /* New 2025-07-22 */
+            final String key = br.getRegex("objectKey: \"([^\"]+)").getMatch(0);
+            if (key != null) {
+                dllink = "https://img.video-src.com/" + key;
+            }
+        }
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

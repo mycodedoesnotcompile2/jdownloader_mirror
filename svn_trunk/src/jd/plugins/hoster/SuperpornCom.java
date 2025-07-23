@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51239 $", interfaceVersion = 3, names = {}, urls = {})
 public class SuperpornCom extends PluginForHost {
     public SuperpornCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,7 @@ public class SuperpornCom extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern TYPE_NORMAL       = Pattern.compile("/video/([\\w-]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_NORMAL       = Pattern.compile("/(?:[a-z]{2}/)?video/([\\w-]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_EMBED        = Pattern.compile("/embed/(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final String  INTERNAL_VIDEO_ID = "internal_video_id";
 
