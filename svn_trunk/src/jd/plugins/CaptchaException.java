@@ -4,7 +4,7 @@ import jd.controlling.captcha.SkipRequest;
 
 import org.jdownloader.captcha.blacklist.BlacklistEntry;
 
-public class CaptchaException extends PluginException {
+public final class CaptchaException extends PluginException {
     private final SkipRequest    skipRequest;
     private final BlacklistEntry blackListEntry;
 

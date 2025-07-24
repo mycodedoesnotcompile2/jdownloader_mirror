@@ -1,6 +1,6 @@
 package jd.plugins;
 
-public class AccountRequiredException extends PluginException {
+public final class AccountRequiredException extends PluginException {
 
     /**
      *

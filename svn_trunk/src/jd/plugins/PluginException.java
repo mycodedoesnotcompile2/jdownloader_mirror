@@ -17,7 +17,14 @@ package jd.plugins;
 
 import org.appwork.utils.StringUtils;
 
-public class PluginException extends Exception {
+public sealed class PluginException extends Exception
+    permits jd.plugins.AccountInvalidException,
+            jd.plugins.AccountRequiredException,
+            jd.plugins.AccountUnavailableException,
+            jd.plugins.CaptchaException,
+            jd.plugins.CountryIPBlockException,
+            jd.plugins.WrongPasswordException,
+            jd.plugins.hoster.DailyMotionComV2.NoAudioException {
     private static final long serialVersionUID              = -413339039711789194L;
     /* do not use final, as the compiler will replace Reference with value, no more Exceptions but broken ErrorHandling in stable */
     public static int         VALUE_ID_PREMIUM_TEMP_DISABLE = 0;

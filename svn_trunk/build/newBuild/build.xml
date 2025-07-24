@@ -45,8 +45,8 @@
 
 	<!-- Compiles the code -->
 	<target name="compile" depends="clean">
-		<property name="jvm_target" value="1.6" />
-		<property name="jvm_source" value="1.6" />
+                <property name="jvm_target" value="1.8" />
+                <property name="jvm_source" value="1.8" />
 		<mkdir dir="${cls}" />
 
 		<!-- Build dependencies -->

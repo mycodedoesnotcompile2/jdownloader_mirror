@@ -2,7 +2,7 @@ package jd.plugins;
 
 import org.jdownloader.translate._JDT;
 
-public class WrongPasswordException extends PluginException {
+public final class WrongPasswordException extends PluginException {
     /*
      * This is just an idea for the ability to add the type of password in order to have nicer UI translation such as
      * "Wrong folder password" or "Wrong decryption key".

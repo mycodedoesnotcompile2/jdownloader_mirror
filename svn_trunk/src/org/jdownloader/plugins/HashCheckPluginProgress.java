@@ -12,7 +12,7 @@ import org.jdownloader.gui.views.downloads.columns.ETAColumn;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.translate._JDT;
 
-public class HashCheckPluginProgress extends PluginProgress {
+public final class HashCheckPluginProgress extends PluginProgress {
     private final String message;
     private long         lastCurrent    = -1;
     private long         startTimeStamp = -1;

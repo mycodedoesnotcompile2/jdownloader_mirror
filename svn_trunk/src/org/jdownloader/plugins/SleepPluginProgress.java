@@ -8,7 +8,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.translate._JDT;
 
-public class SleepPluginProgress extends PluginProgress {
+public final class SleepPluginProgress extends PluginProgress {
     /**
      *
      */

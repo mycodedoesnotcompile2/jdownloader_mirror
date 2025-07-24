@@ -25,7 +25,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.tasks.PluginProgressTask;
 import org.jdownloader.translate._JDT;
 
-public class DownloadPluginProgress extends PluginProgress {
+public final class DownloadPluginProgress extends PluginProgress {
     private final DownloadInterface downloadInterface;
     private final String            unknownFileSize = _JDT.T.gui_download_filesize_unknown() + " \u221E";
     protected final long            startTimeStamp;
