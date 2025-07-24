@@ -26,6 +26,36 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -61,37 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
-
-@HostPlugin(revision = "$Revision: 51213 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51241 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -465,8 +465,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * <b> Enabling this will eventually lead to at least one additional website-request! </b> <br/>
      * DO NOT CALL THIS DIRECTLY - ALWAYS USE {@link #internal_supports_availablecheck_filename_abuse()}!!<br />
      *
-     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing.
-     *         <br />
+     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing. <br />
      *         false: Implies that website does NOT support {@link #getFnameViaAbuseLink()}. <br />
      *         default: true
      */
@@ -499,8 +498,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br />
      * CAUTION: Only set this to true if a filehost: <br />
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br />
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
-     * <br />
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br />
      * 3. Allows a lot of simultaneous connections. <br />
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br />
      * 5. Allows using a generated direct-URL at least two times.
@@ -2165,8 +2163,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br />
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br />
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
-     * it)!<br />
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br />
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br/>
      *
@@ -2424,15 +2421,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         qualityMap.put("x", 100); // download/original
         long maxInternalQualityValue = 0;
         String filesizeStr = null;
-        String videoQualityStr = null;
+        String chosenVideoQualityStr = null;
         String videoHash = null;
         String targetHTML = null;
-        final String userSelectedQualityValue = getPreferredDownloadQualityStr();
+        final String userSelectedQualityStr = getPreferredDownloadQualityStr();
         boolean foundUserSelectedQuality = false;
-        if (userSelectedQualityValue == null) {
+        if (userSelectedQualityStr == null) {
             logger.info("Trying to find highest quality for official video download");
         } else {
-            logger.info(String.format("Trying to find user selected quality %s for official video download", userSelectedQualityValue));
+            logger.info(String.format("Trying to find user selected quality %s for official video download", userSelectedQualityStr));
         }
         int selectedQualityIndex = 0;
         for (int currentQualityIndex = 0; currentQualityIndex < videoQualityHTMLs.length; currentQualityIndex++) {
@@ -2442,26 +2439,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             final Regex videoinfo = new Regex(videoQualityHTML, "download_video\\('([a-z0-9]+)','([^<>\"\\']*)','([^<>\"\\']*)'");
             // final String vid = videoinfo.getMatch(0);
             /* Usually this will be 'o' standing for "original quality" */
-            final String videoQualityStrTmp = videoinfo.getMatch(1);
+            final String videoQualityStr = videoinfo.getMatch(1);
             final String videoHashTmp = videoinfo.getMatch(2);
-            if (StringUtils.isEmpty(videoQualityStrTmp) || StringUtils.isEmpty(videoHashTmp)) {
+            if (StringUtils.isEmpty(videoQualityStr) || StringUtils.isEmpty(videoHashTmp)) {
                 /*
                  * Possible plugin failure but let's skip bad items. Upper handling will fallback to stream download if everything fails!
                  */
                 logger.warning("Found unidentifyable video quality");
                 continue;
-            } else if (!qualityMap.containsKey(videoQualityStrTmp)) {
+            } else if (!qualityMap.containsKey(videoQualityStr)) {
                 /*
                  * 2020-01-18: There shouldn't be any unknown values but we should consider allowing such in the future maybe as final
                  * fallback.
                  */
-                logger.info("Skipping unknown quality: " + videoQualityStrTmp);
+                logger.info("Skipping unknown quality: " + videoQualityStr);
                 continue;
             }
-            if (userSelectedQualityValue != null && videoQualityStrTmp.equalsIgnoreCase(userSelectedQualityValue)) {
-                logger.info("Found user selected quality: " + userSelectedQualityValue);
+            final int internalQualityValue = qualityMap.get(videoQualityStr);
+            if (userSelectedQualityStr != null && videoQualityStr.equalsIgnoreCase(userSelectedQualityStr)) {
+                logger.info("Found user selected quality: " + userSelectedQualityStr);
                 foundUserSelectedQuality = true;
-                videoQualityStr = videoQualityStrTmp;
+                chosenVideoQualityStr = videoQualityStr;
                 videoHash = videoHashTmp;
                 if (filesizeStrTmp != null) {
                     /*
@@ -2475,13 +2473,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 break;
             } else {
                 /* Look for best quality */
-                final int internalQualityValueTmp = qualityMap.get(videoQualityStrTmp);
-                if (internalQualityValueTmp < maxInternalQualityValue) {
+                if (internalQualityValue < maxInternalQualityValue) {
                     /* Only continue with qualities that are higher than the highest we found so far. */
                     continue;
                 }
-                maxInternalQualityValue = internalQualityValueTmp;
-                videoQualityStr = videoQualityStrTmp;
+                maxInternalQualityValue = internalQualityValue;
+                chosenVideoQualityStr = videoQualityStr;
                 videoHash = videoHashTmp;
                 if (filesizeStrTmp != null) {
                     /*
@@ -2494,7 +2491,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 selectedQualityIndex = currentQualityIndex;
             }
         }
-        if (targetHTML == null || videoQualityStr == null || videoHash == null) {
+        if (targetHTML == null || chosenVideoQualityStr == null || videoHash == null) {
             if (videoQualityHTMLs != null && videoQualityHTMLs.length > 0) {
                 /* This should never happen */
                 logger.info(String.format("Failed to find officially downloadable video quality although there are %d qualities available", videoQualityHTMLs.length));
@@ -2513,9 +2510,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
         }
         if (foundUserSelectedQuality) {
-            logger.info("Found user selected quality: " + userSelectedQualityValue);
+            logger.info("Found user selected quality: " + userSelectedQualityStr);
         } else {
-            logger.info("Picked BEST quality: " + videoQualityStr);
+            logger.info("Picked BEST quality: " + chosenVideoQualityStr);
         }
         if (filesizeStr == null) {
             /* No dramatic failure */
@@ -2536,7 +2533,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * This issue may have solved in newer XFS versions so we might be able to remove this extra wait in the long run.
          */
         this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
-        getPage(br, "/dl?op=download_orig&id=" + this.getFUIDFromURL(link) + "&mode=" + videoQualityStr + "&hash=" + videoHash);
+        getPage(br, "/dl?op=download_orig&id=" + this.getFUIDFromURL(link) + "&mode=" + chosenVideoQualityStr + "&hash=" + videoHash);
         /* 2019-08-29: This Form may sometimes be given e.g. deltabit.co */
         final Form download1 = br.getFormByInputFieldKeyValue("op", "download1");
         if (download1 != null) {
@@ -2734,8 +2731,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
-     * <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -4582,8 +4578,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
-     * installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
      * apikey will usually be located here: "/?op=my_account"
@@ -4772,8 +4767,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available
-                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
+                 * data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = SizeFormatter.getSize(trafficDetails[0]);
                 final long max = SizeFormatter.getSize(trafficDetails[1]);
@@ -4784,8 +4779,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
-             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
+             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);
@@ -5428,7 +5423,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         this.tryDownload(br, link, account, br.createGetRequest(finalDownloadlink), DOWNLOAD_ATTEMPT_FLAGS.DOWNLOAD_OR_EXCEPTION);
     }
 
-    /** Returns user selected streaming quality. Returns BEST by default / no selection. */
     protected String handleQualitySelectionHLS(final Browser br, final String hlsMaster) throws Exception {
         if (hlsMaster == null) {
             /* This should never happen */
@@ -5458,8 +5452,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
             }
             if (hlsSelected == null) {
-                logger.info("Failed to find user selected quality --> Returning BEST instead");
-                hlsSelected = HlsContainer.findBestVideoByBandwidth(hlsQualities);
+                logger.info("Failed to find user selected quality --> Finding next best quality");
+                hlsSelected = HlsContainer.findBestTargetHeight(hlsQualities, userSelectedQuality);
             }
         }
         logger.info(String.format("Picked stream quality = %sp", hlsSelected.getHeight()));

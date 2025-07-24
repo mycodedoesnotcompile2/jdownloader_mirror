@@ -7,15 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
+import jd.plugins.hoster.GenericM3u8;
+
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.logging.LogController;
-
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.plugins.hoster.GenericM3u8;
 
 public class HlsContainer {
     public static List<HlsContainer> findBestVideosByBandwidth(final List<HlsContainer> media) {
@@ -43,6 +43,37 @@ public class HlsContainer {
             }
         }
         return ret;
+    }
+
+    public static HlsContainer findBestTargetHeight(final List<HlsContainer> media, final int targetHeight) {
+        if (media == null || media.size() == 0) {
+            return null;
+        }
+        // Find next best quality >= targetHeight
+        HlsContainer best = null;
+        for (HlsContainer next : media) {
+            if (next.getHeight() >= targetHeight) {
+                if (best == null) {
+                    // first quality >= tartgetHeight
+                    best = next;
+                } else if (Math.abs(next.getHeight() - targetHeight) < Math.abs(best.getHeight() - targetHeight)) {
+                    // next has smaller distance to targetHeight than best
+                    best = next;
+                } else if (Math.abs(next.getHeight() - targetHeight) == Math.abs(best.getHeight() - targetHeight)) {
+                    // next has same distance to targetHeight as best, now choose best bandwidth;
+                    final int nextBW = Math.max(next.getBandwidth(), next.getAverageBandwidth());
+                    final int bestBW = Math.max(best.getBandwidth(), best.getAverageBandwidth());
+                    if (nextBW > bestBW) {
+                        best = next;
+                    }
+                }
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        // If no higher quality found, return the highest available (should be <targetHeight)
+        return HlsContainer.findBestVideoByBandwidth(media);
     }
 
     public static HlsContainer findBestVideoByBandwidth(final List<HlsContainer> media) {

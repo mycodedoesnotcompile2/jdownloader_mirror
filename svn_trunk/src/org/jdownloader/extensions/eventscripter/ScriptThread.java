@@ -24,8 +24,10 @@ import net.sourceforge.htmlunit.corejs.javascript.Context;
 import net.sourceforge.htmlunit.corejs.javascript.EcmaError;
 import net.sourceforge.htmlunit.corejs.javascript.NativeJavaMethod;
 import net.sourceforge.htmlunit.corejs.javascript.ScriptRuntime;
+import net.sourceforge.htmlunit.corejs.javascript.Scriptable;
 import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
 import net.sourceforge.htmlunit.corejs.javascript.UniqueTag;
+import net.sourceforge.htmlunit.corejs.javascript.WrapFactory;
 import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
 
 import org.appwork.exceptions.WTFException;
@@ -177,15 +179,28 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
         }
     }
 
+    protected void initContext(Context context) {
+        cx.setOptimizationLevel(-1);
+        cx.setLanguageVersion(Context.VERSION_1_5);
+        cx.setWrapFactory(new WrapFactory() {
+            @Override
+            public Scriptable wrapAsJavaObject(Context cx, Scriptable scope, Object javaObject, Class<?> staticType) {
+                if (javaObject instanceof Map) {
+                    return new NativeJavaMapWrapper(scope, javaObject);
+                } else {
+                    return super.wrapAsJavaObject(cx, scope, javaObject, staticType);
+                }
+            }
+        });
+    }
+
     private synchronized void executeScipt() {
         scope = new Global();
         cx = Context.enter();
         try {
-            cx.setOptimizationLevel(-1);
+            initContext(cx);
             scope.init(cx);
-            cx.setOptimizationLevel(-1);
-            cx.setLanguageVersion(Context.VERSION_1_5);
-            String preloadClasses = preInitClasses();
+            final String preloadClasses = preInitClasses();
             evalTrusted(preloadClasses);
             // required by some libraries
             evalTrusted("global=this;");
@@ -247,7 +262,7 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
 
     private List<Class<?>> visibleClasses = null;
 
-    private String preInitClasses() {
+    protected String preInitClasses() {
         final HashSet<String> dupes = new HashSet<String>();
         final HashSet<Class<?>> visibleClasses = new HashSet<Class<?>>();
         dupes.add("net.sourceforge.htmlunit.corejs.javascript.Function");

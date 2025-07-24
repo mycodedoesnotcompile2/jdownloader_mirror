@@ -15,7 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,14 +23,10 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -41,7 +36,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51209 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51241 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,6 +51,12 @@ public class LixstreamCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal("lixstreamingcaio.com", 250);
     }
 
     @Override
@@ -71,7 +78,7 @@ public class LixstreamCom extends PluginForHost {
          * Current list of domains can be found here: https://lixstream.com/#/file -> Select an uploaded file -> Share -> Dialog pops up ->
          * See "Choose domain"
          */
-        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "doodmv.com", "doodmv.net", "doodtv.net", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net" });
+        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "doodmv.com", "doodmv.net", "doodtv.net", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net", "videb.org" });
         return ret;
     }
 
@@ -132,15 +139,31 @@ public class LixstreamCom extends PluginForHost {
         return fid + ext_default;
     }
 
+    private void getPage(final DownloadLink link, Browser br, Request request) throws Exception {
+        int round = 0;
+        while (true) {
+            final URLConnectionAdapter con = br.openRequestConnection(request);
+            if (con.getResponseCode() == 400 && round++ < 5) {
+                br.followConnection(true);
+                sleep(150, link);
+                request = request.cloneRequest();
+            } else {
+                br.followConnection();
+                break;
+            }
+        }
+    }
+
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         dllink = null;
         final String fid = this.getFID(link);
         this.setBrowserExclusive();
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("Referer", link.getPluginPatternMatcher());
-        brc.getHeaders().put("Content-Type", "application/json");
-        brc.postPage("https://api.lixstreamingcaio.com/v2/s/home/resources/" + fid, "");
+        Request request = brc.createPostRequest("https://api.lixstreamingcaio.com/v2/s/home/resources/" + fid, "");
+        request.getHeaders().put("Content-Type", "application/json");
+        getPage(link, brc, request);
         if (brc.getHttpConnection().getResponseCode() == 400) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server issues (error 400)", 15 * 60 * 1000l);
         } else if (brc.getHttpConnection().getResponseCode() == 404) {
@@ -158,40 +181,43 @@ public class LixstreamCom extends PluginForHost {
         filename = filename.replaceFirst("(?i)\\.m3u8$", "");
         filename = this.correctOrApplyFileNameExtension(filename, ext_default, null);
         link.setFinalFileName(filename);
-        if (filesize != null) {
-            /*
-             * Set file size here before obtaining stream-downloadlink down below so that in case an exception happens down below, it is
-             * thrown.
-             */
-            link.setDownloadSize(filesize.longValue());
-        }
-        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
-            final String internal_file_id = fileinfo.get("id").toString();
-            final String url_thumbnail = fileinfo.get("thumbnail").toString();
-            if (internal_file_id == null || url_thumbnail == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        Boolean isProgressiveVideoStreamDownload = null;
+        try {
+            if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+                final String internal_file_id = fileinfo.get("id").toString();
+                final String url_thumbnail = fileinfo.get("thumbnail").toString();
+                if (internal_file_id == null || url_thumbnail == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final String uid = new Regex(url_thumbnail, "(?i)xbox-streaming/(\\d+)").getMatch(0);
+                if (uid == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                request = brc.createRequest("/v2/s/assets/f?id=" + internal_file_id + "&uid=" + uid);
+                request.getHeaders().put("Content-Type", "application/json");
+                getPage(link, brc, request);
+                final Map<String, Object> downloadinfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String encrypted_downloadurl = downloadinfo.get("url").toString();
+                try {
+                    final byte[] crypted = Base64.decode(encrypted_downloadurl);
+                    final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                    cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec("GNgN1lHXIFCQd8hSEZIeqozKInQTFNXj".getBytes("UTF-8"), "AES"), new IvParameterSpec("2Xk4dLo38c9Z2Q2a".getBytes("UTF-8")));
+                    byte[] plain = cipher.doFinal(crypted);
+                    dllink = new String(plain, "UTF-8");
+                    isProgressiveVideoStreamDownload = StringUtils.endsWithCaseInsensitive(dllink, ".mp4");
+                    link.setResumeable(isProgressiveVideoStreamDownload);
+                } catch (Exception e) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+                }
             }
-            final String uid = new Regex(url_thumbnail, "(?i)xbox-streaming/(\\d+)").getMatch(0);
-            if (uid == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            brc.getPage("/v2/s/assets/f?id=" + internal_file_id + "&uid=" + uid);
-            final Map<String, Object> downloadinfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String encrypted_downloadurl = downloadinfo.get("url").toString();
-            try {
-                final byte[] crypted = Base64.decode(encrypted_downloadurl);
-                final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-                cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec("GNgN1lHXIFCQd8hSEZIeqozKInQTFNXj".getBytes("UTF-8"), "AES"), new IvParameterSpec("2Xk4dLo38c9Z2Q2a".getBytes("UTF-8")));
-                byte[] plain = cipher.doFinal(crypted);
-                dllink = new String(plain, "UTF-8");
-                final boolean isProgressiveVideoStreamDownload = StringUtils.endsWithCaseInsensitive(dllink, ".mp4");
-                link.setResumeable(isProgressiveVideoStreamDownload);
-                if (filesize != null && isProgressiveVideoStreamDownload) {
+        } finally {
+            if (filesize != null) {
+                if (Boolean.TRUE.equals(isProgressiveVideoStreamDownload)) {
                     /* Progressive video stream download -> We know the expected file size 100% -> Set verified filesize */
                     link.setVerifiedFileSize(filesize.longValue());
+                } else {
+                    link.setDownloadSize(filesize.longValue());
                 }
-            } catch (Exception e) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
             }
         }
         return AvailableStatus.TRUE;

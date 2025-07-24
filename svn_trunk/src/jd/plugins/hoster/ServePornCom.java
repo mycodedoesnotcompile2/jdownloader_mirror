@@ -15,6 +15,9 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -26,12 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 47486 $", interfaceVersion = 2, names = { "serveporn.com", "serviporno.com", "heureporno.com", "seansporno.com", "koloporno.com", "einfachporno.com", "vielerporno.com", "pornozot.com", "voglioporno.com", "pornodoido.com", "bubbaporn.com", "pornodrome.tv", "nedporno.com", "filmikiporno.tv", "pornjam.com", "canalporno.com", "prendiporno.com", "prendiporno.tv", "guterporn.com", "guterporn.xxx", "pornalia.xxx", "bundesporno.xxx", "hierporno.com", "pornburst.xxx", "gauleporno.xxx", "muchoporno.xxx", "pornoheit.com", "drpornofilme.com", "garotaporno.com" }, urls = { "https?://(?:www\\.)?serveporn.com\\.com/videos/[a-z0-9\\-_]+/", "https?://(?:www\\.)?serviporno\\.com/videos?/[a-z0-9\\-_]+/", "https?://(?:www\\.)?heureporno\\.com/videos?/[a-z0-9\\-_]+/", "https?://(?:www\\.)?seansporno\\.com/filmy/[a-z0-9\\-_]+/",
-        "https?://(?:www\\.)?koloporno\\.com/filmy/[a-z0-9\\-_]+/", "https?://(?:www\\.)?(?:einfachporno\\.com|pornomenge\\.com)/filme/[a-z0-9\\-_]+/", "https?://(?:www\\.)?vielerporno\\.com/filme/[a-z0-9\\-_]+/", "https?://(?:www\\.)?pornozot\\.com/films/[a-z0-9\\-_]+/", "https?://(?:www\\.)?voglioporno\\.com/video/[a-z0-9\\-_]+/", "https?://(?:www\\.)?pornodoido\\.com/video/[a-z0-9\\-_]+/", "https?://(?:www\\.)?bubbaporn\\.com/videos?/[a-z0-9\\-_]+/", "https?://(?:www\\.)?pornodrome\\.tv/videos?/[a-z0-9\\-_]+/", "https?://(?:www\\.)?nedporno\\.com/films/[a-z0-9\\-_]+/", "https?://(?:www\\.)?filmikiporno\\.tv/filmy/[a-z0-9\\-_]+/", "https?://(?:www\\.)?pornjam\\.com/video/[a-z0-9\\-_]+/", "https?://(?:www\\.)?canalporno\\.com/ver/[a-z0-9\\-_]+/", "https?://(?:www\\.)?prendiporno\\.com/video/[a-z0-9\\-_]+/", "https?://(?:www\\.)?prendiporno\\.tv/video/[a-z0-9\\-_]+/",
-        "https?://(?:www\\.)?guterporn\\.com/filme/[a-z0-9\\-_]+/", "https?://(?:www\\.)?guterporn\\.xxx/filme/[a-z0-9\\-_]+/", "https?://(?:www\\.)?pornalia\\.xxx/video/[a-z0-9\\-_]+/", "https?://(?:www\\.)?bundesporno\\.(?:xxx|com)/filme/[a-z0-9\\-_]+/", "https?://(?:www\\.)?hierporno\\.(?:xxx|com)/filme/[a-z0-9\\-_]+/", "https?://(?:www\\.)?pornburst\\.xxx/videos?/[a-z0-9\\-_]+/", "https?://(?:www\\.)?gauleporno\\.xxx/(?:videos/|video-|filme/)[a-z0-9\\-_]+/", "https?://(?:www\\.)?muchoporno\\.xxx/(?:videos|ver)/[a-z0-9\\-_]+/", "https?://(?:www\\.)?pornoheit\\.com/filme/[^/]+/", "https?://(?:www\\.)?drpornofilme\\.com/filme/[^/]+/", "https?://(?:www\\.)?garotaporno\\.com/video(s?/|-)[a-z0-9\\-_]+/" })
+@HostPlugin(revision = "$Revision: 51240 $", interfaceVersion = 2, names = { "drpornofilme.com", "filmikiporno.tv", "heureporno.com", "muchoporno.xxx", "pornodoido.com", "serviporno.com" }, urls = { "https?://(?:www\\.)?drpornofilme\\.com/filme/[^/]+/", "https?://(?:www\\.)?filmikiporno\\.tv/filmy/[a-z0-9-_]+/", "https?://(?:www\\.)?heureporno\\.com/videos?/[a-z0-9-_]+/", "https?://(?:www\\.)?muchoporno\\.xxx/(?:videos|ver)/[a-z0-9-_]+/", "https?://(?:www\\.)?pornodoido\\.com/video/[a-z0-9\\-_]+/", "https?://(?:www\\.)?serviporno\\.com/videos?/[a-z0-9\\-_]+/" })
 public class ServePornCom extends antiDDoSForHost {
     public ServePornCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,11 +45,6 @@ public class ServePornCom extends antiDDoSForHost {
         if ("muchoporno.xxx".equals(this.getHost())) {
             // spanish to english.
             link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("/ver/", "/videos/"));
-        } else if ("einfachporno.com".equals(this.getHost())) {
-            // new domain
-            link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("einfachporno.com/", "pornomenge.com/"));
-        } else if ("vielerporno.com".equals(this.getHost())) {
-            link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("vielerporno.com/", "pornomenge.com/"));
         }
     }
 
@@ -65,7 +58,7 @@ public class ServePornCom extends antiDDoSForHost {
          * 2016-07-22: Plugins' main domain serveporn.com redirects to bubbaporn.com - we don't care and leave it in in case they
          * re-activate it
          */
-        return "http://www.bubbaporn.com/disclamer/";
+        return "https://" + getHost() + "/disclamer/";
     }
 
     @Override
@@ -142,7 +135,7 @@ public class ServePornCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -5,7 +5,7 @@ import net.sourceforge.htmlunit.corejs.javascript.Function;
 
 public class ScriptReferenceThread extends Thread {
 
-    private ScriptThread scriptThread;
+    private final ScriptThread scriptThread;
 
     public ScriptThread getScriptThread() {
         return scriptThread;
@@ -16,8 +16,9 @@ public class ScriptReferenceThread extends Thread {
     }
 
     public void executeCallback(Function callback, Object... params) {
-        Context cx = Context.enter();
+        final Context cx = Context.enter();
         try {
+            scriptThread.initContext(cx);
             callback.call(cx, getScriptThread().getScope(), getScriptThread().getScope(), params);
         } finally {
             Context.exit();
