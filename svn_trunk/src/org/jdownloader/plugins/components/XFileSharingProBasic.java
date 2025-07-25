@@ -91,7 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 51241 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51249 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1062,27 +1062,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-        try {
-            /* Check if response is plaintext and contains any known error messages. */
-            final byte[] probe = urlConnection.peek(32);
-            if (probe.length > 0) {
-                final String probeContext = new String(probe, "UTF-8");
-                final Request clone = urlConnection.getRequest().cloneRequest();
-                clone.setHtmlCode(probeContext);
-                final Browser br = createNewBrowserInstance();
-                br.setRequest(clone);
-                try {
-                    // TODO: extract the html checks into own method to avoid Browser instance
-                    checkServerErrors(br, getDownloadLink(), null);
-                } catch (PluginException e) {
-                    logger.log(e);
-                    return false;
-                }
+    try {
+        /* Check if response is plaintext and contains any known error messages. */
+        final byte[] probe = urlConnection.peek(32);
+        if (probe.length > 0) {
+            final String probeContext = new String(probe, "UTF-8");
+            final Request clone = urlConnection.getRequest().cloneRequest();
+            clone.setHtmlCode(probeContext);
+            final Browser br = createNewBrowserInstance();
+            br.setRequest(clone);
+            try {
+                // TODO: extract the html checks into own method to avoid Browser instance
+                checkServerErrors(br, getDownloadLink(), null);
+            } catch (PluginException e) {
+                logger.log(e);
+                return false;
             }
-        } catch (IOException e) {
-            logger.log(e);
         }
-        return true;
+    } catch (IOException e) {
+        logger.log(e);
+    }
+    return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -2419,7 +2419,35 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         qualityMap.put("h", 60); // high
         qualityMap.put("o", 80); // original
         qualityMap.put("x", 100); // download/original
-        long maxInternalQualityValue = 0;
+        // Parse all HTML qualities once and store in list
+        List<Map<String, Object>> parsedQualities = new ArrayList<Map<String, Object>>();
+        for (int currentQualityIndex = 0; currentQualityIndex < videoQualityHTMLs.length; currentQualityIndex++) {
+            final String videoQualityHTML = videoQualityHTMLs[currentQualityIndex];
+            final String filesizeStrTmp = scanGenericFileSize(videoQualityHTML);
+            final Regex videoinfo = new Regex(videoQualityHTML, "download_video\\('([a-z0-9]+)','([^<>\"\\']*)','([^<>\"\\']*)'");
+            final String videoQualityStr = videoinfo.getMatch(1);
+            final String videoHashTmp = videoinfo.getMatch(2);
+            if (StringUtils.isEmpty(videoQualityStr) || StringUtils.isEmpty(videoHashTmp)) {
+                logger.warning("Found unidentifyable video quality");
+                continue;
+            } else if (!qualityMap.containsKey(videoQualityStr)) {
+                logger.info("Skipping unknown quality: " + videoQualityStr);
+                continue;
+            }
+            final int internalQualityValue = qualityMap.get(videoQualityStr);
+            Map<String, Object> qualityData = new HashMap<String, Object>();
+            qualityData.put("qualityStr", videoQualityStr);
+            qualityData.put("videoHash", videoHashTmp);
+            qualityData.put("filesizeStr", filesizeStrTmp);
+            qualityData.put("targetHTML", videoQualityHTML);
+            qualityData.put("qualityIndex", currentQualityIndex);
+            qualityData.put("internalQualityValue", internalQualityValue);
+            parsedQualities.add(qualityData);
+        }
+        if (parsedQualities.isEmpty()) {
+            logger.warning("No valid video qualities found");
+            return null;
+        }
         String filesizeStr = null;
         String chosenVideoQualityStr = null;
         String videoHash = null;
@@ -2432,70 +2460,61 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             logger.info(String.format("Trying to find user selected quality %s for official video download", userSelectedQualityStr));
         }
         int selectedQualityIndex = 0;
-        for (int currentQualityIndex = 0; currentQualityIndex < videoQualityHTMLs.length; currentQualityIndex++) {
-            final String videoQualityHTML = videoQualityHTMLs[currentQualityIndex];
-            final String filesizeStrTmp = scanGenericFileSize(videoQualityHTML);
-            // final String vid = videoinfo.getMatch(0);
-            final Regex videoinfo = new Regex(videoQualityHTML, "download_video\\('([a-z0-9]+)','([^<>\"\\']*)','([^<>\"\\']*)'");
-            // final String vid = videoinfo.getMatch(0);
-            /* Usually this will be 'o' standing for "original quality" */
-            final String videoQualityStr = videoinfo.getMatch(1);
-            final String videoHashTmp = videoinfo.getMatch(2);
-            if (StringUtils.isEmpty(videoQualityStr) || StringUtils.isEmpty(videoHashTmp)) {
-                /*
-                 * Possible plugin failure but let's skip bad items. Upper handling will fallback to stream download if everything fails!
-                 */
-                logger.warning("Found unidentifyable video quality");
-                continue;
-            } else if (!qualityMap.containsKey(videoQualityStr)) {
-                /*
-                 * 2020-01-18: There shouldn't be any unknown values but we should consider allowing such in the future maybe as final
-                 * fallback.
-                 */
-                logger.info("Skipping unknown quality: " + videoQualityStr);
-                continue;
+        Map<String, Object> selectedQuality = null;
+        // First try to find exact match for user selected quality
+        if (userSelectedQualityStr != null) {
+            for (Map<String, Object> quality : parsedQualities) {
+                String qualityStr = (String) quality.get("qualityStr");
+                if (qualityStr.equalsIgnoreCase(userSelectedQualityStr)) {
+                    logger.info("Found user selected quality: " + userSelectedQualityStr);
+                    foundUserSelectedQuality = true;
+                    selectedQuality = quality;
+                    break;
+                }
             }
-            final int internalQualityValue = qualityMap.get(videoQualityStr);
-            if (userSelectedQualityStr != null && videoQualityStr.equalsIgnoreCase(userSelectedQualityStr)) {
-                logger.info("Found user selected quality: " + userSelectedQualityStr);
-                foundUserSelectedQuality = true;
-                chosenVideoQualityStr = videoQualityStr;
-                videoHash = videoHashTmp;
-                if (filesizeStrTmp != null) {
-                    /*
-                     * Usually, filesize for official video downloads will be given but not in all cases. It may also happen that our upper
-                     * RegEx fails e.g. for supervideo.tv.
-                     */
-                    filesizeStr = filesizeStrTmp;
+            // If user selected quality not found, find next best
+            if (!foundUserSelectedQuality) {
+                logger.info("Failed to find user selected quality --> Finding next best quality");
+                final int userSelectedQualityValue = qualityMap.get(userSelectedQualityStr.toLowerCase());
+                int nextBestQualityValue = Integer.MAX_VALUE;
+                for (Map<String, Object> quality : parsedQualities) {
+                    int internalQualityValue = (Integer) quality.get("internalQualityValue");
+                    // Find the smallest quality value that is still higher than user selected
+                    if (internalQualityValue > userSelectedQualityValue && internalQualityValue < nextBestQualityValue) {
+                        nextBestQualityValue = internalQualityValue;
+                        selectedQuality = quality;
+                    }
                 }
-                targetHTML = videoQualityHTML;
-                selectedQualityIndex = currentQualityIndex;
-                break;
-            } else {
-                /* Look for best quality */
-                if (internalQualityValue < maxInternalQualityValue) {
-                    /* Only continue with qualities that are higher than the highest we found so far. */
-                    continue;
+                if (selectedQuality != null) {
+                    logger.info("Selected next best quality: " + selectedQuality.get("qualityStr") + " (higher than target " + userSelectedQualityStr + ")");
                 }
-                maxInternalQualityValue = internalQualityValue;
-                chosenVideoQualityStr = videoQualityStr;
-                videoHash = videoHashTmp;
-                if (filesizeStrTmp != null) {
-                    /*
-                     * Usually, filesize for official video downloads will be given but not in all cases. It may also happen that our upper
-                     * RegEx fails e.g. for supervideo.tv.
-                     */
-                    filesizeStr = filesizeStrTmp;
-                }
-                targetHTML = videoQualityHTML;
-                selectedQualityIndex = currentQualityIndex;
             }
         }
-        if (targetHTML == null || chosenVideoQualityStr == null || videoHash == null) {
-            if (videoQualityHTMLs != null && videoQualityHTMLs.length > 0) {
-                /* This should never happen */
-                logger.info(String.format("Failed to find officially downloadable video quality although there are %d qualities available", videoQualityHTMLs.length));
+        // If no user selection or next best found, find highest quality
+        if (selectedQuality == null) {
+            int maxInternalQualityValue = 0;
+            for (Map<String, Object> quality : parsedQualities) {
+                int internalQualityValue = (Integer) quality.get("internalQualityValue");
+                if (internalQualityValue > maxInternalQualityValue) {
+                    maxInternalQualityValue = internalQualityValue;
+                    selectedQuality = quality;
+                }
             }
+            if (userSelectedQualityStr != null && !foundUserSelectedQuality) {
+                logger.info("No higher quality found, returning highest available: " + selectedQuality.get("qualityStr"));
+            }
+        }
+        // Extract final values from selected quality
+        if (selectedQuality != null) {
+            chosenVideoQualityStr = (String) selectedQuality.get("qualityStr");
+            videoHash = (String) selectedQuality.get("videoHash");
+            filesizeStr = (String) selectedQuality.get("filesizeStr");
+            targetHTML = (String) selectedQuality.get("targetHTML");
+            selectedQualityIndex = (Integer) selectedQuality.get("qualityIndex");
+        }
+        if (targetHTML == null || chosenVideoQualityStr == null || videoHash == null) {
+            /* This should never happen */
+            logger.info(String.format("Failed to find officially downloadable video quality although there are %d qualities available", videoQualityHTMLs.length));
             return null;
         }
         if (filesizeStr == null) {
@@ -2567,16 +2586,32 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             logger.info("Failed to find any official video downloads");
             return null;
         }
-        final String[][] videoInfo = new String[videourls.length][];
+        // Parse all video info once and store in list of maps
+        List<Map<String, Object>> parsedVideos = new ArrayList<Map<String, Object>>();
         for (int i = 0; i < videourls.length; i++) {
-            final String[] thisVideoInfos = new String[3];
-            thisVideoInfos[0] = videourls[i];
+            final String videoURL = videourls[i];
+            String resolution = null;
+            String filesizeStr = null;
             if (videoresolutionsAndFilesizes != null && videoresolutionsAndFilesizes.length == videourls.length) {
                 final String[] thisVideoResolutionAndFilesize = videoresolutionsAndFilesizes[i];
-                thisVideoInfos[1] = thisVideoResolutionAndFilesize[0];
-                thisVideoInfos[2] = thisVideoResolutionAndFilesize[1];
+                resolution = thisVideoResolutionAndFilesize[0];
+                filesizeStr = thisVideoResolutionAndFilesize[1];
             }
-            videoInfo[i] = thisVideoInfos;
+            final String videoQualityStr = new Regex(videoURL, "_([a-z]{1})$").getMatch(0);
+            if (StringUtils.isEmpty(videoQualityStr)) {
+                logger.warning("Found unidentifyable video quality");
+                continue;
+            }
+            Map<String, Object> videoData = new HashMap<String, Object>();
+            videoData.put("videoURL", videoURL);
+            videoData.put("resolution", resolution);
+            videoData.put("filesizeStr", filesizeStr);
+            videoData.put("videoQualityStr", videoQualityStr);
+            parsedVideos.add(videoData);
+        }
+        if (parsedVideos.isEmpty()) {
+            logger.info("No valid video qualities found");
+            return null;
         }
         /*
          * Internal quality identifiers highest to lowest (inside 'download_video' String): o = original, h = high, n = normal, l=low
@@ -2587,72 +2622,87 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         qualityMap.put("h", 60); // high
         qualityMap.put("o", 80); // original
         qualityMap.put("x", 100); // download
-        long maxInternalQualityValue = 0;
-        String filesizeStrBest = null;
-        String filesizeStrSelected = null;
-        String videoURLBest = null;
-        String videoURLSelected = null;
+        // Filter out unknown qualities and add internal quality values
+        List<Map<String, Object>> validVideos = new ArrayList<Map<String, Object>>();
+        for (Map<String, Object> videoData : parsedVideos) {
+            String videoQualityStr = (String) videoData.get("videoQualityStr");
+            if (!qualityMap.containsKey(videoQualityStr)) {
+                logger.info("Skipping unknown quality: " + videoQualityStr);
+                continue;
+            }
+            videoData.put("internalQualityValue", qualityMap.get(videoQualityStr));
+            validVideos.add(videoData);
+        }
+        if (validVideos.isEmpty()) {
+            logger.warning("No valid video qualities found after filtering");
+            return null;
+        }
         final String userSelectedQualityValue = getPreferredDownloadQualityStr();
         if (userSelectedQualityValue == null) {
             logger.info("Trying to find highest quality for official video download");
         } else {
             logger.info(String.format("Trying to find user selected quality %s for official video download", userSelectedQualityValue));
         }
-        for (final String videoInfos[] : videoInfo) {
-            final String videoURL = videoInfos[0];
-            final String filesizeStr = videoInfos[2];
-            final String videoQualityStrTmp = new Regex(videoURL, "_([a-z]{1})$").getMatch(0);
-            if (StringUtils.isEmpty(videoQualityStrTmp)) {
-                /*
-                 * Possible plugin failure but let's skip bad items. Upper handling will fallback to stream download if everything fails!
-                 */
-                logger.warning("Found unidentifyable video quality");
-                continue;
-            } else if (!qualityMap.containsKey(videoQualityStrTmp)) {
-                /*
-                 * 2020-01-18: There shouldn't be any unknown values but we should consider allowing such in the future maybe as final
-                 * fallback.
-                 */
-                logger.info("Skipping unknown quality: " + videoQualityStrTmp);
-                continue;
+        Map<String, Object> selectedVideo = null;
+        boolean foundUserSelectedQuality = false;
+        // First try to find exact match for user selected quality
+        if (userSelectedQualityValue != null) {
+            for (Map<String, Object> videoData : validVideos) {
+                String videoQualityStr = (String) videoData.get("videoQualityStr");
+                if (videoQualityStr.equalsIgnoreCase(userSelectedQualityValue)) {
+                    logger.info("Found user selected quality: " + userSelectedQualityValue);
+                    foundUserSelectedQuality = true;
+                    selectedVideo = videoData;
+                    break;
+                }
             }
-            /* Look for best quality */
-            final int internalQualityValueTmp = qualityMap.get(videoQualityStrTmp);
-            if (internalQualityValueTmp > maxInternalQualityValue || videoURLBest == null) {
-                maxInternalQualityValue = internalQualityValueTmp;
-                videoURLBest = videoURL;
-                filesizeStrBest = filesizeStr;
-            }
-            if (userSelectedQualityValue != null && videoQualityStrTmp.equalsIgnoreCase(userSelectedQualityValue)) {
-                logger.info("Found user selected quality: " + userSelectedQualityValue);
-                videoURLSelected = videoURL;
-                if (filesizeStr != null) {
-                    /*
-                     * Usually, filesize for official video downloads will be given but not in all cases. It may also happen that our upper
-                     * RegEx fails e.g. for supervideo.tv.
-                     */
-                    filesizeStrSelected = filesizeStr;
+            // If user selected quality not found, find next best
+            if (!foundUserSelectedQuality) {
+                logger.info("Failed to find user selected quality --> Finding next best quality");
+                final int userSelectedQualityValueInt = qualityMap.get(userSelectedQualityValue.toLowerCase());
+                int nextBestQualityValue = Integer.MAX_VALUE;
+                for (Map<String, Object> videoData : validVideos) {
+                    int internalQualityValue = (Integer) videoData.get("internalQualityValue");
+                    // Find the smallest quality value that is still higher than user selected
+                    if (internalQualityValue > userSelectedQualityValueInt && internalQualityValue < nextBestQualityValue) {
+                        nextBestQualityValue = internalQualityValue;
+                        selectedVideo = videoData;
+                    }
+                }
+                if (selectedVideo != null) {
+                    logger.info("Selected next best quality: " + selectedVideo.get("videoQualityStr") + " (higher than target " + userSelectedQualityValue + ")");
                 }
             }
         }
-        if (videoURLBest == null && videoURLSelected == null) {
+        // If no user selection or next best found, find highest quality
+        if (selectedVideo == null) {
+            int maxInternalQualityValue = 0;
+            for (Map<String, Object> videoData : validVideos) {
+                int internalQualityValue = (Integer) videoData.get("internalQualityValue");
+                if (internalQualityValue > maxInternalQualityValue) {
+                    maxInternalQualityValue = internalQualityValue;
+                    selectedVideo = videoData;
+                }
+            }
+            if (userSelectedQualityValue != null && !foundUserSelectedQuality) {
+                logger.info("No higher quality found, returning highest available: " + selectedVideo.get("videoQualityStr"));
+            } else {
+                logger.info("Returning BEST quality according to user preference");
+            }
+        }
+        if (selectedVideo == null) {
             logger.warning("Video selection handling failed");
             return null;
         }
-        final String filesizeStrChosen;
-        final String continueURL;
-        if (filesizeStrSelected == null) {
-            if (userSelectedQualityValue == null) {
-                logger.info("Returning BEST quality according to user preference");
-            } else {
-                logger.info("Returning BEST quality as fallback");
-            }
-            filesizeStrChosen = filesizeStrBest;
-            continueURL = videoURLBest;
-        } else {
+        // Extract final values
+        final String filesizeStrChosen = (String) selectedVideo.get("filesizeStr");
+        final String continueURL = (String) selectedVideo.get("videoURL");
+        if (foundUserSelectedQuality) {
             logger.info("Returning user selected quality: " + userSelectedQualityValue);
-            filesizeStrChosen = filesizeStrSelected;
-            continueURL = videoURLSelected;
+        } else if (userSelectedQualityValue != null) {
+            logger.info("Returning next best or highest quality as fallback");
+        } else {
+            logger.info("Returning BEST quality according to user preference");
         }
         if (returnFilesize) {
             /* E.g. in availablecheck */

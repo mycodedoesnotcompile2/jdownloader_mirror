@@ -1383,7 +1383,7 @@ public class Browser {
             return null;
         }
         for (final Form form : this.getForms()) {
-            if (form.getAction() != null && new Regex(form.getAction(), regex).matches()) {
+            if (form.getAction() != null && new Regex(form.getAction(), regex).patternFind()) {
                 return form;
             }
         }

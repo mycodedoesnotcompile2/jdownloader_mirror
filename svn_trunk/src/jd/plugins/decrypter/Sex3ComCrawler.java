@@ -18,30 +18,33 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-
 import jd.PluginWrapper;
+import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51243 $", interfaceVersion = 2, names = {}, urls = {})
-public class TextupFr extends AbstractPastebinCrawler {
-    public TextupFr(PluginWrapper wrapper) {
+@DecrypterPlugin(revision = "$Revision: 51243 $", interfaceVersion = 3, names = {}, urls = {})
+public class Sex3ComCrawler extends PluginForDecrypt {
+    public Sex3ComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    String getFID(final String url) {
-        return new Regex(url, this.getSupportedLinks()).getMatch(0);
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(false);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "textup.fr" });
+        ret.add(new String[] { "sex3.com" });
         return ret;
     }
 
@@ -61,32 +64,23 @@ public class TextupFr extends AbstractPastebinCrawler {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/go\\?vx=[a-zA-Z0-9]+");
         }
         return ret.toArray(new String[0]);
     }
 
-    @Override
-    public PastebinMetadata crawlMetadata(final CryptedLink param, final Browser br) throws Exception {
-        br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String plaintext = br.getRegex("<div id=\"page-inner\">(.*?)id=\"dialog-edit\"").getMatch(0);
-        if (plaintext == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        final String finallink = br.getRedirectLocation();
+        if (finallink == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final PastebinMetadata metadata = new PastebinMetadata(param, this.getFID(param.getCryptedUrl()));
-        metadata.setPastebinText(plaintext);
-        final String author = br.getRegex("Auteur\\s*:\\s*<em>([^<]+)</em>").getMatch(0);
-        if (author != null) {
-            metadata.setUsername(author);
-        }
-        final String title = br.getRegex("<div id=\"text\" class=\"standard bbcode\"><h1>([^<]+)</h1>").getMatch(0);
-        if (title != null) {
-            metadata.setTitle(title);
-        }
-        return metadata;
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        ret.add(createDownloadlink(finallink));
+        return ret;
     }
 }

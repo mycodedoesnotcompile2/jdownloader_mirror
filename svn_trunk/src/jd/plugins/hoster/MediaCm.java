@@ -33,7 +33,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51243 $", interfaceVersion = 3, names = {}, urls = {})
 public class MediaCm extends XFileSharingProBasic {
     public MediaCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -204,7 +204,7 @@ public class MediaCm extends XFileSharingProBasic {
         }
         dllink = this.getDllink(link, account, br, br.toString());
         if (StringUtils.isEmpty(dllink)) {
-            dllink = br.getRegex("(?i)This download link will be available for your IP-address next[^<]*</div>\\s*<a href=\"(https?://[^\"]+)").getMatch(0);
+            dllink = br.getRegex("This download link will be available for your IP-address next[^<]*</div>\\s*<a href=\"(https?://[^\"]+)").getMatch(0);
         }
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find dllink via official video download");

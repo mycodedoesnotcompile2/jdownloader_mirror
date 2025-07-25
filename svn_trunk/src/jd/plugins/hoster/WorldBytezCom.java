@@ -22,6 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
@@ -32,7 +33,7 @@ import jd.plugins.PluginException;
 import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51250 $", interfaceVersion = 3, names = {}, urls = {})
 public class WorldBytezCom extends XFileSharingProBasic {
     public WorldBytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +140,10 @@ public class WorldBytezCom extends XFileSharingProBasic {
 
     @Override
     protected void checkErrorsLastResort(final Browser br, final DownloadLink link, final Account account) throws PluginException {
-        if (br.containsHTML("(?i)>\\s*If You Are Using VPN Please Disable To Continue Downloading\\s*<") && account != null) {
+        if (br.containsHTML("(?i)>[^<]*Your account has been temporarily blocked due to multiple IPs") && account != null) {
+            throw new AccountInvalidException("Your account has been temporarily blocked due to multiple IPs. Please change your password..after changing the password the account returns to normal");
+        } else if (br.containsHTML(">\\s*If You Are Using VPN Please Disable To Continue Downloading\\s*<") && account != null) {
+
             /*
              * <h2 style="color: aliceblue;">Oops File Not Found</h2>
              *

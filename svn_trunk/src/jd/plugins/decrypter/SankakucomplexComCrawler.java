@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 51232 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51243 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -350,15 +350,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
             final String nextPageHash = (String) meta.get("next");
             final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
-            if (data.isEmpty()) {
-                if (ret.isEmpty()) {
-                    logger.info("Looks like users' given tag does not lead to any search results");
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else {
-                    logger.info("Stopping because: Current page is empty");
-                    break pagination;
-                }
-            }
             for (final Map<String, Object> post : data) {
                 final String postID = post.get("id").toString();
                 final DownloadLink link = this.createDownloadlink(generateSinglePostURL(postID, language, tagsUrlEncoded));
@@ -393,6 +384,10 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 continue pagination;
             }
         } while (true);
+        if (ret.isEmpty()) {
+            logger.info("Looks like users' given tag does not lead to any search results");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         return ret;
     }
 

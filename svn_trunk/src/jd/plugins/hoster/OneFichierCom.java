@@ -36,6 +36,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -65,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 51050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51244 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS             = "use_cdn_credits";
@@ -217,12 +218,16 @@ public class OneFichierCom extends PluginForHost {
     }
 
     private String getURLWithPreferredProtocol(String url) {
-        if (PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
-            url = url.replaceFirst("(?i)http://", "https://");
+        final OneFichierConfigInterface cfg = PluginJsonConfig.get(OneFichierConfigInterface.class);
+        final SSLMode sslmode = cfg.getSSLMode();
+        if (sslmode == SSLMode.AUTO) {
+            /* Do not modify URL */
+            return url;
+        } else if (sslmode == SSLMode.FORCE_HTTPS) {
+            return url.replaceFirst("(?i)http://", "https://");
         } else {
-            url = url.replaceFirst("(?i)https://", "http://");
+            return url.replaceFirst("(?i)https://", "http://");
         }
-        return url;
     }
 
     private String getContentURL(final DownloadLink link) {
@@ -564,7 +569,7 @@ public class OneFichierCom extends PluginForHost {
         /* Remove form fields we don't want. */
         form.remove("save");
         form.put("did", "1");
-        if (!PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled()) {
+        if (PluginJsonConfig.get(OneFichierConfigInterface.class).getSSLMode() == SSLMode.FORCE_HTTP) {
             form.put("dl_no_ssl", "on");
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, form, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -882,6 +887,9 @@ public class OneFichierCom extends PluginForHost {
         if (!StringUtils.isEmpty(email) && !StringUtils.equals(account.getUser(), email)) {
             account.setUser(email);
         }
+        final Number cold_storage_used = (Number) entries.get("cold_storage");
+        // final Number available_cold_storage = (Number)entries.get("available_cold_storage");
+        final Number hot_storage_used = (Number) entries.get("hot_storage");
         final String subscription_end = (String) entries.get("subscription_end");
         final int accountType = Integer.parseInt(entries.get("offer").toString()); // 0=Free, 1=Premium, 2=Access
         final Object available_credits_in_gigabyteO = entries.get("cdn");
@@ -927,6 +935,16 @@ public class OneFichierCom extends PluginForHost {
             account.removeProperty(PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT);
         }
         account.setConcurrentUsePossible(true);
+        if (cold_storage_used != null || hot_storage_used != null) {
+            long space_used_bytes = 0;
+            if (cold_storage_used != null) {
+                space_used_bytes += cold_storage_used.longValue();
+            }
+            if (hot_storage_used != null) {
+                space_used_bytes += hot_storage_used.longValue();
+            }
+            ai.setUsedSpace(space_used_bytes);
+        }
         setCdnCreditsStatus(account, ai, creditsAsBytes);
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && this.isGoldAccount(account) && account.hasProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED)) {
             /* TODO: Check if this handling is correct, then add a nicer error message dialog + translations. */
@@ -1287,17 +1305,17 @@ public class OneFichierCom extends PluginForHost {
     }
 
     @Override
-    protected long getStartIntervall(final DownloadLink link, final Account account) {
+    protected long getStartInterval(final DownloadLink link, final Account account) {
         if (account == null || !AccountType.PREMIUM.equals(account.getType()) || link == null) {
-            return super.getStartIntervall(link, account);
+            return super.getStartInterval(link, account);
         } else {
             final long knownDownloadSize = link.getKnownDownloadSize();
             if (knownDownloadSize <= 50 * 1024 * 1024) {
                 final int wait = PluginJsonConfig.get(OneFichierConfigInterface.class).getSmallFilesWaitInterval();
-                // avoid IP block because of too many downloads in short time
+                /* Small file or big file but only some bytes remaining -> Avoid IP block because of too many downloads in short time */
                 return Math.max(0, wait * 1000);
             } else {
-                return super.getStartIntervall(link, account);
+                return super.getStartInterval(link, account);
             }
         }
     }
@@ -1367,7 +1385,7 @@ public class OneFichierCom extends PluginForHost {
         final Map<String, Object> postdata = new HashMap<String, Object>();
         postdata.put("url", this.getContentURL(link));
         postdata.put("pass", passCode);
-        postdata.put("no_ssl", PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferSSLEnabled() == false ? 1 : 0);
+        postdata.put("no_ssl", PluginJsonConfig.get(OneFichierConfigInterface.class).getSSLMode() == SSLMode.FORCE_HTTP ? 1 : 0);
         performAPIRequest(API_BASE + "/download/get_token.cgi", JSonStorage.serializeToJson(postdata));
         final Map<String, Object> entries = handleErrorsAPI(account);
         /* 2019-04-04: Downloadlink is officially only valid for 5 minutes */

@@ -50,14 +50,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
+@HostPlugin(revision = "$Revision: 51244 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
 public class UploadgigCom extends antiDDoSForHost {
     @Override
-    protected long getStartIntervall(DownloadLink downloadLink, Account account) {
+    protected long getStartInterval(DownloadLink downloadLink, Account account) {
         if (account != null && account.getType() == AccountType.PREMIUM) {
             return 2000;
         }
-        return super.getStartIntervall(downloadLink, account);
+        return super.getStartInterval(downloadLink, account);
     }
 
     @Override

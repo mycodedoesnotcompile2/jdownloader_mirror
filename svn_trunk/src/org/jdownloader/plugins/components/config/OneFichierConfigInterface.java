@@ -12,7 +12,6 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.TakeValueFromSubconfig;
 import org.jdownloader.plugins.config.Type;
-import org.jdownloader.translate._JDT;
 
 @PluginHost(host = "1fichier.com", type = Type.HOSTER)
 public interface OneFichierConfigInterface extends PluginConfigInterface {
@@ -23,8 +22,8 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
             return "Free download and IP related download limits: Prefer reconnect?";
         }
 
-        public String getPreferSSLEnabled_label() {
-            return _JDT.T.lit_prefer_ssl();
+        public String getSSLMode_label() {
+            return "SSL mode: Control http(s) handling for downloads";
         }
 
         public String getSmallFilesWaitInterval_label() {
@@ -60,13 +59,34 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
 
     void setPreferReconnectEnabled(boolean b);
 
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @TakeValueFromSubconfig("PREFER_SSL")
-    @Order(20)
-    boolean isPreferSSLEnabled();
+    public static enum SSLMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto | Use website preferred protocol";
+            }
+        },
+        FORCE_HTTPS {
+            @Override
+            public String getLabel() {
+                return "Try to force https";
+            }
+        },
+        FORCE_HTTP {
+            @Override
+            public String getLabel() {
+                return "Try to force http";
+            }
+        };
+    }
 
-    void setPreferSSLEnabled(boolean b);
+    @AboutConfig
+    @DefaultEnumValue("AUTO")
+    @Order(20)
+    @DescriptionForConfigEntry("Auto: Use whichever protocol the website provides. Account users can change it under 1fichier.com/console/params.pl -> 'Force the downloads without SSL'. Changes of this setting from forced http or https to auto may only apply for newly added downloads!")
+    SSLMode getSSLMode();
+
+    void setSSLMode(final SSLMode mode);
 
     @AboutConfig
     @DefaultBooleanValue(true)

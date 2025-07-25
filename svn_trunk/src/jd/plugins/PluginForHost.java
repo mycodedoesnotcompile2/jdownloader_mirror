@@ -1496,13 +1496,13 @@ public abstract class PluginForHost extends Plugin {
         WAIT_BETWEEN_STARTS = Math.max(0, interval);
     }
 
-    protected long getStartIntervall(final DownloadLink downloadLink, final Account account) {
+    protected long getStartInterval(final DownloadLink downloadLink, final Account account) {
         return WAIT_BETWEEN_STARTS;
     }
 
     protected void waitForNextStartAllowed(final DownloadLink downloadLink, final Account account) throws PluginException, InterruptedException {
         final WaitingQueueItem queueItem = downloadLink.getDownloadLinkController().getQueueItem();
-        final long wait = Math.max(0, getStartIntervall(downloadLink, account));
+        final long wait = Math.max(0, getStartInterval(downloadLink, account));
         if (wait == 0) {
             queueItem.lastStartTimestamp.set(System.currentTimeMillis());
             return;
