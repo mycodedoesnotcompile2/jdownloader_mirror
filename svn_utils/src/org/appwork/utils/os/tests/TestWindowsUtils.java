@@ -137,7 +137,7 @@ public class TestWindowsUtils extends AWTest {
         logInfoAnyway("The TestWindowUtils Test will now try to start cmd.exe via UAC");
         // Test startElevatedProcess
         long started = Time.now();
-        INT_PTR processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100000", "heise.de" }, null, false);
+        INT_PTR processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "heise.de" }, null, false);
         assertNotNull(processHandle);
         assertTrue(Time.now() - started > 1000);
         // Test getProcessId

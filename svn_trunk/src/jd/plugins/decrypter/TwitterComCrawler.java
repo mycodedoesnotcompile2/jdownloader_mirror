@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51026 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51252 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -726,7 +726,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
             /* No items were skipped but also not all items were found -> Notify user */
             String text = "Some items may be missing!";
             text += "\nTotal number of status items: " + statuses_count + " Crawled: " + totalWalkedThroughTweets;
-            text += "\nLogged in users can sometimes view more items than anonymous users.";
+            if (account == null) {
+                text += "\nYou are not logged in!\nLogged in users can sometimes view more items than anonymous users.\nAdd your X account under Settings -> Account Manager";
+            }
             displayBubbleNotification(bubbleNotifyTitle, text);
         }
         return ret;

@@ -19,15 +19,14 @@ import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.jdownloader.translate._JDT;
 
 public class ClipDataCache {
-    public static final String  THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY = "The Download is not available in your country";
-    private static final Object LOCK                                          = new Object();
+    public static final String THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY = "The Download is not available in your country";
 
     private static class CachedClipData {
         private volatile YoutubeClipData clipData  = null;
         private final long               timeStamp = Time.systemIndependentCurrentJVMTimeMillis();
         private final List<HTTPProxy>    proxyList;
 
-        public CachedClipData(List<HTTPProxy> proxyListNew, YoutubeClipData youtubeClipData) {
+        private CachedClipData(List<HTTPProxy> proxyListNew, YoutubeClipData youtubeClipData) {
             this.clipData = youtubeClipData;
             proxyList = proxyListNew;
         }
@@ -75,71 +74,89 @@ public class ClipDataCache {
     }
 
     private static CachedClipData get(YoutubeHelper helper, YoutubeClipData vid) throws Exception {
-        synchronized (LOCK) {
-            final String cachedID = vid.videoID;
-            if (StringUtils.isEmpty(cachedID)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+        final String cachedID = vid.videoID;
+        if (StringUtils.isEmpty(cachedID)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final List<HTTPProxy> proxyListNew = helper.getBr().selectProxies(new URL("https://youtube.com"));
+        while (true) {
             CachedClipData cachedData = get(cachedID);
-            final List<HTTPProxy> proxyListNew = helper.getBr().selectProxies(new URL("https://youtube.com"));
             if (cachedData != null) {
-                if (!cachedData.hasValidProxyList(proxyListNew)) {
-                    helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:no valid proxyList");
-                    cachedData = null;
-                } else if (StringUtils.isEmpty(cachedData.clipData.title)) {
-                    helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:missing title");
-                    cachedData = null;
-                } else if (cachedData.clipData.datePublished == 0) {
-                    helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:missing date");
-                    cachedData = null;
-                } else if (cachedData.isExpired()) {
-                    helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:expired");
-                    cachedData = null;
-                }
-            }
-            if (cachedData == null || cachedData.clipData == null) {
-                cachedData = new CachedClipData(proxyListNew, vid);
-                helper.getLogger().info("refresh CachedClipData:" + cachedID);
-                helper.loadVideo(cachedData.clipData);
-                put(cachedID, cachedData);
-            } else {
-                helper.getLogger().info("valid CachedClipData found:" + cachedID);
-                cachedData.clipData.copyTo(vid);
-            }
-            if (cachedData.clipData.streams == null || StringUtils.isNotEmpty(cachedData.clipData.error)) {
-                if (StringUtils.equalsIgnoreCase(cachedData.clipData.error, "This video is unavailable.") || StringUtils.equalsIgnoreCase(cachedData.clipData.error, "This video is not available.")) {
-                    // this is not region issue, its just not available.
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, cachedData.clipData.error);
-                }
-                if (StringUtils.containsIgnoreCase(cachedData.clipData.error, "This video has been removed")) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, cachedData.clipData.error);
-                }
-                // private video.. login is required! assumption that account hasn't been used.. or wrong account has been used...
-                if (StringUtils.containsIgnoreCase(cachedData.clipData.error, "This Video is Private")) {
-                    if (helper.getAccountLoggedIn() != null) {
-                        // wrong account used?? try next??
-                        // TODO: confirm with jiaz that this this type of exception will try the next account
-                    }
-                    throw new AccountRequiredException(cachedData.clipData.error); // .localizedMessage(_JDT.T.AccountRequiredException_createCandidateResult());
-                }
-                if (cachedData.clipData.error != null) {
-                    String lc = cachedData.clipData.error.toLowerCase(Locale.ENGLISH);
-                    if (lc.contains("is not available in your country") || lc.contains("geo blocked due to copyright grounds")) {
-                        // 18.04.2016
-                        // „Unfortunately, this video is not available in Germany because it may contain music for which GEMA has not
-                        // granted the respective music rights.”
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY).localizedMessage(_JDT.T.CountryIPBlockException_createCandidateResult());
-                    }
-                    if (lc.contains("content is not available in")) {
-                        // „Unfortunately, this UMG-music-content is not available in Germany because GEMA has not granted the
-                        // respective music publishing rights.”
-                        // 18.04.2016
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY).localizedMessage(_JDT.T.CountryIPBlockException_createCandidateResult());
+                synchronized (cachedData) {
+                    if (cachedData.isExpired()) {
+                        helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:expired");
+                    } else if (!cachedData.hasValidProxyList(proxyListNew)) {
+                        helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:no valid proxyList");
+                    } else if (StringUtils.isEmpty(cachedData.clipData.title)) {
+                        helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:missing title");
+                    } else if (cachedData.clipData.datePublished == 0) {
+                        helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:missing date");
+                    } else if (cachedData.clipData == null) {
+                        helper.getLogger().info("invalidate CachedClipData:" + cachedID + "|reason:missing data");
+                    } else {
+                        helper.getLogger().info("valid CachedClipData found:" + cachedID);
+                        cachedData.clipData.copyTo(vid);
+                        check(helper, cachedData);
+                        return cachedData;
                     }
                 }
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, cachedData.clipData.error);
             }
-            return cachedData;
+            CachedClipData newCachedData = null;
+            synchronized (CACHE) {
+                if (get(cachedID) == cachedData) {
+                    newCachedData = new CachedClipData(proxyListNew, vid);
+                    put(cachedID, newCachedData);
+                }
+                cachedData = get(cachedID);
+            }
+            synchronized (cachedData) {
+                if (cachedData == newCachedData) {
+                    try {
+                        helper.getLogger().info("refresh CachedClipData:" + cachedID);
+                        helper.loadVideo(cachedData.clipData);
+                    } finally {
+                        cachedData.notifyAll();
+                    }
+                } else {
+                    cachedData.wait(500);
+                }
+            }
+        }
+    }
+
+    private static void check(YoutubeHelper helper, CachedClipData cachedData) throws PluginException {
+        if (cachedData.clipData.streams == null || StringUtils.isNotEmpty(cachedData.clipData.error)) {
+            if (StringUtils.equalsIgnoreCase(cachedData.clipData.error, "This video is unavailable.") || StringUtils.equalsIgnoreCase(cachedData.clipData.error, "This video is not available.")) {
+                // this is not region issue, its just not available.
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, cachedData.clipData.error);
+            }
+            if (StringUtils.containsIgnoreCase(cachedData.clipData.error, "This video has been removed")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, cachedData.clipData.error);
+            }
+            // private video.. login is required! assumption that account hasn't been used.. or wrong account has been used...
+            if (StringUtils.containsIgnoreCase(cachedData.clipData.error, "This Video is Private")) {
+                if (helper.getAccountLoggedIn() != null) {
+                    // wrong account used?? try next??
+                    // TODO: confirm with jiaz that this this type of exception will try the next account
+                }
+                throw new AccountRequiredException(cachedData.clipData.error); // .localizedMessage(_JDT.T.AccountRequiredException_createCandidateResult());
+            }
+            if (cachedData.clipData.error != null) {
+                String lc = cachedData.clipData.error.toLowerCase(Locale.ENGLISH);
+                if (lc.contains("is not available in your country") || lc.contains("geo blocked due to copyright grounds")) {
+                    // 18.04.2016
+                    // „Unfortunately, this video is not available in Germany because it may contain music for which GEMA has not
+                    // granted the respective music rights.”
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY).localizedMessage(_JDT.T.CountryIPBlockException_createCandidateResult());
+                }
+                if (lc.contains("content is not available in")) {
+                    // „Unfortunately, this UMG-music-content is not available in Germany because GEMA has not granted the
+                    // respective music publishing rights.”
+                    // 18.04.2016
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY).localizedMessage(_JDT.T.CountryIPBlockException_createCandidateResult());
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, cachedData.clipData.error);
         }
     }
 
@@ -149,34 +166,41 @@ public class ClipDataCache {
     }
 
     public static void clearCache(String videoID) {
-        synchronized (LOCK) {
-            put(videoID, null);
-        }
+        put(videoID, null);
     }
 
     public static void referenceLink(YoutubeHelper helper, DownloadLink link, YoutubeClipData vid) {
-        synchronized (LOCK) {
-            final String cachedID = vid.videoID;
+        final String cachedID = vid.videoID;
+        List<HTTPProxy> proxyListNew = null;
+        try {
+            proxyListNew = helper.getBr().selectProxies(new URL("https://youtube.com"));
+        } catch (IOException e) {
+            helper.getLogger().log(e);
+        }
+        while (true) {
             CachedClipData data = get(cachedID);
-            List<HTTPProxy> proxyListNew = null;
-            try {
-                proxyListNew = helper.getBr().selectProxies(new URL("https://youtube.com"));
-            } catch (IOException e) {
-                helper.getLogger().log(e);
+            if (data != null) {
+                synchronized (data) {
+                    if (!data.isExpired() && data.hasValidProxyList(proxyListNew)) {
+                        data.clipData = vid;
+                        link.getTempProperties().setProperty("CLIP_DATA_REFERENCE", data);
+                        break;
+                    }
+                }
             }
-            if (data != null && !data.isExpired() && data.hasValidProxyList(proxyListNew)) {
-                data.clipData = vid;
-                link.getTempProperties().setProperty("CLIP_DATA_REFERENCE", data);
-            } else {
-                data = new CachedClipData(proxyListNew, vid);
-                link.getTempProperties().setProperty("CLIP_DATA_REFERENCE", data);
-                put(cachedID, data);
+            synchronized (CACHE) {
+                if (get(cachedID) == data) {
+                    data = new CachedClipData(proxyListNew, vid);
+                    link.getTempProperties().setProperty("CLIP_DATA_REFERENCE", data);
+                    put(cachedID, data);
+                    break;
+                }
             }
         }
     }
 
     private static CachedClipData get(final String videoID) {
-        synchronized (LOCK) {
+        synchronized (CACHE) {
             final Iterator<Entry<CachedClipData, String>> it = CACHE.entrySet().iterator();
             while (it.hasNext()) {
                 final Entry<CachedClipData, String> next = it.next();
@@ -192,7 +216,7 @@ public class ClipDataCache {
     }
 
     private static void put(final String videoID, final CachedClipData data) {
-        synchronized (LOCK) {
+        synchronized (CACHE) {
             final Iterator<Entry<CachedClipData, String>> it = CACHE.entrySet().iterator();
             while (it.hasNext()) {
                 final Entry<CachedClipData, String> next = it.next();
@@ -210,18 +234,18 @@ public class ClipDataCache {
     }
 
     public static boolean hasCache(YoutubeHelper helper, String videoID) {
-        synchronized (LOCK) {
-            final CachedClipData cachedData = get(videoID);
-            if (cachedData != null) {
+        final CachedClipData cachedData = get(videoID);
+        if (cachedData != null) {
+            synchronized (cachedData) {
                 try {
                     final List<HTTPProxy> proxyListNew = helper.getBr().selectProxies(new URL("https://youtube.com"));
-                    return cachedData.hasValidProxyList(proxyListNew) && !cachedData.isExpired();
+                    return !cachedData.isExpired() && cachedData.hasValidProxyList(proxyListNew);
                 } catch (IOException e) {
                     helper.getLogger().log(e);
                 }
             }
-            return false;
         }
+        return false;
     }
 
     public static boolean hasCache(YoutubeHelper helper, DownloadLink downloadLink) {

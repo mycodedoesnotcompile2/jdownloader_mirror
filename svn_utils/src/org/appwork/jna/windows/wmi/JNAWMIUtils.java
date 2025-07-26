@@ -113,13 +113,13 @@ public class JNAWMIUtils {
     /**
      *
      */
-    private static final String         PRODUCT_STATE    = "productState";
+    private static final String PRODUCT_STATE = "productState";
     /**
      *
      */
-    private static final String         DISPLAY_NAME     = "displayName";
-    private static final int            TIMEOUT          = 60000;
-    private static boolean              SECURITY_INITIALIZED;
+    private static final String DISPLAY_NAME  = "displayName";
+    private static final int    TIMEOUT       = 60000;
+    private static boolean      SECURITY_INITIALIZED;
 
     private static String decodeProductState(final int productState) {
         // SignatureStatus = 0x000000F0
@@ -185,6 +185,7 @@ public class JNAWMIUtils {
                 boolean comUnInitRequired = false;
                 try {
                     WinNT.HRESULT hres = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_MULTITHREADED);
+                    LogV3.info("COM CoInitializeEx - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
                     switch (hres.intValue()) {
                     // Successful local initialization (S_OK) or was already initialized
                     // (S_FALSE) but still needs uninit
@@ -195,7 +196,9 @@ public class JNAWMIUtils {
                     // COM was already initialized with a different threading model
                     case WinError.RPC_E_CHANGED_MODE:
                         DebugMode.debugger();
+                        LogV3.info("COM already initialized with different threading model, trying COINIT_APARTMENTTHREADED");
                         hres = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
+                        LogV3.info("COM CoInitializeEx#2 - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
                         switch (hres.intValue()) {
                         // Successful local initialization (S_OK) or was already initialized
                         // (S_FALSE) but still needs uninit
@@ -204,10 +207,16 @@ public class JNAWMIUtils {
                             comUnInitRequired = true;
                             break;
                         default:
-                            throw new COMException("Failed to initialize COM library #2.", hres);
+                            throw new COMException("Failed to initialize COM library #2. Error: " + hres.intValue(), hres);
                         }
+                        break;
+                    // COM already initialized - this is fine, we can proceed
+                    case WinError.CO_E_ALREADYINITIALIZED: // CO_E_ALREADYINITIALIZED
+                        DebugMode.debugger();
+                        LogV3.info("COM already initialized - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
+                        break;
                     default:
-                        throw new COMException("Failed to initialize COM library #1.", hres);
+                        throw new COMException("Failed to initialize COM library #1. Error: " + hres.intValue(), hres);
                     }
                     if (true) {
                         synchronized (JNAWMIUtils.class) {
@@ -397,6 +406,7 @@ public class JNAWMIUtils {
                 int code = ((COMException) org).getHresult().intValue();
                 if (WMI_ERRORS.containsKey(code)) {
                     // Known error. no reason to try the fallback
+                    LogV3.info("Known Error Code: " + code);
                     throw WMIException.wrap(org);
                 }
             }
@@ -404,8 +414,10 @@ public class JNAWMIUtils {
             LogV3.info("Try Fallback via PowerShell");
             try {
                 ArrayList<Map<String, Object>> ret = wmiQueryViaPowerShell(namespace, query, properties);
+                LogV3.info("Try Fallback via PowerShell Result: " + ret.size() + " Entries");
                 return ret;
             } catch (WMIException e1) {
+                LogV3.log(e1);
             }
             throw WMIException.wrap(org);
         }
@@ -427,10 +439,12 @@ public class JNAWMIUtils {
             c.start(true);
             int exitCode = c.waitFor();
             if (exitCode != 0) {
-                System.out.println(poh.getResult().getErrOutString());
+                LogV3.info(poh.getResult().getErrOutString());
                 throw new WMIException("PowerShell: " + poh.getResult().getErrOutString());
             }
+
             String json = poh.getResult().getStdOutString();
+            LogV3.info("PowerShell :\r\n" + json);
             if ("".equals(json)) {
                 json = "{}";
             }

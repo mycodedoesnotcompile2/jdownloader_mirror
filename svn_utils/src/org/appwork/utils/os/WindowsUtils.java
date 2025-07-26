@@ -47,7 +47,11 @@ import static com.sun.jna.platform.win32.WinNT.TOKEN_QUERY;
 import static com.sun.jna.platform.win32.WinUser.SW_HIDE;
 import static com.sun.jna.platform.win32.WinUser.SW_SHOW;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -66,12 +70,19 @@ import org.appwork.jna.windows.interfaces.ExplicitAccess;
 import org.appwork.jna.windows.interfaces.Trustee;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.StorableDoc;
+import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.IO;
+import org.appwork.utils.IO.BOM;
+import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.UniqueAlltimeID;
 import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.parser.ShellParser.Style;
+import org.appwork.utils.processes.ProcessBuilderFactory;
+import org.appwork.utils.processes.ProcessOutput;
 
 import com.sun.jna.Memory;
 import com.sun.jna.Pointer;
@@ -169,6 +180,7 @@ public class WindowsUtils {
         SYNCHRONIZE(WinNT.SYNCHRONIZE),
         @StorableDoc("Access system security.")
         ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY);
+
         public final int mask;
 
         private AccessPermission(int mask) {
@@ -259,6 +271,7 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
+
         public final String sid;
 
         private SID(String sid) {
@@ -1416,6 +1429,7 @@ public class WindowsUtils {
              * Application is critical to system operation
              */
             RmCritical(6);
+
             private final int value;
 
             ApplicationType(int value) {
@@ -1644,6 +1658,106 @@ public class WindowsUtils {
     private static void successOrException(int resultCode) throws Win32Exception {
         if (resultCode != WinError.ERROR_SUCCESS) {
             throw new Win32Exception(resultCode);
+        }
+    }
+
+    private static String escapeXml(String input) {
+
+        if (input == null) {
+            return "";
+        }
+        return input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;");
+    }
+
+    public static void runViaWindowsScheduler(String binary, String workingDir, String... args) throws IOException, InterruptedException {
+        String taskName = "TempAppWorkJavaTask_" + UniqueAlltimeID.next();
+        LogV3.info("Launch via Scheduler: " + binary + "  " + Arrays.toString(args) + " in " + workingDir);
+        File file = Application.getResource("tmp/" + taskName + ".xml");
+        file.delete();
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
+        ZonedDateTime start = ZonedDateTime.now().plusMinutes(1);
+        ZonedDateTime end = start.plusMinutes(2);
+        String startTime = fmt.format(start);
+        String endTime = fmt.format(end);
+        String argumentsXMLNode = "";
+        if (args.length > 0) {
+            argumentsXMLNode = "<Arguments>" + escapeXml(ShellParser.createCommandLine(Style.WINDOWS, args)) + "</Arguments>\n";
+        }
+
+     // @formatter:off
+        String xml =
+                "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n" +
+                "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n" +
+                "  <RegistrationInfo>\n" +
+                "    <Author>JavaTask</Author>\n" +
+                "  </RegistrationInfo>\n" +
+                "  <Triggers>\n" +
+                "    <TimeTrigger>\n" +
+                "      <StartBoundary>"+escapeXml(startTime)+"</StartBoundary>\n" +
+                "      <EndBoundary>"+escapeXml(endTime)+"</EndBoundary>\n" +
+                "      <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>\n" +
+                "      <Enabled>true</Enabled>\n" +
+                "    </TimeTrigger>\n" +
+                "  </Triggers>\n" +
+                "  <Principals>\n" +
+                "    <Principal id=\"Author\">\n" +
+                "      <LogonType>InteractiveToken</LogonType>\n" +
+                "      <RunLevel>LeastPrivilege</RunLevel>\n" +
+                "    </Principal>\n" +
+                "  </Principals>\n" +
+                "  <Settings>\n" +
+                "    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>\n" +
+                "    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>\n" +
+                "    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>\n" +
+                "    <AllowHardTerminate>true</AllowHardTerminate>\n" +
+                "    <StartWhenAvailable>true</StartWhenAvailable>\n" +
+                "    <AllowStartOnDemand>true</AllowStartOnDemand>\n" +
+                "    <Enabled>true</Enabled>\n" +
+                "    <Hidden>true</Hidden>\n" +
+                "    <DeleteExpiredTaskAfter>PT1M</DeleteExpiredTaskAfter>\n" +
+                "  </Settings>\n" +
+                "  <Actions Context=\"Author\">\n" +
+                "    <Exec>\n" +
+                "      <Command>"+escapeXml(binary)+"</Command>\n" +argumentsXMLNode+
+           ( workingDir==null?"":    "     <WorkingDirectory>"+escapeXml(workingDir)+"</WorkingDirectory>\n") +
+                "    </Exec>\n" +
+                "  </Actions>\n" +
+                "</Task>";
+     // @formatter:on
+
+        ByteArrayOutputStream bao = new ByteArrayOutputStream();
+        bao.write(BOM.UTF16LE.getBOM());
+        bao.write(xml.getBytes("UTF-16LE"));
+
+        IO.secureWrite(file, bao.toByteArray(), SYNC.META_AND_DATA);
+
+        try {
+            try {
+                LogV3.info("Create Task");
+                ProcessOutput result = ProcessBuilderFactory.runCommand("schtasks", "/create", "/tn", taskName, "/xml", file.toString(), "/f");
+                LogV3.info(result.toString());
+                if (result.getExitCode() != 0) {
+                    throw new WTFException(result.toString());
+                }
+                LogV3.info("Run Task");
+                result = (ProcessBuilderFactory.runCommand("schtasks", "/run", "/tn", taskName));
+                LogV3.info(result.toString());
+                if (result.getExitCode() != 0) {
+                    throw new WTFException(result.toString());
+                }
+
+                // Thread.sleep(1000);
+            } finally {
+                LogV3.info("Delete Task");
+                ProcessOutput result = (ProcessBuilderFactory.runCommand("schtasks", "/delete", "/tn", taskName, "/f"));
+                LogV3.info(result.toString());
+                if (result.getExitCode() != 0) {
+                    throw new WTFException(result.toString());
+                }
+            }
+        } finally {
+            file.delete();
         }
     }
 }

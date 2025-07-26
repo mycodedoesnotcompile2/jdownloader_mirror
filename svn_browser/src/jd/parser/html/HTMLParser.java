@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 import jd.nutils.encoding.Encoding;
 
 import org.appwork.utils.Application;
+import org.appwork.utils.CharSequenceUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Hex;
 import org.appwork.utils.logging2.LogInterface;
@@ -771,51 +772,61 @@ public class HTMLParser {
             return this.unicode;
         }
 
+        private boolean isHtmlDecode() {
+            return this.htmlDecode;
+        }
+
         private final boolean hex;
         private final boolean base64;
         private final boolean urlEncoded;
         private final boolean unescape;
         private final boolean unicode;
+        private final boolean htmlDecode;
 
         private boolean isUnescape() {
             return this.unescape;
         }
 
         private HtmlParserOptions() {
-            this(true, true, true, true, true, true);
+            this(true, true, true, true, true, true, true);
         }
 
-        private HtmlParserOptions(final boolean reverse, final boolean hex, final boolean base64, final boolean urlEncoded, final boolean unescape, final boolean unicode) {
+        private HtmlParserOptions(final boolean reverse, final boolean hex, final boolean base64, final boolean urlEncoded, final boolean unescape, final boolean unicode, final boolean htmlDecode) {
             this.reverse = reverse;
             this.hex = hex;
             this.base64 = base64;
             this.urlEncoded = urlEncoded;
             this.unescape = unescape;
             this.unicode = unicode;
+            this.htmlDecode = htmlDecode;
         }
 
         private HtmlParserOptions reverse(final boolean reverse) {
-            return new HtmlParserOptions(reverse, this.hex, this.base64, this.urlEncoded, this.unescape, this.unicode);
+            return new HtmlParserOptions(reverse, this.hex, this.base64, this.urlEncoded, this.unescape, this.unicode, this.htmlDecode);
         }
 
         private HtmlParserOptions hex(final boolean hex) {
-            return new HtmlParserOptions(this.reverse, hex, this.base64, this.urlEncoded, this.unescape, this.unicode);
+            return new HtmlParserOptions(this.reverse, hex, this.base64, this.urlEncoded, this.unescape, this.unicode, this.htmlDecode);
         }
 
         private HtmlParserOptions base64(final boolean base64) {
-            return new HtmlParserOptions(this.reverse, this.hex, base64, this.urlEncoded, this.unescape, this.unicode);
+            return new HtmlParserOptions(this.reverse, this.hex, base64, this.urlEncoded, this.unescape, this.unicode, this.htmlDecode);
         }
 
         private HtmlParserOptions urlEncoded(final boolean urlEncoded) {
-            return new HtmlParserOptions(this.reverse, this.hex, this.base64, urlEncoded, this.unescape, this.unicode);
+            return new HtmlParserOptions(this.reverse, this.hex, this.base64, urlEncoded, this.unescape, this.unicode, this.htmlDecode);
         }
 
         private HtmlParserOptions unescape(final boolean unescape) {
-            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, unescape, this.unicode);
+            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, unescape, this.unicode, this.htmlDecode);
         }
 
         private HtmlParserOptions unicode(final boolean unicode) {
-            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, this.unescape, unicode);
+            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, this.unescape, unicode, this.htmlDecode);
+        }
+
+        private HtmlParserOptions htmlDecode(final boolean decode) {
+            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, this.unescape, this.unicode, decode);
         }
     }
 
@@ -1409,6 +1420,9 @@ public class HTMLParser {
             HTMLParser.logInfo(results, "Apply auto special cut off|" + input + "|" + cutoff);
             input = cutoff;
         }
+        if (options.isHtmlDecode()) {
+            input = HTMLParser.htmlDecode(input);
+        }
         final int indexofa = input.indexOf("&");
         if (indexofa > 0 && input.indexOf("?") == -1) {
             final int indexofb = input.indexOf("#");
@@ -1723,7 +1737,25 @@ public class HTMLParser {
     }
 
     private static HtmlParserCharSequence unicodeDecode(final CharSequence cs) {
-        return new HtmlParserCharSequence(Encoding.unicodeDecode(cs, true));
+        final CharSequence decoded = Encoding.unicodeDecode(cs, true);
+        if (!CharSequenceUtils.contentEquals(decoded, cs)) {
+            return new HtmlParserCharSequence(decoded);
+        } else if (cs instanceof HtmlParserCharSequence) {
+            return (HtmlParserCharSequence) cs;
+        } else {
+            return new HtmlParserCharSequence(cs);
+        }
+    }
+
+    private static HtmlParserCharSequence htmlDecode(final CharSequence cs) {
+        final CharSequence decoded = Encoding.htmlOnlyDecode(cs.toString(), true);
+        if (!CharSequenceUtils.contentEquals(decoded, cs)) {
+            return new HtmlParserCharSequence(decoded);
+        } else if (cs instanceof HtmlParserCharSequence) {
+            return (HtmlParserCharSequence) cs;
+        } else {
+            return new HtmlParserCharSequence(cs);
+        }
     }
 
     public static String getProtocol(final String url) {

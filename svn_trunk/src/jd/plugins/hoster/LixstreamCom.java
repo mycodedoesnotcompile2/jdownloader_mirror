@@ -42,7 +42,7 @@ import org.appwork.utils.encoding.Base64;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51250 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51257 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class LixstreamCom extends PluginForHost {
          * Current list of domains can be found here: https://lixstream.com/#/file -> Select an uploaded file -> Share -> Dialog pops up ->
          * See "Choose domain"
          */
-        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net", "videb.org", "lix0.org", "doey07sto.com" });
+        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "poopxy.com", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net", "videb.org", "lix0.org", "doey07sto.com" });
         return ret;
     }
 
@@ -101,7 +101,7 @@ public class LixstreamCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:e|s)/([a-zA-Z0-9]{8,})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:e|s)/([a-zA-Z0-9]{8,})(\\?p=(\\d+)&f=([a-f0-9-]{32,}))?");
         }
         return ret.toArray(new String[0]);
     }
@@ -116,8 +116,16 @@ public class LixstreamCom extends PluginForHost {
         }
     }
 
+    /* Returns unique file_id */
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        String fid = urlinfo.getMatch(3);
+        if (fid != null) {
+            /* Link in style /s/([a-zA-Z0-9]{8,})\\?p=... */
+            return fid;
+        }
+        /* Link in style /s/([a-zA-Z0-9]{8,})$ */
+        return urlinfo.getMatch(0);
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
@@ -136,6 +144,7 @@ public class LixstreamCom extends PluginForHost {
 
     @Override
     protected String getDefaultFileName(final DownloadLink link) {
+
         final String fid = this.getFID(link);
         return fid + ext_default;
     }
@@ -167,12 +176,22 @@ public class LixstreamCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         dllink = null;
-        final String fid = this.getFID(link);
         this.setBrowserExclusive();
         final Browser brc = br.cloneBrowser();
         brc.getHeaders().put("Referer", link.getPluginPatternMatcher());
-        Request request = brc.createPostRequest(getAPIBase() + "/s/home/resources/" + fid, "");
-        request.getHeaders().put("Content-Type", "application/json");
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        final String short_file_id = urlinfo.getMatch(0);
+        final String suid = urlinfo.getMatch(2);
+        final String sid = urlinfo.getMatch(3);
+        final Request request;
+        if (suid != null && sid != null) {
+            /* Single file as part of folder */
+            request = brc.createGetRequest(getAPIBase() + "/s/home/resource/" + suid + "/" + sid);
+        } else {
+            /* Single loose file */
+            request = brc.createPostRequest(getAPIBase() + "/s/home/resources/" + short_file_id, "");
+            request.getHeaders().put("Content-Type", "application/json");
+        }
         getPage(link, brc, request);
         if (brc.getHttpConnection().getResponseCode() == 400) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server issues (error 400)", 15 * 60 * 1000l);
