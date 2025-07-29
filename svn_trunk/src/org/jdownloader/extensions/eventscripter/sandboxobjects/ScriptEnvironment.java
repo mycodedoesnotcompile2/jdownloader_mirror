@@ -61,8 +61,6 @@ import jd.controlling.reconnect.Reconnecter;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
-import net.sourceforge.htmlunit.corejs.javascript.Function;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
@@ -108,6 +106,8 @@ import org.jdownloader.plugins.WaitingSkipReason;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.SoundSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.mozilla.javascript.Function;
+import org.mozilla.javascript.ScriptableObject;
 
 public class ScriptEnvironment {
 

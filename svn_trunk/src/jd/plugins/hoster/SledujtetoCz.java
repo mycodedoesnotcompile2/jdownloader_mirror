@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -37,7 +32,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50803 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51269 $", interfaceVersion = 3, names = {}, urls = {})
 public class SledujtetoCz extends PluginForHost {
     public SledujtetoCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +134,7 @@ public class SledujtetoCz extends PluginForHost {
                 /* Set filesize */
                 link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
             }
-            link.setName(this.applyFilenameExtension(filename, extDefault));
+            link.setFinalFileName(this.applyFilenameExtension(filename, extDefault));
         }
         return AvailableStatus.TRUE;
     }
@@ -145,6 +145,7 @@ public class SledujtetoCz extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
+        link.setProperty(DirectHTTP.PROPERTY_ServerComaptibleForByteRangeRequest, true);
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link);
@@ -156,15 +157,11 @@ public class SledujtetoCz extends PluginForHost {
             } else if (fileID == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            br.postPageRaw("https://" + fileServer + ".sledujteto.cz/services/add-file-link", "{\"params\":{\"id\":" + fileID + "}}");
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Browser br2 = br.cloneBrowser();
+            br2.postPageRaw("https://" + fileServer + ".sledujteto.cz/services/add-file-link", "{\"params\":{\"id\":" + fileID + "}}");
+            final Map<String, Object> entries = restoreFromString(br2.getRequest().getHtmlCode(), TypeRef.MAP);
             final String fileHash = entries.get("hash").toString();
             final String dllink = "/player/index/sledujteto/" + fileHash;
-            br.getHeaders().put("Referer", "https://" + hostForReferer + "/");
-            br.getHeaders().put("sec-fetch-dest", "video");
-            // TODO: Make this work
-            // link.setProperty("oldraf_preferOpenRangeFirst", true);
-            // br.getHeaders().put("Range", "bytes=0-");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             this.handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
@@ -185,12 +182,8 @@ public class SledujtetoCz extends PluginForHost {
         try {
             final Browser brc = br.cloneBrowser();
             dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, null), this.getMaxChunks(link, null));
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
+            this.handleConnectionErrors(br, dl.getConnection());
+            return true;
         } catch (final Throwable e) {
             logger.log(e);
             try {

@@ -25,17 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -56,7 +45,18 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 51102 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51265 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,8 +85,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "coomer.su", "coomer.party" }); // onlyfans.com content
-        ret.add(new String[] { "kemono.su", "kemono.party" }); // content of other websites such as patreon.com
+        ret.add(new String[] { "coomer.st", "coomer.su", "coomer.party" }); // onlyfans.com content
+        ret.add(new String[] { "kemono.cr", "kemono.su", "kemono.party" }); // content of other websites such as patreon.com
         return ret;
     }
 
@@ -154,8 +154,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     /**
-     * @param startOffset:
-     *            If provided, only this offset/page will be crawled.
+     * @param startOffset
+     *            : If provided, only this offset/page will be crawled.
      */
     private ArrayList<DownloadLink> crawlProfileAPI(final String service, final String usernameOrUserID, final Integer startOffset) throws Exception {
         if (service == null || usernameOrUserID == null) {
@@ -679,15 +679,13 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-            return size() > 100;
-        };
-    };
+                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                                                              return size() > 100;
+                                                          };
+                                                      };
 
     /**
-     * Returns userID for given username. </br>
-     * Uses API to find userID. </br>
-     * Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {

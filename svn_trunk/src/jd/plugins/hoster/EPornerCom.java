@@ -51,18 +51,27 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51067 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51262 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/");
     }
 
+    public static final Pattern PATTERN_VIDEO           = Pattern.compile("/(?:hd\\-porn/|video-)(\\w+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_VIDEO_EMBED     = Pattern.compile("/embed/([A-Za-z0-9]+)(/([\\w\\-]+)/?)?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_VIDEO_URL       = Pattern.compile("/dload/(\\w+)/(\\d+)/(\\d+)-(\\d+)p(-av1)?\\.mp4", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_PHOTO           = Pattern.compile("/photo/([A-Za-z0-9]+)(/([\\w\\-]+)/)?", Pattern.CASE_INSENSITIVE);
+    public static final String  PROPERTY_DIRECTURL      = "directurl";
+    public static final String  PROPERTY_LAST_DIRECTURL = "directurl";
+
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(410);
+        br.setCookie(this.getHost(), "ageverif_accepted", "T");
+        br.setCookie(this.getHost(), "epcolor", "black");
         return br;
     }
 
@@ -90,7 +99,7 @@ public class EPornerCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/((?:hd\\-porn/|video-)\\w+(/([^/]+))?|photo/[A-Za-z0-9]+(/[\\w\\-]+/)?|dload/(\\w+)/(\\d+)/(\\d+)-(\\d+)p(-av1)?\\.mp4)");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_VIDEO.pattern() + "|" + PATTERN_VIDEO_EMBED.pattern() + "|" + PATTERN_VIDEO_URL.pattern() + "|" + PATTERN_PHOTO.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -99,12 +108,6 @@ public class EPornerCom extends PluginForHost {
     public String getAGBLink() {
         return "https://www." + getHost() + "/terms/";
     }
-
-    private final Pattern      PATTERN_VIDEO           = Pattern.compile("(?i)https?://[^/]+/(?:hd\\-porn/|video-)(\\w+)(/([^/]+))?");
-    private final Pattern      PATTERN_VIDEO_URL       = Pattern.compile("(?i)https?://[^/]+/dload/(\\w+)/(\\d+)/(\\d+)-(\\d+)p(-av1)?\\.mp4");
-    private final Pattern      PATTERN_PHOTO           = Pattern.compile("(?i)https?://[^/]+/photo/([A-Za-z0-9]+)(/([\\w\\-]+)/)?");
-    public static final String PROPERTY_DIRECTURL      = "directurl";
-    public static final String PROPERTY_LAST_DIRECTURL = "directurl";
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
@@ -151,6 +154,10 @@ public class EPornerCom extends PluginForHost {
             extDefault = ".mp4";
             isVideo = true;
             titleByURL = null;
+        } else if ((videoRegex = new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO_EMBED)).patternFind()) {
+            extDefault = ".mp4";
+            isVideo = true;
+            titleByURL = videoRegex.getMatch(2);
         } else {
             extDefault = ".jpg";
             isVideo = false;
@@ -178,6 +185,16 @@ public class EPornerCom extends PluginForHost {
         } else if (!this.br.getURL().contains(this.getFID(link))) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        boolean isAgeVerificationBlocked = this.isAgeVerificationBlocked(br);
+        if (isAgeVerificationBlocked && new Regex(br._getURL().getPath(), PATTERN_VIDEO).patternFind()) {
+            logger.info("Trying to avoid age verification");
+            /* 2025-07-28: Use video embed page to avoid the need of age verification. */
+            br.getPage(br.getURL().replaceFirst("/video-", "/embed/"));
+            isAgeVerificationBlocked = this.isAgeVerificationBlocked(br);
+        }
+        if (isAgeVerificationBlocked) {
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Age verification required! Change your IP or add a verified eporner account.");
+        }
         long filesize = -1;
         String dllink = null;
         long filesizeBestH264 = 0;
@@ -188,7 +205,7 @@ public class EPornerCom extends PluginForHost {
         long filesizeSelectedAV1 = -1;
         String dllinkBestAV1 = null;
         String dllinkSelectedAV1 = null;
-        String title = br.getRegex("(?i)<title>([^<]+)</title>").getMatch(0);
+        String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
         String pic[] = null;
         if (isVideo) {
             final String betterTitleByURL = new Regex(br.getURL(), PATTERN_VIDEO).getMatch(2);
@@ -198,7 +215,7 @@ public class EPornerCom extends PluginForHost {
             final String vq = getPreferredStreamQuality(link);
             PreferredVideoCodec codec = getPreferredVideoCodec(link);
             /* Official downloadurls */
-            final String[][] dloadinfo = br.getRegex("(?i)href=\"(/dload/[^<>\"]+)\"[^>]*>[^<]* MP4 \\((\\d+)p, ([^<>\"]+)\\)</a>").getMatches();
+            final String[][] dloadinfo = br.getRegex("href=\"(/dload/[^<>\"]+)\"[^>]*>[^<]* MP4 \\((\\d+)p, ([^<>\"\\)]+)\\)</a>").getMatches();
             if (dloadinfo != null && dloadinfo.length != 0) {
                 for (final String[] dlinfo : dloadinfo) {
                     final String directurl = dlinfo[0];
@@ -358,6 +375,15 @@ public class EPornerCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    private boolean isAgeVerificationBlocked(final Browser br) {
+        if (br.containsHTML("<title>Eporner Age Verification</title>|ageVerif/blurred-background")) {
+            /* 2025-07-28: French users need to verify. Checking links or downloading is not possible in this state. */
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private PreferredVideoCodec getPreferredVideoCodec(DownloadLink link) {
         final Regex videoUrlRegex = new Regex(link.getProperty(PROPERTY_LAST_DIRECTURL, link.getPluginPatternMatcher()), PATTERN_VIDEO_URL);
         if (videoUrlRegex.patternFind()) {
@@ -421,7 +447,7 @@ public class EPornerCom extends PluginForHost {
 
     private void connectionErrorhandling(final URLConnectionAdapter con, final DownloadLink link, final Account account) throws PluginException, IOException {
         /* E.g. https://static.eporner.com/na.mp4 */
-        if (isBadDirecturl(con.getURL().toString())) {
+        if (isBadDirecturl(con.getURL().toExternalForm())) {
             errorBrokenVideo();
         }
         /* Double-check for broken/bad/dummy-video */
@@ -432,7 +458,7 @@ public class EPornerCom extends PluginForHost {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
             /* 2020-05-26: Limit = 100 videos per day for unregistered users, no limit for registered users */
-            if (br.containsHTML("(?i)>\\s*You have downloaded more than|>\\s*Please try again tomorrow or register for free to unlock unlimited")) {
+            if (br.containsHTML(">\\s*You have downloaded more than|>\\s*Please try again tomorrow or register for free to unlock unlimited")) {
                 if (account != null) {
                     /* 2020-05-26: This should never happen in account mode */
                     throw new AccountUnavailableException("Daily download limit reached or session error", 10 * 60 * 1000l);
@@ -457,8 +483,8 @@ public class EPornerCom extends PluginForHost {
         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken video?", 5 * 60 * 1000l);
     }
 
-    private String getPreferredStreamQuality(final DownloadLink downloadLink) {
-        final Regex videoUrlRegex = new Regex(downloadLink.getProperty(PROPERTY_LAST_DIRECTURL, downloadLink.getPluginPatternMatcher()), PATTERN_VIDEO_URL);
+    private String getPreferredStreamQuality(final DownloadLink link) {
+        final Regex videoUrlRegex = new Regex(link.getProperty(PROPERTY_LAST_DIRECTURL, link.getPluginPatternMatcher()), PATTERN_VIDEO_URL);
         if (videoUrlRegex.patternFind()) {
             return videoUrlRegex.getMatch(1) + "p";
         }
@@ -508,13 +534,15 @@ public class EPornerCom extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
+            br.getPage("https://www." + getHost());
             final Form loginform = new Form();
             loginform.setMethod(MethodType.POST);
-            loginform.setAction("https://www." + this.getHost() + "/xhr/login/");
+            loginform.setAction("/xhr/login/");
             loginform.put("xhr", "1");
             loginform.put("act", "login");
             loginform.put("login", Encoding.urlEncode(account.getUser()));
-            loginform.put("haslo", Encoding.urlEncode(account.getPass()));
+            loginform.put("pass", Encoding.urlEncode(account.getPass()));
+            loginform.put("googleToken", "");
             loginform.put("ref", "/");
             br.submitForm(loginform);
             /* 2020-05-26: E.g. login failed: {"status":0,"msg_head":"Login failed.","msg_body":"Bad login\/password"} */

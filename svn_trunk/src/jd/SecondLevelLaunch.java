@@ -123,7 +123,6 @@ import org.jdownloader.net.AutoBCSSLSocketStreamFactory;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
 import org.jdownloader.osevents.OperatingSystemEventSender;
 import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.scripting.JSHtmlUnitPermissionRestricter;
 import org.jdownloader.scripting.JSRhinoPermissionRestricter;
 import org.jdownloader.settings.AutoDownloadStartOption;
 import org.jdownloader.settings.GeneralSettings;
@@ -356,11 +355,6 @@ public class SecondLevelLaunch {
         }
         try {
             JSRhinoPermissionRestricter.init();
-        } catch (final Throwable e) {
-            LoggerFactory.getDefaultLogger().log(e);
-        }
-        try {
-            JSHtmlUnitPermissionRestricter.init();
         } catch (final Throwable e) {
             LoggerFactory.getDefaultLogger().log(e);
         }

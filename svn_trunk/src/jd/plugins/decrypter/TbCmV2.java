@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51153 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51258 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1364,6 +1364,9 @@ public class TbCmV2 extends PluginForDecrypt {
         Map<String, Object> rootMap;
         List<Map<String, Object>> varray = null;
         boolean abortPaginationAfterFirstPage = false;
+        /* Use integer array here so that other functions can alter this value. */
+        int[] videoPositionCounter = new int[1];
+        videoPositionCounter[0] = 0;
         do {
             run++;
             helper.getPage(br, userOrPlaylistURL);
@@ -1567,7 +1570,6 @@ public class TbCmV2 extends PluginForDecrypt {
         }
         final ArrayList<YoutubeClipData> ret = new ArrayList<YoutubeClipData>();
         humanReadableTitle += " sorted by " + activeSort;
-        int videoPositionCounter = 0;
         int round = 0;
         final String INNERTUBE_CLIENT_NAME = helper.getYtCfgSet() != null ? String.valueOf(helper.getYtCfgSet().get("INNERTUBE_CONTEXT_CLIENT_NAME")) : null;
         final String INNERTUBE_API_KEY = helper.getYtCfgSet() != null ? String.valueOf(helper.getYtCfgSet().get("INNERTUBE_API_KEY")) : null;
@@ -1612,7 +1614,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
                 /* Check for some abort conditions */
                 final int numberofNewItemsThisRun = playListDupes.size() - crawledItemsSizeOld;
-                logger.info("Crawled page " + round + " | Found items on this page: " + numberofNewItemsThisRun + " | Found items so far: " + playListDupes.size() + "/" + totalNumberofItems + " | nextPageToken = " + nextPageToken + " | Max items limit: " + maxItemsLimit + " | activeSort: " + activeSort + " | Internal guessed pagination size: " + internalGuessedPaginationSize);
+                logger.info("Crawled page " + round + " | Found items on this page: " + numberofNewItemsThisRun + " | Found items so far: " + playListDupes.size() + "/" + totalNumberofItems + " | nextPageToken = " + nextPageToken + " | Max items limit: " + maxItemsLimit + " | activeSort: " + activeSort + " | Internal guessed pagination size: " + internalGuessedPaginationSize + " | videoPositionCounter: " + videoPositionCounter[0]);
                 if (this.isAbort()) {
                     logger.info("Stopping because: Aborted by user");
                     throw new InterruptedException();
@@ -1777,6 +1779,8 @@ public class TbCmV2 extends PluginForDecrypt {
                     collectYoutubeClipData(item, result, videoPositionCounter);
                 }
             }
+        } else {
+            logger.warning("WTF jsonObject has unsupported type");
         }
     }
 
@@ -1897,16 +1901,10 @@ public class TbCmV2 extends PluginForDecrypt {
         }
     }
 
-    /**
-     * This method would replace your current varrayLoop implementation It collects all items through recursive search and then handles
-     * limits and duplicates separately
-     */
-    private ArrayList<YoutubeClipData> processVideoArray(List<Map<String, Object>> varray, Set<String> playListDupes, final int maxItemsLimit, int initialVideoPositionCounter) {
-        ArrayList<YoutubeClipData> result = new ArrayList<YoutubeClipData>();
-        int[] videoPositionCounter = new int[1];
-        videoPositionCounter[0] = initialVideoPositionCounter;
+    private ArrayList<YoutubeClipData> processVideoArray(List<Map<String, Object>> varray, Set<String> playListDupes, final int maxItemsLimit, int[] videoPositionCounter) {
+        final ArrayList<YoutubeClipData> result = new ArrayList<YoutubeClipData>();
         // Collect all video data without filtering
-        List<Object[]> collectedData = new ArrayList<Object[]>();
+        final List<Object[]> collectedData = new ArrayList<Object[]>();
         collectYoutubeClipData(varray, collectedData, videoPositionCounter);
         // Process the collected data with filtering logic
         int numberofSkippedDuplicates = 0;

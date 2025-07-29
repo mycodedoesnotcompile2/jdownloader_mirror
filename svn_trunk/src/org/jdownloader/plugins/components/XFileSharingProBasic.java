@@ -91,7 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 51249 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51270 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1062,27 +1062,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-    try {
-        /* Check if response is plaintext and contains any known error messages. */
-        final byte[] probe = urlConnection.peek(32);
-        if (probe.length > 0) {
-            final String probeContext = new String(probe, "UTF-8");
-            final Request clone = urlConnection.getRequest().cloneRequest();
-            clone.setHtmlCode(probeContext);
-            final Browser br = createNewBrowserInstance();
-            br.setRequest(clone);
-            try {
-                // TODO: extract the html checks into own method to avoid Browser instance
-                checkServerErrors(br, getDownloadLink(), null);
-            } catch (PluginException e) {
-                logger.log(e);
-                return false;
+        try {
+            /* Check if response is plaintext and contains any known error messages. */
+            final byte[] probe = urlConnection.peek(32);
+            if (probe.length > 0) {
+                final String probeContext = new String(probe, "UTF-8");
+                final Request clone = urlConnection.getRequest().cloneRequest();
+                clone.setHtmlCode(probeContext);
+                final Browser br = createNewBrowserInstance();
+                br.setRequest(clone);
+                try {
+                    // TODO: extract the html checks into own method to avoid Browser instance
+                    checkServerErrors(br, getDownloadLink(), null);
+                } catch (PluginException e) {
+                    logger.log(e);
+                    return false;
+                }
             }
+        } catch (IOException e) {
+            logger.log(e);
         }
-    } catch (IOException e) {
-        logger.log(e);
-    }
-    return true;
+        return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -3488,7 +3488,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                                 engine.eval("var " + reference.getKey() + "=" + reference.getValue() + ";");
                             }
                             engine.eval("var response=" + jssource + ";");
-                            ressourcelist = (List<Object>) JavaScriptEngineFactory.toMap(engine.get("response"));
+                            ressourcelist = (List<Object>) JavaScriptEngineFactory.convertJavaScriptToJava(engine.get("response"));
                         } else {
                             ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
                         }

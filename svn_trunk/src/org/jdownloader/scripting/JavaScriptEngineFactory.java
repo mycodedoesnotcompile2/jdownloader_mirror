@@ -30,7 +30,6 @@ import javax.script.ScriptException;
 import javax.script.SimpleBindings;
 import javax.script.SimpleScriptContext;
 
-import jd.config.Property;
 import jd.parser.Regex;
 import jd.plugins.MinimalMemoryJSonParser;
 import jd.plugins.components.ThrowingRunnable;
@@ -42,7 +41,6 @@ import org.appwork.storage.simplejson.ParserException;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.reflection.Clazz;
 import org.jdownloader.logging.LogController;
 import org.mozilla.javascript.ConsString;
 import org.mozilla.javascript.Context;
@@ -476,9 +474,9 @@ public class JavaScriptEngineFactory {
                 /*
                  * script may use Java primitive wrapper type objects (such as java.lang.Integer, java.lang.Boolean etc) explicitly. If we
                  * unwrap, then these script objects will become script primitive types. For example,
-                 *
+                 * 
                  * var x = new java.lang.Double(3.0); print(typeof x);
-                 *
+                 * 
                  * will print 'number'. We don't want that to happen.
                  */
                 Object obj = njb.unwrap();
@@ -991,6 +989,8 @@ public class JavaScriptEngineFactory {
             return null;
         } else if (param instanceof Boolean) {
             return param;
+        } else if (param instanceof String) {
+            return param;
         } else if (param instanceof CharSequence) {
             return param.toString();
         } else if (param instanceof Number) {
@@ -1008,7 +1008,13 @@ public class JavaScriptEngineFactory {
             final Map<Object, Object> no = (Map<Object, Object>) param;
             final Map<Object, Object> elem = new HashMap<Object, Object>();
             for (Entry<Object, Object> entry : no.entrySet()) {
-                elem.put(convertJavaScriptToJava(entry.getKey()), convertJavaScriptToJava(entry.getValue()));
+                final Object key = convertJavaScriptToJava(entry.getKey());
+                final Object value = convertJavaScriptToJava(entry.getValue());
+                if (key instanceof String) {
+                    elem.put(key, value);
+                } else {
+                    elem.put(String.valueOf(key), value);
+                }
             }
             return elem;
         } else {
@@ -1023,9 +1029,12 @@ public class JavaScriptEngineFactory {
         }
         final List<Object> ret = new ArrayList<Object>();
         for (Object param : parameters) {
+            System.out.println(param.getClass());
             if (param == null) {
                 ret.add(null);
             } else if (param instanceof Boolean) {
+                ret.add(param);
+            } else if (param instanceof String) {
                 ret.add(param);
             } else if (param instanceof CharSequence) {
                 ret.add(param.toString());
@@ -1044,7 +1053,13 @@ public class JavaScriptEngineFactory {
                 final Map<Object, Object> no = (Map<Object, Object>) param;
                 final Map<Object, Object> elem = new HashMap<Object, Object>();
                 for (Entry<Object, Object> entry : no.entrySet()) {
-                    elem.put(convertJavaScriptToJava(entry.getKey()), convertJavaScriptToJava(entry.getValue()));
+                    final Object key = convertJavaScriptToJava(entry.getKey());
+                    final Object value = convertJavaScriptToJava(entry.getValue());
+                    if (key instanceof String) {
+                        elem.put(key, value);
+                    } else {
+                        elem.put(String.valueOf(key), value);
+                    }
                 }
                 ret.add(elem);
             } else {
@@ -1075,7 +1090,7 @@ public class JavaScriptEngineFactory {
                     throw e;
                 } else {
                     engine.eval("var response=" + string + ";");
-                    return toMap(engine.get("response"));
+                    return convertJavaScriptToJava(engine.get("response"));
                 }
             } catch (ScriptException e2) {
                 Exceptions.addSuppressed(e2, e);
@@ -1251,62 +1266,11 @@ public class JavaScriptEngineFactory {
         return currentObject;
     }
 
-    public static Object toMap(Object obj) {
-        if (obj == null) {
-            return null;
-        } else if (Clazz.isPrimitiveWrapper(obj.getClass())) {
-            return obj;
-        } else if (obj instanceof String) {
-            return obj;
-        } else if (obj instanceof org.mozilla.javascript.NativeObject) {
-            final Object[] entries = ((org.mozilla.javascript.NativeObject) obj).getIds();
-            final Map<String, Object> ret = Property.newMapInstance(entries.length);
-            for (Object s : entries) {
-                if (s instanceof String) {
-                    ret.put((String) s, toMap(((org.mozilla.javascript.NativeObject) obj).get(s)));
-                } else {
-                    System.out.println("Unknown Key: " + s + " " + s.getClass());
-                    ret.put(s + "", toMap(((org.mozilla.javascript.NativeObject) obj).get(s)));
-                }
-            }
-            return ret;
-        } else if (obj instanceof org.mozilla.javascript.NativeArray) {
-            final ArrayList<Object> ret = new ArrayList<Object>();
-            for (int i = 0; i < ((org.mozilla.javascript.NativeArray) obj).getLength(); i++) {
-                ret.add(toMap(((org.mozilla.javascript.NativeArray) obj).get(i)));
-            }
-            ret.trimToSize();
-            return ret;
-        } else if (obj instanceof net.sourceforge.htmlunit.corejs.javascript.NativeObject) {
-            final Object[] entries = ((net.sourceforge.htmlunit.corejs.javascript.NativeObject) obj).getIds();
-            final Map<String, Object> ret = Property.newMapInstance(entries.length);
-            for (Object s : entries) {
-                if (s instanceof String) {
-                    ret.put((String) s, toMap(((net.sourceforge.htmlunit.corejs.javascript.NativeObject) obj).get(s)));
-                } else {
-                    System.out.println("Unknown Key: " + s + " " + s.getClass());
-                    ret.put(s + "", toMap(((org.mozilla.javascript.NativeObject) obj).get(s)));
-                }
-            }
-            return ret;
-        } else if (obj instanceof net.sourceforge.htmlunit.corejs.javascript.NativeArray) {
-            final ArrayList<Object> ret = new ArrayList<Object>();
-            for (int i = 0; i < ((net.sourceforge.htmlunit.corejs.javascript.NativeArray) obj).getLength(); i++) {
-                ret.add(toMap(((net.sourceforge.htmlunit.corejs.javascript.NativeArray) obj).get(i)));
-            }
-            ret.trimToSize();
-            return ret;
-        }
-        return null;
-    }
-
     public static <T extends Exception> void runTrusted(ThrowingRunnable<T> runnable) throws T {
         try {
             JSRhinoPermissionRestricter.TRUSTED_THREAD.put(Thread.currentThread(), true);
-            JSHtmlUnitPermissionRestricter.TRUSTED_THREAD.put(Thread.currentThread(), true);
             runnable.run();
         } finally {
-            JSHtmlUnitPermissionRestricter.TRUSTED_THREAD.remove(Thread.currentThread());
             JSRhinoPermissionRestricter.TRUSTED_THREAD.remove(Thread.currentThread());
         }
     }

@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51261 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexalarabCom extends KernelVideoSharingComV2 {
     public SexalarabCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +47,7 @@ public class SexalarabCom extends KernelVideoSharingComV2 {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/((?!categories|category|latest-updates|models|most-popular|search|tags?|top-rated|get_file)[a-z0-9\\-%]+/?|embed/\\d+/?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/((?!(categories|category|latest-updates|models|most-popular|search|tags?|top-rated|get_file|rss|login-required|signup|login|feedback|terms|dmca|2257))[a-z0-9-%]+/?|embed/\\d+/?)");
         }
         return ret.toArray(new String[0]);
     }

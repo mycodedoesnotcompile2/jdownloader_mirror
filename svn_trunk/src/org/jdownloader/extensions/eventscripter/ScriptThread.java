@@ -20,15 +20,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.swing.SwingUtilities;
 
 import jd.http.Browser;
-import net.sourceforge.htmlunit.corejs.javascript.Context;
-import net.sourceforge.htmlunit.corejs.javascript.EcmaError;
-import net.sourceforge.htmlunit.corejs.javascript.NativeJavaMethod;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptRuntime;
-import net.sourceforge.htmlunit.corejs.javascript.Scriptable;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
-import net.sourceforge.htmlunit.corejs.javascript.UniqueTag;
-import net.sourceforge.htmlunit.corejs.javascript.WrapFactory;
-import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
@@ -49,8 +40,15 @@ import org.jdownloader.extensions.eventscripter.sandboxobjects.ScriptEnvironment
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.myjdownloader.client.json.JsonMap;
-import org.jdownloader.scripting.JSHtmlUnitPermissionRestricter;
+import org.jdownloader.scripting.JSRhinoPermissionRestricter;
 import org.jdownloader.scripting.JSShutterDelegate;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.EcmaError;
+import org.mozilla.javascript.NativeJavaMethod;
+import org.mozilla.javascript.ScriptRuntime;
+import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.UniqueTag;
+import org.mozilla.javascript.tools.shell.Global;
 
 public class ScriptThread extends Thread implements JSShutterDelegate {
     private final ScriptEntry                  script;
@@ -181,17 +179,8 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
 
     protected void initContext(Context context) {
         cx.setOptimizationLevel(-1);
-        cx.setLanguageVersion(Context.VERSION_1_5);
-        cx.setWrapFactory(new WrapFactory() {
-            @Override
-            public Scriptable wrapAsJavaObject(Context cx, Scriptable scope, Object javaObject, Class<?> staticType) {
-                if (javaObject instanceof Map) {
-                    return new NativeJavaMapWrapper(scope, javaObject);
-                } else {
-                    return super.wrapAsJavaObject(cx, scope, javaObject, staticType);
-                }
-            }
-        });
+        cx.setLanguageVersion(Context.VERSION_1_5);// old default
+        cx.getWrapFactory().setJavaPrimitiveWrap(false);// old default
     }
 
     private synchronized void executeScipt() {
@@ -265,10 +254,10 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
     protected String preInitClasses() {
         final HashSet<String> dupes = new HashSet<String>();
         final HashSet<Class<?>> visibleClasses = new HashSet<Class<?>>();
-        dupes.add("net.sourceforge.htmlunit.corejs.javascript.Function");
+        dupes.add("org.mozilla.javascript.Function");
         dupes.add("void");
         StringBuilder preloadClasses = new StringBuilder("");
-        for (Class<?> c : new Class[] { Boolean.class, Byte.class, Short.class, Integer.class, Long.class, String.class, Double.class, Float.class, ArrayList.class, List.class, LinkedList.class, Map.class, HashMap.class, JsonMap.class, Set.class, HashSet.class, MinimalMemoryMap.class, net.sourceforge.htmlunit.corejs.javascript.EcmaError.class, ScriptEnvironment.class, EnvironmentException.class }) {
+        for (Class<?> c : new Class[] { Boolean.class, Byte.class, Short.class, Integer.class, Long.class, String.class, Double.class, Float.class, ArrayList.class, List.class, LinkedList.class, Map.class, HashMap.class, JsonMap.class, Set.class, HashSet.class, MinimalMemoryMap.class, org.mozilla.javascript.EcmaError.class, ScriptEnvironment.class, EnvironmentException.class }) {
             if (c.isArray()) {
                 c = c.getComponentType();
             }
@@ -364,11 +353,11 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
 
     public Object evalTrusted(String preloadClasses) {
         // System.out.println(preloadClasses);
-        return JSHtmlUnitPermissionRestricter.evaluateTrustedString(cx, getScope(), preloadClasses, "", 1, null);
+        return JSRhinoPermissionRestricter.evaluateTrustedString(cx, getScope(), preloadClasses, "", 1, null);
     }
 
     private void cleanupClasses() {
-        final List<String> list = JSHtmlUnitPermissionRestricter.getLoaded();
+        final List<String> list = JSRhinoPermissionRestricter.getLoaded();
         // Cleanup
         ScriptableObject.deleteProperty(scope, "Packages");
         for (String s : list) {
@@ -486,22 +475,22 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
             return true;
         } else if (className.startsWith("adapter")) {
             return true;
-        } else if (className.equals("net.sourceforge.htmlunit.corejs.javascript.EcmaError")) {
+        } else if ("org.mozilla.javascript.EcmaError".equals(className) || "net.sourceforge.htmlunit.corejs.javascript.EcmaError".equals(className)) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().severe("Javascript error occured");
             return true;
-        } else if (className.equals("net.sourceforge.htmlunit.corejs.javascript.ConsString")) {
+        } else if ("org.mozilla.javascript.ConsString".equals(className) || "net.sourceforge.htmlunit.corejs.javascript.ConsString".equals(className)) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().severe("Javascript error occured");
             return true;
-        } else if (className.equals("net.sourceforge.htmlunit.corejs.javascript.JavaScriptException")) {
+        } else if ("org.mozilla.javascript.JavaScriptException".equals(className) || "net.sourceforge.htmlunit.corejs.javascript.JavaScriptException".equals(className)) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().severe("Javascript error occured");
             return true;
-        } else if (className.equals(org.jdownloader.extensions.eventscripter.EnvironmentException.class.getName())) {
+        } else if (org.jdownloader.extensions.eventscripter.EnvironmentException.class.getName().equals(className)) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().severe("Environment error occured");
             return true;
-        } else if (className.equals("net.sourceforge.htmlunit.corejs.javascript.WrappedException")) {
+        } else if ("org.mozilla.javascript.WrappedException".equals(className) || "net.sourceforge.htmlunit.corejs.javascript.WrappedException".equals(className)) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().severe("Script RuntimeException occured");
             return true;
-        } else if (className.equals("net.sourceforge.htmlunit.corejs.javascript.EvaluatorException")) {
+        } else if ("org.mozilla.javascript.EvaluatorException".equals(className) || "net.sourceforge.htmlunit.corejs.javascript.EvaluatorException".equals(className)) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().severe("Javascript error occured");
             return true;
         } else {

@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -34,7 +35,7 @@ import jd.plugins.PluginException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51267 $", interfaceVersion = 3, names = {}, urls = {})
 public class MyqloudOrg extends XFileSharingProBasic {
     public MyqloudOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -142,32 +143,16 @@ public class MyqloudOrg extends XFileSharingProBasic {
             /* 2020-03-11: Special */
             videoQualityHTMLs = new Regex(getCorrectBR(brc), "<div class=\"badge-download high-quality.*?download icon-secondary").getColumn(-1);
         }
-        /** TODO: Add quality selection: Low, Medium, Original Example: deltabit.co */
-        /*
-         * Internal quality identifiers highest to lowest (inside 'download_video' String): o = original, h = high, n = normal, l=low
-         */
-        final HashMap<String, Integer> qualityMap = new HashMap<String, Integer>();
-        qualityMap.put("l", 20); // low
-        qualityMap.put("n", 40); // normal
-        qualityMap.put("h", 60); // high
-        qualityMap.put("o", 80); // original
-        qualityMap.put("x", 100); // download
-        long maxInternalQualityValue = 0;
-        String filesizeStr = null;
-        String videoQualityStr = null;
-        String videoHash = null;
-        String targetHTML = null;
         if (videoQualityHTMLs.length == 0) {
             logger.info("Failed to find any official video downloads");
+            return null;
         }
-        // logger.info("Trying to find selected quality for official video download");
-        logger.info("Trying to find highest quality for official video download");
-        for (final String videoQualityHTML : videoQualityHTMLs) {
+        // Parse all video quality HTML once and store in list of maps
+        List<Map<String, Object>> parsedQualities = new ArrayList<Map<String, Object>>();
+        for (int i = 0; i < videoQualityHTMLs.length; i++) {
+            final String videoQualityHTML = videoQualityHTMLs[i];
             final String filesizeStrTmp = new Regex(videoQualityHTML, "(([0-9\\.]+)\\s*(KB|MB|GB|TB))").getMatch(0);
-            // final String vid = videoinfo.getMatch(0);
             final Regex videoinfo = new Regex(videoQualityHTML, "download_video\\('([a-z0-9]+)','([^<>\"\\']*)','([^<>\"\\']*)'");
-            // final String vid = videoinfo.getMatch(0);
-            /* Usually this will be 'o' standing for "original quality" */
             String videoQualityStrTmp = videoinfo.getMatch(1);
             if (videoQualityStrTmp == null) {
                 /* 2020-03-11: Special */
@@ -179,42 +164,107 @@ public class MyqloudOrg extends XFileSharingProBasic {
                 videoHashTmp = new Regex(videoQualityHTML, "data-hash=\"\\s*(.*?)\\s*\"").getMatch(0);
             }
             if (StringUtils.isEmpty(videoQualityStrTmp) || StringUtils.isEmpty(videoHashTmp)) {
-                /*
-                 * Possible plugin failure but let's skip bad items. Upper handling will fallback to stream download if everything fails!
-                 */
-                continue;
-            } else if (!qualityMap.containsKey(videoQualityStrTmp)) {
-                /*
-                 * 2020-01-18: There shouldn't be any unknown values but we should consider allowing such in the future maybe as final
-                 * fallback.
-                 */
-                logger.info("Skipping unknown quality: " + videoQualityStrTmp);
                 continue;
             }
-            final int internalQualityValueTmp = qualityMap.get(videoQualityStrTmp);
-            if (internalQualityValueTmp < maxInternalQualityValue) {
-                /* Only continue with qualities that are higher than the highest we found so far. */
-                continue;
-            }
-            maxInternalQualityValue = internalQualityValueTmp;
-            videoQualityStr = videoQualityStrTmp;
-            videoHash = videoHashTmp;
-            if (filesizeStrTmp != null) {
-                /*
-                 * Usually, filesize for official video downloads will be given but not in all cases. It may also happen that our upper
-                 * RegEx fails e.g. for supervideo.tv.
-                 */
-                filesizeStr = filesizeStrTmp;
-            }
-            targetHTML = videoQualityHTML;
+            Map<String, Object> qualityData = new HashMap<String, Object>();
+            qualityData.put("videoQualityStr", videoQualityStrTmp);
+            qualityData.put("videoHash", videoHashTmp);
+            qualityData.put("filesizeStr", filesizeStrTmp);
+            qualityData.put("targetHTML", videoQualityHTML);
+            qualityData.put("index", i);
+            parsedQualities.add(qualityData);
         }
-        if (targetHTML == null || videoQualityStr == null || videoHash == null) {
-            if (videoQualityHTMLs != null && videoQualityHTMLs.length > 0) {
-                /* This should never happen */
-                logger.info(String.format("Failed to find officially downloadable video quality although there are %d qualities available", videoQualityHTMLs.length));
-            }
+        if (parsedQualities.isEmpty()) {
+            logger.info("No valid video qualities found");
             return null;
         }
+        /** TODO: Add quality selection: Low, Medium, Original Example: deltabit.co */
+        /*
+         * Internal quality identifiers highest to lowest (inside 'download_video' String): o = original, h = high, n = normal, l=low
+         */
+        final HashMap<String, Integer> qualityMap = new HashMap<String, Integer>();
+        qualityMap.put("l", 20); // low
+        qualityMap.put("n", 40); // normal
+        qualityMap.put("h", 60); // high
+        qualityMap.put("o", 80); // original
+        qualityMap.put("x", 100); // download
+        // Filter out unknown qualities and add internal quality values
+        List<Map<String, Object>> validQualities = new ArrayList<Map<String, Object>>();
+        for (Map<String, Object> qualityData : parsedQualities) {
+            String videoQualityStr = (String) qualityData.get("videoQualityStr");
+            if (!qualityMap.containsKey(videoQualityStr)) {
+                logger.info("Skipping unknown quality: " + videoQualityStr);
+                continue;
+            }
+            qualityData.put("internalQualityValue", qualityMap.get(videoQualityStr));
+            validQualities.add(qualityData);
+        }
+        if (validQualities.isEmpty()) {
+            logger.warning("No valid video qualities found after filtering");
+            return null;
+        }
+        final String userSelectedQualityValue = getPreferredDownloadQualityStr();
+        if (userSelectedQualityValue == null) {
+            logger.info("Trying to find highest quality for official video download");
+        } else {
+            logger.info(String.format("Trying to find user selected quality %s for official video download", userSelectedQualityValue));
+        }
+        Map<String, Object> selectedQuality = null;
+        boolean foundUserSelectedQuality = false;
+        // First try to find exact match for user selected quality
+        if (userSelectedQualityValue != null) {
+            for (Map<String, Object> qualityData : validQualities) {
+                String videoQualityStr = (String) qualityData.get("videoQualityStr");
+                if (videoQualityStr.equalsIgnoreCase(userSelectedQualityValue)) {
+                    logger.info("Found user selected quality: " + userSelectedQualityValue);
+                    foundUserSelectedQuality = true;
+                    selectedQuality = qualityData;
+                    break;
+                }
+            }
+        }
+        // If user selected quality not found, find next best
+        if (userSelectedQualityValue != null && !foundUserSelectedQuality) {
+            logger.info("Failed to find user selected quality --> Finding next best quality");
+            final int userSelectedQualityValueInt = qualityMap.get(userSelectedQualityValue.toLowerCase());
+            int nextBestQualityValue = Integer.MAX_VALUE;
+            for (Map<String, Object> qualityData : validQualities) {
+                int internalQualityValue = (Integer) qualityData.get("internalQualityValue");
+                // Find the smallest quality value that is still higher than user selected
+                if (internalQualityValue > userSelectedQualityValueInt && internalQualityValue < nextBestQualityValue) {
+                    nextBestQualityValue = internalQualityValue;
+                    selectedQuality = qualityData;
+                }
+            }
+            if (selectedQuality != null) {
+                logger.info("Selected next best quality: " + selectedQuality.get("videoQualityStr") + " (higher than target " + userSelectedQualityValue + ")");
+            }
+        }
+        // If no user selection or next best found, find highest quality
+        if (selectedQuality == null) {
+            int maxInternalQualityValue = 0;
+            for (Map<String, Object> qualityData : validQualities) {
+                int internalQualityValue = (Integer) qualityData.get("internalQualityValue");
+                if (internalQualityValue > maxInternalQualityValue) {
+                    maxInternalQualityValue = internalQualityValue;
+                    selectedQuality = qualityData;
+                }
+            }
+            if (userSelectedQualityValue != null && !foundUserSelectedQuality) {
+                logger.info("No higher quality found, returning highest available: " + selectedQuality.get("videoQualityStr"));
+            } else {
+                logger.info("Trying to find highest quality for official video download");
+            }
+        }
+        if (selectedQuality == null) {
+            logger.info("Failed to find officially downloadable video quality although there are qualities available");
+            return null;
+        }
+        // Extract final values
+        String filesizeStr = (String) selectedQuality.get("filesizeStr");
+        String videoQualityStr = (String) selectedQuality.get("videoQualityStr");
+        String videoHash = (String) selectedQuality.get("videoHash");
+        String targetHTML = (String) selectedQuality.get("targetHTML");
         logger.info("Selected videoquality: " + videoQualityStr);
         if (returnFilesize) {
             /* E.g. in availablecheck */

@@ -69,8 +69,7 @@
 	<classpathentry kind="lib" path="/AppWorkUtils/libs/svgSalamander.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/image4j.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/Filters.jar" sourcepath="ressourcen/code-ressourcen/Filter_src.zip"/>
-	<classpathentry kind="lib" path="ressourcen/libs/htmlunit-core-js.jar"/>
-	<classpathentry kind="lib" path="ressourcen/libs/js.jar"/>
+	<classpathentry kind="lib" path="ressourcen/libs/js.jar" sourcepath="/tmp/.org.sf.feeling.decompiler1753683686302/source/rhino-1.7.7.2-sources-1753712490550.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/zip4j.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bcpkix-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bcprov-jdk15on.jar"/>

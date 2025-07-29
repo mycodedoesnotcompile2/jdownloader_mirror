@@ -1,7 +1,7 @@
 package org.jdownloader.extensions.eventscripter;
 
-import net.sourceforge.htmlunit.corejs.javascript.Context;
-import net.sourceforge.htmlunit.corejs.javascript.Function;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.Function;
 
 public class ScriptReferenceThread extends Thread {
 

@@ -1,9 +1,8 @@
 package org.jdownloader.extensions.eventscripter;
 
 import org.appwork.utils.Exceptions;
-
-import net.sourceforge.htmlunit.corejs.javascript.EcmaError;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptRuntime;
+import org.mozilla.javascript.EcmaError;
+import org.mozilla.javascript.ScriptRuntime;
 
 public class EnvironmentException extends Exception {
 

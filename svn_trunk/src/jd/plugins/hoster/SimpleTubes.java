@@ -17,8 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,10 +29,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47769 $", interfaceVersion = 2, names = { "eyny.com" }, urls = { "https?://(?:\\w+\\.)?eyny\\.com/watch\\?v=([a-zA-Z0-9_-]+)" })
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51268 $", interfaceVersion = 2, names = { "eyny.com" }, urls = { "https?://(?:\\w+\\.)?eyny\\.com/watch\\?v=([a-zA-Z0-9_-]+)" })
 public class SimpleTubes extends PluginForHost {
-    private String dllink            = null;
-    private String customFavIconHost = null;
+    private String dllink = null;
 
     public SimpleTubes(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,8 +81,8 @@ public class SimpleTubes extends PluginForHost {
         } else if (br.containsHTML(">找不到影片<|class=\"alert_error\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String title = br.getRegex("<title>(.*?)( -  Free Videos & Sex Movies - XXX Tube - EYNY)?</title>").getMatch(0);
-        dllink = br.getRegex("<source.*?src=\'([^<>']*?)\'").getMatch(0);
+        String title = br.getRegex("<title>(.*?)(\\s*-\\s*Free Videos & Sex Movies - XXX Tube - EYNY)?\\s*</title>").getMatch(0);
+        dllink = br.getRegex("<source.*?src\\s*=\\s*\'([^<>']*?)\'").getMatch(0);
         if (dllink == null) {
             final String internalVideoID = br.getRegex("(\\?|&)vid=(\\d+)").getMatch(0);
             if (internalVideoID == null) {
@@ -93,29 +92,24 @@ public class SimpleTubes extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
+        dllink = Encoding.htmlOnlyDecode(dllink);
         logger.info("dllink: " + dllink);
-        dllink = Encoding.htmlDecode(dllink);
+        String filename = null;
         if (title != null) {
-            link.setFinalFileName(Encoding.htmlDecode(title).trim() + ".mp4");
+            filename = Encoding.htmlDecode(title).trim() + ".mp4";
+            link.setFinalFileName(filename);
         }
         if (dllink != null) {
             final Browser br2 = br.cloneBrowser();
-            // In case the link redirects to the finallink
             br2.setFollowRedirects(true);
-            URLConnectionAdapter con = null;
             try {
-                con = br2.openGetConnection(dllink);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
+                final URLConnectionAdapter con = basicLinkCheck(br2, br2.createHeadRequest(dllink), link, filename, ".mp4");
+                dllink = con.getURL().toExternalForm();
+            } catch (PluginException e) {
+                if (e.getLinkStatus() == LinkStatus.ERROR_PLUGIN_DEFECT) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken media", e);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken media");
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
+                    throw e;
                 }
             }
         }
@@ -129,11 +123,13 @@ public class SimpleTubes extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 3);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
+        handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    @Override
+    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     public String getCustomFavIconURL(final DownloadLink link) {
@@ -142,9 +138,6 @@ public class SimpleTubes extends PluginForHost {
             if (domain != null) {
                 return domain;
             }
-        }
-        if (this.customFavIconHost != null) {
-            return this.customFavIconHost;
         }
         return null;
     }

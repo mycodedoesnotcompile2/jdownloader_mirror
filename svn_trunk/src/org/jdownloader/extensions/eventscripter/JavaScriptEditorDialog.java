@@ -17,10 +17,6 @@ import javax.swing.JToolBar;
 import jd.gui.swing.jdgui.views.settings.components.Checkbox;
 import jsyntaxpane.DefaultSyntaxKit;
 import jsyntaxpane.syntaxkits.JavaSyntaxKit;
-import net.sourceforge.htmlunit.corejs.javascript.Context;
-import net.sourceforge.htmlunit.corejs.javascript.Script;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
-import net.sourceforge.htmlunit.corejs.javascript.tools.shell.Global;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
@@ -38,7 +34,11 @@ import org.jdownloader.actions.AppAction;
 import org.jdownloader.extensions.eventscripter.sandboxobjects.ScriptEnvironment;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
-import org.jdownloader.scripting.JSHtmlUnitPermissionRestricter;
+import org.jdownloader.scripting.JSRhinoPermissionRestricter;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.Script;
+import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.tools.shell.Global;
 
 public class JavaScriptEditorDialog extends AbstractDialog<Object> {
     private static final String                   CLEANUP                  = "[^\\w\\d\\(\\)\\+\\-\\[\\]\\;\\,/\\\\]";
@@ -296,21 +296,13 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
                 scope.init(cx);
                 String lib;
                 lib = IO.readURLToString(ScriptEntry.class.getResource("js_beautifier.js"));
-                Script compiledLibrary = JSHtmlUnitPermissionRestricter.compileTrustedString(cx, scope, lib, "", 1, null);
-                JSHtmlUnitPermissionRestricter.evaluateTrustedString(cx, scope, "global=this;", "", 1, null);
+                Script compiledLibrary = JSRhinoPermissionRestricter.compileTrustedString(cx, scope, lib, "", 1, null);
+                JSRhinoPermissionRestricter.evaluateTrustedString(cx, scope, "global=this;", "", 1, null);
                 compiledLibrary.exec(cx, scope);
             }
-            //
-            // Class[] classes = new Class[] { Boolean.class, Integer.class, Long.class, String.class, Double.class, Float.class,
-            // net.sourceforge.htmlunit.corejs.javascript.EcmaError.class, ProcessRunner.class, DownloadLinkAPIStorableV2.class };
-            // String preloadClasses = "";
-            // for (Class c : classes) {
-            // preloadClasses += "load=" + c.getName() + ";\r\n";
-            // }
-            // preloadClasses += "var call=" + ProcessRunner.class.getName() + ".call;var alert=" + ProcessRunner.class.getName() +
-            // ".alert;delete load;";
+
             ScriptableObject.putProperty(scope, "text", script);
-            String formated = (String) JSHtmlUnitPermissionRestricter.evaluateTrustedString(cx, scope, "js_beautify(text, {   });", "", 1, null);
+            String formated = (String) JSRhinoPermissionRestricter.evaluateTrustedString(cx, scope, "js_beautify(text, {   });", "", 1, null);
             return formated;
             // ProcessBuilderFactory.runCommand(commandline);
         } catch (Throwable e) {

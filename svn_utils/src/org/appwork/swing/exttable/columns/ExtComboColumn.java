@@ -50,6 +50,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 
 import org.appwork.resources.AWUTheme;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.components.RadioBoxIcon;
@@ -408,6 +409,9 @@ public abstract class ExtComboColumn<E, ModelType> extends ExtTextColumn<E> impl
         if (selectedItem == null) {
             return null;
         } else {
+            if (value instanceof LabelInterface) {
+                return ((LabelInterface) value).getLabel();
+            }
             return selectedItem.toString();
         }
     }

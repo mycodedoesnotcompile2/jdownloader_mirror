@@ -1,7 +1,15 @@
 package org.jdownloader.scripting;
 
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.logging.LogController;
 import org.mozilla.javascript.Callable;
@@ -10,8 +18,11 @@ import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.EcmaError;
 import org.mozilla.javascript.NativeJavaObject;
+import org.mozilla.javascript.Script;
+import org.mozilla.javascript.ScriptRuntime;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.WrapFactory;
+import org.mozilla.javascript.tools.shell.Global;
 
 /**
  * from http://codeutopia.net/blog/2009/01/02/sandboxing-rhino-in-java/
@@ -101,7 +112,11 @@ import org.mozilla.javascript.WrapFactory;
  */
 public class JSRhinoPermissionRestricter {
     public static class SandboxException extends RuntimeException {
-        private final Context cx;
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+        private final Context     cx;
 
         public Context getContext() {
             return cx;
@@ -128,7 +143,9 @@ public class JSRhinoPermissionRestricter {
 
     static public class SandboxContextFactory extends ContextFactory {
         static public class MyContext extends Context {
-            private volatile long startTime = -1;
+            private MyContext(ContextFactory factory) {
+                super(factory);
+            }
         }
 
         protected void observeInstructionCount(Context cx, int instructionCount) {
@@ -151,7 +168,17 @@ public class JSRhinoPermissionRestricter {
 
         @Override
         protected Context makeContext() {
-            final MyContext cx = new MyContext();
+            final MyContext cx = new MyContext(SandboxContextFactory.this);
+            try {
+                final Field field = Context.class.getDeclaredField("factory");
+                field.setAccessible(true);
+                if (field.get(cx) != SandboxContextFactory.this) {
+                    field.set(cx, SandboxContextFactory.this);
+                    field.setAccessible(false);
+                }
+            } catch (Throwable e) {
+                throw new WTFException(e);
+            }
             // cx.setInstructionObserverThreshold(10000);
             cx.setWrapFactory(new SandboxWrapFactory());
             cx.setClassShutter(new ClassShutter() {
@@ -175,24 +202,38 @@ public class JSRhinoPermissionRestricter {
                         }
                     }
                     if (jsShutterResult != null) {
+                        if (jsShutterResult.booleanValue()) {
+                            LOADED.add(className);
+                        }
                         return jsShutterResult;
                     }
                     if (threadTrusted) {
+                        LOADED.add(className);
                         LogController.CL().severe("Trusted Thread Loads: " + className + "|Thread:" + thread);
                         return true;
                     } else if (className.startsWith("adapter")) {
+                        LOADED.add(className);
                         return true;
                     } else if (className.startsWith("org.mozilla.javascript.ConsString")) {
+                        LOADED.add(className);
                         return true;
                     } else if (className.startsWith("org.mozilla.javascript.JavaScriptException")) {
+                        LOADED.add(className);
                         return true;
                     } else if (className.startsWith("org.mozilla.javascript.EvaluatorException")) {
+                        LOADED.add(className);
                         return true;
                     } else if (className.equals("org.mozilla.javascript.EcmaError")) {
+                        LOADED.add(className);
                         LogController.CL().severe("Javascript error occured");
                         return true;
                     } else {
-                        throw new SandboxException(cx, thread, className, "Security Violation:" + className + "|Thread:" + thread);
+                        if (false) {
+                            final EcmaError ret = ScriptRuntime.constructError("Security Violation", "Security Violation " + className);
+                            throw ret;
+                        } else {
+                            throw new SandboxException(cx, thread, className, "Security Violation:" + className + "|Thread:" + thread);
+                        }
                     }
                 }
             });
@@ -204,11 +245,131 @@ public class JSRhinoPermissionRestricter {
         @SuppressWarnings("rawtypes")
         @Override
         public Scriptable wrapAsJavaObject(Context cx, Scriptable scope, Object javaObject, Class staticType) {
+            if (javaObject instanceof Map) {
+                return new SandboxNativeJavaMapWrapper(scope, javaObject);
+            }
             if (javaObject instanceof EcmaError) {
                 LogController.CL().log((Exception) javaObject);
             }
             return new SandboxNativeJavaObject(scope, javaObject, staticType);
         }
+    }
+
+    public static class SandboxNativeJavaMapWrapper extends NativeJavaObject {
+
+        private static final long         serialVersionUID = -3786257752907047381L;
+
+        private final Map<Object, Object> map;
+
+        @SuppressWarnings("unchecked")
+        public SandboxNativeJavaMapWrapper(Scriptable scope, Object map) {
+            super(scope, map, map.getClass());
+            assert map instanceof Map;
+            this.map = (Map<Object, Object>) map;
+        }
+
+        @Override
+        public String getClassName() {
+            return "JavaMap";
+        }
+
+        @Override
+        public boolean has(String name, Scriptable start) {
+            final Context cx = Context.getCurrentContext();
+            if (cx != null) {
+                if (map.containsKey(name)) {
+                    return true;
+                }
+            }
+            return super.has(name, start);
+        }
+
+        @Override
+        public boolean has(int index, Scriptable start) {
+            final Context cx = Context.getCurrentContext();
+            if (cx != null) {
+                if (map.containsKey(Integer.valueOf(index))) {
+                    return true;
+                }
+            }
+            return super.has(index, start);
+        }
+
+        @Override
+        public Object get(String name, Scriptable start) {
+            if (name.equals("getClass")) {
+                LogController.CL().severe("JS Security Exception:" + name + "|" + start);
+                return NOT_FOUND;
+            }
+            final Context cx = Context.getCurrentContext();
+            if (cx != null) {
+                if (map.containsKey(name)) {
+                    final Object obj = map.get(name);
+                    return cx.getWrapFactory().wrap(cx, this, obj, obj == null ? null : obj.getClass());
+                }
+            }
+            return super.get(name, start);
+        }
+
+        @Override
+        public Object get(int index, Scriptable start) {
+            final Context cx = Context.getCurrentContext();
+            if (cx != null) {
+                if (map.containsKey(Integer.valueOf(index))) {
+                    final Object obj = map.get(Integer.valueOf(index));
+                    return cx.getWrapFactory().wrap(cx, this, obj, obj == null ? null : obj.getClass());
+                }
+            }
+            return super.get(index, start);
+        }
+
+        @Override
+        public void put(String name, Scriptable start, Object value) {
+            final Context cx = Context.getCurrentContext();
+            if (cx != null) {
+                map.put(name, Context.jsToJava(value, Object.class));
+            } else {
+                super.put(name, start, value);
+            }
+        }
+
+        @Override
+        public void put(int index, Scriptable start, Object value) {
+            final Context cx = Context.getCurrentContext();
+            if (cx != null) {
+                map.put(Integer.valueOf(index), Context.jsToJava(value, Object.class));
+            } else {
+                super.put(index, start, value);
+            }
+        }
+
+        @Override
+        public Object[] getIds() {
+            final Context cx = Context.getCurrentContext();
+            if (cx != null) {
+                final List<Object> ids = new ArrayList<Object>(map.size());
+                for (Object key : map.keySet()) {
+                    if (key instanceof Integer) {
+                        ids.add(key);
+                    } else {
+                        ids.add(ScriptRuntime.toString(key));
+                    }
+                }
+                return ids.toArray();
+            }
+            return super.getIds();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return super.equals(obj);
+        }
+
+        @Override
+        public int hashCode() {
+            return super.hashCode();
+        }
+
     }
 
     public static class SandboxNativeJavaObject extends NativeJavaObject {
@@ -231,6 +392,39 @@ public class JSRhinoPermissionRestricter {
 
     public static final ConcurrentHashMap<Thread, Boolean>           TRUSTED_THREAD   = new ConcurrentHashMap<Thread, Boolean>();
     public static final ConcurrentHashMap<Thread, JSShutterDelegate> THREAD_JSSHUTTER = new ConcurrentHashMap<Thread, JSShutterDelegate>();
+
+    public static Object evaluateTrustedString(Context cx, Global scope, String source, String sourceName, int lineno, Object securityDomain) {
+        final Thread thread = Thread.currentThread();
+        try {
+            TRUSTED_THREAD.put(thread, true);
+            return cx.evaluateString(scope, source, sourceName, lineno, securityDomain);
+        } finally {
+            TRUSTED_THREAD.remove(thread);
+        }
+    }
+
+    public static Script compileTrustedString(Context cx, Global scope, String source, String sourceName, int lineno, Object securityDomain) {
+        final Thread thread = Thread.currentThread();
+        try {
+            TRUSTED_THREAD.put(thread, true);
+            return cx.compileString(source, sourceName, lineno, securityDomain);
+        } finally {
+            TRUSTED_THREAD.remove(thread);
+        }
+    }
+
+    private static final CopyOnWriteArraySet<String> LOADED = new CopyOnWriteArraySet<String>();
+
+    public static List<String> getLoaded() {
+        final List<String> ret = new ArrayList<String>(LOADED);
+        Collections.sort(ret, new Comparator<String>() {
+            @Override
+            public int compare(String o1, String o2) {
+                return o2.length() - o1.length();
+            }
+        });
+        return ret;
+    }
 
     public static void init() {
         try {

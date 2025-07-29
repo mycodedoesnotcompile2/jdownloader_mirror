@@ -52,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51258 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwojplikPl extends PluginForHost {
     public TwojplikPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +66,7 @@ public class TwojplikPl extends PluginForHost {
 
     @Override
     public Object getFavIcon(String host) throws IOException {
-        return "https://jd2.twojplik.pl/assets/images/favicon-2/favicon.ico";
+        return "https://jd2." + getHost() + "/assets/images/favicon-2/favicon.ico";
     }
 
     @Override

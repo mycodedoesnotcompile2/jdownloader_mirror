@@ -34,17 +34,17 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import net.sourceforge.htmlunit.corejs.javascript.ClassShutter;
-import net.sourceforge.htmlunit.corejs.javascript.Context;
-import net.sourceforge.htmlunit.corejs.javascript.ContextFactory;
-import net.sourceforge.htmlunit.corejs.javascript.Scriptable;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.formatter.HexFormatter;
+import org.mozilla.javascript.ClassShutter;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.ContextFactory;
+import org.mozilla.javascript.Scriptable;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "dummycnl.jdownloader.org" }, urls = { "https?://dummycnl\\.jdownloader\\.org/#?[a-f0-9A-F]+" })
+@DecrypterPlugin(revision = "$Revision: 51264 $", interfaceVersion = 3, names = { "dummycnl.jdownloader.org" }, urls = { "https?://dummycnl\\.jdownloader\\.org/#?[a-f0-9A-F]+" })
 public class DummyCNL extends PluginForDecrypt {
     public DummyCNL(final PluginWrapper wrapper) {
         super(wrapper);

@@ -15,9 +15,16 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -34,13 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.YetiShareCore;
-
-@HostPlugin(revision = "$Revision: 51058 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51263 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -138,13 +139,11 @@ public class SharingWtf extends YetiShareCore {
     public String[] scanInfo(final DownloadLink link, final String[] fileInfo) {
         /* 2020-01-17: Special */
         super.scanInfo(link, fileInfo);
-        if (StringUtils.isEmpty(fileInfo[1])) {
-            fileInfo[1] = br.getRegex("class=\"fa fa-file-o\"></i>([^<>\"]+)<span").getMatch(0);
-            if (!StringUtils.isEmpty(fileInfo[1])) {
-                fileInfo[1] = fileInfo[1].trim();
-                if (!fileInfo[1].contains("b")) {
-                    fileInfo[1] += "b";
-                }
+        final String betterFilesize = br.getRegex("class=\"fa fa-file-o\"></i>([^<>\"]+)<span").getMatch(0);
+        if (!StringUtils.isEmpty(betterFilesize)) {
+            fileInfo[1] = betterFilesize.trim();
+            if (!fileInfo[1].contains("b")) {
+                fileInfo[1] += "b";
             }
         }
         return fileInfo;
@@ -187,7 +186,7 @@ public class SharingWtf extends YetiShareCore {
         }
         if (continue_link == null) {
             /* 2023-05-09 */
-            continue_link = br.getRegex("(?i)href='(https?://[^<>\"\\']+)' target='_top'[^>]*>\\s*Download\\s*</a>").getMatch(0);
+            continue_link = br.getRegex("href='(https?://[^<>\"\\']+)' target='_top'[^>]*>\\s*Download\\s*</a>").getMatch(0);
         }
         if (continue_link == null) {
             /* 2024-02-09: Premium */
@@ -208,10 +207,13 @@ public class SharingWtf extends YetiShareCore {
         if (premiumonly_1 != null) {
             throw new AccountRequiredException(Encoding.htmlDecode(premiumonly_1).trim());
         } else if (br.containsHTML("you need to be a registered user to download any files")) {
-            throw new AccountRequiredException();
+            throw new AccountRequiredException("You need to be a registered user to download any files");
         } else if (premiumonly_2 != null) {
             /* 2024-02-09 */
             throw new AccountRequiredException(premiumonly_2);
+        } else if (br.containsHTML(">\\s*You are now required to login in order to download")) {
+            /* 2025-07-28 */
+            throw new AccountRequiredException("You are now required to login in order to download");
         }
         final String dailyLimitReachedText = br.getRegex(">\\s*(You have reached the daily download limit of \\d+ files)").getMatch(0);
         if (dailyLimitReachedText != null) {
@@ -355,5 +357,14 @@ public class SharingWtf extends YetiShareCore {
         } else {
             super.handlePremium(link, account);
         }
+    }
+
+    @Override
+    protected String getCorrectHost(final DownloadLink link, URL url) {
+        /*
+         * 2025-07-28: Small workaround to avoid problems when e.g. login happens via sharing.wtf but links to download contain domain
+         * filesharing.io.
+         */
+        return this.getHost();
     }
 }

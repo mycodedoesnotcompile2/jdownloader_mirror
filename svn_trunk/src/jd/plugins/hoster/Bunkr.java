@@ -37,7 +37,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 51164 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51270 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -88,7 +88,7 @@ public class Bunkr extends PluginForHost {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("httpss?://get\\." + buildHostsPatternPart(domains) + PATH_FUID_NUMBERS.pattern());
+            ret.add("https?://get\\." + buildHostsPatternPart(domains) + PATH_FUID_NUMBERS.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -113,6 +113,7 @@ public class Bunkr extends PluginForHost {
     private final static Pattern PATTERN_FID                                         = Pattern.compile("(-([A-Za-z0-9]{8}))(\\.[^\\.]+)?$");
     /* Plugin properties */
     private static final String  PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
+    private static final String  PROPERTY_LAST_KNOWN_FID                             = "last_known_fid";
     private static final String  PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
     private static final String  PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL = "last_grabbed_image_fullsize_view_directurl";
     private static final String  PROPERTY_LAST_USED_SINGLE_FILE_URL                  = "last_used_single_file_url";
@@ -150,20 +151,24 @@ public class Bunkr extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
+        // getFID should be speed/memory optimized
+        String fid = link.getStringProperty(PROPERTY_LAST_KNOWN_FID);
+        if (fid != null) {
+            return fid;
+        }
         final String lastStoredDirecturl = link.getStringProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
-        String fid = null;
         if (lastStoredDirecturl != null) {
             fid = getFidFromURL(lastStoredDirecturl);
         }
         if (fid == null) {
             fid = getFidFromURL(link.getPluginPatternMatcher());
         }
-        if (fid != null) {
-            return fid;
-        } else {
+        if (fid == null) {
             /* Fallback: Use filename as FID. */
-            return getFilenameFromURL(link);
+            fid = getFilenameFromURL(link);
         }
+        link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+        return fid;
     }
 
     private String getFilenameFromURL(final DownloadLink link) {
@@ -201,6 +206,9 @@ public class Bunkr extends PluginForHost {
             return fid;
         }
         fid = new Regex(url, PATH_FUID_NUMBERS).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
         return fid;
     }
 
@@ -468,7 +476,7 @@ public class Bunkr extends PluginForHost {
     }
 
     private String getDirecturlFromSingleFileAvailablecheck(final DownloadLink link, final String singleFileURL, final boolean accessURL, final boolean isDownload) throws PluginException, IOException {
-        link.removeProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
+        setDirectURL(link, null);
         if (accessURL) {
             br.getPage(singleFileURL);
         }
@@ -577,15 +585,24 @@ public class Bunkr extends PluginForHost {
             directurl = Encoding.htmlOnlyDecode(directurl);
             final String filename = getNameFromURL(this, directurl);
             setFilename(link, filename, true, false);
-            link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, directurl);
+            setDirectURL(link, directurl);
         } else {
             logger.warning("Failed to find download directurl");
         }
         if (directurl == null && imageFullsizeViewDirecturl == null) {
             logger.warning("Failed to find any directurl");
         }
-        link.setProperty(PROPERTY_LAST_USED_SINGLE_FILE_URL, singleFileURL);
+        setDirectURL(link, singleFileURL);
         return directurl;
+    }
+
+    private void setDirectURL(final DownloadLink link, final String directURL) {
+        if (directURL != null) {
+            link.setProperty(PROPERTY_LAST_USED_SINGLE_FILE_URL, directURL);
+        } else {
+            link.removeProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
+        }
+        link.removeProperty(PROPERTY_LAST_KNOWN_FID);
     }
 
     /** For links like this: https://get.bunkrr.su/file/123456... */
@@ -645,7 +662,7 @@ public class Bunkr extends PluginForHost {
             /* n param value is returned via Content-Disposition header as filename */
             directurl += "?n=" + URLEncode.encodeURIComponent(filenameFromHTML);
         }
-        link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, directurl);
+        setDirectURL(link, directurl);
     }
 
     /** See https://get.bunkrr.su/js/src.enc.js */
@@ -799,5 +816,6 @@ public class Bunkr extends PluginForHost {
 
     @Override
     public void resetDownloadlink(DownloadLink link) {
+        link.removeProperty(PROPERTY_LAST_KNOWN_FID);
     }
 }
