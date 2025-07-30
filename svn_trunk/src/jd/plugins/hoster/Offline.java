@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51240 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51276 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -251,6 +251,8 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "hotshag.com" });
         /* 2025-07-22: ServePornCom domains, some of them now redirect to superporn.com */
         ret.add(new String[] { "serveporn.com", "seansporno.com", "einfachporno.com", "vielerporno.com", "pornozot.com", "voglioporno.com", "bubbaporn.com", "pornodrome.tv", "nedporno.com", "pornjam.com", "canalporno.com", "prendiporno.com", "prendiporno.tv", "guterporn.com", "guterporn.xxx", "pornalia.xxx", "bundesporno.xxx", "hierporno.com", "pornburst.xxx", "gauleporno.xxx", "pornoheit.com", "garotaporno.com" });
+        ret.add(new String[] { "ronemo.com", "ronemo.net" });
+        ret.add(new String[] { "spicyfile.com" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

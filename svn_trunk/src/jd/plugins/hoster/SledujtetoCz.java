@@ -37,7 +37,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51269 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51271 $", interfaceVersion = 3, names = {}, urls = {})
 public class SledujtetoCz extends PluginForHost {
     public SledujtetoCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -149,19 +149,22 @@ public class SledujtetoCz extends PluginForHost {
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link);
-            final String hostForReferer = br.getHost(true);
-            final String fileServer = br.getRegex("(data\\d+)\\.sledujteto").getMatch(0);
-            final String fileID = br.getRegex("var files_id = (\\d+);").getMatch(0);
+            final String fileServer = br.getRegex("init\\(\\s*\\d+\\s*,\\s*'(https?://[^/]+)").getMatch(0);
+            final String fileID = br.getRegex("init\\(\\s*(\\d+)\\s*,").getMatch(0);
             if (fileServer == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             } else if (fileID == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final Browser br2 = br.cloneBrowser();
-            br2.postPageRaw("https://" + fileServer + ".sledujteto.cz/services/add-file-link", "{\"params\":{\"id\":" + fileID + "}}");
+            br2.postPageRaw(fileServer + "/services/add-file-link", "{\"params\":{\"id\":" + fileID + "}}");
             final Map<String, Object> entries = restoreFromString(br2.getRequest().getHtmlCode(), TypeRef.MAP);
             final String fileHash = entries.get("hash").toString();
-            final String dllink = "/player/index/sledujteto/" + fileHash;
+            String dllink = br2.getURL("/player/index/sledujteto/" + fileHash).toExternalForm();
+            // br.getHeaders().put("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:141.0) Gecko/20100101 Firefox/141.0");
+            // br.getHeaders().put("Accept-Encoding", "identity");
+            // br.getHeaders().put("Range", "bytes=0-");
+            // br.getHeaders().put("Accept", "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             this.handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());

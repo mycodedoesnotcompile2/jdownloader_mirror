@@ -66,6 +66,7 @@ import javax.swing.PopupFactory;
 import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Time;
@@ -474,7 +475,8 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
                     try {
                         ReflectionUtils.invoke("javax.swing.PopupFactory", "setPopupType", popupFactory, void.class, ToolTipController.MEDIUM_WEIGHT_POPUP);
                     } catch (final InvocationTargetException exception) {
-                        exception.printStackTrace();
+
+                        LogV3.log(exception);
                         setPopupType = false;
                     }
                 }

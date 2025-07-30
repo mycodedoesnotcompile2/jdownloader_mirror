@@ -13,6 +13,16 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.xml.parsers.DocumentBuilder;
 
+import jd.controlling.linkcrawler.ArchiveInfo;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.parser.Regex;
+import jd.plugins.ContainerStatus;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
+import jd.plugins.PluginException;
+import jd.plugins.PluginsC;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
@@ -27,16 +37,6 @@ import org.jdownloader.plugins.components.containers.ContainerConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
-import jd.controlling.linkcrawler.ArchiveInfo;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.parser.Regex;
-import jd.plugins.ContainerStatus;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
-import jd.plugins.PluginException;
-import jd.plugins.PluginsC;
-
 public class SFDL extends PluginsC {
     /* Documentation: https://github.com/n0ix/SFDL.NET/wiki/How-it-Works-(SFDL-File-documentation) */
     public SFDL() {
@@ -48,10 +48,9 @@ public class SFDL extends PluginsC {
     }
 
     /**
-     * Filename scheme containing a title and file-password. </br>
-     * This is typically used for Usenet/NZB container files but I had implemented it for testing password protected .sfdl containers when
-     * the password dialog wasn't implemented yet. </br>
-     * I decided to just leave this feature inside as it's already working fine and it might be useful for some users.
+     * Filename scheme containing a title and file-password. </br> This is typically used for Usenet/NZB container files but I had
+     * implemented it for testing password protected .sfdl containers when the password dialog wasn't implemented yet. </br> I decided to
+     * just leave this feature inside as it's already working fine and it might be useful for some users.
      */
     private static final Pattern        PATTERN_COMMON_FILENAME_SCHEME_WITH_PASSWORD = Pattern.compile("^([^\\{]+)\\{\\{(.*?)\\}\\}\\.sfdl$", Pattern.CASE_INSENSITIVE);
     private static final Object         PWLOCK                                       = new Object();
@@ -176,7 +175,8 @@ public class SFDL extends PluginsC {
             /* TODO: Add check to determine if sfdl_Host is a valid ipv4 address(?) */
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
             if (sfdl_BulkFolderMode) {
-                /* FTP folders(?) */
+                // In case a SFDL Container is in BulkFolder Mode, the SFDL Loader v3 automatically retrieves all Files in the specified
+                // Folder and Subfolders.
                 final NodeList downloadFiles = document.getElementsByTagName("BulkFolderPath");
                 logger.info("Found " + downloadFiles.getLength() + " FTP folders");
                 for (int i = 0; i < downloadFiles.getLength(); i++) {
@@ -186,7 +186,7 @@ public class SFDL extends PluginsC {
                         ftpurl += "/";
                     }
                     logger.info("Result: " + ftpurl);
-                    final DownloadLink ftpfolder = new DownloadLink(null, null, "ftp", ftpurl + "#max_depth=1", true);
+                    final DownloadLink ftpfolder = new DownloadLink(null, null, "ftp", ftpurl + "#max_depth=-1", true);
                     ret.add(ftpfolder);
                 }
             } else {

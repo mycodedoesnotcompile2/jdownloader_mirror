@@ -4,6 +4,8 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
+import jd.http.Browser;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -14,7 +16,7 @@ import org.appwork.utils.net.URLHelper;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.SolverStatus;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -24,8 +26,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_ANTICAPTCHA_COM;
-
-import jd.http.Browser;
 
 public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     private static final AntiCaptchaComSolver INSTANCE = new AntiCaptchaComSolver();
@@ -50,8 +50,16 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     }
 
     @Override
-    protected boolean isChallengeSupported(Challenge<?> c) {
-        return c instanceof HCaptchaChallenge || c instanceof RecaptchaV2Challenge || c instanceof BasicCaptchaChallenge;
+    protected boolean isChallengeSupported(Challenge<?> challenge) {
+        if (challenge instanceof RecaptchaV2Challenge) {
+            return true;
+        } else if (challenge instanceof BasicCaptchaChallenge) {
+            return true;
+        } else if (challenge instanceof CloudflareTurnstileChallenge) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private void errorHandling(AntiCaptchaComAccount account, Map<String, Object> response) throws Exception {
@@ -81,12 +89,12 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     @Override
     protected void solveCES(CESSolverJob<String> job) throws InterruptedException, SolverException {
         final Challenge<String> challenge = job.getChallenge();
-        if (challenge instanceof HCaptchaChallenge) {
-            handleHCaptcha(job);
-        } else if (challenge instanceof RecaptchaV2Challenge) {
+        if (challenge instanceof RecaptchaV2Challenge) {
             handleRecaptchaV2(job);
         } else if (challenge instanceof ImageCaptchaChallenge) {
             handleImageCaptcha(job);
+        } else if (challenge instanceof CloudflareTurnstileChallenge) {
+            handleTurnstileCaptcha(job);
         }
     }
 
@@ -149,24 +157,22 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     }
 
     /**
-     * https://anti-captcha.com/de/apidoc/task-types/HCaptchaTaskProxyless
+     * https://anti-captcha.com/de/apidoc/task-types/TurnstileTaskProxyless
      *
      * @param job
      * @throws InterruptedException
      */
-    private void handleHCaptcha(CESSolverJob<String> job) throws InterruptedException {
-        final HCaptchaChallenge challenge = (HCaptchaChallenge) job.getChallenge();
+    private void handleTurnstileCaptcha(CESSolverJob<String> job) throws InterruptedException {
+        final CloudflareTurnstileChallenge challenge = (CloudflareTurnstileChallenge) job.getChallenge();
         job.showBubble(this);
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
             final Browser br = createNewBrowserInstance();
             br.setReadTimeout(5 * 60000);
-            // Put your CAPTCHA image file, file object, input stream,
-            // or vector of bytes here:
             job.setStatus(SolverStatus.SOLVING);
             final HashMap<String, Object> task = new HashMap<String, Object>();
-            task.put("type", "HCaptchaTaskProxyless");
+            task.put("type", "TurnstileTaskProxyless");
             task.put("websiteURL", challenge.getSiteUrl());
             task.put("websiteKey", challenge.getSiteKey());
             HashMap<String, Object> dataMap = new HashMap<String, Object>();
@@ -188,7 +194,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
                 logger.info(json);
                 if ("ready".equals(response.get("status"))) {
                     final Map<String, Object> solution = ((Map<String, Object>) response.get("solution"));
-                    job.setAnswer(new AntiCaptchaComResponse(challenge, this, taskID, String.valueOf(solution.get("gRecaptchaResponse"))));
+                    job.setAnswer(new AntiCaptchaComResponse(challenge, this, taskID, String.valueOf(solution.get("token"))));
                 } else {
                     Thread.sleep(1000);
                     continue;
@@ -217,8 +223,10 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
             task.put("websiteKey", challenge.getSiteKey());
             if (challenge.getV3Action() != null) {
                 // v3
+                // https://anti-captcha.com/de/apidoc/task-types/RecaptchaV3TaskProxyless
                 task.put("type", "RecaptchaV3TaskProxyless");
                 if (challenge.isEnterprise()) {
+                    // https://anti-captcha.com/de/apidoc/task-types/RecaptchaV3Enterprise
                     task.put("isEnterprise", Boolean.TRUE);
                 }
                 final String action = (String) challenge.getV3Action().get("action");
@@ -229,8 +237,10 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
             } else {
                 // v2
                 if (challenge.isEnterprise()) {
+                    // https://anti-captcha.com/de/apidoc/task-types/RecaptchaV2EnterpriseTaskProxyless
                     task.put("type", "RecaptchaV2EnterpriseTaskProxyless");
                 } else {
+                    // https://anti-captcha.com/de/apidoc/task-types/RecaptchaV2TaskProxyless
                     task.put("type", "RecaptchaV2TaskProxyless");
                 }
                 if (challenge.isInvisible()) {

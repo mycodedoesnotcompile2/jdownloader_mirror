@@ -37,7 +37,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 51270 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51277 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -53,11 +53,33 @@ public class Bunkr extends PluginForHost {
 
     @Override
     public String getMirrorID(DownloadLink link) {
-        final String fid = getFID(link);
+        String fid = link.getStringProperty(PROPERTY_LAST_KNOWN_FID);
         if (fid != null) {
-            return getHost() + "://" + fid;
+            return fid;
+        }
+        fid = getFID(link);
+        if (fid != null) {
+            fid = "bunkr://" + fid;
+            link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+            return fid;
         } else {
             return super.getMirrorID(link);
+        }
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        String fid = link.getStringProperty(PROPERTY_LAST_KNOWN_FID);
+        if (fid != null) {
+            return fid;
+        }
+        fid = getFID(link);
+        if (fid != null) {
+            fid = "bunkr://" + fid;
+            link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+            return fid;
+        } else {
+            return super.getLinkID(link);
         }
     }
 
@@ -140,23 +162,9 @@ public class Bunkr extends PluginForHost {
         return true;
     }
 
-    @Override
-    public String getLinkID(final DownloadLink link) {
-        final String fid = getFID(link);
-        if (fid != null) {
-            return "bunkr://" + fid;
-        } else {
-            return super.getLinkID(link);
-        }
-    }
-
     private String getFID(final DownloadLink link) {
-        // getFID should be speed/memory optimized
-        String fid = link.getStringProperty(PROPERTY_LAST_KNOWN_FID);
-        if (fid != null) {
-            return fid;
-        }
         final String lastStoredDirecturl = link.getStringProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
+        String fid = null;
         if (lastStoredDirecturl != null) {
             fid = getFidFromURL(lastStoredDirecturl);
         }
@@ -167,7 +175,6 @@ public class Bunkr extends PluginForHost {
             /* Fallback: Use filename as FID. */
             fid = getFilenameFromURL(link);
         }
-        link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
         return fid;
     }
 
@@ -592,13 +599,13 @@ public class Bunkr extends PluginForHost {
         if (directurl == null && imageFullsizeViewDirecturl == null) {
             logger.warning("Failed to find any directurl");
         }
-        setDirectURL(link, singleFileURL);
+        link.setProperty(PROPERTY_LAST_USED_SINGLE_FILE_URL, singleFileURL);
         return directurl;
     }
 
     private void setDirectURL(final DownloadLink link, final String directURL) {
         if (directURL != null) {
-            link.setProperty(PROPERTY_LAST_USED_SINGLE_FILE_URL, directURL);
+            link.setProperty(PROPERTY_LAST_GRABBED_DIRECTURL, directURL);
         } else {
             link.removeProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
         }

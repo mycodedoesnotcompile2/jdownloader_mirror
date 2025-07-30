@@ -409,8 +409,8 @@ public abstract class ExtComboColumn<E, ModelType> extends ExtTextColumn<E> impl
         if (selectedItem == null) {
             return null;
         } else {
-            if (value instanceof LabelInterface) {
-                return ((LabelInterface) value).getLabel();
+            if (selectedItem instanceof LabelInterface) {
+                return ((LabelInterface) selectedItem).getLabel();
             }
             return selectedItem.toString();
         }

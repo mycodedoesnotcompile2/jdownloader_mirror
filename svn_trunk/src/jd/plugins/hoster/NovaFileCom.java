@@ -42,7 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51272 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public NovaFileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -226,7 +226,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public void checkServerErrors(final Browser br, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         /* 2020-05-19: Special */
         super.checkServerErrors(br, link, account);
-        if (new Regex(br.toString().trim(), ">\\s*Wrong IP").matches()) {
+        if (new Regex(br.getRequest().getHtmlCode().trim(), ">\\s*Wrong IP").matches()) {
             /*
              * 2020-05-19: May happen when user uses a VPN - this can then especially happen in premium mode for all downloads (via API?!).
              */
@@ -356,18 +356,18 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
          * "message":"You have to wait 5 hours, 56 minutes, 10 seconds until the next download becomes available."}
          */
         final boolean allow_api_only_usage = true;
-        final boolean use_api = this.getPluginConfig().getBooleanProperty(XFileSharingProBasicSpecialFilejoker.PROPERTY_SETTING_USE_API, default_PROPERTY_SETTING_USE_API);
+        final boolean setting_use_api = this.getPluginConfig().getBooleanProperty(XFileSharingProBasicSpecialFilejoker.PROPERTY_SETTING_USE_API, default_PROPERTY_SETTING_USE_API);
         if (!allow_api_only_usage) {
             /* API usage is internally disabled. */
             return false;
         } else if (account == null) {
-            return use_api;
+            return setting_use_api;
         } else if (account.getType() == AccountType.FREE) {
             /* 2020-05-20: API usage is not allowed anymore for free accounts! */
             return false;
         } else {
             /* 2020-05-20: API usage is still allowed for premium accounts. */
-            return use_api;
+            return setting_use_api;
         }
     }
 
@@ -380,7 +380,7 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     @Override
     protected boolean tryAPILoginInWebsiteMode_get_account_info_from_api(final Account account) {
         /*
-         * 2023-11-22: Only us this for free accounts as their API returns invalid 'trafficleft' values for PREMIUM accounts! Seems like
+         * 2023-11-22: Only use this for free accounts as their API returns invalid 'trafficleft' values for PREMIUM accounts! Seems like
          * this field is simply not updated anymore!
          */
         if (account.getType() == AccountType.PREMIUM) {

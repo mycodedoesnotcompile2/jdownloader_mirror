@@ -35,10 +35,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 51210 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51272 $", interfaceVersion = 2, names = {}, urls = {})
 public class JavhdToday extends PluginForDecrypt {
     public JavhdToday(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -50,8 +57,6 @@ public class JavhdToday extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "javhd.today", "javhdz.today" });
-        ret.add(new String[] { "javrave.club", "javr.club" });
-        ret.add(new String[] { "javnew.net" });
         return ret;
     }
 
@@ -80,7 +85,6 @@ public class JavhdToday extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
-        br.setFollowRedirects(true);
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -165,7 +169,7 @@ public class JavhdToday extends PluginForDecrypt {
         if (ret.size() > 0) {
             return ret;
         }
-        String fembed = br.getRegex("<iframe[^<>]*?src=\"([^<>]*?/v/.*?)\"").getMatch(0);
+        String fembed = br.getRegex("<iframe[^>]*?src=\"([^<>]*?/v/.*?)\"").getMatch(0);
         if (fembed == null) {
             fembed = br.getRegex("allowfullscreen=[^<>]+?(http[^<>]+?)>").getMatch(0); // javr.club
         }

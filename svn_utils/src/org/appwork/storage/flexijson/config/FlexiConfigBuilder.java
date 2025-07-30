@@ -368,7 +368,7 @@ public class FlexiConfigBuilder<T> implements InterfaceStorageListener<Object> {
         }
         updateNode();
         String json = toJSONString();
-        LogV3.info("Store FlexiConfig to disk:" + targetPath + "\r\n" + json);
+        LogV3.info("Store FlexiConfig to disk:" + targetPath);
         targetPath.getParentFile().mkdirs();
         IO.secureWrite(targetPath, json, SYNC.META_AND_DATA);
         if (getSource() == Source.DISK) {

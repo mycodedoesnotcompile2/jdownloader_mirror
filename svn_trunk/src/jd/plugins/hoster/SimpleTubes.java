@@ -17,6 +17,9 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -29,9 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51268 $", interfaceVersion = 2, names = { "eyny.com" }, urls = { "https?://(?:\\w+\\.)?eyny\\.com/watch\\?v=([a-zA-Z0-9_-]+)" })
+@HostPlugin(revision = "$Revision: 51273 $", interfaceVersion = 2, names = { "eyny.com" }, urls = { "https?://(?:\\w+\\.)?eyny\\.com/watch\\?v=([a-zA-Z0-9_-]+)" })
 public class SimpleTubes extends PluginForHost {
     private String dllink = null;
 
@@ -46,7 +47,7 @@ public class SimpleTubes extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://eyny.com/";
+        return "https://" + getHost();
     }
 
     @Override
@@ -70,6 +71,7 @@ public class SimpleTubes extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        this.dllink = null;
         if (!link.isNameSet()) {
             link.setName(this.getFID(link) + ".mp4");
         }
@@ -78,7 +80,7 @@ public class SimpleTubes extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">找不到影片<|class=\"alert_error\"")) {
+        } else if (br.containsHTML(">\\s*找不到影片<|class=\"alert_error\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = br.getRegex("<title>(.*?)(\\s*-\\s*Free Videos & Sex Movies - XXX Tube - EYNY)?\\s*</title>").getMatch(0);
@@ -119,7 +121,7 @@ public class SimpleTubes extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        if (dllink == null) {
+        if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 3);
@@ -143,14 +145,7 @@ public class SimpleTubes extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
     public void resetPluginGlobals() {
+        this.dllink = null;
     }
 }

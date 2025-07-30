@@ -185,7 +185,7 @@ public class JNAWMIUtils {
                 boolean comUnInitRequired = false;
                 try {
                     WinNT.HRESULT hres = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_MULTITHREADED);
-                    LogV3.info("COM CoInitializeEx - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
+                    // LogV3.info("COM CoInitializeEx - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
                     switch (hres.intValue()) {
                     // Successful local initialization (S_OK) or was already initialized
                     // (S_FALSE) but still needs uninit
@@ -196,9 +196,10 @@ public class JNAWMIUtils {
                     // COM was already initialized with a different threading model
                     case WinError.RPC_E_CHANGED_MODE:
                         DebugMode.debugger();
-                        LogV3.info("COM already initialized with different threading model, trying COINIT_APARTMENTTHREADED");
+                        // LogV3.info("COM already initialized with different threading model, trying COINIT_APARTMENTTHREADED");
                         hres = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
-                        LogV3.info("COM CoInitializeEx#2 - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
+                        // LogV3.info("COM CoInitializeEx#2 - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) +
+                        // ")");
                         switch (hres.intValue()) {
                         // Successful local initialization (S_OK) or was already initialized
                         // (S_FALSE) but still needs uninit
@@ -213,7 +214,8 @@ public class JNAWMIUtils {
                     // COM already initialized - this is fine, we can proceed
                     case WinError.CO_E_ALREADYINITIALIZED: // CO_E_ALREADYINITIALIZED
                         DebugMode.debugger();
-                        LogV3.info("COM already initialized - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
+                        // LogV3.info("COM already initialized - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) +
+                        // ")");
                         break;
                     default:
                         throw new COMException("Failed to initialize COM library #1. Error: " + hres.intValue(), hres);
@@ -244,7 +246,7 @@ public class JNAWMIUtils {
                                 if (COMUtils.FAILED(hres) && hres.intValue() != WinError.RPC_E_TOO_LATE) {
                                     throw new COMException("Failed to initialize security: " + WMI_ERRORS.get(hres.intValue()), hres);
                                 }
-                                LogV3.info("CoInitializeSecurity - set  COM security configuration for this process");
+                                // LogV3.info("CoInitializeSecurity - set COM security configuration for this process");
                                 SECURITY_INITIALIZED = true;
                             }
                         }
