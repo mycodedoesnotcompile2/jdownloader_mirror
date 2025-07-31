@@ -52,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DeviantArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 51022 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51286 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
     public DeviantArtComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -334,7 +334,7 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
             /* Pass item to hosterplugin straight away. */
             return ret;
         }
-        hosterplugin.requestFileInformation(mainlink, account, false);
+        hosterplugin.requestFileInformation(mainlink, account);
         mainlink.setAvailable(true);
         if (!DeviantArtCom.isImage(mainlink)) {
             /* Item is not an image item -> No need to look for more image items. */

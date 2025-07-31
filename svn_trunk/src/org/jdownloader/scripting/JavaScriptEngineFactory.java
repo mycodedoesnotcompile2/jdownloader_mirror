@@ -474,9 +474,9 @@ public class JavaScriptEngineFactory {
                 /*
                  * script may use Java primitive wrapper type objects (such as java.lang.Integer, java.lang.Boolean etc) explicitly. If we
                  * unwrap, then these script objects will become script primitive types. For example,
-                 * 
+                 *
                  * var x = new java.lang.Double(3.0); print(typeof x);
-                 * 
+                 *
                  * will print 'number'. We don't want that to happen.
                  */
                 Object obj = njb.unwrap();
@@ -999,9 +999,9 @@ public class JavaScriptEngineFactory {
         } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeArray", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeArray", param)) {
             final List<Object> na = (List<Object>) param;
             final int length = na.size();
-            final Object[] elem = new Object[length];
+            final List<Object> elem = new ArrayList<Object>();
             for (int i = 0; i < length; i++) {
-                elem[i] = convertJavaScriptToJava(na.get(i));
+                elem.add(convertJavaScriptToJava(na.get(i)));
             }
             return elem;
         } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeObject", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeObject", param)) {
@@ -1029,7 +1029,6 @@ public class JavaScriptEngineFactory {
         }
         final List<Object> ret = new ArrayList<Object>();
         for (Object param : parameters) {
-            System.out.println(param.getClass());
             if (param == null) {
                 ret.add(null);
             } else if (param instanceof Boolean) {
@@ -1044,9 +1043,9 @@ public class JavaScriptEngineFactory {
             } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeArray", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeArray", param)) {
                 final List<Object> na = (List<Object>) param;
                 final int length = na.size();
-                final Object[] elem = new Object[length];
+                final List<Object> elem = new ArrayList<Object>();
                 for (int i = 0; i < length; i++) {
-                    elem[i] = convertJavaScriptToJava(na.get(i));
+                    elem.add(convertJavaScriptToJava(na.get(i)));
                 }
                 ret.add(elem);
             } else if (ReflectionUtils.isInstanceOf("net.sourceforge.htmlunit.corejs.javascript.NativeObject", param) || ReflectionUtils.isInstanceOf("org.mozilla.javascript.NativeObject", param)) {

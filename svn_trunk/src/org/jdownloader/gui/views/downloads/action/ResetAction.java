@@ -74,8 +74,7 @@ public class ResetAction extends CustomizableTableContextAppAction<FilePackage, 
             return;
         }
         final DeleteMode deleteMode = this.getDeleteMode();
-        // TODO: Make use of ResetSettings
-        // TODO: If grey out this action if user wants to have disabled links excluded && user has only selected disabled items
+        // TODO: Maybe grey out this action if user wants to have disabled links excluded && user has only selected disabled items?
         final ResetSettings settings = new ResetSettings();
         settings.setDeleteMode(this.getDeleteMode());
         settings.setDisabledItemsBehavior(this.getDisabledItemsBehavior());
@@ -109,7 +108,7 @@ public class ResetAction extends CustomizableTableContextAppAction<FilePackage, 
                             e.printStackTrace();
                             return null;
                         }
-                        DownloadWatchDog.getInstance().reset(selection);
+                        DownloadWatchDog.getInstance().reset(selection, settings);
                         return null;
                     }
                 }.start(true);

@@ -91,6 +91,8 @@ import org.jdownloader.controlling.hosterrule.HosterRuleController;
 import org.jdownloader.controlling.hosterrule.HosterRuleControllerListener;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.downloads.action.ResetSettings;
+import org.jdownloader.gui.views.downloads.action.ResetSettings.DeleteMode;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.ConditionalSkipReason;
@@ -1996,6 +1998,11 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
     }
 
     public void reset(final List<DownloadLink> resetLinks) {
+        final ResetSettings settings = new ResetSettings();
+        reset(resetLinks, settings);
+    }
+
+    public void reset(final List<DownloadLink> resetLinks, final ResetSettings settings) {
         if (resetLinks == null || resetLinks.size() == 0) {
             return;
         }
@@ -2007,10 +2014,10 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                     currentSession.getForcedLinks().removeAll(resetLinks);
                 }
                 for (final DownloadLink link : resetLinks) {
-                    SingleDownloadController con = link.getDownloadLinkController();
+                    final SingleDownloadController con = link.getDownloadLinkController();
                     if (con == null) {
                         /* link has no/no alive singleDownloadController, so reset it now */
-                        resetLink(link, currentSession);
+                        resetLink(link, currentSession, settings);
                     } else {
                         /* link has a running singleDownloadController, abort it and reset it after */
                         con.getJobsAfterDetach().add(new DownloadWatchDogJob() {
@@ -2021,7 +2028,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             @Override
                             public void execute(DownloadSession currentSession) {
                                 /* now we can reset the link */
-                                resetLink(link, currentSession);
+                                resetLink(link, currentSession, settings);
                             }
 
                             @Override
@@ -2089,7 +2096,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         return new ArrayList<PluginForHost>(plugins);
     }
 
-    private void resetLink(DownloadLink link, DownloadSession session) {
+    private void resetLink(DownloadLink link, DownloadSession session, ResetSettings settings) {
         if (link.getDownloadLinkController() != null) {
             throw new IllegalStateException("Link is in progress! cannot reset!");
         }
@@ -2100,7 +2107,12 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 container.invalidate();
             }
         }
-        deleteFile(link, DeleteOption.NULL);
+        final DeleteMode dm = settings.getDeleteMode();
+        if (dm == DeleteMode.MOVE_TO_TRASH) {
+            deleteFile(link, DeleteOption.RECYCLE);
+        } else {
+            deleteFile(link, DeleteOption.NULL);
+        }
         unSkipLink(link, session);
         final List<PluginForHost> plugins = getPluginsFromHistory(link, history);
         link.reset(plugins);

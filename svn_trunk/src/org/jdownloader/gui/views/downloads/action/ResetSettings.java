@@ -21,6 +21,12 @@ public class ResetSettings {
                 return _JDT.T.DeleteOption_recycle();
             }
         },
+        MOVE_TO_TRASH_WITH_FINAL_DELETE_AS_FALLBACK {
+            @Override
+            public String getLabel() {
+                return "Move to trash if possible, if not delete permanently";
+            }
+        },
         DELETE {
             @Override
             public String getLabel() {

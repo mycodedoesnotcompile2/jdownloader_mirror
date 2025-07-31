@@ -6,10 +6,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import jd.controlling.downloadcontroller.BadDestinationException;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.PathTooLongException;
-
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
@@ -17,6 +13,10 @@ import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.utils.JDFileUtils;
+
+import jd.controlling.downloadcontroller.BadDestinationException;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.PathTooLongException;
 
 public class FileCreationManager {
     public static enum DeleteOption implements LabelInterface {
@@ -112,50 +112,83 @@ public class FileCreationManager {
         if (deleteTo == null) {
             deleteTo = FileCreationManager.DeleteOption.NULL;
         }
+        if (deleteTo == DeleteOption.NO_DELETE) {
+            /* No delete -> No need to check if file exists -> Early return */
+            return false;
+        }
         if (!file.exists()) {
+            /* File does not exist or has already been deleted. */
             return true;
+        }
+        if (deleteTo == DeleteOption.NULL) {
+            return delete_final(file);
         } else {
-            switch (deleteTo) {
-            case NULL:
-                if (file.delete()) {
-                    return true;
-                } else {
-                    if (Application.getJavaVersion() >= Application.JAVA17) {
-                        try {
-                            java.nio.file.Files.delete(file.toPath());
-                        } catch (Exception e) {
-                            logger.log(e);
-                        }
-                    }
-                    return !file.exists();
-                }
-            case RECYCLE:
-                if (JDFileUtils.isTrashSupported()) {
-                    try {
-                        JDFileUtils.moveToTrash(file);
-                    } catch (IOException e) {
-                        logger.log(e);
-                    }
-                }
+            /* DeleteOption.TRASH */
+            // TODO: Add mode/ENUM like RECYCLE_WITH_FALLBACK_WHEN_UNSUPPORTED
+            return delete_recycle(file, false);
+        }
+    }
+
+    /** Deletes file 'permanently'. */
+    public boolean delete_final(File file) {
+        if (file.delete()) {
+            return true;
+        }
+        /* Try alternative method */
+        if (Application.getJavaVersion() >= Application.JAVA17) {
+            try {
+                java.nio.file.Files.delete(file.toPath());
                 return !file.exists();
-            case NO_DELETE:
-            default:
+            } catch (Exception e) {
+                logger.log(e);
                 return false;
             }
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Moves file to recycle bin if possible. <br>
+     * Permanently deletes it if wished && move to trash is not supported.
+     */
+    public boolean delete_recycle(File file, final boolean delete_final_if_trash_unsupported) {
+        if (JDFileUtils.isTrashSupported()) {
+            try {
+                JDFileUtils.moveToTrash(file);
+                return !file.exists();
+            } catch (IOException e) {
+                logger.log(e);
+                return false;
+            }
+        } else if (delete_final_if_trash_unsupported) {
+            return delete_final(file);
+        } else {
+            return false;
         }
     }
 
     public void moveFile(String oldPath, String newPath) {
-        if (new File(oldPath).exists() && !new File(newPath).exists()) {
-            FileCreationManager.getInstance().mkdir(new File(newPath).getParentFile());
-            if (!new File(oldPath).renameTo(new File(newPath))) {
-                try {
-                    IO.copyFile(new File(oldPath), new File(newPath));
-                    FileCreationManager.getInstance().delete(new File(oldPath), null);
-                } catch (IOException e) {
-                    logger.log(e);
-                }
-            }
+        // Early return if source file doesn't exist
+        if (!new File(oldPath).exists()) {
+            return;
+        }
+        // Early return if destination file already exists
+        if (new File(newPath).exists()) {
+            return;
+        }
+        // Create parent directory for destination
+        FileCreationManager.getInstance().mkdir(new File(newPath).getParentFile());
+        // Try to rename/move the file
+        if (new File(oldPath).renameTo(new File(newPath))) {
+            return; // Success - early return
+        }
+        // If rename failed, try copy and delete
+        try {
+            IO.copyFile(new File(oldPath), new File(newPath));
+            FileCreationManager.getInstance().delete(new File(oldPath), null);
+        } catch (IOException e) {
+            logger.log(e);
         }
     }
 }

@@ -61,13 +61,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51021 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51286 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
     private boolean                    downloadHTML                                = false;
     private String                     betterHTML                                  = null;
     private boolean                    accountRequiredWhenDownloadImpossible       = false;
+    public static final Pattern        PATTERN_STASH                               = Pattern.compile("/stash/([a-z0-9]+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern        PATTERN_ART                                 = Pattern.compile("/([\\w\\-]+/)?art/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern        PATTERN_JOURNAL                             = Pattern.compile("/([\\w\\-]+/)?journal/([\\w\\-]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern        PATTERN_STATUS                              = Pattern.compile("/([\\w\\-]+)/([\\w\\-]+/)?status(?:-update)?/(\\d+)", Pattern.CASE_INSENSITIVE);
@@ -121,6 +122,8 @@ public class DeviantArtCom extends PluginForHost {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
             String regex = "https?://[\\w\\.\\-]*?" + buildHostsPatternPart(domains) + "(";
+            regex += PATTERN_STASH.pattern();
+            regex += "|";
             regex += PATTERN_ART.pattern();
             regex += "|";
             regex += PATTERN_JOURNAL.pattern();
@@ -191,13 +194,19 @@ public class DeviantArtCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "(\\d+)$").getMatch(0);
+        final String contenturl = link.getPluginPatternMatcher();
+        String fid = new Regex(contenturl, PATTERN_STASH).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(contenturl, "(\\d+)$").getMatch(0);
+        return fid;
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        return requestFileInformation(link, account, false);
+        return requestFileInformation(link, account);
     }
 
     public static void parseDeviationJSON(final Plugin plugin, final DownloadLink link, final Map<String, Object> art) {
@@ -297,18 +306,20 @@ public class DeviantArtCom extends PluginForHost {
         return title;
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.downloadHTML = false;
         this.betterHTML = null;
         this.accountRequiredWhenDownloadImpossible = false;
+        final String contenturl = link.getPluginPatternMatcher();
         if (!link.isNameSet()) {
-            link.setName(new URL(link.getPluginPatternMatcher()).getPath() + getAssumedFileExtension(link));
+            /* Set weak filename */
+            link.setName(new URL(contenturl).getPath() + getAssumedFileExtension(link));
         }
         this.setBrowserExclusive();
         if (account != null) {
             login(account, false);
         }
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("/error\\-title\\-oops\\.png\\)")) {
@@ -318,19 +329,40 @@ public class DeviantArtCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         this.handleConnectionErrors(br, br.getHttpConnection(), false);
-        String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
-        if (json != null) {
-            json = PluginJSonUtils.unescape(json);
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            parseFileInformation(br, link, account, entries, isDownload);
+        if (new Regex(contenturl, PATTERN_STASH).patternFind()) {
+            /* Stash download */
+            /* 2025-07-30: Looks like all stash downloads require the user to be logged in. */
+            this.accountRequiredWhenDownloadImpossible = true;
+            String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+            if (title != null) {
+                title = Encoding.htmlDecode(title).trim();
+                title = title.replaceFirst(" on DeviantArt$", "");
+                link.setName(title);
+            }
+            String directurl = br.getRegex("\"(https?://[^/]+/download[^\"]+)").getMatch(0);
+            if (directurl != null) {
+                directurl = Encoding.htmlOnlyDecode(directurl);
+                link.setProperty(PROPERTY_OFFICIAL_DOWNLOADURL, directurl);
+            } else {
+                logger.info("Failed to find directurl");
+            }
         } else {
-            logger.warning("Failed to find json with extended information");
-            parseFileInformation(br, link, account, null, isDownload);
+            /* Art download */
+            String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
+            if (json != null) {
+                json = PluginJSonUtils.unescape(json);
+                final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+                parseFileInformation(br, link, account, entries);
+            } else {
+                logger.warning("Failed to find json with extended information");
+                parseFileInformation(br, link, account, null);
+            }
         }
         return AvailableStatus.TRUE;
     }
 
-    public void parseFileInformation(final Browser br, final DownloadLink link, final Account account, final Map<String, Object> entries, final boolean isDownload) throws Exception {
+    public void parseFileInformation(final Browser br, final DownloadLink link, final Account account, final Map<String, Object> entries) throws Exception {
+        final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
         final String fid = getFID(link);
         String displayedImageURL = null;
         Number unlimitedImageSize = null;
@@ -670,7 +702,7 @@ public class DeviantArtCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        requestFileInformation(link, account, true);
+        requestFileInformation(link, account);
         /* We never know what we get -> Remove verified filesize before download start is attempted. */
         link.setVerifiedFileSize(-1);
         if (this.downloadHTML) {

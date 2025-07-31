@@ -21,24 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.InstagramConfig;
-import org.jdownloader.plugins.components.config.InstagramConfig.MediaQualityDownloadMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -69,7 +51,25 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50881 $", interfaceVersion = 4, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.InstagramConfig;
+import org.jdownloader.plugins.components.config.InstagramConfig.MediaQualityDownloadMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51285 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -150,8 +150,8 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_internal_media_id                  = "internal_media_id";
     public static final String   PROPERTY_orderid                            = "orderid";
     public static final String   PROPERTY_orderid_raw                        = "orderid_raw";
-    public static final String   PROPERTY_orderid_max_raw                    = "orderid_max_raw";                    // number of items
-                                                                                                                     // inside
+    public static final String   PROPERTY_orderid_max_raw                    = "orderid_max_raw";                   // number of items
+    // inside
     // post/story
     public static final String   PROPERTY_shortcode                          = "shortcode";
     public static final String   PROPERTY_story_title                        = "story_title";
@@ -161,13 +161,13 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_date                               = "date";
     public static final String   PROPERTY_hashtag                            = "hashtag";
     public static final String   PROPERTY_coauthor_producers_comma_separated = "coauthor_producers_comma_separated"; // if a post has
-                                                                                                                     // multiple authors
+    // multiple authors
     public static final String   PROPERTY_json_usertags                      = "json_usertags";
     @Deprecated
-    public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                  // used until crawler
-                                                                                                                     // rev
+    public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                 // used until crawler
+    // rev
     // 45795
-    public static final String   PROPERTY_main_content_id                    = "main_content_id";                    // e.g.
+    public static final String   PROPERTY_main_content_id                    = "main_content_id";                   // e.g.
     // instagram.com/p/<main_content_id>/
     public static final String   PROPERTY_forced_packagename                 = "forced_packagename";
     public static final String   PROPERTY_is_private                         = "is_private";
@@ -363,8 +363,8 @@ public class InstaGramCom extends PluginForHost {
     }
 
     /**
-     * Login required to be able to use this!! </br>
-     * removePictureEffects true = grab best quality & original, removePictureEffects false = grab best quality but keep effects/filters.
+     * Login required to be able to use this!! </br> removePictureEffects true = grab best quality & original, removePictureEffects false =
+     * grab best quality but keep effects/filters.
      *
      * @throws Exception
      */
@@ -575,7 +575,7 @@ public class InstaGramCom extends PluginForHost {
         return true;
     }
 
-    public static void checkErrors(Plugin plugin, final Browser br) throws PluginException {
+    public static void checkErrors(Plugin plugin, final Browser br) throws PluginException, AccountInvalidException {
         /* Old trait */
         // if (br.getURL().matches("https?://[^/]+/accounts/login/\\?next=.*")) {
         /* New trait 2020-11-26 */
@@ -583,6 +583,10 @@ public class InstaGramCom extends PluginForHost {
             throw new AccountRequiredException();
         } else if (br.getURL() != null && br.getURL().matches("https?://[^/]+/challenge/.*")) {
             handleLoginChallenge(plugin, br);
+        } else if (br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 400 && br.containsHTML("/accounts/suspended")) {
+            // HTTP/1.1 400 Bad Request
+            // {"message":"checkpoint_required","checkpoint_url":"https://www.instagram.com/accounts/suspended/","lock":true,"flow_render_type":0,"status":"fail"}
+            throw new AccountInvalidException("Account suspended");
         } else if (br.getHttpConnection() != null && br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection() != null && (br.getHttpConnection().getResponseCode() == 403 || br.getHttpConnection().getResponseCode() == 429)) {

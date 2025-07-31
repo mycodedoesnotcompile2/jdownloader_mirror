@@ -18,22 +18,17 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51286 $", interfaceVersion = 3, names = {}, urls = {})
-public class Streama2zCom extends XFileSharingProBasic {
-    public Streama2zCom(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 51281 $", interfaceVersion = 3, names = {}, urls = {})
+public class UpzurCom extends XFileSharingProBasic {
+    public UpzurCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -42,13 +37,13 @@ public class Streama2zCom extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null <br />
+     * captchatype-info: null 4dignum, reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streama2z.com", "streama2z.xyz", "streama2z.pro" });
+        ret.add(new String[] { "upzur.com" });
         return ret;
     }
 
@@ -108,39 +103,5 @@ public class Streama2zCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        if (br.containsHTML(">\\s*Download disabled!")) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Uploader has disabled downloads for this file");
-        }
-        if (link != null && StringUtils.containsIgnoreCase(br.getURL(), "/d/") && br.getHttpConnection().getResponseCode() == 404) {
-            /* 2025-07-30: Special offline -> Example: /d/itlt3myw3ykp */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        super.checkErrors(br, html, link, account, checkAll);
-    }
-
-    @Override
-    protected boolean supports_availablecheck_filename_abuse() {
-        // 2024-10-28
-        return false;
-    }
-
-    @Override
-    protected String getDllinkVideohost(final DownloadLink link, final Account account, final Browser br, final String src) {
-        String dllink = new Regex(src, "\\('mp4link'\\)\\.value='(https?://[^'\"]+)'").getMatch(0);
-        if (dllink != null) {
-            /* Progressive */
-            return dllink;
-        }
-        /* HLS */
-        dllink = new Regex(src, "\\('sources'\\)\\.value='(https?://[^'\"]+)'").getMatch(0);
-        if (dllink != null) {
-            return dllink;
-        }
-        /* Fallback */
-        return super.getDllinkVideohost(link, account, br, src);
     }
 }

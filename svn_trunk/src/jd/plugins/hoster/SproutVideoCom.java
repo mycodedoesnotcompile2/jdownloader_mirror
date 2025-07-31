@@ -2,8 +2,13 @@ package jd.plugins.hoster;
 
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.parser.html.InputField;
@@ -15,23 +20,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-/**
- *
- * note: backend cloudfront
- *
- * @author raztoki
- *
- */
-@HostPlugin(revision = "$Revision: 49499 $", interfaceVersion = 2, names = { "sproutvideo.com" }, urls = { "https?://(?:videos\\.sproutvideo\\.com/embed/[a-f0-9]{18}/[a-f0-9]{16}|\\w+\\.vids\\.io/videos/[a-f0-9]{18})" })
+@HostPlugin(revision = "$Revision: 51278 $", interfaceVersion = 2, names = { "sproutvideo.com" }, urls = { "https?://(?:videos\\.sproutvideo\\.com/embed/[a-f0-9]{18}/[a-f0-9]{16}|\\w+\\.vids\\.io/videos/[a-f0-9]{18})" })
 public class SproutVideoCom extends PluginForHost {
     public SproutVideoCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     @Override
@@ -45,7 +42,6 @@ public class SproutVideoCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(DownloadLink link) throws Exception {
-        br = new Browser();
         dllink = null;
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
@@ -78,7 +74,7 @@ public class SproutVideoCom extends PluginForHost {
 
     private void parseDownloadInfo(final DownloadLink link) throws Exception {
         String http_downloadurl = br.getRegex("class=\\'hd\\-download\\'[^<>]+href=\"(http[^<>\"]+)\"").getMatch(0);
-        String json = br.getRegex("var dat\\s*=\\s*'([a-zA-Z0-9-=_/+]+)'").getMatch(0);
+        String json = br.getRegex("(?:var|const) (?:dat|videoInfo)\\s*=\\s*'([a-zA-Z0-9-=_/+]+)'").getMatch(0);
         if (json == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -90,13 +86,15 @@ public class SproutVideoCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (!StringUtils.isEmpty(http_downloadurl)) {
-            http_downloadurl = http_downloadurl.replace("&amp;", "&");
+            /* Progressive stream */
+            http_downloadurl = Encoding.htmlOnlyDecode(http_downloadurl);
             dllink = http_downloadurl;
         } else {
-            String m3u;
+            /* HLS stream */
             if (!Boolean.TRUE.equals(hls)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            String m3u;
             final String userHash = (String) entries.get("s3_user_hash");
             final String videoHash = (String) entries.get("s3_video_hash");
             final String sessionID = (String) entries.get("sessionID");
@@ -160,8 +158,11 @@ public class SproutVideoCom extends PluginForHost {
         }
         if (dllink.contains(".m3u8")) {
             /* Download stream */
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                /* 2021-09-21: HLS URLs are broken but content is DRM protected anyways. */
+            // if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            // /* 2021-09-21: HLS URLs are broken but content is DRM protected anyways. */
+            // throw new PluginException(LinkStatus.ERROR_FATAL, "DRM unsupported");
+            // }
+            if (true) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "DRM unsupported");
             }
             final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br.cloneBrowser(), dllink));
