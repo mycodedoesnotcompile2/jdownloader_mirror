@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51286 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51291 $", interfaceVersion = 3, names = {}, urls = {})
 public class Streama2zCom extends XFileSharingProBasic {
     public Streama2zCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -50,6 +50,13 @@ public class Streama2zCom extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "streama2z.com", "streama2z.xyz", "streama2z.pro" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("streama2z.xyz");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

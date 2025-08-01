@@ -16,7 +16,6 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -24,9 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.text.TextDownloader;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -43,7 +40,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
 
-@HostPlugin(revision = "$Revision: 50683 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.text.TextDownloader;
+
+@HostPlugin(revision = "$Revision: 51290 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -108,23 +108,31 @@ public class KemonoParty extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
+    private static final String PROPERTY_LAST_KNOWN_FID = "last_known_fid";
+
     @Override
     public String getLinkID(final DownloadLink link) {
         try {
+            String fid = link.getStringProperty(PROPERTY_LAST_KNOWN_FID);
+            if (fid != null) {
+                return fid;
+            }
             final String portal = link.getStringProperty(PROPERTY_PORTAL);
             final String userid = link.getStringProperty(PROPERTY_USERID);
             final String postid = link.getStringProperty(PROPERTY_POSTID);
             if (this.isTextFile(link)) {
-                return UNIQUE_ID_PREFIX + "textfile/portal/" + portal + "/user/" + userid + "/post/" + postid;
+                fid = UNIQUE_ID_PREFIX + "textfile/portal/" + portal + "/user/" + userid + "/post/" + postid;
             } else {
                 final String path = new URL(link.getPluginPatternMatcher()).getPath();
                 final String sha256Hash = getSha256HashFromPath(path);
                 if (sha256Hash != null) {
-                    return UNIQUE_ID_PREFIX + "filehash_sha256/" + sha256Hash;
+                    fid = UNIQUE_ID_PREFIX + "filehash_sha256/" + sha256Hash;
                 } else {
-                    return UNIQUE_ID_PREFIX + "path/" + path;
+                    fid = UNIQUE_ID_PREFIX + "path/" + path;
                 }
             }
+            link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+            return fid;
         } catch (final Exception ignore) {
             return super.getLinkID(link);
         }
@@ -169,8 +177,10 @@ public class KemonoParty extends PluginForHost {
         }
     }
 
+    private static final Pattern HASH_PATTERN = Pattern.compile("/([a-fA-F0-9]{64})");
+
     public static String getSha256HashFromPath(final String path) {
-        return new Regex(path, "/([a-fA-F0-9]{64})").getMatch(0);
+        return new Regex(path, HASH_PATTERN).getMatch(0);
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
@@ -188,11 +198,7 @@ public class KemonoParty extends PluginForHost {
                 /* This should never happen */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            try {
-                link.setDownloadSize(textContent.getBytes("UTF-8").length);
-            } catch (final UnsupportedEncodingException ignore) {
-                ignore.printStackTrace();
-            }
+            link.setDownloadSize(textContent.getBytes("UTF-8").length);
         } else {
             final String sha256 = getSha256HashFromURL(link.getPluginPatternMatcher());
             if (sha256 != null) {

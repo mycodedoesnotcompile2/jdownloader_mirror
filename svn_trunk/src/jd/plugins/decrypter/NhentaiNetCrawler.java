@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -41,12 +36,17 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.NhentaiNet;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 /**
  *
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 50653 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51289 $", interfaceVersion = 2, names = {}, urls = {})
 public class NhentaiNetCrawler extends PluginForDecrypt {
     public NhentaiNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -153,7 +153,7 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
         final DecimalFormat df = estimatedNumberOfPages > 999 ? new DecimalFormat("0000") : estimatedNumberOfPages > 99 ? new DecimalFormat("000") : new DecimalFormat("00");
         for (final String url : urls) {
             final int pageNumber = Integer.parseInt(new Regex(url, "(\\d+)/?$").getMatch(0));
-            String extensionGuess = br.getRegex("/\\d+/" + pageNumber + "t(\\.(?:png|jpe?g|webp))").getMatch(0);
+            String extensionGuess = br.getRegex("/\\d+/" + pageNumber + "t(\\.(?:png|jpe?g|webp|gif))").getMatch(0);
             if (extensionGuess == null) {
                 extensionGuess = NhentaiNet.EXT_DEFAULT;
             }

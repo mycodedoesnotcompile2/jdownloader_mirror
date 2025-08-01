@@ -61,6 +61,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -71,7 +72,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51241 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51294 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -92,12 +93,14 @@ public class XHamsterCom extends PluginForHost {
         /* Set some cookies on all supporte free domains. */
         for (final String[] domains : getPluginDomains()) {
             for (final String domain : domains) {
-                final String dummyURL = "https://" + domain + "/";
-                if (!dummyURL.matches(dummyURL)) {
-                    br.setCookie(domain, "lang", "en");
-                    br.setCookie(domain, "playerVer", "old");
-                }
+                br.setCookie(domain, "lang", "en");
+                br.setCookie(domain, "playerVer", "old");
+                br.setCookie(domain, "video_titles_translation", "0");
             }
+        }
+        for (final String domain : new String[] { "xhamsterpremium.com", "faphouse.com" }) {
+            br.setCookie(domain, "locale", "en");
+            br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
          * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
@@ -366,14 +369,56 @@ public class XHamsterCom extends PluginForHost {
         }
     }
 
+    private String getTitle(final DownloadLink link, final Browser br) throws Exception {
+        String title = br.getRegex("\"videoEntity\"\\s*:\\s*\\{[^\\}\\{]*\"title\"\\s*:\\s*\"(.*?)\"\\s*,").getMatch(0);
+        if (title != null) {
+            // JSON String to String, no further post processing required
+            title = (String) JavaScriptEngineFactory.jsonToJavaObject("\"" + title + "\"");
+        }
+        final String titleLocalized = br.getRegex("\"videoEntity\"\\s*:\\s*\\{[^\\}\\{]*\"titleLocalized\"\\s*:\\s*(\\{.*?\\})\\s*,").getMatch(0);
+        if (title == null && titleLocalized != null) {
+            // JSON, no further post processing required
+            final Map<String, Object> map = restoreFromString(titleLocalized, TypeRef.MAP);
+            title = (String) map.get("value");
+        }
+        if (title == null) {
+            /* Premium content */
+            title = br.getRegex("class=\"video__title\">\\s*([^<]+)\\s*</h1>").getMatch(0);
+            title = URLEncode.decodeURIComponent(Encoding.htmlOnlyDecode(title));
+        }
+        if (title == null) {
+            title = br.getRegex("<meta property\\s*=\\s*\"og:title\"\\s*content\\s*=\\s*\"(.*?)\"\\s*>").getMatch(0);
+            title = URLEncode.decodeURIComponent(Encoding.htmlOnlyDecode(title));
+        }
+        if (title == null) {
+            title = br.getRegex("<title[^>]*>([^<>\"]*?)\\s*(-|\\|)\\s*xHamster[^<]*</title>").getMatch(0);
+            title = URLEncode.decodeURIComponent(Encoding.htmlOnlyDecode(title));
+        }
+        if (title == null) {
+            /* Fallback to URL filename - first try to get nice name from URL. */
+            title = new Regex(br.getURL(), "/(?:videos|movies|moments)/(.+)(?:$|\\?)").getMatch(0);
+            if (title != null) {
+                final String fid = getFID(link);
+                title = title.replaceFirst("-?" + Pattern.quote(fid), "");
+            }
+            title = URLEncode.decodeURIComponent(title);
+        }
+        if (StringUtils.isEmpty(title)) {
+            title = getFID(link);
+        }
+        return title;
+    }
+
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        vq = null;
+        dllink = null;
         final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
         final String contentURL = getCorrectedURL(link.getPluginPatternMatcher());
         final String extDefault = ".mp4";
         if (!link.isNameSet()) {
             link.setName(getFallbackFileTitle(contentURL) + extDefault);
         }
-        String title = null;
+
         if (account != null) {
             login(account, contentURL, true);
         } else {
@@ -430,11 +475,7 @@ public class XHamsterCom extends PluginForHost {
         String datePublished = br.getRegex("\"datePublished\":\"(\\d{4}-\\d{2}-\\d{2})\"").getMatch(0);
         String filename = null;
         if (this.isPremiumURL(contentURL)) {
-            /* Premium content */
-            title = br.getRegex("class=\"video__title\">([^<]+)</h1>").getMatch(0);
-            if (title == null) {
-                title = br.getRegex("property=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
-            }
+            String title = getTitle(link, br);
             if (this.isPremiumAccount(account)) {
                 /* Premium users can download the full videos in different qualities. */
                 if (isDownload) {
@@ -453,7 +494,6 @@ public class XHamsterCom extends PluginForHost {
                 }
             }
             if (title != null) {
-                title = Encoding.htmlDecode(Encoding.unicodeDecode(title)).trim();
                 filename = title + extDefault;
                 link.setFinalFileName(filename);
             }
@@ -500,33 +540,8 @@ public class XHamsterCom extends PluginForHost {
                 }
             }
             final String fid = getFID(link);
-            title = br.getRegex("\"videoEntity\"\\s*:\\s*\\{[^\\}\\{]*\"title\"\\s*:\\s*\"(.*?)\"\\s*,").getMatch(0);
-            if (title != null) {
-                // JSON String to String
-                title = (String) JavaScriptEngineFactory.jsonToJavaObject("\"" + title + "\"");
-            }
-            if (title == null || true) {
-                title = br.getRegex("<h1[^<]*itemprop=\"name\">(.*?)</h1>").getMatch(0);
-                if (title == null) {
-                    title = br.getRegex("\"videoTitle\":\"([^<>\"]*?)\"").getMatch(0); // ge.xhamster.com/embed/123456
-                    if (title == null) {
-                        // may cause false positive, video<->shorts/moments
-                        title = br.getRegex("\"title\":\"([^<>\"]*?)\"").getMatch(0);
-                    }
-                }
-            }
-            if (title == null) {
-                title = br.getRegex("<title[^>]*>([^<>\"]*?)\\s*\\-\\s*xHamster(" + buildHostsPatternPart(getPluginDomains().get(0)) + ")?</title>").getMatch(0);
-            }
-            if (title == null) {
-                /* Fallback to URL filename - first try to get nice name from URL. */
-                title = new Regex(br.getURL(), "/(?:videos|movies)/(.+)\\d+(?:$|\\?)").getMatch(0);
-                if (title == null) {
-                    /* Last chance */
-                    title = new Regex(br.getURL(), "https?://[^/]+/(.+)").getMatch(0);
-                }
-            }
-            String ext;
+            String title = getTitle(link, br);
+            final String ext;
             if (StringUtils.containsIgnoreCase(dllink, ".m3u8")) {
                 ext = extDefault;
             } else if (!StringUtils.isEmpty(dllink)) {
@@ -535,7 +550,7 @@ public class XHamsterCom extends PluginForHost {
                 ext = extDefault;
             }
             if (title != null) {
-                title = Encoding.htmlDecode(Encoding.unicodeDecode(title));
+                // title = Encoding.htmlDecode(Encoding.unicodeDecode(title));
                 if (getPluginConfig().getBooleanProperty(SETTING_FILENAME_ID, default_SETTING_FILENAME_ID)) {
                     filename = title + "_" + fid;
                 } else {

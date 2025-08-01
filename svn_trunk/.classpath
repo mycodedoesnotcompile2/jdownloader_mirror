@@ -60,7 +60,11 @@
 	<classpathentry kind="lib" path="ressourcen/libs/laf/syntheticaAluOxide.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/laf/syntheticaBlueLight.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/laf/syntheticaClassy.jar"/>
-	<classpathentry kind="lib" path="ressourcen/libs/jsyntaxpane.jar"/>
+	<classpathentry kind="lib" path="ressourcen/libs/jsyntaxpane.jar">
+		<accessrules>
+			<accessrule kind="nonaccessible" pattern="jsyntaxpane/util/StringUtils"/>
+		</accessrules>
+	</classpathentry>
 	<classpathentry kind="lib" path="ressourcen/libs/sqljet.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/sequence-library.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/svnkit.jar"/>
@@ -69,12 +73,16 @@
 	<classpathentry kind="lib" path="/AppWorkUtils/libs/svgSalamander.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/image4j.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/Filters.jar" sourcepath="ressourcen/code-ressourcen/Filter_src.zip"/>
-	<classpathentry kind="lib" path="ressourcen/libs/js.jar" sourcepath="/tmp/.org.sf.feeling.decompiler1753683686302/source/rhino-1.7.7.2-sources-1753712490550.jar"/>
+	<classpathentry kind="lib" path="ressourcen/libs/js.jar" sourcepath="/tmp/.org.sf.feeling.decompiler1753856652823/source/rhino-1.7.7.2-sources-1753878266444.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/zip4j.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bcpkix-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bcprov-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bctls-jdk15on.jar"/>
-	<classpathentry kind="lib" path="ressourcen/libs/laf/flatlaf.jar" sourcepath="ressourcen/code-ressourcen/flatlaf-sources.jar"/>
+	<classpathentry kind="lib" path="ressourcen/libs/laf/flatlaf.jar" sourcepath="ressourcen/code-ressourcen/flatlaf-sources.jar">
+		<accessrules>
+			<accessrule kind="nonaccessible" pattern="com/formdev/flatlaf/util/StringUtils"/>
+		</accessrules>
+	</classpathentry>
 	<classpathentry kind="lib" path="ressourcen/libs/bcutil-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/proxyVole.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/AppWorkUtils"/>

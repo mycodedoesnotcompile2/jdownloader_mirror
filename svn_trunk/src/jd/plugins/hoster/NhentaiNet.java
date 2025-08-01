@@ -15,6 +15,8 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,9 +32,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51128 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51294 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
@@ -139,16 +142,23 @@ public class NhentaiNet extends PluginForHost {
         }
     }
 
-    private String getDirecturl(final DownloadLink link, final Browser br) {
+    private String getDirecturl(final DownloadLink link, final Browser br) throws IOException {
         String dllink = link.getStringProperty(CACHED_URL);
         if (dllink == null) {
             dllink = br.getRegex("(https?://[^/]+/galleries/\\d+/\\d+\\.(?:jpe?g|png|webp|gif))").getMatch(0);
             if (dllink == null) {
                 /* 2022-08-11 */
                 dllink = br.getRegex("href=\"/g/\\d+/\\d+/?\">\\s*<img src=\"(https?://[^\"]+)\"").getMatch(0);
+                if (dllink == null) {
+                    /* 2025-07-31 */
+                    dllink = br.getRegex("href=\"/g/\\d+/\\d+/?\">\\s*<img src=\"([^\"]*/galleries/\\d+/\\d+\\.(?:jpe?g|png|webp|gif))\"").getMatch(0);
+                }
             }
         }
-        return dllink;
+        if (dllink == null) {
+            return null;
+        }
+        return URLHelper.parseLocation(new URL(link.getPluginPatternMatcher()), dllink);
     }
 
     @Override

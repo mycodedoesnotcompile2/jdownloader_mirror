@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51131 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51291 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamupWs extends PluginForHost {
     public StreamupWs(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,7 @@ public class StreamupWs extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamup.ws", "streamup.cc" });
+        ret.add(new String[] { "streamup.ws", "streamup.cc", "strmup.to" });
         return ret;
     }
 
@@ -78,7 +78,7 @@ public class StreamupWs extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]{13})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:v/)?([A-Za-z0-9]{13})");
         }
         return ret.toArray(new String[0]);
     }
@@ -109,12 +109,15 @@ public class StreamupWs extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         final String extDefault = ".mp4";
+        final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
             link.setName(this.getFID(link) + extDefault);
         }
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        /* That referer is not needed for all links but for some */
+        br.getHeaders().put("Referer", "https://" + getHost() + "/v/" + fid);
+        br.getPage("https://" + getHost() + "/" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getRequest().getHtmlCode().length() <= 100) {
