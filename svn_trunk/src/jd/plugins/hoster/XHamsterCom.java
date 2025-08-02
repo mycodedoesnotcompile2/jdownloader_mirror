@@ -20,8 +20,8 @@ import java.net.URL;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -72,7 +72,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51294 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51298 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -223,7 +223,6 @@ public class XHamsterCom extends PluginForHost {
     private static final String NORESUME       = "NORESUME";
     private final String        recaptchav2    = "<div class=\"text\">\\s*In order to watch this video please prove you are a human";
     private String              dllink         = null;
-    private String              vq             = null;
     public static final String  DOMAIN_CURRENT = "xhamster.com";
 
     public static String getCorrectedURL(String url) {
@@ -410,7 +409,6 @@ public class XHamsterCom extends PluginForHost {
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
-        vq = null;
         dllink = null;
         final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
         final String contentURL = getCorrectedURL(link.getPluginPatternMatcher());
@@ -531,7 +529,17 @@ public class XHamsterCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             try {
-                dllink = this.getDllink(br);
+                final Object[] ret = getDllink(br);
+                if (ret != null) {
+                    if (ret[0] instanceof String) {
+                        dllink = (String) ret[0];
+                    } else if (ret[0] instanceof HlsContainer) {
+                        final HlsContainer hls = (HlsContainer) ret[0];
+                        dllink = hls.getM3U8URL();
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                }
             } catch (Exception e) {
                 if (PluginEnvironment.DOWNLOAD.equals(getPluginEnvironment())) {
                     throw e;
@@ -556,11 +564,7 @@ public class XHamsterCom extends PluginForHost {
                 } else {
                     filename = fid + "_" + title;
                 }
-                if (vq != null) {
-                    filename = Encoding.htmlDecode(filename.trim() + "_" + vq).trim();
-                } else {
-                    filename = Encoding.htmlDecode(filename).trim();
-                }
+                filename = Encoding.htmlDecode(filename).trim();
                 filename += ext;
                 link.setFinalFileName(filename);
             }
@@ -874,17 +878,16 @@ public class XHamsterCom extends PluginForHost {
      * NOTE: They also have .mp4 version of the videos in the html code -> For mobile devices Those are a bit smaller in size
      */
     @SuppressWarnings("deprecation")
-    public String getDllink(final Browser br) throws IOException, PluginException {
+    public Object[] getDllink(final Browser br) throws Exception {
         final SubConfiguration cfg = getPluginConfig();
         final int selected_format = cfg.getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, default_SETTING_SELECTED_VIDEO_FORMAT);
-        return getDllink(br, selected_format);
+        return getDllink(br, selected_format, null, new HashMap<Integer, Set<Object>>());
     }
 
-    public String getDllink(final Browser br, int selected_format) throws IOException, PluginException {
+    public Object[] getDllink(final Browser br, int selected_format, Map<String, Object> hlsMap, final Map<Integer, Set<Object>> availableQualities) throws Exception {
         final SubConfiguration cfg = getPluginConfig();
         Integer selectedQualityHeight = null;
         final List<String> qualities = new ArrayList<String>();
-        /* TODO: selected quality not available -> it would be better to choose next best instead of best */
         switch (selected_format) {
         /* Fallthrough to automatically choose the next best quality */
         default:
@@ -918,62 +921,56 @@ public class XHamsterCom extends PluginForHost {
             qualities.add("144p");
             selectedQualityHeight = selectedQualityHeight != null ? selectedQualityHeight : 144;
         }
-        int chosenQualityHeight = -1;
-        String chosenQualityDownloadurl = null;
         final Map<Integer, Number> videoHeightToFilesize = new HashMap<Integer, Number>();
-        Map<String, Object> hlsMap = null;
         try {
-            final String jsonStr = br.getRegex(">\\s*window\\.initials\\s*=\\s*(\\{.*?\\})\\s*;\\s*</").getMatch(0);
-            final Map<String, Object> json = restoreFromString(jsonStr, TypeRef.MAP);
-            // TODO: Maybe save subtitle information as plugin property
-            // final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json,
-            // "xplayerPluginSettings/subtitles/tracks");
-            // if (subtitles != null) {
-            // for (final Map<String, Object> subtitle : subtitles) {
-            // }
-            // }
-            String bestProgressiveQualityDownloadurl = null;
-            int maxQualityHeight = 0;
-            final Map<String, Object> videoModel = (Map<String, Object>) json.get("videoModel");
-            if (videoModel != null && videoModel.containsKey("sources")) {
-                final Set<Integer> availableQualities = new HashSet<Integer>();
-                /** 2025-07-03: Sometimes max progressive quality for map down below is 720p thus this is a better source. */
-                final Map<String, Object> sources = (Map<String, Object>) videoModel.get("sources");
-                final Map<String, Object> sources_mp4 = sources == null ? null : (Map<String, Object>) sources.get("mp4");
-                final Map<String, Object> sources_download = sources == null ? null : (Map<String, Object>) sources.get("download");
-                if (sources_download != null) {
-                    /* Collect file size values for later usage */
-                    final Iterator<Entry<String, Object>> iterator = sources_download.entrySet().iterator();
-                    while (iterator.hasNext()) {
-                        final Entry<String, Object> entry = iterator.next();
-                        final String qualityStr = entry.getKey();
-                        final int qualityHeight = Integer.parseInt(qualityStr.replaceFirst("(?i)p", ""));
-                        final Map<String, Object> downloadinfo = (Map<String, Object>) entry.getValue();
-                        videoHeightToFilesize.put(qualityHeight, (Number) downloadinfo.get("size"));
+            if (availableQualities.size() == 0) {
+                final String jsonStr = br.getRegex(">\\s*window\\.initials\\s*=\\s*(\\{.*?\\})\\s*;\\s*</").getMatch(0);
+                final Map<String, Object> json = restoreFromString(jsonStr, TypeRef.MAP);
+                // TODO: Maybe save subtitle information as plugin property
+                // final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json,
+                // "xplayerPluginSettings/subtitles/tracks");
+                // if (subtitles != null) {
+                // for (final Map<String, Object> subtitle : subtitles) {
+                // }
+                // }
+                final Map<String, Object> videoModel = (Map<String, Object>) json.get("videoModel");
+                if (videoModel != null && videoModel.containsKey("sources")) {
+                    /** 2025-07-03: Sometimes max progressive quality for map down below is 720p thus this is a better source. */
+                    final Map<String, Object> sources = (Map<String, Object>) videoModel.get("sources");
+                    final Map<String, Object> sources_mp4 = sources == null ? null : (Map<String, Object>) sources.get("mp4");
+                    final Map<String, Object> sources_download = sources == null ? null : (Map<String, Object>) sources.get("download");
+                    if (sources_download != null) {
+                        /* Collect file size values for later usage */
+                        final Iterator<Entry<String, Object>> iterator = sources_download.entrySet().iterator();
+                        while (iterator.hasNext()) {
+                            final Entry<String, Object> entry = iterator.next();
+                            final String qualityStr = entry.getKey();
+                            final int qualityHeight = Integer.parseInt(qualityStr.replaceFirst("(?i)p", ""));
+                            final Map<String, Object> downloadinfo = (Map<String, Object>) entry.getValue();
+                            videoHeightToFilesize.put(qualityHeight, (Number) downloadinfo.get("size"));
+                        }
+                    }
+                    if (sources_mp4 != null) {
+                        final Iterator<Entry<String, Object>> iterator = sources_mp4.entrySet().iterator();
+                        while (iterator.hasNext()) {
+                            final Entry<String, Object> entry = iterator.next();
+                            final String qualityStr = entry.getKey();
+                            final int qualityHeight = Integer.parseInt(qualityStr.replaceFirst("(?i)p", ""));
+                            final String url = entry.getValue().toString();
+                            Set<Object> sourcesQuality = availableQualities.get(qualityHeight);
+                            if (sourcesQuality == null) {
+                                sourcesQuality = new LinkedHashSet<Object>();
+                                availableQualities.put(qualityHeight, sourcesQuality);
+                            }
+                            // not verified
+                            sourcesQuality.add(url);
+                            if (qualityHeight == selectedQualityHeight) {
+                                logger.info("Found preferred progressive quality(videoModel,url):" + qualityStr + "->" + url);
+                                return new Object[] { url, selectedQualityHeight };
+                            }
+                        }
                     }
                 }
-                final Iterator<Entry<String, Object>> iterator = sources_mp4.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    final Entry<String, Object> entry = iterator.next();
-                    final String qualityStr = entry.getKey();
-                    final int qualityHeight = Integer.parseInt(qualityStr.replaceFirst("(?i)p", ""));
-                    final String url = entry.getValue().toString();
-                    if (bestProgressiveQualityDownloadurl == null || qualityHeight > maxQualityHeight) {
-                        bestProgressiveQualityDownloadurl = url;
-                        maxQualityHeight = qualityHeight;
-                    }
-                    if (qualityHeight == selectedQualityHeight) {
-                        logger.info("Found preferred quality(url):" + qualityStr + "->" + url);
-                        chosenQualityHeight = selectedQualityHeight;
-                        chosenQualityDownloadurl = url;
-                        return url;
-                    }
-                }
-                if (selectedQualityHeight != -1) {
-                    logger.info("Did not find preferred quality(videoModel):" + selectedQualityHeight + "|available:" + availableQualities);
-                }
-            }
-            if (chosenQualityDownloadurl == null && bestProgressiveQualityDownloadurl == null) {
                 /* 2025-07-03: There is also "xplayerSettings2" which looks to be the same as "xplayerSettings". */
                 List<Map<String, Object>> video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/mp4");
                 if (video_sources == null) {
@@ -981,8 +978,6 @@ public class XHamsterCom extends PluginForHost {
                     video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/h264");
                 }
                 if (video_sources != null) {
-                    final Set<Integer> availableQualities = new HashSet<Integer>();
-                    maxQualityHeight = 0;
                     for (final Map<String, Object> source : video_sources) {
                         final String qualityStr = (String) source.get("quality");
                         String url = (String) source.get("url");
@@ -990,204 +985,124 @@ public class XHamsterCom extends PluginForHost {
                             /* HLS */
                             if (hlsMap == null) {
                                 hlsMap = source;
+                                final Browser brc = br.cloneBrowser();
+                                final String m3u8 = (String) hlsMap.get("url");
+                                try {
+                                    final List<HlsContainer> hlsQualities = HlsContainer.getHlsQualities(brc, m3u8);
+                                    for (HlsContainer hlsQuality : hlsQualities) {
+                                        final int qualityHeight = hlsQuality.getHeight();
+                                        Set<Object> sourcesQuality = availableQualities.get(qualityHeight);
+                                        if (sourcesQuality == null) {
+                                            sourcesQuality = new LinkedHashSet<Object>();
+                                            availableQualities.put(qualityHeight, sourcesQuality);
+                                        }
+                                        // not verified
+                                        sourcesQuality.add(hlsQuality);
+                                    }
+                                } catch (Exception e) {
+                                    logger.log(e);
+                                }
                             }
                         } else {
                             /* Progressive */
                             final int qualityHeight = Integer.parseInt(qualityStr.replaceFirst("(?i)p", ""));
-                            availableQualities.add(qualityHeight);
+                            Set<Object> sourcesQuality = availableQualities.get(qualityHeight);
+                            if (sourcesQuality == null) {
+                                sourcesQuality = new LinkedHashSet<Object>();
+                                availableQualities.put(qualityHeight, sourcesQuality);
+                            }
                             String fallback = (String) source.get("fallback");
                             /* We found the quality we were looking for. */
                             url = br.getURL(url).toExternalForm();
                             fallback = !StringUtils.isEmpty(fallback) ? br.getURL(fallback).toExternalForm() : null;
-                            if (bestProgressiveQualityDownloadurl == null || qualityHeight > maxQualityHeight) {
-                                bestProgressiveQualityDownloadurl = url;
-                                maxQualityHeight = qualityHeight;
-                            }
                             if (qualityHeight != selectedQualityHeight) {
+                                // unverified
+                                sourcesQuality.add(url);
+                                sourcesQuality.add(fallback);
                                 continue;
                             }
                             if (verifyURL(url)) {
-                                logger.info("Found preferred quality(url):" + qualityStr + "->" + url);
-                                chosenQualityHeight = selectedQualityHeight;
-                                chosenQualityDownloadurl = url;
-                                break;
+                                logger.info("Found preferred progressive quality(xplayerSettings,url):" + qualityStr + "->" + url);
+                                return new Object[] { url, selectedQualityHeight };
                             } else if (fallback != null && verifyURL(fallback)) {
-                                logger.info("Found preferred quality(fallback):" + qualityStr + "->" + fallback);
-                                chosenQualityHeight = selectedQualityHeight;
-                                chosenQualityDownloadurl = fallback;
-                                break;
+                                logger.info("Found preferred progressive quality(xplayerSettings,fallback):" + qualityStr + "->" + fallback);
+                                return new Object[] { fallback, selectedQualityHeight };
                             } else {
                                 logger.info("Sources(failed):" + qualityStr);
                                 continue;
                             }
                         }
                     }
-                    if (selectedQualityHeight != -1) {
-                        logger.info("Did not find preferred quality(sources):" + selectedQualityHeight + "|available:" + availableQualities);
+                }
+                if (availableQualities.size() == 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
+            if (selectedQualityHeight == -1) {
+                Set<Object> sources = null;
+                int bestHeigh = -1;
+                for (Entry<Integer, Set<Object>> qualitySources : availableQualities.entrySet()) {
+                    if (sources == null) {
+                        bestHeigh = qualitySources.getKey();
+                        sources = qualitySources.getValue();
+                    } else if (qualitySources.getKey() > bestHeigh) {
+                        bestHeigh = qualitySources.getKey();
+                        sources = qualitySources.getValue();
                     }
-                } else {
-                    logger.warning("Could not find any video sources in json");
                 }
-            }
-            if (chosenQualityDownloadurl == null && bestProgressiveQualityDownloadurl != null) {
-                if (selectedQualityHeight == -1) {
-                    logger.info("Returning best progressive quality: " + maxQualityHeight + "p: " + bestProgressiveQualityDownloadurl);
-                    chosenQualityHeight = maxQualityHeight;
-                    chosenQualityDownloadurl = bestProgressiveQualityDownloadurl;
-                } else {
-                    final String ret = getDllink(br, selected_format + 1);
-                    if (ret != null) {
-                        return ret;
+                for (final Object source : sources) {
+                    if (source instanceof String) {
+                        logger.info("Returning best progressive quality: " + bestHeigh + "|" + source);
+                        return new Object[] { source, bestHeigh };
                     }
                 }
-            }
-            if (chosenQualityDownloadurl != null) {
-                logger.info("Returning progressive quality " + chosenQualityHeight + "p");
-                final Number filesize = videoHeightToFilesize.get(chosenQualityHeight);
-                if (filesize != null) {
-                    logger.info("Setting filesize obtained from list of download filesizes -> " + filesize);
-                    this.getDownloadLink().setDownloadSize(filesize.longValue());
+                for (final Object source : sources) {
+                    if (source instanceof HlsContainer) {
+                        logger.info("Returning best hls quality: " + bestHeigh + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
+                        return new Object[] { source, bestHeigh };
+                    }
                 }
-                return chosenQualityDownloadurl;
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else {
+                final Set<Object> sources = availableQualities.get(selectedQualityHeight);
+                if (sources != null) {
+                    for (final Object source : sources) {
+                        if (source instanceof String) {
+                            logger.info("Found preferred progressive quality: " + selectedQualityHeight + "|" + source);
+                            return new Object[] { source, selectedQualityHeight };
+                        }
+                    }
+                    for (final Object source : sources) {
+                        if (source instanceof HlsContainer) {
+                            logger.info("Found preferred hls quality: " + selectedQualityHeight + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
+                            return new Object[] { source, selectedQualityHeight };
+                        }
+                    }
+                }
+                final int next_selected_format = (selected_format + 1) % FORMATS.length;
+                if (next_selected_format > 0) {
+                    logger.info("Could not find preferred quality:" + selectedQualityHeight + "! try next best");
+                } else {
+                    logger.info("Could not find preferred quality:" + selectedQualityHeight + "! try  best");
+                }
+                final Object[] ret = getDllink(br, next_selected_format, hlsMap, availableQualities);
+                if (ret != null) {
+                    return ret;
+                }
             }
+            // if (chosenQualityDownloadurl != null) {
+            // logger.info("Returning progressive quality " + chosenQualityHeight + "p");
+            // final Number filesize = videoHeightToFilesize.get(chosenQualityHeight);
+            // if (filesize != null) {
+            // logger.info("Setting filesize obtained from list of download filesizes -> " + filesize);
+            // this.getDownloadLink().setDownloadSize(filesize.longValue());
+            // }
+            // return chosenQualityDownloadurl;
+            // }
         } catch (final JSonMapperException e) {
             logger.log(e);
         }
-        if (hlsMap != null) {
-            /* 2021-02-01 */
-            logger.info("Try fallback to HLS download -> " + hlsMap);
-            return (String) hlsMap.get("url");
-        }
-        final String newPlayer = Encoding.htmlDecode(br.getRegex("videoUrls\":\"(\\{.*?\\]\\})").getMatch(0));
-        if (newPlayer != null) {
-            // new player
-            final Map<String, Object> map = restoreFromString(restoreFromString("\"" + newPlayer + "\"", TypeRef.STRING), TypeRef.MAP);
-            if (map != null) {
-                for (final String quality : qualities) {
-                    final Object list = map.get(quality);
-                    if (list != null && list instanceof List) {
-                        final List<String> urls = (List<String>) list;
-                        if (urls.size() > 0) {
-                            vq = quality;
-                            logger.info("videoUrls:" + quality + "->" + quality);
-                            return urls.get(0);
-                        }
-                    }
-                }
-            }
-        }
-        for (final String quality : qualities) {
-            // old player
-            final String urls[] = br.getRegex(quality + "\"\\s*:\\s*(\"https?:[^\"]+\")").getColumn(0);
-            if (urls != null && urls.length > 0) {
-                for (String url : urls) {
-                    url = restoreFromString(url, TypeRef.STRING);
-                    if (StringUtils.containsIgnoreCase(url, ".mp4")) {
-                        final boolean verified = verifyURL(url);
-                        if (verified) {
-                            vq = quality;
-                            logger.info("oldPlayer:" + quality + "->" + quality);
-                            return url;
-                        }
-                    }
-                }
-            }
-        }
-        for (final String quality : qualities) {
-            // 3d videos
-            final String urls[] = br.getRegex(quality + "\"\\s*,\\s*\"url\"\\s*:\\s*(\"https?:[^\"]+\")").getColumn(0);
-            if (urls != null && urls.length > 0) {
-                String best = null;
-                for (String url : urls) {
-                    url = restoreFromString(url, TypeRef.STRING);
-                    if (best == null || StringUtils.containsIgnoreCase(url, ".mp4")) {
-                        best = url;
-                    }
-                }
-                if (best != null) {
-                    vq = quality;
-                    logger.info("old3D" + quality + "->" + quality);
-                    return best;
-                }
-            }
-        }
-        // is the rest still in use/required?
-        String ret = null;
-        logger.info("Video quality selection failed.");
-        int urlmodeint = 0;
-        final String urlmode = br.getRegex("url_mode=(\\d+)").getMatch(0);
-        if (urlmode != null) {
-            urlmodeint = Integer.parseInt(urlmode);
-        }
-        if (urlmodeint == 1) {
-            /* Example-ID: 1815274, 1980180 */
-            final Regex secondway = br.getRegex("\\&srv=(https?[A-Za-z0-9%\\.]+\\.xhcdn\\.com)\\&file=([^<>\"]*?)\\&");
-            String server = br.getRegex("\\'srv\\'\\s*:\\s*\\'(.*?)\\'").getMatch(0);
-            if (server == null) {
-                server = secondway.getMatch(0);
-            }
-            String file = br.getRegex("\\'file\\'\\s*:\\s*\\'(.*?)\\'").getMatch(0);
-            if (file == null) {
-                file = secondway.getMatch(1);
-            }
-            if (server == null || file == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            if (file.startsWith("http")) {
-                // Examplelink (ID): 968106
-                ret = file;
-            } else {
-                // Examplelink (ID): 986043
-                ret = server + "/key=" + file;
-            }
-            logger.info("urlmode:" + urlmodeint + "->" + ret);
-        } else {
-            /* E.g. url_mode == 3 */
-            /* Example-ID: 685813 */
-            String flashvars = br.getRegex("flashvars\\s*:\\s*\"([^<>\"]*?)\"").getMatch(0);
-            ret = br.getRegex("\"(https?://\\d+\\.xhcdn\\.com/key=[^<>\"]*?)\" class=\"mp4Thumb\"").getMatch(0);
-            if (ret == null) {
-                ret = br.getRegex("\"(https?://\\d+\\.xhcdn\\.com/key=[^<>\"]*?)\"").getMatch(0);
-            }
-            if (ret == null) {
-                ret = br.getRegex("\"(https?://\\d+\\.xhcdn\\.com/key=[^<>\"]*?)\"").getMatch(0);
-            }
-            if (ret == null) {
-                ret = br.getRegex("flashvars.*?file=(https?%3.*?)&").getMatch(0);
-            }
-            if (ret == null && flashvars != null) {
-                /* E.g. 4753816 */
-                flashvars = Encoding.htmlDecode(flashvars);
-                flashvars = flashvars.replace("\\", "");
-                final String[] qualities2 = { "1080p", "720p", "480p", "360p", "240p" };
-                for (final String quality : qualities2) {
-                    ret = new Regex(flashvars, "\"" + quality + "\"\\s*:\\s*\\[\"(https?[^<>\"]*?)\"\\]").getMatch(0);
-                    if (ret != null) {
-                        logger.info("urlmode:" + urlmodeint + "|quality:" + quality + "->" + ret);
-                        break;
-                    }
-                }
-            }
-        }
-        if (ret == null) {
-            // urlmode fails, eg: 1099006
-            ret = br.getRegex("video\\s*:\\s*\\{[^\\}]+file\\s*:\\s*('|\")(.*?)\\1").getMatch(1);
-            if (ret == null) {
-                ret = PluginJSonUtils.getJson(br, "fallback");
-                if (!StringUtils.isEmpty(ret)) {
-                    ret = ret.replace("\\", "");
-                    logger.info("urlmode(fallback):" + urlmodeint + "->" + ret);
-                }
-            }
-        }
-        if (ret != null) {
-            if (ret.contains("&amp;")) {
-                ret = Encoding.htmlDecode(ret);
-            }
-            return ret;
-        } else {
-            return null;
-        }
+        return null;
     }
 
     public boolean verifyURL(String url) throws IOException, PluginException {
@@ -1276,7 +1191,16 @@ public class XHamsterCom extends PluginForHost {
                     link.setDownloadPassword(passCode);
                 }
             } else {
-                dllink = getDllink(br);
+                final Object[] ret = getDllink(br);
+                if (ret != null) {
+                    if (ret[0] instanceof String) {
+                        dllink = (String) ret[0];
+                    } else if (ret[0] instanceof HlsContainer) {
+                        dllink = ((HlsContainer) ret[0]).getM3U8URL();
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                }
             }
         }
         if (StringUtils.isEmpty(dllink)) {

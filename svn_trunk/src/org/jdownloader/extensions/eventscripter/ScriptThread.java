@@ -179,7 +179,7 @@ public class ScriptThread extends Thread implements JSShutterDelegate {
 
     protected void initContext(Context context) {
         cx.setOptimizationLevel(-1);
-        cx.setLanguageVersion(Context.VERSION_1_5);// old default
+        cx.setLanguageVersion(Context.VERSION_ES6);
         cx.getWrapFactory().setJavaPrimitiveWrap(false);// old default
     }
 

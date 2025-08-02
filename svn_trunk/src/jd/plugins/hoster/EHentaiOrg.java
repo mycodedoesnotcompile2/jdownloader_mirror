@@ -20,21 +20,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.EhentaiConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -57,7 +42,22 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.EhentaiConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 51298 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
 public class EHentaiOrg extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -130,17 +130,28 @@ public class EHentaiOrg extends PluginForHost {
         return "https://e-hentai.org/tos.php";
     }
 
+    private static final String PROPERTY_LAST_KNOWN_FID = "last_known_fid";
+
     @Override
     public String getLinkID(final DownloadLink link) {
-        if (link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches(TYPE_SINGLE_IMAGE)) {
-            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), TYPE_SINGLE_IMAGE);
-            return this.getHost() + "://" + urlinfo.getMatch(1) + "_" + urlinfo.getMatch(2);
-        } else if (link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches(TYPE_SINGLE_IMAGE_MULTI_PAGE_VIEW)) {
-            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), TYPE_SINGLE_IMAGE_MULTI_PAGE_VIEW);
-            return this.getHost() + "://" + urlinfo.getMatch(0) + "_" + urlinfo.getMatch(2);
-        } else {
-            return super.getLinkID(link);
+        String fid = link.getStringProperty(PROPERTY_LAST_KNOWN_FID);
+        if (fid != null) {
+            return fid;
         }
+        if (link.getPluginPatternMatcher() != null) {
+            if (link.getPluginPatternMatcher().matches(TYPE_SINGLE_IMAGE)) {
+                final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), TYPE_SINGLE_IMAGE);
+                fid = this.getHost() + "://" + urlinfo.getMatch(1) + "_" + urlinfo.getMatch(2);
+            } else if (link.getPluginPatternMatcher().matches(TYPE_SINGLE_IMAGE_MULTI_PAGE_VIEW)) {
+                final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), TYPE_SINGLE_IMAGE_MULTI_PAGE_VIEW);
+                fid = this.getHost() + "://" + urlinfo.getMatch(0) + "_" + urlinfo.getMatch(2);
+            }
+            if (fid != null) {
+                link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+                return fid;
+            }
+        }
+        return super.getLinkID(link);
     }
 
     @Override
@@ -175,8 +186,8 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Take account from download candidate! </br>
-     * 2021-01-18: There is an API available but it is only returning the metadata: https://ehwiki.org/wiki/API
+     * Take account from download candidate! </br> 2021-01-18: There is an API available but it is only returning the metadata:
+     * https://ehwiki.org/wiki/API
      *
      * @param link
      * @param account
@@ -243,8 +254,8 @@ public class EHentaiOrg extends PluginForHost {
                 /* Another step */
                 final String continue_url2 = br.getRegex("document\\.getElementById\\(\"continue\"\\).*?document\\.location\\s*=\\s*\"((?:/|http)[^\"]+)\"").getMatch(0);
                 /**
-                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br>
-                 * We prefer best quality --> "Original Archive"
+                 * 2022-01-07: Two types can be available: "Original Archive" and "Resample Archive". </br> We prefer best quality -->
+                 * "Original Archive"
                  */
                 final Form continueForm = br.getFormByInputFieldKeyValue("dltype", "org");
                 if (continue_url2 != null) {
@@ -620,10 +631,9 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * If this returns true: </br>
-     * Download of this image has just recently failed due to the image being serverside broken/unavailable. </br>
-     * Website has a feature called 'Reload broken image' which we are making use of here. </br>
-     * This will give us the same image hosted on a different CDN.
+     * If this returns true: </br> Download of this image has just recently failed due to the image being serverside broken/unavailable.
+     * </br> Website has a feature called 'Reload broken image' which we are making use of here. </br> This will give us the same image
+     * hosted on a different CDN.
      */
     private boolean needsBrokenImageWorkaround(final DownloadLink link, final Account account) {
         final long timestampLastFailDueToBrokenImage = link.getLongProperty(PROPERTY_TIMESTAMP_LAST_BROKEN_IMAGE_FAIL, 0);
@@ -814,8 +824,8 @@ public class EHentaiOrg extends PluginForHost {
                 logger.info("e-hentai.org: Successfully logged in via cookies -> Checking exhentai.org login");
                 /* Get- and save exhentai.org cookies too */
                 /**
-                 * Important! Get- and save exhentai cookies: First time this will happen: </br>
-                 * exhentai.org -> forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
+                 * Important! Get- and save exhentai cookies: First time this will happen: </br> exhentai.org ->
+                 * forums.e-hentai.org/remoteapi.php?ex= -> exhentai.org/?poni= -> exhentai.org
                  */
                 br.getPage(MAINPAGE_exhentai);
                 if (this.isLoggedInEhentaiOrExhentai(br)) {
@@ -931,11 +941,8 @@ public class EHentaiOrg extends PluginForHost {
     }
 
     /**
-     * Access e-hentai.org/home.php before calling this! </br>
-     * Returns array of numbers with: </br>
-     * [0] = number of items downloaded / used from limit </br>
-     * [1] = max limit for this account </br>
-     * [1] minus [0] = points left
+     * Access e-hentai.org/home.php before calling this! </br> Returns array of numbers with: </br> [0] = number of items downloaded / used
+     * from limit </br> [1] = max limit for this account </br> [1] minus [0] = points left
      */
     private int[] parseImagePointsLeftInfo(final Browser br) {
         if (!br.getURL().endsWith("/home.php")) {
