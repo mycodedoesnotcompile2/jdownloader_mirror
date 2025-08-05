@@ -29,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51300 $", interfaceVersion = 3, names = {}, urls = {})
 public class SupervideoTv extends XFileSharingProBasic {
     public SupervideoTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -141,5 +141,31 @@ public class SupervideoTv extends XFileSharingProBasic {
     @Override
     public Class<? extends XFSConfigVideo> getConfigInterface() {
         return XFSConfigVideoSupervideoTv.class;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML("class=\"fake-signup\"")) {
+            /* 2025-08-24 e.g. /e/2rzwt8lywxx3 */
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
+    }
+
+    @Override
+    public ArrayList<String> getCleanupHTMLRegexes() {
+        /* 2025-08-04: Workaround as default handling filters stuff we need, aka class="fake-signup" */
+        final ArrayList<String> regexStuff = new ArrayList<String>();
+        return regexStuff;
+    }
+
+    @Override
+    protected String buildURLPath(final DownloadLink link, final String fuid, final URL_TYPE type) {
+        if (type == URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD) {
+            return "/v/" + fuid;
+        } else {
+            return super.buildURLPath(link, fuid, type);
+        }
     }
 }

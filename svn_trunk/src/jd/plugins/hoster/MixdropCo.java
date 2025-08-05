@@ -21,6 +21,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -34,14 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
-@HostPlugin(revision = "$Revision: 51298 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51300 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -243,13 +244,20 @@ public class MixdropCo extends antiDDoSForHost {
                 logger.info("Found csrftoken: " + csrftoken);
             }
             final UrlQuery query = new UrlQuery();
-            query.add("a", "genticket");
-            query.add("csrf", csrftoken);
+            query.appendEncoded("a", "genticket");
+            query.appendEncoded("csrf", csrftoken);
             /* 2019-12-13: Invisible reCaptchaV2 */
             final boolean requiresCaptcha = true;
             if (requiresCaptcha) {
-                final String recaptchaV2Response = getCaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                query.appendEncoded("token", recaptchaV2Response);
+                final String turnstileKey = br.getRegex("data-cf-key=\"([^\"]+)\"").getMatch(0);
+                if (turnstileKey != null) {
+                    final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileKey);
+                    final String turnstileResponse = ts.getToken();
+                    query.appendEncoded("token", turnstileResponse);
+                } else {
+                    final String recaptchaV2Response = getCaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                    query.appendEncoded("token", recaptchaV2Response);
+                }
             }
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             postPage(br.getURL(), query.toString());

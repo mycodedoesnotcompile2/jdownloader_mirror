@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SuicidegirlsComCrawler;
 
-@HostPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
+@HostPlugin(revision = "$Revision: 51299 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
 public class SuicidegirlsCom extends PluginForHost {
     public SuicidegirlsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -145,6 +145,10 @@ public class SuicidegirlsCom extends PluginForHost {
             dllink = br.getRegex("<source src=\"(http[^<>\"]*?)\" type=\\'video/mp4\\'").getMatch(0);
             if (dllink == null) {
                 dllink = br.getRegex("\"(https?://[^/]+/videos/[^/]+\\.(?:mp4|m3u8))\"").getMatch(0);
+                if (dllink == null) {
+                    /* 2025-08-04 */
+                    dllink = br.getRegex("<source src=\"(https://[^\"]+)\" type=\"application/x-mpegURL\"").getMatch(0);
+                }
             }
             filename = br.getRegex("<h2 class=\"title\">(?:SuicideGirls:\\s*)?([^<>\"]*?)</h2>").getMatch(0);
             if (filename == null) {
@@ -182,10 +186,13 @@ public class SuicidegirlsCom extends PluginForHost {
             }
             dllink = getStoredDirecturl(link);
         }
+        if (dllink != null) {
+            dllink = Encoding.htmlOnlyDecode(dllink);
+        }
         link.setName(filename);
-        if (!isHLS(dllink)) {
+        if (dllink != null && !isHLS(dllink)) {
             final Browser brc = br.cloneBrowser();
-            basicLinkCheck(brc, br.createHeadRequest(dllink), link, filename, extDefault);
+            basicLinkCheck(brc, brc.createHeadRequest(dllink), link, filename, extDefault);
             this.handleConnectionErrors(link, brc, brc.getHttpConnection());
             link.setProperty(PROPERTY_DIRECTURL, dllink);
         }
@@ -351,7 +358,7 @@ public class SuicidegirlsCom extends PluginForHost {
     }
 
     private boolean isHLS(final String url) {
-        if (StringUtils.containsIgnoreCase(".m3u8", url)) {
+        if (StringUtils.containsIgnoreCase(url, ".m3u8")) {
             return true;
         } else {
             return false;

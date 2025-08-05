@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -29,6 +30,7 @@ import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -36,10 +38,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49225 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51302 $", interfaceVersion = 3, names = {}, urls = {})
 public class HanimeTv extends PluginForHost {
     public HanimeTv(PluginWrapper wrapper) {
         super(wrapper);
+        // this.enablePremium("https://" + getHost() + "/premium");
     }
 
     @Override
@@ -51,10 +54,10 @@ public class HanimeTv extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://hanime.tv/terms-of-use";
+        return "https://" + getHost() + "/terms-of-use";
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "hanime.tv" });
@@ -106,7 +109,7 @@ public class HanimeTv extends PluginForHost {
         final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
-            link.setName(fid.replace("-", " ").trim() + ".mp4");
+            link.setName(fid.replace("-", " ").trim() + "_1080p.mp4");
         }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
@@ -122,10 +125,17 @@ public class HanimeTv extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        doFree(link, "free_directlink");
+        handleDownload(link, null);
     }
 
-    private void doFree(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        if (account == null) {
+            throw new AccountRequiredException("Premium account required to download items higher than 720p quality");
+        }
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* 2025-08-04: While the plugin is unfinished either way, their HLS streams are encrypted. */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Encrypted HLS is not supported");
+        }
         if (true) {
             /* 2021-09-30: Unfinished plugin */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -166,7 +176,6 @@ public class HanimeTv extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error");
             }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 

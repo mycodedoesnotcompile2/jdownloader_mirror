@@ -22,6 +22,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.BeegComConfig;
+import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,21 +43,19 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.BeegComConfig;
-import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50427 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/(-\\d+$|-?\\d+\\?t=\\d+-\\d+|-?\\d{8,}$)" })
+@HostPlugin(revision = "$Revision: 51301 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/(-\\d+$|-?\\d+\\?t=\\d+-\\d+|-?\\d{8,}$)" })
 public class BeegCom extends PluginForHost {
     private String dllink[] = null;
 
     public BeegCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -128,7 +135,6 @@ public class BeegCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         String title = null;
         String extraParams = "";
         final String timeParams = UrlQuery.parse(link.getPluginPatternMatcher()).get("t");
@@ -139,7 +145,7 @@ public class BeegCom extends PluginForHost {
         br.getPage("https://store.externulls.com/facts/file/" + videoidOriginal + extraParams);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.toString().length() < 100) {
+        } else if (br.getRequest().getHtmlCode().length() < 100) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -194,7 +200,6 @@ public class BeegCom extends PluginForHost {
             title = title.trim();
             link.setFinalFileName(this.applyFilenameExtension(title, extDefault));
         }
-        br.setFollowRedirects(true);
         br.getHeaders().put("Referer", link.getPluginPatternMatcher());
         if (dllink != null) {
             link.setProperty(PROPERTY_QUALITY, dllink[0]);
@@ -220,8 +225,12 @@ public class BeegCom extends PluginForHost {
             checkFFmpeg(link, "Download a HLS Stream");
             dl = new HLSDownloader(link, br, this.dllink[1]);
         } else {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink[1], true, 0);
-            handleConnectionErrors(br, dl.getConnection());
+            /* 2025-08-04: Important: Avoid wrong referer! */
+            // final Browser br_download = br;
+            final Browser br_download = this.createNewBrowserInstance();
+            br_download.getHeaders().put("Referer", link.getPluginPatternMatcher());
+            dl = jd.plugins.BrowserAdapter.openDownload(br_download, link, dllink[1], true, 0);
+            handleConnectionErrors(br_download, dl.getConnection());
         }
         dl.startDownload();
     }

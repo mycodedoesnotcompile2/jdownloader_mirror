@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49798 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51299 $", interfaceVersion = 3, names = {}, urls = {})
 public class AkiHCom extends PluginForHost {
     public AkiHCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,20 +142,24 @@ public class AkiHCom extends PluginForHost {
         final Browser brc = br.cloneBrowser();
         brc.getPage("https://v." + mainDomain + "/v/" + videoID);
         brc.getPage("https://v." + mainDomain + "/f/" + publicVideoID);
-        final String v_url = brc.getRegex("\"(https?://[^/]+/v2?/[A-Za-z0-9]+)\"").getMatch(0);
+        final String v_url = brc.getRegex("\"(https://[^/]+/playback/v/[A-Za-z0-9]+/?)\"").getMatch(0);
         if (v_url == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        String file_url = v_url.replaceFirst("/v", "/file");
-        if (!file_url.endsWith("/")) {
-            /* Very important otherwise we will run into http response 404 */
-            file_url += "/";
-        }
         // final String streamID = brc.getRegex("stream/v2?/([^\"]*)").getMatch(0);
         brc.getPage(v_url);
+        final String v_url2 = brc.getRegex("\"(https?://[^/]+/v/[A-Za-z0-9]+)\"").getMatch(0);
+        if (v_url2 == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         /* Without this header, we will get html response "null". */
         brc.getHeaders().put(new HTTPHeader("Accept", "*/*"));
-        brc.getPage(file_url);
+        String hls_master = v_url2.replaceFirst("/v", "/file");
+        if (!hls_master.endsWith("/")) {
+            /* Very important otherwise we will run into http response 404 */
+            hls_master += "/";
+        }
+        brc.getPage(hls_master);
         final List<HlsContainer> containers = HlsContainer.getHlsQualities(brc);
         if (containers == null || containers.size() == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

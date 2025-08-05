@@ -58,7 +58,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DailyMotionCom;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 50376 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 51302 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,16 +118,16 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                     username = profileregex1.getMatch(1);
                 }
             } else {
-                username = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/([^/]+)$").getMatch(0);
+                username = new Regex(param.getCryptedUrl(), "(?i)https?://(?:www\\.)?dailymotion\\.com/([^/\\?]+)").getMatch(0);
             }
             if (contenturl.matches(TYPE_PLAYLIST)) {
                 return crawlPlaylist(contenturl);
-            } else if (username != null) {
-                return crawlUser(username);
             } else if (contenturl.matches(TYPE_VIDEO)) {
                 return crawlSingleVideo(param, contenturl, SubConfiguration.getConfig(this.getHost()), false);
             } else if (contenturl.matches(TYPE_USER_SEARCH)) {
                 return crawlUserSearch(contenturl);
+            } else if (username != null) {
+                return crawlUser(username);
             } else {
                 /* This should never happen. */
                 logger.info("Unsupported linktype: " + contenturl);
@@ -166,6 +166,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         fp.setName(username);
         boolean has_more = false;
         int page = 0;
+        int numberofVideos = -1;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
             page++;
@@ -179,6 +180,14 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             }
             final String json = brc.getRequest().getHtmlCode();
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            if (page == 1) {
+                /* Init some variables. */
+                numberofVideos = ((Number) entries.get("total")).intValue();
+                if (numberofVideos == 0) {
+                    logger.info("Profile contains 0 items");
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+                }
+            }
             has_more = ((Boolean) entries.get("has_more")).booleanValue();
             final List<Map<String, Object>> list = (List<Map<String, Object>>) entries.get("list");
             for (final Map<String, Object> videomap : list) {
@@ -188,7 +197,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                 ret.add(dl);
                 distribute(dl);
             }
-            logger.info("Crawled page " + page + " | Items on this page: " + list.size() + " | Found total so far: " + ret.size());
+            logger.info("Crawled page " + page + " | Items on this page: " + list.size() + " | Found total so far: " + ret.size() + "/" + numberofVideos);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
