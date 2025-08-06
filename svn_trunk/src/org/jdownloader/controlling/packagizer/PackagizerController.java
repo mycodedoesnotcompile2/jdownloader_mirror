@@ -15,20 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.controlling.TaskQueue;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinknameCleaner;
-import jd.controlling.linkcollector.PackagizerInterface;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.PackageInfo;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.ParsedFilename;
-
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
 import org.appwork.shutdown.ShutdownRequest;
@@ -60,8 +46,21 @@ import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkA
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
-public class PackagizerController implements PackagizerInterface, FileCreationListener {
+import jd.controlling.TaskQueue;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinknameCleaner;
+import jd.controlling.linkcollector.PackagizerInterface;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.PackageInfo;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.ParsedFilename;
 
+public class PackagizerController implements PackagizerInterface, FileCreationListener {
     public static final HashMap<String, Object> GLOBAL_PROPERTIES = new HashMap<String, Object>();
 
     public static Object getGlobalProperty(final String key) {
@@ -805,42 +804,45 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     }
 
     private void applyPackagizerRules(final CrawledLink link, final List<PackagizerRuleWrapper> rules, final boolean afterOnlineCheck) {
-        if (rules != null) {
-            for (final PackagizerRuleWrapper lgr : rules) {
-                if (lgr.getAlwaysFilter() == null || !lgr.getAlwaysFilter().isEnabled()) {
-                    if (!lgr.checkHoster(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkPluginStatus(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkOrigin(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkConditions(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkSource(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkPackageName(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkFileType(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkOnlineStatus(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkFileName(link)) {
-                        continue;
-                    }
-                    if (!lgr.checkFileSize(link)) {
-                        continue;
-                    }
-                }
+        if (rules == null) {
+            return;
+        }
+        for (final PackagizerRuleWrapper lgr : rules) {
+            if (lgr.getAlwaysFilter() != null && lgr.getAlwaysFilter().isEnabled()) {
                 set(link, lgr);
+                continue;
             }
+            if (!lgr.checkHoster(link)) {
+                continue;
+            }
+            if (!lgr.checkPluginStatus(link)) {
+                continue;
+            }
+            if (!lgr.checkOrigin(link)) {
+                continue;
+            }
+            if (!lgr.checkConditions(link)) {
+                continue;
+            }
+            if (!lgr.checkSource(link)) {
+                continue;
+            }
+            if (!lgr.checkPackageName(link)) {
+                continue;
+            }
+            if (!lgr.checkFileType(link)) {
+                continue;
+            }
+            if (!lgr.checkOnlineStatus(link)) {
+                continue;
+            }
+            if (!lgr.checkFileName(link)) {
+                continue;
+            }
+            if (!lgr.checkFileSize(link)) {
+                continue;
+            }
+            set(link, lgr);
         }
     }
 
@@ -1096,22 +1098,24 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
 
     public String replaceVariables(final REPLACEVARIABLE replaceVariable, String txt, CrawledLink link, PackagizerRuleWrapper lgr) {
         final String[][] matches = new Regex(txt, "<jd:([^>:]+)(?::(.+?))?\\s*/?\\s*>").getMatches();
-        if (matches != null) {
-            for (String m[] : matches) {
-                try {
-                    final PackagizerReplacer replacer = replacers.get(m[0].toLowerCase(Locale.ENGLISH));
-                    if (replacer != null) {
-                        final String modifier;
-                        if (StringUtils.isEmpty(m[1])) {
-                            modifier = null;
-                        } else {
-                            modifier = m[1];
-                        }
-                        txt = replacer.replace(replaceVariable, modifier, link, txt, lgr);
-                    }
-                } catch (final Throwable e) {
-                    LogController.CL(false).log(e);
+        if (matches == null) {
+            return txt;
+        }
+        for (String m[] : matches) {
+            try {
+                final PackagizerReplacer replacer = replacers.get(m[0].toLowerCase(Locale.ENGLISH));
+                if (replacer == null) {
+                    continue;
                 }
+                final String modifier;
+                if (StringUtils.isEmpty(m[1])) {
+                    modifier = null;
+                } else {
+                    modifier = m[1];
+                }
+                txt = replacer.replace(replaceVariable, modifier, link, txt, lgr);
+            } catch (final Throwable e) {
+                LogController.CL(false).log(e);
             }
         }
         return txt;
@@ -1119,61 +1123,66 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
 
     // TODO: add support for deep extraction
     public void onNewFile(Object caller, File[] fileList) {
-        if (org.jdownloader.settings.staticreferences.CFG_PACKAGIZER.PACKAGIZER_ENABLED.isEnabled()) {
-            if (caller instanceof ExtractionController && caller != this) {
-                if (((ExtractionController) caller).getArchive() instanceof DownloadLinkArchive) {
-                    CrawledPackage crawledPackage = null;
-                    for (final ArchiveFile af : ((ExtractionController) caller).getArchive().getArchiveFiles()) {
-                        if (af instanceof DownloadLinkArchiveFile) {
-                            for (final DownloadLink link : ((DownloadLinkArchiveFile) af).getDownloadLinks()) {
-                                for (final File file : fileList) {
-                                    if (file.exists()) {
-                                        final CrawledLink cl = new CrawledLink(link) {
-                                            @Override
-                                            protected void passwordForward(DownloadLink dlLink) {
-                                                /* not needed and used in constructor */
-                                            }
-                                        };
-                                        cl.setName(file.getName());
-                                        final ArrayList<String> sourceURLs = new ArrayList<String>();
-                                        String url = link.getOriginUrl();
-                                        if (url != null) {
-                                            sourceURLs.add(url);
-                                        }
-                                        url = link.getReferrerUrl();
-                                        if (url != null) {
-                                            sourceURLs.add(url);
-                                        }
-                                        url = link.getContainerUrl();
-                                        if (url != null) {
-                                            sourceURLs.add(url);
-                                        }
-                                        url = link.getContentUrl();
-                                        if (url != null) {
-                                            sourceURLs.add(url);
-                                        }
-                                        url = link.getCustomUrl();
-                                        if (url != null) {
-                                            sourceURLs.add(url);
-                                        }
-                                        if (sourceURLs.size() > 0) {
-                                            cl.setSourceUrls(sourceURLs.toArray(new String[0]));
-                                        }
-                                        final FilePackage filePackage = link.getLastValidFilePackage();
-                                        if (filePackage != null) {
-                                            crawledPackage = new CrawledPackage();
-                                            crawledPackage.setName(filePackage.getName());
-                                            crawledPackage.setDownloadFolder(filePackage.getDownloadDirectory());
-                                            cl.setParentNode(crawledPackage);
-                                        } else {
-                                            cl.setParentNode(crawledPackage);
-                                        }
-                                        runAfterExtraction(file, cl);
-                                    }
-                                }
-                            }
-                        }
+        if (!org.jdownloader.settings.staticreferences.CFG_PACKAGIZER.PACKAGIZER_ENABLED.isEnabled()) {
+            return;
+        }
+        if (!(caller instanceof ExtractionController) || caller == this) {
+            return;
+        }
+        if (!(((ExtractionController) caller).getArchive() instanceof DownloadLinkArchive)) {
+            return;
+        }
+        CrawledPackage crawledPackage = null;
+        for (final ArchiveFile af : ((ExtractionController) caller).getArchive().getArchiveFiles()) {
+            if (!(af instanceof DownloadLinkArchiveFile)) {
+                continue;
+            }
+            for (final DownloadLink link : ((DownloadLinkArchiveFile) af).getDownloadLinks()) {
+                for (final File file : fileList) {
+                    if (!file.exists()) {
+                        continue;
                     }
+                    final CrawledLink cl = new CrawledLink(link) {
+                        @Override
+                        protected void passwordForward(DownloadLink dlLink) {
+                            /* not needed and used in constructor */
+                        }
+                    };
+                    cl.setName(file.getName());
+                    final ArrayList<String> sourceURLs = new ArrayList<String>();
+                    String url = link.getOriginUrl();
+                    if (url != null) {
+                        sourceURLs.add(url);
+                    }
+                    url = link.getReferrerUrl();
+                    if (url != null) {
+                        sourceURLs.add(url);
+                    }
+                    url = link.getContainerUrl();
+                    if (url != null) {
+                        sourceURLs.add(url);
+                    }
+                    url = link.getContentUrl();
+                    if (url != null) {
+                        sourceURLs.add(url);
+                    }
+                    url = link.getCustomUrl();
+                    if (url != null) {
+                        sourceURLs.add(url);
+                    }
+                    if (sourceURLs.size() > 0) {
+                        cl.setSourceUrls(sourceURLs.toArray(new String[0]));
+                    }
+                    final FilePackage filePackage = link.getLastValidFilePackage();
+                    if (filePackage != null) {
+                        crawledPackage = new CrawledPackage();
+                        crawledPackage.setName(filePackage.getName());
+                        crawledPackage.setDownloadFolder(filePackage.getDownloadDirectory());
+                        cl.setParentNode(crawledPackage);
+                    } else {
+                        cl.setParentNode(crawledPackage);
+                    }
+                    runAfterExtraction(file, cl);
                 }
             }
         }

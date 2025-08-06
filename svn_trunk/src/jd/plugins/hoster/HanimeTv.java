@@ -20,10 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51302 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51304 $", interfaceVersion = 3, names = {}, urls = {})
 public class HanimeTv extends PluginForHost {
     public HanimeTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,12 +129,12 @@ public class HanimeTv extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        if (account == null) {
-            throw new AccountRequiredException("Premium account required to download items higher than 720p quality");
-        }
         if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /* 2025-08-04: While the plugin is unfinished either way, their HLS streams are encrypted. */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Encrypted HLS is not supported");
+        }
+        if (account == null) {
+            throw new AccountRequiredException("Premium account required to download items higher than 720p quality");
         }
         if (true) {
             /* 2021-09-30: Unfinished plugin */
@@ -152,14 +152,14 @@ public class HanimeTv extends PluginForHost {
         brc.getHeaders().put("x-time", Long.toString(System.currentTimeMillis()));
         brc.getHeaders().put("x-token", "null");
         final UrlQuery query = new UrlQuery();
-        query.add("id", Encoding.urlEncode(fidB64Encoded));
-        query.add("kind", "requestlinks");
-        query.add("captcha_token", "TODO");
-        query.add("captcha_expires", "");
-        query.add("loc", Encoding.urlEncode("https://hanime.tv"));
+        query.appendEncoded("id", Encoding.urlEncode(fidB64Encoded));
+        query.appendEncoded("kind", "requestlinks");
+        query.appendEncoded("captcha_token", "TODO");
+        query.appendEncoded("captcha_expires", "");
+        query.appendEncoded("loc", Encoding.urlEncode("https://hanime.tv"));
         brc.getPage("https://members.hanime.tv/rapi/v7/downloads?" + query.toString());
         /* TODO */
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.getRequest().getHtmlCode());
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         String dllink = (String) entries.get("TODO");
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find final downloadurl");

@@ -2,20 +2,19 @@ package org.jdownloader.controlling.filter;
 
 import java.util.ArrayList;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionFilter;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OriginFilter;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter;
-
 import org.appwork.storage.Storable;
 import org.appwork.utils.Files;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.myjdownloader.client.json.AbstractJsonData;
 
-public abstract class FilterRule extends AbstractJsonData implements Storable {
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionFilter;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OriginFilter;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter;
 
+public abstract class FilterRule extends AbstractJsonData implements Storable {
     private FilesizeFilter     filesizeFilter;
     private RegexFilter        hosterURLFilter;
     private RegexFilter        sourceURLFilter;
@@ -135,7 +134,7 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
     }
 
     /**
-     * Returns false if now filterrule is enabled
+     * Returns false if no filterrule is enabled
      *
      * @return
      */
@@ -158,7 +157,6 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
             if (getConditionFilter().isEnabled()) {
                 cond.add(conditionFilter.toString());
             }
-
             if (getPluginStatusFilter().isEnabled()) {
                 cond.add(pluginStatusFilter.toString());
             }
@@ -168,7 +166,6 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
                 } else {
                     cond.add(_GUI.T.FilterRule_toString_name(filenameFilter.toString()));
                 }
-
             }
             if (getPackagenameFilter().isEnabled()) {
                 if (link != null && link.getParentNode() != null && link.getParentNode().getName() != null) {
@@ -176,7 +173,6 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
                 } else {
                     cond.add(_GUI.T.FilterRule_toString_packagename(packagenameFilter.toString()));
                 }
-
             }
             if (getFilesizeFilter().isEnabled()) {
                 if (link != null && link.getSize() > 0) {
@@ -184,7 +180,6 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
                 } else {
                     cond.add(_GUI.T.FilterRule_toString_size(filesizeFilter.toString()));
                 }
-
             }
             if (getFiletypeFilter().isEnabled()) {
                 if (link != null && link.getName() != null && Files.getExtension(link.getName()) != null) {
@@ -193,7 +188,6 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
                 } else {
                     cond.add(_GUI.T.FilterRule_toString_type(filetypeFilter.toString()));
                 }
-
             }
             if (getHosterURLFilter().isEnabled()) {
                 if (link != null) {
@@ -201,12 +195,9 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
                 } else {
                     cond.add(_GUI.T.FilterRule_toString_hoster(hosterURLFilter.toString()));
                 }
-
             }
             if (getSourceURLFilter().isEnabled()) {
-
                 cond.add(_GUI.T.FilterRule_toString_source(sourceURLFilter.toString()));
-
             }
         }
         for (int i = 0; i < cond.size(); i++) {
@@ -216,11 +207,9 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
                 } else {
                     sb.append(" " + _GUI.T.FilterRule_toString_and2(cond.get(i)).trim());
                 }
-
             } else {
                 sb.append(cond.get(i));
             }
-
         }
         return sb.toString();
     }
@@ -311,7 +300,6 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
     }
 
     private boolean enabled;
-
     private String  name;
 
     public String getName() {
@@ -328,6 +316,5 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
-
     }
 }

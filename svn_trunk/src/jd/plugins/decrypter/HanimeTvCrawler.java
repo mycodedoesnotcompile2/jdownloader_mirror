@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -27,10 +28,13 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPlu
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -42,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.HanimeTv;
 
-@DecrypterPlugin(revision = "$Revision: 51302 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51304 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { HanimeTv.class })
 public class HanimeTvCrawler extends PluginForDecrypt {
     public HanimeTvCrawler(PluginWrapper wrapper) {
@@ -115,18 +119,38 @@ public class HanimeTvCrawler extends PluginForDecrypt {
         query.appendEncoded("captcha_kind", "recaptcha");
         query.appendEncoded("captcha_token", recaptchaV2Response);
         query.appendEncoded("captcha_expires", "");
-        query.appendEncoded("loc", "https://hanime.tv");
+        query.appendEncoded("loc", "https://" + getHost());
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         br.getHeaders().put("Origin", "https://" + br.getHost());
+        /* Session token only exists for logged in users */
         br.getHeaders().put("x-session-token", "");
-        br.getHeaders().put("x-signature", "TODO");
+        br.getHeaders().put("x-signature", generateXSignature()); // TODO: Fix this
         br.getHeaders().put("x-signature-version", "web2");
-        br.getHeaders().put("x-time", Long.toString(System.currentTimeMillis()));
+        br.getHeaders().put("x-time", Long.toString(System.currentTimeMillis() / 1000));
         br.getHeaders().put("x-token", "null");
         br.getPage("https://h.freeanimehentai.net/rapi/v7/downloads?" + query.toString());
         final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (entries2.get("is_downloads_enabled") != Boolean.TRUE) {
             throw new AccountRequiredException();
+        }
+        boolean hasFreeAccount = false;
+        /*
+         * TODO: Add proper handling for case that user owns premium account -> Captcha should be skippable and 1080p downloads should be
+         * possible.
+         */
+        boolean hasPremiumAccount = false;
+        Account premiumAccount = null;
+        final ArrayList<Account> accounts = AccountController.getInstance().listAccounts(new AccountFilter("hanime.tv"));
+        for (final Account account : accounts) {
+            if (!hasFreeAccount && account.getType() == AccountType.FREE) {
+                hasFreeAccount = true;
+            } else if (!hasPremiumAccount && account.getType() == AccountType.PREMIUM) {
+                hasPremiumAccount = true;
+                premiumAccount = account;
+            }
+            if (hasFreeAccount && hasPremiumAccount) {
+                break;
+            }
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int numberofDownloadableItemsGuest = 0;
@@ -162,6 +186,20 @@ public class HanimeTvCrawler extends PluginForDecrypt {
             throw new AccountRequiredException();
         }
         return ret;
+    }
+
+    /**
+     * Generates a random 32-character hexadecimal string for x-signature <br>
+     * This might have worked for their apiv6 but not for v7(?)
+     */
+    public static String generateXSignature() {
+        Random random = new Random();
+        StringBuilder signature = new StringBuilder(32);
+        for (int i = 0; i < 32; i++) {
+            int randomHex = random.nextInt(16); // 0-15
+            signature.append(Integer.toHexString(randomHex));
+        }
+        return signature.toString();
     }
 
     @Override
