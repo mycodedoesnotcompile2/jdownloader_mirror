@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 51243 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51305 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -231,14 +231,22 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(tags);
         int page = 1;
-        final String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>([^<]+)</span>").getMatch(0);
+        String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>([^<]+)</span>").getMatch(0);
         final int numberofItems;
         if (numberofItemsStr == null) {
             logger.warning("Failed to find expected number of items");
             numberofItems = -1;
-        } else {
+        } else if (numberofItemsStr.endsWith("K") || numberofItemsStr.endsWith("k")) {
+            String numPart = numberofItemsStr.substring(0, numberofItemsStr.length() - 1);
+            double num = Double.parseDouble(numPart);
+            numberofItems = (int) (num * 1000);
+        } else if (numberofItemsStr.matches("\\d+")) {
             numberofItems = Integer.parseInt(numberofItemsStr);
+        } else {
+            logger.warning("Total number of items string has unsupported format: " + numberofItemsStr);
+            numberofItems = -1;
         }
+        logger.info("Total number of items: " + numberofItems);
         final HashSet<String> dupes = new HashSet<String>();
         int position = 1;
         pagination: do {

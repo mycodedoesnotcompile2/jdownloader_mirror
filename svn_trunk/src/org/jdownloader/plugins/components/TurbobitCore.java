@@ -3,21 +3,42 @@ package org.jdownloader.plugins.components;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
+
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.http.Browser;
 import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -36,24 +57,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.download.HashInfo;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51249 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51306 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -63,7 +67,6 @@ public abstract class TurbobitCore extends PluginForHost {
     private static final boolean           prefer_single_linkcheck_via_mass_linkchecker  = true;
     private static final String            TYPE_premiumRedirectLinks                     = "(?i)(?:https?://[^/]+/)?/?download/redirect/[A-Za-z0-9]+/([a-z0-9]+)";
     private static Map<String, AtomicLong> hostLastPremiumCaptchaProcessedTimestampMap   = new HashMap<String, AtomicLong>();
-
     /* Properties */
 
     /**
@@ -104,6 +107,8 @@ public abstract class TurbobitCore extends PluginForHost {
         prepBrowserGeneral(br);
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         br.setCookie(getMainpage(), "site_version", "2");
+        /* Response 400 even happens during normal website usage and can still return json. */
+        br.setAllowedResponseCodes(400);
         return br;
     }
 
@@ -146,9 +151,9 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         /**
          * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
-         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
-         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
-         * short amount of time!
+         * filesize is not known already. This will speedup the linkcheck! </br>
+         * Disabled = Check for filesize via single-linkcheck even first time links get added as long as no filesize is given. This will
+         * slow down the linkcheck and cause more http requests in a short amount of time!
          */
         final boolean fastLinkcheck = isFastLinkcheckEnabled();
         final List<DownloadLink> linksForDeepCheck = new ArrayList<DownloadLink>();
@@ -337,11 +342,23 @@ public abstract class TurbobitCore extends PluginForHost {
         brc.postPageRaw(this.getWebsiteV2Base() + "/api/download/info", "{\"fileId\":\"" + fid + "\",\"referrer\":null,\"site\":null,\"shortDomain\":\"\"}");
         final Map<String, Object> entries = this.checkErrorsWebsiteV2(brc, link, account);
         final Map<String, Object> file = (Map<String, Object>) entries.get("file");
+        final Number freeDownloadSize = (Number) entries.get("freeDownloadSize");
+        final long filesizeBytes = ((Number) file.get("size")).longValue();
         /* This is a good source for filename information -> Make use of it */
         link.setFinalFileName(file.get("name").toString());
-        link.setVerifiedFileSize(((Number) file.get("size")).longValue());
-        if (Boolean.TRUE.equals(entries.get("premiumOnlyDownload")) && (account == null || account.getType() != AccountType.PREMIUM) && this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
-            throw new AccountRequiredException();
+        link.setVerifiedFileSize(filesizeBytes);
+        if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+            /* We are in download mode > Check for some error states which would prevent us from downloading. */
+            final boolean isPremium = account != null && account.getType() == AccountType.PREMIUM;
+            if (!isPremium && Boolean.TRUE.equals(entries.get("premiumOnlyDownload"))) {
+                throw new AccountRequiredException("Only downloadable for premium users");
+            }
+            if (!isPremium && freeDownloadSize != null && filesizeBytes > freeDownloadSize.longValue()) {
+                final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+                final String filesizeFormatted = SIZEUNIT.formatValue(maxSizeUnit, freeDownloadSize.longValue());
+                /* Message when download of such files is attempted via WebaiteV2: File size is greater than allowed */
+                throw new AccountRequiredException(String.format("Limit reached for free download of this file (only %s free traffic left for this file). You can download this file using a premium account.", filesizeFormatted));
+            }
         }
         return AvailableStatus.TRUE;
     }
@@ -470,7 +487,19 @@ public abstract class TurbobitCore extends PluginForHost {
      */
     private Map<String, Object> getUserInformationWebsiteV2(final Browser br, final Account account) throws IOException, PluginException {
         br.getPage(getWebsiteV2Base() + "/api/user/info");
-        /* 2025-07-07: Redirects to this page when we are not logged in: https://app.turbobit.net?login=true */
+        /**
+         * 2025-07-07: Redirects to this page when we are not logged in: <br>
+         * https://app.turbobit.net?login=true <br>
+         * This will also return html code and not json.
+         */
+        if (StringUtils.containsIgnoreCase(br.getURL(), "login=true")) {
+            logger.info("Not logged in because: URL contains 'login=true'");
+            return null;
+        }
+        if (!br.getRequest().getHtmlCode().startsWith("{")) {
+            logger.info("Not logged in because: Got html instead of json");
+            return null;
+        }
         final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
         return entries;
     }
@@ -612,7 +641,8 @@ public abstract class TurbobitCore extends PluginForHost {
     }
 
     /**
-     * Fills in captchaForm. </br> DOES NOT SEND CAPTCHA-FORM!!
+     * Fills in captchaForm. </br>
+     * DOES NOT SEND CAPTCHA-FORM!!
      */
     protected boolean processCaptchaFormWebsiteV1(final DownloadLink link, final Account account, final Form captchaform, final Browser br, final boolean optionalCaptcha) throws PluginException, InterruptedException {
         if (AbstractHCaptcha.containsHCaptcha(br)) {
@@ -653,23 +683,16 @@ public abstract class TurbobitCore extends PluginForHost {
                 logger.info("Download of pre given directurl failed --> Attempting normal free download");
             }
         }
+        boolean verifiedLogin = false;
         if (account != null) {
-            this.login(account, false);
+            verifiedLogin = this.login(account, false) != null;
         } else {
             if (checkShowFreeDialog(getHost())) {
                 super.showFreeDialog(getHost());
             }
         }
-        final DownloadType dltype;
-        if (account == null) {
-            dltype = DownloadType.GUEST_FREE;
-        } else if (account.getType() == AccountType.PREMIUM) {
-            dltype = DownloadType.ACCOUNT_PREMIUM;
-        } else {
-            dltype = DownloadType.ACCOUNT_FREE;
-        }
-        String directlink = null;
         final String fid = this.getFUID(link);
+        final String[] mirrors;
         if (allowWebsiteV2Handling()) {
             /* WebsiteV2 */
             final Browser brc = this.prepBrowserWebsiteV2(br.cloneBrowser());
@@ -677,12 +700,23 @@ public abstract class TurbobitCore extends PluginForHost {
                 /* Premium download */
                 /* Linkcheck can be skipped here as the following request will return an error if the file_id is invalid/offline. */
                 // requestFileInformation_WebsiteV2(link, account);
-                brc.postPageRaw(this.getWebsiteV2Base() + "/api/download/info", "{\"fileId\":\"" + fid + "\",\"referrer\":null,\"site\":null,\"shortDomain\":\"\"}");
-                final Map<String, Object> downloadmap = this.checkErrorsWebsiteV2(brc, link, account);
-                final List<String> mirrors = (List<String>) downloadmap.get("downloadUrls");
-                final int chosenMirrorIndex = new Random().nextInt(mirrors.size());
-                directlink = mirrors.get(new Random().nextInt(mirrors.size()));
-                logger.info("Available premium mirrors: " + mirrors.size() + " | Chosen mirror[" + chosenMirrorIndex + "] --> " + directlink);
+                List<String> mirrorList = null;
+                do {
+                    brc.postPageRaw(this.getWebsiteV2Base() + "/api/download/info", "{\"fileId\":\"" + fid + "\",\"referrer\":null,\"site\":null,\"shortDomain\":\"\"}");
+                    final Map<String, Object> downloadmap = this.checkErrorsWebsiteV2(brc, link, account);
+                    mirrorList = (List<String>) downloadmap.get("downloadUrls");
+                    if (mirrorList != null) {
+                        break;
+                    } else if (verifiedLogin) {
+                        break;
+                    }
+                    logger.info("Looks like session has expired -> Ensuring that we're logged in");
+                    this.login(account, true);
+                    verifiedLogin = true;
+                    // continue;
+                } while (!this.isAbort());
+                mirrors = mirrorList.toArray(new String[0]);
+                logger.info("Available premium mirrors: " + mirrors.length);
             } else {
                 requestFileInformation_WebsiteV2(link, account);
                 brc.postPageRaw(this.getWebsiteV2Base() + "/api/download/free/init", "{\"fileId\":\"" + fid + "\"}");
@@ -702,7 +736,7 @@ public abstract class TurbobitCore extends PluginForHost {
                 final int waitSeconds = ((Number) delaymap.get("delay")).intValue();
                 this.sleep(waitSeconds * 1000, link);
                 brc.postPageRaw("/api/download/free/prepare", "{\"fileId\":\"" + fid + "\"}");
-                /* Expected answer: {"success":true} */
+                /* Expected response: {"success":true} */
                 this.checkErrorsWebsiteV2(brc, link, account);
                 brc.getHeaders().put("Referer", "https://new.turbobit.net/download/started/" + fid);
                 brc.postPageRaw("/api/download/free/start", "{\"fileId\":\"" + fid + "\"}");
@@ -712,11 +746,8 @@ public abstract class TurbobitCore extends PluginForHost {
                  * :1234,"premium":1234}}
                  */
                 final Map<String, Object> downloadmap = this.checkErrorsWebsiteV2(brc, link, account);
-                directlink = downloadmap.get("downloadUrl").toString();
-                if (!directlink.contains("?")) {
-                    /* Small workaround. TODO: Check if this is really needed */
-                    directlink += "?site_version=1&from_mirror=1";
-                }
+                final String directlink = downloadmap.get("downloadUrl").toString();
+                mirrors = new String[] { directlink };
             }
         } else {
             /* WebsiteV1 */
@@ -811,50 +842,45 @@ public abstract class TurbobitCore extends PluginForHost {
                 if (!StringUtils.isEmpty(continueLink2)) {
                     br2.getPage(continueLink2);
                 }
-                directlink = br2.getRegex("(\"|')(/?/download/redirect/[^\"\\']+)\\1").getMatch(1);
-                handleDownloadRedirectErrorsWebsiteV1(directlink, link);
-            }
-        }
-        initDownload(dltype, link, account, directlink);
-        handleErrorsPreDownloadstart(dl.getConnection());
-        dl.startDownload();
-    }
-
-    /** Handles errors */
-    private void handleDownloadRedirectErrorsWebsiteV1(final String redirect, final DownloadLink link) throws PluginException {
-        if (StringUtils.isEmpty(redirect)) {
-            logger.info("'redirect' downloadurl is null");
-            if (br.toString().matches("Error: \\d+")) {
-                // unknown error...
-                throw new PluginException(LinkStatus.ERROR_RETRY);
-            } else if (br.toString().matches("^The file is not avaliable now because of technical problems\\. <br> Try to download it once again after 10-15 minutes\\..*?")) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File not avaiable due to technical problems.", 15 * 60 * 1001l);
-            } else if (br.containsHTML("<a href=\\'/" + this.getLinkID(link) + "(\\.html)?\\'>new</a>")) {
-                /* Expired downloadlink - rare issue. If user has added such a direct-URL, we're not able to retry. */
-                /**
-                 * 2019-05-14: TODO: Even premium-directurls should contain the linkid so we should be able to use that to 'convert' such
-                 * problematic URLs to 'normal' URLs. Keep in mind that this is a VERY VERY rare case!
-                 */
-                /*
-                 * <div class="action-block"><p>Der Link ist abgelaufen. Fordern Sie bitte <a href='/FUID.html'>new</a> download
-                 * link.</p></div></div> </div> Example: http://turbobit.net/download/redirect/TEST/TEST
-                 */
-                if (link.getPluginPatternMatcher().matches(TYPE_premiumRedirectLinks)) {
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Generated Premium link has expired");
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to generate final downloadlink");
+                final String directlink = br2.getRegex("(\"|')(/?/download/redirect/[^\"\\']+)\\1").getMatch(1);
+                if (directlink == null) {
+                    logger.info("'redirect' downloadurl is null");
+                    if (br.getRequest().getHtmlCode().matches("Error: \\d+")) {
+                        // unknown error...
+                        throw new PluginException(LinkStatus.ERROR_RETRY);
+                    } else if (br.getRequest().getHtmlCode().matches("^The file is not avaliable now because of technical problems\\. <br> Try to download it once again after 10-15 minutes\\..*?")) {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File not avaiable due to technical problems.", 15 * 60 * 1001l);
+                    } else if (br.containsHTML("<a href=\\'/" + this.getLinkID(link) + "(\\.html)?\\'>new</a>")) {
+                        /* Expired downloadlink - rare issue. If user has added such a direct-URL, we're not able to retry. */
+                        /**
+                         * 2019-05-14: TODO: Even premium-directurls should contain the linkid so we should be able to use that to 'convert'
+                         * such problematic URLs to 'normal' URLs. Keep in mind that this is a VERY VERY rare case!
+                         */
+                        /*
+                         * <div class="action-block"><p>Der Link ist abgelaufen. Fordern Sie bitte <a href='/FUID.html'>new</a> download
+                         * link.</p></div></div> </div> Example: http://turbobit.net/download/redirect/TEST/TEST
+                         */
+                        if (link.getPluginPatternMatcher().matches(TYPE_premiumRedirectLinks)) {
+                            throw new PluginException(LinkStatus.ERROR_FATAL, "Generated Premium link has expired");
+                        } else {
+                            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to generate final downloadlink");
+                        }
+                    }
+                    final String linkerror = br.getRegex("<div\\s*id\\s*=\\s*\"brin-link-error\"\\s*>\\s*([^>]+)\\s*</div>").getMatch(0);
+                    if (linkerror != null) {
+                        /*
+                         * 2019-07-10: E.g. <div id="brin-link-error">Failed to generate link. Internal server error. Please try
+                         * again.</div>
+                         */
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, linkerror);
+                    }
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown Error - failed to find redirect-url to final downloadurl");
                 }
+                mirrors = new String[] { directlink };
             }
-            final String linkerror = br.getRegex("<div\\s*id\\s*=\\s*\"brin-link-error\"\\s*>\\s*([^>]+)\\s*</div>").getMatch(0);
-            if (linkerror != null) {
-                /* 2019-07-10: E.g. <div id="brin-link-error">Failed to generate link. Internal server error. Please try again.</div> */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, linkerror);
-            }
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown Error - failed to find redirect-url to final downloadurl");
-        } else if (redirect.matches("^https?://[^/]+/?$")) {
-            /* Redirect to mainpage --> expired/invalid? */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Premium link no longer valid");
         }
+        initMirrorDownload(link, account, mirrors);
+        dl.startDownload();
     }
 
     /**
@@ -947,7 +973,6 @@ public abstract class TurbobitCore extends PluginForHost {
         sleep(2000, link);
         accessContentURLWebsiteV1(br, link);
         handlePremiumCaptchaWebsiteV1(br, link, account);
-        String dllink = null;
         final String[] mirrors = br.getRegex("('|\")(https?://([a-z0-9\\.]+)?[^/\\'\"]+//?download/redirect/.*?)\\1").getColumn(1);
         if (mirrors == null || mirrors.length == 0) {
             if (br.containsHTML("You have reached the.*? limit of premium downloads")) {
@@ -960,40 +985,7 @@ public abstract class TurbobitCore extends PluginForHost {
             logger.warning("dllink equals null, plugin seems to be broken!");
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadlink");
         }
-        br.setFollowRedirects(false);
-        for (int i = 0; i < mirrors.length; i++) {
-            final String currentlink = mirrors[i];
-            logger.info("Checking mirror: " + i + "/" + mirrors.length + ": " + currentlink);
-            br.getPage(currentlink);
-            if (br.getHttpConnection().getResponseCode() == 503) {
-                logger.info("Too many connections on current account via current IP");
-                throw new AccountUnavailableException("Too many connections on current account via current IP", 30 * 1000l);
-            }
-            if (br.getRedirectLocation() == null) {
-                logger.info("Skipping broken mirror reason#1: " + currentlink);
-                continue;
-            }
-            dllink = br.getRedirectLocation();
-            try {
-                if (initDownload(DownloadType.ACCOUNT_PREMIUM, link, account, dllink)) {
-                    break;
-                }
-            } catch (final PluginException e) {
-                final boolean isLastMirror = mirrors.length - 1 == i;
-                if (isLastMirror) {
-                    throw e;
-                } else {
-                    logger.log(e);
-                    logger.info("Skipping broken mirror reason#2: " + dllink);
-                    continue;
-                }
-            }
-            /* Ugly workaround */
-            logger.info("Skipping non working mirror: " + dllink);
-        }
-        if (dl == null) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadlink");
-        }
+        this.initMirrorDownload(link, account, mirrors);
         dl.startDownload();
     }
 
@@ -1022,8 +1014,65 @@ public abstract class TurbobitCore extends PluginForHost {
         GUEST_PREMIUMLINK;
     }
 
+    /**
+     * Checks a list of mirror links and attempts to find a working download link
+     *
+     * @param link
+     *            The download link object
+     * @param account
+     *            User account for premium downloads
+     * @param mirrors
+     *            Variable number of mirror URLs to check
+     * @throws Exception
+     */
+    private void initMirrorDownload(DownloadLink link, Account account, String... mirrors) throws Exception {
+        final DownloadType dltype;
+        if (link.getPluginPatternMatcher().matches(TYPE_premiumRedirectLinks)) {
+            dltype = DownloadType.GUEST_PREMIUMLINK;
+        } else if (account == null) {
+            dltype = DownloadType.GUEST_FREE;
+        } else if (account.getType() == AccountType.PREMIUM) {
+            dltype = DownloadType.ACCOUNT_PREMIUM;
+        } else {
+            dltype = DownloadType.ACCOUNT_FREE;
+        }
+        // Remove duplicates and randomize order (Java 1.6 compatible)
+        final Set<String> uniqueSet = new LinkedHashSet<String>(Arrays.asList(mirrors));
+        if (uniqueSet.size() != mirrors.length) {
+            /* This should never happen */
+            logger.info("Removed mirror dupes | Size before: " + mirrors.length + " | New: " + uniqueSet.size());
+        }
+        final List<String> uniqueMirrors = new ArrayList<String>(uniqueSet);
+        Collections.shuffle(uniqueMirrors);
+        String dllink = null;
+        for (int i = 0; i < uniqueMirrors.size(); i++) {
+            dllink = uniqueMirrors.get(i);
+            logger.info("Trying mirror: " + (i + 1) + "/" + uniqueMirrors.size() + ": " + dllink);
+            try {
+                if (initSingleDownload(dltype, link, account, dllink)) {
+                    break;
+                }
+            } catch (final PluginException e) {
+                final boolean isLastMirror = uniqueMirrors.size() - 1 == i;
+                if (isLastMirror) {
+                    throw e;
+                } else {
+                    logger.log(e);
+                    logger.info("Skipping broken mirror: " + dllink);
+                    continue;
+                }
+            }
+            /* Ugly workaround */
+            logger.info("Skipping non working mirror: " + dllink);
+        }
+        /* Fail-safe */
+        if (dl == null) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadlink");
+        }
+    }
+
     /** 2019-05-11: Limits seem to be the same for all of their services. */
-    private boolean initDownload(final DownloadType dltype, final DownloadLink link, final Account account, final String directlink) throws Exception {
+    private boolean initSingleDownload(final DownloadType dltype, final DownloadLink link, final Account account, final String directlink) throws Exception {
         if (directlink == null) {
             /* Developer mistake */
             logger.warning("dllink is null");
@@ -1031,6 +1080,11 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         boolean success = false;
         final boolean previousFollowRedirectState = br.isFollowingRedirects();
+        // String host = br.getRequest() != null ? br.getHost() : this.getHost();
+        // final String site_version_old_value = br.getCookie(host, "site_version");
+        /* 2025-08-06: Important: Do not send a Referer header for download request!! */
+        br.setCurrentURL(null);
+        br.getHeaders().put("Referer", "");
         try {
             switch (dltype) {
             case ACCOUNT_PREMIUM:
@@ -1060,38 +1114,46 @@ public abstract class TurbobitCore extends PluginForHost {
             } else if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 handleGeneralErrors(br, account);
-                return false;
-            } else {
-                getAndSetMd5Hash(link, dl.getConnection().getURL().toExternalForm());
-                success = true;
-                return true;
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadlink did not lead to downloadable content");
+            } else if (dl.getConnection().getLongContentLength() == 0) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error, server sends empty file", 5 * 60 * 1000l);
             }
+            /* Success */
+            getAndSetMd5Hash(link, dl.getConnection().getURL().toExternalForm());
+            success = true;
+            return true;
         } finally {
+            logger.info("Mirror is " + (success ? "okay: " : "down: ") + directlink);
             br.setFollowRedirects(previousFollowRedirectState);
             try {
                 if (!success) {
                     dl.getConnection().disconnect();
                     dl = null;
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken mirror", 5 * 60 * 1000l);
                 }
             } catch (final Throwable t) {
             }
-            logger.info("Mirror is " + (success ? "okay: " : "down: ") + directlink);
         }
     }
 
-    /** Attempts to download pre-given premium direct-URLs. */
+    /**
+     * Attempts to download pre-given premium direct-URLs. <br>
+     * Even free users can download such links with premium speeds.
+     */
     protected boolean handlePremiumLink(final DownloadLink link, final Account account) throws Exception {
         if (!link.getPluginPatternMatcher().matches(TYPE_premiumRedirectLinks)) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (initDownload(DownloadType.GUEST_PREMIUMLINK, link, account, link.getPluginPatternMatcher())) {
-            handleErrorsPreDownloadstart(dl.getConnection());
+        try {
+            initMirrorDownload(link, account, link.getPluginPatternMatcher());
             dl.startDownload();
             return true;
-        } else {
-            logger.info("Download of supposedly direct-downloadable premium link failed");
-            this.dl = null;
+        } catch (final InterruptedException ie) {
+            throw ie;
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.info("Download of premium directlink failed");
             return false;
         }
     }
@@ -1136,31 +1198,33 @@ public abstract class TurbobitCore extends PluginForHost {
             }
         }
         final String error_name = (String) entries.get("error_name");
-        if (error_name == null) {
+        final String message = (String) entries.get("message");
+        if (error_name == null && message == null) {
             /* No error */
             return entries;
         }
-        if (error_name.equalsIgnoreCase("file_is_not_available_for_download")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        // TODO: Add translation and support for more errors
-        if (link == null) {
-            /* Account related error e.g. password_incorrect, invalid_captcha */
-            throw new AccountInvalidException(error_name);
+        if (error_name != null) {
+            if (error_name.equalsIgnoreCase("file_is_not_available_for_download")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            // TODO: Add translation and support for more errors
+            if (link == null) {
+                /* Account related error e.g. password_incorrect, invalid_captcha */
+                throw new AccountInvalidException(error_name);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_name);
+            }
         } else {
-            throw new PluginException(LinkStatus.ERROR_FATAL, error_name);
+            if (message.equalsIgnoreCase("File size is greater than allowed")) {
+                throw new AccountRequiredException(message);
+            }
+            // TODO: Add translation and support for more errors
+            if (link == null) {
+                throw new AccountInvalidException(message);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FATAL, message);
+            }
         }
-    }
-
-    private void handleErrorsPreDownloadstart(final URLConnectionAdapter con) throws PluginException {
-        if (con.getLongContentLength() == 0) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error, server sends empty file", 5 * 60 * 1000l);
-        }
-    }
-
-    @Override
-    public boolean hasAutoCaptcha() {
-        return false;
     }
 
     private Map<String, Object> login(final Account account, final boolean force) throws Exception {
@@ -1173,20 +1237,27 @@ public abstract class TurbobitCore extends PluginForHost {
             prepBrowserWebsiteV1(br);
             br.getPage(this.getMainpage());
             final String curr_domain = br.getHost();
-            if (cookies != null) {
+            cookieLogin: if (cookies != null) {
                 logger.info("Attempting cookie login");
                 br.setCookies(curr_domain, cookies);
+                if (!force) {
+                    /* Do not validate login */
+                    return null;
+                }
                 if (allowWebsiteV2Handling()) {
-                    br.clearCookies(null);
                     try {
                         final Map<String, Object> entries = getUserInformationWebsiteV2(br, account);
+                        if (entries == null) {
+                            logger.info("Cookie login failed");
+                            break cookieLogin;
+                        }
                         logger.info("Cookie login successful");
                         /* Set new cookie timestamp */
                         br.setCookies(curr_domain, cookies);
                         return entries;
                     } catch (final PluginException ignore) {
                         logger.log(ignore);
-                        logger.info("Cookie login failed");
+                        logger.info("Cookie login failed due to exception");
                     }
                 } else {
                     /* Request same URL again, this time with cookies set */
@@ -1236,7 +1307,13 @@ public abstract class TurbobitCore extends PluginForHost {
                     }
                     br.submitForm(loginform);
                 }
-                universalLoginErrorhandling(br);
+                if (br.containsHTML(">\\s*Limit of login attempts exceeded for your account")) {
+                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nMaximale Anzahl von Loginversuchen überschritten - dein Account wurde temporär gesperrt!\r\nBestätige deinen Account per E-Mail um ihn zu entsperren.\r\nFalls du keine E-Mail bekommen hast, gib deine E-Mail Adresse auf folgender Seite ein und lasse dir erneut eine zuschicken: " + br.getHost() + "/restoreaccess", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nLimit of login attempts exceeded for your account - your account is locked!\r\nConfirm your account via e-mail to unlock it.\r\nIf you haven't received an e-mail, enter your e-mail address on the following site so the service can send you a new confirmation mail: " + br.getHost() + "/restoreaccess", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    }
+                }
                 if (!isLoggedIN(br) && br.containsHTML("<div[^>]*id\\s*=\\s*\"activation-form\"")) {
                     // <h1>Premium activation</h1>
                     // <div id="activation-form">
@@ -1357,16 +1434,6 @@ public abstract class TurbobitCore extends PluginForHost {
         return loginForm;
     }
 
-    public static void universalLoginErrorhandling(final Browser br) throws PluginException {
-        if (br.containsHTML(">\\s*Limit of login attempts exceeded for your account")) {
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nMaximale Anzahl von Loginversuchen überschritten - dein Account wurde temporär gesperrt!\r\nBestätige deinen Account per E-Mail um ihn zu entsperren.\r\nFalls du keine E-Mail bekommen hast, gib deine E-Mail Adresse auf folgender Seite ein und lasse dir erneut eine zuschicken: " + br.getHost() + "/restoreaccess", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nLimit of login attempts exceeded for your account - your account is locked!\r\nConfirm your account via e-mail to unlock it.\r\nIf you haven't received an e-mail, enter your e-mail address on the following site so the service can send you a new confirmation mail: " + br.getHost() + "/restoreaccess", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        }
-    }
-
     public String getMainpage() {
         if (supports_https()) {
             return "https://" + this.getConfiguredDomain() + "/";
@@ -1421,7 +1488,12 @@ public abstract class TurbobitCore extends PluginForHost {
         try {
             return getContentURL(this.getHost(), this.getFUID(link));
         } catch (final PluginException e) {
-            return null;
+            return super.buildExternalDownloadURL(link, buildForThisPlugin);
         }
+    }
+
+    @Override
+    public boolean hasAutoCaptcha() {
+        return false;
     }
 }
