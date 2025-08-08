@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Color;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Currency;
@@ -23,19 +24,35 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter.HighlightPainter;
+
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.URLHelper;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.plugins.components.config.XFSConfigSendCm;
 import org.jdownloader.plugins.components.config.XFSConfigSendCm.LoginMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
+import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
@@ -45,17 +62,36 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50819 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51310 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
+    }
+
+    private static final String PROPERTY_ACCOUNT_FORCE_API_LOGIN     = "force_api_login";
+    private static final String PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN = "force_website_login";
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            final List<LazyPlugin.FEATURE> ret = new ArrayList<LazyPlugin.FEATURE>();
+            if (requiresCookieLogin()) {
+                ret.add(LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY);
+            } else {
+                ret.add(LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL);
+            }
+            return ret.toArray(new LazyPlugin.FEATURE[0]);
+        } else {
+            return super.getFeatures();
+        }
     }
 
     /**
@@ -273,6 +309,13 @@ public class SendCm extends XFileSharingProBasic {
              */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Website error 'Not allowed'");
         }
+        if (br.containsHTML(">\\s*You can download up to")) {
+            /**
+             * 2025-08-07: "</i> You can download up to&nbsp;<strong>1 GB</strong>&nbsp;without an account.&nbsp;<a
+             * href='https://send.now/register'"
+             */
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Free download limit reached. Change IP or try again with a free or paid account.");
+        }
     }
 
     @Override
@@ -335,6 +378,17 @@ public class SendCm extends XFileSharingProBasic {
     }
 
     @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        if (account.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN)) {
+            return this.fetchAccountInfoWebsite(account);
+        } else if (this.enableAccountApiOnlyMode() || account.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
+            return this.fetchAccountInfoAPI(this.br, account);
+        } else {
+            return this.fetchAccountInfoWebsite(account);
+        }
+    }
+
+    @Override
     protected AccountInfo fetchAccountInfoAPI(final Browser br, final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> entries = loginAPI(br, account);
@@ -390,10 +444,10 @@ public class SendCm extends XFileSharingProBasic {
         if (premium_bandwidthBytes <= 0) {
             if (account.getType() == AccountType.FREE) {
                 /* Free account without premium traffic */
-                throw new AccountInvalidException("You can only use premium accounts or free accounts with premium traffic via API.");
+                throw new AccountInvalidException("\r\nYou can only use premium accounts or free accounts with premium traffic via API login.\r\nUse login via username and password or buy traffic.");
             } else {
                 /* Premium account without traffic */
-                String msg = "This is a paid account but no longer has direct link traffic available. This can be purchased from this page: send.cm/pricing.";
+                String msg = "This is a paid account but no longer has direct link traffic available. This can be purchased from this page: " + getHost() + "/pricing.";
                 msg += "\r\nTo use the direct_link API, you need a Pro or Premium account and direct link traffic.";
                 msg += "\r\nTo use JDownloader for downloading from send.cm website, you need a paid account and 'direct link traffic'.";
                 throw new AccountInvalidException(msg);
@@ -416,11 +470,14 @@ public class SendCm extends XFileSharingProBasic {
                 ai.setUsedSpace(SizeFormatter.getSize(storage_used_bytesO.toString()));
             }
         }
-        if (this.enableAccountApiOnlyMode() && !StringUtils.isEmpty(email)) {
+        if (this.enableAccountApiOnlyMode() && !account.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN) && !StringUtils.isEmpty(email)) {
             /*
              * Each account is unique. Do not care what the user entered - trust what API returns! </br> This is not really important - more
              * visually so that something that makes sense is displayed to the user in his account managers' "Username" column!
              */
+            account.setUser(email);
+        } else if (StringUtils.equals(account.getUser(), this.getAPIKeyFromAccount(account))) {
+            logger.info("User has entered API key as username & password -> Set email as username");
             account.setUser(email);
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
@@ -467,13 +524,12 @@ public class SendCm extends XFileSharingProBasic {
     protected boolean allowAPIDownloadIfApikeyIsAvailable(final DownloadLink link, final Account account) {
         if (account == null) {
             return false;
+        }
+        final String apikey = getAPIKeyFromAccount(account);
+        if (apikey != null && (isFreeAccountWithPremiumTraffic(account) || account.getType() == AccountType.PREMIUM)) {
+            return true;
         } else {
-            final String apikey = getAPIKeyFromAccount(account);
-            if (apikey != null && (isFreeAccountWithPremiumTraffic(account) || account.getType() == AccountType.PREMIUM)) {
-                return true;
-            } else {
-                return false;
-            }
+            return false;
         }
     }
 
@@ -488,11 +544,12 @@ public class SendCm extends XFileSharingProBasic {
 
     @Override
     protected boolean enableAccountApiOnlyMode() {
+        // TODO: Try to remove this override
         final XFSConfigSendCm cfg = PluginJsonConfig.get(XFSConfigSendCm.class);
-        if (cfg.getLoginMode() == LoginMode.WEBSITE) {
-            return false;
-        } else {
+        if (cfg.getLoginMode() == LoginMode.API) {
             return true;
+        } else {
+            return false;
         }
     }
 
@@ -675,5 +732,315 @@ public class SendCm extends XFileSharingProBasic {
     @Override
     public Class<? extends XFSConfigSendCm> getConfigInterface() {
         return XFSConfigSendCm.class;
+    }
+
+    @Override
+    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* 2025-08-07: Testing */
+            return new SendCmAccountFactory(callback, this);
+        } else {
+            /* Website login */
+            final XFSConfigSendCm cfg = PluginJsonConfig.get(XFSConfigSendCm.class);
+            if (cfg.getLoginMode() == LoginMode.API || cfg.getLoginMode() == LoginMode.AUTO || cfg.getLoginMode() == LoginMode.DEFAULT) {
+                return new DefaultEditAccountPanelAPIKeyLogin(callback, this);
+            } else {
+                return super.getAccountFactory(callback);
+            }
+        }
+    }
+
+    public static class SendCmAccountFactory extends MigPanel implements AccountBuilderInterface {
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+
+        protected String getPassword() {
+            if (this.pass == null) {
+                return null;
+            } else {
+                return new String(this.pass.getPassword());
+            }
+        }
+
+        protected String getUsername() {
+            if (name == null) {
+                return "";
+            } else {
+                if (_GUI.T.jd_gui_swing_components_AccountDialog_help_username().equals(this.name.getText())) {
+                    return null;
+                }
+                return this.name.getText();
+            }
+        }
+
+        protected String getApikey() {
+            if (apikey == null) {
+                return null;
+            } else {
+                return this.apikey.getText();
+            }
+        }
+
+        private final ExtTextField                  name;
+        private final ExtPasswordField              pass;
+        private final ExtPasswordField              apikey;
+        private final JLabel                        apikeyLabel;
+        private final InputChangedCallbackInterface callback;
+        private JLabel                              usernameLabel = null;
+        private final JLabel                        passwordOrCookiesLabel;
+        private final SendCm                        plg;
+        private final boolean                       usernameIsEmail;
+        private final boolean                       websiteLoginCookieLoginOnly;
+        private final boolean                       websiteLoginCookieLoginOptional;
+
+        public boolean updateAccount(Account input, Account output) {
+            boolean changed = false;
+            if (!StringUtils.equals(input.getUser(), output.getUser())) {
+                output.setUser(input.getUser());
+                changed = true;
+            }
+            if (!StringUtils.equals(input.getPass(), output.getPass())) {
+                output.setPass(input.getPass());
+                changed = true;
+            }
+            return changed;
+        }
+
+        public SendCmAccountFactory(final InputChangedCallbackInterface callback, final SendCm plg) {
+            super("ins 0, wrap 2", "[][grow,fill]", "");
+            this.plg = plg;
+            this.callback = callback;
+            this.usernameIsEmail = this.plg.hasFeature(FEATURE.USERNAME_IS_EMAIL);
+            this.websiteLoginCookieLoginOnly = this.plg.hasFeature(FEATURE.COOKIE_LOGIN_ONLY);
+            this.websiteLoginCookieLoginOptional = this.plg.hasFeature(FEATURE.COOKIE_LOGIN_OPTIONAL);
+            final String domain = this.plg.getHost();
+            final String apikey_help_url_without_protocol = domain + "/?op=my_account";
+            final String apikey_help_url = "https://" + apikey_help_url_without_protocol;
+            add(new JLabel("Premium account:"));
+            add(new JLink("Enter API key (click here to find it)", apikey_help_url));
+            add(apikeyLabel = new JLink("Premium API Key: ", apikey_help_url));
+            add(this.apikey = new ExtPasswordField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(apikey);
+                }
+            }, "");
+            this.apikey.setHelpText("Obtain API key here: " + apikey_help_url_without_protocol);
+            if (websiteLoginCookieLoginOnly) {
+                add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions()));
+                add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), apikey_help_url));
+                add(new JLabel("Free account:"));
+                add(new JLink("Enter username & cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+            } else {
+                add(new JLabel("Free account:"));
+                add(new JLink("Enter username & pass or cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+            }
+            if (this.usernameIsEmail) {
+                add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_email()));
+            } else {
+                add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name()));
+            }
+            add(this.name = new ExtTextField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(name);
+                }
+
+                {
+                    final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")));
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")));
+                    refreshTextHighlighter();
+                }
+            });
+            if (this.usernameIsEmail) {
+                name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_email());
+            } else {
+                name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_username());
+            }
+            if (websiteLoginCookieLoginOnly) {
+                add(passwordOrCookiesLabel = new JLink("<HTML><U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U></HTML>", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+            } else if (websiteLoginCookieLoginOptional) {
+                String labelTxt = _GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies();
+                labelTxt = labelTxt.replaceFirst("(?i)" + Pattern.quote(_GUI.T.jd_gui_swing_components_AccountDialog_cookies()), "<U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U>");
+                if (!_GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies().matches(labelTxt)) {
+                    labelTxt = "<HTML>" + labelTxt + "</HTML>";
+                    add(passwordOrCookiesLabel = new JLink(labelTxt, "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+                } else {
+                    add(passwordOrCookiesLabel = new JLabel(labelTxt));
+                }
+            } else {
+                /* Normal username & password login */
+                add(passwordOrCookiesLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass()));
+            }
+            // TODO: Fix unclickable password field (only rightclick works to enter it)
+            add(this.pass = new ExtPasswordField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(pass);
+                }
+
+                {
+                    final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")) {
+                        public boolean highlight(javax.swing.text.Highlighter highlighter, CharSequence charSequence) {
+                            if (Cookies.parseCookiesFromString(charSequence.toString()) != null) {
+                                return false;
+                            } else {
+                                return super.highlight(highlighter, charSequence);
+                            }
+                        };
+                    });
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")) {
+                        public boolean highlight(javax.swing.text.Highlighter highlighter, CharSequence charSequence) {
+                            if (Cookies.parseCookiesFromString(charSequence.toString()) != null) {
+                                return false;
+                            } else {
+                                return super.highlight(highlighter, charSequence);
+                            }
+                        };
+                    });
+                    applyTextHighlighter(null);
+                }
+            }, "");
+            if (websiteLoginCookieLoginOnly) {
+                pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_cookies());
+            } else if (websiteLoginCookieLoginOptional) {
+                pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass_or_cookies());
+            } else {
+                /* Normal username & password login */
+                pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
+            }
+            // pass.setFocusable(true);
+            // pass.setEnabled(true);
+            // pass.setBackground(Color.CYAN);
+            final ExtTextField dummy = new ExtTextField();
+            dummy.paste();
+            final String clipboard = dummy.getText();
+            if (StringUtils.isNotEmpty(clipboard)) {
+                /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
+                final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
+                if ((websiteLoginCookieLoginOnly || websiteLoginCookieLoginOptional) && userCookies != null) {
+                    /*
+                     * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field
+                     * with them.
+                     */
+                    // TODO: Check why this doesn't work
+                    pass.setPassword(clipboard.toCharArray());
+                    // pass.setText(clipboard);
+                } else if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
+                    this.apikey.setPassword(clipboard.toCharArray());
+                } else if (userCookies == null && clipboard.trim().length() > 0) {
+                    /* Auto fill username field with clipboard content. */
+                    name.setText(clipboard);
+                }
+            }
+        }
+
+        public InputChangedCallbackInterface getCallback() {
+            return callback;
+        }
+
+        public void setAccount(final Account defaultAccount) {
+            if (defaultAccount != null) {
+                name.setText(defaultAccount.getUser());
+                pass.setText(defaultAccount.getPass());
+                apikey.setText(defaultAccount.getPass());
+            }
+        }
+
+        @Override
+        public boolean validateInputs() {
+            final boolean userok;
+            final boolean passok;
+            boolean apikey_ok = false;
+            final String apikey = this.getApikey();
+            if (apikey != null && apikeyLabel != null) {
+                if (plg.looksLikeValidAPIKey(apikey)) {
+                    apikey_ok = true;
+                    this.apikeyLabel.setForeground(Color.BLACK);
+                } else {
+                    apikey_ok = false;
+                    this.apikeyLabel.setForeground(Color.RED);
+                }
+            }
+            if (StringUtils.isEmpty(this.getUsername())) {
+                usernameLabel.setForeground(Color.RED);
+                userok = false;
+            } else if (this.usernameIsEmail && !plg.looksLikeValidEmailAddress(null, this.getUsername())) {
+                /* E-Mail is needed but user did not enter a valid-looking e-mail address. */
+                usernameLabel.setForeground(Color.RED);
+                userok = false;
+            } else {
+                usernameLabel.setForeground(Color.BLACK);
+                userok = true;
+            }
+            final String pw = getPassword();
+            final Cookies cookies = Cookies.parseCookiesFromString(pw);
+            if (StringUtils.isEmpty(pw)) {
+                /* Password field is never allowed to be empty/null. */
+                passok = false;
+            } else if (websiteLoginCookieLoginOnly && cookies == null) {
+                /* Cookies are needed but not given. */
+                passok = false;
+            } else if (!websiteLoginCookieLoginOnly && !websiteLoginCookieLoginOptional && cookies != null) {
+                /* Cookies are given while user is not allowed to use cookies. */
+                passok = false;
+            } else {
+                passok = true;
+            }
+            if (!passok) {
+                passwordOrCookiesLabel.setForeground(Color.RED);
+            } else {
+                passwordOrCookiesLabel.setForeground(Color.BLACK);
+            }
+            if (apikey_ok) {
+                // TODO: Evaluate if foreground change for passwordOrCookiesLabel is a good idea
+                passwordOrCookiesLabel.setForeground(Color.BLACK);
+                if (StringUtils.isEmpty(this.getUsername())) {
+                    /* TODO: Find a better solution since this may cause an infinite loop */
+                    // this.name.setText(apikey);
+                }
+                return true;
+            } else if (userok && passok) {
+                // TODO: Evaluate if foreground change for apikeyLabel is a good idea
+                apikeyLabel.setForeground(Color.BLACK);
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public Account getAccount() {
+            if (plg.looksLikeValidAPIKey(this.getApikey())) {
+                /* Use API key as password */
+                final String apikey = this.getApikey();
+                final Account account = new Account(getUsername(), apikey);
+                account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
+                account.setProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN, true);
+                return account;
+            } else {
+                /**
+                 * Workaround for users who set this setting to API but login via website/free-account <br>
+                 * The API login mode is still needed for headless installations! <br>
+                 *
+                 * This workaround is required so that PluginForHost.validateLogins will not fail due to API key validation when
+                 * enableAccountApiOnlyMode() returns true.
+                 */
+                final XFSConfigSendCm cfg = PluginJsonConfig.get(XFSConfigSendCm.class);
+                cfg.setLoginMode(LoginMode.AUTO);
+                final Account account = new Account(getUsername(), getPassword());
+                account.setProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN, true);
+                return account;
+            }
+        }
+
+        @Override
+        public JComponent getComponent() {
+            return this;
+        }
     }
 }

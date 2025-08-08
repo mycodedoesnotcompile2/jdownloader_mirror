@@ -25,6 +25,21 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -41,22 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.net.BCSSLSocketStreamFactory;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51271 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51308 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -130,8 +130,8 @@ public class DoodstreamCom extends XFileSharingProBasic {
                  */
                 final Cookies userCookies = account.loadUserCookies();
                 /**
-                 * Important! Domains may change frequently! </br> Let it redirect us to their current main domain so we know which domain
-                 * to set the cookies on.
+                 * Important! Domains may change frequently! </br>
+                 * Let it redirect us to their current main domain so we know which domain to set the cookies on.
                  */
                 br.getPage(getMainPage());
                 if (userCookies != null) {
@@ -151,9 +151,9 @@ public class DoodstreamCom extends XFileSharingProBasic {
                         if (!StringUtils.isEmpty(cookiesUsername)) {
                             cookiesUsername = Encoding.htmlDecode(cookiesUsername).trim();
                             /**
-                             * During cookie login, user can enter whatever he wants into username field.</br> Most users will enter their
-                             * real username but to be sure to have unique usernames we don't trust them and try to get the real username
-                             * out of our cookies.
+                             * During cookie login, user can enter whatever he wants into username field.</br>
+                             * Most users will enter their real username but to be sure to have unique usernames we don't trust them and try
+                             * to get the real username out of our cookies.
                              */
                             if (!StringUtils.isEmpty(cookiesUsername) && !account.getUser().equals(cookiesUsername)) {
                                 account.setUser(cookiesUsername);
@@ -188,8 +188,8 @@ public class DoodstreamCom extends XFileSharingProBasic {
                 logger.info("Full login required");
                 if (this.requiresCookieLogin()) {
                     /**
-                     * Cookie login required but user did not put cookies into the password field: </br> Ask user to login via exported
-                     * browser cookies e.g. xubster.com.
+                     * Cookie login required but user did not put cookies into the password field: </br>
+                     * Ask user to login via exported browser cookies e.g. xubster.com.
                      */
                     showCookieLoginInfo();
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
@@ -213,8 +213,8 @@ public class DoodstreamCom extends XFileSharingProBasic {
                         query.addAndReplace("loginotp", twoFACode);
                         br.getPage("/?" + query.toString());
                         /**
-                         * E.g. wrong code: {"status":"fail","message":"Wrong login OTP."} </br> On success it will redirect us to a
-                         * non-json page!
+                         * E.g. wrong code: {"status":"fail","message":"Wrong login OTP."} </br>
+                         * On success it will redirect us to a non-json page!
                          */
                         if (!this.isLoggedin(br)) {
                             throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
@@ -250,7 +250,8 @@ public class DoodstreamCom extends XFileSharingProBasic {
     @Override
     public String rewriteHost(final String host) {
         /**
-         * 2021-01-15: Main domain has changed from doodstream.com to dood.so </br> 2022-11-21: Changed to: dood.re
+         * 2021-01-15: Main domain has changed from doodstream.com to dood.so </br>
+         * 2022-11-21: Changed to: dood.re
          */
         return this.rewriteHost(getPluginDomains(), host);
     }
@@ -373,8 +374,8 @@ public class DoodstreamCom extends XFileSharingProBasic {
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
         /**
-         * 2021-08-20: Hoster is playing cat & mouse games by adding fake "file not found" texts. </br> An empty embed iframe is a sign that
-         * the item is offline.
+         * 2021-08-20: Hoster is playing cat & mouse games by adding fake "file not found" texts. </br>
+         * An empty embed iframe is a sign that the item is offline.
          */
         if (br.containsHTML("<iframe src=\"/e/\"")) {
             /* 2021-26-04 */
@@ -388,12 +389,12 @@ public class DoodstreamCom extends XFileSharingProBasic {
             } else {
                 return true;
             }
-        } else if (br.containsHTML("(?i)<h1>\\s*Oops\\! Sorry\\s*</h1>\\s*<p>\\s*File you are looking for is not found")) {
+        } else if (br.containsHTML("<h1>\\s*Oops\\! Sorry\\s*</h1>\\s*<p>\\s*File you are looking for is not found")) {
             /* 2021-08-26 */
             return true;
-        } else if (br.containsHTML("(?i)<title>\\s*Video not found\\s*\\|\\s*DoodStream\\s*</title>")) {
+        } else if (br.containsHTML("<title>\\s*Video not found\\s*\\|\\s*DoodStream\\s*</title>")) {
             return true;
-        } else if (br.containsHTML("(?i)<h1>\\s*Not Found\\s*</h1>\\s*<p>\\s*video you are looking for is not found") && link.getPluginPatternMatcher().matches(TYPE_STREAM) && !br.containsHTML("</video>")) {
+        } else if (br.containsHTML("<h1>\\s*Not Found\\s*</h1>\\s*<p>\\s*video you are looking for is not found") && link.getPluginPatternMatcher().matches(TYPE_STREAM) && !br.containsHTML("</video>")) {
             return true;
         } else {
             return false;

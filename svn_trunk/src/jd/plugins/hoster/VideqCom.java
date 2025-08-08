@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -34,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51238 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51308 $", interfaceVersion = 3, names = {}, urls = {})
 public class VideqCom extends PluginForHost {
     public VideqCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +61,7 @@ public class VideqCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "videq.com", "videq.dev", "videq.co", "videym.pro", "videq.mom", "luluv.do" });
+        ret.add(new String[] { "videq.com", "videq.dev", "videq.co", "videq.tel", "videq.mom", "videym.pro", "luluv.do", "videqstream.com" });
         return ret;
     }
 
@@ -124,9 +125,13 @@ public class VideqCom extends PluginForHost {
             filename = Encoding.htmlDecode(filename).trim();
             filename = this.correctOrApplyFileNameExtension(filename, ext_default, null);
             link.setFinalFileName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -138,9 +143,62 @@ public class VideqCom extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String fid = this.getFID(link);
-        br.getPage("https://poophd.video-src.com/vplayer?id=" + fid);
-        String dllink = br.getRegex("\"l\",\\s*\"(https?:/[^\"]+)").getMatch(0);
+        final String fuid = br.getRegex("var id = '([a-z0-9]{12})';").getMatch(0);
+        if (fuid == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String iframe_url_part_1 = br.getRegex("'videq_iframe',\\s*'(https://[^']+)'").getMatch(0);
+        final String iframe_url_part_2 = br.getRegex("'length',\\s*'([a-f0-9]+)'").getMatch(0);
+        if (iframe_url_part_1 == null || iframe_url_part_2 == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        /* 2025-08-07: The "/911" request is not needed. */
+        // final Browser brc = br.cloneBrowser();
+        // brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
+        // brc.getHeaders().put("Origin", "https://" + br.getHost());
+        // brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
+        // brc.postPage("/911", "id=" + fuid);
+        /* Important otherwise we'll get http response 403 */
+        br.getHeaders().put("sec-fetch-dest", "iframe");
+        br.getPage(iframe_url_part_1 + iframe_url_part_2);
+        /* Typically https://embed.video-src.com/ or https://poop.video-src.com/ */
+        final String baseURL = br.getRegex("var baseURL\\s*=\\s*\"(https://[^\"]+)\"").getMatch(0);
+        /* Typically 'vplayer?id=' or 'dplayer?id=...' */
+        final String playerPath = br.getRegex("var playerPath\\s*=\\s*'([^']+)';").getMatch(0);
+        if (baseURL == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (playerPath == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        String dllink = null;
+        if (StringUtils.containsIgnoreCase(playerPath, "dplayer")) {
+            /* 2025-08-07: dplayer -> Item embedded/hosted on doodstream.com -> Special handling */
+            // throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported redirect to new system: " + newLink + " -> Manually
+            // re-add this link to JDownloader to be able to download this file");
+            logger.info("Handling doodstream embed link");
+            br.getPage(baseURL + playerPath);
+            final String newLink = br.getRegex("<iframe[^>]*src=\"(https://[^\"]+)\"").getMatch(0);
+            if (newLink == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final PluginForHost doodstreamPlugin = getNewPluginForHostInstance("dood.re").getLazyP().getPrototype(null);
+            if (!doodstreamPlugin.canHandle(newLink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No idea how to handle this link: " + newLink);
+            }
+            link.setDefaultPlugin(doodstreamPlugin);
+            link.setHost(doodstreamPlugin.getHost());
+            link.setPluginPatternMatcher(newLink);
+            link.setDomainInfo(null);
+            // doodstreamPlugin.handleFree(link);
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Retry link that has been migrated from " + getHost() + " to doodstream");
+        }
+        if (!StringUtils.containsIgnoreCase(playerPath, "vplayer")) {
+            logger.warning("Found possibly unsupported embed format: " + playerPath);
+        }
+        // final String fid = this.getFID(link);
+        // br.getPage("https://embed.video-src.com/vplayer?id=" + fid);
+        br.getPage(baseURL + playerPath);
+        dllink = br.getRegex("\"l\",\\s*\"(https?:/[^\"]+)").getMatch(0);
         if (dllink == null) {
             /* New 2025-07-22 */
             final String key = br.getRegex("objectKey: \"([^\"]+)").getMatch(0);
