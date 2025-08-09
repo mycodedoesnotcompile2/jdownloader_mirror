@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51142 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51312 $", interfaceVersion = 2, names = {}, urls = {})
 public class LoadedfilesOrg extends YetiShareCore {
     public LoadedfilesOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,5 +100,11 @@ public class LoadedfilesOrg extends YetiShareCore {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean requiresWWW() {
+        /* 2025-08-08: Important otherwise we run into Cloudflare error "526: Invalid SSL certificate" */
+        return false;
     }
 }

@@ -2613,7 +2613,9 @@ public class Browser {
         }
         // final boolean isCloudflareHeaderCfRayExistent = req.getResponseHeader("cf-ray") != null;
         final boolean isCloudflareServer = StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare");
-        final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 522 || con.getResponseCode() == 523;
+        final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 522 || con.getResponseCode() == 523 || con.getResponseCode() == 526;
+        /* 526: Invalid SSL certificate */
+        
         /**
          * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
          * Cloudflare block happens. </br>

@@ -69,7 +69,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51310 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51312 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1031,7 +1031,7 @@ public class SendCm extends XFileSharingProBasic {
                  * enableAccountApiOnlyMode() returns true.
                  */
                 final XFSConfigSendCm cfg = PluginJsonConfig.get(XFSConfigSendCm.class);
-                cfg.setLoginMode(LoginMode.AUTO);
+                cfg.setLoginMode(LoginMode.DEFAULT);
                 final Account account = new Account(getUsername(), getPassword());
                 account.setProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN, true);
                 return account;
