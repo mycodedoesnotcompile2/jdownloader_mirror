@@ -72,7 +72,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51310 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51314 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -158,7 +158,7 @@ public class XHamsterCom extends PluginForHost {
             /* Movies old pattern --> Redirects to TYPE_VIDEOS_2 (or TYPE_VIDEOS_3) */
             pattern += "|https?://(?:[a-z0-9\\-]+\\.)?" + buildHostsPatternPart(domains) + "/movies/[0-9]+/[^/]+\\.html";
             /* Premium pattern */
-            pattern += "|https?://(?:gold\\.xhamsterpremium\\.com|faphouse\\.com)/([a-z]{2}/)?videos/([A-Za-z0-9\\-]+)";
+            pattern += "|https?://(?:gold\\.xhamsterpremium\\.com|faphouse\\.com|faphouse2\\.com)/([a-z]{2}/)?videos/([A-Za-z0-9\\-]+)";
             ret.add(pattern);
         }
         return ret.toArray(new String[0]);

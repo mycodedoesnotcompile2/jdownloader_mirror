@@ -41,7 +41,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.RomHustlerCrawler;
 
-@HostPlugin(revision = "$Revision: 50648 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51313 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { RomHustlerCrawler.class })
 public class RomHustler extends PluginForHost {
     public RomHustler(PluginWrapper wrapper) {
@@ -204,8 +204,8 @@ public class RomHustler extends PluginForHost {
             matchingPart = crawledParts.get(0);
         }
         /* Check for errors first. */
-        if (br.containsHTML("(?i)>\\s*File too big for guests")) {
-            throw new AccountRequiredException();
+        if (br.containsHTML(">\\s*File too big for guests")) {
+            throw new AccountRequiredException("File too big for guests, free account needed to download!");
         } else if (br.containsHTML("class=\"alert alert-danger restricted-button\"")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Sorry, this game is restricted.");
         }

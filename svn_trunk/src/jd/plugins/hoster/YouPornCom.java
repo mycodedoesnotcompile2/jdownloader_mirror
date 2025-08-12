@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50650 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51315 $", interfaceVersion = 2, names = {}, urls = {})
 public class YouPornCom extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -153,7 +153,7 @@ public class YouPornCom extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (br.getURL().endsWith("/video-removed")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getURL().endsWith("/video-inactive")) {
+        } else if (StringUtils.containsIgnoreCase(br._getURL().getPath(), "/video-inactive")) {
             /* 2024-04-09: "This video has been deactivated" */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("<div id=\"video-not-found-related\"|watchRemoved\"|class=\\'video-not-found\\'")) {

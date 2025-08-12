@@ -20,6 +20,7 @@ import java.util.List;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -27,11 +28,12 @@ import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51313 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThisvidCom extends KernelVideoSharingComV2 {
     public ThisvidCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -76,8 +78,31 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
         synchronized (account) {
             br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
-            final Cookies cookies = account.loadCookies("");
-            if (cookies != null) {
+            final Cookies cookies;
+            final Cookies userCookies;
+            if ((userCookies = account.loadUserCookies()) != null) {
+                this.br.setCookies(userCookies);
+                if (!validateCookies) {
+                    return;
+                }
+                if (!validateCookies) {
+                    logger.info("Trust cookies without check");
+                    return;
+                }
+                br.getPage("https://" + this.getHost() + "/");
+                if (isLoggedIN(br)) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(this.br.getCookies(this.getHost()), "");
+                    return;
+                } else {
+                    logger.info("User Cookie login failed");
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                    }
+                }
+            } else if ((cookies = account.loadCookies("")) != null) {
                 br.setCookies(cookies);
                 if (!validateCookies) {
                     logger.info("Trust cookies without check");

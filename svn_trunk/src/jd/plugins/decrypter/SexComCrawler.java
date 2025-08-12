@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -42,7 +43,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51181 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51316 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexComCrawler extends PornEmbedParser {
     public SexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,6 +111,7 @@ public class SexComCrawler extends PornEmbedParser {
         if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String contenturl_path = new URL(contenturl).getPath();
         redirect = br.getRegex("onclick=\"window\\.location\\.href=\\'(/[^<>\"]*?)\\'").getMatch(0);
         if (redirect != null) {
             br.getPage(redirect);
@@ -117,9 +119,13 @@ public class SexComCrawler extends PornEmbedParser {
         final Pattern userpatternfull = Pattern.compile("https?://[^/]+" + PATTERN_RELATIVE_USER);
         final Pattern shortspatternfull = Pattern.compile("https?://[^/]+" + PATTERN_RELATIVE_SHORT);
         final Regex shortsRegex;
-        if (new Regex(br.getURL(), userpatternfull).patternFind()) {
+        if (new Regex(contenturl, userpatternfull).patternFind()) {
             /* Find all items of profile. Those can be spread across multiple pages -> Handle pagination */
             /* Example: http://www.sex.com/user/sanje/sexy-vika/ */
+            if (!this.canHandle(br.getURL())) {
+                /* E.g. redirect to mainpage */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             final Set<String> dupes = new HashSet<String>();
             final String userProfilePin = br.getRegex("\"user_profile_picture\"\\s*>\\s*<a\\s*href\\s*=\\s*\"(/pin/\\d+)").getMatch(0);
             dupes.add(userProfilePin);
@@ -152,7 +158,11 @@ public class SexComCrawler extends PornEmbedParser {
                     page++;
                 }
             } while (!this.isAbort());
-        } else if ((shortsRegex = new Regex(br.getURL(), shortspatternfull)).patternFind()) {
+        } else if ((shortsRegex = new Regex(contenturl, shortspatternfull)).patternFind()) {
+            if (!this.canHandle(br.getURL())) {
+                /* E.g. redirect to mainpage */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             final String shortspath = shortsRegex.getMatch(0);
             final String shortstitle = shortsRegex.getMatch(2).replace("-", " ").trim();
             br.getPage("https://shorts.sex.com/api/media/getMedia?relativeUrl=" + Encoding.urlEncode(shortspath));
@@ -193,8 +203,15 @@ public class SexComCrawler extends PornEmbedParser {
             fp.setPackageKey("sex_com_shorts://" + shortspath);
             fp.addLinks(ret);
             return ret;
-        } else if (new Regex(br.getURL(), PATTERN_RELATIVE_PIN).patternFind() || new Regex(br.getURL(), PATTERN_RELATIVE_PIN_NEW).patternFind() || new Regex(br.getURL(), PATTERN_RELATIVE_GIFS).patternFind()) {
+        } else if (new Regex(contenturl_path, PATTERN_RELATIVE_PIN).patternFind() || new Regex(contenturl_path, PATTERN_RELATIVE_PIN_NEW).patternFind() || new Regex(contenturl_path, PATTERN_RELATIVE_GIFS).patternFind()) {
             /* "PIN" item */
+            if (!this.canHandle(br.getURL())) {
+                /**
+                 * E.g. redirect to mainpage, example: <br>
+                 * /pin/64729322-fucking-her-with-that-big-cock/
+                 */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             title = br.getRegex("<title>\\s*([^<>\"]*?)\\s*(?:\\|?\\s*(Sex Videos and Pictures|Gif)\\s*\\|\\s*Sex\\.com)?\\s*</title>").getMatch(0);
             if (title == null || title.length() <= 2) {
                 title = br.getRegex("addthis:title=\"([^<>\"]*?)\"").getMatch(0);
@@ -214,6 +231,7 @@ public class SexComCrawler extends PornEmbedParser {
             }
             title = Encoding.htmlDecode(title).trim();
             title = title.replace("#", "");
+            title = title.replaceFirst("(?i) \\| Sex\\.com", "");
             externID = br.getRegex("<div class=\"from\">From <a rel=\"nofollow\" href=\"(https?://[^<>\"]*?)\"").getMatch(0);
             if (externID != null) {
                 ret.add(createDownloadlink(externID));

@@ -69,7 +69,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51312 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51314 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -818,7 +818,7 @@ public class SendCm extends XFileSharingProBasic {
             final String domain = this.plg.getHost();
             final String apikey_help_url_without_protocol = domain + "/?op=my_account";
             final String apikey_help_url = "https://" + apikey_help_url_without_protocol;
-            add(new JLabel("Premium account:"));
+            add(new JLabel("Premium account users:"));
             add(new JLink("Enter API key (click here to find it)", apikey_help_url));
             add(apikeyLabel = new JLink("Premium API Key: ", apikey_help_url));
             add(this.apikey = new ExtPasswordField() {
@@ -831,10 +831,10 @@ public class SendCm extends XFileSharingProBasic {
             if (websiteLoginCookieLoginOnly) {
                 add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions()));
                 add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), apikey_help_url));
-                add(new JLabel("Free account:"));
+                add(new JLabel("Free account users:"));
                 add(new JLink("Enter username & cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
             } else {
-                add(new JLabel("Free account:"));
+                add(new JLabel("Free account users:"));
                 add(new JLink("Enter username & pass or cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
             }
             if (this.usernameIsEmail) {
@@ -875,7 +875,6 @@ public class SendCm extends XFileSharingProBasic {
                 /* Normal username & password login */
                 add(passwordOrCookiesLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass()));
             }
-            // TODO: Fix unclickable password field (only rightclick works to enter it)
             add(this.pass = new ExtPasswordField() {
                 @Override
                 public void onChanged() {

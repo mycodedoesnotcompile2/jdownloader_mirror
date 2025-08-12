@@ -17,6 +17,10 @@ public interface XFSConfigSendCm extends XFSConfig {
         public String getLoginMode_label() {
             return "Login mode";
         }
+
+        public String getHeadlessLoginMode_label() {
+            return "Login mode for headless login";
+        }
     }
 
     public static final LoginMode DEFAULT_MODE = LoginMode.AUTO;
@@ -56,4 +60,13 @@ public interface XFSConfigSendCm extends XFSConfig {
     LoginMode getLoginMode();
 
     void setLoginMode(final LoginMode mode);
+
+    @AboutConfig
+    @DefaultEnumValue("DEFAULT")
+    @Order(100)
+    @DescriptionForConfigEntry("Switch between API and website mode. API mode = Login via API Key, Website mode = Login via username and password.")
+    @DefaultOnNull
+    LoginMode getHeadlessLoginMode();
+
+    void setHeadlessLoginMode(final LoginMode mode);
 }
