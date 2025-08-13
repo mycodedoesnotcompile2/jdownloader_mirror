@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -30,9 +32,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51318 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -190,6 +190,35 @@ public class TerabytezOrg extends XFileSharingProBasic {
         } else {
             final URL_TYPE type = getURLType(link);
             return getFUID(link, type);
+        }
+    }
+    // @Override
+    // protected String getNormalizedDownloadURL(final DownloadLink link) {
+    // final String url = super.getNormalizedDownloadURL(link);
+    // final String url_without_filename = new Regex(url, "^(https?://[^/]+/[a-z0-9]{12})").getMatch(0);
+    // if (url_without_filename != null) {
+    // /*
+    // * 2025-08-12: Small workaround to allow "massLinkcheckerWebsite" to work, else it may fail with error "Filename don't match!".
+    // */
+    // return url_without_filename;
+    // } else {
+    // return url;
+    // }
+    // }
+
+    @Override
+    protected String getContentURL(final DownloadLink link) {
+        final String url = super.getContentURL(link);
+        final String url_without_filename = new Regex(url, "^(https?://[^/]+/[a-z0-9]{12})").getMatch(0);
+        if (url_without_filename != null) {
+            /**
+             * 2025-08-12: Small workaround to allow "massLinkcheckerWebsite" to work, else it may fail with error "Filename don't match!".
+             * <br>
+             * More details: https://board.jdownloader.org/showthread.php?p=550013#post550013
+             */
+            return url_without_filename;
+        } else {
+            return url;
         }
     }
 }

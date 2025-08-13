@@ -44,10 +44,6 @@ import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigSendCm;
-import org.jdownloader.plugins.components.config.XFSConfigSendCm.LoginMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -62,14 +58,13 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
-import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51314 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51323 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -78,21 +73,6 @@ public class SendCm extends XFileSharingProBasic {
 
     private static final String PROPERTY_ACCOUNT_FORCE_API_LOGIN     = "force_api_login";
     private static final String PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN = "force_website_login";
-
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            final List<LazyPlugin.FEATURE> ret = new ArrayList<LazyPlugin.FEATURE>();
-            if (requiresCookieLogin()) {
-                ret.add(LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY);
-            } else {
-                ret.add(LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL);
-            }
-            return ret.toArray(new LazyPlugin.FEATURE[0]);
-        } else {
-            return super.getFeatures();
-        }
-    }
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
@@ -381,7 +361,40 @@ public class SendCm extends XFileSharingProBasic {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         if (account.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN)) {
             return this.fetchAccountInfoWebsite(account);
-        } else if (this.enableAccountApiOnlyMode() || account.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
+        } else if (account.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
+            return this.fetchAccountInfoAPI(this.br, account);
+        } else if (this.looksLikeValidAPIKey(account.getPass())) {
+            /* Auto mode e.g. headless login */
+            try {
+                logger.info("Attempting API login");
+                /* Important for getAPIKeyFromAccount !! */
+                account.setProperty(PROPERTY_ACCOUNT_apikey, account.getPass());
+                final AccountInfo ai_api = this.fetchAccountInfoAPI(this.br, account);
+                /* API login successful -> Always login via API with this account in the future */
+                account.setProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN, true);
+                // account.setProperty(PROPERTY_ACCOUNT_apikey, account.getPass());
+                return ai_api;
+            } catch (final InterruptedException ie1) {
+                throw ie1;
+            } catch (final Exception pe1) {
+                logger.info("API login failed -> Trying website login");
+                /* Remove property again as API login failed. */
+                account.removeProperty(PROPERTY_ACCOUNT_apikey);
+                try {
+                    final AccountInfo ai_website = this.fetchAccountInfoWebsite(account);
+                    /* Website login successful -> Always login via website with this account in the future */
+                    account.setProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN, true);
+                    return ai_website;
+                } catch (final InterruptedException ie2) {
+                    throw ie2;
+                } catch (final PluginException pe2) {
+                    logger.log(pe2);
+                    logger.info("API login and website login failed -> Throwing API login exception");
+                    throw pe1;
+                }
+            }
+        } else if (this.enableAccountApiOnlyMode()) {
+            /* This should never happen (for this particular plugin). */
             return this.fetchAccountInfoAPI(this.br, account);
         } else {
             return this.fetchAccountInfoWebsite(account);
@@ -470,14 +483,15 @@ public class SendCm extends XFileSharingProBasic {
                 ai.setUsedSpace(SizeFormatter.getSize(storage_used_bytesO.toString()));
             }
         }
-        if (this.enableAccountApiOnlyMode() && !account.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN) && !StringUtils.isEmpty(email)) {
+        if (!account.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN) && !StringUtils.isEmpty(email) && !StringUtils.equals(account.getUser(), email)) {
             /*
              * Each account is unique. Do not care what the user entered - trust what API returns! </br> This is not really important - more
              * visually so that something that makes sense is displayed to the user in his account managers' "Username" column!
              */
+            logger.info("User has entered API key into username field -> Correcting username to email: " + email);
             account.setUser(email);
         } else if (StringUtils.equals(account.getUser(), this.getAPIKeyFromAccount(account))) {
-            logger.info("User has entered API key as username & password -> Set email as username");
+            logger.info("User has entered API key as username & password -> Set email as username: " + email);
             account.setUser(email);
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
@@ -543,17 +557,6 @@ public class SendCm extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean enableAccountApiOnlyMode() {
-        // TODO: Try to remove this override
-        final XFSConfigSendCm cfg = PluginJsonConfig.get(XFSConfigSendCm.class);
-        if (cfg.getLoginMode() == LoginMode.API) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
     protected boolean supportsAPISingleLinkcheck() {
         return looksLikeValidAPIKey(this.getAPIKey());
     }
@@ -588,7 +591,7 @@ public class SendCm extends XFileSharingProBasic {
                         index++;
                     }
                 }
-                final ArrayList<DownloadLink> apiLinkcheckLinks = new ArrayList<DownloadLink>();
+                final List<DownloadLink> apiLinkcheckLinks = new ArrayList<DownloadLink>();
                 sb.delete(0, sb.capacity());
                 for (final DownloadLink link : links) {
                     try {
@@ -730,24 +733,19 @@ public class SendCm extends XFileSharingProBasic {
     }
 
     @Override
-    public Class<? extends XFSConfigSendCm> getConfigInterface() {
-        return XFSConfigSendCm.class;
+    protected boolean looksLikeValidAPIKey(final String str) {
+        if (str == null) {
+            return false;
+        } else if (str.matches("^[a-z0-9]{20,}$")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
     public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* 2025-08-07: Testing */
-            return new SendCmAccountFactory(callback, this);
-        } else {
-            /* Website login */
-            final XFSConfigSendCm cfg = PluginJsonConfig.get(XFSConfigSendCm.class);
-            if (cfg.getLoginMode() == LoginMode.API || cfg.getLoginMode() == LoginMode.AUTO || cfg.getLoginMode() == LoginMode.DEFAULT) {
-                return new DefaultEditAccountPanelAPIKeyLogin(callback, this);
-            } else {
-                return super.getAccountFactory(callback);
-            }
-        }
+        return new SendCmAccountFactory(callback, this);
     }
 
     public static class SendCmAccountFactory extends MigPanel implements AccountBuilderInterface {
@@ -1014,23 +1012,14 @@ public class SendCm extends XFileSharingProBasic {
 
         @Override
         public Account getAccount() {
-            if (plg.looksLikeValidAPIKey(this.getApikey())) {
+            final String apikey = this.getApikey();
+            if (plg.looksLikeValidAPIKey(apikey)) {
                 /* Use API key as password */
-                final String apikey = this.getApikey();
                 final Account account = new Account(getUsername(), apikey);
                 account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
                 account.setProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN, true);
                 return account;
             } else {
-                /**
-                 * Workaround for users who set this setting to API but login via website/free-account <br>
-                 * The API login mode is still needed for headless installations! <br>
-                 *
-                 * This workaround is required so that PluginForHost.validateLogins will not fail due to API key validation when
-                 * enableAccountApiOnlyMode() returns true.
-                 */
-                final XFSConfigSendCm cfg = PluginJsonConfig.get(XFSConfigSendCm.class);
-                cfg.setLoginMode(LoginMode.DEFAULT);
                 final Account account = new Account(getUsername(), getPassword());
                 account.setProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN, true);
                 return account;

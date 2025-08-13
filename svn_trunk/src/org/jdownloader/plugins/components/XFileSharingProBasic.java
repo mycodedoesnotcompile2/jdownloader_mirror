@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51310 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51322 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -169,9 +169,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     private static final String               PROPERTY_PLUGIN_api_domain_with_protocol                          = "apidomain";
     protected static final String             PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP = "REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP";
     protected static final String             PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION   = "REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_VERSION";
-    private static final String               PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP         = "ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP";
+    public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP         = "ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP";
     private static final String               PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_VERSION           = "ALT_AVAILABLECHECK_LAST_FAILURE_VERSION";
-    private static final String               PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING                   = "ALT_AVAILABLECHECK_LAST_WORKING";
+    public static final String                PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_WORKING                   = "ALT_AVAILABLECHECK_LAST_WORKING";
     protected static final String             PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE       = "allow_api_download_attempt_in_website_mode";
     private String                            videoStreamDownloadurl                                            = null;
     private boolean                           hasCheckedEmbedHandling                                           = false;
@@ -4968,47 +4968,48 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected boolean handleLoginWebsite2FA(PluginException e, final DownloadLink link, final Account account, final boolean validateCookies) throws Exception {
-        Form twoFAForm = null;
-        String fieldKey = null;
-        final Form[] forms = br.getForms();
-        formLoop: for (final Form form : forms) {
-            final List<InputField> fields = form.getInputFields();
-            for (final InputField field : fields) {
-                if (field.getKey() != null && field.getKey().matches("^code\\d*$")) {
-                    fieldKey = field.getKey();
-                    twoFAForm = form;
-                    break formLoop;
-                }
-            }
-            for (final InputField field : fields) {
-                if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
-                    fieldKey = field.getKey();
-                    // send.cm -> SendCm class
-                    twoFAForm = form;
-                    break formLoop;
-                }
-            }
-        }
+        final Form twoFAForm = this.find2FALoginform(br);
         if (twoFAForm == null) {
             /* No 2FA login needed -> Login failed because user has entered invalid credentials. */
             throw e;
+        }
+        String fieldKey = "code";
+        if (twoFAForm.hasInputFieldByName("new_ip_token")) {
+            /* E.g. send.cm */
+            fieldKey = "new_ip_token";
         }
         logger.info("2FA code required");
         final String twoFACode = this.getTwoFACode(account, "\\d{6}");
         logger.info("Submitting 2FA code");
         twoFAForm.put(fieldKey, twoFACode);
         this.submitForm(twoFAForm);
-        if (!this.br.getURL().contains("?op=my_account")) {
+        if (!this.isLoggedin(br) || find2FALoginform(br) != null) {
             throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
-        } else {
-            final Cookies cookies = br.getCookies(br.getHost());
-            account.saveCookies(cookies, "");
-            if (verifyCookies(account, cookies)) {
-                return loginWebsite(link, account, validateCookies);
-            } else {
-                throw e;
+        }
+        final Cookies cookies = br.getCookies(br.getHost());
+        account.saveCookies(cookies, "");
+        if (!verifyCookies(account, cookies)) {
+            throw e;
+        }
+        return loginWebsite(link, account, validateCookies);
+    }
+
+    protected Form find2FALoginform(final Browser br) {
+        final Form[] forms = br.getForms();
+        for (final Form form : forms) {
+            final List<InputField> fields = form.getInputFields();
+            for (final InputField field : fields) {
+                if (field.getKey() != null && field.getKey().matches("^code\\d*$")) {
+                    return form;
+                }
+            }
+            for (final InputField field : fields) {
+                if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
+                    return form;
+                }
             }
         }
+        return null;
     }
 
     /**
@@ -5710,7 +5711,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
              */
             account.setUser(email);
         } else if (StringUtils.equals(account.getUser(), this.getAPIKeyFromAccount(account))) {
-            logger.info("User has entered API key as username & password -> Set email as username");
+            logger.info("User has entered API key as username & password -> Set email as username: " + email);
             account.setUser(email);
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
@@ -6146,7 +6147,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     @Override
-    public final boolean internal_supportsMassLinkcheck() {
+    public boolean internal_supportsMassLinkcheck() {
         return this.supportsAPIMassLinkcheck() || this.supportsMassLinkcheckOverWebsite() || this.enableAccountApiOnlyMode();
     }
 

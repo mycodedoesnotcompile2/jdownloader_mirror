@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51291 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51318 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThreeCatCat extends PluginForDecrypt {
     public ThreeCatCat(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,10 +105,14 @@ public class ThreeCatCat extends PluginForDecrypt {
         final Map<String, Object> images = (Map<String, Object>) entries.get("imatges");
         final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) entries.get("subtitols");
         final Map<String, Object> media = (Map<String, Object>) entries.get("media");
-        String title = (String) info.get("titol_complet");
-        if (StringUtils.isEmpty(title)) {
-            title = info.get("titol").toString();
-        }
+        // String title = (String) info.get("titol_complet");
+        // if (StringUtils.isEmpty(title)) {
+        // title = info.get("titol").toString();
+        // }
+        /* Mimic title which website is using for <title> html tag */
+        String title = info.get("titol").toString();
+        final String programme = info.get("programa").toString();
+        title = programme + " - " + title;
         final String description = (String) info.get("descripcio");
         /* Add video qualities */
         String lastMediaTitle = null;
