@@ -242,6 +242,10 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         }
     }
 
+    public boolean isV3() {
+        return false;
+    }
+
     public boolean isEnterprise() {
         return false;
     }
@@ -740,7 +744,7 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
 
     @Override
     protected String getCaptchaNameSpace() {
-        if (getV3Action() != null) {
+        if (getV3Action() != null || isV3()) {
             return "recaptchav3";
         } else {
             return "recaptchav2";

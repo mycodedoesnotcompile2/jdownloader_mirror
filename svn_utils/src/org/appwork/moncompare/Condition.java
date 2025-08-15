@@ -293,27 +293,33 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         @Override
         public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             try {
-                ListAccessorInterface access = container.getListWrapper(expression);
-                CharSequence str = toCharSequence(container.resolveValue(container, access.get(0), scope, true));
-                Pattern searchPattern = Pattern.compile(String.valueOf(container.resolveValue(container, access.get(1), scope, true)));
-                String replacement = String.valueOf(container.resolveValue(container, access.get(2), scope, true));
-                Matcher matcher = searchPattern.matcher(str);
+                final ListAccessorInterface access = container.getListWrapper(expression);
+                final CharSequence str = toCharSequence(container.resolveValue(container, access.get(0), scope, true));
+                final Pattern searchPattern = Pattern.compile(String.valueOf(container.resolveValue(container, access.get(1), scope, true)));
+                final String replacement = String.valueOf(container.resolveValue(container, access.get(2), scope, true));
+                final Matcher matcher = searchPattern.matcher(str);
                 if (access.size() > 3) {
+                    boolean match = false;
                     // replace group ID only
-                    int groupIndex = ((Number) container.resolveValue(container, access.get(3), scope, true)).intValue();
-                    StringBuffer sb = new StringBuffer();
+                    final int groupIndex = ((Number) container.resolveValue(container, access.get(3), scope, true)).intValue();
+                    final StringBuffer sb = new StringBuffer();
                     while (matcher.find()) {
-                        String fullMatch = matcher.group(0);
-                        int start = matcher.start(groupIndex) - matcher.start();
-                        int end = matcher.end(groupIndex) - matcher.start();
+                        match = true;
+                        final String fullMatch = matcher.group(0);
+                        final int start = matcher.start(groupIndex) - matcher.start();
+                        final int end = matcher.end(groupIndex) - matcher.start();
                         // only replace the group's content inside the match
-                        String updatedMatch = fullMatch.substring(0, start) + replacement + fullMatch.substring(end);
-                        matcher.appendReplacement(sb, Matcher.quoteReplacement(updatedMatch));
+                        final String updatedMatch = Matcher.quoteReplacement(fullMatch.substring(0, start)) + replacement + Matcher.quoteReplacement(fullMatch.substring(end));
+                        matcher.appendReplacement(sb, updatedMatch);
                     }
-                    matcher.appendTail(sb);
-                    return sb.toString();
+                    if (!match) {
+                        return str.toString();
+                    } else {
+                        matcher.appendTail(sb);
+                        return sb.toString();
+                    }
                 } else {
-                    String result = matcher.replaceAll(replacement);
+                    final String result = matcher.replaceAll(replacement);
                     return result;
                 }
             } catch (final ConditionException e) {
@@ -735,7 +741,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     return (compareResult > 0);
                 }
             };
-
             protected abstract boolean opEval(int compareResult);
         }
 
@@ -1758,19 +1763,19 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return false;
     }
 
-    public static final ThreadLocal<List<TypeHandler>> TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
-    public static final List<TypeHandler>              GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
+    public static final ThreadLocal<List<TypeHandler>>         TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
+    public static final List<TypeHandler>                      GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
     static {
         GLOBAL_TYPE_HANDLERS.add(new TimeSpanHandler());
         GLOBAL_TYPE_HANDLERS.add(new DateHandler());
     }
-    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS    = new ThreadLocal<Map<String, PathHandler>>();
+    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS        = new ThreadLocal<Map<String, PathHandler>>();
     /**
      *
      */
-    private static final long                                  serialVersionUID = 1L;
-    public static final org.appwork.storage.TypeRef<Condition> TYPE             = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
-                                                                                };
+    private static final long                                  serialVersionUID     = 1L;
+    public static final org.appwork.storage.TypeRef<Condition> TYPE                 = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
+                                                                                    };
     static {
         IGNORE.add($OPTIONS);
     }

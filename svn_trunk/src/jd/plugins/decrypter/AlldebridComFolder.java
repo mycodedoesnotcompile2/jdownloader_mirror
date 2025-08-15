@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -41,7 +37,11 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AllDebridCom;
 
-@DecrypterPlugin(revision = "$Revision: 50480 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51328 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlldebridComFolder extends PluginForDecrypt {
     public AlldebridComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,7 +136,10 @@ public class AlldebridComFolder extends PluginForDecrypt {
                 /* Single file in folder root */
                 final DownloadLink dl = this.createDownloadlink(url);
                 dl.setName(name);
-                dl.setDownloadSize(((Number) resource.get("s")).longValue());
+                final Number downloadSize = (Number) resource.get("s");
+                if (downloadSize != null) {
+                    dl.setDownloadSize(downloadSize.longValue());
+                }
                 /* File that goes into (nested) subfolder. */
                 /* Remove filename from path. */
                 final String filePath = path.replaceAll("/" + Pattern.quote(name) + "$", "");

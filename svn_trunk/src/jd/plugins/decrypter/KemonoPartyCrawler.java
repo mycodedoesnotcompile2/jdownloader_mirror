@@ -32,7 +32,6 @@ import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
-import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
@@ -42,7 +41,6 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
 import org.appwork.storage.TypeRef;
@@ -56,7 +54,7 @@ import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51265 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51328 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -145,12 +143,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         if (startOffsetStr != null) {
             startOffset = Integer.parseInt(startOffsetStr);
         }
-        final boolean useAPI = true;
-        if (useAPI) {
-            return crawlProfileAPI(service, userID, startOffset);
-        } else {
-            return crawlProfileWebsite(param, service, userID, startOffset);
-        }
+        return crawlProfileAPI(service, userID, startOffset);
     }
 
     /**
@@ -177,7 +170,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         int numberofContinuousPagesWithoutAnyNewItems = 0;
         final int maxPagesWithoutNewItems = 15;
         do {
-            getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(usernameOrUserID) + "?o=" + offset);
+            getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(usernameOrUserID) + "/posts?o=" + offset);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -231,77 +224,6 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    @Deprecated
-    private ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param, final String service, final String userID, final Integer startOffset) throws Exception {
-        if (service == null || userID == null) {
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        String url = "https://" + this.getHost() + "/" + service + "/user/" + userID;
-        if (startOffset != null) {
-            logger.info("Starting from offset: " + startOffset);
-            url += "?o=" + startOffset;
-        }
-        getPage(br, url);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.getURL().matches(TYPE_PROFILE)) {
-            /* E.g. redirect to main page */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        /* Find number of last page (for logging purposes) */
-        int maxpage = getMaxPageWebsite(br, service, userID, 1);
-        int totalNumberofItems = -1;
-        String totalNumberofItemsStr = br.getRegex("Showing \\d+ - \\d+ of (\\d+)").getMatch(0);
-        if (totalNumberofItemsStr != null) {
-            totalNumberofItems = Integer.parseInt(totalNumberofItemsStr);
-        } else {
-            totalNumberofItemsStr = "unknown";
-        }
-        final FilePackage fp = getFilePackageForProfileCrawler(service, userID);
-        final HashSet<String> dupes = new HashSet<String>();
-        int page = 1;
-        do {
-            final String[] posturls = br.getRegex("(?:https?://[^/]+)?/([^/]+)/user/([^/]+)/post/([a-z0-9]+)").getColumn(-1);
-            int numberofAddedItems = 0;
-            for (String posturl : posturls) {
-                posturl = br.getURL(posturl).toString();
-                if (dupes.add(posturl)) {
-                    final DownloadLink result = this.createDownloadlink(posturl);
-                    result._setFilePackage(fp);
-                    ret.add(result);
-                    distribute(result);
-                    numberofAddedItems++;
-                }
-            }
-            maxpage = getMaxPageWebsite(br, service, userID, maxpage);
-            logger.info("Crawled page " + page + "/" + maxpage + " | Found items: " + ret.size() + "/" + totalNumberofItemsStr);
-            final String nextpageurl = br.getRegex("(/[^\"]+\\?o=\\d+)\"[^>]*>(?:<b>)?\\s*" + (page + 1)).getMatch(0);
-            if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                break;
-            } else if (ret.size() == totalNumberofItems) {
-                logger.info("Stopping because: Found all items");
-                break;
-            } else if (startOffset != null) {
-                logger.info("Stopping because: User provided specific offset to crawl");
-                break;
-            } else if (nextpageurl == null) {
-                /* Additional fail-safe */
-                logger.info("Stopping because: Failed to find nextpageurl - last page is: " + br.getURL());
-                break;
-            } else if (numberofAddedItems == 0) {
-                logger.info("Stopping because: Failed to find any [new] items on current page");
-                break;
-            } else {
-                page++;
-                getPage(br, nextpageurl);
-            }
-        } while (true);
-        return ret;
-    }
-
     private int getMaxPageWebsite(Browser br, final String service, final String username, int maxPage) {
         final String[] pages = br.getRegex("href=\"/" + Pattern.quote(service) + "/user/" + Pattern.quote(username) + "\\?o=\\d+\"[^>]*>\\s*(?:<b>)?\\s*(\\d+)").getColumn(0);
         int ret = maxPage;
@@ -345,12 +267,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final String service = urlinfo.getMatch(0);
         final String usernameOrUserID = urlinfo.getMatch(1);
         final String postID = urlinfo.getMatch(2);
-        final boolean crawlPostAPI = true;
-        if (crawlPostAPI) {
-            return crawlPostAPI(param, service, usernameOrUserID, postID);
-        } else {
-            return crawlPostWebsite(param, service, usernameOrUserID, postID);
-        }
+        return crawlPostAPI(param, service, usernameOrUserID, postID);
     }
 
     /** API docs: https://kemono.su/api/schema */
@@ -529,160 +446,11 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return media;
     }
 
-    @Deprecated
-    private ArrayList<DownloadLink> crawlPostWebsite(final CryptedLink param, final String service, final String usernameOrUserID, final String postID) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        if (service == null || usernameOrUserID == null || postID == null) {
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String posturl = "https://" + this.getHost() + "/" + service + "/user/" + usernameOrUserID + "/post/" + postID;
-        br.setAllowedResponseCodes(500);// DDOS-GUARD
-        int retry = 3;
-        while (retry > 0) {
-            getPage(br, posturl);
-            if (br.getHttpConnection().getResponseCode() == 500 && !isAbort()) {
-                sleep(1000, param);
-                retry--;
-            } else {
-                break;
-            }
-        }
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.getURL().matches(TYPE_POST)) {
-            /* E.g. redirect to main page of user because single post does not exist */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        String postTitle = br.getRegex("class=\"post__title\">\\s*<span>([^<]+)</span>").getMatch(0);
-        if (postTitle != null) {
-            postTitle = Encoding.htmlDecode(postTitle).trim();
-        }
-        String publishedDateStr = br.getRegex("\"post__published\"[^>]*>\\s*<time[^>]*class\\s*=\\s*\"timestamp[^>]*datetime\\s*=\\s*\"\\s*([0-9\\-: ]+)").getMatch(0);
-        if (publishedDateStr == null) {
-            publishedDateStr = br.getRegex("<meta name\\s*=\\s*\"published\"\\s*content\\s*=\\s*\"\\s*([0-9\\-: ]+)").getMatch(0);
-        }
-        final ArrayList<DownloadLink> kemonoResults = new ArrayList<DownloadLink>();
-        final String[] directURLs = br.getRegex("\"((https?://[^/]+)?/data/[^\"]+)").getColumn(0);
-        if (directURLs != null && directURLs.length > 0) {
-            /* Remove duplicates from results so our index will be correct down below. */
-            ensureInitHosterplugin();
-            final ArrayList<String> videoItemsToSkip = new ArrayList<String>();
-            final HashSet<String> dups = new HashSet<String>();
-            int index = 0;
-            final ArrayList<DownloadLink> videoItemsUnfiltered = new ArrayList<DownloadLink>();
-            for (final String directURL : directURLs) {
-                final String urlFull = br.getURL(directURL).toString();
-                final String sha256hash = KemonoParty.getSha256HashFromURL(urlFull);
-                final String dupeCheckString;
-                if (sha256hash != null) {
-                    dupeCheckString = sha256hash;
-                } else {
-                    dupeCheckString = new URL(urlFull).getPath();
-                }
-                if (!dups.add(dupeCheckString)) {
-                    /* Skip dupes */
-                    continue;
-                }
-                final DownloadLink media = new DownloadLink(this.hostPlugin, this.getHost(), urlFull);
-                media.setProperty(KemonoParty.PROPERTY_POST_CONTENT_INDEX, index);
-                boolean isFilenameFromHTML = false;
-                String betterFilename = getBetterFilenameFromURL(urlFull);
-                if (betterFilename == null) {
-                    /* 2023-03-01 */
-                    betterFilename = br.getRegex(Pattern.quote(directURL) + "\"\\s+download=\"([^\"]+)\"").getMatch(0);
-                    isFilenameFromHTML = true;
-                }
-                if (!StringUtils.isEmpty(betterFilename)) {
-                    betterFilename = Encoding.htmlDecode(betterFilename).trim();
-                    media.setFinalFileName(betterFilename);
-                    if (isFilenameFromHTML) {
-                        media.setProperty(KemonoParty.PROPERTY_BETTER_FILENAME, betterFilename);
-                    }
-                    media.setProperty(DirectHTTP.FIXNAME, betterFilename);
-                    final String internalVideoFilename = new Regex(urlFull, "(?i)([a-f0-9]{64}\\.(m4v|mp4))").getMatch(0);
-                    if (internalVideoFilename != null) {
-                        videoItemsToSkip.add(internalVideoFilename);
-                    }
-                }
-                if (sha256hash != null) {
-                    media.setSha256Hash(sha256hash);
-                }
-                videoItemsUnfiltered.add(media);
-                index++;
-            }
-            if (videoItemsToSkip.size() > 0) {
-                logger.info("Filtering duplicated video items: " + videoItemsUnfiltered);
-                for (final DownloadLink link : videoItemsUnfiltered) {
-                    boolean filter = false;
-                    for (final String videoItemToSkip : videoItemsToSkip) {
-                        if (link.getPluginPatternMatcher().endsWith(videoItemToSkip)) {
-                            filter = true;
-                            break;
-                        }
-                    }
-                    if (!filter) {
-                        kemonoResults.add(link);
-                    }
-                }
-            } else {
-                kemonoResults.addAll(videoItemsUnfiltered);
-            }
-        }
-        final FilePackage fp = getFilePackageForPostCrawler(service, usernameOrUserID, postID, postTitle);
-        final String postTextContent = br.getRegex("<div\\s*class\\s*=\\s*\"post__content\"[^>]*>(.+)</div>\\s*<footer").getMatch(0);
-        if (!StringUtils.isEmpty(postTextContent)) {
-            final KemonoPartyConfig cfg = PluginJsonConfig.get(getConfigInterface());
-            final TextCrawlMode mode = cfg.getTextCrawlMode();
-            if (cfg.isCrawlHttpLinksFromPostContent()) {
-                final String[] urls = HTMLParser.getHttpLinks(postTextContent, br.getURL());
-                if (urls != null && urls.length > 0) {
-                    for (final String url : urls) {
-                        ret.add(this.createDownloadlink(url));
-                    }
-                }
-            }
-            if (mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && kemonoResults.isEmpty())) {
-                ensureInitHosterplugin();
-                final DownloadLink textfile = new DownloadLink(this.hostPlugin, this.getHost(), posturl);
-                textfile.setProperty(KemonoParty.PROPERTY_TEXT, postTextContent);
-                textfile.setFinalFileName(fp.getName() + ".txt");
-                try {
-                    textfile.setDownloadSize(postTextContent.getBytes("UTF-8").length);
-                } catch (final UnsupportedEncodingException ignore) {
-                    ignore.printStackTrace();
-                }
-                kemonoResults.add(textfile);
-            }
-        }
-        final String username = this.findUsername(service, usernameOrUserID);
-        for (final DownloadLink kemonoResult : kemonoResults) {
-            if (!StringUtils.isEmpty(postTitle)) {
-                kemonoResult.setProperty(KemonoParty.PROPERTY_TITLE, postTitle);
-            }
-            if (publishedDateStr != null) {
-                kemonoResult.setProperty(KemonoParty.PROPERTY_DATE, publishedDateStr);
-            }
-            kemonoResult.setProperty(KemonoParty.PROPERTY_PORTAL, service);
-            kemonoResult.setProperty(KemonoParty.PROPERTY_USERID, usernameOrUserID);
-            kemonoResult.setProperty(KemonoParty.PROPERTY_USERID, username);
-            kemonoResult.setProperty(KemonoParty.PROPERTY_POSTID, postID);
-            kemonoResult.setAvailable(true);
-            /* Add kemono item to our list of total results. */
-            ret.add(kemonoResult);
-        }
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            fp.setName(String.format("[@DEV: %d Expected kemono results] ", kemonoResults.size()) + fp.getName());
-        }
-        fp.addLinks(ret);
-        return ret;
-    }
-
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                                                              return size() > 100;
-                                                          };
-                                                      };
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > 100;
+        };
+    };
 
     /**
      * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.

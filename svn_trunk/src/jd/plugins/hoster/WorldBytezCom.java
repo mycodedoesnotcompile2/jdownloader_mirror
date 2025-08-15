@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 51250 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51328 $", interfaceVersion = 3, names = {}, urls = {})
 public class WorldBytezCom extends XFileSharingProBasic {
     public WorldBytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,7 @@ public class WorldBytezCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "worldbytez.net", "worldbytez.com" });
+        ret.add(new String[] { "worldbytez.net", "worldbytez.com", "worldbytez.org" });
         return ret;
     }
 
@@ -146,7 +146,7 @@ public class WorldBytezCom extends XFileSharingProBasic {
 
             /*
              * <h2 style="color: aliceblue;">Oops File Not Found</h2>
-             *
+             * 
              * <h2 style="color: aliceblue;">If You Are Using VPN Please Disable To Continue Downloading</h2> <h2 style="color: aliceblue;">
              * We apologize for any inconvenience caused.</h2>
              */

@@ -23,6 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -44,13 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51294 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51325 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -408,24 +408,37 @@ public class XHamsterGallery extends PluginForDecrypt {
         br.getPage(contenturl);
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username);
+        // fp.setPackageKey("xhamster://profile/" + username + "/shorts");
         int page = 1;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        do {
+        final HashSet<String> dupes = new HashSet<String>();
+        pagination: do {
             logger.info("Crawling page: " + page);
+            int newItemsThisPage = 0;
             final String[] urls = br.getRegex("(/moments/[a-z0-9-_]+)").getColumn(0);
             for (String url : new HashSet<String>(Arrays.asList(urls))) {
-                url = br.getURL(url).toString();
-                ret.add(this.createDownloadlink(url));
+                if (!dupes.add(url)) {
+                    continue;
+                }
+                newItemsThisPage++;
+                url = br.getURL(url).toExternalForm();
+                final DownloadLink link = this.createDownloadlink(url);
+                link._setFilePackage(fp);
+                ret.add(link);
+                distribute(link);
             }
+            logger.info("Crawled page: " + page + " | Found items so far: " + ret.size() + " | New this page: " + newItemsThisPage);
             page++;
             final String nextpageURL = br.getRegex("(/" + type + "/" + username + "/moments/" + page + ")").getMatch(0);
-            if (nextpageURL != null) {
-                logger.info("Nextpage available: " + nextpageURL);
-                br.getPage(nextpageURL);
-            } else {
-                logger.info("No nextpage available");
-                break;
+            if (nextpageURL == null) {
+                logger.info("Stopping because: No nextpage available");
+                break pagination;
+            } else if (newItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find any new items on current page");
+                break pagination;
             }
+            logger.info("Nextpage available: " + nextpageURL);
+            br.getPage(nextpageURL);
         } while (!this.isAbort());
         return ret;
     }
@@ -443,22 +456,33 @@ public class XHamsterGallery extends PluginForDecrypt {
         fp.setName(username);
         int page = 1;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        do {
+        final HashSet<String> dupes = new HashSet<String>();
+        pagination: do {
             logger.info("Crawling page: " + page);
+            int newItemsThisPage = 0;
             final String[] urls = br.getRegex("(/photos/gallery/[a-z0-9\\-]+-\\d+)").getColumn(0);
             for (String url : new HashSet<String>(Arrays.asList(urls))) {
-                url = br.getURL(url).toString();
-                ret.add(this.createDownloadlink(url));
+                if (!dupes.add(url)) {
+                    continue;
+                }
+                newItemsThisPage++;
+                url = br.getURL(url).toExternalForm();
+                final DownloadLink link = this.createDownloadlink(url);
+                ret.add(link);
+                distribute(link);
             }
+            logger.info("Crawled page: " + page + " | Found items so far: " + ret.size() + " | New this page: " + newItemsThisPage);
             page++;
             final String nextpageURL = br.getRegex("(/" + type + "/" + username + "/photos/" + page + ")").getMatch(0);
-            if (nextpageURL != null) {
-                logger.info("Nextpage available: " + nextpageURL);
-                br.getPage(nextpageURL);
-            } else {
-                logger.info("No nextpage available");
-                break;
+            if (nextpageURL == null) {
+                logger.info("Stopping because: No nextpage available");
+                break pagination;
+            } else if (newItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find any new items on current page");
+                break pagination;
             }
+            logger.info("Nextpage available: " + nextpageURL);
+            br.getPage(nextpageURL);
         } while (!this.isAbort());
         return ret;
     }

@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 50052 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51326 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -197,6 +197,7 @@ public class ORFMediathek extends PluginForHost {
                 if (!looksLikeDownloadableContent(con, link)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
+                this.findAndSetFileHash(link, con);
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
                         link.setDownloadSize(con.getCompleteContentLength());
@@ -236,6 +237,7 @@ public class ORFMediathek extends PluginForHost {
                 final Browser br2 = br.cloneBrowser();
                 con = br2.openHeadConnection(dllink);
                 handleConnectionErrors(br2, link, con);
+                this.findAndSetFileHash(link, con);
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
                         link.setDownloadSize(con.getCompleteContentLength());
@@ -280,73 +282,72 @@ public class ORFMediathek extends PluginForHost {
     }
 
     private void checkUrlForAgeProtection(final DownloadLink link, final String url) throws Exception {
-        if (isAgeRestricted(url)) {
-            if (System.currentTimeMillis() - link.getLongProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, 0) < 30 * 60 * 1000) {
-                /**
-                 * Recrawl has just happened and we were still unable to download the item :( </br>
-                 * This should never happen!
-                 */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen Grund 1", 10 * 60 * 1000l);
-            }
-            /*
-             * E.g. progressive:
-             * https://apasfpd.sf.apa.at/gp/online/14ed5a0157632458580f9bc7bfd1feba/1708297200/Jugendschutz0600b2000_Q8C.mp4
-             */
-            /* E.g. HLS: https://apasfiis.sf.apa.at/gp_nas/_definst_/nas/gp/online/Jugendschutz0600b2000_Q8C.mp4/playlist.m3u8 */
-            // Last-Modified: Mon, 18 Mar 2019 23:11:36 GMT
-            final long browserDateTimestamp = br.getCurrentServerTime(System.currentTimeMillis());
-            final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("GMT+1"));
-            if (browserDateTimestamp != -1) {
-                c.setTime(new Date(browserDateTimestamp));
-            }
-            c.set(c.HOUR_OF_DAY, 20);
-            c.set(c.MINUTE, 0);
-            c.set(c.SECOND, 0);
-            final long tsLater = c.getTimeInMillis();
-            final long timeUntilLater = tsLater - System.currentTimeMillis();
-            link.setProperty(ORFMediathek.PROPERTY_AGE_RESTRICTED, true);
-            if (timeUntilLater > 0) {
-                /* Video can't be played yet. */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Dieses Video ist im Sinne des Jugendschutzes nur von 20.00 bis 6.00 Uhr verfügbar.", timeUntilLater);
-            }
-            /*
-             * Video should be available -> Re-crawl item in order to find a fresh streaming URL which should enable us to download the
-             * item.
-             */
-            final String sourceurl = link.getStringProperty(PROPERTY_SOURCEURL);
-            final OrfAt crawler = (OrfAt) this.getNewPluginForDecryptInstance(this.getHost());
-            if (sourceurl == null || !crawler.canHandle(sourceurl)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            /* Hack to force crawler to crawl all items regardless of user configuration. */
-            crawler.cfg = null;
-            DownloadLink freshItem = null;
-            final ArrayList<DownloadLink> results = crawler.decryptIt(new CryptedLink(sourceurl), null);
-            link.setProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, System.currentTimeMillis());
-            final String thisLinkID = this.getLinkID(link);
-            for (final DownloadLink result : results) {
-                if (StringUtils.equals(this.getLinkID(result), thisLinkID)) {
-                    freshItem = result;
-                    break;
-                }
-            }
-            if (freshItem == null) {
-                /* Video version we are looking for doesn't exist anymore -> Item offline? Should be a very rare case. */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final String oldDirecturl = link.getStringProperty(PROPERTY_DIRECTURL);
-            final String freshDirecturl = freshItem.getStringProperty(PROPERTY_DIRECTURL);
-            if (StringUtils.isEmpty(freshDirecturl)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else if (freshDirecturl.equals(oldDirecturl)) {
-                /* This should never happen */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen Grund 2", 10 * 60 * 1000l);
-            }
-            /* Set fresh directurl which can be used to download this item. */
-            link.setProperty(PROPERTY_DIRECTURL, freshDirecturl);
-            /* Trigger retry of this item - this time the download should work. */
-            throw new PluginException(LinkStatus.ERROR_RETRY, "Retry after Jugenschutz recrawl");
+        if (!isAgeRestricted(url)) {
+            return;
         }
+        if (System.currentTimeMillis() - link.getLongProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, 0) < 30 * 60 * 1000) {
+            /**
+             * Recrawl has just happened and we were still unable to download the item :( </br>
+             * This should never happen!
+             */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen Grund 1", 10 * 60 * 1000l);
+        }
+        /*
+         * E.g. progressive: https://apasfpd.sf.apa.at/gp/online/14ed5a0157632458580f9bc7bfd1feba/1708297200/Jugendschutz0600b2000_Q8C.mp4
+         */
+        /* E.g. HLS: https://apasfiis.sf.apa.at/gp_nas/_definst_/nas/gp/online/Jugendschutz0600b2000_Q8C.mp4/playlist.m3u8 */
+        // Last-Modified: Mon, 18 Mar 2019 23:11:36 GMT
+        final long browserDateTimestamp = br.getCurrentServerTime(System.currentTimeMillis());
+        final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("GMT+1"));
+        if (browserDateTimestamp != -1) {
+            c.setTime(new Date(browserDateTimestamp));
+        }
+        c.set(c.HOUR_OF_DAY, 20);
+        c.set(c.MINUTE, 0);
+        c.set(c.SECOND, 0);
+        final long tsLater = c.getTimeInMillis();
+        final long timeUntilLater = tsLater - System.currentTimeMillis();
+        link.setProperty(ORFMediathek.PROPERTY_AGE_RESTRICTED, true);
+        if (timeUntilLater > 0) {
+            /* Video can't be played yet. */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Dieses Video ist im Sinne des Jugendschutzes nur von 20.00 bis 6.00 Uhr verfügbar.", timeUntilLater);
+        }
+        /*
+         * Video should be available -> Re-crawl item in order to find a fresh streaming URL which should enable us to download the item.
+         */
+        final String sourceurl = link.getStringProperty(PROPERTY_SOURCEURL);
+        final OrfAt crawler = (OrfAt) this.getNewPluginForDecryptInstance(this.getHost());
+        if (sourceurl == null || !crawler.canHandle(sourceurl)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        /* Hack to force crawler to crawl all items regardless of user configuration. */
+        crawler.cfg = null;
+        DownloadLink freshItem = null;
+        final ArrayList<DownloadLink> results = crawler.decryptIt(new CryptedLink(sourceurl), null);
+        link.setProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, System.currentTimeMillis());
+        final String thisLinkID = this.getLinkID(link);
+        for (final DownloadLink result : results) {
+            if (StringUtils.equals(this.getLinkID(result), thisLinkID)) {
+                freshItem = result;
+                break;
+            }
+        }
+        if (freshItem == null) {
+            /* Video version we are looking for doesn't exist anymore -> Item offline? Should be a very rare case. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String oldDirecturl = link.getStringProperty(PROPERTY_DIRECTURL);
+        final String freshDirecturl = freshItem.getStringProperty(PROPERTY_DIRECTURL);
+        if (StringUtils.isEmpty(freshDirecturl)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (freshDirecturl.equals(oldDirecturl)) {
+            /* This should never happen */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen Grund 2", 10 * 60 * 1000l);
+        }
+        /* Set fresh directurl which can be used to download this item. */
+        link.setProperty(PROPERTY_DIRECTURL, freshDirecturl);
+        /* Trigger retry of this item - this time the download should work. */
+        throw new PluginException(LinkStatus.ERROR_RETRY, "Retry after Jugenschutz recrawl");
     }
 
     public static boolean isAgeRestricted(final String url) {
@@ -376,6 +377,7 @@ public class ORFMediathek extends PluginForHost {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
             handleConnectionErrors(br, link, dl.getConnection());
+            this.findAndSetFileHash(link, dl.getConnection());
             dl.startDownload();
         } else if ("hls".equals(link.getStringProperty(PROPERTY_DELIVERY)) && dllink.contains("playlist.m3u8")) {
             /* HLS playlist which should contain only one quality (for older items from tvthek.orf.at). */
@@ -425,7 +427,29 @@ public class ORFMediathek extends PluginForHost {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             this.handleConnectionErrors(br, link, dl.getConnection());
+            this.findAndSetFileHash(link, dl.getConnection());
             dl.startDownload();
+        }
+    }
+
+    private void findAndSetFileHash(final DownloadLink link, final URLConnectionAdapter con) {
+        final List<String> amazonRequestIDList = con.getRequest().getResponseHeaders("x-amz-request-id");
+        final List<String> etagList = con.getRequest().getResponseHeaders("etag");
+        if (amazonRequestIDList == null || amazonRequestIDList.isEmpty() || etagList == null || etagList.isEmpty()) {
+            /* No file hash given in headers */
+            return;
+        }
+        /**
+         * 2025-08-12: e.g. thumbnail and subtitles from orf.at: /video/14285832/schlosshotel-orth-220-alles-verspielt <br>
+         * Reference: https://board.jdownloader.org/showthread.php?t=97742
+         */
+        for (final String etag : etagList) {
+            final String md5hash = new Regex(etag, "W/\"([a-f0-9]{32})\"").getMatch(0);
+            if (md5hash == null) {
+                continue;
+            }
+            link.setMD5Hash(md5hash);
+            return;
         }
     }
 

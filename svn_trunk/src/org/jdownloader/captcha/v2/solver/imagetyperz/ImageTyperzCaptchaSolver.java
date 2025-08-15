@@ -5,6 +5,11 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
@@ -20,11 +25,6 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_IMAGE_TYPERZ;
 import org.seamless.util.io.IO;
-
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
 
 public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
     private final ImageTyperzConfigInterface      config;
@@ -158,6 +158,9 @@ public class ImageTyperzCaptchaSolver extends CESChallengeSolver<String> {
             String enterprise_type = "v2";// default
             if (challenge.isInvisible()) {
                 enterprise_type = "v2";// invisible
+            }
+            if (challenge.isV3()) {
+                enterprise_type = "v3";// v3
             }
             if (challenge.getV3Action() != null) {
                 final String action = (String) challenge.getV3Action().get("action");

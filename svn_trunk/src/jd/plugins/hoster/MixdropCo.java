@@ -21,14 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -42,7 +34,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51300 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
+@HostPlugin(revision = "$Revision: 51330 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,7 +65,7 @@ public class MixdropCo extends antiDDoSForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mixdrop.to", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", " mixdrop.sn" });
+        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mixdrop.to", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", "mixdrop.sn", "mixdrop.cfd" });
         return ret;
     }
 
@@ -107,7 +107,8 @@ public class MixdropCo extends antiDDoSForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:f|e)/([a-z0-9]+)");
+            /** 2025-08-14: The "/e/..." link-type does not exist anymore and has been replaced by "/emb/..." */
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:f|e|emb)/([a-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -140,7 +141,7 @@ public class MixdropCo extends antiDDoSForHost {
     }
 
     private String getNormalFileURL(final DownloadLink link) {
-        String url = link.getPluginPatternMatcher().replaceFirst("(?i)/e/", "/f/").replaceAll("(?i)http://", "https://");
+        String url = link.getPluginPatternMatcher().replaceFirst("(?i)/(e|emb)/", "/f/").replaceAll("(?i)http://", "https://");
         final List<String> deadDomains = getDeadDomains();
         final String domainFromURL = Browser.getHost(url, false);
         if (deadDomains.contains(domainFromURL)) {
@@ -249,14 +250,23 @@ public class MixdropCo extends antiDDoSForHost {
             /* 2019-12-13: Invisible reCaptchaV2 */
             final boolean requiresCaptcha = true;
             if (requiresCaptcha) {
+                Boolean recaptcha = null;
+                final String js = br.getRegex("\"([^\"]*/js/script.v2.min.js.*?)\"").getMatch(0);
+                if (js != null) {
+                    final Browser brc = br.cloneBrowser();
+                    brc.getPage(js);
+                    recaptcha = brc.containsHTML("grecaptcha.execute");
+                }
+
                 final String turnstileKey = br.getRegex("data-cf-key=\"([^\"]+)\"").getMatch(0);
-                if (turnstileKey != null) {
-                    final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileKey);
-                    final String turnstileResponse = ts.getToken();
-                    query.appendEncoded("token", turnstileResponse);
-                } else {
-                    final String recaptchaV2Response = getCaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                    query.appendEncoded("token", recaptchaV2Response);
+                String token = null;
+                if (Boolean.TRUE.equals(recaptcha) || turnstileKey == null) {
+                    token = getCaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                } else if (turnstileKey != null) {
+                    token = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileKey).getToken();
+                }
+                if (token != null) {
+                    query.appendEncoded("token", token);
                 }
             }
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -300,6 +310,12 @@ public class MixdropCo extends antiDDoSForHost {
 
     protected CaptchaHelperHostPluginRecaptchaV2 getCaptchaHelperHostPluginRecaptchaV2(PluginForHost plugin, Browser br) throws PluginException {
         return new CaptchaHelperHostPluginRecaptchaV2(this, br, this.getReCaptchaKey()) {
+
+            @Override
+            public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.VERSION getVersion() {
+                return VERSION.V3;
+            }
+
             @Override
             public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
                 return TYPE.INVISIBLE;

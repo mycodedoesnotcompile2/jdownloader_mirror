@@ -221,7 +221,8 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
             HashMap<String, Object> task = new HashMap<String, Object>();
             task.put("websiteURL", challenge.getSiteUrl());
             task.put("websiteKey", challenge.getSiteKey());
-            if (challenge.getV3Action() != null) {
+            final Map<String, Object> v3Action = challenge.getV3Action();
+            if (v3Action != null || challenge.isV3()) {
                 // v3
                 // https://anti-captcha.com/de/apidoc/task-types/RecaptchaV3TaskProxyless
                 task.put("type", "RecaptchaV3TaskProxyless");
@@ -229,9 +230,12 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
                     // https://anti-captcha.com/de/apidoc/task-types/RecaptchaV3Enterprise
                     task.put("isEnterprise", Boolean.TRUE);
                 }
-                final String action = (String) challenge.getV3Action().get("action");
-                if (action != null) {
-                    task.put("pageAction", action);
+
+                if (v3Action != null) {
+                    final String action = (String) v3Action.get("action");
+                    if (action != null) {
+                        task.put("pageAction", action);
+                    }
                 }
                 task.put("minScore", 0.3d);
             } else {

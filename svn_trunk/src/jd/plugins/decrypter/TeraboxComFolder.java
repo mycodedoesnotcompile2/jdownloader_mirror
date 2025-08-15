@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50387 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51325 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -117,38 +118,37 @@ public class TeraboxComFolder extends PluginForDecrypt {
     private static final AtomicLong        anonymousJstokenTimestamp = new AtomicLong(-1);
     private static AtomicReference<String> anonymousJstoken          = new AtomicReference<String>(null);
 
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        return crawlFolder(this, param, account, null);
-    }
-
-    public ArrayList<DownloadLink> crawlFolder(final Plugin callingPlugin, final CryptedLink param, final Account account, final String targetFileID) throws Exception {
-        String contenturl = param.getCryptedUrl();
+    private String getContentURL(final String originalurl) {
+        String contenturl = originalurl;
         final List<String> deadDomains = getDeadDomains();
         final String domainOfAddedURL = Browser.getHost(contenturl);
         if (deadDomains.contains(domainOfAddedURL)) {
             /* Fix domain inside URL */
             contenturl = contenturl.replaceFirst(Pattern.quote(domainOfAddedURL) + "/", getHost() + "/");
         }
-        final UrlQuery paramsOfAddedURL = UrlQuery.parse(contenturl);
-        String surl = null;
-        String preGivenPath = null;
-        if (new Regex(contenturl, TYPE_SHORT).patternFind()) {
-            surl = new Regex(contenturl, TYPE_SHORT).getMatch(0);
-        } else {
-            surl = paramsOfAddedURL.get("surl");
+        return contenturl;
+    }
+
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        String[] result = extractSurlAndPath(param.getCryptedUrl());
+        String surl = result[0];
+        if (surl == null) {
+            /* User has added invalid url */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        preGivenPath = paramsOfAddedURL.get("dir");
-        if (preGivenPath == null) {
-            preGivenPath = paramsOfAddedURL.get("path");
-        }
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        return crawlFolder(this, param, account, null);
+    }
+
+    public ArrayList<DownloadLink> crawlFolder(final Plugin callingPlugin, final CryptedLink param, final Account account, final String targetFileID) throws Exception {
+        final String contenturl = getContentURL(param.getCryptedUrl());
+        String[] result = extractSurlAndPath(contenturl);
+        String surl = result[0];
         if (surl == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (!Encoding.isUrlCoded(preGivenPath)) {
-            preGivenPath = Encoding.urlEncode(preGivenPath);
-        }
+        String preGivenPath = result[1];
         final TeraboxCom plg = (TeraboxCom) this.getNewPluginForHostInstance(this.getHost());
         /*
          * Login whenever possible. This way we will get direct downloadable URLs right away which we can store --> Saves a LOT of time- and
@@ -478,5 +478,30 @@ public class TeraboxComFolder extends PluginForDecrypt {
             }
         } while (!this.isAbort());
         return ret;
+    }
+
+    private String[] extractSurlAndPath(String contenturl) throws MalformedURLException {
+        final List<String> deadDomains = getDeadDomains();
+        final String domainOfAddedURL = Browser.getHost(contenturl);
+        if (deadDomains.contains(domainOfAddedURL)) {
+            /* Fix domain inside URL */
+            contenturl = contenturl.replaceFirst(Pattern.quote(domainOfAddedURL) + "/", getHost() + "/");
+        }
+        final UrlQuery paramsOfAddedURL = UrlQuery.parse(contenturl);
+        String surl = null;
+        String preGivenPath = null;
+        if (new Regex(contenturl, TYPE_SHORT).patternFind()) {
+            surl = new Regex(contenturl, TYPE_SHORT).getMatch(0);
+        } else {
+            surl = paramsOfAddedURL.get("surl");
+        }
+        preGivenPath = paramsOfAddedURL.get("dir");
+        if (preGivenPath == null) {
+            preGivenPath = paramsOfAddedURL.get("path");
+        }
+        if (!Encoding.isUrlCoded(preGivenPath)) {
+            preGivenPath = Encoding.urlEncode(preGivenPath);
+        }
+        return new String[] { surl, preGivenPath };
     }
 }

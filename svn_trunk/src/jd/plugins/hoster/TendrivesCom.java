@@ -27,6 +27,7 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHos
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -37,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50708 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51329 $", interfaceVersion = 3, names = {}, urls = {})
 public class TendrivesCom extends PluginForHost {
     public TendrivesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -117,6 +118,8 @@ public class TendrivesCom extends PluginForHost {
         } else if (br.getRequest().getHtmlCode().equals("404")) {
             /* Plaintext response with content "404" */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<div>\\s*File Not Found")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = null, filesize = null;
         final String[] tables = br.getRegex("<table class=\"table\">(.*?)</table>").getColumn(0);
@@ -132,12 +135,24 @@ public class TendrivesCom extends PluginForHost {
             filesize = rows[1];
             break;
         }
+        if (filename == null) {
+            /* 2025-08-14 */
+            filename = br.getRegex("style=\"font-size: 24px; display: block; color: #1a1a1a; margin-bottom: 10px;\">([^<]+)</strong>").getMatch(0);
+        }
+        if (filesize == null) {
+            /* 2025-08-14 */
+            filesize = br.getRegex(">\\s*File Size:([^<]+)</span>").getMatch(0);
+        }
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -219,6 +234,14 @@ public class TendrivesCom extends PluginForHost {
             } catch (Throwable ignore) {
             }
             return false;
+        }
+    }
+
+    @Override
+    protected void throwConnectionExceptions(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        super.throwConnectionExceptions(br, con);
+        if (con.getResponseCode() == 502) {
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 502 bad gateway", 5 * 60 * 1000l);
         }
     }
 

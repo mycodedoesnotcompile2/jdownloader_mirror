@@ -708,23 +708,6 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
                 }
             }
         }
-        final List<String> amazonRequestIDList = con.getRequest().getResponseHeaders("x-amz-request-id");
-        final List<String> etagList = con.getRequest().getResponseHeaders("etag");
-        if (amazonRequestIDList != null && !amazonRequestIDList.isEmpty() && etagList != null && !etagList.isEmpty()) {
-            /**
-             * 2025-08-12: e.g. thumbnail and subtitles from orf.at: /video/14285832/schlosshotel-orth-220-alles-verspielt <br>
-             * Reference: https://board.jdownloader.org/showthread.php?t=97742
-             */
-            for (final String etag : etagList) {
-                final String md5hash = new Regex(etag, "W/\"([a-f0-9]{32})\"").getMatch(0);
-                if (md5hash == null) {
-                    continue;
-                }
-                final HashInfo ret = newConnectionHashInfo(logger, md5hash, HashInfo.TYPE.MD5);
-                /* Take first result */
-                return ret;
-            }
-        }
         return null;
     }
 

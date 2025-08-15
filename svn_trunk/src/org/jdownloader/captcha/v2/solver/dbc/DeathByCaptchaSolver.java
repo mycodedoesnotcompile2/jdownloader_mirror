@@ -11,6 +11,10 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import jd.http.Browser;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -40,10 +44,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_DBC;
-
-import jd.http.Browser;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
 
 public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     private DeathByCaptchaSettings            config;
@@ -132,7 +132,10 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                     token_param.put("pageurl", rc.getSiteUrl());
                     token_param.put("min_score", "0.3");// minimal score
                 } else {
-                    if (rc.isInvisible()) {
+                    if (rc.isV3()) {
+                        type = "RecaptchaV3";
+                        r.addFormData(new FormData("type", "5"));
+                    } else if (rc.isInvisible()) {
                         type = "RecaptchaV2 invisible";
                         r.addFormData(new FormData("type", "4"));
                     } else {

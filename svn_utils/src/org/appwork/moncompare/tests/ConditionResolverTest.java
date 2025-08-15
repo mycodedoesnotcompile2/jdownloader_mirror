@@ -100,8 +100,8 @@ public class ConditionResolverTest extends AWTest {
             this.list2.add(new String[] { "a", "b" });
             this.list2.add(new String[] { "a", "b" });
         }
-        private boolean b = false;
-        private boolean c = false;
+        private boolean            b     = false;
+        private boolean            c     = false;
 
         /**
          * @return the b
@@ -142,7 +142,7 @@ public class ConditionResolverTest extends AWTest {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @SuppressWarnings("unchecked")
@@ -180,5 +180,7 @@ public class ConditionResolverTest extends AWTest {
         assertEquals(new Condition("§concat", new Object[] { "§a", " ", new Condition(Condition.$TO_LOWER_CASE, "§set[1]") }).evaluate(regex), "(. 643dfbg");
         assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "abc", "§a" }).evaluate(regex), "(..def");
         assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "a(.)c", new Condition(Condition.$TO_UPPER_CASE, new Condition(Condition.$REGEX_FIND_ONE, new Object[] { "§valid", "a(.)c", 1 })), 1 }).evaluate(regex), "aBc.def");
+        assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "a(.)c", "-$1", 1 }).evaluate(regex), "a-bc.def");
+        assertEquals(new Condition(Condition.$SEARCH_AND_REPLACE, new Object[] { "§valid", "aBc", "-$1", 1 }).evaluate(regex), "abc.def");
     }
 }

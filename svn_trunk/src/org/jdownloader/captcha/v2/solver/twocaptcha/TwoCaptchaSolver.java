@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -33,9 +36,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_TWO_CAPTCHA;
-
-import jd.http.Browser;
-import jd.http.requests.PostRequest;
 
 public class TwoCaptchaSolver extends CESChallengeSolver<String> {
     private static final TwoCaptchaSolver     INSTANCE           = new TwoCaptchaSolver();
@@ -121,6 +121,8 @@ public class TwoCaptchaSolver extends CESChallengeSolver<String> {
                     if (action != null && action.containsKey("action")) {
                         task.put("type", "RecaptchaV3TaskProxyless");
                         task.put("pageAction", String.valueOf(action.get("action")));
+                    } else if (challenge.isV3()) {
+                        task.put("type", "RecaptchaV3TaskProxyless");
                     } else if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
                         task.put("isInvisible", true);
                     }

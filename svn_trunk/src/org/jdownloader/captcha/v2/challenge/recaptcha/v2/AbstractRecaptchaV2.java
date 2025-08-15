@@ -9,13 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.logging.LogController;
-
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.Browser;
 import jd.http.Request;
@@ -25,6 +18,13 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.logging.LogController;
+
 public abstract class AbstractRecaptchaV2<T extends Plugin> {
     /**
      * https://cloud.google.com/recaptcha-enterprise/docs/migrate-recaptcha
@@ -33,6 +33,11 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
     public static enum TYPE {
         NORMAL,
         INVISIBLE
+    }
+
+    public static enum VERSION {
+        V2,
+        V3
     }
 
     protected final T            plugin;
@@ -94,8 +99,7 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
      * errormessage and the user will have to solve it again! This value is especially important for rare EDGE cases such as long
      * waiting-times + captcha. Example: User has to wait 180 seconds before he can confirm such a captcha. If he solves it directly, the
      * captcha will be invalid once the 180 seconds are over. Also see documentation in XFileSharingProBasic.java class in method
-     * 'handleCaptcha'. </br>
-     * TRY TO KEEP THIS VALUE UP-TO-DATE!!
+     * 'handleCaptcha'. </br> TRY TO KEEP THIS VALUE UP-TO-DATE!!
      */
     public int getSolutionTimeout() {
         return 1 * 60 * 1000;
@@ -103,6 +107,17 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
 
     protected Map<String, Object> getV3Action() {
         return getV3Action(br != null ? br.toString() : null);
+    }
+
+    public VERSION getVersion() {
+        return getVersion(br != null ? br.toString() : null);
+    }
+
+    protected VERSION getVersion(final String source) {
+        if (getV3Action(source) != null) {
+            return VERSION.V3;
+        }
+        return VERSION.V2;
     }
 
     protected Map<String, Object> getV3Action(final String source) {
@@ -495,6 +510,11 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
             @Override
             public boolean isEnterprise() {
                 return AbstractRecaptchaV2.this.isEnterprise();
+            }
+
+            @Override
+            public boolean isV3() {
+                return VERSION.V3.equals(AbstractRecaptchaV2.this.getVersion());
             }
 
             @Override
