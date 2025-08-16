@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51322 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51331 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -6007,6 +6007,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             if (errormsg.equalsIgnoreCase("no file")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (link == null) {
+                /* Error happened during account login */
+                throw new AccountInvalidException(errormsg);
             }
         }
         /* Handle misc / response-code related errors */

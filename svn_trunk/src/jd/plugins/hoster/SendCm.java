@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.awt.Color;
+import java.awt.Container;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Currency;
@@ -26,8 +27,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
@@ -63,8 +66,9 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51323 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51333 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -457,7 +461,7 @@ public class SendCm extends XFileSharingProBasic {
         if (premium_bandwidthBytes <= 0) {
             if (account.getType() == AccountType.FREE) {
                 /* Free account without premium traffic */
-                throw new AccountInvalidException("\r\nYou can only use premium accounts or free accounts with premium traffic via API login.\r\nUse login via username and password or buy traffic.");
+                throw new AccountInvalidException("\r\nYou can only use premium accounts or accounts with premium traffic via API login.\r\nUse login via username and password or buy traffic.");
             } else {
                 /* Premium account without traffic */
                 String msg = "This is a paid account but no longer has direct link traffic available. This can be purchased from this page: " + getHost() + "/pricing.";
@@ -786,12 +790,20 @@ public class SendCm extends XFileSharingProBasic {
         private final ExtPasswordField              apikey;
         private final JLabel                        apikeyLabel;
         private final InputChangedCallbackInterface callback;
-        private JLabel                              usernameLabel = null;
+        private JLabel                              usernameLabel         = null;
         private final JLabel                        passwordOrCookiesLabel;
         private final SendCm                        plg;
         private final boolean                       usernameIsEmail;
         private final boolean                       websiteLoginCookieLoginOnly;
         private final boolean                       websiteLoginCookieLoginOptional;
+        // New components for account type selection
+        private final JComboBox                     accountTypeComboBox;
+        private final JPanel                        premiumAccountPanel;
+        private final JPanel                        freeAccountPanel;
+        private final JLabel                        premiumInstructionsLabel;
+        private final JLabel                        premiumInstructionsLink;
+        private JLabel                              freeInstructionsLabel = null;
+        private JLabel                              freeInstructionsLink  = null;
 
         public boolean updateAccount(Account input, Account output) {
             boolean changed = false;
@@ -816,31 +828,56 @@ public class SendCm extends XFileSharingProBasic {
             final String domain = this.plg.getHost();
             final String apikey_help_url_without_protocol = domain + "/?op=my_account";
             final String apikey_help_url = "https://" + apikey_help_url_without_protocol;
-            add(new JLabel("Premium account users:"));
-            add(new JLink("Enter API key (click here to find it)", apikey_help_url));
-            add(apikeyLabel = new JLink("Premium API Key: ", apikey_help_url));
-            add(this.apikey = new ExtPasswordField() {
+            // Add account type dropdown
+            add(new JLabel("Account Type:"));
+            accountTypeComboBox = new JComboBox<>(new String[] { "Premium Account", "Free Account" });
+            accountTypeComboBox.setSelectedIndex(0);
+            accountTypeComboBox.addActionListener(e -> {
+                updateVisibleComponents();
+                callback.onChangedInput(accountTypeComboBox);
+            });
+            add(accountTypeComboBox);
+            // Create premium account panel
+            premiumAccountPanel = new JPanel(new MigLayout("ins 0, wrap 2", "[][grow,fill]", ""));
+            premiumInstructionsLabel = new JLabel("Premium account users:");
+            premiumInstructionsLink = new JLink("Enter API key (click here to find it)", apikey_help_url);
+            premiumAccountPanel.add(premiumInstructionsLabel);
+            premiumAccountPanel.add(premiumInstructionsLink);
+            apikeyLabel = new JLink("Premium API Key: ", apikey_help_url);
+            premiumAccountPanel.add(apikeyLabel);
+            this.apikey = new ExtPasswordField() {
                 @Override
                 public void onChanged() {
                     callback.onChangedInput(apikey);
                 }
-            }, "");
+            };
             this.apikey.setHelpText("Obtain API key here: " + apikey_help_url_without_protocol);
+            premiumAccountPanel.add(this.apikey);
+            // Create free account panel
+            freeAccountPanel = new JPanel(new MigLayout("ins 0, wrap 2", "[][grow,fill]", ""));
             if (websiteLoginCookieLoginOnly) {
-                add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions()));
-                add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), apikey_help_url));
-                add(new JLabel("Free account users:"));
-                add(new JLink("Enter username & cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+                freeInstructionsLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions());
+                freeInstructionsLink = new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), apikey_help_url);
+                freeAccountPanel.add(freeInstructionsLabel);
+                freeAccountPanel.add(freeInstructionsLink);
+                JLabel freeUsersLabel = new JLabel("Free account users:");
+                JLink cookieInstructionsLink = new JLink("Enter username & cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
+                freeAccountPanel.add(freeUsersLabel);
+                freeAccountPanel.add(cookieInstructionsLink);
             } else {
-                add(new JLabel("Free account users:"));
-                add(new JLink("Enter username & pass or cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+                JLabel freeUsersLabel = new JLabel("Free account users:");
+                JLink loginInstructionsLink = new JLink("Enter username & pass or cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
+                freeAccountPanel.add(freeUsersLabel);
+                freeAccountPanel.add(loginInstructionsLink);
             }
+            // Username field (common for both account types)
             if (this.usernameIsEmail) {
-                add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_email()));
+                usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_email());
             } else {
-                add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name()));
+                usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name());
             }
-            add(this.name = new ExtTextField() {
+            freeAccountPanel.add(usernameLabel);
+            this.name = new ExtTextField() {
                 @Override
                 public void onChanged() {
                     callback.onChangedInput(name);
@@ -852,28 +889,31 @@ public class SendCm extends XFileSharingProBasic {
                     addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")));
                     refreshTextHighlighter();
                 }
-            });
+            };
             if (this.usernameIsEmail) {
                 name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_email());
             } else {
                 name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_username());
             }
+            freeAccountPanel.add(name);
+            // Password field
             if (websiteLoginCookieLoginOnly) {
-                add(passwordOrCookiesLabel = new JLink("<HTML><U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U></HTML>", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+                passwordOrCookiesLabel = new JLink("<HTML><U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U></HTML>", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
             } else if (websiteLoginCookieLoginOptional) {
                 String labelTxt = _GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies();
                 labelTxt = labelTxt.replaceFirst("(?i)" + Pattern.quote(_GUI.T.jd_gui_swing_components_AccountDialog_cookies()), "<U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U>");
                 if (!_GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies().matches(labelTxt)) {
                     labelTxt = "<HTML>" + labelTxt + "</HTML>";
-                    add(passwordOrCookiesLabel = new JLink(labelTxt, "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+                    passwordOrCookiesLabel = new JLink(labelTxt, "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
                 } else {
-                    add(passwordOrCookiesLabel = new JLabel(labelTxt));
+                    passwordOrCookiesLabel = new JLabel(labelTxt);
                 }
             } else {
                 /* Normal username & password login */
-                add(passwordOrCookiesLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass()));
+                passwordOrCookiesLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass());
             }
-            add(this.pass = new ExtPasswordField() {
+            freeAccountPanel.add(passwordOrCookiesLabel);
+            this.pass = new ExtPasswordField() {
                 @Override
                 public void onChanged() {
                     callback.onChangedInput(pass);
@@ -901,7 +941,7 @@ public class SendCm extends XFileSharingProBasic {
                     });
                     applyTextHighlighter(null);
                 }
-            }, "");
+            };
             if (websiteLoginCookieLoginOnly) {
                 pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_cookies());
             } else if (websiteLoginCookieLoginOptional) {
@@ -910,29 +950,60 @@ public class SendCm extends XFileSharingProBasic {
                 /* Normal username & password login */
                 pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
             }
-            // pass.setFocusable(true);
-            // pass.setEnabled(true);
-            // pass.setBackground(Color.CYAN);
+            freeAccountPanel.add(pass);
+            // Add panels to main container
+            add(premiumAccountPanel, "span 2, grow");
+            add(freeAccountPanel, "span 2, grow");
+            // Handle clipboard auto-fill
+            handleClipboardAutoFill(apikey_help_url_without_protocol);
+            // Set initial visibility
+            updateVisibleComponents();
+        }
+
+        private void handleClipboardAutoFill(String apikey_help_url_without_protocol) {
             final ExtTextField dummy = new ExtTextField();
             dummy.paste();
             final String clipboard = dummy.getText();
-            if (StringUtils.isNotEmpty(clipboard)) {
-                /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
-                final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
-                if ((websiteLoginCookieLoginOnly || websiteLoginCookieLoginOptional) && userCookies != null) {
-                    /*
-                     * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field
-                     * with them.
-                     */
-                    // TODO: Check why this doesn't work
-                    pass.setPassword(clipboard.toCharArray());
-                    // pass.setText(clipboard);
-                } else if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
-                    this.apikey.setPassword(clipboard.toCharArray());
-                } else if (userCookies == null && clipboard.trim().length() > 0) {
-                    /* Auto fill username field with clipboard content. */
-                    name.setText(clipboard);
-                }
+            if (StringUtils.isEmpty(clipboard)) {
+                return;
+            }
+            /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
+            final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
+            if ((websiteLoginCookieLoginOnly || websiteLoginCookieLoginOptional) && userCookies != null && !userCookies.isEmpty()) {
+                /*
+                 * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
+                 * them.
+                 */
+                pass.setPassword(clipboard.toCharArray());
+            } else if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
+                this.apikey.setText(clipboard);
+            } else if (userCookies == null && clipboard.trim().length() > 0) {
+                /* Auto fill username field with clipboard content. */
+                name.setText(clipboard);
+            }
+            updateVisibleComponents();
+        }
+
+        private void updateVisibleComponents() {
+            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            premiumAccountPanel.setVisible(isPremium);
+            freeAccountPanel.setVisible(!isPremium);
+            if (isPremium) {
+                this.remove(freeAccountPanel);
+                this.add(premiumAccountPanel);
+            } else {
+                this.remove(premiumAccountPanel);
+                this.add(freeAccountPanel);
+            }
+            // Trigger layout update
+            revalidate();
+            repaint();
+            // Notify parent container to update its layout
+            Container parent = getParent();
+            while (parent != null) {
+                parent.revalidate();
+                parent.repaint();
+                parent = parent.getParent();
             }
         }
 
@@ -941,79 +1012,81 @@ public class SendCm extends XFileSharingProBasic {
         }
 
         public void setAccount(final Account defaultAccount) {
-            if (defaultAccount != null) {
-                name.setText(defaultAccount.getUser());
-                pass.setText(defaultAccount.getPass());
-                apikey.setText(defaultAccount.getPass());
+            if (defaultAccount == null) {
+                return;
             }
+            /* If user edits existing account ensure that GUI matches users' account type. */
+            if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN)) {
+                /* Free account / website login */
+                accountTypeComboBox.setSelectedIndex(1);
+            } else if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
+                if (plg.looksLikeValidAPIKey(defaultAccount.getPass())) {
+                    /* Premium account / API key login */
+                    apikey.setText(defaultAccount.getPass());
+                    accountTypeComboBox.setSelectedIndex(0);
+                }
+            } else {
+                /* Do nothing */
+            }
+            updateVisibleComponents();
         }
 
         @Override
         public boolean validateInputs() {
-            final boolean userok;
-            final boolean passok;
-            boolean apikey_ok = false;
-            final String apikey = this.getApikey();
-            if (apikey != null && apikeyLabel != null) {
+            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            if (isPremium) {
+                // Premium account validation - only API key needed
+                final String apikey = this.getApikey();
                 if (plg.looksLikeValidAPIKey(apikey)) {
-                    apikey_ok = true;
                     this.apikeyLabel.setForeground(Color.BLACK);
+                    return true;
                 } else {
-                    apikey_ok = false;
                     this.apikeyLabel.setForeground(Color.RED);
+                    return false;
                 }
-            }
-            if (StringUtils.isEmpty(this.getUsername())) {
-                usernameLabel.setForeground(Color.RED);
-                userok = false;
-            } else if (this.usernameIsEmail && !plg.looksLikeValidEmailAddress(null, this.getUsername())) {
-                /* E-Mail is needed but user did not enter a valid-looking e-mail address. */
-                usernameLabel.setForeground(Color.RED);
-                userok = false;
             } else {
-                usernameLabel.setForeground(Color.BLACK);
-                userok = true;
-            }
-            final String pw = getPassword();
-            final Cookies cookies = Cookies.parseCookiesFromString(pw);
-            if (StringUtils.isEmpty(pw)) {
-                /* Password field is never allowed to be empty/null. */
-                passok = false;
-            } else if (websiteLoginCookieLoginOnly && cookies == null) {
-                /* Cookies are needed but not given. */
-                passok = false;
-            } else if (!websiteLoginCookieLoginOnly && !websiteLoginCookieLoginOptional && cookies != null) {
-                /* Cookies are given while user is not allowed to use cookies. */
-                passok = false;
-            } else {
-                passok = true;
-            }
-            if (!passok) {
-                passwordOrCookiesLabel.setForeground(Color.RED);
-            } else {
-                passwordOrCookiesLabel.setForeground(Color.BLACK);
-            }
-            if (apikey_ok) {
-                // TODO: Evaluate if foreground change for passwordOrCookiesLabel is a good idea
-                passwordOrCookiesLabel.setForeground(Color.BLACK);
+                // Free account validation - username and password/cookies needed
+                final boolean userok;
+                final boolean passok;
                 if (StringUtils.isEmpty(this.getUsername())) {
-                    /* TODO: Find a better solution since this may cause an infinite loop */
-                    // this.name.setText(apikey);
+                    usernameLabel.setForeground(Color.RED);
+                    userok = false;
+                } else if (this.usernameIsEmail && !plg.looksLikeValidEmailAddress(null, this.getUsername())) {
+                    /* E-Mail is needed but user did not enter a valid-looking e-mail address. */
+                    usernameLabel.setForeground(Color.RED);
+                    userok = false;
+                } else {
+                    usernameLabel.setForeground(Color.BLACK);
+                    userok = true;
                 }
-                return true;
-            } else if (userok && passok) {
-                // TODO: Evaluate if foreground change for apikeyLabel is a good idea
-                apikeyLabel.setForeground(Color.BLACK);
-                return true;
-            } else {
-                return false;
+                final String pw = getPassword();
+                final Cookies cookies = Cookies.parseCookiesFromString(pw);
+                if (StringUtils.isEmpty(pw)) {
+                    /* Password field is never allowed to be empty/null. */
+                    passok = false;
+                } else if (websiteLoginCookieLoginOnly && cookies == null) {
+                    /* Cookies are needed but not given. */
+                    passok = false;
+                } else if (!websiteLoginCookieLoginOnly && !websiteLoginCookieLoginOptional && cookies != null) {
+                    /* Cookies are given while user is not allowed to use cookies. */
+                    passok = false;
+                } else {
+                    passok = true;
+                }
+                if (!passok) {
+                    passwordOrCookiesLabel.setForeground(Color.RED);
+                } else {
+                    passwordOrCookiesLabel.setForeground(Color.BLACK);
+                }
+                return userok && passok;
             }
         }
 
         @Override
         public Account getAccount() {
+            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
             final String apikey = this.getApikey();
-            if (plg.looksLikeValidAPIKey(apikey)) {
+            if (isPremium && plg.looksLikeValidAPIKey(apikey)) {
                 /* Use API key as password */
                 final Account account = new Account(getUsername(), apikey);
                 account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);

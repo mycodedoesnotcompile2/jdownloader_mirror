@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -29,6 +30,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Request;
+import jd.http.requests.GetRequest;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -39,7 +41,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-@DecrypterPlugin(revision = "$Revision: 50321 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51331 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,18 +93,25 @@ public class RedgifsComCrawler extends PluginForDecrypt {
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www." + this.getHost());
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www." + this.getHost() + "/");
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
+        int totalNumberofItems = -1;
         if (username != null) {
             /* Crawl all items of a user */
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(username);
             final int maxItemsPerPage = 40;
             int page = 1;
-            do {
+            final HashSet<String> dupes = new HashSet<String>();
+            final List<Integer> pagesWithMissingItems = new ArrayList<Integer>();
+            pagination: do {
+                int numberofNewItemsThisPage = 0;
                 final UrlQuery query = new UrlQuery();
-                query.add("order", "new");
-                query.add("count", Integer.toString(maxItemsPerPage));
-                query.add("page", Integer.toString(page));
-                br.getPage("https://api.redgifs.com/v2/users/" + username + "/search?" + query.toString());
+                query.appendEncoded("order", "new");
+                query.appendEncoded("count", Integer.toString(maxItemsPerPage));
+                if (page > 1) {
+                    query.appendEncoded("page", Integer.toString(page));
+                }
+                final GetRequest req = br.createGetRequest("https://api.redgifs.com/v2/users/" + username + "/search?" + query.toString());
+                plg.getPage(br, token, req);
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 if (((Number) entries.get("total")).intValue() == 0) {
                     /* Profile contains zero items/content. */
@@ -111,31 +120,60 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                 final List<Map<String, Object>> gifs = (List<Map<String, Object>>) entries.get("gifs");
                 for (final Map<String, Object> gif : gifs) {
                     final String mediaID = gif.get("id").toString();
+                    if (!dupes.add(mediaID)) {
+                        logger.info("Skipping dupe mediaID: " + mediaID);
+                        continue;
+                    }
+                    numberofNewItemsThisPage++;
                     final DownloadLink link = this.createDownloadlink(generateSingleItemURL(mediaID, null));
                     RedGifsCom.parseFileInfo(link, gif);
                     link.setAvailable(true);
                     link._setFilePackage(fp);
-                    distribute(link);
                     ret.add(link);
+                    distribute(link);
                 }
                 final int pageMax = ((Number) entries.get("pages")).intValue();
-                logger.info("Crawled page " + page + "/" + pageMax + " | Found items: " + ret.size() + "/" + entries.get("total"));
+                totalNumberofItems = ((Number) entries.get("total")).intValue();
+                logger.info("Crawled page " + page + "/" + pageMax + " | Found items: " + ret.size() + "/" + totalNumberofItems + " | New items this page: " + numberofNewItemsThisPage);
+                final boolean isLastPage = page >= pageMax;
+                if (gifs.size() < maxItemsPerPage && !isLastPage) {
+                    /* Double fail-safe */
+                    logger.info("Current page contains less than max items -> Most likely some items of this profile have been deleted!");
+                    pagesWithMissingItems.add(page);
+                    /* 2025-08-15: Do not stop, just log this case. */
+                    // break pagination;
+                }
                 if (this.isAbort()) {
                     logger.info("Stopping because: Aborted by user");
-                    break;
-                } else if (page >= pageMax) {
+                    throw new InterruptedException();
+                } else if (isLastPage) {
                     logger.info("Stopping because: Reached last page: " + pageMax);
-                    break;
-                } else if (gifs.size() < maxItemsPerPage) {
-                    /* Double fail-safe */
-                    logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage + " -> Reached last page?");
-                    break;
+                    break pagination;
+                } else if (numberofNewItemsThisPage == 0) {
+                    /* Additional fail safe which should not be needed. */
+                    logger.info("Stopping because: Failed to find any new items on current page: " + page);
+                    break pagination;
                 } else {
                     /* Continue to next page */
                     page++;
-                    continue;
+                    continue pagination;
                 }
             } while (true);
+            final int numberofMissingItems = totalNumberofItems - ret.size();
+            if (numberofMissingItems > 0) {
+                String message = String.format("Found only %d/%d items!\r\nThis may happen if items get deleted but the server side total number of items is not updated by redgifs.\r\nThis is not a JDownloader bug!", ret.size(), totalNumberofItems);
+                if (!pagesWithMissingItems.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < pagesWithMissingItems.size(); i++) {
+                        if (i > 0) {
+                            sb.append(", ");
+                        }
+                        sb.append(pagesWithMissingItems.get(i));
+                    }
+                    message += String.format("\r\nPage numbers with missing items: %s", sb.toString());
+                }
+                this.displayBubbleNotification(String.format("Profile: %s | Items missing!", username), message);
+            }
         } else {
             /* Crawl single image or all images of a gallery */
             final Map<String, Object> response = plg.getView(br, token, contentID);

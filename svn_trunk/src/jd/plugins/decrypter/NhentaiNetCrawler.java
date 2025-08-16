@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -41,12 +36,17 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.NhentaiNet;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 /**
  *
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 51313 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51332 $", interfaceVersion = 2, names = {}, urls = {})
 public class NhentaiNetCrawler extends PluginForDecrypt {
     public NhentaiNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,25 +118,28 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
             String json = br.getRegex("JSON\\.parse\\(\"(\\{.*?)\"\\);").getMatch(0);
             if (json == null) {
                 /* 2025-08-11, nhentai.xxx */
-                json = br.getRegex("parseJSON\\(\"(\\{.*?)\"\\);").getMatch(0);
+                json = br.getRegex("parseJSON\\((\"|')(\\{.*?)(\"|')\\);").getMatch(1);
             }
             json = PluginJSonUtils.unescape(json);
-            Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            Map<String, Object> titles = (Map<String, Object>) entries.get("title");
-            title = (String) titles.get("english");
-            if (StringUtils.isEmpty(title)) {
+            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            final Map<String, Object> titles = (Map<String, Object>) entries.get("title");
+            if (titles != null) {
                 title = (String) titles.get("english");
+                if (StringUtils.isEmpty(title)) {
+                    title = (String) titles.get("japanese");
+                }
             }
         } catch (final Throwable ignore) {
             logger.log(ignore);
         }
         if (title == null) {
-            /* nhentai.xxx */
-            title = br.getRegex("id\\s*=\\s*\"info\"\\s*>\\s*<h1[^>]*><span class=\"pretty\">\\s*(.*?)\\s*<").getMatch(0);
-        }
-        if (title == null) {
-            /* nhentai.to */
-            title = br.getRegex("id\\s*=\\s*\"info\"\\s*>\\s*<h1[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+            final String english = br.getRegex("(?:id|class)\\s*=\\s*\"info\"\\s*>\\s*<h1[^>]*>\\s*(.*?)\\s*</h1").getMatch(0);
+            final String japanese = br.getRegex("(?:id|class)\\s*=\\s*\"info\"\\s*>.*?<h2[^>]*>\\s*(.*?)\\s*</h2").getMatch(0);
+            title = StringUtils.firstNotEmpty(english, japanese);
+            if (title != null) {
+                title = title.replaceAll("<span[^>]*>", "").replaceAll("</span[^>]*>", "");
+                title = Encoding.htmlDecode(title);
+            }
         }
         if (StringUtils.isEmpty(title)) {
             /* Fallback */
@@ -148,7 +151,6 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
              */
             title = galleryID + "_" + title;
         }
-        title = Encoding.htmlDecode(title);
         final String[] urls = br.getRegex("(/g/" + galleryID + "/\\d+/?)").getColumn(0);
         if (urls == null || urls.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -157,7 +159,7 @@ public class NhentaiNetCrawler extends PluginForDecrypt {
         final DecimalFormat df = estimatedNumberOfPages > 999 ? new DecimalFormat("0000") : estimatedNumberOfPages > 99 ? new DecimalFormat("000") : new DecimalFormat("00");
         for (final String url : urls) {
             final int pageNumber = Integer.parseInt(new Regex(url, "(\\d+)/?$").getMatch(0));
-            String extensionGuess = br.getRegex("/\\d+/" + pageNumber + "t(\\.(?:png|jpe?g|webp|gif))").getMatch(0);
+            String extensionGuess = br.getRegex("/\\d+/(?:[^/]*/)?" + pageNumber + "t(\\.(?:png|jpe?g|webp|gif))").getMatch(0);
             if (extensionGuess == null) {
                 extensionGuess = NhentaiNet.EXT_DEFAULT;
             }

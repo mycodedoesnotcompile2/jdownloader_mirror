@@ -35,7 +35,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 51294 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51332 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
@@ -144,7 +144,7 @@ public class NhentaiNet extends PluginForHost {
 
     private String getDirecturl(final DownloadLink link, final Browser br) throws IOException {
         String dllink = link.getStringProperty(CACHED_URL);
-        if (dllink == null) {
+        if (dllink == null && br.getRequest() != null) {
             dllink = br.getRegex("(https?://[^/]+/galleries/\\d+/\\d+\\.(?:jpe?g|png|webp|gif))").getMatch(0);
             if (dllink == null) {
                 /* 2022-08-11 */
@@ -152,6 +152,10 @@ public class NhentaiNet extends PluginForHost {
                 if (dllink == null) {
                     /* 2025-07-31 */
                     dllink = br.getRegex("href=\"/g/\\d+/\\d+/?\">\\s*<img src=\"([^\"]*/galleries/\\d+/\\d+\\.(?:jpe?g|png|webp|gif))\"").getMatch(0);
+                    if (dllink == null) {
+                        /* nhentai.xxx */
+                        dllink = br.getRegex("data-src\\s*=\\s*\"([^\"]*/\\d+\\.(?:jpe?g|png|webp|gif))\"").getMatch(0);
+                    }
                 }
             }
         }

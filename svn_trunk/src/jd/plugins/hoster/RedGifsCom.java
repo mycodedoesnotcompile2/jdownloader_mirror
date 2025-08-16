@@ -43,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50824 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51331 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
     public RedGifsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class RedGifsCom extends GfyCatCom {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.XXX };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     private static List<String[]> getPluginDomains() {
@@ -180,6 +180,10 @@ public class RedGifsCom extends GfyCatCom {
         req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
         br.getPage(req);
         if (req.getHttpConnection().getResponseCode() == 401) {
+            /*
+             * e.g.
+             * {"error":{"code":"WrongSender","message":"This token belongs to a different device, please request a new one.","status":401}}
+             */
             invalidateTemporaryToken(br, token);
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid", 5 * 60 * 1000);
         } else if (req.getHttpConnection().getResponseCode() == 404) {

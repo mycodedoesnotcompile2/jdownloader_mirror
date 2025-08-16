@@ -57,7 +57,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51306 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51331 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -393,6 +393,11 @@ public abstract class TurbobitCore extends PluginForHost {
                 ai.setValidUntil(TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
                 getAndSetPremiumInformationWebsiteV1_in_website_v2_handling(account, ai);
             } else {
+                /**
+                 * 2025-08-15: At this moment multiple simultaneous downloads are possible via free account, see: <br>
+                 * https://board.jdownloader.org/showthread.php?t=97715
+                 */
+                // account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
                 account.setType(AccountType.FREE);
             }
         } else {

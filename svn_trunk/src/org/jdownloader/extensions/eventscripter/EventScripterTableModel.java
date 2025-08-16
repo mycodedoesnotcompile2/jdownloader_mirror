@@ -5,6 +5,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.Icon;
@@ -17,6 +18,7 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.MigPanel;
+import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
@@ -34,6 +36,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 public class EventScripterTableModel extends ExtTableModel<ScriptEntry> implements GenericConfigEventListener<Object> {
     private EventScripterExtension extension;
@@ -284,6 +287,54 @@ public class EventScripterTableModel extends ExtTableModel<ScriptEntry> implemen
             public void resetRenderer() {
             }
         });
+    }
+
+    private static final String SORT_ORIGINAL = "ORIGINAL";
+
+    @Override
+    public List<ScriptEntry> sort(List<ScriptEntry> data, ExtColumn<ScriptEntry> column) {
+        if (column == null || column.getSortOrderIdentifier() == SORT_ORIGINAL) {
+            return super.sort(data, null);
+        } else {
+            return super.sort(data, column);
+        }
+    }
+
+    @Override
+    public String getNextSortIdentifier(String sortOrderIdentifier) {
+        if (sortOrderIdentifier == null) {
+            if (CFG_GUI.CFG.isPrimaryTableSorterDesc()) {
+                sortOrderIdentifier = ExtColumn.SORT_DESC;
+            } else {
+                sortOrderIdentifier = ExtColumn.SORT_ASC;
+            }
+        }
+        if (CFG_GUI.CFG.isPrimaryTableSorterDesc()) {
+            if (sortOrderIdentifier.equals(SORT_ORIGINAL)) {
+                return ExtColumn.SORT_DESC;
+            } else if (sortOrderIdentifier.equals(ExtColumn.SORT_DESC)) {
+                return ExtColumn.SORT_ASC;
+            } else {
+                return SORT_ORIGINAL;
+            }
+        } else {
+            if (sortOrderIdentifier.equals(SORT_ORIGINAL)) {
+                return ExtColumn.SORT_ASC;
+            } else if (sortOrderIdentifier.equals(ExtColumn.SORT_ASC)) {
+                return ExtColumn.SORT_DESC;
+            } else {
+                return SORT_ORIGINAL;
+            }
+        }
+    }
+
+    @Override
+    public Icon getSortIcon(String sortOrderIdentifier) {
+        if (SORT_ORIGINAL.equals(sortOrderIdentifier)) {
+            return null;
+        } else {
+            return super.getSortIcon(sortOrderIdentifier);
+        }
     }
 
     @Override
