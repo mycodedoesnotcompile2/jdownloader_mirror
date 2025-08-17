@@ -23,7 +23,18 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -43,18 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51328 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51335 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,9 +171,6 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final int maxPagesWithoutNewItems = 15;
         do {
             getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(usernameOrUserID) + "/posts?o=" + offset);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
             final List<Map<String, Object>> posts = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
             if (posts == null || posts.isEmpty()) {
                 if (ret.isEmpty()) {
@@ -224,18 +221,6 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private int getMaxPageWebsite(Browser br, final String service, final String username, int maxPage) {
-        final String[] pages = br.getRegex("href=\"/" + Pattern.quote(service) + "/user/" + Pattern.quote(username) + "\\?o=\\d+\"[^>]*>\\s*(?:<b>)?\\s*(\\d+)").getColumn(0);
-        int ret = maxPage;
-        for (final String pageStr : pages) {
-            final int page = Integer.parseInt(pageStr);
-            if (page > ret) {
-                ret = page;
-            }
-        }
-        return ret;
-    }
-
     private FilePackage getFilePackageForProfileCrawler(final String service, final String userID) {
         final FilePackage fp = FilePackage.getInstance();
         fp.setAllowMerge(true);
@@ -277,10 +262,6 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         getPage(br, this.getApiBase() + "/" + service + "/user/" + userID + "/post/" + postID);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            /* E.g. {"error":"Not Found"} */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         /* 2024-11-06: Looks like they are playing around with API changes. */
         Map<String, Object> post = (Map<String, Object>) entries.get("post");
@@ -453,7 +434,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     };
 
     /**
-     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br>
+     * Uses API to find userID. </br>
+     * Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {
@@ -472,9 +455,6 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
             final Browser brc = br.cloneBrowser();
             getPage(brc, this.getApiBase() + "/" + service + "/user/" + usernameOrUserID + "/profile");
-            if (brc.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             username = entries.get("name").toString();
             if (StringUtils.isEmpty(username)) {
@@ -512,11 +492,18 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final int maxtries = 15;
         for (int i = 0; i <= maxtries; i++) {
             GetRequest getRequest = br.createGetRequest(url);
+            // If you want to scrape, use "Accept: text/css" header in your requests for now. For whatever reason DDG does not like SPA and
+            // JSON, so we have to be funny. And you are no exception to caching.
+            getRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "text/css");
             final URLConnectionAdapter con = br.openRequestConnection(getRequest);
             try {
                 if (this.isAbort()) {
                     /* Aborted by user */
                     throw new InterruptedException();
+                } else if (con.getResponseCode() == 404) {
+                    br.followConnection(true);
+                    /* E.g. {"error":"Not Found"} */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else if (con.getResponseCode() == 429) {
                     br.followConnection(true);
                     logger.info("Error 429 too many requests");

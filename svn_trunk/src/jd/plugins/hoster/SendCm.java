@@ -17,6 +17,8 @@ package jd.plugins.hoster;
 
 import java.awt.Color;
 import java.awt.Container;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Currency;
@@ -68,7 +70,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51333 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51337 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -830,11 +832,14 @@ public class SendCm extends XFileSharingProBasic {
             final String apikey_help_url = "https://" + apikey_help_url_without_protocol;
             // Add account type dropdown
             add(new JLabel("Account Type:"));
-            accountTypeComboBox = new JComboBox<>(new String[] { "Premium Account", "Free Account" });
+            accountTypeComboBox = new JComboBox<String>(new String[] { "Premium Account", "Free Account" });
             accountTypeComboBox.setSelectedIndex(0);
-            accountTypeComboBox.addActionListener(e -> {
-                updateVisibleComponents();
-                callback.onChangedInput(accountTypeComboBox);
+            accountTypeComboBox.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    updateVisibleComponents();
+                    callback.onChangedInput(accountTypeComboBox);
+                }
             });
             add(accountTypeComboBox);
             // Create premium account panel

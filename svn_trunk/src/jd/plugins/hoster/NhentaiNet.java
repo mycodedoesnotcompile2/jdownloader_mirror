@@ -20,6 +20,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -31,11 +35,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51332 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51336 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNetCrawler.class })
 public class NhentaiNet extends PluginForHost {
     public NhentaiNet(PluginWrapper wrapper) {
@@ -144,7 +144,7 @@ public class NhentaiNet extends PluginForHost {
 
     private String getDirecturl(final DownloadLink link, final Browser br) throws IOException {
         String dllink = link.getStringProperty(CACHED_URL);
-        if (dllink == null && br.getRequest() != null) {
+        if (br.getRequest() != null && dllink == null) {
             dllink = br.getRegex("(https?://[^/]+/galleries/\\d+/\\d+\\.(?:jpe?g|png|webp|gif))").getMatch(0);
             if (dllink == null) {
                 /* 2022-08-11 */
