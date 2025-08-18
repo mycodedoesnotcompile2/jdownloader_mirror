@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -34,11 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 51215 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubsourceNet extends PluginForHost {
     public SubsourceNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,9 +135,9 @@ public class SubsourceNet extends PluginForHost {
         final Map<String, Object> sub = (Map<String, Object>) entries.get("subtitle");
         final String comment = (String) sub.get("commentary");
         /* 0 = unknown filesize */
-        final long filesize = ((Number) sub.get("size")).longValue();
-        if (filesize > 0) {
-            link.setDownloadSize(filesize);
+        final Number filesize = ((Number) sub.get("size"));
+        if (filesize != null && filesize.longValue() > 0) {
+            link.setDownloadSize(filesize.longValue());
         }
         if (!StringUtils.isEmpty(comment) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(comment);

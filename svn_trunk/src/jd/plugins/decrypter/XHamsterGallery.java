@@ -23,8 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -50,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51325 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,10 +95,10 @@ public class XHamsterGallery extends PluginForDecrypt {
             sb.append("/(");
             sb.append("photos/gallery/[0-9A-Za-z_\\-/]+-\\d+");
             sb.append("|my/favorites/videos(?:/[a-f0-9]{24}-[\\w\\-]+)?");
-            sb.append("|users/[^/]+/videos");
-            sb.append("|users/[^/]+/shorts");
-            sb.append("|users/[^/]+/favorites/videos");
-            sb.append("|users/[^/]+/photos");
+            sb.append("|users/(?:profiles/)?[^/]+/videos");
+            sb.append("|users/(?:profiles/)?[^/]+/shorts");
+            sb.append("|users/(?:profiles/)?[^/]+/favorites/videos");
+            sb.append("|users/(?:profiles/)?[^/]+/photos");
             sb.append("|creators/[^/]+/photos");
             sb.append("|creators/[^/]+/shorts");
             sb.append("|channels/[^/]+");
@@ -114,10 +112,10 @@ public class XHamsterGallery extends PluginForDecrypt {
 
     private static final String TYPE_PHOTO_GALLERY                   = "(?i)https?://[^/]+/photos/gallery/[0-9A-Za-z_\\-/]+-(\\d+)";
     private static final String TYPE_FAVORITES_OF_CURRENT_USER       = "(?i)https?://[^/]+/my/favorites/videos(/[a-f0-9]{24}-([\\w\\-]+))?";
-    private static final String TYPE_VIDEOS_OF_USER                  = "(?i)https?://[^/]+/users/([^/]+)/videos";
-    private static final String TYPE_VIDEOS_FAVORITES_OF_USER        = "(?i)https?://[^/]+/users/([^/]+)/favorites/videos";
-    private static final String TYPE_PHOTO_GALLERIES_OF_USER_CREATOR = "(?i)https?://[^/]+/(creators|users)/([^/]+)/photos";
-    private static final String TYPE_SHORTS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(creators|users)/([^/]+)/shorts";
+    private static final String TYPE_VIDEOS_OF_USER                  = "(?i)https?://[^/]+/users/(?:profiles/)?([^/]+)/videos";
+    private static final String TYPE_VIDEOS_FAVORITES_OF_USER        = "(?i)https?://[^/]+/users/(?:profiles/)?([^/]+)/favorites/videos";
+    private static final String TYPE_PHOTO_GALLERIES_OF_USER_CREATOR = "(?i)https?://[^/]+/(creators|users)/(?:profiles/)?([^/]+)/photos";
+    private static final String TYPE_SHORTS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(creators|users)/(?:profiles/)?([^/]+)/shorts";
     private static final String TYPE_VIDEOS_OF_CHANNEL               = "(?i)https?://[^/]+/channels/([^/]+)";
     private static final String TYPE_VIDEOS_OF_USER_PORNSTAR         = "(?i)https?://[^/]+/(?:[^/]+/)?pornstars/([^/]+)";
     private static final String TYPE_VIDEOS_OF_USER_CREATOR          = "(?i)https?://[^/]+/(?:[^/]+/)?creators/([^/]+)";
@@ -319,34 +317,6 @@ public class XHamsterGallery extends PluginForDecrypt {
         }
         final Pattern ignoreVideo = Pattern.compile("(?i).*/videos/[a-f0-9]{24}-watch-later.*");
         do {
-            final String json = br.getRegex("window\\.initials=(\\{.*?\\});</script>").getMatch(0);
-            if (json != null && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                /* 2023-09-08: Experimenting with nicer data source */
-                int numberofDeletedItems = 0;
-                final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-                final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("userVideoCollection");
-                for (final Map<String, Object> vid : ressourcelist) {
-                    final String title = vid.get("title").toString();
-                    final String url = (String) vid.get("pageURL");
-                    final String icon = (String) vid.get("icon");
-                    if (url == null && StringUtils.equalsIgnoreCase(icon, "deleted")) {
-                        logger.info("Skipping deleted item: " + title);
-                        numberofDeletedItems++;
-                        continue;
-                    }
-                    final DownloadLink video = this.createDownloadlink(url);
-                    video.setName(title + ".mp4");
-                    video.setAvailable(true);
-                    video._setFilePackage(fp);
-                    // ret.add(video);
-                    // distribute(video);
-                }
-                // if (numberofDeletedItems == ressourcelist.size()) {
-                // /* This should be a super rare case */
-                // logger.info("All favorites of this user have been deleted");
-                // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                // }
-            }
             final String[] urlParts = br.getRegex("(/videos/[^<>\"']+)").getColumn(0);
             if (urlParts == null || urlParts.length == 0) {
                 logger.info("Stopping because: Failed to find any items on current page");

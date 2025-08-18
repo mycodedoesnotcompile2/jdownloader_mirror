@@ -72,7 +72,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51314 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -1053,73 +1053,73 @@ public class XHamsterCom extends PluginForHost {
                     }
                 }
             }
-            if (availableQualities.size() == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            if (selectedQualityHeight == -1) {
-                Set<Object> sources = null;
-                int bestHeigh = -1;
-                for (Entry<Integer, Set<Object>> qualitySources : availableQualities.entrySet()) {
-                    if (sources == null) {
-                        bestHeigh = qualitySources.getKey();
-                        sources = qualitySources.getValue();
-                    } else if (qualitySources.getKey() > bestHeigh) {
-                        bestHeigh = qualitySources.getKey();
-                        sources = qualitySources.getValue();
-                    }
+        } catch (final JSonMapperException e) {
+            logger.log(e);
+        }
+        if (availableQualities.size() == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (selectedQualityHeight == -1) {
+            Set<Object> sources = null;
+            int bestHeigh = -1;
+            for (Entry<Integer, Set<Object>> qualitySources : availableQualities.entrySet()) {
+                if (sources == null) {
+                    bestHeigh = qualitySources.getKey();
+                    sources = qualitySources.getValue();
+                } else if (qualitySources.getKey() > bestHeigh) {
+                    bestHeigh = qualitySources.getKey();
+                    sources = qualitySources.getValue();
                 }
+            }
+            for (final Object source : sources) {
+                if (source instanceof String) {
+                    logger.info("Returning best progressive quality: " + bestHeigh + "|" + source);
+                    return new Object[] { source, bestHeigh };
+                }
+            }
+            for (final Object source : sources) {
+                if (source instanceof HlsContainer) {
+                    logger.info("Returning best hls quality: " + bestHeigh + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
+                    return new Object[] { source, bestHeigh };
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else {
+            final Set<Object> sources = availableQualities.get(selectedQualityHeight);
+            if (sources != null) {
                 for (final Object source : sources) {
                     if (source instanceof String) {
-                        logger.info("Returning best progressive quality: " + bestHeigh + "|" + source);
-                        return new Object[] { source, bestHeigh };
+                        logger.info("Found preferred progressive quality: " + selectedQualityHeight + "|" + source);
+                        return new Object[] { source, selectedQualityHeight };
                     }
                 }
                 for (final Object source : sources) {
                     if (source instanceof HlsContainer) {
-                        logger.info("Returning best hls quality: " + bestHeigh + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
-                        return new Object[] { source, bestHeigh };
+                        logger.info("Found preferred hls quality: " + selectedQualityHeight + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
+                        return new Object[] { source, selectedQualityHeight };
                     }
-                }
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else {
-                final Set<Object> sources = availableQualities.get(selectedQualityHeight);
-                if (sources != null) {
-                    for (final Object source : sources) {
-                        if (source instanceof String) {
-                            logger.info("Found preferred progressive quality: " + selectedQualityHeight + "|" + source);
-                            return new Object[] { source, selectedQualityHeight };
-                        }
-                    }
-                    for (final Object source : sources) {
-                        if (source instanceof HlsContainer) {
-                            logger.info("Found preferred hls quality: " + selectedQualityHeight + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
-                            return new Object[] { source, selectedQualityHeight };
-                        }
-                    }
-                }
-                final int next_selected_format = (selected_format + 1) % FORMATS.length;
-                if (next_selected_format > 0) {
-                    logger.info("Could not find preferred quality:" + selectedQualityHeight + "! try next best");
-                } else {
-                    logger.info("Could not find preferred quality:" + selectedQualityHeight + "! try  best");
-                }
-                final Object[] ret = getDllink(br, next_selected_format, hlsMap, availableQualities);
-                if (ret != null) {
-                    return ret;
                 }
             }
-            // if (chosenQualityDownloadurl != null) {
-            // logger.info("Returning progressive quality " + chosenQualityHeight + "p");
-            // final Number filesize = videoHeightToFilesize.get(chosenQualityHeight);
-            // if (filesize != null) {
-            // logger.info("Setting filesize obtained from list of download filesizes -> " + filesize);
-            // this.getDownloadLink().setDownloadSize(filesize.longValue());
-            // }
-            // return chosenQualityDownloadurl;
-            // }
-        } catch (final JSonMapperException e) {
-            logger.log(e);
+            final int next_selected_format = (selected_format + 1) % FORMATS.length;
+            if (next_selected_format > 0) {
+                logger.info("Could not find preferred quality:" + selectedQualityHeight + "! try next best");
+            } else {
+                logger.info("Could not find preferred quality:" + selectedQualityHeight + "! try  best");
+            }
+            final Object[] ret = getDllink(br, next_selected_format, hlsMap, availableQualities);
+            if (ret != null) {
+                return ret;
+            }
         }
+        // if (chosenQualityDownloadurl != null) {
+        // logger.info("Returning progressive quality " + chosenQualityHeight + "p");
+        // final Number filesize = videoHeightToFilesize.get(chosenQualityHeight);
+        // if (filesize != null) {
+        // logger.info("Setting filesize obtained from list of download filesizes -> " + filesize);
+        // this.getDownloadLink().setDownloadSize(filesize.longValue());
+        // }
+        // return chosenQualityDownloadurl;
+        // }
         return null;
     }
 

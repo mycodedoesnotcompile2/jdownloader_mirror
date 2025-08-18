@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VimmNet;
 
-@DecrypterPlugin(revision = "$Revision: 50613 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimmNetCrawler extends PluginForDecrypt {
     public VimmNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,7 +87,7 @@ public class VimmNetCrawler extends PluginForDecrypt {
         if (downloadUnavailableText != null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, downloadUnavailableText);
         }
-        final String jsonarrayStr = br.getRegex("(?:var|const) allMedia\\s*=\\s*(\\[.*?\\]);").getMatch(0);
+        final String jsonarrayStr = br.getRegex("(?:var|const) (?:allMedia|media)\\s*=\\s*(\\[.*?\\]);").getMatch(0);
         if (jsonarrayStr == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

@@ -38,7 +38,6 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
@@ -87,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51224 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -1040,7 +1039,7 @@ public class PornHubCom extends PluginForHost {
     public static String getUserName(final Plugin plugin, final Browser br) {
         String ret = br.getRegex("\"author\"\\s*:\\s*(\"[^\"]+\")").getMatch(0);
         if (ret != null) {
-            ret = JSonStorage.restoreFromString(ret, TypeRef.STRING);
+            ret = plugin.restoreFromString(ret, TypeRef.STRING);
         } else {
             ret = br.getRegex("/(?:model|users)/[^\"]+\"\\s*class\\s*=\\s*\"bolded\"\\s*>\\s*([^<>]+)\\s*</a>").getMatch(0);
         }
@@ -1380,8 +1379,8 @@ public class PornHubCom extends PluginForHost {
 
     private boolean isLoggedinPremium(final Browser br) throws Exception {
         final String preferredLoginPremiumDomain = getConfiguredDomainLoginPremium(this.getHost());
-        getPage(br, (getProtocolPremium() + preferredLoginPremiumDomain + "/user/login_status?ajax=1"));
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Request req = getPage(br, (getProtocolPremium() + preferredLoginPremiumDomain + "/user/login_status?ajax=1"));
+        final Map<String, Object> entries = restoreFromString(req.getHtmlCode(), TypeRef.MAP);
         final String success = entries.get("success").toString();
         if (success.equals("1")) {
             return true;
