@@ -37,7 +37,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.BunkrConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 51277 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51340 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -780,7 +780,23 @@ public class Bunkr extends PluginForHost {
             /* https://bnkr.b-cdn.net/maintenance-vid.mp4 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Media temporarily not available due to ongoing server maintenance.", 2 * 60 * 60 * 1000l);
         } else if (parsedExpectedFilesize > 0 && con.getCompleteContentLength() > 0 && con.getCompleteContentLength() < (parsedExpectedFilesize * 0.5)) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is too small: File under maintenance?", 1 * 60 * 60 * 1000l);
+            /*
+             * Content-Type: image/jpeg
+             *
+             * Content-Length: 5534281
+             *
+             * Cf-Bgj: imgq:100,h2pri
+             *
+             * Cf-Polished: origSize=5817221
+             */
+
+            final String origSize = new Regex(con.getHeaderField("Cf-Polished"), "origSize=(\\d+)").getMatch(0);
+            if (origSize == null || Long.parseLong(origSize) == parsedExpectedFilesize) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is too small: File under maintenance?", 1 * 60 * 60 * 1000l);
+            } else if (Long.parseLong(origSize) != parsedExpectedFilesize) {
+                logger.info("apply cloudflare polish workaround:" + origSize + "!=" + parsedExpectedFilesize);
+                link.setVerifiedFileSize(-1);
+            }
         }
     }
 

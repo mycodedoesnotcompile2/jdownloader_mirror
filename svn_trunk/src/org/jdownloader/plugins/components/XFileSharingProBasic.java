@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51331 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51342 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4973,10 +4973,21 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* No 2FA login needed -> Login failed because user has entered invalid credentials. */
             throw e;
         }
-        String fieldKey = "code";
-        if (twoFAForm.hasInputFieldByName("new_ip_token")) {
-            /* E.g. send.cm */
-            fieldKey = "new_ip_token";
+        String fieldKey = null;
+        final List<InputField> fields = twoFAForm.getInputFields();
+        for (final InputField field : fields) {
+            if (field.getKey() != null && field.getKey().matches("^code\\d*$")) {
+                /* 2025-08-18: e.g. ddownload.com Google 2FA -> Field name "code6". */
+                fieldKey = field.getKey();
+                break;
+            } else if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
+                fieldKey = field.getKey();
+                break;
+            }
+        }
+        if (fieldKey == null) {
+            logger.warning("Failed to find 2FA fieldKey");
+            throw e;
         }
         logger.info("2FA code required");
         final String twoFACode = this.getTwoFACode(account, "\\d{6}");
@@ -4997,14 +5008,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected Form find2FALoginform(final Browser br) {
         final Form[] forms = br.getForms();
         for (final Form form : forms) {
+            if (form.containsHTML("g2fa_check")) {
+                /* e.g. ddownload.com */
+                return form;
+            }
             final List<InputField> fields = form.getInputFields();
             for (final InputField field : fields) {
                 if (field.getKey() != null && field.getKey().matches("^code\\d*$")) {
                     return form;
-                }
-            }
-            for (final InputField field : fields) {
-                if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
+                } else if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
                     return form;
                 }
             }

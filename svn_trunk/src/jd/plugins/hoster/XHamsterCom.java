@@ -72,7 +72,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51342 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -289,28 +289,27 @@ public class XHamsterCom extends PluginForHost {
     private static String getFID(final String url) {
         if (url == null) {
             return null;
+        }
+        if (url.matches(TYPE_EMBED)) {
+            return new Regex(url, TYPE_EMBED).getMatch(0);
+        } else if (url.matches(TYPE_MOBILE)) {
+            return new Regex(url, "https?://[^/]+/[^/]+/[^/]*?([a-z0-9]+)(/|$|\\?)").getMatch(0);
+        } else if (url.matches(TYPE_MOVIES)) {
+            return new Regex(url, TYPE_MOVIES).getMatch(0);
+        } else if (url.matches(TYPE_MOMENTS)) {
+            return new Regex(url, TYPE_MOMENTS).getMatch(1);
+        } else if (url.matches(TYPE_VIDEOS_3)) {
+            // first we check title-FID
+            return new Regex(url, TYPE_VIDEOS_3).getMatch(1);
+        } else if (url.matches(TYPE_VIDEOS_2)) {
+            // then we check next title-NUMBER FID
+            return new Regex(url, TYPE_VIDEOS_2).getMatch(1);
+        } else if (url.matches(TYPE_VIDEOS)) {
+            // then we check last FID
+            return new Regex(url, TYPE_VIDEOS).getMatch(0);
         } else {
-            if (url.matches(TYPE_EMBED)) {
-                return new Regex(url, TYPE_EMBED).getMatch(0);
-            } else if (url.matches(TYPE_MOBILE)) {
-                return new Regex(url, "https?://[^/]+/[^/]+/[^/]*?([a-z0-9]+)(/|$|\\?)").getMatch(0);
-            } else if (url.matches(TYPE_MOVIES)) {
-                return new Regex(url, TYPE_MOVIES).getMatch(0);
-            } else if (url.matches(TYPE_MOMENTS)) {
-                return new Regex(url, TYPE_MOMENTS).getMatch(1);
-            } else if (url.matches(TYPE_VIDEOS_3)) {
-                // first we check title-FID
-                return new Regex(url, TYPE_VIDEOS_3).getMatch(1);
-            } else if (url.matches(TYPE_VIDEOS_2)) {
-                // then we check next title-NUMBER FID
-                return new Regex(url, TYPE_VIDEOS_2).getMatch(1);
-            } else if (url.matches(TYPE_VIDEOS)) {
-                // then we check last FID
-                return new Regex(url, TYPE_VIDEOS).getMatch(0);
-            } else {
-                /* This should never happen */
-                return null;
-            }
+            /* This should never happen */
+            return null;
         }
     }
 
@@ -418,18 +417,25 @@ public class XHamsterCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(getFallbackFileTitle(contentURL) + extDefault);
         }
+        final String fidBefore = getFID(link);
         if (account != null) {
             login(account, contentURL, true);
         } else {
             br.getPage(contentURL);
         }
+        final String fidAfter = getFID(br.getURL());
+        if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
+            // video link redirects to another video, eg shorter video, maybe uploaded longer version
+            logger.info("VideoID has changed: Old: " + fidBefore + " | New: " + fidAfter);
+            link.setProperty(PROPERTY_VIDEOID, fidAfter);
+        }
         if (StringUtils.containsIgnoreCase(br.getURL(), "/site/error")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Check for self-embed */
-        String selfEmbeddedURL = br.getRegex("(?i)<iframe[^>]*src\\s*=\\s*\"(https?://xh\\.video/(?:[A-Za-z])/" + getFID(link) + ")\"[^>]*></iframe>").getMatch(0);
+        String selfEmbeddedURL = br.getRegex("<iframe[^>]*src\\s*=\\s*\"(https?://xh\\.video/(?:[A-Za-z])/" + getFID(link) + ")\"[^>]*></iframe>").getMatch(0);
         if (selfEmbeddedURL == null) {
-            selfEmbeddedURL = br.getRegex("(?i)<iframe[^>]*src\\s*=\\s*\"(https?://xh\\.video/(?:[A-Za-z])/[^\"]+)\"[^>]*></iframe>").getMatch(0);
+            selfEmbeddedURL = br.getRegex("<iframe[^>]*src\\s*=\\s*\"(https?://xh\\.video/(?:[A-Za-z])/[^\"]+)\"[^>]*></iframe>").getMatch(0);
         }
         if (selfEmbeddedURL != null) {
             /* 2022-09-12: Some special domains like xhamster.one / xhamster.tv show a different page and self-embeds */
@@ -503,7 +509,7 @@ public class XHamsterCom extends PluginForHost {
             // embeded correction --> Usually not needed
             if (contentURL.matches("(?i).+/xembed\\.php.*")) {
                 logger.info("Trying to change embed URL --> Real URL");
-                String realpage = br.getRegex("(?i)main_url=(https?[^\\&]+)").getMatch(0);
+                String realpage = br.getRegex("main_url=(https?[^\\&]+)").getMatch(0);
                 if (realpage != null && !StringUtils.equals(realpage, contentURL)) {
                     logger.info("Successfully changed: " + contentURL + " ----> " + realpage);
                     link.setUrlDownload(Encoding.htmlDecode(realpage));

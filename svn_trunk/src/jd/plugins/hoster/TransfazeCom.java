@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51339 $", interfaceVersion = 3, names = {}, urls = {})
 public class TransfazeCom extends XFileSharingProBasic {
     public TransfazeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +103,11 @@ public class TransfazeCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filesize_html() {
+        /* 2025-08-18 */
+        return false;
     }
 }

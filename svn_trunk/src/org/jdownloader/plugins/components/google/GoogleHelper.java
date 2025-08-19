@@ -279,7 +279,7 @@ public class GoogleHelper {
             try {
                 getSAPISidHash(br, br.getURL());
             } catch (final PluginException e) {
-                /* If this happens, we cannot perform auted requests with this account so effectively the login process is not complete. */
+                /* If this happens, we cannot perform authed requests with this account so effectively the login process is not complete. */
                 throw new AccountInvalidException("Login incomplete ('SAPISID' cookie missing?), try again with fresh cookies");
             }
             validate(account);

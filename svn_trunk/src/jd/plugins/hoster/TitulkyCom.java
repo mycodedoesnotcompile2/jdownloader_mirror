@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -32,17 +34,22 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 47487 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51339 $", interfaceVersion = 3, names = {}, urls = {})
 public class TitulkyCom extends PluginForHost {
     public TitulkyCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "https://www.titulky.com/";
+        return "https://www." + getHost();
     }
 
     private static List<String[]> getPluginDomains() {
@@ -70,9 +77,8 @@ public class TitulkyCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = false;
+    private static final int     FREE_MAXCHUNKS = 1;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -93,14 +99,14 @@ public class TitulkyCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        final String ext = ".srt";
         if (link.hasProperty(CRAWLER_PRESET_TITLE)) {
-            link.setName(link.getStringProperty(CRAWLER_PRESET_TITLE) + ".srt");
+            link.setName(link.getStringProperty(CRAWLER_PRESET_TITLE) + ext);
         } else if (!link.isNameSet()) {
             /* Fallback */
-            link.setName(this.getFID(link) + ".srt");
+            link.setName(this.getFID(link) + ext);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -119,8 +125,11 @@ public class TitulkyCom extends PluginForHost {
             requestFileInformation(link);
             /* Captcha handling */
             final Form dlform = br.getFormbyProperty("name", "downform");
+            if (dlform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             final String captchaurl = getCaptchaURL(br);
-            if (dlform == null || captchaurl == null) {
+            if (captchaurl == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final String code = this.getCaptchaCode(captchaurl, link);
@@ -129,7 +138,7 @@ public class TitulkyCom extends PluginForHost {
             /* Check for wrong captcha */
             if (getCaptchaURL(br) != null) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-            } else if (br.containsHTML("(?i)Tyto titulky jsou úplně nové")) {
+            } else if (br.containsHTML("Tyto titulky jsou úplně nové")) {
                 /* Check for premiumonly */
                 /* 2021-11-16: New items uploaded within the last 5 days can be downloaded by premium users only. */
                 throw new AccountRequiredException();
@@ -144,9 +153,9 @@ public class TitulkyCom extends PluginForHost {
                 logger.warning("Failed to find final downloadurl");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final String waitSecondsStr = br.getRegex("onload=\"CountDown\\((\\d+)\\)\"").getMatch(0);
+            final String waitSecondsStr = br.getRegex("CountDown\\((\\d{1,2})\\)").getMatch(0);
             if (waitSecondsStr != null) {
-                this.sleep(Long.parseLong(waitSecondsStr) * 1001l, link);
+                this.sleep(Long.parseLong(waitSecondsStr) * 1000l, link);
             } else {
                 logger.warning("Failed to find pre-download-waittime");
             }
@@ -162,10 +171,14 @@ public class TitulkyCom extends PluginForHost {
                      * 2021-11-16: Random errors like e.g. <h2>Odkaz ještě není funkční</h2>Pokračujte tudy na <a
                      * href="https://www.titulky.com">titulky</a>
                      */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown download error");
+                    if (waitSecondsStr == null) {
+                        throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown download error: Failed to find pre download countdown time, contact JD support!");
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown download error");
+                    }
                 }
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
     }
@@ -210,7 +223,7 @@ public class TitulkyCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -281,7 +281,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
     }
 
-    public static class SearchAndReplaceOp implements Operator {
+    public static class GetOp implements Operator {
         /**
          * See "Query Filter mode" vs. "Strict Compare mode"
          */
@@ -293,10 +293,41 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         @Override
         public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             try {
+                return container.resolveValue(container, expression, scope, true);
+            } catch (final ConditionException e) {
+                throw new AggregationException(e);
+            }
+        }
+    }
+
+    public static class SearchAndReplaceOp implements Operator {
+        /**
+         *
+         */
+
+        /**
+         * See "Query Filter mode" vs. "Strict Compare mode"
+         */
+        @Override
+        public boolean isFilterRoot() {
+            return false;
+        }
+
+        @Override
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
+            try {
+                boolean allowReferences = false;
+                Object options = container.getOptions(Object.class);
+
+                if (options instanceof Map) {
+                    allowReferences = Boolean.TRUE.equals(((Map) options).get(OPTIONS_ALLOW_REFERENCES));
+                }
+
                 final ListAccessorInterface access = container.getListWrapper(expression);
                 final CharSequence str = toCharSequence(container.resolveValue(container, access.get(0), scope, true));
                 final Pattern searchPattern = Pattern.compile(String.valueOf(container.resolveValue(container, access.get(1), scope, true)));
-                final String replacement = String.valueOf(container.resolveValue(container, access.get(2), scope, true));
+                String replacement = String.valueOf(container.resolveValue(container, access.get(2), scope, true));
+                replacement = (allowReferences ? replacement : Matcher.quoteReplacement(replacement));
                 final Matcher matcher = searchPattern.matcher(str);
                 if (access.size() > 3) {
                     boolean match = false;
@@ -309,6 +340,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         final int start = matcher.start(groupIndex) - matcher.start();
                         final int end = matcher.end(groupIndex) - matcher.start();
                         // only replace the group's content inside the match
+                        // by default references are disabled. else we would get issues e.g. if we replace XXX by a directory path (which
+                        // contains \ or $ .. add §options:{allowReferences:true} to allow references
                         final String updatedMatch = Matcher.quoteReplacement(fullMatch.substring(0, start)) + replacement + Matcher.quoteReplacement(fullMatch.substring(end));
                         matcher.appendReplacement(sb, updatedMatch);
                     }
@@ -741,6 +774,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     return (compareResult > 0);
                 }
             };
+
             protected abstract boolean opEval(int compareResult);
         }
 
@@ -1228,6 +1262,38 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
     }
 
+    public static class IfOp implements Operator {
+        /**
+         * See "Query Filter mode" vs. "Strict Compare mode"
+         */
+        @Override
+        public boolean isFilterRoot() {
+            return true;
+        }
+
+        @Override
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
+            try {
+                ListAccessorInterface list = container.getListWrapper(expression);
+                if (list != null) {
+                    final Object ifCondition = container.resolveValue(container, list.get(0), scope, true);
+                    if (ifCondition == KEY_DOES_NOT_EXIST) {
+                        return false;
+                    }
+                    if (container.isTrue(ifCondition)) {
+                        return container.resolveValue(container, list.get(1), scope, true);
+                    } else {
+                        return container.resolveValue(container, list.get(2), scope, true);
+                    }
+
+                }
+            } catch (final ConditionException e) {
+                throw new AggregationException(e);
+            }
+            throw new AggregationException();
+        }
+    }
+
     /**
      * @author Thomas
      * @date 07.05.2019
@@ -1514,24 +1580,26 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * CURRENT is modifiable. However, since $<field> is equivalent to $$CURRENT.<field>, rebinding CURRENT changes the meaning of $
      * accesses.
      */
-    public static final String                              $$CURRENT           = "§§CURRENT";
+    public static final String                              $$CURRENT                = "§§CURRENT";
     @StorableDoc("Path Modifier: References the root document, i.e. the top-level document.")
-    public static final String                              $$ROOT              = "§§ROOT";
+    public static final String                              $$ROOT                   = "§§ROOT";
     @ApiDoc("Path Modifier:  §§THIS references the current scope object or field. Note: All field identifiers that start with §§ are absolute identifiers and MUST be places as first key element")
     @ApiDocExample("{'c':{'§gt':[{'§sum':['§§this',1]},0}}  '§§this' references to the field c, adds 1 and checks if the result is greater than 0")
-    public static final String                              $$THIS              = "§§THIS";
-    public static final String                              $AND                = "§and";
+    public static final String                              $$THIS                   = "§§THIS";
+    public static final String                              $AND                     = "§and";
     /**
      *
      */
-    public static final String                              $ANY                = "§any";
+    public static final String                              $ANY                     = "§any";
     @ApiDoc("Aggregation OP: concat all values to a single string")
-    public static final String                              $CONCAT             = "§concat";
-    public static final String                              $TO_UPPER_CASE      = "§toUpperCase";
-    public static final String                              $TO_LOWER_CASE      = "§toLowerCase";
-    public static final String                              $SEARCH_AND_REPLACE = "§searchAndReplace";
-    public static final String                              $DIVIDE             = "§divide";
-    public static final String                              $EACH               = "§each";
+    public static final String                              $CONCAT                  = "§concat";
+    public static final String                              $TO_UPPER_CASE           = "§toUpperCase";
+    public static final String                              $GET                     = "§get";
+    public static final String                              $TO_LOWER_CASE           = "§toLowerCase";
+    public static final String                              $SEARCH_AND_REPLACE      = "§searchAndReplace";
+    public static final String                              $DIVIDE                  = "§divide";
+    public static final String                              $EACH                    = "§each";
+    public static final String                              $IF                      = "§if";
     /**
      * Specifies equality condition. The $eq operator matches documents where the value of a field equals the specified value. WARNING:
      * There is a difference to MongoDb $EQ: If the specified <value> is a document, the order of the fields in the document DOES NOT
@@ -1540,20 +1608,20 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * the <field> contains an element that matches the array exactly. The order of the elements matters. For an example, see Equals an
      * Array Value.
      */
-    public static final String                              $EQ                 = "§eq";
+    public static final String                              $EQ                      = "§eq";
     /**
      *
      */
-    public static final String                              $EXISTS             = "§exists";
-    public static final String                              $IS_REGEX           = "§isRegex";
+    public static final String                              $EXISTS                  = "§exists";
+    public static final String                              $IS_REGEX                = "§isRegex";
     /**
      * $gt selects those documents where the value of the field is greater than (i.e. >) the specified value.
      */
-    public static final String                              $GT                 = "§gt";
+    public static final String                              $GT                      = "§gt";
     /**
      * $gte selects the documents where the value of the field is greater than or equal to (i.e. >=) a specified value (e.g. value.)
      */
-    public static final String                              $GTE                = "§gte";
+    public static final String                              $GTE                     = "§gte";
     /**
      * The $in operator selects the documents where the value of a field equals any value in the specified array. To specify an $in
      * expression, use the following prototype:
@@ -1563,89 +1631,92 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      *
      *
      */
-    public static final String                              $IN                 = "§in";
+    public static final String                              $IN                      = "§in";
     /**
      *
      */
     @ApiDoc("Path modifier. a.§keys returns all keys of the map a or all indizes of the list a")
     @ApiDocExample("a.§keys")
-    public static final String                              $KEYS               = "§keys";
+    public static final String                              $KEYS                    = "§keys";
     /**
      *
      */
-    public static final String                              $LT                 = "§lt";
+    public static final String                              $LT                      = "§lt";
     /**
      *
      */
-    public static final String                              $LTE                = "§lte";
-    public static final String                              $MAX                = "§max";
-    public static final String                              $MIN                = "§min";
-    public static final String                              $MULTIPLY           = "§multiply";
+    public static final String                              $LTE                     = "§lte";
+    public static final String                              $MAX                     = "§max";
+    public static final String                              $MIN                     = "§min";
+    public static final String                              $MULTIPLY                = "§multiply";
     /**
      * $ne selects the documents where the value of the field is not equal to the specified value. This includes documents that do not
      * contain the field.
      */
-    public static final String                              $NE                 = "§ne";
+    public static final String                              $NE                      = "§ne";
     /**
      *
      */
-    public static final String                              $NIN                = "§nin";
+    public static final String                              $NIN                     = "§nin";
     /**
      *
      */
-    public static final String                              $NOT                = "§not";
+    public static final String                              $NOT                     = "§not";
     /**
      * Returns the current datetime value, which is same across all members of the deployment and remains constant throughout the
      * aggregation pipeline.
      */
-    public static final String                              $NOW                = "§NOW";
+    public static final String                              $NOW                     = "§NOW";
     /**
      * Regex options https://docs.mongodb.com/manual/reference/operator/expression/regex/#op._S_options
      */
-    public static final String                              $OPTIONS            = "§options";
+    public static final String                              $OPTIONS                 = "§options";
     /**
      *
      */
-    public static final String                              $OR                 = "§or";
+    public static final String                              $OR                      = "§or";
     /**
      *
      */
     @ApiDoc("Path traversal identifier. Used to access parent fields in the matcher object - relative to the current scope. Usage is like ../../ in directory pathes")
-    public static final String                              $PARENT             = "§PARENT";
-    public static final String                              $REGEX              = "§regex";
+    public static final String                              $PARENT                  = "§PARENT";
+    public static final String                              $REGEX                   = "§regex";
     @ApiDoc("Aggregation OP: find a match in a string via regex\r\nParam 1:string\r\nParam 2:regex\r\nParam 3: matching group index(optional)")
-    public static final String                              $REGEX_FIND_ONE     = "§regexFindOne";
+    public static final String                              $REGEX_FIND_ONE          = "§regexFindOne";
     @ApiDoc("Virtual field identifier. a.§size references length of an array, string, map or other objects")
     @ApiDocExample("a.§size")
-    public static final String                              $SIZE               = "§size";
-    public static final String                              $SUBTRACT           = "§subtract";
-    public static final String                              $SUM                = "§sum";
+    public static final String                              $SIZE                    = "§size";
+    public static final String                              $SUBTRACT                = "§subtract";
+    public static final String                              $SUM                     = "§sum";
     /**
      *
      */
     @ApiDoc("Virtual field identifier. a.§type references the ClassName of 'a'")
     @ApiDocExample("a.§type")
-    public static final String                              $TYPE               = "§type";
-    private static final Class[]                            EMPTY               = new Class[] {};
-    protected static final EqOp                             EQOP                = new EqOp();
-    private static HashSet<String>                          IGNORE              = new HashSet<String>();
-    public static final Object                              KEY_DOES_NOT_EXIST  = new Object() {
-                                                                                    @Override
-                                                                                    public String toString() {
-                                                                                        return "KEY_DOES_NOT_EXIST";
-                                                                                    }
-                                                                                };
-    private final static ThreadLocal<Long>                  now                 = new ThreadLocal<Long>();
-    private final static ThreadLocal<Condition>             ROOT_CONDITION      = new ThreadLocal<Condition>();
-    public static final ThreadLocal<Map<String, OpHandler>> OPERATIONS          = new ThreadLocal<Map<String, OpHandler>>();
-    private static final HashMap<String, Operator>          OPS                 = new HashMap<String, Operator>();
+    public static final String                              $TYPE                    = "§type";
+    private static final Class[]                            EMPTY                    = new Class[] {};
+    protected static final EqOp                             EQOP                     = new EqOp();
+    private static HashSet<String>                          IGNORE                   = new HashSet<String>();
+    public static final Object                              KEY_DOES_NOT_EXIST       = new Object() {
+                                                                                         @Override
+                                                                                         public String toString() {
+                                                                                             return "KEY_DOES_NOT_EXIST";
+                                                                                         }
+                                                                                     };
+    private final static ThreadLocal<Long>                  now                      = new ThreadLocal<Long>();
+    private final static ThreadLocal<Condition>             ROOT_CONDITION           = new ThreadLocal<Condition>();
+    public static final ThreadLocal<Map<String, OpHandler>> OPERATIONS               = new ThreadLocal<Map<String, OpHandler>>();
+    private static final HashMap<String, Operator>          OPS                      = new HashMap<String, Operator>();
     /**
      * used as $options to force a Condition get handled as Aggregate COndition
      */
     @ApiDoc("Set this option to true to force all operators in the same layer to work in aggregation mode.")
     @ApiDocExample("{§eq:['§a',1],§options:{'aggregate':true}}")
-    public static final String                              OPTIONS_AGGREGATE   = "aggregate";
-    protected List<TypeHandler>                             typeHandlers        = new ArrayList<TypeHandler>();
+    public static final String                              OPTIONS_AGGREGATE        = "aggregate";
+
+    public static final String                              OPTIONS_ALLOW_REFERENCES = "allowReferences";
+
+    protected List<TypeHandler>                             typeHandlers             = new ArrayList<TypeHandler>();
 
     protected List<TypeHandler> getTypeHandler() {
         return typeHandlers;
@@ -1763,19 +1834,19 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return false;
     }
 
-    public static final ThreadLocal<List<TypeHandler>>         TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
-    public static final List<TypeHandler>                      GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
+    public static final ThreadLocal<List<TypeHandler>> TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
+    public static final List<TypeHandler>              GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
     static {
         GLOBAL_TYPE_HANDLERS.add(new TimeSpanHandler());
         GLOBAL_TYPE_HANDLERS.add(new DateHandler());
     }
-    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS        = new ThreadLocal<Map<String, PathHandler>>();
+    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS    = new ThreadLocal<Map<String, PathHandler>>();
     /**
      *
      */
-    private static final long                                  serialVersionUID     = 1L;
-    public static final org.appwork.storage.TypeRef<Condition> TYPE                 = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
-                                                                                    };
+    private static final long                                  serialVersionUID = 1L;
+    public static final org.appwork.storage.TypeRef<Condition> TYPE             = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
+                                                                                };
     static {
         IGNORE.add($OPTIONS);
     }
@@ -1808,8 +1879,10 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         OPS.put($CONCAT, new ConcatOp());
         OPS.put($TO_UPPER_CASE, new ToUpperCaseOp());
         OPS.put($TO_LOWER_CASE, new ToLowerCaseOp());
+        OPS.put($GET, new GetOp());
         OPS.put($SEARCH_AND_REPLACE, new SearchAndReplaceOp());
         OPS.put($REGEX_FIND_ONE, new RegexFindOp());
+        OPS.put($IF, new IfOp());
     }
 
     public static OpHandler putThreadOPHandler(final String key, final OpHandler handler) {
@@ -2943,8 +3016,19 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     public static final ThreadLocal<LogInterface> THREAD_LOGGER = new ThreadLocal<LogInterface>();
 
     public boolean _isDebug() {
+
         if (this.debug) {
             return true;
+        }
+        Object options = get($OPTIONS);
+        if (options != null) {
+            if (options instanceof Map) {
+
+                if (Boolean.TRUE.equals(((Map) options).get("debug"))) {
+                    return true;
+                }
+            }
+
         }
         final Condition root = ROOT_CONDITION.get();
         if (root != null && root != this && root._isDebug()) {
@@ -3217,5 +3301,20 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             return null;
         }
         return (TYPE) options;
+    }
+
+    /**
+     * @param optionsAllowReferences
+     * @param b
+     * @return
+     */
+    public Condition<MatcherType> option(String key, Object value) {
+        Object map = get($OPTIONS);
+        if (map == null) {
+            map = new Condition();
+            put($OPTIONS, map);
+        }
+        ((Map) map).put(key, value);
+        return this;
     }
 }

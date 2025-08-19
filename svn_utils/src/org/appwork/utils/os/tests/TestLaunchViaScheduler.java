@@ -8,11 +8,13 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.processes.ProcessHandlerFactory;
 import org.appwork.processes.ProcessInfo;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Timeout;
 import org.appwork.utils.UniqueAlltimeID;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 
+@TestDependency({ "org.appwork.utils.Timeout" })
 public class TestLaunchViaScheduler extends AWTest {
     public static void main(String[] args) {
         run();

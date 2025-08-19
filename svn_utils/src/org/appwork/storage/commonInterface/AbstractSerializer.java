@@ -108,7 +108,7 @@ public abstract class AbstractSerializer implements SerializerInterface {
     @Override
     public <T> T fromByteArray(byte[] byteArray, TypeRef<T> type, Object... context) throws SerializerException {
         try {
-            return fromStream(new ByteArrayInputStream(byteArray), type);
+            return fromStream(new ByteArrayInputStream(byteArray), type, context);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }

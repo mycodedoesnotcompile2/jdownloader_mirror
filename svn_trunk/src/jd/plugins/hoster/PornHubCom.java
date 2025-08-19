@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51338 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51339 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -1262,6 +1262,10 @@ public class PornHubCom extends PluginForHost {
             br.submitForm(loginform2);
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         }
+        // if (Boolean.FALSE.equals(entries.get("remember_me"))) {
+        // /* 2025-08-18: Same in browser hm */
+        // logger.warning("'remember_me' field in json is false but we want it to be true");
+        // }
         final String message = (String) entries.get("message");
         /*
          * 2022-06-27: remember_me is always "false" even though we check the "remember_me" checkbox/field. It's the same in browser though!
