@@ -47,8 +47,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50532 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51344 $", interfaceVersion = 3, names = {}, urls = {})
 public class Tube8Com extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -150,12 +151,15 @@ public class Tube8Com extends PluginForHost {
         if (br.containsHTML("class=\"video-removed-div\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (this.br.getHttpConnection().getResponseCode() == 500) {
-            return AvailableStatus.UNCHECKABLE;
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500");
         } else if (br.containsHTML("class=\"geo-blocked-container\"")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "GEO-blocked");
         }
         String title = br.getRegex("\"video_title\":\"([^\"]+)").getMatch(0);
-        if (title == null) {
+        if (title != null) {
+            /* Unescape title obtained from json source */
+            title = PluginJSonUtils.unescape(title);
+        } else {
             title = br.getRegex("<span class=\"item\">(.*?)</span>").getMatch(0);
             if (title == null) {
                 title = br.getRegex("<title>([^<]+)<").getMatch(0);

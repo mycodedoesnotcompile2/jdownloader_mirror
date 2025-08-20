@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51343 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamrecorderIo extends PluginForHost {
     public StreamrecorderIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -256,12 +256,15 @@ public class StreamrecorderIo extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
-        final String expire = br.getRegex("Premium until (\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        String expire = br.getRegex("Premium until (\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        if (expire == null) {
+            expire = br.getRegex("Premium account active until (\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        }
         if (expire == null) {
             throw new AccountInvalidException("Free accounts are not supported");
         }
+        final AccountInfo ai = new AccountInfo();
         ai.setValidUntil(TimeFormatter.getMilliSeconds(expire, "yyyy-MM-dd", Locale.ENGLISH));
         ai.setUnlimitedTraffic();
         account.setType(AccountType.PREMIUM);

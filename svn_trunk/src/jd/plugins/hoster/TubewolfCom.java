@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51344 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubewolfCom extends KernelVideoSharingComV2 {
     public TubewolfCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class TubewolfCom extends KernelVideoSharingComV2 {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final String TYPE_CUSTOM = "(?i)https?://(?:www\\.)?[^/]+/movies/([a-z0-9\\-]+)/?";
+    private static final String TYPE_CUSTOM = "(?i)https?://(?:(?:www|m)\\.)?[^/]+/movies/([a-z0-9\\-]+)/?";
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
@@ -54,7 +54,7 @@ public class TubewolfCom extends KernelVideoSharingComV2 {
              * 2020-10-27: They got embed URLs but they do not work and it is impossible to get the original URL if you only have the embed
              * URL!
              */
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:movies/([a-z0-9\\-]+)/?|embed/\\d+/?)");
+            ret.add("https?://(?:(?:www|m)\\.)?" + buildHostsPatternPart(domains) + "/(?:movies/([a-z0-9\\-]+)/?|embed/\\d+/?)");
         }
         return ret.toArray(new String[0]);
     }

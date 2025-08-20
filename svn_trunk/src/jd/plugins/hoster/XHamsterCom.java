@@ -72,7 +72,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51342 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51343 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -676,7 +676,7 @@ public class XHamsterCom extends PluginForHost {
         String friendsname = br.getRegex(">([^<>\"]*?)</a>\\'s friends only\\s*</div>").getMatch(0);
         if (StringUtils.isEmpty(friendsname)) {
             /* 2019-06-05 */
-            friendsname = br.getRegex("This video is visible to\\s*<br>\\s*friends of\\s*<a href=\"[^\"]+\">([^<>\"]+)</a> only").getMatch(0);
+            friendsname = br.getRegex("This video is visible to\\s*<br>\\s*friends of\\s*<a[^>]*>([^<]+)</a> only").getMatch(0);
         }
         if (friendsname != null) {
             return Encoding.htmlDecode(friendsname).trim();
@@ -686,7 +686,8 @@ public class XHamsterCom extends PluginForHost {
     }
 
     private boolean isVideoOnlyForFriends(final Browser br) {
-        if (br.getHttpConnection().getResponseCode() == 423 && br.containsHTML(">\\s*This (gallery|video) is visible (for|to)\\s*<")) {
+        final int rcode = br.getHttpConnection().getResponseCode();
+        if ((rcode == 403 || rcode == 423) && br.containsHTML(">\\s*This (gallery|video) is visible (for|to)\\s*<")) {
             return true;
         } else {
             return false;
@@ -1030,28 +1031,33 @@ public class XHamsterCom extends PluginForHost {
                         }
                     } else {
                         /* Progressive */
-                        final int qualityHeight = Integer.parseInt(qualityStr.replaceFirst("(?i)p", ""));
+                        final String qualityStrNumber = qualityStr.replaceFirst("(?i)p", "");
+                        if (!qualityStrNumber.matches("\\d+")) {
+                            /* Skip invalid items -> Most likely "auto" */
+                            continue;
+                        }
+                        final int qualityHeight = Integer.parseInt(qualityStrNumber);
                         Set<Object> sourcesQuality = availableQualities.get(qualityHeight);
                         if (sourcesQuality == null) {
                             sourcesQuality = new LinkedHashSet<Object>();
                             availableQualities.put(qualityHeight, sourcesQuality);
                         }
-                        String fallback = (String) source.get("fallback");
                         /* We found the quality we were looking for. */
-                        url = br.getURL(url).toExternalForm();
-                        fallback = !StringUtils.isEmpty(fallback) ? br.getURL(fallback).toExternalForm() : null;
+                        if (url.startsWith("/")) {
+                            url = br.getURL(url).toExternalForm();
+                        } else if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
+                            /* 2025-08-19 */
+                            url = Encoding.Base64Decode(url);
+                            url = url.replaceFirst("^encrypted_", "");
+                        }
                         if (qualityHeight != selectedQualityHeight) {
                             // unverified
                             sourcesQuality.add(url);
-                            sourcesQuality.add(fallback);
                             continue;
                         }
                         if (verifyURL(url)) {
                             logger.info("Found preferred progressive quality(xplayerSettings,url):" + qualityStr + "->" + url);
                             return new Object[] { url, selectedQualityHeight };
-                        } else if (fallback != null && verifyURL(fallback)) {
-                            logger.info("Found preferred progressive quality(xplayerSettings,fallback):" + qualityStr + "->" + fallback);
-                            return new Object[] { fallback, selectedQualityHeight };
                         } else {
                             logger.info("Sources(failed):" + qualityStr);
                             continue;
@@ -1062,8 +1068,8 @@ public class XHamsterCom extends PluginForHost {
         } catch (final JSonMapperException e) {
             logger.log(e);
         }
-        if (availableQualities.size() == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (availableQualities.isEmpty()) {
+            return null;
         }
         if (selectedQualityHeight == -1) {
             Set<Object> sources = null;
@@ -1230,9 +1236,9 @@ public class XHamsterCom extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             final String onlyforFriendsWithThisName = isVideoOnlyForFriendsOf(br);
             if (onlyforFriendsWithThisName != null) {
-                throw new AccountRequiredException("You need to be friends with " + onlyforFriendsWithThisName + " to access this contents");
+                throw new AccountRequiredException("You need to be friends with " + onlyforFriendsWithThisName + " to access this content.");
             } else if (this.isVideoOnlyForFriends(br)) {
-                throw new AccountRequiredException("You need to be friends with the uploader to access this content");
+                throw new AccountRequiredException("You need to be friends with the uploader to access this content.");
             } else if (isPaidContent(br)) {
                 throw new AccountRequiredException("Paid content");
             } else if (isPremiumURL) {

@@ -20,6 +20,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.EromeComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -34,14 +38,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.jdownloader.plugins.components.config.EromeComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 50705 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51344 $", interfaceVersion = 3, names = {}, urls = {})
 public class EromeComCrawler extends PluginForDecrypt {
     public EromeComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    private static final String PROPERTY_TAGS_COMMA_SEPARATED = "tags_comma_separated";
 
     @Override
     public void init() {
@@ -160,6 +163,11 @@ public class EromeComCrawler extends PluginForDecrypt {
             if (bottomAlbumDescription != null) {
                 fp.setComment(Encoding.htmlDecode(bottomAlbumDescription).trim());
             }
+            String hashtagsCommaSeparated = null;
+            final String[] hashtags = br.getRegex("/search\\?q=[^\"]+\"[^>]*>([^<]+)</a>").getColumn(0);
+            if (hashtags != null && hashtags.length > 0) {
+                hashtagsCommaSeparated = getCommaSeparatedString(hashtags);
+            }
             for (final DownloadLink result : ret) {
                 /*
                  * Crucial for linkchecking without Referer header their servers will return "405 Not Allowed" at least for video
@@ -170,6 +178,9 @@ public class EromeComCrawler extends PluginForDecrypt {
                 /* Disable chunkload to prevent issues as we don't have fine tuning for connections per file and simultaneous downloads. */
                 result.setProperty(DirectHTTP.NOCHUNKS, true);
                 result.setProperty(DirectHTTP.PROPERTY_MAX_CONCURRENT, cfg.getMaxSimultaneousDownloads());
+                if (hashtagsCommaSeparated != null) {
+                    result.setProperty(PROPERTY_TAGS_COMMA_SEPARATED, hashtagsCommaSeparated);
+                }
                 result.setAvailable(true);
                 result._setFilePackage(fp);
             }
@@ -229,6 +240,26 @@ public class EromeComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
+    }
+
+    private static String getCommaSeparatedString(final String[] strings) {
+        if (strings == null || strings.length == 0) {
+            return null;
+        }
+        String result = "";
+        for (int index = 0; index < strings.length; index++) {
+            String str = strings[index];
+            str = Encoding.htmlDecode(str).trim();
+            if (StringUtils.isEmpty(str)) {
+                continue;
+            }
+            if (result.length() > 0) {
+                result += "," + str;
+            } else {
+                result += str;
+            }
+        }
+        return result;
     }
 
     @Override

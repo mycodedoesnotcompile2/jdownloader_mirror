@@ -522,7 +522,15 @@ public class FlexiJSonMapper {
                 }
                 if (is != null) {
                     // Convert backendNodes that have no getter
-                    for (final KeyValueElement el : is.backendNode.getElements()) {
+                    FlexiJSonObject backendNode = is.getBackendNode();
+                    // clone backend map. do not use the backendNode directly here, because it would change the parent.
+                    // TODO:faster clone
+                    Map<String, Object> map = jsonToObject(backendNode, TypeRef.MAP);
+                    backendNode = (FlexiJSonObject) objectToJsonNode(map);
+                    if (backendNode == is.backendNode) {
+                        throw new WTFException("Failed to clone!");
+                    }
+                    for (final KeyValueElement el : backendNode.getElements()) {
                         if (el.getKey() == null) {
                             final KeyValueElement emptyKeyValueElement = this.createKeyValueElement(ret, el.getKey(), el.getValue());
                             emptyKeyValueElement.addCommentsAfterKey(el.getCommentsAfterKey());

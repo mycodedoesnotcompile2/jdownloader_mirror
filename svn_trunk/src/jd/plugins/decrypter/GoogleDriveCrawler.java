@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -46,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GoogleDrive;
 
-@DecrypterPlugin(revision = "$Revision: 50412 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51344 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { GoogleDrive.class })
 public class GoogleDriveCrawler extends PluginForDecrypt {
     /**
@@ -55,6 +56,27 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
     public GoogleDriveCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    // DEV NOTES
+    // https://docs.google.com/folder/d/0B4lNqBSBfg_dbEdISXAyNlBpLUk/edit?pli=1 :: folder view of dir and files, can't seem to view dir
+    // unless 'edit' present.
+    // https://docs.google.com/folder/d/0B4lNqBSBfg_dOEVERmQzcU9LaWc/edit?pli=1&docId=0B4lNqBSBfg_deEpXNjJrZy1MSGM :: above sub dir of docs
+    // they don't provide data constistantly.
+    // - with /edit?pli=1 they provide via javascript section partly escaped
+    // - with /list?rm=whitebox&hl=en_GB&forcehl=1&pref=2&pli=1"; - not used and commented out, supported except for scanLinks
+    // language determined by the accept-language
+    private static final Pattern PATTERN_FOLDER_NORMAL      = Pattern.compile("/folder/d/([a-zA-Z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
+    /*
+     * Usually with old docs.google.com domain e.g. "folderview?" or also "embeddedfolderview?" see
+     * https://stackoverflow.com/questions/69325664/embedding-google-drive-folder-using-embeddedfolderview-does-not-seem-to-work-any
+     */
+    private static final Pattern PATTERN_FOLDERVIEW         = Pattern.compile("/(?:embedded)?folderview\\?.+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_FOLDER_CURRENT     = Pattern.compile("/.*/folders/([a-zA-Z0-9\\-_]+)(/([a-zA-Z0-9\\-_]+))?.*", Pattern.CASE_INSENSITIVE);
+    /* 2021-02-26: Theoretically, "leaf?" does the same but for now we'll only handle "open=" as TYPE_REDIRECT */
+    private static final Pattern PATTERN_REDIRECT           = Pattern.compile("/open\\?id=([a-zA-Z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_FOLDER             = Pattern.compile("folder/d/([a-zA-Z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
+    /* Developer: Set this to false if for some reason, private folders cannot be crawled with this plugin (anymore/temporarily). */
+    private static final boolean CAN_HANDLE_PRIVATE_FOLDERS = true;
 
     public static List<String[]> getPluginDomains() {
         return GoogleDrive.getPluginDomains();
@@ -67,11 +89,14 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            String regex = "https?://" + buildHostsPatternPart(domains) + "/(?:";
-            regex += "open\\?id=[a-zA-Z0-9\\-_]+";
-            regex += "|folder/d/[a-zA-Z0-9\\-_]+";
-            regex += "|(?:embedded)?folderview\\?[a-z0-9\\-_=\\&]+";
-            regex += "|drive/(?:[\\w\\-]+/)*folders/[a-zA-Z0-9\\-_=\\&]+(\\?resourcekey=[A-Za-z0-9_\\-]+)?";
+            String regex = "https?://" + buildHostsPatternPart(domains) + "(";
+            regex += PATTERN_REDIRECT.pattern();
+            regex += "|";
+            regex += PATTERN_FOLDER.pattern();
+            regex += "|";
+            regex += PATTERN_FOLDERVIEW.pattern();
+            regex += "|";
+            regex += PATTERN_FOLDER_CURRENT.pattern();
             regex += ")";
             ret.add(regex);
         }
@@ -83,13 +108,26 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         WEBSITE;
     }
 
-    /** Extracts folderID from given URL. */
+    /**
+     * Extracts folderID from given URL. <br>
+     *
+     * @return null if no folderID is found in URL.
+     */
     private String findFolderID(final String url) {
-        Regex folderregex = new Regex(url, TYPE_FOLDER_NORMAL);
+        Regex folderregex = new Regex(url, PATTERN_FOLDER_NORMAL);
         if (folderregex.patternFind()) {
             return folderregex.getMatch(0);
-        } else if ((folderregex = new Regex(url, TYPE_FOLDER_CURRENT)).patternFind()) {
-            return folderregex.getMatch(0);
+        } else if ((folderregex = new Regex(url, PATTERN_FOLDER_CURRENT)).patternFind()) {
+            /**
+             * Sometimes these links can contain the parent/root folderID and the folderID of the final subfolder we want -> Check for the
+             * 2nd [desired] id first. <br>
+             * Reference: https://board.jdownloader.org/showthread.php?t=97743
+             */
+            String folderID = folderregex.getMatch(2);
+            if (folderID == null) {
+                folderID = folderregex.getMatch(0);
+            }
+            return folderID;
         } else {
             folderregex = new Regex(url, "(?:\\?|\\&)id=([^\\&=]+)");
             return folderregex.getMatch(0);
@@ -104,31 +142,10 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         }
     }
 
-    // DEV NOTES
-    // https://docs.google.com/folder/d/0B4lNqBSBfg_dbEdISXAyNlBpLUk/edit?pli=1 :: folder view of dir and files, can't seem to view dir
-    // unless edit present.
-    // https://docs.google.com/folder/d/0B4lNqBSBfg_dOEVERmQzcU9LaWc/edit?pli=1&docId=0B4lNqBSBfg_deEpXNjJrZy1MSGM :: above sub dir of docs
-    // they don't provide data constistantly.
-    // - with /edit?pli=1 they provide via javascript section partly escaped
-    // - with /list?rm=whitebox&hl=en_GB&forcehl=1&pref=2&pli=1"; - not used and commented out, supported except for scanLinks
-    // language determined by the accept-language
-    private static final String  TYPE_FOLDER_NORMAL         = "(?i)https?://[^/]+/folder/d/([a-zA-Z0-9\\-_]+)";
-    /* Usually with old docs.google.com domain. */
-    private static final String  TYPE_FOLDER_OLD            = "(?i)https?://[^/]+/(?:embedded)?folderview\\?(pli=1\\&id=[A-Za-z0-9_]+(\\&tid=[A-Za-z0-9]+)?|id=[A-Za-z0-9_]+\\&usp=sharing)";
-    private static final String  TYPE_FOLDER_CURRENT        = "(?i)https?://[^/]+/drive/(?:[\\w\\-]+/)*folders/([^/?]+)(\\?resourcekey=[A-Za-z0-9_\\-]+)?";
-    /* 2021-02-26: Theoretically, "leaf?" does the same but for now we'll only handle "open=" as TYPE_REDIRECT */
-    private static final String  TYPE_REDIRECT              = "(?i)https?://[^/]+/open\\?id=([a-zA-Z0-9\\-_]+)";
-    /* Developer: Set this to false if for some reason, private folders cannot be crawled with this plugin (anymore/temporarily). */
-    private static final boolean CAN_HANDLE_PRIVATE_FOLDERS = true;
-
-    private String getContentURL(final CryptedLink param) {
-        return param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
-    }
-
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String contenturl = getContentURL(param);
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         try {
-            if (contenturl.matches(TYPE_REDIRECT)) {
+            if (new Regex(contenturl, PATTERN_REDIRECT).patternFind()) {
                 /**
                  * Special case: This could either be a file or a folder. Other theoretically possible special cases which we will ignore
                  * here: folderID in file URL --> Un-Downloadable item and can only be handled by API </br>
@@ -152,7 +169,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
                         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
                         ret.add(this.createDownloadlink(redirect));
                         return ret;
-                    } else if (!redirect.matches(TYPE_REDIRECT)) {
+                    } else if (!new Regex(redirect, PATTERN_REDIRECT).patternFind()) {
                         /* Must be folder */
                         break;
                     } else {
@@ -210,14 +227,14 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         String nameOfCurrentFolder = null;
         final UrlQuery queryFolder = new UrlQuery();
         queryFolder.appendEncoded("q", "'" + folderID + "' in parents");
-        queryFolder.add("supportsAllDrives", "true");
-        queryFolder.add("includeItemsFromAllDrives", "true");
+        queryFolder.appendEncoded("supportsAllDrives", "true");
+        queryFolder.appendEncoded("includeItemsFromAllDrives", "true");
         /**
          * pageSize = up to how many items get returned per request. </br>
          * 2021-02-25: Apparently the GDrive API decides randomly how many items it wants to return but it doesn't matter as we got
          * pagination. It worked fine in my tests in their API explorer but in reality the max number of items I got was 30.
          */
-        queryFolder.add("pageSize", "200");
+        queryFolder.appendEncoded("pageSize", "200");
         queryFolder.appendEncoded("fields", "kind,nextPageToken,incompleteSearch,files(" + GoogleDrive.getSingleFilesFieldsAPI() + ")");
         /* API key for testing */
         queryFolder.appendEncoded("key", GoogleDrive.getAPIKey());
@@ -457,7 +474,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
             } else {
                 brc.getPage(GoogleDrive.WEBAPI_BASE_2 + "/v2beta/files?" + query.toString());
             }
-            Map<String, Object> entries = restoreFromString(brc.toString(), TypeRef.MAP);
+            Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final List<Object> items = (List<Object>) entries.get("items");
             if (items == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

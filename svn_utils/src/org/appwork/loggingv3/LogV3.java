@@ -50,7 +50,7 @@ public class LogV3 {
     static {
         Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
             @Override
-            public void uncaughtException(final Thread t, final Throwable e) {            
+            public void uncaughtException(final Thread t, final Throwable e) {
                 LogV3.logger(t).exception("Uncaught Exception in: " + t.getId() + "=" + t.getName(), e);
                 DebugMode.debugger();
             }

@@ -59,6 +59,7 @@ import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
+import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -70,7 +71,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51337 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51343 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -248,6 +249,44 @@ public class SendCm extends XFileSharingProBasic {
         } catch (final PluginException e) {
             return handleLoginWebsite2FA(e, link, account, validateCookies);
         }
+    }
+
+    @Override
+    protected boolean handleLoginWebsite2FA(PluginException e, final DownloadLink link, final Account account, final boolean validateCookies) throws Exception {
+        final Form twoFAForm = this.find2FALoginform(br);
+        if (twoFAForm == null) {
+            /* No 2FA login needed -> Login failed because user has entered invalid credentials. */
+            throw e;
+        }
+        logger.info("2FA code required");
+        final String fieldKey = "new_ip_token";
+        final String twoFACode = this.getTwoFACode(account, "\\d{6}");
+        logger.info("Submitting 2FA code");
+        twoFAForm.put(fieldKey, twoFACode);
+        this.submitForm(twoFAForm);
+        if (!this.isLoggedin(br) || find2FALoginform(br) != null) {
+            throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
+        }
+        final Cookies cookies = br.getCookies(br.getHost());
+        account.saveCookies(cookies, "");
+        if (!verifyCookies(account, cookies)) {
+            throw e;
+        }
+        return loginWebsite(link, account, validateCookies);
+    }
+
+    @Override
+    protected Form find2FALoginform(final Browser br) {
+        final Form[] forms = br.getForms();
+        for (final Form form : forms) {
+            final List<InputField> fields = form.getInputFields();
+            for (final InputField field : fields) {
+                if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
+                    return form;
+                }
+            }
+        }
+        return super.find2FALoginform(br);
     }
 
     @Override

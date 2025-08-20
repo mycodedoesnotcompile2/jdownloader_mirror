@@ -17,7 +17,11 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -28,13 +32,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "bdsmstreak.com" }, urls = { "https?://(?:www\\.)?bdsmstreak\\.com/(?:embed/\\d+|video/\\d+(?:/[a-z0-9\\-]+)?)" })
+@HostPlugin(revision = "$Revision: 51343 $", interfaceVersion = 3, names = { "bdsmstreak.com" }, urls = { "https?://(?:www\\.)?bdsmstreak\\.com/(?:embed/\\d+|video/\\d+(?:/[a-z0-9\\-]+)?)" })
 public class BdsmstreakCom extends PluginForHost {
     public BdsmstreakCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(new int[] { 500 });
+        return br;
     }
 
     @Override
@@ -105,12 +114,10 @@ public class BdsmstreakCom extends PluginForHost {
             }
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.setAllowedResponseCodes(new int[] { 500 });
         br.getPage(getContentURL(link));
         if (br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 500) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)\"Video not found|>\\s*This video doesn't exist")) {
+        } else if (br.containsHTML("\"Video not found|>\\s*This video doesn't exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (urlSlug == null) {
@@ -121,9 +128,9 @@ public class BdsmstreakCom extends PluginForHost {
             /* Fallback: use title from url */
             title = urlSlug.replace("-", " ").trim();
         }
-        dllink = br.getRegex("\"(https?://[^\"]+\\.mp4[^\"]+)\"").getMatch(0);
+        dllink = br.getRegex("\"(https?://[^\"]+\\.mp4[^\"]*)\"").getMatch(0);
         if (!StringUtils.isEmpty(dllink)) {
-            dllink = br.getURL(dllink).toString();
+            dllink = br.getURL(dllink).toExternalForm();
             if (Encoding.isHtmlEntityCoded(dllink)) {
                 dllink = Encoding.htmlDecode(dllink);
             }
@@ -133,7 +140,7 @@ public class BdsmstreakCom extends PluginForHost {
             title = title.trim();
             link.setFinalFileName(this.applyFilenameExtension(title, extDefault));
         }
-        if (!StringUtils.isEmpty(dllink) && !isDownload) {
+        if (!StringUtils.isEmpty(dllink) && !link.isSizeSet() && !isDownload) {
             basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, link.getFinalFileName(), extDefault);
         }
         return AvailableStatus.TRUE;

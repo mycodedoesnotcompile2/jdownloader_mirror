@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 51339 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51345 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -1326,7 +1326,7 @@ public class PornHubCom extends PluginForHost {
             getPage(br, (getProtocolFree() + "www." + preferredLoginFreeDomain));
             this.checkErrors(br, null, account);
         }
-        final String hopefullyFreeDomain = br.getHost();
+        final String domainAfterFirstHttpRequest = br.getHost();
         final boolean loggedinFree = isLoggedInHtml(br);
         if (!loggedinFree) {
             throw new AccountInvalidException();
@@ -1343,32 +1343,40 @@ public class PornHubCom extends PluginForHost {
                 setAccountType(account, AccountType.PREMIUM);
             }
             /* Ensure that we are logged in on premium domain. */
+            logger.info("Cookie premium login failed -> Trying other login methods");
             final Browser brc = br.cloneBrowser();
             if (isLoggedinPremium(brc)) {
                 logger.info("Premium cookie login successful");
             } else {
-                logger.info("Account is premium but we are not yet logged in -> Performing full premium login");
-                final Cookies userCookies = account.loadUserCookies();
-                if (userCookies != null) {
-                    /*
-                     * User used special login cookies, owns a premium account but is not logged in as premium user -> A problem we cannot
-                     * automatically solve.
-                     */
-                    throw new AccountInvalidException("Premium login failed, do not use cookie login!");
+                logger.info("Account is premium but we are not yet logged in -> Trying magic link premium login");
+                /* https://de.pornhubpremium.com/authenticate/goToLoggedIn */
+                br.getPage("/authenticate/goToLoggedIn");
+                if (isLoggedInHtmlPremium(br)) {
+                    logger.info("Magic link premium login successful");
+                } else {
+                    logger.info("Magic link premium login failed -> Performing full premium login");
+                    final Cookies userCookies = account.loadUserCookies();
+                    if (userCookies != null) {
+                        /*
+                         * User used special login cookies, owns a premium account but is not logged in as premium user -> A problem we
+                         * cannot automatically solve.
+                         */
+                        throw new AccountInvalidException("Premium login failed. Do not use cookie login!");
+                    }
+                    this.performFullLogin(brc, account, preferredLoginPremiumDomain, "/premium/login");
                 }
-                this.performFullLogin(brc, account, preferredLoginPremiumDomain, "/premium/login");
             }
         } else {
             setAccountType(account, AccountType.FREE);
         }
-        if (isFreeDomain(hopefullyFreeDomain)) {
+        if (isFreeDomain(domainAfterFirstHttpRequest)) {
             /* Free cookies shall be available and we're currently on a free domain -> Get cookies from that domain */
-            account.saveCookies(br.getCookies(hopefullyFreeDomain), COOKIE_ID_FREE);
-            logger.info("User preferred free domain: " + preferredLoginFreeDomain + " | Actually used free domain: " + hopefullyFreeDomain);
-            if (!account.getStringProperty(PROPERTY_LAST_USED_LOGIN_DOMAIN, freeCookieDomain).equals(hopefullyFreeDomain)) {
+            account.saveCookies(br.getCookies(domainAfterFirstHttpRequest), COOKIE_ID_FREE);
+            logger.info("User preferred free domain: " + preferredLoginFreeDomain + " | Actually used free domain: " + domainAfterFirstHttpRequest);
+            if (!account.getStringProperty(PROPERTY_LAST_USED_LOGIN_DOMAIN, freeCookieDomain).equals(domainAfterFirstHttpRequest)) {
                 /* This is needed so when we check the login cookies next time, cookies will be set on the correct domain. */
-                logger.info("Old free domain: " + freeCookieDomain + " | New free domain: " + hopefullyFreeDomain);
-                account.setProperty(PROPERTY_LAST_USED_LOGIN_DOMAIN, hopefullyFreeDomain);
+                logger.info("Old free domain: " + freeCookieDomain + " | New free domain: " + domainAfterFirstHttpRequest);
+                account.setProperty(PROPERTY_LAST_USED_LOGIN_DOMAIN, domainAfterFirstHttpRequest);
             }
         } else {
             /*
@@ -1383,12 +1391,17 @@ public class PornHubCom extends PluginForHost {
 
     private boolean isLoggedinPremium(final Browser br) throws Exception {
         final String preferredLoginPremiumDomain = getConfiguredDomainLoginPremium(this.getHost());
-        final Request req = getPage(br, (getProtocolPremium() + preferredLoginPremiumDomain + "/user/login_status?ajax=1"));
-        final Map<String, Object> entries = restoreFromString(req.getHtmlCode(), TypeRef.MAP);
-        final String success = entries.get("success").toString();
-        if (success.equals("1")) {
-            return true;
-        } else {
+        try {
+            final Request req = getPage(br, (getProtocolPremium() + preferredLoginPremiumDomain + "/user/login_status?ajax=1"));
+            final Map<String, Object> entries = restoreFromString(req.getHtmlCode(), TypeRef.MAP);
+            final String success = entries.get("success").toString();
+            if (success.equals("1")) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (final JSonMapperException jme) {
+            /* No json response */
             return false;
         }
     }
@@ -1795,7 +1808,7 @@ public class PornHubCom extends PluginForHost {
     /** Returns user configured domain for login process premium account. */
     public static String getConfiguredDomainLoginPremium(final String pluginDomain) {
         if (true) {
-            /* right now https://pornhubpremium.org does not work */
+            /* right now https://pornhubpremium.org does not exist */
             return getPrimaryPremiumDomain();
         } else {
             return getConfiguredDomainURL(pluginDomain, getPrimaryPremiumDomain());
