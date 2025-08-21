@@ -644,33 +644,33 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         final ArrayList<PackagizerRuleWrapper> newRules = new ArrayList<PackagizerRuleWrapper>();
         synchronized (this) {
             for (final PackagizerRule lgr : list) {
-                if (lgr.isEnabled() && lgr._isValid()) {
-                    try {
-                        final PackagizerRuleWrapper compiled = lgr.compile();
-                        lgr._setBroken(false);
-                        newRules.add(compiled);
-                    } catch (final Throwable e) {
-                        lgr.setEnabled(false);
-                        lgr._setBroken(true);
-                        LogController.CL().log(e);
-                    }
+                if (!lgr.isEnabled() || !lgr._isValid()) {
+                    continue;
+                }
+                try {
+                    final PackagizerRuleWrapper compiled = lgr.compile();
+                    lgr._setBroken(false);
+                    newRules.add(compiled);
+                } catch (final Throwable e) {
+                    lgr.setEnabled(false);
+                    lgr._setBroken(true);
+                    LogController.CL().log(e);
                 }
             }
-            if (!isTestInstance()) {
-                if (rules != null && newRules.size() != rules.size()) {
-                    save(list);
-                }
+            if (!isTestInstance() && rules != null && newRules.size() != rules.size()) {
+                save(list);
             }
         }
         rules = newRules;
-        if (getEventSender().hasListener()) {
-            getEventSender().fireEvent(new PackagizerControllerEvent() {
-                @Override
-                public void sendTo(PackagizerControllerListener listener) {
-                    listener.onPackagizerUpdate();
-                }
-            });
+        if (!getEventSender().hasListener()) {
+            return;
         }
+        getEventSender().fireEvent(new PackagizerControllerEvent() {
+            @Override
+            public void sendTo(PackagizerControllerListener listener) {
+                listener.onPackagizerUpdate();
+            }
+        });
     }
 
     public void add(PackagizerRule linkFilter) {
@@ -813,6 +813,7 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         }
         for (final PackagizerRuleWrapper lgr : rules) {
             if (lgr.getAlwaysFilter() != null && lgr.getAlwaysFilter().isEnabled()) {
+                /* Apply rule */
                 set(link, lgr);
                 continue;
             }
@@ -846,18 +847,20 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             if (!lgr.checkFileSize(link)) {
                 continue;
             }
+            /* Apply rule */
             set(link, lgr);
             if (lgr.isStopAfterThisRule()) {
-                // TODO: Add logging
+                // TODO: Add logging?
                 break;
             }
         }
     }
 
-    protected void set(CrawledLink link, PackagizerRuleWrapper lgr) {
+    /** Returns true if the rule was _really_ applied (in most cases). */
+    protected boolean set(CrawledLink link, PackagizerRuleWrapper lgr) {
         if (SubFolderByPackageRule.ID.equals(lgr.getRule().getId()) && StringUtils.contains(CFG_GENERAL.DEFAULT_DOWNLOAD_FOLDER.getValue(), PACKAGETAG)) {
             // ignore SubFolderByPackageRule when default folder already contains variables
-            return;
+            return false;
         }
         boolean packageKeyFlag = false;
         String packageKey = null;
@@ -987,6 +990,7 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             /* customize auto start */
             link.setForcedAutoStartEnabled(b);
         }
+        return true;
     }
 
     public static final String PACKAGETAG = "<jd:" + PackagizerController.PACKAGENAME + ">";
@@ -1050,48 +1054,49 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     }
 
     public static String replaceDynamicTags(String input, String packageName, AbstractNode node, final Set<String> replaceTags) {
-        String ret = input;
-        if (ret != null && ret.contains("<jd:")) {
-            final AtomicBoolean modifyFlag = new AtomicBoolean(false);
-            if (ret.contains(PACKAGETAG) && (replaceTags == null || replaceTags.contains(PACKAGETAG))) {
-                modifyFlag.set(true);
-                if (StringUtils.isEmpty(packageName)) {
-                    ret = ret.replace(PACKAGETAG, "");
-                } else {
-                    ret = ret.replace(PACKAGETAG, LinknameCleaner.cleanPackagename(packageName, true));
-                }
-            }
-            if (ret.contains(INDEXOFTAG) && (replaceTags == null || replaceTags.contains(INDEXOFTAG))) {
-                modifyFlag.set(true);
-                AbstractPackageNode parentNode = null;
-                if (!(node instanceof AbstractPackageChildrenNode) || (parentNode = ((AbstractPackageChildrenNode<AbstractPackageNode>) node).getParentNode()) == null) {
-                    ret = ret.replace(INDEXOFTAG, "");
-                } else {
-                    final ModifyLock modifyLock = parentNode.getModifyLock();
-                    final int index;
-                    final int size;
-                    final boolean readL = modifyLock.readLock();
-                    try {
-                        index = parentNode.indexOf((AbstractPackageChildrenNode) node);
-                        size = parentNode.getChildren().size();
-                    } finally {
-                        modifyLock.readUnlock(readL);
-                    }
-                    if (index >= 0) {
-                        final String replacement = String.format(Locale.US, "%0" + padLength(size) + "d", index + 1);
-                        ret = ret.replace(INDEXOFTAG, replacement);
-                    } else {
-                        ret = ret.replace(INDEXOFTAG, "");
-                    }
-                }
-            }
-            ret = replaceDynamicTags(REPLACEVARIABLE.DIRECTORY, ret, ENVTAG, ENV_REPLACER, modifyFlag);
-            ret = replaceDynamicTags(REPLACEVARIABLE.DIRECTORY, ret, DATETAG, DATER_REPLACER, modifyFlag);
-            if (modifyFlag.get()) {
-                ret = CrossSystem.fixPathSeparators(ret);
-            }
-            ret = ret.trim();
+        if (input == null || !input.contains("<jd:")) {
+            return input;
         }
+        String ret = input;
+        final AtomicBoolean modifyFlag = new AtomicBoolean(false);
+        if (ret.contains(PACKAGETAG) && (replaceTags == null || replaceTags.contains(PACKAGETAG))) {
+            modifyFlag.set(true);
+            if (StringUtils.isEmpty(packageName)) {
+                ret = ret.replace(PACKAGETAG, "");
+            } else {
+                ret = ret.replace(PACKAGETAG, LinknameCleaner.cleanPackagename(packageName, true));
+            }
+        }
+        if (ret.contains(INDEXOFTAG) && (replaceTags == null || replaceTags.contains(INDEXOFTAG))) {
+            modifyFlag.set(true);
+            AbstractPackageNode parentNode = null;
+            if (!(node instanceof AbstractPackageChildrenNode) || (parentNode = ((AbstractPackageChildrenNode<AbstractPackageNode>) node).getParentNode()) == null) {
+                ret = ret.replace(INDEXOFTAG, "");
+            } else {
+                final ModifyLock modifyLock = parentNode.getModifyLock();
+                final int index;
+                final int size;
+                final boolean readL = modifyLock.readLock();
+                try {
+                    index = parentNode.indexOf((AbstractPackageChildrenNode) node);
+                    size = parentNode.getChildren().size();
+                } finally {
+                    modifyLock.readUnlock(readL);
+                }
+                if (index >= 0) {
+                    final String replacement = String.format(Locale.US, "%0" + padLength(size) + "d", index + 1);
+                    ret = ret.replace(INDEXOFTAG, replacement);
+                } else {
+                    ret = ret.replace(INDEXOFTAG, "");
+                }
+            }
+        }
+        ret = replaceDynamicTags(REPLACEVARIABLE.DIRECTORY, ret, ENVTAG, ENV_REPLACER, modifyFlag);
+        ret = replaceDynamicTags(REPLACEVARIABLE.DIRECTORY, ret, DATETAG, DATER_REPLACER, modifyFlag);
+        if (modifyFlag.get()) {
+            ret = CrossSystem.fixPathSeparators(ret);
+        }
+        ret = ret.trim();
         return ret;
     }
 
@@ -1112,6 +1117,7 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             try {
                 final PackagizerReplacer replacer = replacers.get(m[0].toLowerCase(Locale.ENGLISH));
                 if (replacer == null) {
+                    /* User has entered garbage -> Ignore it */
                     continue;
                 }
                 final String modifier;

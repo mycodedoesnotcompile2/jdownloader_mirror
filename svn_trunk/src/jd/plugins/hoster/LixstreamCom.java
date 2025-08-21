@@ -23,6 +23,12 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -36,13 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51257 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51347 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class LixstreamCom extends PluginForHost {
          * Current list of domains can be found here: https://lixstream.com/#/file -> Select an uploaded file -> Share -> Dialog pops up ->
          * See "Choose domain"
          */
-        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "poopxy.com", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net", "videb.org", "lix0.org", "doey07sto.com" });
+        ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "poopxy.com", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net", "videb.org", "lix0.org", "doey07sto.com", "videyii.co", "vdey.org" });
         return ret;
     }
 
@@ -144,7 +144,6 @@ public class LixstreamCom extends PluginForHost {
 
     @Override
     protected String getDefaultFileName(final DownloadLink link) {
-
         final String fid = this.getFID(link);
         return fid + ext_default;
     }

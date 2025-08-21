@@ -335,7 +335,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Offline" })
     String literally_offline();
 
-    @Default(lngs = { "en" }, values = { "The Packagizer rules let you auto-set Download Settings on Files based on their properties." })
+    @Default(lngs = { "en" }, values = { "Packagizer rules allow you to set download settings on files based on existing properties. Rules are processed top to bottom." })
     String gui_settings_linkgrabber_packagizer_description();
 
     @Default(lngs = { "en" }, values = { "%s1 (copy)" })

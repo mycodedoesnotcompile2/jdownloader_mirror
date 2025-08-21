@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49839 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51346 $", interfaceVersion = 3, names = {}, urls = {})
 public class HypnotubeCom extends PluginForHost {
     public HypnotubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,6 +76,7 @@ public class HypnotubeCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        /* Based on script: mechbunny.com */
         ret.add(new String[] { "hypnotube.com" });
         ret.add(new String[] { "shesfreaky.com" });
         return ret;

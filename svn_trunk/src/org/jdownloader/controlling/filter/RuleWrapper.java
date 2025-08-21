@@ -6,6 +6,8 @@ import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.RegexFilter.MatchType;
+import org.jdownloader.controlling.packagizer.PackagizerController;
+import org.jdownloader.controlling.packagizer.PackagizerRule;
 import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
 
 import jd.controlling.linkcollector.LinkCollectingJob;
@@ -27,7 +29,7 @@ public class RuleWrapper<T extends FilterRule> {
         return pluginStatusFilter;
     }
 
-    public RuleWrapper(T rule2) {
+    public RuleWrapper(final T rule2) {
         this.rule = rule2;
         boolean requiresHoster = false;
         if (rule.getPluginStatusFilter().isEnabled()) {
@@ -300,81 +302,85 @@ public class RuleWrapper<T extends FilterRule> {
     }
 
     public boolean checkPackageName(final CrawledLink link) {
-        final CompiledRegexFilter packageNameRule = getPackageNameRule();
-        if (packageNameRule != null) {
-            String packagename = null;
-            if (link != null) {
-                if (link.getParentNode() != null) {
-                    packagename = link.getParentNode().getName();
-                }
-                if (StringUtils.isEmpty(packagename) && link.getDesiredPackageInfo() != null) {
-                    packagename = link.getDesiredPackageInfo().getName();
-                }
-            }
-            if (StringUtils.isEmpty(packagename)) {
-                return false;
-            } else {
-                return packageNameRule.matches(packagename);
-            }
-        } else {
+        final CompiledRegexFilter rule = getPackageNameRule();
+        if (rule == null) {
             return true;
         }
+        String regexText = rule.getRegex();
+        /* Replace dynamic tags which allows user to e.g. check for current date in packagename. */
+        regexText = PackagizerController.replaceDynamicTags(regexText, null, null, null);
+        rule.setRegex(regexText);
+        String packagename = null;
+        if (link != null) {
+            if (link.getParentNode() != null) {
+                packagename = link.getParentNode().getName();
+            }
+            if (StringUtils.isEmpty(packagename) && link.getDesiredPackageInfo() != null) {
+                packagename = link.getDesiredPackageInfo().getName();
+            }
+        }
+        if (StringUtils.isEmpty(packagename)) {
+            return false;
+        }
+        return rule.matches(packagename);
     }
 
     public boolean checkFileName(final CrawledLink link) {
-        final CompiledRegexFilter fileNameRule = getFileNameRule();
-        if (fileNameRule != null) {
-            final String url = link.getURL();
-            final DownloadLink downloadLink = link.getDownloadLink();
-            if (downloadLink != null) {
-                if (downloadLink.getFinalFileName() != null || downloadLink.getForcedFileName() != null) {
-                    // final or forced filename available
-                    return fileNameRule.matches(link.getName());
-                } else if (link.getLinkState() == AvailableLinkState.ONLINE) {
-                    // file is online
-                    return fileNameRule.matches(link.getName());
-                } else if (checkOnlineStatus(link)) {
-                    // onlinestatus matches so we trust the available filename
-                    return fileNameRule.matches(link.getName());
-                } else {
-                    return false;
-                }
-            } else if (StringUtils.startsWithCaseInsensitive(url, "file:")) {
-                try {
-                    final File file = new File(new URL(url).toURI());
-                    return fileNameRule.matches(file.getName());
-                } catch (final Exception e) {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        } else {
+        final CompiledRegexFilter rule = getFileNameRule();
+        if (rule == null) {
             return true;
+        }
+        final String url = link.getURL();
+        final DownloadLink downloadLink = link.getDownloadLink();
+        if (downloadLink != null) {
+            String regexText = rule.getRegex();
+            /* Replace dynamic tags which allows user to e.g. check for current date in filename. */
+            regexText = PackagizerController.replaceDynamicTags(regexText, null, null, null);
+            rule.setRegex(regexText);
+            // final or forced filename available
+            if (downloadLink.getFinalFileName() != null || downloadLink.getForcedFileName() != null) {
+                return rule.matches(link.getName());
+            }
+            // file is online
+            if (link.getLinkState() == AvailableLinkState.ONLINE) {
+                return rule.matches(link.getName());
+            }
+            // onlinestatus matches so we trust the available filename
+            if (checkOnlineStatus(link)) {
+                return rule.matches(link.getName());
+            }
+            return false;
+        }
+        if (!StringUtils.startsWithCaseInsensitive(url, "file:")) {
+            return false;
+        }
+        try {
+            final File file = new File(new URL(url).toURI());
+            return rule.matches(file.getName());
+        } catch (final Exception e) {
+            return false;
         }
     }
 
     public boolean checkHoster(final CrawledLink link) {
         final CompiledRegexFilter hosterRule = getHosterRule();
-        if (hosterRule != null) {
-            final DownloadLink dlLink = link.getDownloadLink();
-            if (dlLink == null || link.gethPlugin() == null) {
-                return false;
-            } else {
-                final String host = dlLink.getServiceHost(true);
-                switch (hosterRule.getMatchType()) {
-                case CONTAINS:
-                case EQUALS:
-                    return (host != null && hosterRule.matches(host)) || hosterRule.matches(dlLink.getContentUrlOrPatternMatcher());
-                case CONTAINS_NOT:
-                case EQUALS_NOT:
-                    return (host == null || hosterRule.matches(host)) && hosterRule.matches(dlLink.getContentUrlOrPatternMatcher());
-                default:
-                    return false;
-                }
-            }
-        } else {
+        if (hosterRule == null) {
             return true;
+        }
+        final DownloadLink dlLink = link.getDownloadLink();
+        if (dlLink == null || link.gethPlugin() == null) {
+            return false;
+        }
+        final String host = dlLink.getServiceHost(true);
+        switch (hosterRule.getMatchType()) {
+        case CONTAINS:
+        case EQUALS:
+            return (host != null && hosterRule.matches(host)) || hosterRule.matches(dlLink.getContentUrlOrPatternMatcher());
+        case CONTAINS_NOT:
+        case EQUALS_NOT:
+            return (host == null || hosterRule.matches(host)) && hosterRule.matches(dlLink.getContentUrlOrPatternMatcher());
+        default:
+            return false;
         }
     }
 
@@ -465,29 +471,25 @@ public class RuleWrapper<T extends FilterRule> {
 
     public boolean checkOrigin(final CrawledLink link) {
         final CompiledOriginFilter originFiler = getOriginFilter();
-        if (originFiler != null) {
-            final LinkOriginDetails origin = link.getOrigin();
-            if (origin == null) {
-                return false;
-            } else {
-                return originFiler.matches(origin.getOrigin(), link);
-            }
-        } else {
+        if (originFiler == null) {
             return true;
         }
+        final LinkOriginDetails origin = link.getOrigin();
+        if (origin == null) {
+            return false;
+        }
+        return originFiler.matches(origin.getOrigin(), link);
     }
 
     public boolean checkPluginStatus(final CrawledLink link) {
         final CompiledPluginStatusFilter pluginStatusFilter = getPluginStatusFilter();
-        if (pluginStatusFilter != null) {
-            if (link.getDownloadLink() == null || link.gethPlugin() == null) {
-                return false;
-            } else {
-                return pluginStatusFilter.matches(link);
-            }
-        } else {
+        if (pluginStatusFilter == null) {
             return true;
         }
+        if (link.getDownloadLink() == null || link.gethPlugin() == null) {
+            return false;
+        }
+        return pluginStatusFilter.matches(link);
     }
 
     public String getName() {
@@ -498,8 +500,10 @@ public class RuleWrapper<T extends FilterRule> {
         return rule.isEnabled();
     }
 
-    public boolean isStopAfterThisRule() {
-        // TODO: Add functionality
-        return false;
+    public Boolean isStopAfterThisRule() {
+        if (rule instanceof PackagizerRule) {
+            return ((PackagizerRule) rule).isStopAfterThisRule();
+        }
+        return null;
     }
 }

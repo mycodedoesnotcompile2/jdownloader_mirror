@@ -6,6 +6,24 @@ import org.jdownloader.controlling.filter.FilterRule;
 import org.jdownloader.translate._JDT;
 
 public class PackagizerRule extends FilterRule implements Storable {
+    // Fields sorted alphabetically by type, then by name
+    private Boolean  autoAddEnabled;
+    private Boolean  autoExtractionEnabled;
+    private Boolean  autoForcedStartEnabled;
+    private Boolean  autoStartEnabled;
+    private Boolean  isStopAfterThisRule;
+    private Boolean  linkEnabled;
+    private int      chunks;
+    private int      order       = 0;
+    private Priority priority    = null;
+    private String   comment;
+    private String   downloadDestination;
+    private String   filename;
+    private String   moveto      = null;
+    private String   packageKey  = null;
+    private String   packageName = null;
+    private String   rename      = null;
+
     public PackagizerRule() {
         // required by Storable
     }
@@ -42,25 +60,21 @@ public class PackagizerRule extends FilterRule implements Storable {
         ret.setRename(getRename());
         ret.setTestUrl(getTestUrl());
         ret.setPackageKey(getPackageKey());
+        ret.setStopAfterThisRule(isStopAfterThisRule());
         return ret;
     }
 
-    private String downloadDestination;
-
-    public Priority getPriority() {
-        return priority;
+    public PackagizerRuleWrapper compile() {
+        return new PackagizerRuleWrapper(this);
     }
 
-    public void setPriority(Priority priority) {
-        this.priority = priority;
+    // Getters and Setters (sorted alphabetically by field name)
+    public Boolean isAutoAddEnabled() {
+        return autoAddEnabled;
     }
 
-    public String getPackageName() {
-        return packageName;
-    }
-
-    public void setPackageName(String packageName) {
-        this.packageName = packageName;
+    public void setAutoAddEnabled(Boolean autoAddEnabled) {
+        this.autoAddEnabled = autoAddEnabled;
     }
 
     public Boolean isAutoExtractionEnabled() {
@@ -71,66 +85,12 @@ public class PackagizerRule extends FilterRule implements Storable {
         this.autoExtractionEnabled = autoExtractionEnabled;
     }
 
-    public int getChunks() {
-        return chunks;
+    public Boolean isAutoForcedStartEnabled() {
+        return autoForcedStartEnabled;
     }
 
-    public void setChunks(int chunks) {
-        this.chunks = chunks;
-    }
-
-    public String getDownloadDestination() {
-        return downloadDestination;
-    }
-
-    private Priority priority    = null;
-    private String   packageName = null;
-    private String   rename      = null;
-
-    public String getRename() {
-        return rename;
-    }
-
-    public void setRename(String rename) {
-        this.rename = rename;
-    }
-
-    public String getMoveto() {
-        return moveto;
-    }
-
-    public void setMoveto(String moveto) {
-        this.moveto = moveto;
-    }
-
-    private String  moveto     = null;
-    private Boolean autoExtractionEnabled;
-    private Boolean autoAddEnabled;
-    private Boolean linkEnabled;
-    private String  packageKey = null;
-
-    public String getPackageKey() {
-        return packageKey;
-    }
-
-    public void setPackageKey(String packageKey) {
-        this.packageKey = packageKey;
-    }
-
-    public Boolean getLinkEnabled() {
-        return linkEnabled;
-    }
-
-    public void setLinkEnabled(Boolean linkEnabled) {
-        this.linkEnabled = linkEnabled;
-    }
-
-    public Boolean isAutoAddEnabled() {
-        return autoAddEnabled;
-    }
-
-    public void setAutoAddEnabled(Boolean autoAddEnabled) {
-        this.autoAddEnabled = autoAddEnabled;
+    public void setAutoForcedStartEnabled(Boolean autoForcedStartEnabled) {
+        this.autoForcedStartEnabled = autoForcedStartEnabled;
     }
 
     public Boolean isAutoStartEnabled() {
@@ -141,10 +101,13 @@ public class PackagizerRule extends FilterRule implements Storable {
         this.autoStartEnabled = autoStartEnabled;
     }
 
-    private Boolean autoStartEnabled;
-    private int     chunks;
-    private String  filename;
-    private String  comment;
+    public int getChunks() {
+        return chunks;
+    }
+
+    public void setChunks(int chunks) {
+        this.chunks = chunks;
+    }
 
     public String getComment() {
         return comment;
@@ -154,38 +117,83 @@ public class PackagizerRule extends FilterRule implements Storable {
         this.comment = comment;
     }
 
-    private int     order = 0;
-    private Boolean autoForcedStartEnabled;
-
-    public void setOrder(int order) {
-        this.order = order;
+    public String getDownloadDestination() {
+        return downloadDestination;
     }
 
-    public void setFilename(String filename) {
-        this.filename = filename;
-    }
-
-    public void setDownloadDestination(String string) {
-        downloadDestination = string;
-    }
-
-    public PackagizerRuleWrapper compile() {
-        return new PackagizerRuleWrapper(this);
+    public void setDownloadDestination(String downloadDestination) {
+        this.downloadDestination = downloadDestination;
     }
 
     public String getFilename() {
         return filename;
     }
 
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    public Boolean getLinkEnabled() {
+        return linkEnabled;
+    }
+
+    public void setLinkEnabled(Boolean linkEnabled) {
+        this.linkEnabled = linkEnabled;
+    }
+
+    public String getMoveto() {
+        return moveto;
+    }
+
+    public void setMoveto(String moveto) {
+        this.moveto = moveto;
+    }
+
     public int getOrder() {
         return order;
     }
 
-    public void setAutoForcedStartEnabled(Boolean autoForcedStartEnabled) {
-        this.autoForcedStartEnabled = autoForcedStartEnabled;
+    public void setOrder(int order) {
+        this.order = order;
     }
 
-    public Boolean isAutoForcedStartEnabled() {
-        return autoForcedStartEnabled;
+    public String getPackageKey() {
+        return packageKey;
+    }
+
+    public void setPackageKey(String packageKey) {
+        this.packageKey = packageKey;
+    }
+
+    public String getPackageName() {
+        return packageName;
+    }
+
+    public void setPackageName(String packageName) {
+        this.packageName = packageName;
+    }
+
+    public Priority getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Priority priority) {
+        this.priority = priority;
+    }
+
+    public String getRename() {
+        return rename;
+    }
+
+    public void setRename(String rename) {
+        this.rename = rename;
+    }
+
+    public Boolean isStopAfterThisRule() {
+        return isStopAfterThisRule;
+    }
+
+    public void setStopAfterThisRule(Boolean isStopAfterThisRule) {
+        this.isStopAfterThisRule = isStopAfterThisRule;
     }
 }

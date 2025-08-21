@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.appwork.utils.StringUtils;
@@ -24,6 +25,7 @@ import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -36,10 +38,17 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.FireloadCom;
 
-@DecrypterPlugin(revision = "$Revision: 49949 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51346 $", interfaceVersion = 3, names = {}, urls = {})
 public class FireloadComFolder extends PluginForDecrypt {
     public FireloadComFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -62,35 +71,38 @@ public class FireloadComFolder extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/folder/([a-f0-9]{32})/([^/]+)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/folder/([a-zA-Z0-9]{32,})/([^/]+)?");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br.setFollowRedirects(true);
         final Regex folderInfo = new Regex(param.getCryptedUrl(), this.getSupportedLinks());
-        final String addedFolderHash = folderInfo.getMatch(0);
-        String folderNameFromURL = folderInfo.getMatch(1);
-        if (folderNameFromURL != null) {
-            folderNameFromURL = Encoding.htmlDecode(folderNameFromURL).trim();
+        final String folderID = folderInfo.getMatch(0);
+        String folderNameFromAddedURL = folderInfo.getMatch(1);
+        if (folderNameFromAddedURL != null) {
+            folderNameFromAddedURL = Encoding.htmlDecode(folderNameFromAddedURL).trim();
         }
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.getURL().contains(addedFolderHash)) {
+        } else if (!br.getURL().contains(folderID)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String folderNameFromBrowserURL = new Regex(br.getURL(), this.getSupportedLinks()).getMatch(1);
         final int maxItemsPerPage = 100;
         final String folderIDFromHTML = br.getRegex("nodeId'\\)\\.val\\('(\\d+)'\\)").getMatch(0);
-        String currentFolderName = br.getRegex("(?i)<h2>\\s*Folder \\'([^\\']+)'\\s*</h2>").getMatch(0);
+        String currentFolderName = br.getRegex("<h2>\\s*Folder \\'([^\\']+)'\\s*</h2>").getMatch(0);
         if (currentFolderName == null) {
-            /* Fallback */
-            currentFolderName = folderNameFromURL;
+            currentFolderName = folderNameFromBrowserURL;
+            if (currentFolderName == null) {
+                /* Fallback */
+                currentFolderName = folderNameFromAddedURL;
+            }
         }
         if (currentFolderName == null) {
             /* Final fallback */
-            currentFolderName = addedFolderHash;
+            currentFolderName = folderID;
         }
         currentFolderName = Encoding.htmlDecode(currentFolderName).trim();
         String filePath = this.getAdoptedCloudFolderStructure("");
@@ -98,24 +110,22 @@ public class FireloadComFolder extends PluginForDecrypt {
             filePath += "/";
         }
         filePath += currentFolderName;
-        FilePackage fp = null;
-        if (filePath != null) {
-            fp = FilePackage.getInstance();
-            fp.setName(filePath);
-        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(filePath);
         /* Customized YetiShareFolder handling */
         final UrlQuery query = new UrlQuery();
-        query.appendEncoded("url_hash", addedFolderHash);
+        query.appendEncoded("url_hash", folderID);
         query.appendEncoded("nodeId", folderIDFromHTML);
         query.appendEncoded("filterText", "");
         query.appendEncoded("filterOrderBy", "order_by_filename_asc");
         query.appendEncoded("perPage", Integer.toString(maxItemsPerPage));
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final HashSet<String> dupes = new HashSet<String>();
         int page = 0;
         pagination: do {
             query.addAndReplace("pageStart", Integer.toString(page));
             br.postPage("/ajax/_view_folder_v2_file_listing.ajax.php", query);
-            final int numberofItemsOld = ret.size();
+            int numberofNewItemsThisPage = 0;
             final String[] fileHTMLSnippets = br.getRegex("(<li.*?</li>)").getColumn(0);
             if (fileHTMLSnippets != null && fileHTMLSnippets.length > 0) {
                 for (final String html : fileHTMLSnippets) {
@@ -126,8 +136,13 @@ public class FireloadComFolder extends PluginForDecrypt {
                     final String internalFileID = new Regex(html, "fileId\\s*=\\s*\"(\\d+)\"").getMatch(0);
                     if (StringUtils.isEmpty(url) || StringUtils.isEmpty(internalFileID)) {
                         /* Skip invalid items */
+                        logger.info("Skipping invalid item: " + html);
                         continue;
                     }
+                    if (!dupes.add(url)) {
+                        continue;
+                    }
+                    numberofNewItemsThisPage++;
                     final DownloadLink dl = createDownloadlink(url);
                     if (!StringUtils.isEmpty(filename)) {
                         dl.setName(Encoding.htmlDecode(filename).trim());
@@ -151,13 +166,13 @@ public class FireloadComFolder extends PluginForDecrypt {
                 }
             }
             /* Now crawl subfolders inside this folder */
-            final String[] folderHashes = br.getRegex("(/folder/[a-f0-9]{32})").getColumn(0);
+            final String[] folderHashes = br.getRegex("(/folder/[a-zA-Z0-9]{32,})").getColumn(0);
             for (String folderHash : folderHashes) {
-                if (folderHash.equalsIgnoreCase(addedFolderHash)) {
+                if (folderHash.equalsIgnoreCase(folderID)) {
                     /* Don't re-add the folder we're just crawling! */
                     continue;
                 }
-                final String folderURL = br.getURL(folderHash).toString();
+                final String folderURL = br.getURL(folderHash).toExternalForm();
                 final DownloadLink folder = this.createDownloadlink(folderURL);
                 /*
                  * 2020-11-13: Not required. If a "root" folder is password-protected, all files within it are usually not password
@@ -168,9 +183,8 @@ public class FireloadComFolder extends PluginForDecrypt {
                 ret.add(folder);
                 distribute(folder);
             }
-            final int numberofItemsAddedThisPage = ret.size() - numberofItemsOld;
             logger.info("Crawled page " + page + "| Found items so far: " + ret.size());
-            if (numberofItemsAddedThisPage < maxItemsPerPage) {
+            if (numberofNewItemsThisPage < maxItemsPerPage) {
                 logger.info("Stopping because: Reached end?");
                 break pagination;
             }

@@ -71,7 +71,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51343 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51346 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1019,6 +1019,8 @@ public class SendCm extends XFileSharingProBasic {
                  * them.
                  */
                 pass.setPassword(clipboard.toCharArray());
+                /* User has copied exported cookies in beforehand, auto switch to website login. */
+                accountTypeComboBox.setSelectedIndex(1);
             } else if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
                 this.apikey.setText(clipboard);
             } else if (userCookies == null && clipboard.trim().length() > 0) {

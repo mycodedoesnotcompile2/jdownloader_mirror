@@ -165,6 +165,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
 
     private ExtCheckBox    cbAdd;
     private JToggleButton  cbAlways;
+    private JToggleButton  cbStopAfterThisRule;
     private ExtCheckBox    cbChunks;
     private ExtCheckBox    cbDest;
     private ExtCheckBox    cbEnable;
@@ -689,6 +690,11 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         ret.add(lblRename, "spanx 2");
         ret.add(txtRename, "spanx,pushx,growx");
         link(cbRename, lblRename, txtRename);
+        ret.add(createHeader("...and"), "gaptop 10, spanx,growx,pushx");
+        cbStopAfterThisRule = new ExtCheckBox();
+        cbStopAfterThisRule.setToolTipText("Stop processing further rules if this rule matches");
+        panel.add(cbStopAfterThisRule);
+        panel.add(new JLabel("Stop processing further rules"), "spanx");
         updateGUI();
         if (rule.isStaticRule()) {
             okButton.setEnabled(false);
@@ -741,7 +747,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
             matcher = new RuleMatcher(rule);
             PackagizerController packagizer = new PackagizerController(true) {
                 @Override
-                protected void set(CrawledLink link, PackagizerRuleWrapper lgr) {
+                protected boolean set(CrawledLink link, PackagizerRuleWrapper lgr) {
                     final String name;
                     if (link.isNameSet()) {
                         name = link.getName();
@@ -752,6 +758,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                     super.set(link, lgr);
                     // restore name to provide before/after filename
                     link.setName(name);
+                    return true;
                 }
             };
             rule.setEnabled(true);
@@ -763,7 +770,8 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 }
             };
             d.setPackagizer(packagizer);
-            java.util.List<CrawledLink> ret = Dialog.getInstance().showDialog(d);
+            // java.util.List<CrawledLink> ret = Dialog.getInstance().showDialog(d);
+            Dialog.getInstance().showDialog(d);
         } catch (DialogClosedException e) {
             e.printStackTrace();
         } catch (DialogCanceledException e) {
@@ -812,6 +820,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         rule.setTestUrl(getTxtTestUrl());
         rule.setOnlineStatusFilter(getOnlineStatusFilter());
         rule.setPluginStatusFilter(getPluginStatusFilter());
+        rule.setStopAfterThisRule(cbStopAfterThisRule.isSelected());
     }
 
     @Override
@@ -892,5 +901,6 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 break;
             }
         }
+        cbStopAfterThisRule.setSelected(Boolean.TRUE.equals(rule.isStopAfterThisRule()));
     }
 }
