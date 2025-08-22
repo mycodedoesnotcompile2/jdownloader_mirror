@@ -28,6 +28,7 @@ import javax.script.ScriptEngineManager;
 
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -52,7 +53,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 51084 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
+@HostPlugin(revision = "$Revision: 51353 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
 public class HulkShareCom extends PluginForHost {
     private String              BRBEFORE            = "";
     private static final String PASSWORDTEXT        = "(<br><b>Password:</b> <input|<br><b>Passwort:</b> <input)";
@@ -411,7 +412,7 @@ public class HulkShareCom extends PluginForHost {
                     logger.warning("Standard captcha captchahandling broken!");
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                String code = getCaptchaCode("xfilesharingprobasic", captchaurl, link);
+                String code = getCaptchaCode(XFileSharingProBasic.CAPTCHA_METHOD_ID_XFS_DEFAULT, captchaurl, link);
                 dlForm.put("code", code);
                 logger.info("Put captchacode " + code + " obtained by captcha metod \"Standard captcha\" in the form.");
             }

@@ -266,7 +266,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         return rule;
     }
 
-    protected JMenu createVariablesMenu(JTextComponent txtPackagename2) {
+    protected JMenu createVariablesMenu(final JTextComponent tc) {
         JMenu ret = new JMenu(_GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_menu());
         // ret.add(new VariableAction(txtPackagename2,
         // _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_hoster(),
@@ -274,35 +274,37 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         // ret.add(new VariableAction(txtPackagename2,
         // _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_source(),
         // "<jd:source>"));
-        ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_date(), "<jd:" + PackagizerController.SIMPLEDATE + ":dd.MM.yyyy>"));
-        ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename_org(), "<jd:" + PackagizerController.ORGFILENAME + ">"));
-        ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename_org_without_file_extension(), "<jd:" + PackagizerController.ORGFILENAMEWITHOUTEXT + ">"));
-        ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filetype_org(), "<jd:" + PackagizerController.ORGFILETYPE + ">"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_date(), "<jd:" + PackagizerController.SIMPLEDATE + ":dd.MM.yyyy>"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename_org(), "<jd:" + PackagizerController.ORGFILENAME + ">"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename_org_without_file_extension(), "<jd:" + PackagizerController.ORGFILENAMEWITHOUTEXT + ">"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filetype_org(), "<jd:" + PackagizerController.ORGFILETYPE + ">"));
+        // TODO: Add translation
+        ret.add(new VariableAction(tc, "Default download path", "<jd:" + PackagizerController.DEFAULT_DOWNLOAD_PATH + ">"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_plugin_property(), "<jd:prop:putYourDesiredPropertyKeyHere>"));
         if (getFilenameFilter().isEnabled()) {
             for (int i = 0; i < getFilenameFilter().calcPlaceholderCount(); i++) {
-                ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename((i + 1)), "<jd:" + PackagizerController.ORGFILENAME + ":" + (i + 1) + ">"));
+                ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename((i + 1)), "<jd:" + PackagizerController.ORGFILENAME + ":" + (i + 1) + ">"));
             }
         }
-        ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_packagename(), "<jd:" + PackagizerController.ORGPACKAGENAME + ">"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_packagename(), "<jd:" + PackagizerController.ORGPACKAGENAME + ">"));
         if (getPackagenameFilter().isEnabled()) {
             for (int i = 0; i < getPackagenameFilter().calcPlaceholderCount(); i++) {
-                ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_package((i + 1)), "<jd:" + PackagizerController.ORGPACKAGENAME + ":" + (i + 1) + ">"));
+                ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_package((i + 1)), "<jd:" + PackagizerController.ORGPACKAGENAME + ":" + (i + 1) + ">"));
             }
         }
         if (getHosterFilter().isEnabled()) {
             for (int i = 0; i < getHosterFilter().calcPlaceholderCount(); i++) {
-                ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_hoster((i + 1)), "<jd:" + PackagizerController.HOSTER + ":" + (i + 1) + ">"));
+                ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_hoster((i + 1)), "<jd:" + PackagizerController.HOSTER + ":" + (i + 1) + ">"));
             }
         }
         if (getSourceFilter().isEnabled()) {
             for (int i = 0; i < getSourceFilter().calcPlaceholderCount(); i++) {
-                ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_source((i + 1)), "<jd:" + PackagizerController.SOURCE + ":" + (i + 1) + ">"));
+                ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_source((i + 1)), "<jd:" + PackagizerController.SOURCE + ":" + (i + 1) + ">"));
             }
         }
-        if (txtPackagename2 != txtPackagename && txtPackagename2 != txtFilename) {
-            ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_current_packagename(), "<jd:" + PackagizerController.PACKAGENAME + ">"));
+        if (tc != txtPackagename && tc != txtFilename) {
+            ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_current_packagename(), "<jd:" + PackagizerController.PACKAGENAME + ">"));
         }
-        ret.add(new VariableAction(txtPackagename2, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_plugin_property(), "<jd:prop:putYourDesiredPropertyKeyHere>"));
         return ret;
     }
 
@@ -697,6 +699,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         panel.add(new JLabel("Stop processing further rules"), "spanx");
         updateGUI();
         if (rule.isStaticRule()) {
+            /* Static/Default rules cannot be modified */
             okButton.setEnabled(false);
             okButton.setText(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_cannot_modify_());
             disable(ret);

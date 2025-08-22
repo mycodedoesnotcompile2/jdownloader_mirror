@@ -299,8 +299,8 @@ public class JNAWMIUtils {
                                     int vtType = -1;
                                     for (final String property : properties) {
                                         try {
-                                            boolean clear = true;
-                                            final Variant.VARIANT.ByReference pVal = new Variant.VARIANT.ByReference();
+
+                                            Variant.VARIANT.ByReference pVal = new Variant.VARIANT.ByReference();
                                             try {
                                                 vtType = -1;
                                                 OleAuto.INSTANCE.VariantInit(pVal);
@@ -344,26 +344,57 @@ public class JNAWMIUtils {
                                                 case Variant.VT_EMPTY:
                                                     map.put(property, null);
                                                     break;
+
                                                 default:
-                                                    if (true) {
-                                                        final Object value = pVal.getValue();
-                                                        if (value instanceof SAFEARRAY) {
+
+                                                    boolean isarray = (vtType & Variant.VT_ARRAY) == Variant.VT_ARRAY;
+
+                                                    if (isarray) {
+                                                        try {
+                                                            final Object value = pVal.getValue();
+                                                            // System.out.println("SafeArray");
+                                                            DebugMode.breakIf(!(value instanceof SAFEARRAY));
                                                             final Object array = OaIdlUtil.toPrimitiveArray((SAFEARRAY) value, false);
+                                                            // warning: Chat gpt warns that we should not use destroy but work with
+                                                            // clearVariant only. We should evaluate if this is true
+                                                            // clearVariant: COM cares about cleanup
+                                                            // .destroy: Java/JNA cares about cleanup
                                                             ((SAFEARRAY) value).destroy();
-                                                            clear = false;
+                                                            // set value to empty to avoid that it gets freed another time.
+                                                            pVal.setValue(Variant.VT_EMPTY, null);
+                                                            pVal = null;
                                                             map.put(property, array);
-                                                        } else {
-                                                            map.put(property, null);
+                                                        } catch (RuntimeException e) {
+                                                            e.printStackTrace();
+                                                            DebugMode.debugger();
+                                                            throw e;
+                                                        } catch (Error e) {
+                                                            e.printStackTrace();
+                                                            DebugMode.debugger();
+                                                            throw e;
                                                         }
+                                                    } else {
+                                                        final Object value = pVal.getValue();
+                                                        DebugMode.breakIf(value instanceof SAFEARRAY);
+
+                                                        map.put(property, null);
                                                     }
                                                 }
                                             } finally {
-                                                if (clear) {
-                                                    if (pVal.getValue() instanceof SAFEARRAY) {
+
+                                                if (pVal != null) {
+                                                    boolean isarray = (vtType & Variant.VT_ARRAY) == Variant.VT_ARRAY;
+                                                    try {
+
+                                                        DebugMode.breakIf(isarray);
+                                                    } catch (Error e) {
+                                                        e.printStackTrace();
                                                         DebugMode.debugger();
+                                                        throw e;
                                                     }
                                                     OleAuto.INSTANCE.VariantClear(pVal);
                                                 }
+
                                             }
                                         } catch (final Throwable e) {
                                             for (final Field f : Variant.class.getFields()) {

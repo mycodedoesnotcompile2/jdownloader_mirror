@@ -66,6 +66,13 @@ public class ShellParser {
         return Math.min(Math.min(space, q), dq);
     }
 
+    public static enum ShellParserHint {
+
+        STYLE_UNIX,
+        STYLE_WINDOWS_CMDEXE,
+        STYLE_WINDOWS_POWERSHELL
+    }
+
     /**
      * Splits a Commandstring it its single commands <br>
      * <code>java -jar
@@ -83,96 +90,259 @@ public class ShellParser {
      * @param command
      * @return
      */
-    public static java.util.List<String> splitCommandString(String command) {
-        final java.util.List<String> ret = new ArrayList<String>();
-        while (true) {
-            final int space = command.indexOf(" ");
-            int q = command.indexOf("'");
-            while (true) {
-                if (q == -1) {
-                    break;
+
+    private static String unescapeSpecials(String s, char escChar, boolean allowEscapedWhitespace) {
+        if (s.indexOf(escChar) < 0) {
+            return s;
+        }
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == escChar && i + 1 < s.length()) {
+                char next = s.charAt(i + 1);
+                if (allowEscapedWhitespace && Character.isWhitespace(next)) {
+                    sb.append(next);
+                    i++;
+                    continue;
                 }
-                int escapes = 0;
-                int ec = 1;
-                while (q - ec >= 0 && command.charAt(q - ec++) == '\\') {
-                    escapes++;
+                if (next == '\'' || next == '"' || next == escChar) {
+                    sb.append(next);
+                    i++;
+                    continue;
                 }
-                if (escapes % 2 == 0) {
-                    break;
-                }
-                q = command.indexOf("'", q + 1);
             }
-            int dq = command.indexOf("\"");
-            while (true) {
-                if (dq == -1) {
-                    break;
-                }
-                int escapes = 0;
-                int ec = 1;
-                while (dq - ec >= 0 && command.charAt(dq - ec++) == '\\') {
-                    escapes++;
-                }
-                if (escapes % 2 == 0) {
-                    break;
-                }
-                dq = command.indexOf("\"", dq + 1);
-            }
-            final int min = ShellParser.min(space, q, dq);
-            if (min == Integer.MAX_VALUE) {
-                if (command.trim().length() > 0) {
-                    ret.add(command);
-                }
-                return ret;
-            } else {
-                if (min == space) {
-                    final String p = command.substring(0, min).trim();
-                    if (p.length() > 0) {
-                        ret.add(p);
-                    }
-                    command = command.substring(min + 1);
-                } else if (min == q) {
-                    int nq = command.indexOf("'", min + 1);
-                    while (true) {
-                        if (nq == -1) {
-                            nq = command.length() - 1;
-                            org.appwork.loggingv3.LogV3.warning("Malformed commandstring");
-                            break;
-                        }
-                        int escapes = 0;
-                        int ec = 1;
-                        while (command.charAt(nq - ec++) == '\\') {
-                            escapes++;
-                        }
-                        if (escapes % 2 == 0) {
-                            break;
-                        }
-                        nq = command.indexOf("'", nq + 1);
-                    }
-                    ret.add(command.substring(min + 1, nq));
-                    command = command.substring(Math.min(nq + 2, command.length()));
-                } else if (min == dq) {
-                    int nq = command.indexOf("\"", min + 1);
-                    while (true) {
-                        if (nq == -1) {
-                            nq = command.length() - 1;
-                            org.appwork.loggingv3.LogV3.warning("Malformed commandstring");
-                            break;
-                        }
-                        int escapes = 0;
-                        int ec = 1;
-                        while (command.charAt(nq - ec++) == '\\') {
-                            escapes++;
-                        }
-                        if (escapes % 2 == 0) {
-                            break;
-                        }
-                        nq = command.indexOf("\"", nq + 1);
-                    }
-                    ret.add(command.substring(min + 1, nq));
-                    command = command.substring(Math.min(nq + 2, command.length()));
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    public static java.util.List<String> splitCommandString(String command, ShellParserHint... hints) {
+        // Style selection; default = Windows CMD
+        boolean styleUnix = false;
+        boolean styleCmd = true;
+        boolean stylePs = false;
+
+        if (hints != null) {
+            for (ShellParserHint h : hints) {
+                if (h == ShellParserHint.STYLE_UNIX) {
+                    styleUnix = true;
+                    styleCmd = false;
+                    stylePs = false;
+                } else if (h == ShellParserHint.STYLE_WINDOWS_CMDEXE) {
+                    styleUnix = false;
+                    styleCmd = true;
+                    stylePs = false;
+                } else if (h == ShellParserHint.STYLE_WINDOWS_POWERSHELL) {
+                    styleUnix = false;
+                    styleCmd = false;
+                    stylePs = true;
                 }
             }
         }
+
+        // Behavior per style
+        final boolean singleQuoteActive = !styleCmd; // in CMD, single quotes are literal
+        final boolean doubleQuoteActive = true; // all styles
+        final char escForQuote = styleUnix ? '\\' : (stylePs ? '`' : '^'); // CMD: ^ only escapes quotes
+        final char escGeneral = styleUnix ? '\\' : (stylePs ? '`' : '^');
+
+        final java.util.List<String> ret = new ArrayList<String>();
+        final StringBuilder acc = new StringBuilder(); // current token (concatenates across quote segments)
+
+        while (true) {
+            // 1) find next splitting whitespace (style-aware)
+            int whitespace = -1;
+            for (int i = 0; i < command.length(); i++) {
+                char ch = command.charAt(i);
+                if (!Character.isWhitespace(ch)) {
+                    continue;
+                }
+
+                if (styleUnix || stylePs) {
+                    // In UNIX/PS, escGeneral can escape whitespace (e.g., "\ " or "` ")
+                    int escapes = 0, ec = 1;
+                    while (i - ec >= 0 && command.charAt(i - ec) == escGeneral) {
+                        escapes++;
+                        ec++;
+                    }
+                    if ((escapes & 1) == 1) {
+                        continue; // odd => escaped whitespace -> do not split here
+                    }
+                }
+                // In CMD caret does not escape whitespace -> always split
+                whitespace = i;
+                break;
+            }
+
+            // 2) locate next unescaped single quote
+            int q = singleQuoteActive ? command.indexOf('\'') : -1;
+            if (singleQuoteActive) {
+                while (q != -1) {
+                    if (escForQuote == 0) {
+                        break;
+                    }
+                    int escapes = 0, ec = 1;
+                    while (q - ec >= 0 && command.charAt(q - ec) == escForQuote) {
+                        escapes++;
+                        ec++;
+                    }
+                    if ((escapes & 1) == 0) {
+                        break; // found unescaped '
+                    }
+                    q = command.indexOf('\'', q + 1);
+                }
+            }
+
+            // 3) locate next unescaped double quote
+            int dq = doubleQuoteActive ? command.indexOf('"') : -1;
+            if (doubleQuoteActive) {
+                while (dq != -1) {
+                    if (escForQuote == 0) {
+                        break; // CMD: first " counts (no quote-escaper for detection)
+                    }
+                    int escapes = 0, ec = 1;
+                    while (dq - ec >= 0 && command.charAt(dq - ec) == escForQuote) {
+                        escapes++;
+                        ec++;
+                    }
+                    if ((escapes & 1) == 0) {
+                        break; // found unescaped "
+                    }
+                    dq = command.indexOf('"', dq + 1);
+                }
+            }
+
+            final int min = ShellParser.min(whitespace, q, dq);
+
+            // 4) nothing left -> flush & return
+            if (min == Integer.MAX_VALUE) {
+                if (command.length() > 0) {
+                    acc.append(command);
+                }
+                if (acc.length() > 0) {
+                    final String tok = unescapeSpecials(acc.toString(), styleUnix, styleCmd, stylePs, escGeneral).trim();
+                    if (!tok.isEmpty()) {
+                        ret.add(tok);
+                    }
+                }
+                return ret;
+            }
+
+            // 5) consume next element
+            if (min == whitespace) {
+                String p = command.substring(0, min);
+                // CMD: caret right before the splitting space is eaten by cmd.exe
+                if (styleCmd && p.endsWith("^")) {
+                    p = p.substring(0, p.length() - 1);
+                }
+                acc.append(p);
+
+                String tok = unescapeSpecials(acc.toString(), styleUnix, styleCmd, stylePs, escGeneral).trim();
+                if (!tok.isEmpty()) {
+                    ret.add(tok);
+                }
+                acc.setLength(0);
+
+                command = command.substring(min + 1);
+            } else if (min == q) {
+                // single-quoted block (UNIX/PS only)
+                if (min > 0) {
+                    acc.append(command.substring(0, min));
+                }
+
+                int nq = command.indexOf('\'', min + 1);
+                if (escForQuote != 0) {
+                    while (nq != -1) {
+                        int escapes = 0, ec = 1;
+                        while (nq - ec >= 0 && command.charAt(nq - ec) == escForQuote) {
+                            escapes++;
+                            ec++;
+                        }
+                        if ((escapes & 1) == 0) {
+                            break;
+                        }
+                        nq = command.indexOf('\'', nq + 1);
+                    }
+                }
+                if (nq == -1) {
+                    org.appwork.loggingv3.LogV3.warning("Malformed commandstring");
+                    nq = command.length();
+                }
+                if (nq > min + 1) {
+                    acc.append(command.substring(min + 1, nq));
+                }
+                command = command.substring(Math.min(nq + 1, command.length()));
+            } else if (min == dq) {
+                // double-quoted block
+                if (min > 0) {
+                    String prefix = command.substring(0, min);
+                    // CMD: caret directly before " is eaten by cmd.exe
+                    if (styleCmd && prefix.endsWith("^")) {
+                        prefix = prefix.substring(0, prefix.length() - 1);
+                    }
+                    acc.append(prefix);
+                }
+
+                int nq = command.indexOf('"', min + 1);
+                if (escForQuote != 0) {
+                    while (nq != -1) {
+                        int escapes = 0, ec = 1;
+                        while (nq - ec >= 0 && command.charAt(nq - ec) == escForQuote) {
+                            escapes++;
+                            ec++;
+                        }
+                        if ((escapes & 1) == 0) {
+                            break;
+                        }
+                        nq = command.indexOf('"', nq + 1);
+                    }
+                }
+                if (nq == -1) {
+                    org.appwork.loggingv3.LogV3.warning("Malformed commandstring");
+                    nq = command.length();
+                }
+                if (nq > min + 1) {
+                    acc.append(command.substring(min + 1, nq));
+                }
+                command = command.substring(Math.min(nq + 1, command.length()));
+            }
+        }
+    }
+
+    /**
+     * Style-aware unescape inside a finished token. - UNIX: \<ws>, \", \', \\ => literal char - CMD: ^" => " (caret before space is handled
+     * at split time) - PS: `x => x (backtick escapes next char)
+     */
+    private static String unescapeSpecials(String s, boolean styleUnix, boolean styleCmd, boolean stylePs, char escGeneral) {
+        if (s.indexOf(escGeneral) < 0) {
+            return s;
+        }
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (styleUnix && c == '\\' && i + 1 < s.length()) {
+                char n = s.charAt(i + 1);
+                if (Character.isWhitespace(n) || n == '"' || n == '\'' || n == '\\') {
+                    sb.append(n);
+                    i++;
+                    continue;
+                }
+            } else if (stylePs && c == '`' && i + 1 < s.length()) {
+                sb.append(s.charAt(++i)); // backtick escapes next char
+                continue;
+            } else if (styleCmd && c == '^' && i + 1 < s.length()) {
+                char n = s.charAt(i + 1);
+                if (n == '"') {
+                    sb.append('"');
+                    i++;
+                    continue;
+                } // ^" -> "
+                // caret before space is already removed when splitting;
+                // any other caret remains as literal.
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 
     public static String createCommandLine(Style style, String... commandline) {

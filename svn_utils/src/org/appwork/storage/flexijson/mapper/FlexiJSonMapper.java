@@ -1408,6 +1408,7 @@ public class FlexiJSonMapper {
                 } catch (final Exception e) {
                     return this.returnFallbackOrThrowException(new FailedToCreateInstanceFlexiMapperException(json, cType, e));
                 }
+                DebugMode.breakIf(!(json instanceof FlexiJSonObject));
                 final FlexiJSonObject obj = (FlexiJSonObject) json;
                 final CompiledType[] componentTypes = cType.getComponentTypes(Map.class);
                 // may be empty if the type is a simple Map without generic definition

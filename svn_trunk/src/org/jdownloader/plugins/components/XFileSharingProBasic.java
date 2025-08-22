@@ -91,12 +91,14 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51343 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51353 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
         // this.enablePremium(super.getPurchasePremiumURL());
     }
+
+    public static final String CAPTCHA_METHOD_ID_XFS_DEFAULT = "xfilesharingprobasic";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -2968,14 +2970,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
                 if (StringUtils.isEmpty(captchaurl)) {
                     /* Fallback e.g. for relative URLs (e.g. subyshare.com [bad example, needs special handling anways!]) */
-                    captchaurl = new Regex(getCorrectBR(br), "(/captchas/[a-z0-9]+\\.jpe?g)", Pattern.CASE_INSENSITIVE).getMatch(0);
+                    captchaurl = new Regex(getCorrectBR(br), Pattern.compile("(/captchas/[a-z0-9]+\\.jpe?g)", Pattern.CASE_INSENSITIVE)).getMatch(0);
                 }
                 if (captchaurl == null) {
                     logger.warning("Standard captcha captchahandling broken2!");
                     checkErrorsLastResort(br, link, null);
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final String code = getCaptchaCode("xfilesharingprobasic", captchaurl, link);
+                final String code = getCaptchaCode(CAPTCHA_METHOD_ID_XFS_DEFAULT, captchaurl, link);
                 captchaForm.put("code", code);
                 logger.info("Put captchacode " + code + " obtained by captcha metod \"Standard captcha\" in the form.");
             } else if (new Regex(getCorrectBR(br), "(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)").patternFind()) {

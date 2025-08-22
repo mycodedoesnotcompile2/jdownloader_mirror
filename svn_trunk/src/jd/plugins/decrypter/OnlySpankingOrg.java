@@ -25,7 +25,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 48401 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51353 $", interfaceVersion = 3, names = {}, urls = {})
 public class OnlySpankingOrg extends antiDDoSForDecrypt {
     public OnlySpankingOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,9 +101,9 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
                     }
                 }
             }
-            if (isPremiumAccountRequired(br) && ubiqfile_premium_mail == null) {
-                logger.info("Content is premiumonly and user does not own premium access");
-                throw new AccountRequiredException();
+            final String error_msg_premium_required = "ubiqfile.com premium account required to access this content";
+            if (ubiqfile_premium_mail == null && isPremiumAccountRequired(br)) {
+                throw new AccountRequiredException(error_msg_premium_required);
             }
             String ajax_action = null;
             boolean captchaSuccess = false;
@@ -111,9 +111,8 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
                 /* Important! */
                 br.getHeaders().put("Referer", startURL);
                 getPage("/engine/ajax/getlink2.php");
-                if (isPremiumAccountRequired(br) && ubiqfile_premium_mail == null) {
-                    logger.info("Content is premiumonly and user does not own premium access");
-                    throw new AccountRequiredException();
+                if (ubiqfile_premium_mail == null && isPremiumAccountRequired(br)) {
+                    throw new AccountRequiredException(error_msg_premium_required);
                 }
                 ajax_action = br.getURL();
                 final Form captchaform = getCaptchaForm(br);
@@ -166,8 +165,7 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
             if (redirect == null) {
                 if (isPremiumAccountRequired(br)) {
                     if (ubiqfile_premium_mail == null) {
-                        logger.info("Content is premiumonly and user does not own premium access");
-                        throw new AccountRequiredException();
+                        throw new AccountRequiredException(error_msg_premium_required);
                     }
                     logger.info("Content is premiumonly and user should have premium access via mail: " + ubiqfile_premium_mail);
                     final Form premiumForm = new Form();

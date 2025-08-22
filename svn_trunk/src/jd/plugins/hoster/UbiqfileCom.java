@@ -17,21 +17,26 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.parser.html.HTMLParser;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
+@HostPlugin(revision = "$Revision: 51353 $", interfaceVersion = 3, names = {}, urls = {})
 public class UbiqfileCom extends XFileSharingProBasic {
     public UbiqfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -124,8 +129,8 @@ public class UbiqfileCom extends XFileSharingProBasic {
     }
 
     @Override
-    public boolean loginWebsite(final DownloadLink downloadLink, final Account account, final boolean force) throws Exception {
-        if (super.loginWebsite(downloadLink, account, force)) {
+    public boolean loginWebsite(final DownloadLink link, final Account account, final boolean force) throws Exception {
+        if (super.loginWebsite(link, account, force)) {
             /* Special: User logs in via username + password but we need his email as a property! */
             /* Only access URL if we haven't accessed it before already. */
             if (br.getURL() == null || !br.getURL().contains("/?op=my_account")) {
@@ -162,7 +167,7 @@ public class UbiqfileCom extends XFileSharingProBasic {
                 fileInfo[0] = new Regex(this.getCorrectBR(br), "name=description content=\"Download File ([^<>\"]+)\"").getMatch(0);
             }
         }
-        final String betterFilesize = br.getRegex("(?i)>\\s*Size\\s*:\\s*(\\d+[^<]+)</div>").getMatch(0);
+        final String betterFilesize = br.getRegex(">\\s*Size\\s*:\\s*(\\d+[^<]+)</div>").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }
@@ -190,6 +195,65 @@ public class UbiqfileCom extends XFileSharingProBasic {
             return msg;
         } else {
             return super.getPremiumOnlyErrorMessage(br);
+        }
+    }
+
+    @Override
+    public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
+        /**
+         * Special: Check for old image captcha first, then for other captchas. <br>
+         * Reason: On the login page, their html code contains a reCaptcha siteKey that is not used thus upper handling would ask for the
+         * wrong captcha.
+         */
+        if (StringUtils.containsIgnoreCase(getCorrectBR(br), "/captchas/")) {
+            logger.info("Detected captcha method \"Standard captcha\" for this host");
+            final String[] sitelinks = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), "");
+            if (sitelinks == null || sitelinks.length == 0) {
+                logger.warning("Standard captcha captchahandling broken!");
+                checkErrorsLastResort(br, link, null);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            String captchaurl = null;
+            for (final String linkTmp : sitelinks) {
+                if (StringUtils.containsIgnoreCase(linkTmp, "/captchas/")) {
+                    captchaurl = linkTmp;
+                    break;
+                }
+            }
+            if (StringUtils.isEmpty(captchaurl)) {
+                /* Fallback e.g. for relative URLs (e.g. subyshare.com [bad example, needs special handling anways!]) */
+                captchaurl = new Regex(getCorrectBR(br), Pattern.compile("(/captchas/[a-z0-9]+\\.jpe?g)", Pattern.CASE_INSENSITIVE)).getMatch(0);
+            }
+            if (captchaurl == null) {
+                logger.warning("Standard captcha captchahandling broken2!");
+                checkErrorsLastResort(br, link, null);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String code = getCaptchaCode(XFileSharingProBasic.CAPTCHA_METHOD_ID_XFS_DEFAULT, captchaurl, link);
+            captchaForm.put("code", code);
+            logger.info("Put captchacode " + code + " obtained by captcha metod \"Standard captcha\" in the form.");
+        } else {
+            super.handleCaptcha(link, br, captchaForm);
+        }
+    }
+
+    @Override
+    protected boolean handleRecaptchaV2(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
+        /* 2025-08-21: Small workaround */
+        if (br.containsHTML("//\\s*grecaptcha\\.execute\\(\\);")) {
+            logger.info("Looks like reCaptcha handling is commented out in html code -> Doing nothing");
+            return false;
+        }
+        return super.handleRecaptchaV2(link, br, captchaForm);
+    }
+
+    @Override
+    protected String regExTrafficLeft(final Browser br) {
+        final String traffic = br.getRegex("Premium Traffic\\s*</TD>\\s*<TD>\\s*<b[^>]*>([^<]+)</b>").getMatch(0);
+        if (traffic != null) {
+            return traffic;
+        } else {
+            return super.regExTrafficLeft(br);
         }
     }
 }

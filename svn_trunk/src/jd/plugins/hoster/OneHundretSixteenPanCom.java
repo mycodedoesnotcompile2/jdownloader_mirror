@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51221 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51351 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,7 +128,10 @@ public class OneHundretSixteenPanCom extends PluginForHost {
         String filename = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
         String filesize = br.getRegex(">\\s*文件大小：([^<]+)").getMatch(0);
         if (br.getHost().equals("116pan.com")) {
-            /* 2025-07-15: Some migration helper code for migration from 116pan.com to 116pan.xyz */
+            /**
+             * 2025-07-15: Some migration helper code for migration from 116pan.com to 116pan.xyz <br>
+             * See: https://board.jdownloader.org/showthread.php?t=96948
+             */
             final String newLink = br.getRegex("window\\.location\\.href = '(https?://(?:www\\.)?116pan\\.xyz/f/[a-zA-Z0-9]+)';").getMatch(0);
             if (newLink != null) {
                 if (filesize == null) {

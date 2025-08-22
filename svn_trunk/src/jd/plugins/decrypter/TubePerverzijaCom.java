@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50222 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51351 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubePerverzijaCom extends PluginForDecrypt {
     public TubePerverzijaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +83,7 @@ public class TubePerverzijaCom extends PluginForDecrypt {
             if (plg.canHandle(singleLink)) {
                 final DownloadLink dl = createDownloadlink(singleLink);
                 /* Required in order to access embedded content later. */
-                dl.setReferrerUrl(this.br.getURL());
+                dl.setReferrerUrl(br.getURL());
                 ret.add(dl);
             }
         }
@@ -91,8 +91,8 @@ public class TubePerverzijaCom extends PluginForDecrypt {
             /* Search for iframe embedded items e.g. from playhydrax.com */
             links = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)").getColumn(0);
             if (links != null && links.length > 0) {
-                for (final String singleLink : links) {
-                    ret.add(createDownloadlink(singleLink));
+                for (final String url : links) {
+                    ret.add(createDownloadlink(url));
                 }
             }
         }
