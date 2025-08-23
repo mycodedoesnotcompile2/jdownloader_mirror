@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 51351 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
+@DecrypterPlugin(revision = "$Revision: 51363 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
 public class Rule34Xxx extends PluginForDecrypt {
     private final String        prefixLinkID                          = getHost().replaceAll("[\\.\\-]+", "") + "://";
     private static final String ERROR_MESSAG_API_CREDENTIALS_REQUIRED = "API credentials required. Add them in plugin settings or change access mode to website and try again.";
@@ -78,20 +78,22 @@ public class Rule34Xxx extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final Rule34xxxConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         final AccessMode am = cfg.getCrawlerAccessMode();
-        if (am == AccessMode.WEBSITE) {
+        switch (am) {
+        case WEBSITE:
             return this.crawlWebsite(param);
-        } else {
+        case API:
             return this.crawlAPI(param);
+        case AUTO:
+        default:
+            try {
+                return this.crawlAPI(param);
+            } catch (AccountRequiredException e) {
+                return this.crawlWebsite(param);
+            }
         }
     }
 
     private ArrayList<DownloadLink> crawlAPI(final CryptedLink param) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
-        final String s = query.get("s");
-        final String tags = query.get("tags");
-        /* API docs: https://api.rule34.xxx/ */
-        final String api_base = "https://api.rule34.xxx/index.php";
         final Rule34xxxConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         /**
          * 2025-08-21: API key is required for all API requests we are using. <br>
@@ -103,6 +105,12 @@ public class Rule34Xxx extends PluginForDecrypt {
         if (authRequired && (StringUtils.isEmpty(apiUser) || StringUtils.isEmpty(apiKey))) {
             throw new AccountRequiredException(ERROR_MESSAG_API_CREDENTIALS_REQUIRED);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
+        final String s = query.get("s");
+        final String tags = query.get("tags");
+        /* API docs: https://api.rule34.xxx/ */
+        final String api_base = "https://api.rule34.xxx/index.php";
         if (s.equalsIgnoreCase("view")) {
             /* Crawl single post which can contain multiple images */
             final String postID = query.get("id");

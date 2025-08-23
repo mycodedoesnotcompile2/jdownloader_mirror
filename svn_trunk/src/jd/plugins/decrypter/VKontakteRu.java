@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50806 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51354 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,7 +125,11 @@ public class VKontakteRu extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.|m\\.|new\\.)?" + buildHostsPatternPart(domains) + "/(?!doc[\\d\\-]+_[\\d\\-]+|picturelink|audiolink)[a-z0-9_/=\\.\\-\\?&%@:\\!]+");
+            /**
+             * 2025-08-22: Allowed any subdomain to e.g. allow for "vksport.vkvideo.ru", see: <br>
+             * https://board.jdownloader.org/showthread.php?t=30431&page=92
+             */
+            ret.add("https?://(?:[\\w-]+\\.)?" + buildHostsPatternPart(domains) + "/(?!doc[\\d\\-]+_[\\d\\-]+|picturelink|audiolink)[a-z0-9_/=\\.\\-\\?&%@:\\!]+");
         }
         return ret.toArray(new String[0]);
     }

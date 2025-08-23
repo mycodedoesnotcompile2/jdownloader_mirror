@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -32,10 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51355 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.UnknownPornScript1Crawler.class })
 public class UnknownPornScript1 extends PluginForHost {
     public UnknownPornScript1(PluginWrapper wrapper) {
@@ -96,7 +96,7 @@ public class UnknownPornScript1 extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.dansmovies.com/tos/";
+        return "http://www." + getHost() + "/tos/";
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {

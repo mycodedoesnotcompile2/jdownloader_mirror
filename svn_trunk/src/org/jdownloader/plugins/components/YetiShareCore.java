@@ -68,7 +68,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 51205 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51354 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1487,6 +1487,11 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             /* TURKISH errors */
             if (StringUtils.containsIgnoreCase(errorMsgURL, "Dosya bulunamadı") || StringUtils.containsIgnoreCase(errorMsgURL, "Dosya kaldırıldı")) {
                 /* File offline */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
+            }
+            /* FRENCH errors */
+            if (StringUtils.containsIgnoreCase(errorMsgURL, "Fichier introuvable")) {
+                /* File not found. */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
             }
             logger.info("Found unidentified errormessage inside URL: " + errorMsgURL);

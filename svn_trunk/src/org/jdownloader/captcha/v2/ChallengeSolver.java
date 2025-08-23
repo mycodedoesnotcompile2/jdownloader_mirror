@@ -13,13 +13,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import jd.controlling.captcha.SkipException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
-
-import jd.controlling.captcha.SkipException;
 
 public abstract class ChallengeSolver<T> {
     public static final ChallengeSolver EXTERN = new ChallengeSolver<Object>() {
@@ -189,54 +189,78 @@ public abstract class ChallengeSolver<T> {
         }
     }
 
+    /**
+     * returns true for whitelisted and false for blacklisted
+     *
+     * @param c
+     * @return
+     */
     public boolean validateBlackWhite(final Challenge<?> c) {
         if (!getService().getConfig().isBlackWhiteListingEnabled()) {
+            /* Black/Whitelist disabled by user -> No need to check */
             return true;
         }
         final String host = c.getHost();
+        Boolean result = null;
         final ArrayList<String> whitelist = getService().getConfig().getWhitelistEntries();
-        if (whitelist != null) {
-            for (final String s : whitelist) {
+        if (whitelist != null && whitelist.size() > 0) {
+            whitelist: for (final String s : whitelist) {
                 try {
                     final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
                     if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
                         if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                            return true;
+                            result = true;
+                            break whitelist;
                         }
                         if (pattern.matcher(host).matches()) {
-                            return true;
+                            result = true;
+                            break whitelist;
                         }
                     }
                     if (pattern.matcher(c.getTypeID()).matches()) {
-                        return true;
+                        result = true;
+                        break whitelist;
                     }
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    c.getPlugin().getLogger().log(e);
                 }
             }
         }
-        final ArrayList<String> blacklist = getService().getConfig().getBlacklistEntries();
-        if (blacklist != null) {
-            for (final String s : blacklist) {
-                try {
-                    final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
-                    if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
-                        if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                            return false;
+        if (result == null) {
+            final ArrayList<String> blacklist = getService().getConfig().getBlacklistEntries();
+            if (blacklist != null && blacklist.size() > 0) {
+                blacklist: for (final String s : blacklist) {
+                    try {
+                        final Pattern pattern = Pattern.compile(s, Pattern.CASE_INSENSITIVE);
+                        if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
+                            if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
+                                result = false;
+                                break blacklist;
+                            }
+                            if (pattern.matcher(host).matches()) {
+                                result = false;
+                                break blacklist;
+                            }
                         }
-                        if (pattern.matcher(host).matches()) {
-                            return false;
+                        if (pattern.matcher(c.getTypeID()).matches()) {
+                            result = false;
+                            break blacklist;
                         }
+                    } catch (Throwable e) {
+                        c.getPlugin().getLogger().log(e);
                     }
-                    if (pattern.matcher(c.getTypeID()).matches()) {
-                        return false;
-                    }
-                } catch (Throwable e) {
-                    e.printStackTrace();
                 }
             }
         }
-        return true;
+        if (result == null) {
+            return true;
+        }
+        if (result) {
+            c.getPlugin().getLogger().info(c + " is whitelisted for " + this);
+        } else {
+            c.getPlugin().getLogger().info(c + " is blacklisted for " + this);
+        }
+        return result.booleanValue();
     }
 
     public long getTimeout() {

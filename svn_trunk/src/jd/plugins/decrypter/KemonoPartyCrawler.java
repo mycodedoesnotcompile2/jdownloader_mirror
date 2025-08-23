@@ -54,7 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 51335 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51362 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -282,7 +282,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final String postID = postmap.get("id").toString();
         final String posturl = "https://" + this.getHost() + "/" + service + "/user/" + usernameOrUserID + "/post/" + postID;
         final String postTitle = postmap.get("title").toString();
-        final String publishedDateStr = postmap.get("published").toString();
+        final String publishedDateStr = StringUtils.valueOfOrNull(postmap.get("published"));
+        final String editedDateStr = StringUtils.valueOfOrNull(postmap.get("edited"));
         final ArrayList<DownloadLink> kemonoResults = new ArrayList<DownloadLink>();
         int numberofResultsSimpleCount = 0;
         int index = 0;
@@ -367,6 +368,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
             if (publishedDateStr != null) {
                 kemonoResult.setProperty(KemonoParty.PROPERTY_DATE, publishedDateStr);
+            }
+            if (editedDateStr != null) {
+                kemonoResult.setProperty(KemonoParty.PROPERTY_DATE_EDIT, editedDateStr);
             }
             kemonoResult.setProperty(KemonoParty.PROPERTY_PORTAL, service);
             kemonoResult.setProperty(KemonoParty.PROPERTY_USERID, usernameOrUserID);

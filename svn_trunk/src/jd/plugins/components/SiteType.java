@@ -148,7 +148,7 @@ public class SiteType {
          * <b>Minimum requirements:</b> Usage of "flowplayer" <br />
          * <b>Additional requirements to be added to main class:</b> NO account support, offline via http code 404<br />
          * <b>Main host class:</b> UnknownPornScript1<br />
-         * <b>Example that suits main host class:</b> <a href="http:/dansmovies.com/">dansmovies.com</a><br />
+         * <b>Example that suits main host class:</b> <a href="https:/pornsteep.com/">pornsteep.com</a><br />
          * <b>Example that does NOT suit main host class (needs separate class):</b> -<br />
          * <b>Example that needs a decrypter class :</b> -<br />
          */

@@ -18,6 +18,22 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -29,25 +45,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-
-@HostPlugin(revision = "$Revision: 51342 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51361 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -318,54 +316,6 @@ public class DdownloadCom extends XFileSharingProBasic {
             logger.warning("Detected invalid traffic_left value");
         }
         return ai;
-    }
-
-    @Override
-    public boolean loginWebsite(final DownloadLink downloadLink, final Account account, final boolean validateCookies) throws Exception {
-        try {
-            return super.loginWebsite(downloadLink, account, validateCookies);
-        } catch (final PluginException e) {
-            return handleLoginWebsite2FA(e, downloadLink, account, validateCookies);
-        }
-    }
-
-    @Override
-    protected boolean handleLoginWebsite2FA(PluginException e, final DownloadLink link, final Account account, final boolean validateCookies) throws Exception {
-        final Form twoFAForm = this.find2FALoginform(br);
-        if (twoFAForm == null) {
-            /* No 2FA login needed -> Login failed because user has entered invalid credentials. */
-            throw e;
-        }
-        String fieldKey = null;
-        final List<InputField> fields = twoFAForm.getInputFields();
-        for (final InputField field : fields) {
-            if (field.getKey() != null && field.getKey().matches("^code\\d*$")) {
-                /* 2025-08-18: e.g. ddownload.com Google 2FA -> Field name "code6". */
-                fieldKey = field.getKey();
-                break;
-            } else if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
-                fieldKey = field.getKey();
-                break;
-            }
-        }
-        if (fieldKey == null) {
-            logger.warning("Failed to find 2FA fieldKey");
-            throw e;
-        }
-        logger.info("2FA code required");
-        final String twoFACode = this.getTwoFACode(account, "\\d{6}");
-        logger.info("Submitting 2FA code");
-        twoFAForm.put(fieldKey, twoFACode);
-        this.submitForm(twoFAForm);
-        if (!this.isLoggedin(br) || find2FALoginform(br) != null) {
-            throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
-        }
-        final Cookies cookies = br.getCookies(br.getHost());
-        account.saveCookies(cookies, "");
-        if (!verifyCookies(account, cookies)) {
-            throw e;
-        }
-        return loginWebsite(link, account, validateCookies);
     }
 
     @Override

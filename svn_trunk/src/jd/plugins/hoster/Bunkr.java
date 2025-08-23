@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -11,10 +12,20 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.encoding.URLEncode.Decoder;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
+import jd.nutils.encoding.HTMLEntities;
 import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.Account;
@@ -29,15 +40,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 51340 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51364 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -482,10 +485,32 @@ public class Bunkr extends PluginForHost {
         return super.getFileNameFromSource(source, link, customName, customExtension, con);
     }
 
-    private String getDirecturlFromSingleFileAvailablecheck(final DownloadLink link, final String singleFileURL, final boolean accessURL, final boolean isDownload) throws PluginException, IOException {
+    private String getDirecturlFromSingleFileAvailablecheck(final DownloadLink link, String singleFileURL, final boolean accessURL, final boolean isDownload) throws PluginException, IOException {
         setDirectURL(link, null);
         if (accessURL) {
             br.getPage(singleFileURL);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                // dirty workaround for filenames that contain html encoded entities
+                String htmlCoded = singleFileURL;
+                htmlCoded = URLEncode.decodeURIComponent(htmlCoded, new Decoder() {
+                    @Override
+                    public String decode(final String value) throws UnsupportedEncodingException {
+                        try {
+                            String ret = URLDecoder.decode(value, "UTF-8");
+                            ret = HTMLEntities.htmlentities(ret);
+                            return ret;
+                        } catch (IllegalArgumentException e) {
+                            return value;
+                        }
+                    }
+                });
+                if (!StringUtils.equals(singleFileURL, htmlCoded)) {
+                    br.getPage(htmlCoded);
+                    if (br.getHttpConnection().getResponseCode() != 404) {
+                        singleFileURL = htmlCoded;
+                    }
+                }
+            }
         }
         handleResponsecodeErrors(br.getHttpConnection());
         String album = br.getRegex(">\\s*More files in this\\s*<a[^>]*href\\s*=\\s*\"(\\.\\./a/[^\"]*)\"").getMatch(0);
@@ -587,10 +612,10 @@ public class Bunkr extends PluginForHost {
                     directurl = br.getRegex("(https?://[a-z0-9\\-]+\\.[^/]+/" + Pattern.quote(filenameFromHTML) + ")").getMatch(0);
                 }
             }
+            directurl = Encoding.htmlOnlyDecode(directurl);
         }
         if (directurl != null) {
-            directurl = Encoding.htmlOnlyDecode(directurl);
-            final String filename = getNameFromURL(this, directurl);
+            final String filename = getNameFromURL(this, Encoding.htmlOnlyDecode(directurl));
             setFilename(link, filename, true, false);
             setDirectURL(link, directurl);
         } else {
@@ -613,7 +638,7 @@ public class Bunkr extends PluginForHost {
     }
 
     /** For links like this: https://get.bunkrr.su/file/123456... */
-    private void crawlFileInfoInternalFuid(final DownloadLink link, final String contenturl, final String slug, final boolean isDownload) throws PluginException, IOException {
+    private String crawlFileInfoInternalFuid(final DownloadLink link, final String contenturl, final String slug, final boolean isDownload) throws PluginException, IOException {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -637,7 +662,7 @@ public class Bunkr extends PluginForHost {
             logger.info("Failed to find filesize");
         }
         if (!isDownload) {
-            return;
+            return null;
         }
         final String internalFileID = br.getRegex("data-id=\"(\\d+)\"").getMatch(0);
         final Browser brc = br.cloneBrowser();
@@ -658,7 +683,7 @@ public class Bunkr extends PluginForHost {
         }
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final Number timestamp = (Number) entries.get("timestamp");
-        String url = entries.get("url").toString();
+        final String url = entries.get("url").toString();
         String directurl;
         if (Boolean.TRUE.equals(entries.get("encrypted"))) {
             directurl = decryptData(url, timestamp.longValue());
@@ -670,6 +695,7 @@ public class Bunkr extends PluginForHost {
             directurl += "?n=" + URLEncode.encodeURIComponent(filenameFromHTML);
         }
         setDirectURL(link, directurl);
+        return directurl;
     }
 
     /** See https://get.bunkrr.su/js/src.enc.js */
@@ -789,7 +815,6 @@ public class Bunkr extends PluginForHost {
              *
              * Cf-Polished: origSize=5817221
              */
-
             final String origSize = new Regex(con.getHeaderField("Cf-Polished"), "origSize=(\\d+)").getMatch(0);
             if (origSize == null || Long.parseLong(origSize) == parsedExpectedFilesize) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is too small: File under maintenance?", 1 * 60 * 60 * 1000l);

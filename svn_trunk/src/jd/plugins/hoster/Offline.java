@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51352 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51355 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -261,6 +261,8 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "tubous.com" });
         ret.add(new String[] { "illvid.com" });
         ret.add(new String[] { "u.115.com" });
+        /* 2025-08-22: domain has changed to dansdames.com and now provides paid content / livestreams only RE forum 95874 */
+        ret.add(new String[] { "dansmovies.com" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

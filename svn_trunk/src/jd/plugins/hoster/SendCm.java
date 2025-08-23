@@ -36,22 +36,6 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
@@ -71,7 +55,23 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51346 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51361 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -214,8 +214,8 @@ public class SendCm extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (allowAPIDownloadIfApikeyIsAvailable(link, account)) {
             /**
-             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br>
-             * Looks like this is supposed to help with Cloudflare problems.
+             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br> Looks like this is supposed to help with
+             * Cloudflare problems.
              */
             final String directurl = this.getDllinkAPI(link, account);
             handleDownload(link, account, null, directurl);
@@ -243,50 +243,18 @@ public class SendCm extends XFileSharingProBasic {
     }
 
     @Override
-    public boolean loginWebsite(final DownloadLink link, final Account account, final boolean validateCookies) throws Exception {
-        try {
-            return super.loginWebsite(link, account, validateCookies);
-        } catch (final PluginException e) {
-            return handleLoginWebsite2FA(e, link, account, validateCookies);
-        }
-    }
-
-    @Override
-    protected boolean handleLoginWebsite2FA(PluginException e, final DownloadLink link, final Account account, final boolean validateCookies) throws Exception {
-        final Form twoFAForm = this.find2FALoginform(br);
-        if (twoFAForm == null) {
-            /* No 2FA login needed -> Login failed because user has entered invalid credentials. */
-            throw e;
-        }
-        logger.info("2FA code required");
-        final String fieldKey = "new_ip_token";
-        final String twoFACode = this.getTwoFACode(account, "\\d{6}");
-        logger.info("Submitting 2FA code");
-        twoFAForm.put(fieldKey, twoFACode);
-        this.submitForm(twoFAForm);
-        if (!this.isLoggedin(br) || find2FALoginform(br) != null) {
-            throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
-        }
-        final Cookies cookies = br.getCookies(br.getHost());
-        account.saveCookies(cookies, "");
-        if (!verifyCookies(account, cookies)) {
-            throw e;
-        }
-        return loginWebsite(link, account, validateCookies);
-    }
-
-    @Override
-    protected Form find2FALoginform(final Browser br) {
-        final Form[] forms = br.getForms();
-        for (final Form form : forms) {
-            final List<InputField> fields = form.getInputFields();
-            for (final InputField field : fields) {
-                if (field.getKey() != null && field.getKey().matches("^new_ip_token$")) {
-                    return form;
-                }
+    protected InputField get2FALoginField(final Browser br, final Form form) {
+        final List<InputField> fields = form.getInputFields();
+        for (final InputField field : fields) {
+            if (field.getKey() == null) {
+                continue;
+            }
+            if (field.getKey().matches("^new_ip_token$")) {
+                /* E.g. send.cm */
+                return field;
             }
         }
-        return super.find2FALoginform(br);
+        return super.get2FALoginField(br, form);
     }
 
     @Override

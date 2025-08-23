@@ -11,7 +11,7 @@ public class PackagizerRule extends FilterRule implements Storable {
     private Boolean  autoExtractionEnabled;
     private Boolean  autoForcedStartEnabled;
     private Boolean  autoStartEnabled;
-    private Boolean  isStopAfterThisRule;
+    private boolean  isStopAfterThisRule;
     private Boolean  linkEnabled;
     private int      chunks;
     private int      order       = 0;
@@ -189,11 +189,11 @@ public class PackagizerRule extends FilterRule implements Storable {
         this.rename = rename;
     }
 
-    public Boolean isStopAfterThisRule() {
+    public boolean isStopAfterThisRule() {
         return isStopAfterThisRule;
     }
 
-    public void setStopAfterThisRule(Boolean isStopAfterThisRule) {
+    public void setStopAfterThisRule(boolean isStopAfterThisRule) {
         this.isStopAfterThisRule = isStopAfterThisRule;
     }
 }

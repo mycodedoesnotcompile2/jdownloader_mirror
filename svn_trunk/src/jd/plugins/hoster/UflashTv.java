@@ -16,10 +16,14 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.Map;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Base64;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -30,104 +34,104 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 47151 $", interfaceVersion = 2, names = { "uflash.tv" }, urls = { "https?://(www\\.)?uflash\\.tv/video/\\d+" })
+@HostPlugin(revision = "$Revision: 51355 $", interfaceVersion = 2, names = { "uflash.tv" }, urls = { "https?://(?:www\\.)?uflash\\.tv/video/(\\d+)" })
 public class UflashTv extends PluginForHost {
     public UflashTv(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private String  dllink        = null;
-    private boolean server_issues = false;
-
     @Override
-    public String getAGBLink() {
-        return "http://www.uflash.tv/static/terms";
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink downloadLink) throws IOException, PluginException {
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+    }
+
+    private String dllink = null;
+
+    @Override
+    public String getAGBLink() {
+        return "http://www." + getHost() + "/static/terms";
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String linkid = getFID(link);
+        if (linkid != null) {
+            return this.getHost() + "://" + linkid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         dllink = null;
-        server_issues = false;
+        final String extDefault = ".mp4";
+        final String fid = this.getFID(link);
+        if (!link.isNameSet()) {
+            link.setName(fid + extDefault);
+        }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getPage(downloadLink.getDownloadURL());
-        if (br.getURL().contains("uflash.tv/error/video_missing")) {
+        br.getPage(link.getPluginPatternMatcher());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/error/video_missing")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("VIDEO \\| ([^<>\"]*?) \\| UFLASH\\.TV").getMatch(0);
-        if (filename == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        String title = br.getRegex("VIDEO \\| ([^<>\"]*?) \\| UFLASH\\.TV").getMatch(0);
+        title = Encoding.htmlDecode(title.trim());
+        if (title == null) {
+            title = fid;
         }
-        filename = Encoding.htmlDecode(filename.trim());
-        if (br.containsHTML(">This is a private video")) {
-            downloadLink.getLinkStatus().setStatusText("Private videos are only downloadable via account");
-            downloadLink.setName(filename + ".flv");
+        if (this.isPrivateVideo(br)) {
+            link.getLinkStatus().setStatusText("Private videos are only downloadable via account");
+            link.setName(title + extDefault);
             return AvailableStatus.TRUE;
         }
         String video = br.getRegex("var\\s*[\\w_]*\\s*=\\s*\"(a.*?)\"").getMatch(0);
         if (video != null) {
-            final String videoID = new Regex(downloadLink.getDownloadURL(), "/video/(\\d+)").getMatch(0);
             video = Base64.decodeToString(video);
-            if (StringUtils.contains(video, videoID)) {
+            if (StringUtils.contains(video, fid)) {
                 dllink = video;
             }
         }
+        link.setFinalFileName(title + extDefault);
         if (dllink == null) {
-            br.getPage("/media/player/config.v89x.php?vkey=" + new Regex(downloadLink.getDownloadURL(), "(\\d+)$").getMatch(0));
-            dllink = br.getRegex("<src>(https?://[^<>\"]*?)</src>").getMatch(0);
+            br.postPage("/ajax/getvideo", "vid=" + fid);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            dllink = entries.get("video_src").toString();
         }
-        final String ext = ".mp4";
-        downloadLink.setFinalFileName(filename + ext);
-        if (dllink != null) {
-            dllink = Encoding.htmlDecode(dllink);
-            URLConnectionAdapter con = null;
-            try {
-                final Browser brc = br.cloneBrowser();
-                brc.setFollowRedirects(true);
-                con = brc.openGetConnection(dllink);
-                if (looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        downloadLink.setDownloadSize(con.getCompleteContentLength());
-                    }
-                } else {
-                    brc.followConnection(true);
-                    if (brc.containsHTML(">\\s*404 Not Found\\s*<")) {
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    } else {
-                        server_issues = true;
-                    }
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
-                }
-            }
+        if (dllink != null && !link.isSizeSet() && !PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment())) {
+            dllink = Encoding.htmlOnlyDecode(dllink);
+            this.basicLinkCheck(br, br.createGetRequest(dllink), link, title, extDefault);
         }
         return AvailableStatus.TRUE;
     }
 
+    private boolean isPrivateVideo(final Browser br) {
+        return br.containsHTML(">\\s*This is a private video");
+    }
+
     @Override
-    public void handleFree(final DownloadLink downloadLink) throws Exception {
-        requestFileInformation(downloadLink);
-        if (br.containsHTML(">This is a private video")) {
+    public void handleFree(final DownloadLink link) throws Exception {
+        requestFileInformation(link);
+        if (this.isPrivateVideo(br)) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
-        } else if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
         } else if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, downloadLink, dllink, true, 1);
-        if (!looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (br.containsHTML(">\\s*404 Not Found\\s*<")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
+        this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 

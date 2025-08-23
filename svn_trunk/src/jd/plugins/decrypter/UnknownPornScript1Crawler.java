@@ -27,7 +27,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.UnknownPornScript1;
 
-@DecrypterPlugin(revision = "$Revision: 48530 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51355 $", interfaceVersion = 3, names = {}, urls = {})
 public class UnknownPornScript1Crawler extends PornEmbedParser {
     public UnknownPornScript1Crawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,6 @@ public class UnknownPornScript1Crawler extends PornEmbedParser {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "pornsteep.com" });
         ret.add(new String[] { "vidxporn.com" });
-        ret.add(new String[] { "dansmovies.com" });
         return ret;
     }
 
@@ -62,7 +61,7 @@ public class UnknownPornScript1Crawler extends PornEmbedParser {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video/([a-z0-9\\-]+)\\-(\\d+)\\.html");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video/([a-z0-9-]+)\\-(\\d+)\\.html");
         }
         return ret.toArray(new String[0]);
     }
