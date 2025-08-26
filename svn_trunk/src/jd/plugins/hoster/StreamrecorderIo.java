@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51343 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51367 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamrecorderIo extends PluginForHost {
     public StreamrecorderIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -269,6 +269,29 @@ public class StreamrecorderIo extends PluginForHost {
         ai.setUnlimitedTraffic();
         account.setType(AccountType.PREMIUM);
         account.setConcurrentUsePossible(true);
+        logger.info("Obtaining additional account information...");
+        br.getPage("/userdashboard");
+        String numberofRecordingsStr = br.getRegex(">\\s*(\\d+)\\s*</div>\\s*<div[^>]*>\\s*Total recordings\\s*</div>").getMatch(0);
+        if (numberofRecordingsStr == null) {
+            logger.warning("Failed to find number of recordings");
+            numberofRecordingsStr = "N/A";
+        }
+        String numberofCurrentRecordingsStr = br.getRegex(">\\s*(\\d+)\\s*</div>\\s*<div[^>]*>\\s*Current Recordings\\s*</div>").getMatch(0);
+        if (numberofCurrentRecordingsStr == null) {
+            logger.warning("Failed to find number of current recordings");
+            numberofCurrentRecordingsStr = "N/A";
+        }
+        String numberofTotalViewersStr = br.getRegex(">\\s*(\\d+)\\s*</div>\\s*<div[^>]*>\\s*Total Viewers\\s*</div>").getMatch(0);
+        if (numberofTotalViewersStr == null) {
+            logger.warning("Failed to find number of total viewers");
+            numberofTotalViewersStr = "N/A";
+        }
+        String numberofStreamersMonitoredStr = br.getRegex(">\\s*([^<]+)\\s*</div>\\s*<div[^>]*>\\s*Streamers Monitored\\s*</div>").getMatch(0);
+        if (numberofStreamersMonitoredStr == null) {
+            logger.warning("Failed to find number of streamers monitored");
+            numberofStreamersMonitoredStr = "N/A";
+        }
+        ai.setStatus(account.getType().getLabel() + " | Recs: Total: " + numberofRecordingsStr + " | Curr: " + numberofCurrentRecordingsStr + " | Viewers: " + numberofTotalViewersStr + " | Streamers monitored: " + numberofStreamersMonitoredStr);
         return ai;
     }
 
@@ -304,13 +327,5 @@ public class StreamrecorderIo extends PluginForHost {
             return false;
         }
         return super.canHandle(link, account);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

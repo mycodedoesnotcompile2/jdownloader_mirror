@@ -6,30 +6,23 @@ package org.appwork.jna.windows.wmi;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.loggingv3.LogV3;
-import org.appwork.loggingv3.simple.SimpleLoggerFactory;
-import org.appwork.loggingv3.simple.sink.LogToStdOutSink;
 import org.appwork.serializer.Deser;
-import org.appwork.serializer.SC;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.processes.command.Command;
 import org.appwork.utils.processes.command.ProcessOutputHandler;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.OaIdl.SAFEARRAY;
+import com.sun.jna.platform.win32.OaIdl.VARIANT_BOOL;
 import com.sun.jna.platform.win32.OaIdlUtil;
 import com.sun.jna.platform.win32.Ole32;
 import com.sun.jna.platform.win32.OleAuto;
@@ -113,15 +106,16 @@ public class JNAWMIUtils {
     /**
      *
      */
-    private static final String PRODUCT_STATE = "productState";
+    public static final String PRODUCT_STATE            = "productState";
     /**
      *
      */
-    private static final String DISPLAY_NAME  = "displayName";
-    private static final int    TIMEOUT       = 60000;
-    private static boolean      SECURITY_INITIALIZED;
+    public static final String DISPLAY_NAME             = "displayName";
+    private static final int   TIMEOUT                  = 60000;
+    private static final int   WBEM_FLAG_NONSYSTEM_ONLY = 0x40;
+    private static boolean     SECURITY_INITIALIZED;
 
-    private static String decodeProductState(final int productState) {
+    public static String decodeProductState(final int productState) {
         // SignatureStatus = 0x000000F0
         // ProductOwner = 0x00000F00
         // ProductState = 0x0000F000
@@ -180,11 +174,13 @@ public class JNAWMIUtils {
         // DebugMode.debugger();
         final ArrayList<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
         try {
+            OleAuto oleAuto = OleAuto.INSTANCE;
+            Ole32 ole32 = Ole32.INSTANCE;
             // synchronized (JNAWMIUtils.class)
             {
                 boolean comUnInitRequired = false;
                 try {
-                    WinNT.HRESULT hres = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_MULTITHREADED);
+                    WinNT.HRESULT hres = ole32.CoInitializeEx(null, Ole32.COINIT_MULTITHREADED);
                     // LogV3.info("COM CoInitializeEx - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) + ")");
                     switch (hres.intValue()) {
                     // Successful local initialization (S_OK) or was already initialized
@@ -197,7 +193,7 @@ public class JNAWMIUtils {
                     case WinError.RPC_E_CHANGED_MODE:
                         DebugMode.debugger();
                         // LogV3.info("COM already initialized with different threading model, trying COINIT_APARTMENTTHREADED");
-                        hres = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
+                        hres = ole32.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
                         // LogV3.info("COM CoInitializeEx#2 - hres: " + hres.intValue() + " (0x" + Integer.toHexString(hres.intValue()) +
                         // ")");
                         switch (hres.intValue()) {
@@ -240,7 +236,7 @@ public class JNAWMIUtils {
                                 // Without these security settings, the COM infrastructure may deny access to the WMI service, or it could
                                 // result in
                                 // insecure operations.
-                                hres = Ole32.INSTANCE.CoInitializeSecurity(null, -1, null, null, Ole32.RPC_C_AUTHN_LEVEL_DEFAULT, Ole32.RPC_C_IMP_LEVEL_IMPERSONATE, null, Ole32.EOAC_NONE, null);
+                                hres = ole32.CoInitializeSecurity(null, -1, null, null, Ole32.RPC_C_AUTHN_LEVEL_DEFAULT, Ole32.RPC_C_IMP_LEVEL_IMPERSONATE, null, Ole32.EOAC_NONE, null);
                                 // If security already initialized we get RPC_E_TOO_LATE
                                 // This can be safely ignored
                                 if (COMUtils.FAILED(hres) && hres.intValue() != WinError.RPC_E_TOO_LATE) {
@@ -266,7 +262,7 @@ public class JNAWMIUtils {
                         // information
                         loc.Release();
                         // Set security levels on the proxy -
-                        hres = Ole32.INSTANCE.CoSetProxyBlanket(svc, Ole32.RPC_C_AUTHN_WINNT, Ole32.RPC_C_AUTHZ_NONE, null, Ole32.RPC_C_AUTHN_LEVEL_CALL, Ole32.RPC_C_IMP_LEVEL_IMPERSONATE, null, Ole32.EOAC_NONE);
+                        hres = ole32.CoSetProxyBlanket(svc, Ole32.RPC_C_AUTHN_WINNT, Ole32.RPC_C_AUTHZ_NONE, null, Ole32.RPC_C_AUTHN_LEVEL_CALL, Ole32.RPC_C_IMP_LEVEL_IMPERSONATE, null, Ole32.EOAC_NONE);
                         if (COMUtils.FAILED(hres)) {
                             throw new COMException("Could not set proxy blanket: " + WMI_ERRORS.get(hres.intValue()), hres);
                         }
@@ -290,111 +286,90 @@ public class JNAWMIUtils {
                                     throw new COMException(message == null ? "Unknown Error" : message, hres);
                                 }
                                 final Wbemcli.IWbemClassObject classObject = new ExtIWbemClassObject(pclsObj[0]);
-                                ;
                                 try {
+                                    String propertiesList[];
                                     if (properties == null || properties.length == 0) {
-                                        properties = classObject.GetNames(null, 0, null);
+                                        int retry = 0;
+                                        while (true) {
+                                            try {
+                                                propertiesList = classObject.GetNames(null, WBEM_FLAG_NONSYSTEM_ONLY, null);
+                                                break;
+                                            } catch (IllegalArgumentException e) {
+                                                if (retry++ > 5) {
+                                                    throw e;
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        propertiesList = properties;
                                     }
                                     final HashMap<String, Object> map = new HashMap<String, Object>();
                                     int vtType = -1;
-                                    for (final String property : properties) {
+                                    for (final String property : propertiesList) {
+
+                                        Variant.VARIANT.ByReference pVal = new Variant.VARIANT.ByReference();
                                         try {
-
-                                            Variant.VARIANT.ByReference pVal = new Variant.VARIANT.ByReference();
-                                            try {
-                                                vtType = -1;
-                                                OleAuto.INSTANCE.VariantInit(pVal);
-                                                COMUtils.checkRC(classObject.Get(property, 0, pVal, pType, null));
-                                                // final Object value = pVal.getValue();
-                                                vtType = (pVal.getValue() == null ? Variant.VT_NULL : pVal.getVarType()).intValue();
-                                                // final int cimType = pType.getValue();
-                                                switch (vtType) {
-                                                case Variant.VT_I1:
-                                                case Variant.VT_UI1:
-                                                    map.put(property, pVal.byteValue());
-                                                    break;
-                                                case Variant.VT_I2:
-                                                case Variant.VT_UI2:
-                                                    map.put(property, pVal.shortValue());
-                                                    break;
-                                                case Variant.VT_I4:
-                                                case Variant.VT_UI4:
-                                                    map.put(property, pVal.intValue());
-                                                    break;
-                                                case Variant.VT_I8:
-                                                case Variant.VT_UI8:
-                                                    map.put(property, pVal.longValue());
-                                                    break;
-                                                case Variant.VT_BSTR:
-                                                    map.put(property, pVal.stringValue());
-                                                    break;
-                                                case Variant.VT_DATE:
-                                                    map.put(property, pVal.dateValue());
-                                                    break;
-                                                case Variant.VT_BOOL:
-                                                    map.put(property, pVal.booleanValue());
-                                                    break;
-                                                case Variant.VT_R4:
-                                                    map.put(property, pVal.floatValue());
-                                                    break;
-                                                case Variant.VT_R8:
-                                                    map.put(property, pVal.doubleValue());
-                                                    break;
-                                                case Variant.VT_NULL:
-                                                case Variant.VT_EMPTY:
+                                            vtType = -1;
+                                            oleAuto.VariantInit(pVal);
+                                            COMUtils.checkRC(classObject.Get(property, 0, pVal, pType, null));
+                                            final Object pValValue = pVal.getValue();
+                                            vtType = (pValValue == null ? Variant.VT_NULL : pVal.getVarType()).intValue();
+                                            // final int cimType = pType.getValue();
+                                            switch (vtType) {
+                                            case Variant.VT_I1:
+                                            case Variant.VT_UI1:
+                                                map.put(property, ((Number) pValValue).byteValue());
+                                                break;
+                                            case Variant.VT_I2:
+                                            case Variant.VT_UI2:
+                                                map.put(property, ((Number) pValValue).shortValue());
+                                                break;
+                                            case Variant.VT_I4:
+                                            case Variant.VT_UI4:
+                                                map.put(property, ((Number) pValValue).intValue());
+                                                break;
+                                            case Variant.VT_I8:
+                                            case Variant.VT_UI8:
+                                                map.put(property, ((Number) pValValue).longValue());
+                                                break;
+                                            case Variant.VT_BSTR:
+                                                map.put(property, pVal.stringValue());
+                                                break;
+                                            case Variant.VT_DATE:
+                                                map.put(property, pVal.dateValue());
+                                                break;
+                                            case Variant.VT_BOOL:
+                                                map.put(property, ((VARIANT_BOOL) pValValue).booleanValue());
+                                                break;
+                                            case Variant.VT_R4:
+                                                map.put(property, ((Number) pValValue).floatValue());
+                                                break;
+                                            case Variant.VT_R8:
+                                                map.put(property, ((Number) pValValue).doubleValue());
+                                                break;
+                                            case Variant.VT_NULL:
+                                            case Variant.VT_EMPTY:
+                                                map.put(property, null);
+                                                break;
+                                            default:
+                                                boolean isarray = (vtType & Variant.VT_ARRAY) == Variant.VT_ARRAY;
+                                                if (isarray) {
+                                                    // System.out.println("SafeArray");
+                                                    DebugMode.breakIf(!(pValValue instanceof SAFEARRAY));
+                                                    final Object array = OaIdlUtil.toPrimitiveArray((SAFEARRAY) pValValue, false);
+                                                    map.put(property, array);
+                                                } else {
+                                                    DebugMode.breakIf(pValValue instanceof SAFEARRAY);
                                                     map.put(property, null);
-                                                    break;
-
-                                                default:
-
-                                                    boolean isarray = (vtType & Variant.VT_ARRAY) == Variant.VT_ARRAY;
-
-                                                    if (isarray) {
-                                                        try {
-                                                            final Object value = pVal.getValue();
-                                                            // System.out.println("SafeArray");
-                                                            DebugMode.breakIf(!(value instanceof SAFEARRAY));
-                                                            final Object array = OaIdlUtil.toPrimitiveArray((SAFEARRAY) value, false);
-                                                            // warning: Chat gpt warns that we should not use destroy but work with
-                                                            // clearVariant only. We should evaluate if this is true
-                                                            // clearVariant: COM cares about cleanup
-                                                            // .destroy: Java/JNA cares about cleanup
-                                                            ((SAFEARRAY) value).destroy();
-                                                            // set value to empty to avoid that it gets freed another time.
-                                                            pVal.setValue(Variant.VT_EMPTY, null);
-                                                            pVal = null;
-                                                            map.put(property, array);
-                                                        } catch (RuntimeException e) {
-                                                            e.printStackTrace();
-                                                            DebugMode.debugger();
-                                                            throw e;
-                                                        } catch (Error e) {
-                                                            e.printStackTrace();
-                                                            DebugMode.debugger();
-                                                            throw e;
-                                                        }
-                                                    } else {
-                                                        final Object value = pVal.getValue();
-                                                        DebugMode.breakIf(value instanceof SAFEARRAY);
-
-                                                        map.put(property, null);
-                                                    }
                                                 }
+                                                break;
+                                            }
+                                            try {
+                                                oleAuto.VariantClear(pVal);
+                                            } catch (IllegalArgumentException e) {
+                                                e.printStackTrace();
                                             } finally {
-
-                                                if (pVal != null) {
-                                                    boolean isarray = (vtType & Variant.VT_ARRAY) == Variant.VT_ARRAY;
-                                                    try {
-
-                                                        DebugMode.breakIf(isarray);
-                                                    } catch (Error e) {
-                                                        e.printStackTrace();
-                                                        DebugMode.debugger();
-                                                        throw e;
-                                                    }
-                                                    OleAuto.INSTANCE.VariantClear(pVal);
-                                                }
-
+                                                pVal = null;
                                             }
                                         } catch (final Throwable e) {
                                             for (final Field f : Variant.class.getFields()) {
@@ -412,6 +387,14 @@ public class JNAWMIUtils {
                                             // if (manager != null) {
                                             // manager.trackException(e);
                                             // }
+                                        } finally {
+                                            if (pVal != null) {
+                                                try {
+                                                    oleAuto.VariantClear(pVal);
+                                                } catch (IllegalArgumentException e) {
+                                                    e.printStackTrace();
+                                                }
+                                            }
                                         }
                                     }
                                     list.add(map);
@@ -429,7 +412,7 @@ public class JNAWMIUtils {
                 } finally {
                     // Uninitialize COM components
                     if (comUnInitRequired) {
-                        Ole32.INSTANCE.CoUninitialize();
+                        ole32.CoUninitialize();
                     }
                 }
                 return list;
@@ -475,7 +458,6 @@ public class JNAWMIUtils {
                 LogV3.info(poh.getResult().getErrOutString());
                 throw new WMIException("PowerShell: " + poh.getResult().getErrOutString());
             }
-
             String json = poh.getResult().getStdOutString();
             LogV3.info("PowerShell :\r\n" + json);
             if ("".equals(json)) {
@@ -493,69 +475,6 @@ public class JNAWMIUtils {
             }
         } catch (IOException e) {
             throw WMIException.wrap(e);
-        }
-    }
-
-    public static void main(final String[] args) throws WMIException, InterruptedException {
-        final SimpleLoggerFactory f = new SimpleLoggerFactory();
-        f.setSinkToConsole(new LogToStdOutSink());
-        LogV3.setFactory(f);
-        final HashSet<String> expected = new HashSet<String>();
-        expected.add(";DisplayName: Windows Defender - on,up_to_date,ms;{\"__NAMESPACE\":\"ROOT\\\\SecurityCenter2\",\"pathToSignedReportingExe\":\"%ProgramFiles%\\\\Windows Defender\\\\MsMpeng.exe\",\"displayName\":\"Windows Defender\",\"pathToSignedProductExe\":\"windowsdefender://\",\"productState\":397568,\"__PROPERTY_COUNT\":6,\"__DYNASTY\":\"AntiVirusProduct\",\"__DERIVATION\":[],\"__SERVER\":\"DESKTOP-7KP0VLD\",\"__CLASS\":\"AntiVirusProduct\",\"__RELPATH\":\"AntiVirusProduct.instanceGuid=\\\"{D68DDC3A-831F-4fae-9E44-DA132C1ACF46}\\\"\",\"__PATH\":\"\\\\\\\\DESKTOP-7KP0VLD\\\\ROOT\\\\SecurityCenter2:AntiVirusProduct.instanceGuid=\\\"{D68DDC3A-831F-4fae-9E44-DA132C1ACF46}\\\"\",\"__GENUS\":2,\"instanceGuid\":\"{D68DDC3A-831F-4fae-9E44-DA132C1ACF46}\",\"__SUPERCLASS\":null,\"timestamp\":\"Tue, 30 Jul 2024 15:06:30 GMT\"}");
-        expected.add(";DisplayName: Windows Defender - on,up_to_date,ms;{\"__NAMESPACE\":\"ROOT\\\\SecurityCenter2\",\"pathToSignedReportingExe\":\"%ProgramFiles%\\\\Windows Defender\\\\MsMpeng.exe\",\"displayName\":\"Windows Defender\",\"pathToSignedProductExe\":\"windowsdefender://\",\"productState\":397568,\"__PROPERTY_COUNT\":6,\"__DYNASTY\":\"AntiVirusProduct\",\"__SERVER\":\"DESKTOP-7KP0VLD\",\"__CLASS\":\"AntiVirusProduct\",\"__RELPATH\":\"AntiVirusProduct.instanceGuid=\\\"{D68DDC3A-831F-4fae-9E44-DA132C1ACF46}\\\"\",\"__PATH\":\"\\\\\\\\DESKTOP-7KP0VLD\\\\ROOT\\\\SecurityCenter2:AntiVirusProduct.instanceGuid=\\\"{D68DDC3A-831F-4fae-9E44-DA132C1ACF46}\\\"\",\"__GENUS\":2,\"instanceGuid\":\"{D68DDC3A-831F-4fae-9E44-DA132C1ACF46}\",\"__SUPERCLASS\":null,\"timestamp\":\"Tue, 30 Jul 2024 15:06:30 GMT\"}");
-        final AtomicLong lastGC = new AtomicLong();
-        for (int i = 0; i < 1; i++) {
-            new Thread() {
-                private int counter = 0;
-
-                @Override
-                public void run() {
-                    while (true) {
-                        // LogV3.info("AntiVirusProduct START");
-                        try {
-                            this.setName(new Date().toString() + " - " + this.counter);
-                            String namespace;
-                            switch (CrossSystem.getOS()) {
-                            case WINDOWS_XP:
-                                namespace = "ROOT\\SecurityCenter";
-                                break;
-                            default:
-                                namespace = "ROOT\\SecurityCenter2";
-                                break;
-                            }
-                            final String query = "SELECT * from AntiVirusProduct";
-                            final ArrayList<Map<String, Object>> list = JNAWMIUtils.query(namespace, query);
-                            final StringBuilder sb = new StringBuilder();
-                            if (list.size() > 0) {
-                                for (final Map<String, Object> map : list) {
-                                    final String displayName = StringUtils.valueOfOrNull(map.get(DISPLAY_NAME));
-                                    final int state = ((Number) map.get(PRODUCT_STATE)).intValue();
-                                    final String stateString = decodeProductState(state);
-                                    sb.append(";" + "DisplayName: " + displayName + " - " + stateString);
-                                    sb.append(";" + Deser.get().toString(map, SC.LOG_SINGLELINE));
-                                }
-                            }
-                            // Thread.sleep(100);
-                            synchronized (lastGC) {
-                                if (Time.now() - lastGC.get() > 1000) {
-                                    lastGC.set(Time.now());
-                                    LogV3.info("GC");
-                                    System.gc();
-                                    Thread.sleep(200);
-                                }
-                            }
-                            this.counter++;
-                            // if (!expected.contains(sb.toString())) {
-                            // LogV3.info("Unexpected result:\r\n" + sb.toString());
-                            // }
-                        } catch (final Throwable e) {
-                            LogV3.log(e);
-                        } finally {
-                            // LogV3.info("AntiVirusProduct END");
-                        }
-                    }
-                };
-            }.start();
         }
     }
 

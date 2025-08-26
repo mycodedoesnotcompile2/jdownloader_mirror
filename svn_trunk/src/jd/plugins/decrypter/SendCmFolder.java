@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -34,9 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SendCm;
 
-import org.appwork.utils.formatter.SizeFormatter;
-
-@DecrypterPlugin(revision = "$Revision: 51189 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51367 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SendCm.class })
 public class SendCmFolder extends PluginForDecrypt {
     public SendCmFolder(PluginWrapper wrapper) {
@@ -80,6 +80,8 @@ public class SendCmFolder extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl().replace("/e/", "/s/");
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Files not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         int page = 1;

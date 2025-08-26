@@ -71,6 +71,9 @@ public class AbstractVariantWrapper {
             return ((AudioInterface) variant).getAudioLocale();
         } else if (variant instanceof SubtitleVariant) {
             final String lng = ((SubtitleVariant) variant).getLanguageCode();
+            if (lng == null) {
+                return null;
+            }
             return TranslationFactory.stringToLocale(lng.replaceAll("[^a-zA-Z\\-]*", ""));
         } else {
             return null;

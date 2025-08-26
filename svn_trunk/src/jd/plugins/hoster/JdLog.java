@@ -34,21 +34,21 @@ import jd.controlling.downloadcontroller.DownloadWatchDog;
 import jd.controlling.downloadcontroller.DownloadWatchDogJob;
 import jd.http.AuthenticationFactory;
 import jd.parser.Regex;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.utils.locale.JDL;
 
 /**
- * Alternative AppWork log downloader
+ * Alternative AppWork log downloader for internal use
  *
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50057 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 51366 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
     @Override
     public String getAGBLink() {
@@ -98,7 +98,7 @@ public class JdLog extends PluginForHost {
         }
         if (dl.getConnection().getResponseCode() == 401) {
             dl.getConnection().disconnect();
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, JDL.L("plugins.hoster.httplinks.errors.basicauthneeded", "BasicAuth needed"));
+            throw new AccountRequiredException("BasicAuth needed");
         } else if (dl.getConnection().getCompleteContentLength() == 0) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -178,14 +178,6 @@ public class JdLog extends PluginForHost {
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
         return false;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

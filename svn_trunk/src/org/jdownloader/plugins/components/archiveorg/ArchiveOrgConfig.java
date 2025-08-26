@@ -1,9 +1,14 @@
 package org.jdownloader.plugins.components.archiveorg;
 
+import java.util.Set;
+
+import org.appwork.storage.StorableValidatorIgnoresMissingSetter;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
@@ -17,6 +22,10 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
+        public String getFileCrawlerTypesToCrawl_label() {
+            return "File crawler: Select types to crawl";
+        }
+
         public String getFileCrawlerCrawlOnlyOriginalVersions_label() {
             return "File crawler: Add only original versions of files?";
         }
@@ -60,6 +69,22 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         public String getSearchTermCrawlerMaxResultsLimit_label() {
             return "Search term and profile crawler: Limit max results [0 = disable this crawler]";
         }
+    }
+
+    @AboutConfig
+    @DefaultOnNull
+    @DefaultEnumArrayValue(value = { "ORIGINAL", "DERIVATIVE", "METADATA", "THUMBNAIL" })
+    @Order(10)
+    Set<ArchiveOrgType> getFileCrawlerTypesToCrawl();
+
+    void setFileCrawlerTypesToCrawl(Set<ArchiveOrgType> list);
+
+    @StorableValidatorIgnoresMissingSetter
+    public enum ArchiveOrgType {
+        ORIGINAL,
+        DERIVATIVE,
+        METADATA,
+        THUMBNAIL
     }
 
     @AboutConfig

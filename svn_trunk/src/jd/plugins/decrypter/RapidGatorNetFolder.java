@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RapidGatorNet;
 
-@DecrypterPlugin(revision = "$Revision: 48585 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51365 $", interfaceVersion = 2, names = {}, urls = {})
 @SuppressWarnings("deprecation")
 @PluginDependencies(dependencies = { RapidGatorNet.class })
 public class RapidGatorNetFolder extends PluginForDecrypt {
@@ -99,7 +99,9 @@ public class RapidGatorNetFolder extends PluginForDecrypt {
             folderTitle = folderID;
             titleForEmptyOrOfflineFolder = folderTitle;
         }
-        if (br.containsHTML("E_FOLDERNOTFOUND") || br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("E_FOLDERNOTFOUND")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("class=\"empty\"")) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, titleForEmptyOrOfflineFolder);

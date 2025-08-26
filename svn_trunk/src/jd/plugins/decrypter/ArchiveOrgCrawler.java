@@ -74,7 +74,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 51141 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 51367 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -367,7 +367,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         do {
             query.addAndReplace("page", Integer.toString(page));
             /* This looks to be an internally used version of public crawl/search API v2 beta, see: https://archive.org/services/swagger/ */
-            brc.getPage("https://archive.org/services/search/beta/page_production/?" + query.toString());
+            brc.getPage("https://" + getHost() + "/services/search/beta/page_production/?" + query.toString());
             if (brc.getHttpConnection().getResponseCode() == 400) {
                 if (ret.size() > 0) {
                     logger.info("Stopping because: Surprisingly got http response 400 | Possibly missing items: " + (totalNumberofItems - ret.size()));
@@ -750,38 +750,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
 
     private String findBookReaderURLWebsite(final Browser br) {
         String url = br.getRegex("(?:\\'|\")([^\\'\"]+BookReaderJSIA\\.php\\?[^\\'\"]+)").getMatch(0);
-        if (url != null) {
-            url = PluginJSonUtils.unescape(url);
-            return url;
-        }
-        return null;
-    }
-
-    @Deprecated
-    /** This function can parse the "track" field of json items from "/metadata/<identifier> */
-    private int[] parseAudioTrackPosition(final Object audioTrackPositionO) throws PluginException {
-        if (audioTrackPositionO == null) {
+        if (url == null) {
             return null;
-        } else if (audioTrackPositionO instanceof int[]) {
-            return (int[]) audioTrackPositionO;
-        } else if (audioTrackPositionO instanceof Number) {
-            return new int[] { ((Number) audioTrackPositionO).intValue() };
-        } else if (audioTrackPositionO instanceof String) {
-            final String string = audioTrackPositionO.toString();
-            final String xofY[] = new Regex(string, "(\\d+)\\s*/\\s*(\\d+)").getRow(0);
-            if (xofY != null) {
-                // 02/09
-                return new int[] { Integer.parseInt(xofY[0]) };
-            }
-            final String cdAndTrack[] = new Regex(string, "(\\d+)\\s*\\.\\s*(\\d+)").getRow(0);
-            if (cdAndTrack != null) {
-                // 1.01 and 3.09
-                return new int[] { Integer.parseInt(cdAndTrack[1]), Integer.parseInt(cdAndTrack[0]) };
-            }
-            return new int[] { Integer.parseInt(string) };
-        } else {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + audioTrackPositionO);
         }
+        url = PluginJSonUtils.unescape(url);
+        return url;
     }
 
     /** Work in progress, see https://archive.org/metadata/<identifier> */
@@ -805,7 +778,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final Browser brc = br.cloneBrowser();
         /* The json answer can be really big. */
         brc.setLoadLimit(Integer.MAX_VALUE);
-        brc.getPage("https://archive.org/metadata/" + Encoding.urlEncode(identifier));
+        brc.getPage("https://" + getHost() + "/metadata/" + Encoding.urlEncode(identifier));
         final Map<String, Object> root = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         // final Boolean is_dark = (Boolean) root.get("is_dark"); // This means that the content is offline(?)
         final List<Map<String, Object>> root_files = (List<Map<String, Object>>) root.get("files");
@@ -870,6 +843,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         DownloadLink singleDesiredFile = null;
         DownloadLink singleDesiredFile2 = null;
         final ArrayList<DownloadLink> selectedItems = new ArrayList<DownloadLink>();
+        /* FilPackage for all file items that are contained in the root of this identifiers' filesystem. */
         final FilePackage fpRoot = FilePackage.getInstance();
         fpRoot.setName(identifier);
         if (!StringUtils.isEmpty(description)) {
@@ -877,6 +851,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         }
         final Map<String, FilePackage> packagemap = new HashMap<String, FilePackage>();
         packagemap.put(identifier, fpRoot);
+        // final Set<ArchiveOrgType> selectedTypes = cfg.getTypesToCrawl();
         final boolean crawlOriginalFilesOnly = cfg.isFileCrawlerCrawlOnlyOriginalVersions();
         final boolean crawlMetadataFiles = cfg.isFileCrawlerCrawlMetadataFiles();
         final boolean crawlThumbnails = cfg.isFileCrawlerCrawlThumbnails();
@@ -944,7 +919,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 filename = pathWithFilename;
             }
             final Object fileSizeO = filemap.get("size");
-            String url = "https://archive.org/download/" + identifier;
+            String url = "https://" + getHost() + "/download/" + identifier;
             if (pathWithFilename.startsWith("/")) {
                 url += URLEncode.encodeURIComponent(pathWithFilename);
             } else {
@@ -1208,7 +1183,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
              * Video can't be officially downloaded but it can be streamed in segments of X seconds each -> Generate those stream-links
              */
             for (int position = 0; position < numberofVideoSegments; position++) {
-                final String directurl = "https://archive.org/download/" + identifier + "/" + identifier + ".mp4?t=" + offsetSeconds + "/" + (offsetSeconds + secondsPerSegment) + "&ignore=x.mp4";
+                final String directurl = "https://" + getHost() + "/download/" + identifier + "/" + identifier + ".mp4?t=" + offsetSeconds + "/" + (offsetSeconds + secondsPerSegment) + "&ignore=x.mp4";
                 final DownloadLink video = this.createDownloadlink(directurl);
                 video.setProperty(ArchiveOrg.PROPERTY_FILETYPE, ArchiveOrg.FILETYPE_VIDEO);
                 video.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION, position);
@@ -1638,7 +1613,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlFiles(final String contenturl) throws Exception {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*The item is not available")) {
+        } else if (br.containsHTML(">\\s*The item is not available")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!br.containsHTML("\"/download/")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Maybe invalid link or nothing there to download");
@@ -1824,7 +1799,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             throw new IllegalArgumentException();
         }
         String xmlResponse = null;
-        final String xmlurl = "https://archive.org/download/" + titleSlug + "/" + titleSlug + "_files.xml";
+        final String xmlurl = "https://" + getHost() + "/download/" + titleSlug + "/" + titleSlug + "_files.xml";
         final String cacheKey = xmlurl;
         final Object lock = requestLock(cacheKey);
         try {
@@ -1869,7 +1844,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, path);
         }
         logger.info("Crawling all files below path: " + path);
-        final String basePath = "https://archive.org/download/" + titleSlug;
+        final String basePath = "https://" + getHost() + "/download/" + titleSlug;
         final List<String> skippedItems = new ArrayList<String>();
         for (final String item : items) {
             /* <old_version>true</old_version> */

@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Request;
@@ -41,7 +35,13 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51331 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51371 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,7 +132,9 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                     ret.add(link);
                     distribute(link);
                 }
+                /* 2025-08-25: This number might be wrong sometimes e.g. /users/romythicc */
                 final int pageMax = ((Number) entries.get("pages")).intValue();
+                /* 2025-08-25: This number might ALSO be wrong sometimes (or I'm stupid [psp]) */
                 totalNumberofItems = ((Number) entries.get("total")).intValue();
                 logger.info("Crawled page " + page + "/" + pageMax + " | Found items: " + ret.size() + "/" + totalNumberofItems + " | New items this page: " + numberofNewItemsThisPage);
                 final boolean isLastPage = page >= pageMax;
@@ -146,10 +148,18 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                 if (this.isAbort()) {
                     logger.info("Stopping because: Aborted by user");
                     throw new InterruptedException();
-                } else if (isLastPage) {
-                    logger.info("Stopping because: Reached last page: " + pageMax);
-                    break pagination;
-                } else if (numberofNewItemsThisPage == 0) {
+                }
+                if (false) {
+                    /* 2025-08-25 -> api reports max 25 pages with 40 items/page, max 1000 but more pages may still exist */
+                    if (isLastPage) {
+                        logger.info("Stopping because: Reached last page: " + pageMax);
+                        break pagination;
+                    } else if (ret.size() >= totalNumberofItems) {
+                        logger.info("Stopping because: Found all items: " + totalNumberofItems);
+                        break pagination;
+                    }
+                }
+                if (numberofNewItemsThisPage == 0) {
                     /* Additional fail safe which should not be needed. */
                     logger.info("Stopping because: Failed to find any new items on current page: " + page);
                     break pagination;

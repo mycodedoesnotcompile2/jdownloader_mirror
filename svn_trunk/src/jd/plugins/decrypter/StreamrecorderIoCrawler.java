@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.StreamrecorderIo;
 
-@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51365 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { StreamrecorderIo.class })
 public class StreamrecorderIoCrawler extends PluginForDecrypt {
     public StreamrecorderIoCrawler(PluginWrapper wrapper) {
@@ -197,34 +197,30 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String[] favinfos = br.getRegex("togglefavorite\\((\\d+, [^\\)]+)\\)").getColumn(0);
-        if (favinfos == null || favinfos.length == 0) {
-            final String totalRecordings = br.getRegex("class=\"count\">(\\d+)</div>\\s*<div class=\"title\"[^^>]*>\\s*Total recordings\\s*</div>").getMatch(0);
-            if (StringUtils.equals(totalRecordings, "0")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        final String error_msg_no_recordings = "User has zero recordings";
+        final String[] user_ids = br.getRegex("content-(\\d+)").getColumn(0);
+        if (user_ids == null || user_ids.length == 0) {
+            final String totalNumberofRecordingsStr = br.getRegex("class=\"count\">(\\d+)</div>\\s*<div class=\"title\"[^^>]*>\\s*Total recordings\\s*</div>").getMatch(0);
+            if (totalNumberofRecordingsStr != null && totalNumberofRecordingsStr.equals("0")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, error_msg_no_recordings);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
         final HashSet<String> dupes_user_ids = new HashSet<String>();
-        userloop: for (final String favinfo : favinfos) {
-            final String[] vars = favinfo.replace("'", "").split(", ");
-            final String userID = vars[0];
-            final String username = vars[1];
-            if (displayName != null && !StringUtils.equalsIgnoreCase(displayName, username)) {
+        int numberOfUsersWithZeroRecordings = 0;
+        userloop: for (final String user_id : user_ids) {
+            if (!dupes_user_ids.add(user_id)) {
+                /* Prevent crawling the same user_id multiple times. */
                 continue userloop;
             }
-            if (!dupes_user_ids.add(userID)) {
-                /* Skip duplicates */
-                continue userloop;
-            }
+            String username = null;
             int offset = 0;
             final int maxItemsPerPage = 20;
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(username);
+            FilePackage fp = null;
             fetchUserVideoLoop: do {
                 final UrlQuery query = new UrlQuery();
-                query.appendEncoded("targetid", userID);
+                query.appendEncoded("targetid", user_id);
                 query.appendEncoded("offset", Integer.toString(offset));
                 query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
                 final Browser brc = br.cloneBrowser();
@@ -235,17 +231,27 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorStr);
                 }
-                final int count = ((Number) entries.get("count")).intValue();
+                final int totalNumberofRecordings = ((Number) entries.get("count")).intValue();
+                if (totalNumberofRecordings == 0) {
+                    numberOfUsersWithZeroRecordings++;
+                    continue;
+                }
                 final List<Map<String, Object>> recordings = (List<Map<String, Object>>) entries.get("data");
                 int newItemsThisPage = 0;
                 final ArrayList<DownloadLink> thisresults = new ArrayList<DownloadLink>();
-                recordingsLoop: for (final Map<String, Object> recordingMap : recordings) {
+                recordingsLoop: for (final Map<String, Object> recording : recordings) {
+                    if (username == null) {
+                        /* First loop */
+                        username = recording.get("target_name").toString();
+                        fp = FilePackage.getInstance();
+                        fp.setName(username);
+                    }
                     if (recordingIDs != null) {
-                        if (!recordingIDs.remove(StringUtils.valueOfOrNull(recordingMap.get("id")))) {
+                        if (!recordingIDs.remove(StringUtils.valueOfOrNull(recording.get("id")))) {
                             continue recordingsLoop;
                         }
                     }
-                    final List<DownloadLink> results = parseRecordingEntry(account, userID, username, null, recordingMap);
+                    final List<DownloadLink> results = parseRecordingEntry(account, user_id, username, null, recording);
                     // parentID -> another recording that belongs to same "recording" session, see /playlist/ or playListMode
                     newItemsThisPage += results.size();
                     thisresults.addAll(results);
@@ -257,22 +263,27 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
                         distribute(thisresult);
                     }
                 }
-                logger.info("UserID" + userID + " | Crawled page: " + "" + " | Offset: " + offset + "/" + count + " | Found items so far: " + ret.size());
+                logger.info("UserID" + user_id + " | Crawled page: " + "" + " | Offset: " + offset + "/" + totalNumberofRecordings + " | Found items so far: " + ret.size());
                 offset += recordings.size();
-                if (recordingIDs != null && recordingIDs.size() == 0) {
+                if (recordingIDs != null && recordingIDs.isEmpty()) {
+                    logger.info("UserID " + user_id + ": Stopping because: recordingIDs array is empty");
                     break fetchUserVideoLoop;
                 }
                 if (newItemsThisPage == 0 && recordingIDs == null) {
-                    logger.info("UserID " + userID + ": Stopping because: Reached end?");
+                    logger.info("UserID " + user_id + ": Stopping because: Reached end?");
                     break fetchUserVideoLoop;
                 } else if (this.isAbort()) {
                     /* Aborted by user */
                     throw new InterruptedException();
-                } else if (offset >= count) {
-                    logger.info("UserID " + userID + ": Stopping because: Reached end");
+                } else if (offset >= totalNumberofRecordings) {
+                    logger.info("UserID " + user_id + ": Stopping because: Reached end");
                     break fetchUserVideoLoop;
                 }
             } while (!this.isAbort());
+        }
+        if (ret.isEmpty() && numberOfUsersWithZeroRecordings > 0) {
+            /* Edge case: User is following some users but none of them have any recorded videos available. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, error_msg_no_recordings);
         }
         return ret;
     }

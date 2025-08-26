@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51355 $", interfaceVersion = 2, names = { "uflash.tv" }, urls = { "https?://(?:www\\.)?uflash\\.tv/video/(\\d+)" })
+@HostPlugin(revision = "$Revision: 51365 $", interfaceVersion = 2, names = { "uflash.tv" }, urls = { "https?://(?:www\\.)?uflash\\.tv/video/(\\d+)" })
 public class UflashTv extends PluginForHost {
     public UflashTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,7 +89,7 @@ public class UflashTv extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = br.getRegex("VIDEO \\| ([^<>\"]*?) \\| UFLASH\\.TV").getMatch(0);
-        title = Encoding.htmlDecode(title.trim());
+        title = Encoding.htmlDecode(title).trim();
         if (title == null) {
             title = fid;
         }
@@ -137,7 +137,8 @@ public class UflashTv extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return 3;
+        /* 2025-08-25: Set to 1 to prevent error 503, see: https://board.jdownloader.org/showthread.php?t=97782 */
+        return 1;
     }
 
     @Override

@@ -23,7 +23,6 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.components.config.ProleechLinkConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -33,7 +32,6 @@ import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -46,13 +44,14 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
-public class ProLeechLink extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 51365 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+public class ProLeechLink extends PluginForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://proleech.link/signup");
+        this.enablePremium("https://" + getHost() + "/signup");
         if (useAPIOnly()) {
             /* 2020-06-04: API allows more requests in a short time than website does */
             /* 2020-06-05: API does not have rate limits at all (RE: admin) */
@@ -130,14 +129,14 @@ public class ProLeechLink extends antiDDoSForHost {
         {
             /* Grab free hosts */
             if (br.getURL() == null || !br.getURL().contains("/downloader")) {
-                this.getPage("/downloader");
+                br.getPage("/downloader");
             }
             final String html_free_filehosts = br.getRegex("<section id=\"content\">.*?Free Filehosters</div>.*?</section>").getMatch(-1);
             filehosts_free = new Regex(html_free_filehosts, "domain=([^\"]+)").getColumn(0);
         }
         {
             /* Grab premium hosts */
-            getPage("/page/hostlist");
+            br.getPage("/page/hostlist");
             filehosts_premium_onlineArray = this.regexPremiumHostsOnlineWebsite(br);
             traffic_max_dailyStr = this.regexMaxDailyTrafficWebsite(br);
         }
@@ -167,14 +166,14 @@ public class ProLeechLink extends antiDDoSForHost {
         /* Clear download history on every accountcheck (if selected by user) */
         clearDownloadHistoryWebsite(account, true);
         /* 2020-06-04: Workaround: Save apikey to try to use API for downloading */
-        this.getPage("/jdownloader");
-        final String apiuser = br.getRegex("(?i)<h4>\\s*API Username\\s*:\\s*</h4>\\s*<p>([^<>\"]+)</p>").getMatch(0);
+        br.getPage("/jdownloader");
+        final String apiuser = br.getRegex("<h4>\\s*API Username\\s*:\\s*</h4>\\s*<p>([^<>\"]+)</p>").getMatch(0);
         final String apikey = br.getRegex("class=\"apipass\"[^>]*>([a-z0-9]+)<").getMatch(0);
         String accstatus = ai.getStatus();
         if (accstatus == null) {
             accstatus = "";
         }
-        if (apiuser != null && this.isAPIKey(apikey)) {
+        if (apiuser != null && this.looksLikeValidAPIKey(apikey)) {
             logger.info(String.format("Successfully found apikey and user: %s:%s", apiuser, apikey));
             account.setProperty(PROPERTY_ACCOUNT_apiuser, apiuser);
             account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
@@ -199,7 +198,7 @@ public class ProLeechLink extends antiDDoSForHost {
             account.setType(AccountType.PREMIUM);
             /* Get list of supported hosts from website */
             try {
-                getPage("/page/hostlist");
+                br.getPage("/page/hostlist");
                 filehosts_premium_onlineArray = regexPremiumHostsOnlineWebsite(br);
                 trafficmaxDailyStr = this.regexMaxDailyTrafficWebsite(br);
             } catch (final Exception e) {
@@ -212,7 +211,7 @@ public class ProLeechLink extends antiDDoSForHost {
             /* Small workaround: Use website to find daily max traffic value as API doesn't provide that information. */
             try {
                 final Browser brc = br.cloneBrowser();
-                this.getPage(brc, "/page/hostlist");
+                brc.getPage("/page/hostlist");
                 trafficmaxDailyStr = this.regexMaxDailyTrafficWebsite(brc);
             } catch (final Exception ignore) {
                 logger.log(ignore);
@@ -220,6 +219,7 @@ public class ProLeechLink extends antiDDoSForHost {
             if (trafficmaxDailyStr == null) {
                 /* 2022-19-08: Fallback: Static value taken from: https://proleech.link/page/hostlist */
                 /* 2023-09-03: asked by admin to increase to 200GB */
+                /* 2025-08-25: asked by admin to increase to 400GB */
                 trafficmaxDailyStr = "200 GB";
             }
             final Object premiumO = entries.get("premium");
@@ -253,7 +253,7 @@ public class ProLeechLink extends antiDDoSForHost {
             }
         }
         /* Host specific traffic limits would be here: http://proleech.link/dl/debrid/deb_api.php?limits */
-        this.getPage(API_BASE + "?hosts");
+        br.getPage(API_BASE + "?hosts");
         final String[] supportedhostsAPI = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.STRING_ARRAY);
         for (final String filehost_premium_online : supportedhostsAPI) {
             if (filehost_premium_online.contains("/")) {
@@ -277,9 +277,9 @@ public class ProLeechLink extends antiDDoSForHost {
         final String saved_apikey = account.getStringProperty(PROPERTY_ACCOUNT_apikey);
         String apiuser = null;
         String apikey = null;
-        if (!this.isAPIKey(account.getPass()) && !this.isAPIKey(saved_apikey) && !this.isAPIKey(account.getPass())) {
+        if (!this.looksLikeValidAPIKey(account.getPass()) && !this.looksLikeValidAPIKey(saved_apikey) && !this.looksLikeValidAPIKey(account.getPass())) {
             this.apiInvalidApikey(account);
-        } else if (this.isAPIKey(account.getPass())) {
+        } else if (this.looksLikeValidAPIKey(account.getPass())) {
             apiuser = account.getUser();
             apikey = account.getPass();
         } else {
@@ -295,10 +295,10 @@ public class ProLeechLink extends antiDDoSForHost {
         logger.info("Performing full API login");
         if (useAPILoginWorkaround()) {
             final UrlQuery query = new UrlQuery();
-            query.add("apiusername", Encoding.urlEncode(apiuser));
-            query.add("apikey", Encoding.urlEncode(apikey));
-            query.add("link", "null");
-            this.getPage(API_BASE + "?" + query.toString());
+            query.appendEncoded("apiusername", apiuser);
+            query.appendEncoded("apikey", apikey);
+            query.appendEncoded("link", "null");
+            br.getPage(API_BASE + "?" + query.toString());
             /* 2020-06-04: We expect this - otherwise probably wrong logindata: {"error":1,"message":"Link not supported or empty link."} */
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Number error = (Number) entries.get("error");
@@ -309,10 +309,10 @@ public class ProLeechLink extends antiDDoSForHost {
             account.setType(AccountType.PREMIUM);
         } else {
             final UrlQuery query = new UrlQuery();
-            query.add("apiusername", Encoding.urlEncode(apiuser));
-            query.add("apikey", Encoding.urlEncode(apikey));
-            query.add("account", "");
-            this.getPage(API_BASE + "?" + query.toString());
+            query.appendEncoded("apiusername", apiuser);
+            query.appendEncoded("apikey", apikey);
+            query.appendEncoded("account", "");
+            br.getPage(API_BASE + "?" + query.toString());
             this.checkErrorsAPI(null, account);
         }
         /* Just to save last login timestamp, we don't need these cookies! */
@@ -368,7 +368,7 @@ public class ProLeechLink extends antiDDoSForHost {
                 try {
                     String message = "";
                     final String title;
-                    final String loginurl = "https://proleech.link/jdownloader";
+                    final String loginurl = getAPILoginHelpURL();
                     if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
                         title = "Proleech.link - Login";
                         message += "Hallo liebe(r) proleech NutzerIn\r\n";
@@ -458,15 +458,15 @@ public class ProLeechLink extends antiDDoSForHost {
                     if (!validateCookies) {
                         return false;
                     }
-                    getPage("https://" + this.getHost() + "/member");
+                    br.getPage("https://" + this.getHost() + "/member");
                     br.followRedirect();
                     loggedIN = this.isLoggedinWebsite(this.br);
                 }
                 if (!loggedIN) {
                     logger.info("Performing full login");
-                    br.clearCookies(getHost());
-                    getPage("https://" + this.getHost());
-                    getPage("/login");
+                    br.clearCookies(null);
+                    br.getPage("https://" + this.getHost());
+                    br.getPage("/login");
                     final Form loginform = br.getFormbyAction("/login");
                     if (loginform == null) {
                         logger.warning("Failed to find loginform");
@@ -489,10 +489,10 @@ public class ProLeechLink extends antiDDoSForHost {
                         final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
                         loginform.put("g-recaptcha-response", URLEncoder.encode(recaptchaV2Response, "UTF-8"));
                     }
-                    submitForm(loginform);
+                    br.submitForm(loginform);
                     br.followRedirect();
                     if (!br.getURL().contains("/member")) {
-                        getPage("/member");
+                        br.getPage("/member");
                     }
                     if (!isLoggedinWebsite(this.br)) {
                         /* On failure, recommend user to use API mode instead of website mode! */
@@ -504,7 +504,7 @@ public class ProLeechLink extends antiDDoSForHost {
                  * 2019-11-19: Important! This is NOT the 'daily traffic used' - this is the total traffic ever used with the current
                  * account! We can display it in the account status but we cannot use this to calculate the remaining traffic!
                  */
-                final String total_traffic_ever_used_with_this_accountStr = br.getRegex("(?i)Bandwidth Used\\s*:\\s*<span[^<>]*><b>\\s*(\\d+(?:\\.\\d{1,2})[ ]*[A-Za-z]+)\\s*<").getMatch(0);
+                final String total_traffic_ever_used_with_this_accountStr = br.getRegex("Bandwidth Used\\s*:\\s*<span[^<>]*><b>\\s*(\\d+(?:\\.\\d{1,2})[ ]*[A-Za-z]+)\\s*<").getMatch(0);
                 final String activeSubscription = br.getRegex("am-list-subscriptions\">\\s*<li[^<]*>(.*?)</li>").getMatch(0);
                 String accountStatus = null;
                 if (activeSubscription != null) {
@@ -526,13 +526,13 @@ public class ProLeechLink extends antiDDoSForHost {
                     account.setConcurrentUsePossible(true);
                     if (ai != null) {
                         /* Only get/set hostlist if we're not currently trying to download a file (quick login) */
-                        getPage("/downloader");
+                        br.getPage("/downloader");
                         int maxfiles_per_day_used = 0;
                         int maxfiles_per_day_maxvalue = 0;
-                        final Regex maxfiles_per_day = br.getRegex("(?i)<li>Files per day\\s*:\\s*?<b>\\s*?(\\d+)?\\s*?/\\s*?(\\d+)\\s*?</li>");
+                        final Regex maxfiles_per_day = br.getRegex("<li>\\s*Files per day\\s*:\\s*?<b>\\s*?(\\d+)?\\s*?/\\s*?(\\d+)\\s*?</li>");
                         final String maxfiles_per_day_usedStr = maxfiles_per_day.getMatch(0);
                         final String maxfiles_per_day_maxvalueStr = maxfiles_per_day.getMatch(1);
-                        final String max_free_filesize = br.getRegex("(?i)<li>Max\\. Filesize\\s*:\\s*<b>(\\d+ [^<>\"]+)</li>").getMatch(0);
+                        final String max_free_filesize = br.getRegex("<li>\\s*Max\\. Filesize\\s*:\\s*<b>(\\d+ [^<>\"]+)</li>").getMatch(0);
                         if (maxfiles_per_day_usedStr != null) {
                             maxfiles_per_day_used = Integer.parseInt(maxfiles_per_day_usedStr);
                         }
@@ -684,12 +684,13 @@ public class ProLeechLink extends antiDDoSForHost {
                             post.put("pass", URLEncoder.encode(pass, "UTF-8"));
                         }
                         post.put("boxlinklist", "0");
-                        sendRequest(post);
+                        br.getPage(post);
                         dllink = getDllinkWebsite(link, account);
                         if (StringUtils.isEmpty(dllink) && !validatedCookies && !this.isLoggedinWebsite(this.br)) {
                             /* Bad login - try again with fresh / validated cookies! */
                             loginWebsite(account, null, true);
-                            sendRequest(post);
+                            post.resetConnection();
+                            br.getPage(post);
                             dllink = getDllinkWebsite(link, account);
                         }
                     }
@@ -736,7 +737,7 @@ public class ProLeechLink extends antiDDoSForHost {
                  */
                 if (br.getURL() == null || !br.getURL().contains("/mydownloads")) {
                     /* Only access this URL if it has not been accessed before! */
-                    getPage("https://" + this.getHost() + "/mydownloads");
+                    br.getPage("https://" + this.getHost() + "/mydownloads");
                 }
                 final String[] cloudDownloadRows = getDownloadHistoryRowsWebsite();
                 final ArrayList<String> filename_entries_to_delete = new ArrayList<String>();
@@ -930,11 +931,11 @@ public class ProLeechLink extends antiDDoSForHost {
             } else {
                 logger.info("Checking for directurl of NON-forced cloud download URL");
             }
-            getPage("https://" + this.getHost() + "/mydownloads");
+            br.getPage("https://" + this.getHost() + "/mydownloads");
             if (!this.isLoggedinWebsite(this.br)) {
                 /* Ensure that we're logged-in */
                 loginWebsite(account, null, true);
-                getPage("/mydownloads");
+                br.getPage("/mydownloads");
             }
             final String errortext_basic = "Proleech.link Cloud-downloader:";
             boolean foundDownloadHistoryRow = false;
@@ -996,10 +997,10 @@ public class ProLeechLink extends antiDDoSForHost {
         prepBrAPI(this.br);
         final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
         final UrlQuery query = new UrlQuery();
-        query.add("apiusername", Encoding.urlEncode(apiuser));
-        query.add("apikey", Encoding.urlEncode(apikey));
-        query.add("link", Encoding.urlEncode(url));
-        this.getPage(API_BASE + "?" + query.toString());
+        query.appendEncoded("apiusername", apiuser);
+        query.appendEncoded("apikey", apikey);
+        query.appendEncoded("link", url);
+        br.getPage(API_BASE + "?" + query.toString());
         checkErrorsAPI(link, account);
         /*
          * 2020-06-04: E.g. success response: {"error":0,"message":"OK","hoster":"http:CENSORED","link":"http:CENSORED","size":"10.15 MB"}
@@ -1088,11 +1089,24 @@ public class ProLeechLink extends antiDDoSForHost {
         }
     }
 
-    private boolean isAPIKey(final String str) {
+    @Override
+    protected String getAPILoginHelpURL() {
+        return "https://" + getAPILoginHelpURLWithoutProtocol();
+    }
+
+    protected String getAPILoginHelpURLWithoutProtocol() {
+        return getHost() + "/jdownloader";
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
+        } else if (str.matches("[a-z0-9]{21}")) {
+            return true;
+        } else {
+            return false;
         }
-        return str.matches("[a-z0-9]{21}");
     }
 
     /** Invalid API Username and/or API Key. */
@@ -1108,9 +1122,9 @@ public class ProLeechLink extends antiDDoSForHost {
             logger.log(npe);
         }
         if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-            throw new AccountInvalidException("API Username/API Key ungültig!\r\n Siehe proleech.link/jdownloader");
+            throw new AccountInvalidException("API Username/API Key ungültig!\r\n Siehe " + getAPILoginHelpURLWithoutProtocol());
         } else {
-            throw new AccountInvalidException("API Username/API Key invalid!\r\n See proleech.link/jdownloader");
+            throw new AccountInvalidException("API Username/API Key invalid!\r\n See " + getAPILoginHelpURLWithoutProtocol());
         }
     }
 
@@ -1127,9 +1141,9 @@ public class ProLeechLink extends antiDDoSForHost {
             logger.log(npe);
         }
         if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-            throw new AccountInvalidException("API Key ungültig!\r\n Siehe proleech.link/jdownloader");
+            throw new AccountInvalidException("API Key ungültig!\r\n Siehe " + getAPILoginHelpURLWithoutProtocol());
         } else {
-            throw new AccountInvalidException("API Key invalid!\r\n See proleech.link/jdownloader");
+            throw new AccountInvalidException("API Key invalid!\r\n See " + getAPILoginHelpURLWithoutProtocol());
         }
     }
 
@@ -1163,7 +1177,11 @@ public class ProLeechLink extends antiDDoSForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+        if (this.useAPIOnly()) {
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.API_KEY_LOGIN };
+        } else {
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+        }
     }
 
     @Override

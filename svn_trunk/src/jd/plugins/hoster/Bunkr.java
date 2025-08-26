@@ -40,7 +40,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 51364 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51366 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -490,7 +490,10 @@ public class Bunkr extends PluginForHost {
         if (accessURL) {
             br.getPage(singleFileURL);
             if (br.getHttpConnection().getResponseCode() == 404) {
-                // dirty workaround for filenames that contain html encoded entities
+                /**
+                 * dirty workaround for filenames that contain html encoded entities, see: <br>
+                 * https://board.jdownloader.org/showthread.php?t=97785
+                 */
                 String htmlCoded = singleFileURL;
                 htmlCoded = URLEncode.decodeURIComponent(htmlCoded, new Decoder() {
                     @Override

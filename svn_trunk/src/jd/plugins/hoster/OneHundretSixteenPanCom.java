@@ -15,10 +15,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51351 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51367 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -112,7 +112,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final String fid = this.getFID(link);
@@ -127,12 +127,15 @@ public class OneHundretSixteenPanCom extends PluginForHost {
         }
         String filename = br.getRegex("<h1>([^<]+)</h1>").getMatch(0);
         String filesize = br.getRegex(">\\s*文件大小：([^<]+)").getMatch(0);
+        final Pattern newlinkpattern = Pattern.compile("https?://(?:www\\.)?116pan\\.xyz/f/[a-zA-Z0-9]+", Pattern.CASE_INSENSITIVE);
+        String newLink = null;
+        boolean allowImmediateCheckAvailablestatusViaForeignPlugin = false;
         if (br.getHost().equals("116pan.com")) {
             /**
              * 2025-07-15: Some migration helper code for migration from 116pan.com to 116pan.xyz <br>
              * See: https://board.jdownloader.org/showthread.php?t=96948
              */
-            final String newLink = br.getRegex("window\\.location\\.href = '(https?://(?:www\\.)?116pan\\.xyz/f/[a-zA-Z0-9]+)';").getMatch(0);
+            newLink = br.getRegex("window\\.location\\.href = '(" + newlinkpattern.pattern() + ")';").getMatch(0);
             if (newLink != null) {
                 if (filesize == null) {
                     /* Grab filesize from html tag "keywords" or "description" */
@@ -142,27 +145,43 @@ public class OneHundretSixteenPanCom extends PluginForHost {
                     /* Grab filename from html tag "description" */
                     filename = br.getRegex("name=\"description\" content=\"([^\"]+)免费高速网盘下载，").getMatch(0);
                 }
-                // if (StringUtils.isEmpty(link.getComment())) {
-                // link.setComment("New link: " + newLink);
-                // }
-                if (this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
-                    // throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported redirect to new system: " + newLink + " -> Manually
-                    // re-add this link to JDownloader to be able to download this file");
-                    try {
-                        final PluginForHost newPlugin = getNewPluginForHostInstance("116pan.xyz").getLazyP().getPrototype(null);
-                        link.setDefaultPlugin(newPlugin);
-                        link.setHost(newPlugin.getHost());
-                        link.setPluginPatternMatcher(newLink);
-                        link.setDomainInfo(null);
+            }
+            allowImmediateCheckAvailablestatusViaForeignPlugin = false;
+        } else if (new Regex(br.getURL(), newlinkpattern).patternFind()) {
+            /* 2025-08-25: Code for "direct-migrated" links that do a straight redirect to new domain/system. */
+            newLink = br.getURL();
+            allowImmediateCheckAvailablestatusViaForeignPlugin = true;
+        }
+        if (newLink != null) {
+            // if (StringUtils.isEmpty(link.getComment())) {
+            // link.setComment("New link: " + newLink);
+            // }
+            final boolean isDownload = this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD;
+            if (isDownload || allowImmediateCheckAvailablestatusViaForeignPlugin) {
+                // throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported redirect to new system: " + newLink + " -> Manually
+                // re-add this link to JDownloader to be able to download this file");
+                try {
+                    final PluginForHost newPlugin = getNewPluginForHostInstance("116pan.xyz").getLazyP().getPrototype(null);
+                    link.setDefaultPlugin(newPlugin);
+                    link.setHost(newPlugin.getHost());
+                    link.setPluginPatternMatcher(newLink);
+                    link.setDomainInfo(null);
+                    if (!isDownload && allowImmediateCheckAvailablestatusViaForeignPlugin) {
+                        /* Init new plugin */
+                        newPlugin.setBrowser(this.br);
+                        newPlugin.setLogger(this.getLogger());
+                        return newPlugin.requestFileInformation(link);
+                    } else {
                         throw new PluginException(LinkStatus.ERROR_RETRY, "Retry link that has been migrated from 116pan.com to 116pan.xyz");
-                    } catch (UpdateRequiredClassNotFoundException e) {
-                        getLogger().log(e);
                     }
+                } catch (UpdateRequiredClassNotFoundException e) {
+                    getLogger().log(e);
                 }
             }
         }
         if (filename != null) {
-            link.setName(Encoding.htmlDecode(filename).trim());
+            filename = Encoding.htmlDecode(filename).trim();
+            link.setName(filename);
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize + "b"));
