@@ -138,10 +138,13 @@ public class TestWindowsUtils extends AWTest {
         // Test startElevatedProcess
         long started = Time.now();
         INT_PTR processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "heise.de" }, null, false);
+
         assertNotNull(processHandle);
         assertTrue(Time.now() - started > 1000);
         // Test getProcessId
         int pid = WindowsUtils.getProcessId(processHandle);
+        Integer exitCode = WindowsUtils.waitForPID(pid, 2000);
+        assertNull(exitCode);
         assertTrue(pid > 0);
         // Verify process exists
         List<ProcessInfo> processes = ProcessHandlerFactory.getProcessHandler().listByPids(pid);
@@ -152,8 +155,10 @@ public class TestWindowsUtils extends AWTest {
         // Wait a bit to see the process
         Thread.sleep(1000);
         // Test terminateProcess
-        boolean killed = WindowsUtils.terminateProcess(processHandle, 1);
+        boolean killed = WindowsUtils.terminateProcess(processHandle, 5);
         assertTrue(killed);
+        exitCode = WindowsUtils.waitForPID(pid, -1);
+        assertEquals(5, exitCode);
         // Verify process is gone
         List<ProcessInfo> processesAfter = ProcessHandlerFactory.getProcessHandler().listByPids(pid);
         assertTrue(processesAfter.isEmpty());

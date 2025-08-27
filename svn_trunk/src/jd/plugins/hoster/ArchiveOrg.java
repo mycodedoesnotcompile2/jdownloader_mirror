@@ -36,28 +36,6 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.CryptedLink;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.decrypter.ArchiveOrgCrawler;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -81,7 +59,29 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.seamless.util.io.IO;
 
-@HostPlugin(revision = "$Revision: 51061 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.CryptedLink;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.ArchiveOrgCrawler;
+
+@HostPlugin(revision = "$Revision: 51376 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,8 +111,9 @@ public class ArchiveOrg extends PluginForHost {
         if (isAudioPlaylistItem(link)) {
             /**
              * This enables us to add the same link twice, one time as playlist item (with different filenames) and one time as "original
-             * file". </br> We basically need to trick our own duplicate detection to allow the user to add a file as playlist item and
-             * "original" at the same time.
+             * file". </br>
+             * We basically need to trick our own duplicate detection to allow the user to add a file as playlist item and "original" at the
+             * same time.
              */
             return super.getLinkID(link) + "_audio_playlist_item";
         } else if (this.isBook(link)) {
@@ -331,8 +332,9 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * Returns true if this book page is borrowed at this moment. </br> This information is only useful with the combination of the
-     * borrow-cookies and can become invalid at any point of time if e.g. the user returns the book manually via browser.
+     * Returns true if this book page is borrowed at this moment. </br>
+     * This information is only useful with the combination of the borrow-cookies and can become invalid at any point of time if e.g. the
+     * user returns the book manually via browser.
      */
     private boolean isLendAtThisMoment(final DownloadLink link) {
         final long borrowedUntilTimestamp = link.getLongProperty(PROPERTY_IS_BORROWED_UNTIL_TIMESTAMP, -1);
@@ -365,8 +367,8 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * A special string that is the same as the bookID but different for multi volume books. </br> ...thus only relevant for multi volume
-     * books.
+     * A special string that is the same as the bookID but different for multi volume books. </br>
+     * ...thus only relevant for multi volume books.
      */
     private String getBookSubPrefix(final DownloadLink link) {
         return link.getStringProperty(PROPERTY_BOOK_SUB_PREFIX);
@@ -447,9 +449,10 @@ public class ArchiveOrg extends PluginForHost {
         if (link.getHashInfo() != null) {
             /**
              * Check if we can use the current HashInfo. Delete it if we can't be sure that the file we are going to download is the same
-             * file/version which was initially crawled. </br> Getting the current/new file-hash would also be too much effort and in most
-             * of all cases the files won't have changed until download is initiated but it is relly important to clear the hash if in doubt
-             * otherwise the user may get a "CRC check failed" error message for no reason.
+             * file/version which was initially crawled. </br>
+             * Getting the current/new file-hash would also be too much effort and in most of all cases the files won't have changed until
+             * download is initiated but it is relly important to clear the hash if in doubt otherwise the user may get a "CRC check failed"
+             * error message for no reason.
              */
             boolean deleteHashInfo = false;
             final long lastModifiedTimestampFromAPI = link.getLongProperty(PROPERTY_TIMESTAMP_FROM_API_LAST_MODIFIED, -1);
@@ -587,7 +590,7 @@ public class ArchiveOrg extends PluginForHost {
             lendingInfoForBeforeDownload = this.getLendingInfo(link, account);
         } else {
             if (this.requiresAccount(link)) {
-                throw new AccountRequiredException();
+                throw new AccountRequiredException(ERRORMSG_ACCOUNT_REQUIRED_TO_DOWNLOAD_BOOK_PAGE);
             }
         }
         cleanupBorrowSessionMap();
@@ -833,12 +836,13 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * Borrows given bookID which gives us a token we can use to download all pages of that book. </br> It is typically valid for one hour.
+     * Borrows given bookID which gives us a token we can use to download all pages of that book. </br>
+     * It is typically valid for one hour.
      */
     private void borrowBook(final Browser br, final Account account, final String bookID, final boolean skipAllExceptLastStep) throws Exception {
         if (account == null) {
             /* Account is required to borrow books. */
-            throw new AccountRequiredException();
+            throw new AccountRequiredException("Account required to allow for downloading books that need to be borrowed");
         } else if (bookID == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -867,9 +871,9 @@ public class ArchiveOrg extends PluginForHost {
                     if (StringUtils.equalsIgnoreCase(error, "This book is not available to borrow at this time. Please try again later.")) {
                         /**
                          * Happens if you try to borrow a book that can't be borrowed or if you try to borrow a book while too many
-                         * (2022-08-31: max 10) books per hour have already been borrowed with the current account. </br> With setting this
-                         * timestamp we can ensure not to waste more http requests on trying to borrow books but simply set error status on
-                         * all future links [for the next 60 minutes].
+                         * (2022-08-31: max 10) books per hour have already been borrowed with the current account. </br>
+                         * With setting this timestamp we can ensure not to waste more http requests on trying to borrow books but simply
+                         * set error status on all future links [for the next 60 minutes].
                          */
                         account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_BORROW_LIMIT_REACHED, Time.systemIndependentCurrentJVMTimeMillis());
                         /*

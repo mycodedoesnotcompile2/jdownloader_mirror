@@ -59,6 +59,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.jna.windows.Kernel32Ext;
@@ -180,7 +181,6 @@ public class WindowsUtils {
         SYNCHRONIZE(WinNT.SYNCHRONIZE),
         @StorableDoc("Access system security.")
         ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY);
-
         public final int mask;
 
         private AccessPermission(int mask) {
@@ -271,7 +271,6 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
-
         public final String sid;
 
         private SID(String sid) {
@@ -1429,7 +1428,6 @@ public class WindowsUtils {
              * Application is critical to system operation
              */
             RmCritical(6);
-
             private final int value;
 
             ApplicationType(int value) {
@@ -1661,8 +1659,88 @@ public class WindowsUtils {
         }
     }
 
-    private static String escapeXml(String input) {
+    // Access rights: need SYNCHRONIZE to wait, QUERY to read exit code
+    private static final int SYNCHRONIZE                       = 0x00100000;
+    private static final int PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;    // Vista+
 
+    /**
+     * Wait until the process with the given PID exits.
+     *
+     * @param pid
+     *            Windows process id
+     * @param timeoutMillis
+     *            0 = no wait, <0 = infinite, >0 = milliseconds
+     * @return exit code if process exited; null if timeout
+     * @throws IllegalStateException
+     *             on Win32 API error or if process handle can't be opened
+     */
+    public static Integer waitForPID(int pid, long timeoutMillis) throws InterruptedException {
+        final int access = SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION;
+        final HANDLE hProcess = Kernel32.INSTANCE.OpenProcess(access, false, pid);
+        if (hProcess == null || Pointer.nativeValue(hProcess.getPointer()) == 0) {
+            int err = Kernel32.INSTANCE.GetLastError();
+            throw new IllegalStateException("OpenProcess failed, pid=" + pid + ", error=" + err);
+        }
+        try {
+            // Interruptible polling parameters
+            final int pollMs = 200; // adjust if you want finer granularity
+            // Compute absolute deadline if a finite timeout was requested
+            final boolean infinite = (timeoutMillis < 0);
+            final long start = System.nanoTime();
+            final long deadlineNanos = infinite ? Long.MAX_VALUE : start + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+            while (true) {
+                // Compute remaining time for this poll
+                long now = System.nanoTime();
+                long remainingNanos = deadlineNanos - now;
+                if (!infinite && remainingNanos <= 0) {
+                    return null; // timed out
+                }
+                int thisWaitMs = infinite ? pollMs : (int) Math.max(1, Math.min(pollMs, TimeUnit.NANOSECONDS.toMillis(remainingNanos)));
+                int res = Kernel32.INSTANCE.WaitForSingleObject(hProcess, thisWaitMs);
+                if (res == WinBase.WAIT_OBJECT_0) {
+                    // Process exited → return exit code
+                    IntByReference exitRef = new IntByReference();
+                    ;
+                    if (!Kernel32.INSTANCE.GetExitCodeProcess(hProcess, exitRef)) {
+                        int err = Kernel32.INSTANCE.GetLastError();
+                        throw new IllegalStateException("GetExitCodeProcess failed, error=" + err);
+                    }
+                    return exitRef.getValue();
+                } else if (res == WinError.WAIT_TIMEOUT) {
+                    // Check Java interrupt between polls
+                    if (Thread.interrupted()) {
+                        throw new InterruptedException("Interrupted while waiting for pid=" + pid);
+                    }
+                    // loop and continue waiting
+                } else if (res == WinBase.WAIT_FAILED) {
+                    int err = Kernel32.INSTANCE.GetLastError();
+                    throw new IllegalStateException("WaitForSingleObject failed, error=" + err);
+                } else {
+                    int err = Kernel32.INSTANCE.GetLastError();
+                    throw new IllegalStateException("Unexpected wait result: " + res + ", lastError=" + err);
+                }
+            }
+        } finally {
+            Kernel32.INSTANCE.CloseHandle(hProcess); // does not kill the process
+        }
+    }
+
+    // Small helper since JNA lacks a simple DWORD ref type in some versions
+    public static class DWORDByRef extends com.sun.jna.ptr.ByReference {
+        public DWORDByRef() {
+            super(4);
+        }
+
+        public DWORD getValue() {
+            return new DWORD(getPointer().getInt(0));
+        }
+
+        public void setValue(DWORD v) {
+            getPointer().setInt(0, v.intValue());
+        }
+    }
+
+    private static String escapeXml(String input) {
         if (input == null) {
             return "";
         }
@@ -1674,7 +1752,6 @@ public class WindowsUtils {
         LogV3.info("Launch via Scheduler: " + binary + "  " + Arrays.toString(args) + " in " + workingDir);
         File file = Application.getResource("tmp/" + taskName + ".xml");
         file.delete();
-
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
         ZonedDateTime start = ZonedDateTime.now().plusMinutes(1);
         ZonedDateTime end = start.plusMinutes(2);
@@ -1684,8 +1761,7 @@ public class WindowsUtils {
         if (args.length > 0) {
             argumentsXMLNode = "<Arguments>" + escapeXml(ShellParser.createCommandLine(Style.WINDOWS, args)) + "</Arguments>\n";
         }
-
-     // @formatter:off
+        // @formatter:off
         String xml =
                 "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n" +
                 "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n" +
@@ -1725,13 +1801,10 @@ public class WindowsUtils {
                 "  </Actions>\n" +
                 "</Task>";
      // @formatter:on
-
         ByteArrayOutputStream bao = new ByteArrayOutputStream();
         bao.write(BOM.UTF16LE.getBOM());
         bao.write(xml.getBytes("UTF-16LE"));
-
         IO.secureWrite(file, bao.toByteArray(), SYNC.META_AND_DATA);
-
         try {
             try {
                 LogV3.info("Create Task");
@@ -1746,7 +1819,6 @@ public class WindowsUtils {
                 if (result.getExitCode() != 0) {
                     throw new WTFException(result.toString());
                 }
-
                 // Thread.sleep(1000);
             } finally {
                 LogV3.info("Delete Task");

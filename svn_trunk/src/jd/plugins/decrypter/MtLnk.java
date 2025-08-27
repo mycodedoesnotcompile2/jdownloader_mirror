@@ -41,7 +41,7 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-@DecrypterPlugin(revision = "$Revision: 45506 $", interfaceVersion = 2, names = { "metalinker.org" }, urls = { "http://[\\d\\w\\.:\\-@]*/.*?\\.(metalink|meta4)" })
+@DecrypterPlugin(revision = "$Revision: 51377 $", interfaceVersion = 2, names = { "metalinker.org" }, urls = { "http://[\\d\\w\\.:\\-@]*/.*?\\.(metalink|meta4)" })
 public class MtLnk extends PluginForDecrypt {
     private ArrayList<DownloadLink>         decryptedLinks;
     /* we use identity as package name if available */
@@ -49,14 +49,14 @@ public class MtLnk extends PluginForDecrypt {
     private String                          publisherName = null;
     private String                          publisherURL  = null;
     final private UnknownCrawledLinkHandler handler       = new UnknownCrawledLinkHandler() {
-        @Override
-                                                              public void unhandledCrawledLink(CrawledLink link, LinkCrawler lc) {
-                                                                  final DownloadLink dlLink = link.getDownloadLink();
-                                                                  if (dlLink != null && !StringUtils.startsWithCaseInsensitive(dlLink.getPluginPatternMatcher(), "directhttp://")) {
-                                                                      dlLink.setPluginPatternMatcher("directhttp://" + dlLink.getPluginPatternMatcher());
-                                                                  }
-                                                              }
-                                                          };
+                                                              @Override
+        public void unhandledCrawledLink(CrawledLink link, LinkCrawler lc) {
+            final DownloadLink dlLink = link.getDownloadLink();
+            if (dlLink != null && !StringUtils.startsWithCaseInsensitive(dlLink.getPluginPatternMatcher(), "directhttp://")) {
+                dlLink.setPluginPatternMatcher("directhttp://" + dlLink.getPluginPatternMatcher());
+            }
+        }
+    };
 
     public MtLnk(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,7 @@ public class MtLnk extends PluginForDecrypt {
 
     @Override
     public CrawledLink convert(DownloadLink link) {
-        final CrawledLink ret = new CrawledLink(link);
+        final CrawledLink ret = super.convert(link);
         ret.setUnknownHandler(handler);
         return ret;
     }

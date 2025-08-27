@@ -21,6 +21,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Request;
@@ -35,13 +41,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51371 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51373 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,7 +150,10 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                     throw new InterruptedException();
                 }
                 if (false) {
-                    /* 2025-08-25 -> api reports max 25 pages with 40 items/page, max 1000 but more pages may still exist */
+                    /*
+                     * 2025-08-25 -> api reports max 25 pages with 40 items/page, max 1000 but more pages may still exist e.g.
+                     * /users/romythicc
+                     */
                     if (isLastPage) {
                         logger.info("Stopping because: Reached last page: " + pageMax);
                         break pagination;

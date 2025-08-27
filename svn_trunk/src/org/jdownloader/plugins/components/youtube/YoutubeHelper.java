@@ -2854,6 +2854,7 @@ public class YoutubeHelper {
             }
         }
         if (ret != null) {
+            ret = ret.replaceFirst("player_.*?.vflset", "player_ias.vflset");
             return br.getURL(ret).toExternalForm();
         } else {
             return null;

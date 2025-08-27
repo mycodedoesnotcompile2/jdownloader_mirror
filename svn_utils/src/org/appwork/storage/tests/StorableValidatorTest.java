@@ -423,7 +423,7 @@ public class StorableValidatorTest extends AWTest {
                     logInfoAnyway("NULL raw " + gType + " ." + gType.getTypeName());
                 }
                 try {
-                    if (skipValidation(raw)) {
+                    if (raw != null && skipValidation(raw)) {
                         return true;
                     }
                 } catch (Exception e) {

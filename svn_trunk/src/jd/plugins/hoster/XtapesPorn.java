@@ -18,16 +18,18 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51367 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51373 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtapesPorn extends XFileSharingProBasic {
     public XtapesPorn(final PluginWrapper wrapper) {
         super(wrapper);
@@ -118,5 +120,21 @@ public class XtapesPorn extends XFileSharingProBasic {
             fileInfo[0] = betterFilename;
         }
         return fileInfo;
+    }
+
+    @Override
+    public String decodeDownloadLink(final DownloadLink link, final Account account, final Browser br, final String s) {
+        String dllink = super.decodeDownloadLink(link, account, br, s);
+        if (dllink == null) {
+            return null;
+        } else if (StringUtils.containsIgnoreCase(dllink, "master.m3u8")) {
+            /*
+             * 2025-08-26: Small hack as their stock .m3u8 links are invalid, they are modified via js to prevent tools from easily
+             * downloading them. We need to invalidate them here so that the upper handling prefers the official stream download.
+             */
+            return null;
+        } else {
+            return dllink;
+        }
     }
 }

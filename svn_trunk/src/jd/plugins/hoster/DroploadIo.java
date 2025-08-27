@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
@@ -27,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51324 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51374 $", interfaceVersion = 3, names = {}, urls = {})
 public class DroploadIo extends XFileSharingProBasic {
     public DroploadIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -58,7 +59,21 @@ public class DroploadIo extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_NORMAL                    = Pattern.compile("/([a-z0-9]{12})$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_OFFICIAL_VIDEO_DOWNLOAD   = Pattern.compile("/d/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_OFFICIAL_VIDEO_DOWNLOAD_2 = Pattern.compile("/v/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED_NEW                 = Pattern.compile("/e/([a-z0-9]{12})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED_OLD                 = Pattern.compile("/embed-([a-z0-9]{12})\\.html", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_NORMAL.pattern() + "|" + PATTERN_OFFICIAL_VIDEO_DOWNLOAD.pattern() + "|" + PATTERN_OFFICIAL_VIDEO_DOWNLOAD_2.pattern() + "|" + PATTERN_EMBED_NEW + "|" + PATTERN_EMBED_NEW + "|" + PATTERN_EMBED_OLD + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -114,8 +129,43 @@ public class DroploadIo extends XFileSharingProBasic {
             betterFileTitle = new Regex(html, "<h5 class=\"text-white\"[^>]*>([^<]+)</h5>").getMatch(0);
         }
         if (betterFileTitle != null) {
+            /* Overwrite possible previous result since we know that this one is better. */
             fileInfo[0] = betterFileTitle;
         }
         return fileInfo;
     }
+
+    @Override
+    protected URL_TYPE getURLType(final String url) {
+        if (url == null) {
+            return null;
+        }
+        if (new Regex(url, PATTERN_OFFICIAL_VIDEO_DOWNLOAD).patternFind()) {
+            return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
+        } else if (new Regex(url, PATTERN_OFFICIAL_VIDEO_DOWNLOAD_2).patternFind()) {
+            return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
+        } else if (new Regex(url, PATTERN_EMBED_OLD).patternFind()) {
+            return URL_TYPE.EMBED_VIDEO;
+        } else if (new Regex(url, PATTERN_EMBED_NEW).patternFind()) {
+            return URL_TYPE.EMBED_VIDEO_2;
+        } else if (new Regex(url, PATTERN_NORMAL).patternFind()) {
+            return URL_TYPE.NORMAL;
+        } else {
+            logger.info("Unknown URL_TYPE: " + url);
+            return null;
+        }
+    }
+
+    @Override
+    protected String getFUID(final String url, URL_TYPE type) {
+        if (url == null || type == null) {
+            return null;
+        }
+        return new Regex(url, "/([a-z0-9]{12})$").getMatch(0);
+    }
+    /* Auto handling works fine thus no override is needed. */
+    // @Override
+    // protected boolean isVideohoster_enforce_video_filename() {
+    // return false;
+    // }
 }

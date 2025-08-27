@@ -124,6 +124,7 @@ public class PostBuildRunner {
     private static boolean                 PRINT_CLASSLOADER_ERRORS;
     private static ArrayList<String>       TESTS_OK;
     private static HashMap<String, String> TESTS_FAILED = new HashMap<String, String>();
+    private static boolean                 VERBOSE;
 
     public static void main(final String[] args) throws Exception {
         BuildDecisions.setEnabled(false);
@@ -159,6 +160,8 @@ public class PostBuildRunner {
                 sourceFolder = args[i].substring(SOURCE.length());
             } else if (StringUtils.equalsIgnoreCase(args[i], "-print_classloader_errors")) {
                 PRINT_CLASSLOADER_ERRORS = true;
+            } else if (StringUtils.equalsIgnoreCase(args[i], "-verbose")) {
+                AWTest.VERBOSE = true;
             } else {
                 throw new WTFException("Unknown Parameter: " + args[i]);
             }
@@ -191,6 +194,7 @@ public class PostBuildRunner {
                                 continue main;
                             }
                         }
+                        LogV3.info("Try Test " + classname);
                         Class<?> cls = Class.forName(classname, false, Thread.currentThread().getContextClassLoader());
                         if (Modifier.isAbstract(cls.getModifiers())) {
                             continue main;
@@ -342,6 +346,11 @@ public class PostBuildRunner {
 
     protected static void runTestClass(Class<?> cls, String sourceFolder, String[] args) throws Exception {
         LogV3.info(header("run test") + cls.getName());
+        for (String a : args) {
+            if ("-verbose".equals(a)) {
+                AWTest.VERBOSE = true;
+            }
+        }
         AWTest.setLoggerSilent(true, false);
         final File workingcopy = new File(BASE, "RUNNING_TEST");
         try {
@@ -377,7 +386,13 @@ public class PostBuildRunner {
                 }
                 // logInfoAnyway(url + "");
                 File u = new File(url.toURI());
-                sb.append(Files.getRelativePath(BASE, u));
+                String cp = Files.getRelativePath(BASE, u);
+                if (cp != null) {
+                    sb.append(cp);
+                } else {
+                    // ide
+                    sb.append(u.getAbsolutePath());
+                }
             }
             ArrayList<String> cmd = new ArrayList<String>();
             cmd.add(CrossSystem.getJavaBinary());

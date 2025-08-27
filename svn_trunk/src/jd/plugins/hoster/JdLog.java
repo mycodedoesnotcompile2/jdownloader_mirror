@@ -33,6 +33,7 @@ import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
 import jd.controlling.downloadcontroller.DownloadWatchDogJob;
 import jd.http.AuthenticationFactory;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
@@ -48,11 +49,18 @@ import jd.plugins.PluginForHost;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51366 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 51373 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
     @Override
     public String getAGBLink() {
         return "https://jdownloader.org/impressum";
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public JdLog(PluginWrapper wrapper) {
@@ -68,12 +76,24 @@ public class JdLog extends PluginForHost {
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
     }
+    // @Override
+    // public String getLinkID(final DownloadLink link) {
+    // final String linkid = getFID(link);
+    // if (linkid != null) {
+    // return "jdlog://" + linkid;
+    // } else {
+    // return super.getLinkID(link);
+    // }
+    // }
 
-    @SuppressWarnings("deprecation")
+    private String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
-        final String uid = new Regex(link.getDownloadURL(), this.getSupportedLinks()).getMatch(0);
+        final String uid = getFID(link);
         link.setFinalFileName(uid + ".log");
         return AvailableStatus.TRUE;
     }
@@ -81,7 +101,7 @@ public class JdLog extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        final String uid = new Regex(link.getDownloadURL(), this.getSupportedLinks()).getMatch(0);
+        final String uid = getFID(link);
         final String url = JDServUtils.BASE + "logunsorted?" + uid;
         final List<AuthenticationFactory> authenticationFactories = AuthenticationController.getInstance().buildAuthenticationFactories(URLHelper.createURL(url), null);
         for (final AuthenticationFactory authenticationFactory : authenticationFactories) {
@@ -100,7 +120,7 @@ public class JdLog extends PluginForHost {
             dl.getConnection().disconnect();
             throw new AccountRequiredException("BasicAuth needed");
         } else if (dl.getConnection().getCompleteContentLength() == 0) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Empty log");
         }
         dl.startDownload();
         // the following determine is its empty container.
@@ -111,8 +131,6 @@ public class JdLog extends PluginForHost {
             if (dlsize < 50) {
                 final String out = parseLocalFile(file);
                 if (StringUtils.equals(out, "LogID: " + uid + "\r\n\r\n")) {
-                    // set as offline
-                    link.setProperty("offlineByRegexConfirmation", true);
                     // delete unusable file
                     link.getDownloadLinkController().getJobsAfterDetach().add(new DownloadWatchDogJob() {
                         @Override
@@ -153,7 +171,7 @@ public class JdLog extends PluginForHost {
                         return false;
                     }
                 });
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Log too small (between 51 and <125 bytes)");
             }
         }
     }

@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 42312 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51378 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadCloudPro extends XFileSharingProBasic {
     public UploadCloudPro(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +104,14 @@ public class UploadCloudPro extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        if (br.containsHTML(">\\s*This file is available for")) {
+            return "This file is available for premium users only";
+        } else {
+            return super.getPremiumOnlyErrorMessage(br);
+        }
     }
 }

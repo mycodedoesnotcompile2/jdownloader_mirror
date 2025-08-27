@@ -46,7 +46,7 @@ public interface LogSenderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Send a Bugreport" })
     String SendLogDialog_SendLogDialog_title_();
 
-    @Default(lngs = { "en" }, values = { "When did the Problem occure? Please check all entries that may be worth considering!" })
+    @Default(lngs = { "en" }, values = { "When did the Problem occur? Please check all entries that may be worth considering!" })
     String SendLogDialog_layoutDialogContent_desc_();
 
     @Default(lngs = { "en" }, values = { "No available logs found!" })
@@ -81,5 +81,4 @@ public interface LogSenderTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Preparing your logs", "Logs werden vorbereitet" })
     String LogAction_getString_uploading_();
-
 }

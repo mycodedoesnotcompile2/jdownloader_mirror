@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51367 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51373 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2404,7 +2404,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else {
             logger.info("[DownloadMode] Trying to find official video downloads");
         }
-        String dllink = null;
         /* Info in table. E.g. xvideosharing.com, watchvideo.us */
         String[] videoQualityHTMLs = br.getRegex("<tr><td>[^\r\t\n]+download_video\\(.*?</td></tr>").getColumn(-1);
         if (videoQualityHTMLs == null || videoQualityHTMLs.length == 0) {
@@ -2568,7 +2567,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * 2019-10-04: TODO: Unsure whether we should use the general 'getDllink' method here as it contains a lot of RegExes (e.g. for
          * streaming URLs) which are completely useless here.
          */
-        dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
+        String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find dllink via official video download");
             return null;
@@ -2584,6 +2583,16 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             logger.info("[FilesizeMode] Trying to find official video downloads");
         } else {
             logger.info("[DownloadMode] Trying to find official video downloads");
+        }
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
+        if (isDownload) {
+            /* Allow extra step in download mode */
+            final String fuid = this.getFUIDFromURL(link);
+            final String download_button_url = br.getRegex("(/d/" + fuid + ")").getMatch(0);
+            if (download_button_url != null && !br.getURL().contains(download_button_url)) {
+                logger.info("Accessing download page: " + download_button_url);
+                this.getPage(br, download_button_url);
+            }
         }
         final String[] videourls = br.getRegex("(/d/[a-z0-9]{12}_[a-z]{1})").getColumn(0);
         final String[][] videoresolutionsAndFilesizes = br.getRegex(">\\s*(\\d+x\\d+), (\\d+(\\.\\d{1,2})?,? [A-Za-z]{1,5})").getMatches();

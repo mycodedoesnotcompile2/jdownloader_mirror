@@ -10,6 +10,7 @@ import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.storage.config.annotations.DevConfig;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.plugins.config.Order;
@@ -26,6 +27,10 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
             return "File crawler: Select types to crawl";
         }
 
+        public String getDeselectedTypesLinksMode_label() {
+            return "File crawler: How to treat links of deselected types?";
+        }
+
         public String getFileCrawlerCrawlOnlyOriginalVersions_label() {
             return "File crawler: Add only original versions of files?";
         }
@@ -38,7 +43,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
             return "File crawler: Crawl thumbnails?";
         }
 
-        public String getSingleFilePathNonFoundMode_label() {
+        public String getSingleFilePathNotFoundMode_label() {
             return "File crawler: What to do when single file/folder-path is not found?";
         }
 
@@ -55,15 +60,19 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         }
 
         public String getBookCrawlMode_label() {
-            return "Book crawl mode";
+            return "Book crawl mode: Which items to return if the added link is a book?";
         }
 
         public String getMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable_label() {
-            return "Mark non viewable book pages as offline if no account is available?";
+            return "Mark non downloadable book pages as offline if no account is available?";
+        }
+
+        public String getNonDownloadableBookPagesMode_label() {
+            return "How to display non downloadable book pages in linkgrabber?";
         }
 
         public String getPlaylistCrawlMode202404_label() {
-            return "Audio/video playlist crawl mode";
+            return "Playlist crawl mode: Which files to add if the added link is a audio/video playlist?";
         }
 
         public String getSearchTermCrawlerMaxResultsLimit_label() {
@@ -87,9 +96,32 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         THUMBNAIL
     }
 
+    public static enum DeselectedTypesMode implements LabelInterface {
+        ADD_DISABLED {
+            @Override
+            public String getLabel() {
+                return "Add links disabled";
+            }
+        },
+        DO_NOT_ADD_SKIP {
+            @Override
+            public String getLabel() {
+                return "Do not add links (skip)";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("ADD_DISABLED")
+    @Order(11)
+    DeselectedTypesMode getDeselectedTypesLinksMode();
+
+    void setDeselectedTypesLinksMode(final DeselectedTypesMode mode);
+
     @AboutConfig
     @DefaultBooleanValue(false)
     @Order(10)
+    @DevConfig
     boolean isFileCrawlerCrawlOnlyOriginalVersions();
 
     void setFileCrawlerCrawlOnlyOriginalVersions(boolean b);
@@ -97,6 +129,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(false)
     @Order(25)
+    @DevConfig
     boolean isFileCrawlerCrawlMetadataFiles();
 
     void setFileCrawlerCrawlMetadataFiles(boolean b);
@@ -105,6 +138,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @DefaultBooleanValue(true)
     @DescriptionForConfigEntry("Crawl thumbnails?")
     @Order(26)
+    @DevConfig
     boolean isFileCrawlerCrawlThumbnails();
 
     void setFileCrawlerCrawlThumbnails(boolean b);
@@ -115,7 +149,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         ADD_ALL {
             @Override
             public String getLabel() {
-                return "Add all (other) items";
+                return "Add all other items";
             }
         },
         ADD_NOTHING_AND_DISPLAY_ADDED_URL_AS_OFFLINE {
@@ -135,9 +169,9 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT")
     @Order(27)
-    SingleFilePathNotFoundMode getSingleFilePathNonFoundMode();
+    SingleFilePathNotFoundMode getSingleFilePathNotFoundMode();
 
-    void setSingleFilePathNonFoundMode(final SingleFilePathNotFoundMode mode);
+    void setSingleFilePathNotFoundMode(final SingleFilePathNotFoundMode mode);
 
     final SingleFileAdoptFolderStructureMode default_SingleFileAdoptFolderStructureMode = SingleFileAdoptFolderStructureMode.ENABLE;
 
@@ -173,7 +207,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         PLAYLIST_TITLE_WITH_TRACK_NUMBER {
             @Override
             public String getLabel() {
-                return "Like in playlist: <TrackNumber>.<title> - <artist>.<fileExt>";
+                return "Same as website: <TrackNumber>.<title> - <artist>.<fileExt>";
             }
         },
         ORIGINAL_FILENAME {
@@ -230,9 +264,32 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(true)
     @Order(41)
+    @DevConfig
     boolean isMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable();
 
     void setMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable(boolean b);
+
+    @AboutConfig
+    @DefaultEnumValue("SET_AVAILABLE_STATUS_OFFLINE")
+    @Order(41)
+    NonDownloadableBookPagesMode getNonDownloadableBookPagesMode();
+
+    void setNonDownloadableBookPagesMode(final NonDownloadableBookPagesMode mode);
+
+    public static enum NonDownloadableBookPagesMode implements LabelInterface {
+        SET_AVAILABLE_STATUS_OFFLINE {
+            @Override
+            public String getLabel() {
+                return "Display as offline";
+            }
+        },
+        SET_AVAILABLE_STATUS_ONLINE {
+            @Override
+            public String getLabel() {
+                return "Display as online (download will fail with error status)";
+            }
+        };
+    }
 
     final PlaylistCrawlMode default_PlaylistCrawlMode = PlaylistCrawlMode.AUTO;
 

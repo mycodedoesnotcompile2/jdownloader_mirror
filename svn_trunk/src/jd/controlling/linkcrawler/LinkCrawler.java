@@ -3255,8 +3255,12 @@ public class LinkCrawler {
         destCrawledLink.setOrigin(sourceCrawledLink.getOrigin());
         destCrawledLink.setSourceUrls(sourceURLs);
         destCrawledLink.setMatchingFilter(sourceCrawledLink.getMatchingFilter());
+        final DownloadLink latestDownloadLink = getLatestDownloadLink(sourceCrawledLink);
+        if (!sourceCrawledLink.isEnabled() || (latestDownloadLink != null && !latestDownloadLink.isEnabled())) {
+            destCrawledLink.setEnabled(false);
+        }
         forwardCryptedLinkInfos(sourceCrawledLink, destCrawledLink.getCryptedLink());
-        forwardDownloadLinkInfos(getLatestDownloadLink(sourceCrawledLink), destCrawledLink.getDownloadLink(), singleDestCrawledLink);
+        forwardDownloadLinkInfos(latestDownloadLink, destCrawledLink.getDownloadLink(), singleDestCrawledLink);
         if (Boolean.TRUE.equals(singleDestCrawledLink) && sourceCrawledLink.isNameSet()) {
             // forward customized name, eg from container plugins
             destCrawledLink.setName(sourceCrawledLink.getName());

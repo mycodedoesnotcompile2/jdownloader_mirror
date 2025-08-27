@@ -391,6 +391,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     }
 
     private static boolean SINK_ACCESS_GRANTED = false;
+    public static boolean  VERBOSE             = false;
 
     /**
      * Deletes all cached entries so far. This is used after a Sub-Test is successful, and we are sure that we don't need its debug output
@@ -570,12 +571,15 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @param c
      * @return
      */
-    public synchronized static boolean setLoggerSilent(final boolean silent, final boolean cache) {
+    public synchronized static boolean setLoggerSilent(final boolean silent, boolean cache) {
         if (AWTest.SILENT == silent) {
             return false;
         } else if (AWTest.LOGGER == null) {
             // no logger set. ignore request
             return false;
+        }
+        if (VERBOSE) {
+            cache = true;
         }
         AWTest.SILENT = silent;
         if (silent) {
