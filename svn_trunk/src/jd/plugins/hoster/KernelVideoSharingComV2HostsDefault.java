@@ -19,15 +19,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Exceptions;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51226 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Exceptions;
+
+@HostPlugin(revision = "$Revision: 51391 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -148,6 +148,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "megatube.xxx" });
         ret.add(new String[] { "cluset.com" });
         ret.add(new String[] { "bootyexpo.net" });
+        ret.add(new String[] { "xxbrits.com" });
         return ret;
     }
 

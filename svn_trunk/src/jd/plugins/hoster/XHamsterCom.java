@@ -72,7 +72,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51377 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51390 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -476,6 +476,9 @@ public class XHamsterCom extends PluginForHost {
         /* Set some Packagizer properties */
         String username = br.getRegex("class=\"entity-author-container__name\"[^>]*href=\"https?://[^/]+/users/([^<>\"]+)\"").getMatch(0);
         String datePublished = br.getRegex("\"datePublished\":\"(\\d{4}-\\d{2}-\\d{2})\"").getMatch(0);
+        if (datePublished == null) {
+            datePublished = br.getRegex("data-tooltip\\s*=\\s*\"(\\d{4}-\\d{2}-\\d{2}) \\d{2}:\\d{2}:\\d{2} UTC\"").getMatch(0);
+        }
         String filename = null;
         if (this.isPremiumURL(contentURL)) {
             String title = getTitle(link, br);
@@ -890,6 +893,45 @@ public class XHamsterCom extends PluginForHost {
         return getDllink(br, selected_format, null, new HashMap<Integer, Set<Object>>());
     }
 
+    private String decryptURL(final Browser br, String url) throws Exception {
+        if (url.startsWith("/")) {
+            url = br.getURL(url).toExternalForm();
+        } else if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
+            /* 2025-08-19 */
+            url = Encoding.Base64Decode(url);
+            if (url.startsWith("xor_")) {
+                final String input = url.substring(4);
+                String xor = null;
+                synchronized (XOR) {
+                    final String xplayer = br.getRegex("src\\s*=\\s*\"([^\"]*xplayer\\.js)\"").getMatch(0);
+                    if (xplayer != null) {
+                        if (XOR.containsKey(xplayer)) {
+                            xor = XOR.get(xplayer);
+                        } else {
+                            final Browser brc = br.cloneBrowser();
+                            brc.getPage(xplayer);
+                            xor = brc.getRegex("substring\\(4\\)\\s*,\\s*\\w+\\s*=\\s*(\"|')(xh[^'\"]+)(\"|')\\s*,").getMatch(1);
+                            XOR.put(xplayer, xor);
+                        }
+                    }
+                }
+                if (xor == null) {
+                    xor = "xh7999";
+                }
+                final StringBuilder ret = new StringBuilder();
+                for (int i = 0; i < input.length(); i++) {
+                    ret.append(Character.toChars(input.codePointAt(i) ^ xor.charAt(i % xor.length())));
+                }
+                url = ret.toString();
+            }
+            url = url.replaceFirst("^encrypted_", "");
+            if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
+        return url;
+    }
+
     public Object[] getDllink(final Browser br, int selected_format, Map<String, Object> hlsMap, final Map<Integer, Set<Object>> availableQualities) throws Exception {
         final SubConfiguration cfg = getPluginConfig();
         Integer selectedQualityHeight = null;
@@ -992,6 +1034,9 @@ public class XHamsterCom extends PluginForHost {
             if (video_sources == null) {
                 /* 2023-07-31: VR */
                 video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/h264");
+                if (video_sources == null) {
+                    video_sources = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, "xplayerSettings/sources/standard/av1");
+                }
             }
             if (video_sources == null) {
                 /* 2023-07-31: VR via xplayerSettings2 e.g. /videos/czech-vr-eightsome-to-celebrate-1000th-video-xhCy4Kj */
@@ -1005,6 +1050,8 @@ public class XHamsterCom extends PluginForHost {
                 for (final Map<String, Object> source : video_sources) {
                     final String qualityStr = (String) source.get("quality");
                     String url = (String) source.get("url");
+                    url = decryptURL(br, url);
+                    source.put("url", url);
                     if (StringUtils.containsIgnoreCase(url, ".m3u8")) {
                         /* HLS */
                         if (hlsMap == null) {
@@ -1041,41 +1088,6 @@ public class XHamsterCom extends PluginForHost {
                             availableQualities.put(qualityHeight, sourcesQuality);
                         }
                         /* We found the quality we were looking for. */
-                        if (url.startsWith("/")) {
-                            url = br.getURL(url).toExternalForm();
-                        } else if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
-                            /* 2025-08-19 */
-                            url = Encoding.Base64Decode(url);
-                            if (url.startsWith("xor_")) {
-                                final String input = url.substring(4);
-                                String xor = null;
-                                synchronized (XOR) {
-                                    final String xplayer = br.getRegex("src\\s*=\\s*\"([^\"]*xplayer\\.js)\"").getMatch(0);
-                                    if (xplayer != null) {
-                                        if (XOR.containsKey(xplayer)) {
-                                            xor = XOR.get(xplayer);
-                                        } else {
-                                            final Browser brc = br.cloneBrowser();
-                                            brc.getPage(xplayer);
-                                            xor = brc.getRegex("substring\\(4\\)\\s*,\\s*\\w+\\s*=\\s*(\"|')(xh[^'\"]+)(\"|')\\s*,").getMatch(1);
-                                            XOR.put(xplayer, xor);
-                                        }
-                                    }
-                                }
-                                if (xor == null) {
-                                    xor = "xh7999";
-                                }
-                                final StringBuilder ret = new StringBuilder();
-                                for (int i = 0; i < input.length(); i++) {
-                                    ret.append(Character.toChars(input.codePointAt(i) ^ xor.charAt(i % xor.length())));
-                                }
-                                url = ret.toString();
-                            }
-                            url = url.replaceFirst("^encrypted_", "");
-                            if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                            }
-                        }
                         if (qualityHeight != selectedQualityHeight) {
                             // unverified
                             sourcesQuality.add(url);

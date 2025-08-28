@@ -311,6 +311,7 @@ public class HlsContainer {
         FLAC(CODEC_TYPE.VIDEO, "flac", "flac", "fLaC"),
         AVC(CODEC_TYPE.VIDEO, "avc", "mp4", "(avc1|avc3|h264)"),
         HEVC(CODEC_TYPE.VIDEO, "hevc", "mp4", "(hev1|hvc1|h265)"),
+        AV1(CODEC_TYPE.VIDEO, "av1", "mp4", "(av1|av01)"), // Alliance for Open Media AV1
         UNKNOWN(CODEC_TYPE.UNKNOWN, null, null, null);
 
         private final CODEC_TYPE type;

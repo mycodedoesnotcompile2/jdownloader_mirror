@@ -30,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50761 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51386 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadhubWf extends XFileSharingProBasic {
     public UploadhubWf(final PluginWrapper wrapper) {
         super(wrapper);
@@ -48,8 +48,15 @@ public class UploadhubWf extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uploadhub.wf", "uploadhub.ws" });
+        ret.add(new String[] { "uploadhub.dad", "uploadhub.wf", "uploadhub.ws" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("uploadhub.wf"); // 2025-08-27
+        return deadDomains;
     }
 
     @Override
@@ -119,9 +126,9 @@ public class UploadhubWf extends XFileSharingProBasic {
     @Override
     protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
         super.checkErrors(br, correctedBR, link, account, checkAll);
-        if (new Regex(correctedBR, "Download \\& Install Our FREE Rapid Download Manager|Visit Your UploadHUB Download Link\\s*<").matches()) {
+        if (new Regex(correctedBR, "Download \\& Install Our FREE Rapid Download Manager|Visit Your UploadHUB Download Link\\s*<").patternFind()) {
             /* 2020-11-24: They want to force users to use a self-coded tool which is only available for Windows. */
-            throw new AccountRequiredException();
+            throw new AccountRequiredException("File is only downloadable via proprietary download manager software from " + getHost());
         }
     }
 }

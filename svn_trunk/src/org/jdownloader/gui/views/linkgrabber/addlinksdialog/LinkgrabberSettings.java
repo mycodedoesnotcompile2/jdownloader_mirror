@@ -306,7 +306,7 @@ public interface LinkgrabberSettings extends ConfigInterface {
     OnDupesLinksAction getHandleDupesOnConfirmLatestSelection();
 
     @AboutConfig
-    @DescriptionForConfigEntry("Linkanalyze in the 'Add Links' dialog before button \"continue\" works")
+    @DescriptionForConfigEntry("Analyze content in the links field 'Add Links' dialog before button \"continue\" is enabled.")
     @DefaultBooleanValue(true)
     boolean getAddLinksDialogCheck();
 

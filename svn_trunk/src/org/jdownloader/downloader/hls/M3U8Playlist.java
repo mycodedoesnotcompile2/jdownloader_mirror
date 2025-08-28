@@ -152,7 +152,11 @@ public class M3U8Playlist {
         }
 
         public void setSize(long size) {
-            this.size = Math.max(size, 0);
+            if (size == -1) {
+                this.size = -1;
+            } else {
+                this.size = Math.max(size, 0);
+            }
         }
 
         public String getUrl() {
@@ -166,7 +170,11 @@ public class M3U8Playlist {
         private volatile long duration;
 
         private void setDuration(long duration) {
-            this.duration = duration;
+            if (duration < 0) {
+                this.duration = -1;
+            } else {
+                this.duration = duration;
+            }
         }
 
         private volatile long size      = -1;
@@ -186,11 +194,7 @@ public class M3U8Playlist {
 
         public M3U8Segment(final String url, long duration) {
             this.url = url;
-            if (duration < 0) {
-                this.duration = -1;
-            } else {
-                this.duration = duration;
-            }
+            setDuration(duration);
         }
 
         @Override
@@ -300,7 +304,9 @@ public class M3U8Playlist {
                         segment.setSize(byteRange[0]);
                     }
                 } else if (existing != null && byteRange != null) {
-                    existing.setDuration(existing.getDuration() + lastSegmentDuration);
+                    if (lastSegmentDuration > 0) {
+                        existing.setDuration(existing.getDuration() + lastSegmentDuration);
+                    }
                     if (existing.getSize() > 0) {
                         existing.setSize(existing.getSize() + byteRange[0]);
                     }

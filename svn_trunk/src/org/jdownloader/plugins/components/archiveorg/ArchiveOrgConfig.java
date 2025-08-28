@@ -1,18 +1,23 @@
 package org.jdownloader.plugins.components.archiveorg;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.appwork.storage.StorableValidatorIgnoresMissingSetter;
+import org.appwork.storage.Storage;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultFactory;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.DevConfig;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
+import org.appwork.storage.config.defaults.AbstractDefaultFactory;
+import org.appwork.storage.config.handler.KeyHandler;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
@@ -80,20 +85,55 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         }
     }
 
+    class DefaultFileCrawlerTypesToCrawl extends AbstractDefaultFactory<Set<ArchiveOrgType>> {
+        @Override
+        public Set<ArchiveOrgType> getDefaultValue(KeyHandler<Set<ArchiveOrgType>> keyHandler) {
+            final Storage storage;
+            if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
+                if (storage.hasProperty("filecrawlercrawlonlyoriginalversions") || storage.hasProperty("filecrawlercrawlthumbnails") || storage.hasProperty("filecrawlercrawlmetadatafiles")) {
+                    final Set<ArchiveOrgType> ret = new HashSet<ArchiveOrgType>();
+                    if (Boolean.TRUE.equals(storage.remove("filecrawlercrawlonlyoriginalversions"))) {
+                        ret.add(ArchiveOrgType.ORIGINAL);
+                    } else {
+                        ret.add(ArchiveOrgType.ORIGINAL);
+                        ret.add(ArchiveOrgType.DERIVATIVE);
+                        if (Boolean.TRUE.equals(storage.remove("filecrawlercrawlthumbnails"))) {
+                            ret.add(ArchiveOrgType.THUMBNAIL);
+                            ret.add(ArchiveOrgType.DERIVATIVE_COVER);
+                        }
+                        if (Boolean.TRUE.equals(storage.remove("filecrawlercrawlmetadatafiles"))) {
+                            ret.add(ArchiveOrgType.METADATA);
+                            ret.add(ArchiveOrgType.METADATA_TORRENT);
+                        }
+                    }
+                    if (ret.size() > 0) {
+                        return ret;
+                    }
+                }
+            }
+            return new HashSet<ArchiveOrgType>(Arrays.asList(ArchiveOrgType.values()));// ALL
+        }
+    }
+
     @AboutConfig
     @DefaultOnNull
-    @DefaultEnumArrayValue(value = { "ORIGINAL", "DERIVATIVE", "METADATA", "THUMBNAIL" })
+    @DefaultFactory(DefaultFileCrawlerTypesToCrawl.class)
+    // @DefaultEnumArrayValue(value = { "ORIGINAL", "DERIVATIVE", "METADATA", "THUMBNAIL" })
     @Order(10)
     Set<ArchiveOrgType> getFileCrawlerTypesToCrawl();
 
     void setFileCrawlerTypesToCrawl(Set<ArchiveOrgType> list);
 
     @StorableValidatorIgnoresMissingSetter
-    public enum ArchiveOrgType {
+    public static enum ArchiveOrgType {
         ORIGINAL,
         DERIVATIVE,
         METADATA,
-        THUMBNAIL
+        METADATA_TORRENT,
+        THUMBNAIL,
+        DERIVATIVE_COVER,
+        DERIVATIVE_SPECTROGRAM,
+        DERIVATIVE_PEAKS;
     }
 
     public static enum DeselectedTypesMode implements LabelInterface {
@@ -117,31 +157,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     DeselectedTypesMode getDeselectedTypesLinksMode();
 
     void setDeselectedTypesLinksMode(final DeselectedTypesMode mode);
-
-    @AboutConfig
-    @DefaultBooleanValue(false)
-    @Order(10)
-    @DevConfig
-    boolean isFileCrawlerCrawlOnlyOriginalVersions();
-
-    void setFileCrawlerCrawlOnlyOriginalVersions(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(false)
-    @Order(25)
-    @DevConfig
-    boolean isFileCrawlerCrawlMetadataFiles();
-
-    void setFileCrawlerCrawlMetadataFiles(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("Crawl thumbnails?")
-    @Order(26)
-    @DevConfig
-    boolean isFileCrawlerCrawlThumbnails();
-
-    void setFileCrawlerCrawlThumbnails(boolean b);
 
     final SingleFilePathNotFoundMode default_SingleFilePathNotFoundMode = SingleFilePathNotFoundMode.ADD_ALL;
 
@@ -237,13 +252,13 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         PREFER_ORIGINAL {
             @Override
             public String getLabel() {
-                return "Original files if possible else loose book pages";
+                return "Selected files if possible else loose book pages";
             }
         },
         ORIGINAL_AND_LOOSE_PAGES {
             @Override
             public String getLabel() {
-                return "Original files if possible and loose book pages";
+                return "Selected files if possible and loose book pages";
             }
         },
         LOOSE_PAGES {
@@ -265,12 +280,30 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @DefaultBooleanValue(true)
     @Order(41)
     @DevConfig
+    // TODO: Remove this after 2026/01
     boolean isMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable();
 
+    // TODO: Remove this after 2026/01
     void setMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable(boolean b);
 
+    class DefaultNonDownloadableBookPagesMode extends AbstractDefaultFactory<NonDownloadableBookPagesMode> {
+        @Override
+        public NonDownloadableBookPagesMode getDefaultValue(KeyHandler<NonDownloadableBookPagesMode> keyHandler) {
+            final Storage storage;
+            if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
+                if (storage.hasProperty("marknonviewablebookpagesasofflineifnoaccountisavailable")) {
+                    if (Boolean.FALSE.equals(storage.remove("marknonviewablebookpagesasofflineifnoaccountisavailable"))) {
+                        return NonDownloadableBookPagesMode.SET_AVAILABLE_STATUS_ONLINE;
+                    }
+                }
+            }
+            return NonDownloadableBookPagesMode.SET_AVAILABLE_STATUS_OFFLINE;
+        }
+    }
+
     @AboutConfig
-    @DefaultEnumValue("SET_AVAILABLE_STATUS_OFFLINE")
+    @DefaultFactory(DefaultNonDownloadableBookPagesMode.class)
+    // @DefaultEnumValue("SET_AVAILABLE_STATUS_OFFLINE")
     @Order(41)
     NonDownloadableBookPagesMode getNonDownloadableBookPagesMode();
 
@@ -303,13 +336,13 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         PLAYLIST_AND_FILES {
             @Override
             public String getLabel() {
-                return "Playlist and files";
+                return "Playlist and selected files";
             }
         },
         FILES_ONLY {
             @Override
             public String getLabel() {
-                return "Files only";
+                return "Selected files only";
             }
         },
         AUTO {

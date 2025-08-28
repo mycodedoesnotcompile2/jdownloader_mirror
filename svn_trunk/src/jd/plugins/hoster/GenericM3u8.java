@@ -31,6 +31,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.ffmpeg.json.Stream;
 import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
@@ -41,7 +42,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49336 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
+@HostPlugin(revision = "$Revision: 51390 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
 public class GenericM3u8 extends PluginForHost {
     public static final String PRESET_NAME_PROPERTY               = "preSetName";
     public static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
@@ -186,6 +187,13 @@ public class GenericM3u8 extends PluginForHost {
         return link.getStringProperty("Referer", link.getReferrerUrl());
     }
 
+    private static String getURLFilename(final DownloadLink link) throws MalformedURLException {
+        String name = link.isNameSet() ? link.getName() : getFileNameFromURL(new URL(link.getPluginPatternMatcher().replaceFirst("(?i)^m3u8s?", "https://")));
+        /* .m3u8 is not a valid file extension and we don't want to have this in our filename */
+        name = name.replaceFirst("(?i)\\.m3u8$", "");
+        return name;
+    }
+
     public static void setFilename(Plugin plugin, final DownloadLink link, final boolean setFinalFilename) throws MalformedURLException {
         if (link.getFinalFileName() != null) {
             /**
@@ -199,9 +207,7 @@ public class GenericM3u8 extends PluginForHost {
         /* 2024-02-16: Do not touch this "DEPRECATED_NAME_PROPERTY" handling for now! */
         String name = link.getStringProperty(PRESET_NAME_PROPERTY, link.getStringProperty(DEPRECATED_NAME_PROPERTY));
         if (name == null) {
-            name = link.isNameSet() ? link.getName() : getFileNameFromURL(new URL(link.getPluginPatternMatcher().replaceFirst("(?i)^m3u8s?", "https://")));
-            /* .m3u8 is not a valid file extension and we don't want to have this in our filename */
-            name = name.replaceFirst("(?i)\\.m3u8$", "");
+            name = getURLFilename(link);
             /* store name as property to avoid name duplication issue */
             link.setProperty(DEPRECATED_NAME_PROPERTY, name);
         }
@@ -242,14 +248,6 @@ public class GenericM3u8 extends PluginForHost {
             }
             videoq = videoHeight + "p";
         }
-        if (assumedFileExtension == null) {
-            /* Fallback */
-            if (videoHeight > 0) {
-                assumedFileExtension = "mp4";
-            } else {
-                assumedFileExtension = "m4a";
-            }
-        }
         if (videoq != null && audioq != null) {
             name += " (" + videoq + "_" + audioq + ")";
         } else if (videoq != null) {
@@ -259,6 +257,16 @@ public class GenericM3u8 extends PluginForHost {
         }
         if (bandwidth > 0 && ((videoq == null && audioq == null) || PluginJsonConfig.get(GenericM3u8DecrypterConfig.class).isAddBandwidthValueToFilenames())) {
             name += "_bw_" + bandwidth;
+        }
+        if (assumedFileExtension == null) {
+            /* Fallback */
+            final String urlFilename = getURLFilename(link);
+            final String urlFilenameExtension = new Regex(urlFilename, "\\.(mp4|mp3|m4a|m4v|aac|flac)$").getMatch(0);
+            if (videoHeight > 0) {
+                assumedFileExtension = StringUtils.firstNotEmpty(urlFilenameExtension, "mp4");
+            } else {
+                assumedFileExtension = StringUtils.firstNotEmpty(urlFilenameExtension, "m4a");
+            }
         }
         name = plugin.applyFilenameExtension(name, "." + assumedFileExtension);
         if (setFinalFilename) {

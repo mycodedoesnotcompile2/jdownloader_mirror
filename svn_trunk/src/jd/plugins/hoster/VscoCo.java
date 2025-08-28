@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.VscoCoCrawler;
 
-@HostPlugin(revision = "$Revision: 50190 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51384 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCo extends PluginForHost {
     public VscoCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,14 +104,14 @@ public class VscoCo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://vsco.co/about/terms_of_use";
+        return "https://" + getHost() + "/about/terms_of_use";
     }
 
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String linkid = getMediaID(link);
-        if (linkid != null && (isHLSVideo(link) || link.getStringProperty(PROPERTY_HLS_URL) != null)) {
-            return this.getHost() + "://" + "/" + getUsername(link) + "/" + linkid + "/" + getQuality(link);
+        final String media_id = getMediaID(link);
+        if (media_id != null && (isHLSVideo(link) || link.getStringProperty(PROPERTY_HLS_URL) != null)) {
+            return this.getHost() + "://" + "/" + getUsername(link) + "/" + media_id + "/" + getQuality(link);
         } else {
             /*
              * Do not return special linkID for older http videos and images as we rely purely on the http links for dupechecking. Also for

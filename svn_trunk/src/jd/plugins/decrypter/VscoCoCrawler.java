@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VscoCo;
 
-@DecrypterPlugin(revision = "$Revision: 51373 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51384 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCoCrawler extends PluginForDecrypt {
     public VscoCoCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -352,5 +352,11 @@ public class VscoCoCrawler extends PluginForDecrypt {
         video.setFinalFileName(username + "_" + mediaID + ".mp4");
         ret.add(video);
         return ret;
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* 2025-08-27: Limited to 1 for testing to see if this helps avoid running into rate limiting or Cloudflare. */
+        return 1;
     }
 }
