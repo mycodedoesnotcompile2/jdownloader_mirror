@@ -32,6 +32,13 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.text.JTextComponent;
 
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionDialog;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.FilterPanel;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.test.TestWaitDialog;
+import jd.gui.swing.jdgui.views.settings.panels.packagizer.test.PackagizerSingleTestTableModel;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtCheckBox;
@@ -42,10 +49,12 @@ import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.appwork.utils.swing.dialog.dimensor.RememberLastDialogDimension;
 import org.appwork.utils.swing.dialog.locator.RememberAbsoluteDialogLocator;
 import org.appwork.utils.swing.windowmanager.WindowManager;
@@ -61,13 +70,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.DownloadFolderChooserDialog;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
-
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionDialog;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.FilterPanel;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.test.TestWaitDialog;
-import jd.gui.swing.jdgui.views.settings.panels.packagizer.test.PackagizerSingleTestTableModel;
 
 public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> {
     private class PriorityAction extends AbstractAction {
@@ -332,9 +334,8 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
      * @return
      */
     private PackagizerRule getCurrentCopy() {
-        PackagizerRule ret = this.rule.duplicate();
-        save(ret);
-        return ret;
+        final PackagizerRule ret = this.rule.duplicate();
+        return save(ret);
     }
 
     private JLabel getLbl(PriorityAction pa) {
@@ -775,55 +776,59 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
             d.setPackagizer(packagizer);
             // java.util.List<CrawledLink> ret = Dialog.getInstance().showDialog(d);
             Dialog.getInstance().showDialog(d);
-        } catch (DialogClosedException e) {
-            e.printStackTrace();
-        } catch (DialogCanceledException e) {
+        } catch (DialogNoAnswerException e) {
             e.printStackTrace();
         }
     }
 
-    private void save(PackagizerRule rule) {
-        rule.setFilenameFilter(getFilenameFilter());
-        rule.setPackagenameFilter(getPackagenameFilter());
-        rule.setHosterURLFilter(getHosterFilter());
-        rule.setName(getName());
-        rule.setFilesizeFilter(getFilersizeFilter());
-        rule.setSourceURLFilter(getSourceFilter());
-        rule.setOriginFilter(getOriginFilter());
-        rule.setConditionFilter(getConditionFilter());
-        rule.setFiletypeFilter(getFiletypeFilter());
-        rule.setMatchAlwaysFilter(getMatchAlwaysFilter());
-        if (cbDest.isSelected()) {
-            final String path = fpDest.getPath();
-            DownloadPathHistoryManager.getInstance().add(path);
-            rule.setDownloadDestination(path);
-        } else {
-            rule.setDownloadDestination(null);
-        }
-        if (cbMove.isSelected()) {
-            final String path = fpMove.getPath();
-            DownloadPathHistoryManager.getInstance().add(path);
-            rule.setMoveto(path);
-        } else {
-            rule.setMoveto(null);
-        }
-        rule.setPackageKey(cbPackagekey.isSelected() ? txtPackagekey.getText() : null);
-        rule.setRename(cbRename.isSelected() ? txtRename.getText() : null);
-        rule.setLinkEnabled(cbEnable.isSelected() ? cobEnable.getSelectedIndex() == 0 : null);
-        rule.setChunks(cbChunks.isSelected() ? ((Number) spChunks.getValue()).intValue() : -1);
-        rule.setPriority(cbPriority.isSelected() ? prio : null);
-        rule.setPackageName(cbPackagename.isSelected() ? txtPackagename.getText() : null);
-        rule.setFilename(cbName.isSelected() ? txtNewFilename.getText() : null);
-        rule.setComment(cbComment.isSelected() ? txtComment.getText() : null);
-        rule.setAutoExtractionEnabled(cbExtract.isSelected() ? cobExtract.getSelectedIndex() == 0 : null);
-        rule.setAutoAddEnabled(cbAdd.isSelected() ? cobAutoAdd.getSelectedIndex() == 0 : null);
-        rule.setAutoStartEnabled(cbStart.isSelected() ? cobAutostart.getSelectedIndex() == 0 : null);
-        rule.setAutoForcedStartEnabled(cbForce.isSelected() ? cobForce.getSelectedIndex() == 0 : null);
-        rule.setIconKey(getIconKey());
-        rule.setTestUrl(getTxtTestUrl());
-        rule.setOnlineStatusFilter(getOnlineStatusFilter());
-        rule.setPluginStatusFilter(getPluginStatusFilter());
-        rule.setStopAfterThisRule(cbStopAfterThisRule.isSelected());
+    private PackagizerRule save(final PackagizerRule rule) {
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                rule.setFilenameFilter(getFilenameFilter());
+                rule.setPackagenameFilter(getPackagenameFilter());
+                rule.setHosterURLFilter(getHosterFilter());
+                rule.setName(getName());
+                rule.setFilesizeFilter(getFilersizeFilter());
+                rule.setSourceURLFilter(getSourceFilter());
+                rule.setOriginFilter(getOriginFilter());
+                rule.setConditionFilter(getConditionFilter());
+                rule.setFiletypeFilter(getFiletypeFilter());
+                rule.setMatchAlwaysFilter(getMatchAlwaysFilter());
+                if (cbDest.isSelected()) {
+                    final String path = fpDest.getPath();
+                    DownloadPathHistoryManager.getInstance().add(path);
+                    rule.setDownloadDestination(path);
+                } else {
+                    rule.setDownloadDestination(null);
+                }
+                if (cbMove.isSelected()) {
+                    final String path = fpMove.getPath();
+                    DownloadPathHistoryManager.getInstance().add(path);
+                    rule.setMoveto(path);
+                } else {
+                    rule.setMoveto(null);
+                }
+                rule.setPackageKey(cbPackagekey.isSelected() ? txtPackagekey.getText() : null);
+                rule.setRename(cbRename.isSelected() ? txtRename.getText() : null);
+                rule.setLinkEnabled(cbEnable.isSelected() ? cobEnable.getSelectedIndex() == 0 : null);
+                rule.setChunks(cbChunks.isSelected() ? ((Number) spChunks.getValue()).intValue() : -1);
+                rule.setPriority(cbPriority.isSelected() ? prio : null);
+                rule.setPackageName(cbPackagename.isSelected() ? txtPackagename.getText() : null);
+                rule.setFilename(cbName.isSelected() ? txtNewFilename.getText() : null);
+                rule.setComment(cbComment.isSelected() ? txtComment.getText() : null);
+                rule.setAutoExtractionEnabled(cbExtract.isSelected() ? cobExtract.getSelectedIndex() == 0 : null);
+                rule.setAutoAddEnabled(cbAdd.isSelected() ? cobAutoAdd.getSelectedIndex() == 0 : null);
+                rule.setAutoStartEnabled(cbStart.isSelected() ? cobAutostart.getSelectedIndex() == 0 : null);
+                rule.setAutoForcedStartEnabled(cbForce.isSelected() ? cobForce.getSelectedIndex() == 0 : null);
+                rule.setIconKey(getIconKey());
+                rule.setTestUrl(getTxtTestUrl());
+                rule.setOnlineStatusFilter(getOnlineStatusFilter());
+                rule.setPluginStatusFilter(getPluginStatusFilter());
+                rule.setStopAfterThisRule(cbStopAfterThisRule.isSelected());
+            }
+        }.waitForEDT();
+        return rule;
     }
 
     @Override
@@ -904,6 +909,6 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 break;
             }
         }
-        cbStopAfterThisRule.setSelected(Boolean.TRUE.equals(rule.isStopAfterThisRule()));
+        cbStopAfterThisRule.setSelected(rule.isStopAfterThisRule());
     }
 }

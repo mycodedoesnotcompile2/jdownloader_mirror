@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51403 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadmallCom extends XFileSharingProBasic {
     public UploadmallCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +104,15 @@ public class UploadmallCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        String better_filename = new Regex(html, "<h1 class=[^>]*>([^<]+)</h1>").getMatch(0);
+        if (better_filename != null) {
+            fileInfo[0] = better_filename;
+        }
+        return fileInfo;
     }
 }

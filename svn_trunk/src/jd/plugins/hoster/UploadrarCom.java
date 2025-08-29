@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51081 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51403 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadrarCom extends XFileSharingProBasic {
     public UploadrarCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -48,7 +48,7 @@ public class UploadrarCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uploadrar.com", "uploadrar.net" });
+        ret.add(new String[] { "uploadrar.com", "uploadrar.net", "cloud.getpczone.com" });
         return ret;
     }
 
@@ -142,12 +142,6 @@ public class UploadrarCom extends XFileSharingProBasic {
     @Override
     public String[] siteSupportedNames() {
         return buildSupportedNames(getPluginDomains());
-    }
-
-    @Override
-    protected boolean supports_availablecheck_alt() {
-        // 2024-07-04
-        return false;
     }
 
     @Override

@@ -63,7 +63,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GeneralSettings;
 
-@DecrypterPlugin(revision = "$Revision: 50900 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51404 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaNz.class })
 public class MegaNzFolder extends PluginForDecrypt {
     private static AtomicLong CS = new AtomicLong(System.currentTimeMillis());
@@ -217,6 +217,10 @@ public class MegaNzFolder extends PluginForDecrypt {
     protected String toString(final Object object) {
         if (object == null) {
             return null;
+        } else if (object instanceof Boolean) {
+            return object.toString();
+        } else if (object instanceof Number) {
+            return object.toString();
         } else if (object instanceof JSonValue) {
             return toString(((JSonValue) object).getValue());
         } else if (object instanceof String) {
@@ -310,6 +314,7 @@ public class MegaNzFolder extends PluginForDecrypt {
             if (folderNodes.size() > 0) {
                 logger.info("Found Cache:Nodes=" + (folderNodes.size() - 1) + "|FolderID=" + folderID);
             } else {
+                final Map<String, List<Map<String, Object>>> nodeUpdates = new HashMap<String, List<Map<String, Object>>>();
                 final List<Map<String, Object>> parsedNodes = new ArrayList<Map<String, Object>>();
                 pagination: while (!isAbort()) {
                     final URLConnectionAdapter con;
@@ -372,6 +377,7 @@ public class MegaNzFolder extends PluginForDecrypt {
                         con.disconnect();
                     }
                     if (response instanceof List && StringUtils.isEmpty(sn)) {
+                        // TODO: check if this response can also contain updates/deletions
                         List<Map<String, Object>> pageNodes = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(response, "{0}/f");
                         if (pageNodes == null) {
                             pageNodes = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(response, "{0}/a/{0}/t/f");
@@ -403,9 +409,24 @@ public class MegaNzFolder extends PluginForDecrypt {
                         if (pageNodes != null) {
                             final int nodesBefore = parsedNodes.size();
                             for (Map<String, Object> pageNode : pageNodes) {
-                                final List<Map<String, Object>> additionalNodes = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(pageNode, "t/f");
-                                if (additionalNodes != null) {
-                                    parsedNodes.addAll(additionalNodes);
+                                final String a = toString(pageNode.get("a"));
+                                if ("t".equals(a)) {
+                                    // nodes
+                                    final List<Map<String, Object>> additionalNodes = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(pageNode, "t/f");
+                                    if (additionalNodes != null) {
+                                        parsedNodes.addAll(additionalNodes);
+                                    }
+                                } else if ("fa".equals(a) || "d".equals(a) || "u".equals(a)) {
+                                    // js/mega.js, scparser.$add('fa', function(a) ,file attribute change/addition
+                                    // js/mega.js, scparser.$add('d', function(a) , fileDeletion
+                                    // js/mega.js, scparser.$add('u', function(a) , update node attributes
+                                    final String n = toString(pageNode.get("n"));
+                                    List<Map<String, Object>> updates = nodeUpdates.get(n);
+                                    if (updates == null) {
+                                        updates = new ArrayList<Map<String, Object>>();
+                                        nodeUpdates.put(n, updates);
+                                    }
+                                    updates.add(pageNode);
                                 }
                             }
                             if (parsedNodes.size() == nodesBefore) {
@@ -540,6 +561,27 @@ public class MegaNzFolder extends PluginForDecrypt {
                     }
                     parsedNode.put("nodeKey", nodeKey);
                     parsedNode.put("nodeName", nodeName);
+                }
+                final Iterator<Map<String, Object>> it2 = parsedNodes.iterator();
+                nodeUpdatesLoop: while (it2.hasNext()) {
+                    Map<String, Object> parsedNode = it2.next();
+                    final String nodeID = toString(parsedNode.get("h"));
+                    final List<Map<String, Object>> updateEntries = nodeUpdates.get(nodeID);
+                    if (updateEntries == null) {
+                        continue;
+                    }
+                    for (Map<String, Object> updateEntry : updateEntries) {
+                        final String a = toString(updateEntry.get("a"));
+                        if ("d".equals(a) && "1".equals(toString(updateEntry.get("m")))) {
+                            logger.info("Apply updates:remove node:" + parsedNode);
+                            it2.remove();
+                            nodeUpdates.remove(nodeID);
+                            continue nodeUpdatesLoop;
+                        } else if ("fa".equals(a) && updateEntry.get("fa") != null) {
+                            parsedNode.put("fa", updateEntry.get("fa"));
+                            logger.info("Apply updates:update fa:" + parsedNode);
+                        }
+                    }
                 }
                 logger.info("Fill Cache:Nodes=" + parsedNodes.size() + "|FolderID=" + folderID);
                 folderNodes.addAll(parsedNodes);

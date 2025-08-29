@@ -65,16 +65,20 @@ public class RegexFilter extends Filter implements Storable {
         EQUALS_NOT
     }
 
-    protected Pattern buildPattern() {
+    public Pattern buildPattern() {
+        return buildPattern(getRegex());
+    }
+
+    public Pattern buildPattern(final String regex) {
         switch (getMatchType()) {
         case CONTAINS:
         case CONTAINS_NOT:
-            return LinkgrabberFilterRuleWrapper.createPattern(getRegex(), isUseRegex(), RuleWrapper.AUTO_PATTERN_MODE.FINDS);
+            return LinkgrabberFilterRuleWrapper.createPattern(regex, isUseRegex(), RuleWrapper.AUTO_PATTERN_MODE.FINDS);
         case EQUALS:
         case EQUALS_NOT:
-            return LinkgrabberFilterRuleWrapper.createPattern(getRegex(), isUseRegex(), RuleWrapper.AUTO_PATTERN_MODE.MATCHES);
+            return LinkgrabberFilterRuleWrapper.createPattern(regex, isUseRegex(), RuleWrapper.AUTO_PATTERN_MODE.MATCHES);
         default:
-            return LinkgrabberFilterRuleWrapper.createPattern(getRegex(), isUseRegex(), RuleWrapper.AUTO_PATTERN_MODE.WILDCARD);
+            return LinkgrabberFilterRuleWrapper.createPattern(regex, isUseRegex(), RuleWrapper.AUTO_PATTERN_MODE.WILDCARD);
         }
     }
 

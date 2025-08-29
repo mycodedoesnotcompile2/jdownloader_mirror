@@ -7,13 +7,11 @@ import java.util.Set;
 import org.appwork.storage.StorableValidatorIgnoresMissingSetter;
 import org.appwork.storage.Storage;
 import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultFactory;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.appwork.storage.config.annotations.DevConfig;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.storage.config.defaults.AbstractDefaultFactory;
@@ -36,18 +34,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
             return "File crawler: How to treat links of deselected types?";
         }
 
-        public String getFileCrawlerCrawlOnlyOriginalVersions_label() {
-            return "File crawler: Add only original versions of files?";
-        }
-
-        public String getFileCrawlerCrawlMetadataFiles_label() {
-            return "File crawler: Include metadata files (typically .xml & .sqlite files)?";
-        }
-
-        public String getFileCrawlerCrawlThumbnails_label() {
-            return "File crawler: Crawl thumbnails?";
-        }
-
         public String getSingleFilePathNotFoundMode_label() {
             return "File crawler: What to do when single file/folder-path is not found?";
         }
@@ -68,10 +54,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
             return "Book crawl mode: Which items to return if the added link is a book?";
         }
 
-        public String getMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable_label() {
-            return "Mark non downloadable book pages as offline if no account is available?";
-        }
-
         public String getNonDownloadableBookPagesMode_label() {
             return "How to display non downloadable book pages in linkgrabber?";
         }
@@ -90,6 +72,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         public Set<ArchiveOrgType> getDefaultValue(KeyHandler<Set<ArchiveOrgType>> keyHandler) {
             final Storage storage;
             if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
+                /* This migrated a bunch of old boolean settings to one new ENUM setting. */
                 if (storage.hasProperty("filecrawlercrawlonlyoriginalversions") || storage.hasProperty("filecrawlercrawlthumbnails") || storage.hasProperty("filecrawlercrawlmetadatafiles")) {
                     final Set<ArchiveOrgType> ret = new HashSet<ArchiveOrgType>();
                     if (Boolean.TRUE.equals(storage.remove("filecrawlercrawlonlyoriginalversions"))) {
@@ -118,22 +101,61 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultOnNull
     @DefaultFactory(DefaultFileCrawlerTypesToCrawl.class)
-    // @DefaultEnumArrayValue(value = { "ORIGINAL", "DERIVATIVE", "METADATA", "THUMBNAIL" })
     @Order(10)
     Set<ArchiveOrgType> getFileCrawlerTypesToCrawl();
 
     void setFileCrawlerTypesToCrawl(Set<ArchiveOrgType> list);
 
     @StorableValidatorIgnoresMissingSetter
-    public static enum ArchiveOrgType {
-        ORIGINAL,
-        DERIVATIVE,
-        METADATA,
-        METADATA_TORRENT,
-        THUMBNAIL,
-        DERIVATIVE_COVER,
-        DERIVATIVE_SPECTROGRAM,
-        DERIVATIVE_PEAKS;
+    public static enum ArchiveOrgType implements LabelInterface {
+        ORIGINAL {
+            @Override
+            public String getLabel() {
+                return "Original files";
+            }
+        },
+        DERIVATIVE {
+            @Override
+            public String getLabel() {
+                return "Derivatives | Transcoded audio/video files";
+            }
+        },
+        METADATA {
+            @Override
+            public String getLabel() {
+                return "Metadata | .xml/.xqlite files";
+            }
+        },
+        METADATA_TORRENT {
+            @Override
+            public String getLabel() {
+                return "Metadata | .torrent files";
+            }
+        },
+        THUMBNAIL {
+            @Override
+            public String getLabel() {
+                return "Thumbnails";
+            }
+        },
+        DERIVATIVE_COVER {
+            @Override
+            public String getLabel() {
+                return "Decorative covers";
+            }
+        },
+        DERIVATIVE_SPECTROGRAM {
+            @Override
+            public String getLabel() {
+                return "Spectogram";
+            }
+        },
+        DERIVATIVE_PEAKS {
+            @Override
+            public String getLabel() {
+                return "Columbia Peaks | .afpk audio fingerprint files";
+            }
+        };
     }
 
     public static enum DeselectedTypesMode implements LabelInterface {
@@ -275,16 +297,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     BookCrawlMode getBookCrawlMode();
 
     void setBookCrawlMode(final BookCrawlMode bookCrawlerMode);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @Order(41)
-    @DevConfig
-    // TODO: Remove this after 2026/01
-    boolean isMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable();
-
-    // TODO: Remove this after 2026/01
-    void setMarkNonViewableBookPagesAsOfflineIfNoAccountIsAvailable(boolean b);
 
     class DefaultNonDownloadableBookPagesMode extends AbstractDefaultFactory<NonDownloadableBookPagesMode> {
         @Override

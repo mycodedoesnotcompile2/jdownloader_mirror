@@ -198,8 +198,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                 JCheckBox source = (JCheckBox) e.getSource();
                 boolean isSelected = source.isSelected();
                 if (isSelected != CFG_LINKGRABBER.CFG.isAddLinksDialogOverwritesPackagizerRulesEnabled()) {
-                    // TODO: Fix this
-                    // hasUserSelectedOverwritePackagizerButton = true;
+                    hasUserSelectedOverwritePackagizerButton = true;
                 }
             }
         });
@@ -660,11 +659,11 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                             }
                         }
                         ClipboardContent clipboardContent = null;
-                        if (StringUtils.isEmpty(textAuto) && config.isAutoFillAddLinksDialogWithClipboardContentEnabled()) {
+                        if (config.isAutoFillAddLinksDialogWithClipboardContentEnabled() && StringUtils.isEmpty(textAuto)) {
                             final ClipboardMonitoring clp = ClipboardMonitoring.getINSTANCE();
                             clipboardContent = clp.getCurrentContent();
                             if (clipboardContent != null) {
-                                textAuto = clipboardContent.getContent();
+                                textAuto = clipboardContent.getContentText();
                             }
                         }
                         new EDTRunner() {
@@ -906,10 +905,17 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             }
 
             /** Process text: find links and possible extraction passwords. */
-            private String processTextAuto(final String textAuto, final ClipboardContent clipboardContent) {
+            private String processTextAuto(String textAuto, final ClipboardContent clipboardContent) {
                 if (textAuto == null) {
                     /* Nothing to process */
                     return "";
+                }
+                /**
+                 * Fix line breaks for GUI. <br>
+                 * TODO: Maybe move this into upper classes or even into the ClipboardContent class?
+                 */
+                if (textAuto.contains("\r") && !textAuto.contains("\n")) {
+                    textAuto = textAuto.replaceAll("\r", "\r\n");
                 }
                 if (config.isAddLinksPreParserAutoExtractionPasswordSearchEnabled()) {
                     processPasswordExtraction(textAuto, clipboardContent);
@@ -1004,6 +1010,8 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             return;
         }
         this.overwritePackagizer.setSelected(true);
+        /* ChangeListener on overwritePackagizer will set this to true so we'll correct that here. */
+        hasUserSelectedOverwritePackagizerButton = false;
     }
 
     private void autoDisablePackagizerCheckbox() {
@@ -1034,10 +1042,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         if (priority != this.getPriorityFieldDefaultValue()) {
             return;
         }
-        /*
-         * TODO: Check against all relevant fields' default values. Only disable Packagizer checkbox if all fields have their default
-         * values.
-         */
+        /* ChangeListener on overwritePackagizer will set this to true so we'll correct that here. */
         this.overwritePackagizer.setSelected(false);
     }
 

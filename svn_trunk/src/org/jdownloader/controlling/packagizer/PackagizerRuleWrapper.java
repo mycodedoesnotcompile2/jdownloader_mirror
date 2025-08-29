@@ -8,4 +8,8 @@ public class PackagizerRuleWrapper extends RuleWrapper<PackagizerRule> {
         super(rule);
     }
 
+    public boolean isStopAfterThisRule() {
+        return rule.isStopAfterThisRule();
+    }
+
 }

@@ -4,18 +4,17 @@ import java.io.File;
 import java.net.URL;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.RegexFilter.MatchType;
-import org.jdownloader.controlling.packagizer.PackagizerController;
-import org.jdownloader.controlling.packagizer.PackagizerRule;
-import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
-
 import jd.controlling.linkcollector.LinkCollectingJob;
 import jd.controlling.linkcollector.LinkOriginDetails;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.LinkCrawler;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkInfo;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.RegexFilter.MatchType;
+import org.jdownloader.controlling.packagizer.PackagizerController;
+import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
 
 public class RuleWrapper<T extends FilterRule> {
     private final CompiledRegexFilter        fileNameRule;
@@ -134,13 +133,13 @@ public class RuleWrapper<T extends FilterRule> {
         return filetypeFilter;
     }
 
-    private final boolean                   requiresHoster;
-    private final CompiledRegexFilter       hosterRule;
-    private final CompiledRegexFilter       sourceRule;
-    private final CompiledFilesizeFilter    filesizeRule;
-    private final CompiledFiletypeFilter    filetypeFilter;
-    private final T                         rule;
-    private final CompiledOnlineStatusFiler onlineStatusFilter;
+    protected final boolean                   requiresHoster;
+    protected final CompiledRegexFilter       hosterRule;
+    protected final CompiledRegexFilter       sourceRule;
+    protected final CompiledFilesizeFilter    filesizeRule;
+    protected final CompiledFiletypeFilter    filetypeFilter;
+    protected final T                         rule;
+    protected final CompiledOnlineStatusFiler onlineStatusFilter;
 
     public T getRule() {
         return rule;
@@ -301,28 +300,46 @@ public class RuleWrapper<T extends FilterRule> {
         }
     }
 
+    protected String getPackageName(CrawledLink link) {
+        if (link == null) {
+            return null;
+        }
+        String ret = null;
+        if (link.getParentNode() != null) {
+            ret = link.getParentNode().getName();
+        }
+        if (StringUtils.isEmpty(ret) && link.getDesiredPackageInfo() != null) {
+            ret = link.getDesiredPackageInfo().getName();
+        }
+        return ret;
+    }
+
+    protected Pattern getPatternWithoutDynamicTags(final CrawledLink link, CompiledRegexFilter rule) {
+        Pattern ret = rule._getPattern();
+        try {
+            String patternString = ret.pattern();
+            /* Replace dynamic tags which allows user to e.g. check for current date in packagename. */
+            patternString = PackagizerController.replaceDynamicTags(patternString, getPackageName(link), link, null);
+            if (!ret.pattern().equals(patternString)) {
+                ret = rule.buildPattern(patternString);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ret;
+    }
+
     public boolean checkPackageName(final CrawledLink link) {
         final CompiledRegexFilter rule = getPackageNameRule();
         if (rule == null) {
             return true;
         }
-        String regexText = rule.getRegex();
-        /* Replace dynamic tags which allows user to e.g. check for current date in packagename. */
-        regexText = PackagizerController.replaceDynamicTags(regexText, null, null, null);
-        rule.setRegex(regexText);
-        String packagename = null;
-        if (link != null) {
-            if (link.getParentNode() != null) {
-                packagename = link.getParentNode().getName();
-            }
-            if (StringUtils.isEmpty(packagename) && link.getDesiredPackageInfo() != null) {
-                packagename = link.getDesiredPackageInfo().getName();
-            }
-        }
+        final String packagename = getPackageName(link);
         if (StringUtils.isEmpty(packagename)) {
             return false;
         }
-        return rule.matches(packagename);
+        final Pattern pattern = getPatternWithoutDynamicTags(link, rule);
+        return rule.matches(pattern, packagename);
     }
 
     public boolean checkFileName(final CrawledLink link) {
@@ -330,33 +347,31 @@ public class RuleWrapper<T extends FilterRule> {
         if (rule == null) {
             return true;
         }
-        final String url = link.getURL();
+        final Pattern pattern = getPatternWithoutDynamicTags(link, rule);
         final DownloadLink downloadLink = link.getDownloadLink();
         if (downloadLink != null) {
-            String regexText = rule.getRegex();
-            /* Replace dynamic tags which allows user to e.g. check for current date in filename. */
-            regexText = PackagizerController.replaceDynamicTags(regexText, null, null, null);
-            rule.setRegex(regexText);
             // final or forced filename available
-            if (downloadLink.getFinalFileName() != null || downloadLink.getForcedFileName() != null) {
-                return rule.matches(link.getName());
+            String fileName = null;
+            if ((fileName = downloadLink.getFinalFileName()) != null || (fileName = downloadLink.getForcedFileName()) != null) {
+                return rule.matches(pattern, fileName);
             }
             // file is online
             if (link.getLinkState() == AvailableLinkState.ONLINE) {
-                return rule.matches(link.getName());
+                return rule.matches(pattern, link.getName());
             }
             // onlinestatus matches so we trust the available filename
             if (checkOnlineStatus(link)) {
-                return rule.matches(link.getName());
+                return rule.matches(pattern, link.getName());
             }
             return false;
         }
+        final String url = link.getURL();
         if (!StringUtils.startsWithCaseInsensitive(url, "file:")) {
             return false;
         }
         try {
             final File file = new File(new URL(url).toURI());
-            return rule.matches(file.getName());
+            return rule.matches(pattern, file.getName());
         } catch (final Exception e) {
             return false;
         }
@@ -500,10 +515,4 @@ public class RuleWrapper<T extends FilterRule> {
         return rule.isEnabled();
     }
 
-    public Boolean isStopAfterThisRule() {
-        if (rule instanceof PackagizerRule) {
-            return ((PackagizerRule) rule).isStopAfterThisRule();
-        }
-        return null;
-    }
 }

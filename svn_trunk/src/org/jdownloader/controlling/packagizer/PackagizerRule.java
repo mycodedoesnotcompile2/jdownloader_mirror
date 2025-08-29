@@ -11,18 +11,18 @@ public class PackagizerRule extends FilterRule implements Storable {
     private Boolean  autoExtractionEnabled;
     private Boolean  autoForcedStartEnabled;
     private Boolean  autoStartEnabled;
-    private boolean  isStopAfterThisRule;
+    private boolean  isStopAfterThisRule = false;
     private Boolean  linkEnabled;
     private int      chunks;
-    private int      order       = 0;
-    private Priority priority    = null;
+    private int      order               = 0;
+    private Priority priority            = null;
     private String   comment;
     private String   downloadDestination;
     private String   filename;
-    private String   moveto      = null;
-    private String   packageKey  = null;
-    private String   packageName = null;
-    private String   rename      = null;
+    private String   moveto              = null;
+    private String   packageKey          = null;
+    private String   packageName         = null;
+    private String   rename              = null;
 
     public PackagizerRule() {
         // required by Storable

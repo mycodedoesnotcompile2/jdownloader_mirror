@@ -58,6 +58,7 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.components.ExtCheckBox;
+import org.appwork.swing.components.ExtJToggleButton;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.ExtTextHighlighter;
 import org.appwork.swing.components.SizeSpinner;
@@ -898,7 +899,7 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     }
 
     protected JToggleButton createToggle() {
-        JToggleButton ret = new JToggleButton(new AppAction() {
+        final JToggleButton ret = new ExtJToggleButton(new AppAction() {
             {
                 setTooltipText(_GUI.T.ConditionDialog_layoutDialogContent_regex_tooltip_());
             }
@@ -924,11 +925,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         if (e.getSource() == this.okButton) {
             if (validate()) {
                 super.actionPerformed(e);
-            } else {
-                return;
             }
+        } else {
+            super.actionPerformed(e);
         }
-        super.actionPerformed(e);
     }
 
     private boolean validate() {

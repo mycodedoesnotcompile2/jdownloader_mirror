@@ -33,7 +33,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51201 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51403 $", interfaceVersion = 3, names = {}, urls = {})
 public class DropapkCom extends XFileSharingProBasic {
     public DropapkCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,8 @@ public class DropapkCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "drop.download", "dropapk.to", "dropapk.com", "fastclick.to", "mixloads.com" });
+        /* 2025-08-28: other filehost upstream.to is now also drop.download (ex plugin UpstreamTo.java) */
+        ret.add(new String[] { "drop.download", "dropapk.to", "dropapk.com", "fastclick.to", "mixloads.com", "upstream.to" });
         return ret;
     }
 
