@@ -102,7 +102,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 51372 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -857,7 +857,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     vid.error = errormessage;
                 }
                 lastVideoFailedErrorMessage = vid.error;
-                final DownloadLink offlineVideo = createOfflinelink(YoutubeHelper.generateVideoContentURL(vid.videoID, playlistID, (videoidindex + 1)), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error);
+                final DownloadLink offlineVideo = createOfflinelink(YoutubeHelper.generateSingleVideoContentURL(vid.videoID, playlistID, (videoidindex + 1)), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error);
                 if (channelOrPlaylistPackage != null) {
                     offlineVideo._setFilePackage(channelOrPlaylistPackage);
                 }

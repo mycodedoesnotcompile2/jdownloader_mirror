@@ -38,7 +38,7 @@ import jd.plugins.hoster.DirectHTTP;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 49607 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51418 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagebamCom extends PluginForDecrypt {
     public ImagebamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -154,6 +154,7 @@ public class ImagebamCom extends PluginForDecrypt {
             if (waitMillisStr != null && !skipWaittime) {
                 this.sleep(Long.parseLong(waitMillisStr), param);
             }
+            br.setCookie(br.getHost(), "sfw_inter", "1");
             br.getPage(br.getURL());
         }
         if (br.containsHTML("class=\"links gallery\"")) {
@@ -167,6 +168,7 @@ public class ImagebamCom extends PluginForDecrypt {
             }
             final String originalFilename = br.getRegex(galleryID + "\\?full=1\"[^<>]*title=\"([^\"]+)\"").getMatch(0);
             final DownloadLink direct = this.createDownloadlink(finallink);
+            direct.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
             direct.setContentUrl(param.getCryptedUrl());
             final String filenameURL = Plugin.getFileNameFromURL(new URL(finallink));
             if (originalFilename != null) {
@@ -285,6 +287,7 @@ public class ImagebamCom extends PluginForDecrypt {
         }
         finallink = Encoding.htmlDecode(finallink);
         final DownloadLink dl = createDownloadlink(finallink);
+        dl.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
         dl.setContentUrl(param.getCryptedUrl());
         String originalFilename = br.getRegex(imageID + "\\?full=1\"[^<>]*title=\"([^\"]+)\"").getMatch(0);
         String urlFilename = extractFileNameFromURL(finallink);

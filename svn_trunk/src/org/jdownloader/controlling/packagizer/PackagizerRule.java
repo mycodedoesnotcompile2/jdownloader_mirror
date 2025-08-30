@@ -64,6 +64,10 @@ public class PackagizerRule extends FilterRule implements Storable {
         return ret;
     }
 
+    public PackagizerRule init() {
+        return this;
+    }
+
     public PackagizerRuleWrapper compile() {
         return new PackagizerRuleWrapper(this);
     }

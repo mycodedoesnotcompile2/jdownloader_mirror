@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -147,6 +148,12 @@ public abstract class FFmpeg extends AbstractFFmpegBinary {
         if (!file.delete() && file.exists()) {
             file.deleteOnExit();
         }
+    }
+
+    public String getVersionString() throws InterruptedException, IOException, FFMpegException {
+        final String stdOut = runCommand(null, Arrays.asList(new String[] { getFullPath(), "-version" }));
+        final String version = new Regex(stdOut, "ffmpeg version\\s*([^\r\n]+)").getMatch(0);
+        return version;
     }
 
     protected boolean mux(FFMpegProgress progress, String out, String videoIn, String audioIn, final String muxCommand[]) throws InterruptedException, IOException, FFMpegException {

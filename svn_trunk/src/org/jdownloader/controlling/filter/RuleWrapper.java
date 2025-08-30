@@ -316,12 +316,18 @@ public class RuleWrapper<T extends FilterRule> {
 
     protected Pattern getPatternWithoutDynamicTags(final CrawledLink link, CompiledRegexFilter rule) {
         Pattern ret = rule._getPattern();
+        if (Boolean.FALSE.equals(rule.getDynamicTags())) {
+            return ret;
+        }
         try {
             String patternString = ret.pattern();
             /* Replace dynamic tags which allows user to e.g. check for current date in packagename. */
             patternString = PackagizerController.replaceDynamicTags(patternString, getPackageName(link), link, null);
             if (!ret.pattern().equals(patternString)) {
+                rule.setDynamicTags(Boolean.TRUE);
                 ret = rule.buildPattern(patternString);
+            } else {
+                rule.setDynamicTags(Boolean.FALSE);
             }
         } catch (Exception e) {
             e.printStackTrace();

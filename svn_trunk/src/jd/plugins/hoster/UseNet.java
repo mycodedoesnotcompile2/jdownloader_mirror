@@ -47,7 +47,7 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
+@HostPlugin(revision = "$Revision: 51409 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
 public class UseNet extends PluginForHost {
     public UseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -269,13 +269,16 @@ public class UseNet extends PluginForHost {
                     }
                 }
                 if (server == null) {
-                    server = getAvailableUsenetServer().get(0);
+                    server = serverList.get(0);
                 }
+                // store new UsenetServer to UsenetAccountConfigInterface, so it can be found on next getUseNetServer invocation
                 config.setHost(server.getHost());
                 config.setPort(server.getPort());
                 config.setSSLEnabled(server.isSSL());
-                config.setConnections(server.getConnections());
+                config.setConnections(Math.max(1, server.getConnections()));
             }
+            // set account connection settings to UsenetServer
+            server.setConnections(config.getConnections());
             return server;
         }
     }

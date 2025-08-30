@@ -13,7 +13,8 @@ public class SubFolderByPluginRule extends PackagizerRule {
         super();
     }
 
-    public void init() {
+    @Override
+    public SubFolderByPluginRule init() {
         setMatchAlwaysFilter(new BooleanFilter(true));
         setDownloadDestination("<jd:" + DownloadLink.RELATIVE_DOWNLOAD_FOLDER_PATH + ">");
         setIconKey(IconKey.ICON_FOLDER);
@@ -21,5 +22,6 @@ public class SubFolderByPluginRule extends PackagizerRule {
         setEnabled(true);
         setId(ID);
         setStaticRule(true);
+        return this;
     }
 }

@@ -11,7 +11,8 @@ public class DisableRevFilesPackageRule extends PackagizerRule {
         super();
     }
 
-    public void init() {
+    @Override
+    public DisableRevFilesPackageRule init() {
         setFiletypeFilter(new FiletypeFilter(TypeMatchType.IS, true, false, false, false, false, false, false, false, false, "rev", false));
         setIconKey(org.jdownloader.gui.IconKey.ICON_EXTRACT);
         setName(_JDT.T.DisableRevFilesPackageRulee_rule_name());
@@ -19,5 +20,6 @@ public class DisableRevFilesPackageRule extends PackagizerRule {
         setEnabled(true);
         setId(ID);
         setStaticRule(true);
+        return this;
     }
 }

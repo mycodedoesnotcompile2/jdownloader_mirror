@@ -69,6 +69,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.svg.SVGFactory;
+import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
@@ -83,6 +84,7 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.jdownloader.actions.AppAction;
+import org.jdownloader.controlling.ffmpeg.FFmpeg;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.notify.BasicNotify;
 import org.jdownloader.gui.notify.BubbleNotify;
@@ -90,6 +92,7 @@ import org.jdownloader.gui.notify.BubbleNotify.AbstractNotifyWindowFactory;
 import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.logging.LogController;
 
 public class AboutDialog extends AbstractDialog<Integer> {
     private int labelHeight = 0;
@@ -429,6 +432,11 @@ public class AboutDialog extends AbstractDialog<Integer> {
         extraction.add(createLink("7ZipJBindings (" + get7ZipJBindingDetails() + ")", "https://github.com/borisbrodski/sevenzipjbinding"));
         extraction.add(createLink("Zip4J 1.3.3", "https://github.com/srikanth-lingala/zip4j"));
         stats.add(extraction);
+        final String ffmpegVersion = getFFmpegDetails();
+        if (ffmpegVersion != null) {
+            stats.add(new JLabel("FFmpeg:"), "");
+            stats.add(createLink(ffmpegVersion, "https://ffmpeg.org/"));
+        }
         final LookAndFeel laf = UIManager.getLookAndFeel();
         if (laf != null) {
             stats.add(new JLabel(_GUI.T.jd_gui_swing_components_AboutDialog_laf()), "");
@@ -470,7 +478,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
         }
         stats.add(new JLabel(_GUI.T.jd_gui_swing_components_AboutDialog_icons()), "");
         stats.add(createLink("See /themes/* folder for Icon Licenses"), "");
-        final JPanel icons = new JPanel(new MigLayout("ins 0,wrap 3"));
+        final JPanel icons = new JPanel(new MigLayout("ins 0, wrap 3", "[grow,fill]", ""));
         icons.add(createLink("Icons8", "https://icons8.com"));
         icons.add(createLink("Tango Icons", "https://en.wikipedia.org/wiki/Tango_Desktop_Project"));
         icons.add(createLink("FatCow-Farm Fresh Icons", "https://www.fatcow.com/free-icons"));
@@ -513,6 +521,26 @@ public class AboutDialog extends AbstractDialog<Integer> {
         } catch (final Throwable ignore1) {
         }
         return version;
+    }
+
+    private String getFFmpegDetails() {
+        try {
+            final FFmpeg ffmpeg = new FFmpeg(null) {
+                @Override
+                public LogInterface getLogger() {
+                    return LogController.getFastPluginLogger("ffmpeg");
+                }
+            };
+            if (!ffmpeg.isAvailable()) {
+                return null;
+            }
+            final String version = ffmpeg.getVersionString();
+            if (version != null) {
+                return version;
+            }
+        } catch (final Throwable ignore1) {
+        }
+        return "unknown version";
     }
 
     private ExtButton createLink(final Object object, final String url) {

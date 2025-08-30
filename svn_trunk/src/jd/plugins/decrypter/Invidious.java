@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
 /** Crawler for hosted instances of: https://github.com/iv-org/invidious */
-@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = {}, urls = {})
 public class Invidious extends PluginForDecrypt {
     public Invidious(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,7 @@ public class Invidious extends PluginForDecrypt {
             /* Programmer mistake - this should never happen! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        decryptedLinks.add(this.createDownloadlink(YoutubeHelper.generateContentURL(videoID)));
+        decryptedLinks.add(this.createDownloadlink(YoutubeHelper.generateSingleVideoContentURL(videoID)));
         return decryptedLinks;
     }
 }

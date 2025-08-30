@@ -94,7 +94,6 @@ import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
 import jd.controlling.linkcrawler.modifier.PackageNameModifier;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
-import jd.gui.swing.laf.LookAndFeelController;
 import jd.parser.html.HTMLParser;
 import jd.parser.html.HTMLParser.HtmlParserCharSequence;
 import jd.parser.html.HTMLParser.HtmlParserResultSet;
@@ -150,6 +149,11 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private ExtTextField           comment;
     private JCheckBox              overwritePackagizer;
     private boolean                hasUserSelectedOverwritePackagizerButton = false;
+    /*
+     * Dummy value for a possible future setting to allow user to enable/disable "overwrite Packagizer rule" checkbox based on other fields'
+     * user inputs in AddLinksDialog.
+     */
+    private final boolean          packagizerAutoModeEnabled                = true;
 
     public boolean isDeepAnalyse() {
         return deepAnalyse;
@@ -663,7 +667,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                             final ClipboardMonitoring clp = ClipboardMonitoring.getINSTANCE();
                             clipboardContent = clp.getCurrentContent();
                             if (clipboardContent != null) {
-                                textAuto = clipboardContent.getContentText();
+                                textAuto = clipboardContent.getContent();
                             }
                         }
                         new EDTRunner() {
@@ -867,19 +871,6 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         return true;
     }
 
-    public static void main(String[] args) {
-        LookAndFeelController.getInstance().setUIManager();
-        AddLinksDialog d = new AddLinksDialog();
-        try {
-            Dialog.getInstance().showDialog(d);
-        } catch (DialogClosedException e) {
-            e.printStackTrace();
-        } catch (DialogCanceledException e) {
-            e.printStackTrace();
-        }
-        System.exit(1);
-    }
-
     private final AtomicReference<Thread> asyncImportThread = new AtomicReference<Thread>();
 
     protected void asyncAnalyse(final String textAuto, final ClipboardContent clipboardContent) {
@@ -910,13 +901,8 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                     /* Nothing to process */
                     return "";
                 }
-                /**
-                 * Fix line breaks for GUI. <br>
-                 * TODO: Maybe move this into upper classes or even into the ClipboardContent class?
-                 */
-                if (textAuto.contains("\r") && !textAuto.contains("\n")) {
-                    textAuto = textAuto.replaceAll("\r", "\r\n");
-                }
+                /* replace lonely carrier return with CRLF */
+                textAuto = textAuto.replaceAll("\r(!\n)", "\r\n");
                 if (config.isAddLinksPreParserAutoExtractionPasswordSearchEnabled()) {
                     processPasswordExtraction(textAuto, clipboardContent);
                 }
@@ -1005,6 +991,8 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private void autoEnablePackagizerCheckbox() {
         if (this.overwritePackagizer == null) {
             return;
+        } else if (!packagizerAutoModeEnabled) {
+            return;
         } else if (hasUserSelectedOverwritePackagizerButton) {
             /* User has already altered this checkbox -> Do not touch */
             return;
@@ -1017,11 +1005,13 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private void autoDisablePackagizerCheckbox() {
         if (this.overwritePackagizer == null) {
             return;
+        } else if (!packagizerAutoModeEnabled) {
+            return;
         } else if (hasUserSelectedOverwritePackagizerButton) {
             /* User has already altered this checkbox -> Do not touch */
             return;
         }
-        /* Check for non default values for all relevant fields. If any field is non default, do not touch Packagizer checkbox. */
+        /* Check for non-default values for all relevant fields. If any field is non default, do not touch Packagizer checkbox. */
         final String finalPackageName = getPackageName();
         if (!StringUtils.isEmpty(finalPackageName)) {
             return;

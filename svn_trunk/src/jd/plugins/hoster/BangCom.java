@@ -40,6 +40,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -49,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BangComCrawler;
 
-@HostPlugin(revision = "$Revision: 50697 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51413 $", interfaceVersion = 3, names = {}, urls = {})
 public class BangCom extends PluginForHost {
     public BangCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -262,6 +263,7 @@ public class BangCom extends PluginForHost {
                 br.getPage(checkurl);
                 if (this.isLoggedin(br)) {
                     logger.info("Cookie login successful");
+                    checkForProblemsAfterSuccessfulLogin(br);
                     return;
                 } else {
                     logger.info("Cookie login failed");
@@ -320,6 +322,14 @@ public class BangCom extends PluginForHost {
             }
             logger.info("Login successful");
             account.saveCookies(this.br.getCookies(br.getHost()), "");
+            /* Login can be successful but age verification may still be required */
+            checkForProblemsAfterSuccessfulLogin(br);
+        }
+    }
+
+    private void checkForProblemsAfterSuccessfulLogin(final Browser br) throws AccountUnavailableException {
+        if (br.containsHTML("data-age-guard")) {
+            throw new AccountUnavailableException("Age verification required", 3 * 60 * 60 * 1000l);
         }
     }
 

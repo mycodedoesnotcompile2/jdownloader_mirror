@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.OkRu;
 
-@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
+@DecrypterPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
 public class OkRuDecrypter extends PluginForDecrypt {
     public OkRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -224,7 +224,7 @@ public class OkRuDecrypter extends PluginForDecrypt {
                 externID = (String) JavaScriptEngineFactory.walkJson(entries, "movie/contentId");
             }
             if ("USER_YOUTUBE".equalsIgnoreCase(provider) && !StringUtils.isEmpty(externID)) {
-                ret.add(createDownloadlink(YoutubeHelper.generateContentURL(externID)));
+                ret.add(createDownloadlink(YoutubeHelper.generateSingleVideoContentURL(externID)));
                 return ret;
             }
             /* 2019-10-15: TODO: Check if this is still working */

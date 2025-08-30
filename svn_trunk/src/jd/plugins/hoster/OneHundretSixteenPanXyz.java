@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51366 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -133,16 +133,17 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        // TODO: Check this value
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return true;
+            // 2025-08-29
+            return false;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
+            // 2025-08-29
             return false;
         }
     }
@@ -262,10 +263,6 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             br.getHeaders().put("x-requested-with", "XMLHttpRequest");
             /* 2025-07-07: Website sends x-csrf-token header twice with different values */
             // br.getHeaders().put("x-xsrf-token", "");
-            /*
-             * TODO: 2025-07-08: Fix this request for downloads without account (though at this moment anonymous downloads are
-             * broken/disabled anyways so this has no priority)
-             */
             br.postPageRaw("/f/" + internal_file_id + "/generate-download", JSonStorage.serializeToJson(postdata));
             final Map<String, Object> data = this.checkErrorsWebapi(br, link, account);
             /* TODO: Add generic error handling and check for wrong captcha */
@@ -291,7 +288,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             }
         } catch (final Exception e) {
             if (storedDirecturl != null) {
-                link.removeProperty(directlinkproperty);
+                // link.removeProperty(directlinkproperty);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
             } else {
                 throw e;
@@ -348,7 +345,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             postdata.put("password", account.getPass());
             postdata.put("remember", true);
             br.getHeaders().put("Content-Type", "application/json");
-            br.getHeaders().put("Origin", "https://www.116pan.xyz");
+            br.getHeaders().put("Origin", "https://www." + br.getHost());
             br.getHeaders().put("x-csrf-token", csrftoken);
             br.getHeaders().put("x-inertia", "true");
             br.getHeaders().put("x-inertia-version", x_inertia_version);
@@ -401,7 +398,6 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
     }
 
     private Map<String, Object> checkErrorsWebapi(final Map<String, Object> entries, final DownloadLink link, final Account account) throws PluginException {
-        // TODO: Implement more error handling
         final String error_msg = (String) entries.get("message");
         if (error_msg == null) {
             /* No error */
@@ -413,6 +409,13 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
              * {"success":false,"message":"\u9a8c\u8bc1\u7801\u9519\u8bef\uff0c\u8bf7\u91cd\u65b0\u8f93\u5165","captcha_error":true}
              */
             throw new PluginException(LinkStatus.ERROR_CAPTCHA, error_msg);
+        }
+        if (error_msg.equalsIgnoreCase("游客每日下载次数已达上限，请注册账号享受更多下载次数")) {
+            /*
+             * IP limit: The number of daily downloads by visitors has reached the upper limit. Please register an account to enjoy more
+             * downloads.
+             */
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, error_msg);
         }
         if (link == null) {
             /* Account related error e.g. password_incorrect, invalid_captcha */

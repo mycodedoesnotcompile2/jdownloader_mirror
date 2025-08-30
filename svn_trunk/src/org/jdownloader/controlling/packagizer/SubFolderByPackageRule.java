@@ -21,7 +21,8 @@ public class SubFolderByPackageRule extends PackagizerRule {
         super.setEnabled(enabled);
     }
 
-    public void init() {
+    @Override
+    public SubFolderByPackageRule init() {
         setMatchAlwaysFilter(new BooleanFilter(true));
         setDownloadDestination("<jd:packagename>");
         setIconKey(IconKey.ICON_FOLDER);
@@ -29,5 +30,6 @@ public class SubFolderByPackageRule extends PackagizerRule {
         setEnabled(true);
         setId(ID);
         setStaticRule(true);
+        return this;
     }
 }

@@ -22,6 +22,16 @@ public class CompiledRegexFilter extends RegexFilter implements Storable {
         return pattern;
     }
 
+    private Boolean dynamicTags = null;
+
+    protected Boolean getDynamicTags() {
+        return dynamicTags;
+    }
+
+    protected void setDynamicTags(Boolean dynamicTags) {
+        this.dynamicTags = dynamicTags;
+    }
+
     public boolean matches(String string) {
         return matches(_getPattern(), string);
     }

@@ -749,6 +749,7 @@ public abstract class AbstractFFmpegBinary {
     static {
         DEFAULT_FORMAT_BY_EXTENSION = new HashMap<String, String>();
         DEFAULT_FORMAT_BY_EXTENSION.put(".mp3", "mp3");
+        DEFAULT_FORMAT_BY_EXTENSION.put(".flac", "flac");
         DEFAULT_FORMAT_BY_EXTENSION.put(".mp4", "mp4");
         DEFAULT_FORMAT_BY_EXTENSION.put(".mpg", "mpeg");
         DEFAULT_FORMAT_BY_EXTENSION.put(".mov", "mov");
@@ -840,7 +841,7 @@ public abstract class AbstractFFmpegBinary {
         }
     }
 
-    public String runCommand(FFMpegProgress progress, ArrayList<String> commandLine) throws IOException, InterruptedException, FFMpegException {
+    public String runCommand(FFMpegProgress progress, List<String> commandLine) throws IOException, InterruptedException, FFMpegException {
         final LogInterface logger = getLogger();
         logger.info("runCommand(ProcessBuilderFactory):" + commandLine);
         final ProcessBuilder pb = ProcessBuilderFactory.create(commandLine);

@@ -690,8 +690,12 @@ public class HTTPConnectionUtils {
                         break;
                     }
                     if (bigbuffer.position() >= 4) {
-                        /* \r\n\r\n for header<->content divider */
+                        /* \r\n\r\n for header<->content divider , correct line termination */
                         if (bigbuffer.get(position - 4) == HTTPConnectionUtils.R && bigbuffer.get(position - 3) == HTTPConnectionUtils.N && bigbuffer.get(position - 2) == HTTPConnectionUtils.R && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
+                            break;
+                        }
+                        /* X\n\r\n for header<->content divider, for server that use \n line termination */
+                        if (bigbuffer.get(position - 4) != HTTPConnectionUtils.R && bigbuffer.get(position - 3) == HTTPConnectionUtils.N && bigbuffer.get(position - 2) == HTTPConnectionUtils.R && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
                             break;
                         }
                     }

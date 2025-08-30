@@ -30,7 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = {}, urls = {})
 public class HooktubeCom extends PluginForDecrypt {
     public HooktubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class HooktubeCom extends PluginForDecrypt {
         if (!TbCmV2.isValidVideoID(videoID)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        ret.add(createDownloadlink(YoutubeHelper.generateContentURL(videoID)));
+        ret.add(createDownloadlink(YoutubeHelper.generateSingleVideoContentURL(videoID)));
         return ret;
     }
 }

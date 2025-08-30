@@ -341,7 +341,7 @@ public class HLSDownloader extends DownloadInterface {
                 }
 
                 @Override
-                public String runCommand(FFMpegProgress progress, ArrayList<String> commandLine) throws IOException, InterruptedException, FFMpegException {
+                public String runCommand(FFMpegProgress progress, List<String> commandLine) throws IOException, InterruptedException, FFMpegException {
                     ffmpegThread = Thread.currentThread();
                     try {
                         return super.runCommand(progress, commandLine);
@@ -391,7 +391,7 @@ public class HLSDownloader extends DownloadInterface {
         return null;
     }
 
-    protected String getFFmpegFormat(final FFmpeg ffmpeg) throws Exception {
+    protected String getFFmpegFormat(final AbstractFFmpegBinary ffmpeg) throws Exception {
         String name = link.getForcedFileName();
         if (StringUtils.isEmpty(name)) {
             name = link.getFinalFileName();
@@ -461,7 +461,7 @@ public class HLSDownloader extends DownloadInterface {
                 }
 
                 @Override
-                public String runCommand(FFMpegProgress progress, ArrayList<String> commandLine) throws IOException, InterruptedException, FFMpegException {
+                public String runCommand(FFMpegProgress progress, List<String> commandLine) throws IOException, InterruptedException, FFMpegException {
                     ffmpegThread = Thread.currentThread();
                     try {
                         return super.runCommand(progress, commandLine);
@@ -633,7 +633,7 @@ public class HLSDownloader extends DownloadInterface {
                 }
 
                 @Override
-                public String runCommand(FFMpegProgress progress, ArrayList<String> commandLine) throws IOException, InterruptedException, FFMpegException {
+                public String runCommand(FFMpegProgress progress, List<String> commandLine) throws IOException, InterruptedException, FFMpegException {
                     ffmpegThread = Thread.currentThread();
                     try {
                         return super.runCommand(progress, commandLine);
@@ -1042,6 +1042,36 @@ public class HLSDownloader extends DownloadInterface {
         return server;
     }
 
+    /**
+     * extension checks in https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/hls.c - test_segment method
+     *
+     * @param ffmpeg
+     * @param segment
+     * @return
+     * @throws Exception
+     */
+    protected String getSegmentExtension(final AbstractFFmpegBinary ffmpeg, final M3U8Segment segment) throws Exception {
+        final String format = getFFmpegFormat(ffmpeg);
+        if (format != null) {
+            if (format.matches("(?i)^flac$")) {
+                return "flac";
+            } else if (format.matches("(?i)^mp3$")) {
+                return "mp3";
+            } else if (format.matches("(?i)^(mp4|aac|mpegts)$")) {
+                return "ts";
+            }
+        }
+        return "ts";
+    }
+
+    protected boolean isSegmentDownload(GetRequest request) {
+        final String requestedPath = request.getRequestedPath();
+        if (requestedPath == null) {
+            return false;
+        }
+        return requestedPath.matches("^/download(\\.(ts|mp3|flac))?$");
+    }
+
     private void initPipe(final AbstractFFmpegBinary ffmpeg) throws IOException {
         final LinkedList<MeteredThrottledInputStream> connectedMeteredThrottledInputStream = new LinkedList<MeteredThrottledInputStream>();
         final DelayedRunnable delayedCleanup = new DelayedRunnable(5000) {
@@ -1253,11 +1283,12 @@ public class HLSDownloader extends DownloadInterface {
                             if (extXMap != null) {
                                 sb.append("#EXT-X-MAP:URI=" + extXMap.getUrl() + "\r\n");
                             }
+
                             for (int index = 0; index < m3u8.size(); index++) {
                                 final M3U8Segment segment = m3u8.getSegment(index);
                                 sb.append("#EXTINF:" + M3U8Segment.toExtInfDuration(segment.getDuration()));
                                 // prefer relative URLs
-                                sb.append("\r\ndownload.ts?id=" + processID + "&ts_index=" + index + "\r\n");
+                                sb.append("\r\ndownload." + getSegmentExtension(ffmpeg, segment) + "?id=" + processID + "&ts_index=" + index + "\r\n");
                             }
                             sb.append("#EXT-X-ENDLIST\r\n");
                             response.setResponseCode(ResponseCode.get(200));
@@ -1272,7 +1303,7 @@ public class HLSDownloader extends DownloadInterface {
                         }
                         requestOkay = true;
                         return true;
-                    } else if ("/download".equals(request.getRequestedPath()) || "/download.ts".equals(request.getRequestedPath())) {
+                    } else if (isSegmentDownload(request)) {
                         final String url = request.getParameterbyKey("url");
                         final String segmentIndex = request.getParameterbyKey("ts_index");
                         if (segmentIndex == null && url == null) {
