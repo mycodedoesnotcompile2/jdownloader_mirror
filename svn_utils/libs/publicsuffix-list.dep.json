@@ -1280,11 +1280,29 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "version":"2025.230.1 f6d9f996b248aa92a6fcf7dd739730220f1cbabd"
+    },
+    {
+      "changes":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5\t: add `hrsn.au` & `vps.hrsn.au` (#2566)",
+      "date":"2025-08-19T16:08:02.358+02:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b4d74b21810123f054314a0b36e666bd934dd050918b9abdaea50bc0b758b191"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5"
     }
   ],
   "installed":{
-    "changes":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5\t: add `hrsn.au` & `vps.hrsn.au` (#2566)",
-    "date":"2025-08-19T16:08:02.358+02:00",
+    "changes":"2025.231.1 0654b20320910922259c7869606f027e6f7789d1\t: Add sourcecraft.site to the PSL (#2547)\r\n2025.231.2 db0dbe5d4852712c1e6b3bf06a053850c3e114c2\t: util: gTLD data autopull updates for 2025-08-19T15:20:18 UTC (#2567)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.232.0 8c9e8b967e7429b4cb0f2fe75f20c2c4b020402f\t: Update 611.to (#2561)\r\n2025.235.0 2b05f1fef3b52831d70b40a05da2614a031557ea\t: Update public_suffix_list.dat to remove schools.nsw.edu.au (#2556)\n\nRemoved schools.nsw.edu.au at the request of Andrew Zografos (NSW DoE) and Amanda Shay (ESA)\r\n2025.238.0 80eac0eba1e8215052b9b67654955e87d84d6141\t: Add api.br, ia.br, social.br, xyz.br to public section for Brazil (#2575)\r\n2025.238.1 44211b0fbb8b4e09b89a553f5b26c6a02f889c4b\t: Removing lib.de.us from PSL (#2572)\r\n2025.239.0 55b9732118f51fa4f14309b475aff6e0671026b3\t: chore: add realtime and storage to the psl (#2570)\r\n2025.239.1 7c7f76b6aef151082767f2f991bf99a824a654df\t: Add wal.app (#2529)\r\n2025.239.2 519af36326939e3b6c07fbbd30806f67a570b2ba\t: util: gTLD data autopull updates for 2025-08-27T15:19:07 UTC (#2578)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.240.0 4103956c4300902436b03d7da482536e757b3601\t: Add jote.cloud to Jotelulu's Public Suffix List (#2532)",
+    "date":"2025-08-31T17:25:19.744+02:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -1389,7 +1407,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b4d74b21810123f054314a0b36e666bd934dd050918b9abdaea50bc0b758b191"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"aef53a6329193716221ffaf1dca3327ab4b171cbe482932ed3cd4a4193c8591c"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1399,7 +1417,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2025.231.0 8eb248f2286592aa1d41cb38414dbd4fe1d58be5"
+    "version":"2025.240.0 4103956c4300902436b03d7da482536e757b3601"
   },
   "minJRE":null,
   "provider":"github-clone",
