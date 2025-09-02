@@ -148,7 +148,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private final HashSet<String>  autoPasswords                            = new HashSet<String>();
     private ExtTextField           comment;
     private JCheckBox              overwritePackagizer;
-    private boolean                hasUserSelectedOverwritePackagizerButton = false;
+    private boolean                hasUserClickedOverwritePackagizerButton = false;
     /*
      * Dummy value for a possible future setting to allow user to enable/disable "overwrite Packagizer rule" checkbox based on other fields'
      * user inputs in AddLinksDialog.
@@ -197,13 +197,10 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         JLabel lbl = new JLabel(_GUI.T.AddLinksDialog_getDefaultButtonPanel_overwrite_packagizer());
         overwritePackagizer = new JCheckBox();
         overwritePackagizer.setSelected(CFG_LINKGRABBER.CFG.isAddLinksDialogOverwritesPackagizerRulesEnabled());
-        overwritePackagizer.addChangeListener(new ChangeListener() {
-            public void stateChanged(ChangeEvent e) {
-                JCheckBox source = (JCheckBox) e.getSource();
-                boolean isSelected = source.isSelected();
-                if (isSelected != CFG_LINKGRABBER.CFG.isAddLinksDialogOverwritesPackagizerRulesEnabled()) {
-                    hasUserSelectedOverwritePackagizerButton = true;
-                }
+        overwritePackagizer.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                hasUserClickedOverwritePackagizerButton = true;
             }
         });
         ret.add(new JLabel(new AbstractIcon(IconKey.ICON_UPLOAD, 22)), "gapleft 5");
@@ -219,7 +216,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     @Override
     protected void setReturnmask(boolean b) {
         super.setReturnmask(b);
-        if (b && hasUserSelectedOverwritePackagizerButton) {
+        if (b && hasUserClickedOverwritePackagizerButton) {
             /* Update config so next time the dialog is opened, the value is remembered. */
             CFG_LINKGRABBER.CFG.setAddLinksDialogOverwritesPackagizerRulesEnabled(overwritePackagizer.isSelected());
         }
@@ -852,10 +849,8 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                 new EDTRunner() {
                     @Override
                     protected void runInEDT() {
-                        if (input.isShowing()) {
-                            if (CFG_GUI.HELP_DIALOGS_ENABLED.isEnabled()) {
-                                HelpDialog.show(Boolean.FALSE, Boolean.TRUE, new Point(input.getLocationOnScreen().x + input.getWidth() / 2, input.getLocationOnScreen().y + 10), null, Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.AddLinksDialog_AddLinksDialog_(), _GUI.T.AddLinksDialog_layoutDialogContent_description(), new AbstractIcon(IconKey.ICON_LINKGRABBER, 32));
-                            }
+                        if (input.isShowing() && CFG_GUI.HELP_DIALOGS_ENABLED.isEnabled()) {
+                            HelpDialog.show(Boolean.FALSE, Boolean.TRUE, new Point(input.getLocationOnScreen().x + input.getWidth() / 2, input.getLocationOnScreen().y + 10), null, Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.AddLinksDialog_AddLinksDialog_(), _GUI.T.AddLinksDialog_layoutDialogContent_description(), new AbstractIcon(IconKey.ICON_LINKGRABBER, 32));
                         }
                     }
                 };
@@ -993,13 +988,13 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             return;
         } else if (!packagizerAutoModeEnabled) {
             return;
-        } else if (hasUserSelectedOverwritePackagizerButton) {
+        } else if (hasUserClickedOverwritePackagizerButton) {
             /* User has already altered this checkbox -> Do not touch */
             return;
         }
         this.overwritePackagizer.setSelected(true);
         /* ChangeListener on overwritePackagizer will set this to true so we'll correct that here. */
-        hasUserSelectedOverwritePackagizerButton = false;
+        hasUserClickedOverwritePackagizerButton = false;
     }
 
     private void autoDisablePackagizerCheckbox() {
@@ -1007,7 +1002,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             return;
         } else if (!packagizerAutoModeEnabled) {
             return;
-        } else if (hasUserSelectedOverwritePackagizerButton) {
+        } else if (hasUserClickedOverwritePackagizerButton) {
             /* User has already altered this checkbox -> Do not touch */
             return;
         }

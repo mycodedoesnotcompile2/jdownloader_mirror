@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
@@ -47,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VscoCo;
 
-@DecrypterPlugin(revision = "$Revision: 51384 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51420 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCoCrawler extends PluginForDecrypt {
     public VscoCoCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,11 +87,13 @@ public class VscoCoCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_PROFILE_AND_SINGLE_MEDIA = Pattern.compile("/([\\w-]+)(/(media|video)/([a-f0-9-]{24,}))?", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             final String domainsPattern = buildHostsPatternPart(domains);
-            ret.add("https?://(?:[^/]+\\." + domainsPattern + "/grid/\\d+|(?:www\\.)?" + domainsPattern + "/[\\w-]+/grid/\\d+|(?:www\\.)?" + domainsPattern + "/[\\w-]+(/media/[a-f0-9]{24})?)");
+            ret.add("https?://(?:[^/]+\\." + domainsPattern + "/grid/\\d+|(?:www\\.)?" + domainsPattern + "/[\\w-]+/grid/\\d+|(?:www\\.)?" + domainsPattern + PATTERN_PROFILE_AND_SINGLE_MEDIA.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -125,10 +128,11 @@ public class VscoCoCrawler extends PluginForDecrypt {
         /* Prepare json for our parser */
         json = json.replace(":undefined", ":null,");
         final Map<String, Object> root = JavaScriptEngineFactory.jsonToJavaMap(json);
-        final String singleImageID = new Regex(br.getURL(), "(?i)https?://[^/]+/[^/]+/media/([a-f0-9]{24})").getMatch(0);
-        if (singleImageID != null) {
-            /* Crawl single image */
-            final Map<String, Object> media = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "medias/byId/" + singleImageID + "/media");
+        /* Check if we are looking for a single media item. */
+        final String singleMediaID = new Regex(br._getURL().getPath(), PATTERN_PROFILE_AND_SINGLE_MEDIA).getMatch(3);
+        if (singleMediaID != null) {
+            /* Crawl single media item */
+            final Map<String, Object> media = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "medias/byId/" + singleMediaID + "/media");
             return crawlProcessMediaFirstPage(media, username);
         } else {
             /* Crawl profile */

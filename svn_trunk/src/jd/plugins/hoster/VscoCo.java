@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.VscoCoCrawler;
 
-@HostPlugin(revision = "$Revision: 51384 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51420 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCo extends PluginForHost {
     public VscoCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,12 +110,12 @@ public class VscoCo extends PluginForHost {
     @Override
     public String getLinkID(final DownloadLink link) {
         final String media_id = getMediaID(link);
-        if (media_id != null && (isHLSVideo(link) || link.getStringProperty(PROPERTY_HLS_URL) != null)) {
-            return this.getHost() + "://" + "/" + getUsername(link) + "/" + media_id + "/" + getQuality(link);
+        if (media_id != null) {
+            return this.getHost() + "://" + "/" + getUsername(link) + "/" + media_id;
         } else {
             /*
-             * Do not return special linkID for older http videos and images as we rely purely on the http links for dupechecking. Also for
-             * "backwards compatibility" see https://board.jdownloader.org/showthread.php?p=509192#post509192
+             * Do not return special linkID for older http videos and images as we rely purely on the http links for duplicate checking.
+             * Also for "backwards compatibility" see https://board.jdownloader.org/showthread.php?p=509192#post509192
              */
             return super.getLinkID(link);
         }
@@ -149,7 +149,7 @@ public class VscoCo extends PluginForHost {
     }
 
     private boolean isHLSVideo(final DownloadLink link) {
-        if (link.getPluginPatternMatcher().contains(".m3u8")) {
+        if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), ".m3u8")) {
             return true;
         } else {
             return false;

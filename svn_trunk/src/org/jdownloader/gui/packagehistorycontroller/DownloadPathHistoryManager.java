@@ -91,10 +91,10 @@ public class DownloadPathHistoryManager extends HistoryManager<DownloadPath> imp
     }
 
     public List<String> listPaths(String... strings) {
-        return listPathes(false, strings);
+        return listPaths(false, strings);
     }
 
-    public List<String> listPathes(boolean atTop, String... strings) {
+    public List<String> listPaths(boolean atTop, String... strings) {
         final List<DownloadPath> l = list();
         final LinkedHashSet<String> dupe = new LinkedHashSet<String>();
         if (atTop && strings != null) {

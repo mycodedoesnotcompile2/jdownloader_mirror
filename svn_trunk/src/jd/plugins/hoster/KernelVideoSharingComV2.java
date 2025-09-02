@@ -79,7 +79,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51420 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -940,6 +940,9 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         } else if (br._getURL().getPath().matches("(?i)/4(04|10)\\.php.*")) {
             return true;
         } else if (br.containsHTML(">\\s*(Sorry, this video was deleted per copyright owner request|Video has been removed due to a violation of the Terms and Conditions|Deleted by the owner request|This video has been removed|Video removed due to DMCA|Video is not found)")) {
+            return true;
+        } else if (br.containsHTML(">\\s*DMCA Takedown, This video was deleted per")) {
+            /* 2025-09-01: xxbrits.com e.g. /videos/23834/sophia-isabella-smith-taking-danny-d-monster-cock-on-podcast-f4d80e4/ */
             return true;
         } else if (thisVideoNoLongerExists(br)) {
             return true;

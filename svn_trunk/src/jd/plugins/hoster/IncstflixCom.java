@@ -31,7 +31,7 @@ import jd.plugins.PluginForHost;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51424 $", interfaceVersion = 3, names = {}, urls = {})
 public class IncstflixCom extends PluginForHost {
     public IncstflixCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,7 @@ public class IncstflixCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "incestflix.com" });
+        ret.add(new String[] { "incestflix.com", "incestflix.org" });
         return ret;
     }
 

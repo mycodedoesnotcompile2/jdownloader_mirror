@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BangComCrawler;
 
-@HostPlugin(revision = "$Revision: 51413 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51421 $", interfaceVersion = 3, names = {}, urls = {})
 public class BangCom extends PluginForHost {
     public BangCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -345,13 +345,16 @@ public class BangCom extends PluginForHost {
         ai.setUnlimitedTraffic();
         /* 2023-01-31: A public API is available but so far is not of any use for us: https://api.bang.com */
         final String userJson = br.getRegex("window\\.user = (\\{.*?\\});\\s").getMatch(0);
-        boolean isSubscriptionRunning = br.containsHTML(">\\s*Click to cancel");
+        boolean isSubscriptionRunning = br.containsHTML(">\\s*Click to cancel|/cancel\"");
         final boolean isTrialSubscription = br.containsHTML(">\\s*TRIAL");
         String email = null;
         if (userJson != null) {
             final Map<String, Object> user = restoreFromString(userJson, TypeRef.MAP);
-            final Map<String, Object> accountType = (Map<String, Object>) user.get("accountType");
-            if (!isSubscriptionRunning && accountType.get("type").toString().equalsIgnoreCase("paid")) {
+            // final String lastSubscriptionId = user.get("lastSubscriptionId").toString();
+            /* 2025-09-01: This map does not exist anymore. */
+            final Map<String, Object> accountTypeMap = (Map<String, Object>) user.get("accountType");
+            final String accountType = accountTypeMap != null ? accountTypeMap.get("type").toString() : null;
+            if (!isSubscriptionRunning && "paid".equalsIgnoreCase(accountType)) {
                 isSubscriptionRunning = true;
             }
             email = (String) user.get("email");

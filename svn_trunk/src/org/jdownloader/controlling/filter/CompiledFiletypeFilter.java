@@ -6,12 +6,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import jd.plugins.LinkInfo;
+
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.FiletypeFilter.TypeMatchType;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
-
-import jd.plugins.LinkInfo;
 
 public class CompiledFiletypeFilter {
     private final Pattern[]                   list;
@@ -501,7 +501,14 @@ public class CompiledFiletypeFilter {
             }
         },
         MO3, // proprietary format developed by "Un4seen Developments": https://www.un4seen.com/mo3.html
-        WMA,
+        WMA {
+            private final Pattern pattern = Pattern.compile("(?i)audio/x-ms-wma");
+
+            @Override
+            public boolean matchesMimeType(String mimeType) {
+                return pattern.matcher(mimeType).find();
+            }
+        },
         AAC,
         WAV {
             private final Pattern pattern = Pattern.compile("(?i)audio/wav");
@@ -680,7 +687,14 @@ public class CompiledFiletypeFilter {
         OGM,
         OGV,
         VOB,
-        WMV,
+        WMV {
+            private final Pattern pattern = Pattern.compile("(?i)video/x-ms-wmv");
+
+            @Override
+            public boolean matchesMimeType(String mimeType) {
+                return pattern.matcher(mimeType).find();
+            }
+        },
         GP3,
         WEBM {
             private final Pattern pattern = Pattern.compile("(?i)video/webm");

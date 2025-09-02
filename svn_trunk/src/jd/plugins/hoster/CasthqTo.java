@@ -1,5 +1,5 @@
 //jDownloader - Downloadmanager
-//Copyright (C) 2016  JD-Team support@jdownloader.org
+//Copyright (C) 2013  JD-Team support@jdownloader.org
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -18,42 +18,33 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.YetiShareCore;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.parser.html.HTMLParser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51420 $", interfaceVersion = 2, names = {}, urls = {})
-public class SbuploadCom extends YetiShareCore {
-    public SbuploadCom(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 51423 $", interfaceVersion = 3, names = {}, urls = {})
+public class CasthqTo extends XFileSharingProBasic {
+    public CasthqTo(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(getPurchasePremiumURL());
+        this.enablePremium(super.getPurchasePremiumURL());
     }
 
     /**
-     * DEV NOTES YetiShare<br />
-     ****************************
+     * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2020-06-10: null<br />
-     * other: <br />
+     * captchatype-info: null 4dignum, reCaptchaV2, hcaptcha<br />
+     * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        /* 2025-09-01: Merged UsersdownloadCom into this plugin RE forum 97820 */
-        ret.add(new String[] { "sbupload.com", "usersdownload.com" });
+        ret.add(new String[] { "casthq.to" });
         return ret;
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -66,15 +57,16 @@ public class SbuploadCom extends YetiShareCore {
     }
 
     public static String[] getAnnotationUrls() {
-        return YetiShareCore.buildAnnotationUrls(getPluginDomains());
+        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
             return true;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
@@ -83,11 +75,13 @@ public class SbuploadCom extends YetiShareCore {
         }
     }
 
+    @Override
     public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
             return 0;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return 0;
         } else {
@@ -97,10 +91,11 @@ public class SbuploadCom extends YetiShareCore {
     }
 
     @Override
-    public int getMaxSimultanFreeDownloadNum() {
+    public int getMaxSimultaneousFreeAnonymousDownloads() {
         return -1;
     }
 
+    @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
         return -1;
     }
@@ -108,29 +103,5 @@ public class SbuploadCom extends YetiShareCore {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected String getContinueLink(final Browser br) throws Exception {
-        /* 2023-05-05 */
-        String directDownloadurl = null;
-        final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
-        for (final String url : urls) {
-            if (isDownloadlink(url)) {
-                directDownloadurl = url;
-                break;
-            }
-        }
-        if (directDownloadurl != null) {
-            return directDownloadurl;
-        } else {
-            String result = br.getRegex("(?i)class=\"download-timer\">\\s*<a class='btn btn-free'[^>]*href='(https?://[^<>\"\\']+)'>\\s*DOWNLOAD NOW\\s*</a>").getMatch(0);
-            // result = br.getRegex("load-timer1'\\)\\.html\\(\"[^>]*href='(https?://[^<>\\']+)").getMatch(0);
-            if (result != null) {
-                return result;
-            } else {
-                return super.getContinueLink(br);
-            }
-        }
     }
 }
