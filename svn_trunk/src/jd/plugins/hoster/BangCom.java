@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BangComCrawler;
 
-@HostPlugin(revision = "$Revision: 51421 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51432 $", interfaceVersion = 3, names = {}, urls = {})
 public class BangCom extends PluginForHost {
     public BangCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -301,8 +301,7 @@ public class BangCom extends PluginForHost {
             } else {
                 final Form loginform = br.getFormbyActionRegex(".*/login_check");
                 if (loginform == null) {
-                    logger.warning("Failed to find loginform");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
                 }
                 loginform.put("_username", Encoding.urlEncode(account.getUser()));
                 loginform.put("_password", Encoding.urlEncode(account.getPass()));
@@ -382,6 +381,10 @@ public class BangCom extends PluginForHost {
             return ai;
         } else {
             // TODO: Find expire-date
+            /*
+             * 2025-09-02: Expire date is nowhere to be seen on their website so at this moment we can only find out if the user has an
+             * active paid subscription and use this as an indicator of his account type.
+             */
             account.setType(AccountType.PREMIUM);
         }
         return ai;

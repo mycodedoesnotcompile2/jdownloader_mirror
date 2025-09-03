@@ -16,12 +16,8 @@
 package jd.plugins.decrypter;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -54,7 +50,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@DecrypterPlugin(revision = "$Revision: 49619 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
+@DecrypterPlugin(revision = "$Revision: 51435 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
 public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -150,28 +146,8 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
         final GenericM3u8DecrypterConfig cfg = PluginJsonConfig.get(GenericM3u8DecrypterConfig.class);
         final CrawlSpeedMode mode = cfg.getCrawlSpeedMode();
         if (br.containsHTML("#EXT-X-STREAM-INF")) {
-            final Map<HlsContainer, URL> hlsContainers = new HashMap<HlsContainer, URL>();
             final String sessionDataTitle = br.getRegex("#EXT-X-SESSION-DATA:DATA-ID\\s*=\\s*\"[^\"]*title\"[^\r\n]*VALUE\\s*=\\s*\"(.*?)\"").getMatch(0);
-            final ArrayList<String> infos = new ArrayList<String>();
-            for (final String line : Regex.getLines(br.toString())) {
-                if (StringUtils.startsWithCaseInsensitive(line, "concat") || StringUtils.contains(line, "file:")) {
-                    continue;
-                } else if (!line.startsWith("#")) {
-                    infos.add(line);
-                    final String m3u8Content = StringUtils.join(infos, "\r\n");
-                    final List<HlsContainer> hlsContainer = HlsContainer.parseHlsQualities(m3u8Content, br);
-                    if (hlsContainer.size() > 1) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    } else if (hlsContainer.size() == 1) {
-                        hlsContainers.put(hlsContainer.get(0), br.getURL(line));
-                    } else {
-                        // Parser found multiple HlsContainers? This should never happen and indicates a problem with this parser!
-                    }
-                    infos.clear();
-                } else {
-                    infos.add(line);
-                }
-            }
+            final List<HlsContainer> hlsContainer = HlsContainer.parseHlsQualities(br.getRequest().getHtmlCode(), br);
             final String finalFallbackTitle = new Regex(m3u8URL, "/([^/]+)\\.m3u8").getMatch(0);
             FilePackage fpTemplate = FilePackage.getInstance();
             if (StringUtils.isNotEmpty(preSetTitle)) {
@@ -184,83 +160,93 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                 fpTemplate = null;
             }
             Long estimatedDurationMillis = null;
-            for (final Entry<HlsContainer, URL> entry : hlsContainers.entrySet()) {
-                final HlsContainer hls = entry.getKey();
-                final URL url = entry.getValue();
-                final DownloadLink link = new DownloadLink(null, null, plugin.getHost(), GenericM3u8.createURLForThisPlugin(url.toString()), true);
-                link.setProperty("m3u8Source", m3u8URL);
-                link.setReferrerUrl(referer);
-                link.setProperty("cookies", cookiesString);
-                if (StringUtils.isNotEmpty(preSetTitle)) {
-                    link.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, preSetTitle);
-                } else if (StringUtils.isNotEmpty(sessionDataTitle)) {
-                    link.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, sessionDataTitle);
+            for (HlsContainer hls : hlsContainer) {
+                final List<HlsContainer.MEDIA> audioMedia = new ArrayList<HlsContainer.MEDIA>();
+                audioMedia.addAll(hls.getMedia(HlsContainer.MEDIA.TYPE.AUDIO, null));
+                if (audioMedia == null) {
+                    audioMedia.add(null);// dummy entry when no audioMedia is set
                 }
-                List<StreamCodec> codecs = hls.getStreamCodecs();
-                Boolean hasVideo = null;
-                Boolean hasAudio = null;
-                if (codecs != null && codecs.size() > 0) {
-                    hasVideo = false;
-                    hasAudio = false;
-                    for (StreamCodec codec : codecs) {
-                        switch (codec.getCodec().getType()) {
-                        case AUDIO:
-                            hasAudio = true;
-                            break;
-                        case VIDEO:
-                            hasVideo = true;
-                            break;
-                        default:
-                            break;
-                        }
+                for (HlsContainer.MEDIA audioEntry : audioMedia) {
+                    final DownloadLink link = new DownloadLink(null, null, plugin.getHost(), GenericM3u8.createURLForThisPlugin(hls.getStreamURL()), true);
+                    link.setProperty("m3u8Source", m3u8URL);
+                    link.setReferrerUrl(referer);
+                    link.setProperty("cookies", cookiesString);
+                    if (audioEntry != null) {
+                        link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_LNG, audioEntry.getLanguage());
+                        link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_NAME, audioEntry.getName());
                     }
-                }
-                final boolean isAudioOnly = Boolean.FALSE.equals(hasVideo) && Boolean.TRUE.equals(hasAudio);
-                final boolean isVideo = Boolean.TRUE.equals(hasVideo);
-                hls.setPropertiesOnDownloadLink(link);
-                if (mode == CrawlSpeedMode.FAST || (mode == CrawlSpeedMode.AUTOMATIC_FAST && (isAudioOnly || isVideo && hls.getHeight() > 0))) {
-                    link.setAvailable(true);
-                    if (hls.getAverageBandwidth() > 0 || hls.getBandwidth() > 0) {
-                        if (estimatedDurationMillis == null) {
-                            /**
-                             * Load first item to get the estimated play-duration which we expect to be the same for all items. </br> Based
-                             * on this we can set estimated filesizes while at the same time providing a super fast crawling experience.
-                             */
-                            final List<M3U8Playlist> playlist = hls.getM3U8(br);
-                            estimatedDurationMillis = M3U8Playlist.getEstimatedDuration(playlist);
-                            link.setDownloadSize(M3U8Playlist.getEstimatedSize(playlist));
-                        } else {
-                            /*
-                             * TODO: Maybe prefer smaller of both possible bandwidth values for filesize calculation as that seems to be
-                             * more accurate?
-                             */
-                            int bandwidth = hls.getAverageBandwidth();
-                            if (bandwidth < 0) {
-                                bandwidth = hls.getBandwidth();
+                    if (StringUtils.isNotEmpty(preSetTitle)) {
+                        link.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, preSetTitle);
+                    } else if (StringUtils.isNotEmpty(sessionDataTitle)) {
+                        link.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, sessionDataTitle);
+                    }
+                    List<StreamCodec> codecs = hls.getStreamCodecs();
+                    Boolean hasVideo = null;
+                    Boolean hasAudio = null;
+                    if (codecs != null && codecs.size() > 0) {
+                        hasVideo = false;
+                        hasAudio = false;
+                        for (StreamCodec codec : codecs) {
+                            switch (codec.getCodec().getType()) {
+                            case AUDIO:
+                                hasAudio = true;
+                                break;
+                            case VIDEO:
+                                hasVideo = true;
+                                break;
+                            default:
+                                break;
                             }
-                            link.setDownloadSize(bandwidth / 8 * (estimatedDurationMillis / 1000));
                         }
                     }
-                    if (estimatedDurationMillis != null) {
-                        link.setProperty(GenericM3u8.PROPERTY_DURATION_ESTIMATED_MILLIS, estimatedDurationMillis);
+                    final boolean isAudioOnly = Boolean.FALSE.equals(hasVideo) && Boolean.TRUE.equals(hasAudio);
+                    final boolean isVideo = Boolean.TRUE.equals(hasVideo);
+                    hls.setPropertiesOnDownloadLink(link);
+                    if (mode == CrawlSpeedMode.FAST || (mode == CrawlSpeedMode.AUTOMATIC_FAST && (isAudioOnly || isVideo && hls.getHeight() > 0))) {
+                        link.setAvailable(true);
+                        if (hls.getAverageBandwidth() > 0 || hls.getBandwidth() > 0) {
+                            if (estimatedDurationMillis == null) {
+                                /**
+                                 * Load first item to get the estimated play-duration which we expect to be the same for all items. </br>
+                                 * Based on this we can set estimated filesizes while at the same time providing a super fast crawling
+                                 * experience.
+                                 */
+                                final List<M3U8Playlist> playlist = hls.getM3U8(br);
+                                estimatedDurationMillis = M3U8Playlist.getEstimatedDuration(playlist);
+                                link.setDownloadSize(M3U8Playlist.getEstimatedSize(playlist));
+                            } else {
+                                /*
+                                 * TODO: Maybe prefer smaller of both possible bandwidth values for filesize calculation as that seems to be
+                                 * more accurate?
+                                 */
+                                int bandwidth = hls.getAverageBandwidth();
+                                if (bandwidth < 0) {
+                                    bandwidth = hls.getBandwidth();
+                                }
+                                link.setDownloadSize(bandwidth / 8 * (estimatedDurationMillis / 1000));
+                            }
+                        }
+                        if (estimatedDurationMillis != null) {
+                            link.setProperty(GenericM3u8.PROPERTY_DURATION_ESTIMATED_MILLIS, estimatedDurationMillis);
+                        }
+                    } else if (mode == CrawlSpeedMode.SUPERFAST || (mode == CrawlSpeedMode.AUTOMATIC_SUPERFAST && (isAudioOnly || isVideo && hls.getHeight() > 0))) {
+                        link.setAvailable(true);
                     }
-                } else if (mode == CrawlSpeedMode.SUPERFAST || (mode == CrawlSpeedMode.AUTOMATIC_SUPERFAST && (isAudioOnly || isVideo && hls.getHeight() > 0))) {
-                    link.setAvailable(true);
-                }
-                FilePackage fp = fpTemplate;
-                if (cfg.isGroupByResolution() && hls.getHeight() > 0) {
-                    fp = FilePackage.getInstance();
-                    if (fpTemplate != null) {
-                        fp.setName(fpTemplate.getName() + "-" + hls.getHeight());
-                    } else {
-                        fp.setName(String.valueOf(hls.getHeight()));
+                    FilePackage fp = fpTemplate;
+                    if (cfg.isGroupByResolution() && hls.getHeight() > 0) {
+                        fp = FilePackage.getInstance();
+                        if (fpTemplate != null) {
+                            fp.setName(fpTemplate.getName() + "-" + hls.getHeight());
+                        } else {
+                            fp.setName(String.valueOf(hls.getHeight()));
+                        }
                     }
+                    if (fp != null) {
+                        link._setFilePackage(fp);
+                    }
+                    GenericM3u8.setFilename(plugin, link, false);
+                    ret.add(link);
                 }
-                if (fp != null) {
-                    link._setFilePackage(fp);
-                }
-                GenericM3u8.setFilename(plugin, link, false);
-                ret.add(link);
             }
         } else {
             final List<M3U8Playlist> playlist = M3U8Playlist.parseM3U8(br);

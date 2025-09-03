@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.VscoCoCrawler;
 
-@HostPlugin(revision = "$Revision: 51420 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51428 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCo extends PluginForHost {
     public VscoCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,14 +109,17 @@ public class VscoCo extends PluginForHost {
 
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String media_id = getMediaID(link);
-        if (media_id != null) {
-            return this.getHost() + "://" + "/" + getUsername(link) + "/" + media_id;
-        } else {
+        if (isImageLinkidHandlingLegacyModeEnabled() && !this.isVideo(link)) {
             /*
              * Do not return special linkID for older http videos and images as we rely purely on the http links for duplicate checking.
              * Also for "backwards compatibility" see https://board.jdownloader.org/showthread.php?p=509192#post509192
              */
+            return super.getLinkID(link);
+        }
+        final String media_id = getMediaID(link);
+        if (media_id != null) {
+            return this.getHost() + "://" + "/" + getUsername(link) + "/" + media_id;
+        } else {
             return super.getLinkID(link);
         }
     }
@@ -385,15 +388,23 @@ public class VscoCo extends PluginForHost {
         }
     }
 
-    private static final String   SETTING_CUSTOM_USER_AGENT         = "custom_user_agent";
-    private static final String   SETTING_CUSTOM_USER_AGENT_default = null;
-    private static final String[] FILENAME_SCHEMES_LIST             = new String[] { "Plugin filenames", "Original/serverside filenames" };
-    public static final String    SETTING_FILENAME_SCHEME           = "filename_scheme";
-    public static final int       SETTING_FILENAME_SCHEME_default   = 0;
+    private boolean isImageLinkidHandlingLegacyModeEnabled() {
+        return this.getPluginConfig().getBooleanProperty(SETTING_IMAGE_LINKID_HANDLING_LEGACY, SETTING_IMAGE_LINKID_HANDLING_LEGACY_default);
+    }
+
+    private static final String   SETTING_CUSTOM_USER_AGENT                    = "custom_user_agent";
+    private static final String   SETTING_CUSTOM_USER_AGENT_default            = null;
+    private static final String[] FILENAME_SCHEMES_LIST                        = new String[] { "Plugin filenames", "Original/serverside filenames" };
+    public static final String    SETTING_FILENAME_SCHEME                      = "filename_scheme";
+    public static final int       SETTING_FILENAME_SCHEME_default              = 0;
+    public static final String    SETTING_IMAGE_LINKID_HANDLING_LEGACY         = "image_linkid_handling_legacy";
+    public static final boolean   SETTING_IMAGE_LINKID_HANDLING_LEGACY_default = false;
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_FILENAME_SCHEME, FILENAME_SCHEMES_LIST, "Filename scheme").setDefaultValue(SETTING_FILENAME_SCHEME_default));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), SETTING_CUSTOM_USER_AGENT, "Custom User-Agent value").setDefaultValue(SETTING_CUSTOM_USER_AGENT_default));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_IMAGE_LINKID_HANDLING_LEGACY, "Use legacy handling for images duplicate checking?").setDefaultValue(SETTING_IMAGE_LINKID_HANDLING_LEGACY_default));
     }
 }

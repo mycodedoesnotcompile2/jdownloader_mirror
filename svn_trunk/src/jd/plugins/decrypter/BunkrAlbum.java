@@ -15,7 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -23,6 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
+import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -42,18 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.Bunkr;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 51424 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51432 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +68,8 @@ public class BunkrAlbum extends PluginForDecrypt {
 
     /**
      * These domains are dead and can't be used for main URLs/albums BUT some of them can still be used for downloading inside directurls.
-     * </br> 2023-08-08: Example still working as CDN domain: bunkr.ru, bunkr.is
+     * </br>
+     * 2023-08-08: Example still working as CDN domain: bunkr.ru, bunkr.is
      */
     public static List<String> getDeadDomains() {
         return Arrays.asList(new String[] { "bunkr.su", "bunkr.ru", "bunkr.is", "bunkr.la", "bunkr.se" });
@@ -149,9 +147,9 @@ public class BunkrAlbum extends PluginForDecrypt {
             /* Double-check for offline / empty album. */
             final String albumID = new Regex(param.getCryptedUrl(), PATTERN_ALBUM).getMatch(0);
             int numberofFiles = -1;
-            String numberofFilesStr = br.getRegex(">\\s*(\\d+)\\s*files").getMatch(0);
+            String numberofFilesStr = br.getRegex("\"Explore\\s*this\\s*album\\s*with\\s*(\\d+)\\s*files").getMatch(0);
             if (numberofFilesStr == null) {
-                numberofFilesStr = br.getRegex("\"Explore\\s*this\\s*album\\s*with\\s*(\\d+)\\s*files").getMatch(0);
+                numberofFilesStr = br.getRegex(">\\s*(\\d+)\\s*files").getMatch(0);
             }
             if (numberofFilesStr != null) {
                 numberofFiles = Integer.parseInt(numberofFilesStr);
@@ -169,62 +167,51 @@ public class BunkrAlbum extends PluginForDecrypt {
             } else {
                 logger.warning("Failed to find album title");
             }
+            final FilePackage fp = FilePackage.getInstance();
+            if (albumTitle != null) {
+                fp.setName(albumTitle);
+            } else {
+                /* Fallback */
+                fp.setName(albumID);
+            }
+            fp.setAllowInheritance(true);
+            if (!StringUtils.isEmpty(albumDescription)) {
+                fp.setComment(albumDescription);
+            }
             if (advancedView) {
+                /* Crawl without pagination */
                 String advancedViewJson = br.getRegex("<script[^>]*>\\s*window\\.albumFiles\\s*=\\s*(\\[.*?\\]\\s*);\\s*(console.*?)?</script").getMatch(0);
-                if (advancedViewJson != null) {
-                    advancedViewJson = advancedViewJson.replaceAll("(\\{|,)\\s*(\\w+)\\s*:", "$1\"$2\":");// convert from javascript to json
-                    final List<Map<String, Object>> files = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(advancedViewJson);
-                    for (final Map<String, Object> file : files) {
-                        final String slug = (String) file.get("slug");
-                        final String originalName = (String) file.get("original");
-                        final String serverName = (String) file.get("name");
-                        final String size = StringUtils.valueOfOrNull(file.get("size"));
-                        if (slug != null) {
-                            final String directurl = br.getURL("/f/" + slug).toExternalForm();
-                            add(ret, dups, directurl, StringUtils.firstNotEmpty(originalName, serverName), size != null && size.matches("[0-9]+") ? size : null, size != null && !size.matches("[0-9]+") ? size : null, true);
-                        }
-                    }
+                if (advancedViewJson == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                /**
+                 * convert from javascript to json <br>
+                 * without converting to json, JavaScriptEngineFactory.jsonToJavaObject will fail to use normal JSON parser and fallback to
+                 * JavaScript engine and that will reach stack limit for very large albums (several thousand items)
+                 */
+                advancedViewJson = advancedViewJson.replaceAll("(\\{|,)\\s*(\\w+)\\s*:", "$1\"$2\":").replace("\\'", "'");
+                final List<Map<String, Object>> files = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(advancedViewJson);
+                for (final Map<String, Object> file : files) {
+                    final String slug = file.get("slug").toString();
+                    final String originalName = (String) file.get("original");
+                    final String serverName = (String) file.get("name");
+                    final String size = StringUtils.valueOfOrNull(file.get("size"));
+                    final String directurl = br.getURL("/f/" + slug).toExternalForm();
+                    final DownloadLink result = add(ret, dups, directurl, StringUtils.firstNotEmpty(originalName, serverName), size != null && size.matches("[0-9]+") ? size : null, size != null && !size.matches("[0-9]+") ? size : null, true);
+                    result._setFilePackage(fp);
+                    distribute(result);
                 }
             } else {
-                final String oldJson = br.getRegex("<script\\s*id\\s*=\\s*\"__NEXT_DATA__\"\\s*type\\s*=\\s*\"application/json\">\\s*(\\{.*?\\})\\s*</script").getMatch(0);
-                if (oldJson != null) {
-                    // TODO: can we remove this?
-                    final Map<String, Object> map = restoreFromString(oldJson, TypeRef.MAP);
-                    List<Map<String, Object>> files = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(map, "props/pageProps/files");
-                    if (files == null) {
-                        files = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(map, "props/pageProps/album/files");
-                    }
-                    if (files == null) {
-                        files = new ArrayList<Map<String, Object>>();
-                    }
-                    Map<String, Object> pagePropsFile = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "props/pageProps/file");
-                    if (pagePropsFile == null) {
-                        pagePropsFile = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "props/pageProps/album/file");
-                    }
-                    if (pagePropsFile != null) {
-                        files.add(pagePropsFile);
-                    }
-                    if (files != null) {
-                        for (final Map<String, Object> file : files) {
-                            final String name = (String) file.get("name");
-                            String cdn = (String) file.get("cdn");
-                            if (cdn == null) {
-                                cdn = (String) file.get("mediafiles");
-                            }
-                            final String size = StringUtils.valueOfOrNull(file.get("size"));
-                            if (name != null && cdn != null) {
-                                final String directurl = URLHelper.parseLocation(new URL(cdn), name);
-                                add(ret, dups, directurl, name, size != null && size.matches("[0-9]+") ? size : null, size != null && !size.matches("[0-9]+") ? size : null, true);
-                            }
-                        }
-                    }
-                }
+                /* Crawl with pagination */
+                final HashSet<String> dupes = new HashSet<String>();
                 Browser pageBr = br;
-                while (true) {
+                int page = 1;
+                pagination: while (true) {
+                    int newItemsThisPage = 0;
                     final String[] htmls = pageBr.getRegex("<div class=\"grid-images_box(?: rounded-lg)?[^\"]+\"(.*?)</div>\\s+</div>").getColumn(0);
                     for (final String html : htmls) {
                         if (html.contains("/f/' + file.slug")) {
-                            // coding entry used by javascript filling for next entries while scroling
+                            // skip coding entry used by javascript filling for next entries while scroling
                             continue;
                         }
                         String directurl = new Regex(html, "href\\s*=\\s*\"(https?://[^\"]+)\"").getMatch(0);
@@ -238,33 +225,50 @@ public class BunkrAlbum extends PluginForDecrypt {
                                 }
                             }
                         }
-                        if (directurl != null) {
-                            String filesizeStr = new Regex(html, "<p class=\"mt-0 dark:text-white-900\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
-                            if (filesizeStr == null) {
-                                filesizeStr = new Regex(html, "<p class=\"[^\"]*theSize[^\"]*\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
-                            }
-                            String filename = new Regex(html, "<div\\s*class\\s*=\\s*\"[^\"]*details\"\\s*>\\s*<p\\s*class[^>]*>\\s*(.*?)\\s*<").getMatch(0);
-                            if (filename == null) {
-                                filename = new Regex(html, "<p class=\"[^\"]*theName[^\"]*\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
-                            }
-                            add(ret, dups, directurl, filename, null, filesizeStr, true);
-                        } else {
+                        if (directurl == null) {
                             logger.warning("html Parser broken? HTML: " + html);
+                            continue;
+                        } else if (!dupes.add(directurl)) {
+                            logger.info("Skipping dupe: " + directurl);
+                            continue;
                         }
+                        newItemsThisPage++;
+                        String filesizeStr = new Regex(html, "<p class=\"mt-0 dark:text-white-900\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
+                        if (filesizeStr == null) {
+                            filesizeStr = new Regex(html, "<p class=\"[^\"]*theSize[^\"]*\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
+                        }
+                        String filename = new Regex(html, "<div\\s*class\\s*=\\s*\"[^\"]*details\"\\s*>\\s*<p\\s*class[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+                        if (filename == null) {
+                            filename = new Regex(html, "<p class=\"[^\"]*theName[^\"]*\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
+                        }
+                        final DownloadLink result = add(ret, dups, directurl, filename, null, filesizeStr, true);
+                        result._setFilePackage(fp);
+                        distribute(result);
                     }
                     final String nextPage = pageBr.getRegex("<a\\s*href\\s*=\\s*\"(\\?page=\\d+)\"\\s*>\\s*(»|&raquo;)\\s*<").getMatch(0);
-                    if (nextPage != null) {
-                        logger.info("next page," + nextPage);
-                        pageBr.getPage(nextPage);
-                    } else {
-                        logger.info("no next page, stop");
-                        break;
+                    logger.info("Crawled page " + page + " | New items this page: " + newItemsThisPage + " | Found items so far: " + ret.size() + "/" + numberofFiles + " | NextPage: " + nextPage);
+                    if (this.isAbort()) {
+                        return ret;
+                    } else if (nextPage == null) {
+                        logger.info("Stopping because: no next page -> Reached end?");
+                        break pagination;
+                    } else if (ret.size() == numberofFiles) {
+                        /* Fail-safe to prevent infinite loop */
+                        logger.info("Stopping because: found all items");
+                        break pagination;
+                    } else if (newItemsThisPage == 0) {
+                        /* Fail-safe to prevent infinite loop */
+                        logger.info("Stopping because: failed to find any new items on current page");
+                        break pagination;
                     }
+                    /* Continue to next page */
+                    pageBr.getPage(nextPage);
+                    page++;
                 }
             }
             if (ret.isEmpty()) {
                 /* Check for empty album */
-                if (numberofFiles == 0 || br.containsHTML("(?i)There are no files in the album")) {
+                if (numberofFiles == 0 || br.containsHTML("There are no files in the album")) {
                     throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -274,18 +278,6 @@ public class BunkrAlbum extends PluginForDecrypt {
                 /* This should never happen. */
                 logger.warning("Some files were not found: " + (numberofFiles - ret.size()));
             }
-            final FilePackage fp = FilePackage.getInstance();
-            if (albumTitle != null) {
-                fp.setName(albumTitle);
-            } else {
-                /* Fallback */
-                fp.setName(albumID);
-            }
-            fp.setAllowInheritance(true);
-            if (!StringUtils.isEmpty(albumDescription)) {
-                fp.setComment(albumDescription);
-            }
-            fp.addLinks(ret);
         } else {
             /* Invalid URL -> Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -357,8 +349,8 @@ public class BunkrAlbum extends PluginForDecrypt {
     }
 
     /**
-     * Returns URL if given URL looks like it is pointing to a single file. </br> Returns null if given URL-structure is unknown or does not
-     * seem to point to a single file.
+     * Returns URL if given URL looks like it is pointing to a single file. </br>
+     * Returns null if given URL-structure is unknown or does not seem to point to a single file.
      */
     private String isSingleMediaURL(final String url) {
         if (url == null) {

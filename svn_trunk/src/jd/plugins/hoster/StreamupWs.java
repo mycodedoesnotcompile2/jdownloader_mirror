@@ -18,11 +18,7 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -36,7 +32,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51291 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51427 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamupWs extends PluginForHost {
     public StreamupWs(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +141,13 @@ public class StreamupWs extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String hlsMaster = br.getRegex("streaming_url:\\s*\"(https?://[^\"]+)").getMatch(0);
+        String hlsMaster = br.getRegex("streaming_url:\\s*\"(https?://[^\"]+)").getMatch(0);
+        if (hlsMaster == null) {
+            final Browser brc = br.cloneBrowser();
+            brc.getPage("/ajax/stream?filecode=" + getFID(link));
+            final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            hlsMaster = (String) response.get("streaming_url");
+        }
         if (StringUtils.isEmpty(hlsMaster)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

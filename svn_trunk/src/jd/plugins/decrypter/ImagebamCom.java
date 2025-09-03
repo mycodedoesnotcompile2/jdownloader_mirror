@@ -38,7 +38,7 @@ import jd.plugins.hoster.DirectHTTP;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51418 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51433 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagebamCom extends PluginForDecrypt {
     public ImagebamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,17 +113,14 @@ public class ImagebamCom extends PluginForDecrypt {
         }
     }
 
-    private ArrayList<DownloadLink> crawlGallery(final CryptedLink param) throws PluginException, IOException {
+    private ArrayList<DownloadLink> crawlGallery(final CryptedLink param) throws PluginException, IOException, InterruptedException {
         final String galleryID = new Regex(param.getCryptedUrl(), TYPE_GALLERY).getMatch(0);
         if (galleryID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.getPage(param.getCryptedUrl());
         errorHandling(br, param);
-        if (br.containsHTML("(?i)>\\s*Continue to your image")) {
-            /* Reload page */
-            br.getPage(param.getCryptedUrl());
-        }
+        continueToYourImage(br, param);
         return crawlProcessGallery(param, this.br);
     }
 
@@ -131,6 +128,19 @@ public class ImagebamCom extends PluginForDecrypt {
         /* 2022-03-23: This will skip some "Continue to image" pages. */
         br.setCookie(this.getHost(), "nsfw_inter", "1");
         return br;
+    }
+
+    private void continueToYourImage(final Browser br, final CryptedLink param) throws InterruptedException, IOException {
+        if (br.containsHTML("(?i)>\\s*Continue to your image")) {
+            /* Reload page */
+            final boolean skipWaittime = true;
+            final String waitMillisStr = br.getRegex("show\\(\\);\\s*\\},\\s*(\\d+)\\);").getMatch(0);
+            if (waitMillisStr != null && !skipWaittime) {
+                this.sleep(Long.parseLong(waitMillisStr), param);
+            }
+            br.setCookie(br.getHost(), "sfw_inter", "1");
+            br.getPage(br.getURL());
+        }
     }
 
     /**
@@ -147,16 +157,7 @@ public class ImagebamCom extends PluginForDecrypt {
         prepBR(br);
         br.getPage(param.getCryptedUrl());
         errorHandling(br, param);
-        if (br.containsHTML("(?i)>\\s*Continue to your image")) {
-            /* Reload page */
-            final boolean skipWaittime = true;
-            final String waitMillisStr = br.getRegex("show\\(\\);\\s*\\},\\s*(\\d+)\\);").getMatch(0);
-            if (waitMillisStr != null && !skipWaittime) {
-                this.sleep(Long.parseLong(waitMillisStr), param);
-            }
-            br.setCookie(br.getHost(), "sfw_inter", "1");
-            br.getPage(br.getURL());
-        }
+        continueToYourImage(br, param);
         if (br.containsHTML("class=\"links gallery\"")) {
             return this.crawlProcessGallery(param, this.br);
         } else {
@@ -274,10 +275,8 @@ public class ImagebamCom extends PluginForDecrypt {
         prepBR(br);
         br.getPage(param.getCryptedUrl());
         errorHandling(br, param);
-        if (br.containsHTML("(?i)>\\s*Continue to your image")) {
-            /* Reload page */
-            br.getPage(param.getCryptedUrl());
-        }
+        continueToYourImage(br, param);
+
         String finallink = br.getRegex("('|\")(https?://\\d+\\.imagebam\\.com/download/[^<>\\s]+)\\1").getMatch(1);
         if (finallink == null) {
             finallink = br.getRegex("('|\")(https?://images\\d+\\.imagebam\\.com/[^<>\\s]+\\.(jpe?g|png))\\1").getMatch(1);

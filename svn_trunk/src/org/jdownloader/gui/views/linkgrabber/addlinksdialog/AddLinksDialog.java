@@ -109,6 +109,12 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private ExtCheckBox                         extractToggle;
     private EnableDisableUnchanged              autoStart = EnableDisableUnchanged.UNCHANGED;
 
+    @Override
+    protected void _init() {
+        super._init();
+        this.autoDisablePackagizerCheckbox();
+    }
+
     /**
      * @return the autoStart
      */
@@ -139,21 +145,20 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         this.autoConfirm = autoConfirm;
     }
 
-    private EnableDisableUnchanged autoConfirm                              = EnableDisableUnchanged.UNCHANGED;
+    private EnableDisableUnchanged autoConfirm                             = EnableDisableUnchanged.UNCHANGED;
     private JButton                confirmOptions;
-    private boolean                deepAnalyse                              = false;
+    private boolean                deepAnalyse                             = false;
     private DelayedRunnable        delayedValidate;
     private ExtTextField           downloadPassword;
     private JComboBox              priority;
-    private final HashSet<String>  autoPasswords                            = new HashSet<String>();
+    private final HashSet<String>  autoPasswords                           = new HashSet<String>();
     private ExtTextField           comment;
     private JCheckBox              overwritePackagizer;
     private boolean                hasUserClickedOverwritePackagizerButton = false;
     /*
-     * Dummy value for a possible future setting to allow user to enable/disable "overwrite Packagizer rule" checkbox based on other fields'
-     * user inputs in AddLinksDialog.
+     * Enable/disable "overwrite Packagizer rule" checkbox based on other fields' user inputs in AddLinksDialog.
      */
-    private final boolean          packagizerAutoModeEnabled                = true;
+    private final boolean          packagizerAutoModeEnabled;
 
     public boolean isDeepAnalyse() {
         return deepAnalyse;
@@ -166,6 +171,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     public AddLinksDialog() {
         super(UIOManager.BUTTONS_HIDE_OK, _GUI.T.AddLinksDialog_AddLinksDialog_(), null, _GUI.T.AddLinksDialog_AddLinksDialog_confirm(), null);
         config = JsonConfig.create(LinkgrabberSettings.class);
+        packagizerAutoModeEnabled = config.isAddLinksOverridePackagizerCheckboxAutoModeEnabled();
         final String dialog_id = "AddLinksDialog";
         delayedValidate = new DelayedRunnable(500l, 10000l) {
             @Override
@@ -413,16 +419,6 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                 final File file = this.getFile();
                 if (file == null) {
                     return;
-                }
-                final String result = file.getAbsolutePath();
-                final String defaultDownloadDestinationFieldValue = getDownloadDestinationFieldDefaultValue();
-                if (StringUtils.isEmpty(result)) {
-                    return;
-                }
-                if (result.equals(defaultDownloadDestinationFieldValue)) {
-                    autoDisablePackagizerCheckbox();
-                } else {
-                    autoEnablePackagizerCheckbox();
                 }
             }
 
@@ -983,6 +979,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         thread.start();
     }
 
+    /** Auto disables override packagizer rules checkbox if any relevant fields has a non default value && auto mode is enabled. */
     private void autoEnablePackagizerCheckbox() {
         if (this.overwritePackagizer == null) {
             return;
@@ -997,6 +994,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         hasUserClickedOverwritePackagizerButton = false;
     }
 
+    /** Auto disables override packagizer rules checkbox if all relevant fields have their default settings && auto mode is enabled. */
     private void autoDisablePackagizerCheckbox() {
         if (this.overwritePackagizer == null) {
             return;
@@ -1017,10 +1015,6 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         }
         final String finalDownloadPassword = getDownloadPassword();
         if (!StringUtils.isEmpty(finalDownloadPassword)) {
-            return;
-        }
-        final String finalDestination = getDestination();
-        if (finalDestination != null && !finalDestination.equals(this.getDownloadDestinationFieldDefaultValue())) {
             return;
         }
         final Priority priority = this.getPriority();

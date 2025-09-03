@@ -83,12 +83,18 @@ public interface LinkgrabberSettings extends ConfigInterface {
     void setAutoSwitchToDownloadTableOnConfirmDefaultEnabled(boolean b);
 
     @AboutConfig
-    @RequiresRestart("A JDownloader Restart is Required")
     @DefaultBooleanValue(true)
     @DescriptionForConfigEntry("If false, The 'Add Links' dialog in Linkgrabber works on the pasted text, and does not prefilter URLS anymore")
     boolean isAddLinksPreParserEnabled();
 
     void setAddLinksPreParserEnabled(boolean b);
+
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("Allows add links dialog to auto enable/disable 'override packagizer rules' checkbox based on user input of the other fields.")
+    boolean isAddLinksOverridePackagizerCheckboxAutoModeEnabled();
+
+    void setAddLinksOverridePackagizerCheckboxAutoModeEnabled(boolean b);
 
     @AboutConfig
     @DescriptionForConfigEntry("Automatically search for possible extraction password in pasted text and show them in 'Add Links' dialog")

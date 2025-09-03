@@ -11,13 +11,126 @@ import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.hoster.GenericM3u8;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
 public class HlsContainer {
+
+    public static class MEDIA {
+
+        public static enum TYPE {
+            AUDIO,
+            SUBTITLES,
+            CLOSEDCAPTIONS;
+            public static TYPE parse(final String type) {
+                if ("AUDIO".equals(type)) {
+                    return TYPE.AUDIO;
+                } else if ("SUBTITLES".equals(type)) {
+                    return TYPE.SUBTITLES;
+                } else if ("CLOSED-CAPTIONS".equals(type)) {
+                    return TYPE.CLOSEDCAPTIONS;
+                } else {
+                    return null;
+                }
+            }
+        }
+
+        protected final TYPE type;
+
+        public TYPE getType() {
+            return type;
+        }
+
+        public String getGroupID() {
+            return groupID;
+        }
+
+        public String getLanguage() {
+            return language;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public Boolean getAutoSelect() {
+            return autoSelect;
+        }
+
+        public Boolean getDefaultSelect() {
+            return defaultSelect;
+        }
+
+        public Boolean getForced() {
+            return forced;
+        }
+
+        public String getUri() {
+            return uri;
+        }
+
+        protected final String  groupID;
+        protected final String  language;
+        protected final String  name;
+        protected final Boolean autoSelect;
+        protected final Boolean defaultSelect;
+        protected final Boolean forced;
+        protected final String  uri;
+
+        public MEDIA(TYPE type, String groupID, String language, String name, Boolean autoSelect, Boolean defaultSelect, Boolean forced, String uri) {
+            super();
+            this.type = type;
+            this.groupID = groupID;
+            this.language = language;
+            this.name = name;
+            this.autoSelect = autoSelect;
+            this.defaultSelect = defaultSelect;
+            this.forced = forced;
+            this.uri = uri;
+        }
+
+        public String buildExtXMediaLine() {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("#EXT-X-MEDIA:");
+            switch (getType()) {
+            case AUDIO:
+            case SUBTITLES:
+                sb.append("TYPE=").append(getType().name());
+                break;
+            default:
+                sb.append("TYPE=FIXME");
+                break;
+            }
+            sb.append(",GROUP-ID=\"").append(getGroupID()).append("\"");
+            final String language = getLanguage();
+            if (language != null) {
+                sb.append(",LANGUAGE=\"").append(language).append("\"");
+            }
+            final String name = getName();
+            if (name != null) {
+                sb.append(",NAME=\"").append(name).append("\"");
+            }
+            sb.append(",AUTOSELECT=").append(Boolean.TRUE.equals(getAutoSelect()) ? "YES" : "NO");
+            sb.append(",DEFAULT=").append(Boolean.TRUE.equals(getDefaultSelect()) ? "YES" : "NO");
+            final Boolean forced = getForced();
+            if (forced != null) {
+                sb.append(",FORCED=").append(Boolean.TRUE.equals(forced) ? "YES" : "NO");
+            }
+            sb.append(",URI=\"").append(getUri()).append("\"");
+            return sb.toString();
+        }
+
+        @Override
+        public String toString() {
+            return buildExtXMediaLine();
+        }
+    }
+
     public static List<HlsContainer> findBestVideosByBandwidth(final List<HlsContainer> media) {
         if (media == null || media.size() == 0) {
             return null;
@@ -26,7 +139,7 @@ public class HlsContainer {
         List<HlsContainer> ret = null;
         long bandwidth_highest = 0;
         for (HlsContainer item : media) {
-            final String id = item.getExtXStreamInf();
+            final String id = item.buildExtXStreamInfLine();
             List<HlsContainer> list = hlsContainer.get(id);
             if (list == null) {
                 list = new ArrayList<HlsContainer>();
@@ -95,11 +208,65 @@ public class HlsContainer {
         return parseHlsQualities(br.toString(), br);
     }
 
+    private static List<MEDIA> parseMedia(final String m3u8, final Browser br) throws Exception {
+        final List<MEDIA> ret = new ArrayList<MEDIA>();
+        final String[] extXMedia = new Regex(m3u8, "#EXT-X-MEDIA:([^\r\n]+)").getColumn(0);
+        for (final String entry : extXMedia) {
+            try {
+                final String type = new Regex(entry, "(?:,|^)\\s*TYPE\\s*=\\s*(AUDIO|SUBTITLES)").getMatch(0);
+                final TYPE mediaType = TYPE.parse(type);
+                if (mediaType == null) {
+                    continue;
+                } else if (TYPE.CLOSEDCAPTIONS.equals(mediaType)) {
+                    // unsupported
+                    continue;
+                }
+                final String groupID = new Regex(entry, "(?:,|^)\\s*GROUP-ID\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                if (groupID == null) {
+                    throw new Exception("No GROUP-ID?:" + entry);
+                }
+                final String uri = new Regex(entry, "(?:,|^)\\s*URI\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                if (uri == null) {
+                    throw new Exception("No URI?:" + entry);
+                }
+                final String language = new Regex(entry, "(?:,|^)\\s*LANGUAGE\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                final String name = new Regex(entry, "(?:,|^)\\s*NAME\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                final String autoSelect = new Regex(entry, "(?:,|^)\\s*AUTOSELECT\\s*=\\s*(YES|NO)").getMatch(0);
+                final String defaultSelect = new Regex(entry, "(?:,|^)\\s*DEFAULT\\s*=\\s*(YES|NO)").getMatch(0);
+                final String forced = new Regex(entry, "(?:,|^)\\s*FORCED\\s*=\\s*(YES|NO)").getMatch(0);
+                ret.add(new MEDIA(mediaType, groupID, language, name, (autoSelect == null ? null : "YES".equals(autoSelect)), (defaultSelect == null ? null : "YES".equals(defaultSelect)), (forced == null ? null : "YES".equals(forced)), uri));
+            } catch (Exception e) {
+                br.getLogger().log(e);
+            }
+        }
+        return ret;
+    }
+
+    private static List<MEDIA> filterMedia(List<MEDIA> media, TYPE type, final String groupID) {
+        if (media == null || media.size() == 0) {
+            return media;
+        }
+        final List<MEDIA> ret = new ArrayList<MEDIA>();
+        for (MEDIA entry : media) {
+            if (type != null && !type.equals(entry.getType())) {
+                continue;
+            }
+            if (groupID != null && !groupID.equals(entry.getGroupID())) {
+                continue;
+            }
+            ret.add(entry);
+        }
+        return ret;
+    }
+
     public static List<HlsContainer> parseHlsQualities(final String m3u8, final Browser br) throws Exception {
         final ArrayList<HlsContainer> hlsqualities = new ArrayList<HlsContainer>();
+        final List<MEDIA> media = parseMedia(m3u8, br);
+
         // TODO: update to support #EXT-X-SESSION-DATA:DATA-ID="com.example.title",LANGUAGE="en", VALUE="This is an example",see
         // GenericM3u8Decrypter
         // https://hlsbook.net/adding-session-data-to-a-playlist/
+
         final String[][] streams = new Regex(m3u8, "#EXT-X-STREAM-INF:?([^\r\n]+)[\r\n]+([^\r\n]+)").getMatches();
         if (streams != null) {
             for (final String stream[] : streams) {
@@ -113,7 +280,7 @@ public class HlsContainer {
                         logger.info("Unsupported M3U8! Split Audio/Video, see  https://svn.jdownloader.org/issues/87898|" + streamInfo);
                         continue;
                     }
-                    // final String quality = new Regex(media, "(?:,|^)\\s*NAME\\s*=\\s*\"(.*?)\"").getMatch(0);
+
                     final String programID = new Regex(streamInfo, "(?:,|^)\\s*PROGRAM-ID\\s*=\\s*(\\d+)").getMatch(0);
                     final String bandwidth = new Regex(streamInfo, "(?:,|^)\\s*BANDWIDTH\\s*=\\s*(\\d+)").getMatch(0);
                     final String average_bandwidth = new Regex(streamInfo, "(?:,|^)\\s*AVERAGE-BANDWIDTH\\s*=\\s*(\\d+)").getMatch(0);
@@ -121,6 +288,7 @@ public class HlsContainer {
                     final String framerate = new Regex(streamInfo, "(?:,|^)\\s*FRAME-RATE\\s*=\\s*(\\d+)").getMatch(0);
                     final String codecs = new Regex(streamInfo, "(?:,|^)\\s*CODECS\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                     final String name = new Regex(streamInfo, "(?:,|^)\\s*NAME\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+
                     // final String uri = new Regex(streamInfo, "(?:,|^)\\s*URI\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                     // final String language = new Regex(streamInfo, "(?:,|^)\\s*LANGUAGE\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                     // final String type = new Regex(streamInfo, "(?:,|^)\\s*TYPE\\s*=\\s*([^<>\"]+)").getMatch(0);
@@ -147,6 +315,7 @@ public class HlsContainer {
                     if (codecs != null) {
                         hls.codecs = codecs.trim();
                     }
+
                     hls.streamURL = url;
                     hls.m3u8URL = br.getURL();
                     if (resolution != null) {
@@ -158,6 +327,23 @@ public class HlsContainer {
                     }
                     if (framerate != null) {
                         hls.framerate = Integer.parseInt(framerate);
+                    }
+                    final List<MEDIA> containerMedia = new ArrayList<MEDIA>();
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && false) {
+                        final String audioID = new Regex(streamInfo, "(?:,|^)\\s*AUDIO\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                        hls.audioGroupID = audioID;
+                        containerMedia.addAll(filterMedia(media, TYPE.AUDIO, audioID));
+                    }
+                    if (false) {
+                        final String closedCaptionsID = new Regex(streamInfo, "(?:,|^)\\s*CLOSED-CAPTIONS\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                        containerMedia.addAll(filterMedia(media, TYPE.CLOSEDCAPTIONS, closedCaptionsID));
+                    }
+                    if (false) {
+                        final String subtitlesID = new Regex(streamInfo, "(?:,|^)\\s*SUBTITLES\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                        containerMedia.addAll(filterMedia(media, TYPE.SUBTITLES, subtitlesID));
+                    }
+                    if (containerMedia.size() > 0) {
+                        hls.setMedia(containerMedia);
                     }
                     hlsqualities.add(hls);
                 }
@@ -177,6 +363,20 @@ public class HlsContainer {
     private List<M3U8Playlist> m3u8List = null;
     private int                width    = -1;
 
+    private List<MEDIA>        media    = null;
+
+    public List<MEDIA> getMedia() {
+        return media;
+    }
+
+    public List<MEDIA> getMedia(TYPE type, String groupID) {
+        return filterMedia(getMedia(), type, groupID);
+    }
+
+    public void setMedia(List<MEDIA> media) {
+        this.media = media;
+    }
+
     public void setAverageBandwidth(int average_bandwidth) {
         this.average_bandwidth = average_bandwidth;
     }
@@ -193,11 +393,20 @@ public class HlsContainer {
         this.bandwidth = bandwidth;
     }
 
-    private int height            = -1;
-    private int bandwidth         = -1;
-    private int average_bandwidth = -1;
-    private int programID         = -1;
-    private int framerate         = -1;
+    private int    height            = -1;
+    private int    bandwidth         = -1;
+    private int    average_bandwidth = -1;
+    private int    programID         = -1;
+    private int    framerate         = -1;
+    private String audioGroupID      = null;
+
+    public String getAudioGroupID() {
+        return audioGroupID;
+    }
+
+    public void setAudioGroupID(String audioGroupID) {
+        this.audioGroupID = audioGroupID;
+    }
 
     public void setFramerate(int framerate) {
         this.framerate = framerate;
@@ -218,7 +427,7 @@ public class HlsContainer {
         this.m3u8List = m3u8List;
     }
 
-    public String getExtXStreamInf() {
+    public String buildExtXStreamInfLine() {
         final StringBuilder sb = new StringBuilder();
         sb.append("#EXT-X-STREAM-INF:");
         boolean sep = false;
@@ -486,7 +695,7 @@ public class HlsContainer {
 
     @Override
     public String toString() {
-        return getExtXStreamInf();
+        return buildExtXStreamInfLine();
     }
 
     public String getStandardFilename() {
@@ -537,6 +746,8 @@ public class HlsContainer {
         }
         link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
         link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
+        link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_GROUP, getAudioGroupID());
         // TODO: Set type of content e.g. audio, video, subtitle
     }
+
 }

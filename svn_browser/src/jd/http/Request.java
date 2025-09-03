@@ -612,6 +612,9 @@ public abstract class Request {
                     useCS = "UTF-8";
                 } else if (contentType.matches("(?i)application/javascript")) {
                     useCS = "UTF-8";
+                } else if (contentType.matches("(?i)application/(x-mpegURL|vnd\\.apple\\.mpegurl)")) {
+                    // https://datatracker.ietf.org/doc/html/rfc8216
+                    useCS = "UTF-8";
                 }
             }
             if (StringUtils.isEmpty(useCS)) {

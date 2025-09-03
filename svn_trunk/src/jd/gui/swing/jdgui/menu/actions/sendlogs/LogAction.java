@@ -19,8 +19,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import jd.controlling.ClipboardMonitoring;
-
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.logging2.LogSink.FLUSH;
 import org.appwork.utils.logging2.LogSourceProvider;
@@ -35,6 +33,8 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.jdserv.JDServUtils;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.startup.commands.ThreadDump;
+
+import jd.controlling.ClipboardMonitoring;
 
 public class LogAction extends AbstractLogAction {
     /**
@@ -62,12 +62,13 @@ public class LogAction extends AbstractLogAction {
         id = null;
         super.createPackage(selection);
         final String id = this.id;
-        if (id != null) {
-            final String name = format(selection.get(0).getCreated()) + " <--> " + format(selection.get(selection.size() - 1).getLastModified());
-            final String jdLog = "jdlog://" + id + "/";
-            ClipboardMonitoring.getINSTANCE().setCurrentContent(jdLog);
-            Dialog.getInstance().showInputDialog(UIOManager.BUTTONS_HIDE_CANCEL, _GUI.T.LogAction_actionPerformed_givelogid_(), name + " " + jdLog);
+        if (id == null) {
+            return;
         }
+        final String name = format(selection.get(0).getCreated()) + " <--> " + format(selection.get(selection.size() - 1).getLastModified());
+        final String jdLog = "jdlog://" + id + "/";
+        ClipboardMonitoring.getINSTANCE().setCurrentContent(jdLog);
+        Dialog.getInstance().showInputDialog(UIOManager.BUTTONS_HIDE_CANCEL, _GUI.T.LogAction_actionPerformed_givelogid_(), name + " " + jdLog);
     }
 
     @Override
