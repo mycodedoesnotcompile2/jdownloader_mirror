@@ -45,7 +45,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50439 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -277,15 +277,15 @@ public class CivitaiCom extends PluginForHost {
              */
             final String modifiedOriginalURL = dllink.replace(widthValue, "/original=true/");
             logger.info("Trying to download original image via modified URL: " + modifiedOriginalURL);
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, modifiedOriginalURL, this.isResumeable(link, null), this.getMaxChunks(link, account));
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, modifiedOriginalURL, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 logger.info("Failed to download original image with trick -> Download normal image");
-                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, account));
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             }
         } else {
             /* Download the URL we have */
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, account));
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         }
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();

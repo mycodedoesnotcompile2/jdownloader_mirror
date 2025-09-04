@@ -14,9 +14,7 @@ import jd.plugins.hoster.GenericM3u8;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
 import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
 public class HlsContainer {
@@ -272,15 +270,6 @@ public class HlsContainer {
             for (final String stream[] : streams) {
                 if (StringUtils.isNotEmpty(stream[1])) {
                     final String streamInfo = stream[0];
-                    if (false && new Regex(streamInfo, "(?:,|^)\\s*AUDIO\\s*=").matches()) {
-                        LogInterface logger = br.getLogger();
-                        if (logger == null) {
-                            logger = LogController.CL();
-                        }
-                        logger.info("Unsupported M3U8! Split Audio/Video, see  https://svn.jdownloader.org/issues/87898|" + streamInfo);
-                        continue;
-                    }
-
                     final String programID = new Regex(streamInfo, "(?:,|^)\\s*PROGRAM-ID\\s*=\\s*(\\d+)").getMatch(0);
                     final String bandwidth = new Regex(streamInfo, "(?:,|^)\\s*BANDWIDTH\\s*=\\s*(\\d+)").getMatch(0);
                     final String average_bandwidth = new Regex(streamInfo, "(?:,|^)\\s*AVERAGE-BANDWIDTH\\s*=\\s*(\\d+)").getMatch(0);

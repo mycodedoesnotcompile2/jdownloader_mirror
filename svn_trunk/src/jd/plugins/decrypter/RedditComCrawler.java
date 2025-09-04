@@ -69,7 +69,7 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51099 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51441 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -503,7 +503,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                                 if (StringUtils.endsWithCaseInsensitive(filenameFromURL, ".gif")) {
                                     /*
                                      * Filename from URL contains .gif extension but this is a .mp4 file
-                                     * 
+                                     *
                                      * -> Correct that but keep .gif to signal source of the mp4
                                      */
                                     direct.setFinalFileName(this.applyFilenameExtension(filenameFromURL, ".gif.mp4"));
@@ -560,6 +560,11 @@ public class RedditComCrawler extends PluginForDecrypt {
                         final String mediaID = galleryItem.get("media_id").toString();
                         final String caption = (String) galleryItem.get("caption");
                         final Map<String, Object> mediaInfo = (Map<String, Object>) media_metadata.get(mediaID);
+                        if (!"valid".equals(mediaInfo.get("status"))) {
+                            // {"status": "unprocessed"}
+                            logger.info("skip invalid item:" + mediaID + "|status:" + mediaInfo.get("status"));
+                            continue;
+                        }
                         /* "image/png" --> "png" */
                         String mediaType = (String) mediaInfo.get("m");
                         String extension = getExtensionFromMimeType(mediaType);

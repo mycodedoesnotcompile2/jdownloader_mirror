@@ -155,7 +155,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@HostPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 51439 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -359,7 +359,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         return AvailableStatus.TRUE;
                     }
                 }
-                break;
+                    break;
                 case IMAGE: {
                     final String newID;
                     if (VariantGroup.IMAGE_PLAYLIST_COVER.equals(variant.getBaseVariant().getGroup()) && downloadLink.hasProperty(YoutubeHelper.YT_PLAYLIST_ID)) {
@@ -372,7 +372,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         return AvailableStatus.TRUE;
                     }
                 }
-                break;
+                    break;
                 case DESCRIPTION:
                     break;
                 default:
@@ -2463,13 +2463,17 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         final String myID = downloadLink.getStringProperty(YoutubeHelper.YT_ID, null);
                         for (DownloadLink child : pkg.getChildren()) {
                             try {
+                                String fileName = child.getForcedFileName();
+                                if (fileName == null) {
+                                    fileName = child.getFinalFileName();
+                                }
                                 if (myID.equals(child.getStringProperty(YoutubeHelper.YT_ID, null))) {
                                     final AbstractVariant v = getVariant(child);
                                     switch (v.getGroup()) {
                                     case VIDEO:
-                                        final String ext = Files.getExtension(child.getFinalFileName());
+                                        final String ext = Files.getExtension(fileName);
                                         if (StringUtils.isNotEmpty(ext)) {
-                                            final String base = child.getFinalFileName().substring(0, child.getFinalFileName().length() - ext.length() - 1);
+                                            final String base = fileName.substring(0, fileName.length() - ext.length() - 1);
                                             final String displayLanguage;
                                             if (variant instanceof SubtitleVariant) {
                                                 displayLanguage = ((SubtitleVariant) variant).getDisplayLanguage();

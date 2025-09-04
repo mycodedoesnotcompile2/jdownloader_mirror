@@ -20,6 +20,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -36,9 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51433 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51436 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagebamCom extends PluginForDecrypt {
     public ImagebamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -131,7 +131,7 @@ public class ImagebamCom extends PluginForDecrypt {
     }
 
     private void continueToYourImage(final Browser br, final CryptedLink param) throws InterruptedException, IOException {
-        if (br.containsHTML("(?i)>\\s*Continue to your image")) {
+        if (br.containsHTML(">\\s*Continue to your image")) {
             /* Reload page */
             final boolean skipWaittime = true;
             final String waitMillisStr = br.getRegex("show\\(\\);\\s*\\},\\s*(\\d+)\\);").getMatch(0);
@@ -262,7 +262,7 @@ public class ImagebamCom extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("Image not found|>\\s*Image violated our terms of service|>\\s*The requested image could not be located|>\\s*The image has been deleted")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)The gallery you are looking for")) {
+        } else if (br.containsHTML("The gallery you are looking for")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
     }
@@ -276,7 +276,6 @@ public class ImagebamCom extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         errorHandling(br, param);
         continueToYourImage(br, param);
-
         String finallink = br.getRegex("('|\")(https?://\\d+\\.imagebam\\.com/download/[^<>\\s]+)\\1").getMatch(1);
         if (finallink == null) {
             finallink = br.getRegex("('|\")(https?://images\\d+\\.imagebam\\.com/[^<>\\s]+\\.(jpe?g|png))\\1").getMatch(1);

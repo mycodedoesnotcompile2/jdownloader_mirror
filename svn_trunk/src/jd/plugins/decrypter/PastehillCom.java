@@ -37,7 +37,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48203 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51436 $", interfaceVersion = 2, names = {}, urls = {})
 public class PastehillCom extends AbstractPastebinCrawler {
     public PastehillCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,6 @@ public class PastehillCom extends AbstractPastebinCrawler {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "pastehill.com" });
-        ret.add(new String[] { "pastecanyon.com" });
         return ret;
     }
 

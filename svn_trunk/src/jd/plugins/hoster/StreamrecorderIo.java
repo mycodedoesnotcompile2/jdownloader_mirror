@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51367 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamrecorderIo extends PluginForHost {
     public StreamrecorderIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -166,7 +166,7 @@ public class StreamrecorderIo extends PluginForHost {
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         final String dllink = link.getStringProperty(PROPERTY_directurl);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }

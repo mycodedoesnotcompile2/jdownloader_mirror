@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51420 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51436 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -269,6 +269,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "uploadhub.to" });
         ret.add(new String[] { "userupload.in" });
         ret.add(new String[] { "usafiles.net" });
+        ret.add(new String[] { "filegram.to" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

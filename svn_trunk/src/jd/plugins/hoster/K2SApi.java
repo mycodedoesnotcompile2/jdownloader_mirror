@@ -70,7 +70,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -282,7 +282,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 50770 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 51437 $"));
     }
 
     /**
@@ -895,8 +895,8 @@ public abstract class K2SApi extends PluginForHost {
                     counter++;
                 } while (!this.isAbort() && !stopNow);
                 /* Captcha required -> Free [= download-without-account] limits apply! */
-                resumable = this.isResumeable(link, null);
-                maxChunks = this.getMaxChunks(null);
+                resumable = this.isResumeable(link, account);
+                maxChunks = this.getMaxChunks(account);
             }
             dllink = (String) geturlResponse.get("url");
             if (StringUtils.isEmpty(dllink)) {

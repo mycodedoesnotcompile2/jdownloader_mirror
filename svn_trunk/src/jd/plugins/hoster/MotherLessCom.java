@@ -21,11 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.MotherlessComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -49,7 +44,12 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.MotherLessComCrawler;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.MotherlessComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51442 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MotherLessComCrawler.class })
 public class MotherLessCom extends PluginForHost {
     public static final String  text_subscribeFailed        = "Failed to subscribe to the owner of the video";
@@ -361,7 +361,7 @@ public class MotherLessCom extends PluginForHost {
         }
         try {
             prepHeadersDownload(link, br);
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, url, isResumeable(link, null), this.getMaxChunks());
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, url, isResumeable(link, account), this.getMaxChunks());
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
                 return true;
             } else {
@@ -520,10 +520,10 @@ public class MotherLessCom extends PluginForHost {
             }
         }
         if (StringUtils.isEmpty(directlink)) {
-            directlink = PluginJSonUtils.getJsonValue(br, "file");
+            directlink = br.getRegex("__fileurl\\s*=\\s*'(https?://[^<>\"\\']+)").getMatch(0);
         }
         if (StringUtils.isEmpty(directlink)) {
-            directlink = br.getRegex("__fileurl\\s*=\\s*'(https?://[^<>\"\\']+)").getMatch(0);
+            directlink = PluginJSonUtils.getJsonValue(br, "file");
         }
         if (directlink != null && !directlink.contains("?start=0")) {
             // dllink += "?start=0";

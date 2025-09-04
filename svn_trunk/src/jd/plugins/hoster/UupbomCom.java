@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50775 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51438 $", interfaceVersion = 3, names = {}, urls = {})
 public class UupbomCom extends XFileSharingProBasic {
     public UupbomCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -109,5 +109,11 @@ public class UupbomCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean websiteSupportsHTTPS() {
+        // 2025-09-03: Workaround, see https://board.jdownloader.org/showthread.php?t=89455
+        return false;
     }
 }

@@ -1045,8 +1045,9 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
 
     public String getForcedFileName() {
         // workaround. all plugin calls should return the forced filename from the singledownloadcontroller - if available
-        if (Thread.currentThread() instanceof SingleDownloadController) {
-            return ((SingleDownloadController) Thread.currentThread()).getSessionDownloadFilename();
+        final SingleDownloadController controller;
+        if (Thread.currentThread() instanceof SingleDownloadController && (controller = getDownloadLinkController()) != null && controller.getDownloadLink() == this) {
+            return controller.getSessionDownloadFilename();
         } else {
             return this.getStringProperty(PROPERTY_FORCEDFILENAME, null);
         }
@@ -1090,7 +1091,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     /*
      * Gibt zurueck ob Dieser Link schon auf verfuegbarkeit getestet wurde.+ Diese FUnktion fuehrt keinen!! Check durch. Sie prueft nur ob
      * schon geprueft worden ist. anschiessend kann mit isAvailable() die verfuegbarkeit ueberprueft werden
-     * 
+     *
      * @return Link wurde schon getestet (true) nicht getestet(false)
      */
     public boolean isAvailabilityStatusChecked() {

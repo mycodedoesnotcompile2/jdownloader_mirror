@@ -21,12 +21,14 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47768 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51438 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidelloNet extends XFileSharingProBasic {
     public VidelloNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +105,35 @@ public class VidelloNet extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilename = new Regex(html, "[^>]*>Download ([^<]+)</th>").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = betterFilename;
+        }
+        return fileInfo;
+    }
+
+    @Override
+    protected boolean containsRecaptchaV2Class(String string) {
+        if (string.contains("class=\"g-recaptcha btn btn-warning d-inline-flex align-items-center")) {
+            /* 2025-09-03: Small workaround as upper handling would return true while there is no reCaptcha. */
+            return false;
+        } else {
+            return super.containsRecaptchaV2Class(string);
+        }
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
+        final String betterDllink = new Regex(src, "href=\"(https?://[^\"]+)\" class=\"btn btn-light btn-lg d-inline-flex").getMatch(0);
+        if (betterDllink != null) {
+            return betterDllink;
+        } else {
+            return super.getDllink(link, account, br, src);
+        }
     }
 }

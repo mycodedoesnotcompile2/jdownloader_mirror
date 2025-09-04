@@ -47,7 +47,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50947 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
 public class WrzutaNet extends PluginForHost {
     public WrzutaNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -251,7 +251,7 @@ public class WrzutaNet extends PluginForHost {
             dlreq = br.createFormRequest(dlform);
         }
         try {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlreq, this.isResumeable(link, null), this.getMaxChunks(link, null));
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlreq, this.isResumeable(link, account), this.getMaxChunks(link, account));
             this.handleConnectionErrors(br, dl.getConnection());
         } catch (final Exception e) {
             if (storedDirecturl != null) {
