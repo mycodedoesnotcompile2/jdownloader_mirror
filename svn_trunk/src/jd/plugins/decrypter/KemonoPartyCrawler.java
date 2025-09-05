@@ -46,16 +46,18 @@ import jd.plugins.hoster.KemonoParty;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.components.config.KemonoPartyConfig;
 import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
 import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51371 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -435,10 +437,16 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
          * broken/missing on the server. <br>
          * Example: /fanbox/user/64937143/post/2095805
          */
-        final String filename = (String) filemap.get("name");
+        String filename = (String) filemap.get("name");
         final String filepath = filemap.get("path").toString();
         String url = "https://" + this.getHost() + "/data" + filepath;
         if (filename != null) {
+            final String nameExt = Files.getExtension(filename, true);
+            final String pathExt = Files.getExtension(filepath, true);
+            if (CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(CompiledFiletypeFilter.getExtensionsFilterInterface(nameExt)) && CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(CompiledFiletypeFilter.getExtensionsFilterInterface(pathExt))) {
+                // both name and path have ImageExtensions so we trust path extension more
+                filename = correctOrApplyFileNameExtension(filename, pathExt, null);
+            }
             url += "?f=" + Encoding.urlEncode(filename);
         }
         final String sha256hash = KemonoParty.getSha256HashFromURL(url);

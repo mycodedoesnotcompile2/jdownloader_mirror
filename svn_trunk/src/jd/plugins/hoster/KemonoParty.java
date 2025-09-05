@@ -34,16 +34,17 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
 
+import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.downloader.text.TextDownloader;
 
-@HostPlugin(revision = "$Revision: 51361 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -213,34 +214,22 @@ public class KemonoParty extends PluginForHost {
                 link.setFinalFileName(betterFilename);
             }
             if (!isDownload) {
-                URLConnectionAdapter con = null;
-                try {
-                    final Browser brc = br.cloneBrowser();
-                    brc.setFollowRedirects(true);
-                    con = brc.openHeadConnection(link.getPluginPatternMatcher());
-                    handleConnectionErrors(brc, con);
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    }
-                    if (betterFilename == null) {
-                        final String filenameFromConnection = Plugin.getFileNameFromDispositionHeader(con);
-                        if (filenameFromConnection != null) {
-                            link.setFinalFileName(filenameFromConnection);
-                        }
-                    }
-                } finally {
-                    try {
-                        con.disconnect();
-                    } catch (final Throwable e) {
-                    }
-                }
+                final Browser brc = br.cloneBrowser();
+                brc.setFollowRedirects(true);
+                basicLinkCheck(brc, brc.createHeadRequest(link.getPluginPatternMatcher()), link, betterFilename, null, FILENAME_SOURCE.prefer(FILENAME_SOURCE.values(), FILENAME_SOURCE.FORCED, FILENAME_SOURCE.CUSTOM));
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    @Override
+    protected String correctOrApplyFileNameExtension(FILENAME_SOURCE source, DownloadLink link, String fileName, URLConnectionAdapter con, String... customValues) {
+        String extensionFromMimeType = null;
+        if (CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(CompiledFiletypeFilter.getExtensionsFilterInterface(Files.getExtension(fileName, true))) && CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(CompiledFiletypeFilter.getExtensionsFilterInterface(extensionFromMimeType = getExtensionFromMimeType(con)))) {
+            // fileName and mimeType have ImageExtensions, so we prefer the extension from mimeType
+            return super.correctOrApplyFileNameExtension(fileName, extensionFromMimeType, null);
+        }
+        return super.correctOrApplyFileNameExtension(source, link, fileName, con, customValues);
     }
 
     @Override

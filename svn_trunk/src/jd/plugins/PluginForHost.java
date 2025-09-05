@@ -38,6 +38,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -145,6 +146,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
@@ -233,14 +235,14 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-                                                  /**
-                                                   * these patterns should split filename and fileextension (extension must include the
-                                                   * point)
-                                                   */
-                                                  // multipart rar archives
-            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-            // normal files with extension
-            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+        /**
+         * these patterns should split filename and fileextension (extension must include the
+         * point)
+         */
+        // multipart rar archives
+        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+        // normal files with extension
+        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -1440,16 +1442,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         * 
+         *
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         * 
+         *
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         * 
+         *
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         * 
-         * 
-         * 
+         *
+         *
+         *
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -3787,9 +3789,12 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public static interface FilenameSourceInterface {
-        public String getFilename(Plugin plugin, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con);
+        public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues);
 
         public boolean setFilename(Plugin plugin, DownloadLink link, final String filename);
+
+        public boolean setFilename(DownloadLinkDownloadable downloadable, final String filename);
+
     }
 
     /**
@@ -3799,70 +3804,174 @@ public abstract class PluginForHost extends Plugin {
      *
      */
     public static enum FILENAME_SOURCE implements FilenameSourceInterface {
+        FORCED() {
+            @Override
+            public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+                if (link == null) {
+                    return null;
+                }
+                String ret = CrawledLink.getForcedName(link);
+                if (ret != null && plugin != null) {
+                    ret = plugin.correctOrApplyFileNameExtension(this, link, ret, con, customValues);
+                }
+                return ret;
+            }
+
+            @Override
+            public boolean setFilename(DownloadLinkDownloadable downloadable, String filename) {
+                if (filename == null) {
+                    return false;
+                }
+                downloadable.setForcedFileName(filename);
+                downloadable.setFinalFileName(filename);
+                return true;
+            }
+
+            @Override
+            public boolean setFilename(Plugin plugin, DownloadLink link, String fileName) {
+                if (fileName == null) {
+                    return false;
+                } else if (plugin != null) {
+                    return plugin.setFilename(this, link, fileName);
+                } else {
+                    CrawledLink.setForcedName(link, fileName);
+                    link.setFinalFileName(fileName);
+                    return true;
+                }
+            }
+        },
         CUSTOM() {
             @Override
-            public String getFilename(Plugin plugin, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-                String ret = customName;
+            public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+                String ret = getCustomFilename(customValues);
                 if (ret != null && plugin != null) {
-                    ret = plugin.correctOrApplyFileNameExtension(ret, customExtension, con);
+                    ret = plugin.correctOrApplyFileNameExtension(this, link, ret, con, customValues);
                 }
                 return ret;
             }
         },
         CONNECTION() {
             @Override
-            public String getFilename(Plugin plugin, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-                String ret = getFileNameFromSource(plugin, HEADER, link, customName, customExtension, con);
+            public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+                if (con == null) {
+                    return null;
+                }
+                String ret = HEADER.getFilename(plugin, link, con, customValues);
                 if (ret == null) {
-                    ret = getFileNameFromSource(plugin, URL, link, customName, customExtension, con);
+                    ret = URL.getFilename(plugin, link, con, customValues);
+                }
+                if (ret != null && plugin != null) {
+                    ret = plugin.correctOrApplyFileNameExtension(this, link, ret, con, customValues);
                 }
                 return ret;
             }
         },
         FINAL() {
             @Override
-            public String getFilename(Plugin plugin, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-                String finalFilename = link != null ? link.getFinalFileName() : null;
-                if (finalFilename != null && plugin != null) {
-                    finalFilename = plugin.correctOrApplyFileNameExtension(finalFilename, customExtension, con);
+            public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+                if (link == null) {
+                    return null;
                 }
-                return finalFilename;
+                String ret = link.getFinalFileName();
+                if (ret != null && plugin != null) {
+                    ret = plugin.correctOrApplyFileNameExtension(this, link, ret, con, customValues);
+                }
+                return ret;
             }
         },
         HEADER() {
             @Override
-            public String getFilename(Plugin plugin, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-                return con != null ? getFileNameFromDispositionHeader(con) : null;
+            public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+                if (con == null) {
+                    return null;
+                }
+                final DispositionHeader header;
+                if (plugin != null) {
+                    header = plugin.getDispositionHeader(con);
+                } else {
+                    header = Plugin.parseDispositionHeader(con);
+                }
+                if (header == null) {
+                    return null;
+                }
+                String ret = header.getFilename();
+                if (ret != null && plugin != null) {
+                    ret = plugin.correctOrApplyFileNameExtension(this, link, ret, con, customValues);
+                }
+                return ret;
             }
         },
         URL() {
             @Override
-            public String getFilename(Plugin plugin, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-                String urlFilename = con != null ? getFileNameFromURL(con.getURL()) : null;
-                if (urlFilename != null && plugin != null) {
-                    urlFilename = plugin.correctOrApplyFileNameExtension(urlFilename, customExtension, con);
+            public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+                if (con == null) {
+                    return null;
                 }
-                return urlFilename;
+                String ret = getFileNameFromURL(con.getURL());
+                if (ret != null && plugin != null) {
+                    ret = plugin.correctOrApplyFileNameExtension(this, link, ret, con, customValues);
+                }
+                return ret;
             }
         },
         PLUGIN() {
             @Override
-            public String getFilename(Plugin plugin, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-                String pluginFilename = link != null ? link.getNameSetbyPlugin() : null;
-                if (pluginFilename != null && plugin != null) {
-                    pluginFilename = plugin.correctOrApplyFileNameExtension(pluginFilename, customExtension, con);
+            public String getFilename(Plugin plugin, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+                if (link == null) {
+                    return null;
                 }
-                return pluginFilename;
+                String ret = link.getNameSetbyPlugin();
+                if (ret != null && plugin != null) {
+                    ret = plugin.correctOrApplyFileNameExtension(this, link, ret, con, customValues);
+                }
+                return ret;
             }
         };
 
+        public static String getCustomFilename(final String... customValues) {
+            if (customValues != null && customValues.length > 0) {
+                return customValues[0];
+            }
+            return null;
+        };
+
+        public static String getCustomExtension(final String... customValues) {
+            if (customValues != null && customValues.length > 1) {
+                return customValues[1];
+            }
+            return null;
+        };
+
+        public static FILENAME_SOURCE[] prefer(FILENAME_SOURCE[] list, FILENAME_SOURCE... preferSource) {
+            final LinkedHashSet<FILENAME_SOURCE> ret = new LinkedHashSet<PluginForHost.FILENAME_SOURCE>();
+            if (preferSource != null) {
+                ret.addAll(Arrays.asList(preferSource));
+            }
+            if (list != null) {
+                ret.addAll(Arrays.asList(list));
+            }
+            return ret.toArray(new FILENAME_SOURCE[0]);
+        }
+
         @Override
-        public boolean setFilename(Plugin plugin, DownloadLink link, String filename) {
-            if (filename != null) {
-                link.setFinalFileName(filename);
-                return true;
-            } else {
+        public boolean setFilename(DownloadLinkDownloadable downloadable, String filename) {
+            if (filename == null) {
                 return false;
+            } else {
+                downloadable.setFinalFileName(filename);
+                return true;
+            }
+        }
+
+        @Override
+        public boolean setFilename(Plugin plugin, DownloadLink link, String fileName) {
+            if (fileName == null) {
+                return false;
+            } else if (plugin != null) {
+                return plugin.setFilename(this, link, fileName);
+            } else {
+                link.setFinalFileName(fileName);
+                return true;
             }
         }
     }
@@ -3884,7 +3993,7 @@ public abstract class PluginForHost extends Plugin {
             }
             if (fileNameSource != null && fileNameSource.length > 0) {
                 for (FILENAME_SOURCE source : fileNameSource) {
-                    final String filename = getFileNameFromSource(source, link, customFileName, defaultExtension, con);
+                    final String filename = getFileNameFromSource(source, link, con, customFileName, defaultExtension);
                     if (source.setFilename(this, link, filename)) {
                         break;
                     }

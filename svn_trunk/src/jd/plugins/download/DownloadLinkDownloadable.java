@@ -14,20 +14,6 @@ import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
 
-import org.appwork.utils.IO;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
-import org.bouncycastle.crypto.digests.WhirlpoolDigest;
-import org.jdownloader.controlling.FileCreationManager;
-import org.jdownloader.plugins.FinalLinkState;
-import org.jdownloader.plugins.HashCheckPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-
 import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -43,9 +29,24 @@ import jd.plugins.DownloadLinkDatabindingInterface;
 import jd.plugins.FilePackage;
 import jd.plugins.Plugin;
 import jd.plugins.PluginForHost;
+import jd.plugins.PluginForHost.FILENAME_SOURCE;
 import jd.plugins.PluginProgress;
 import jd.plugins.download.HashInfo.TYPE;
 import jd.plugins.hoster.DirectHTTP;
+
+import org.appwork.utils.IO;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
+import org.bouncycastle.crypto.digests.WhirlpoolDigest;
+import org.jdownloader.controlling.FileCreationManager;
+import org.jdownloader.plugins.FinalLinkState;
+import org.jdownloader.plugins.HashCheckPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
 
 public class DownloadLinkDownloadable implements Downloadable {
     private static volatile boolean crcHashingInProgress = false;
@@ -168,6 +169,10 @@ public class DownloadLinkDownloadable implements Downloadable {
     @Override
     public void setFinalFileName(String newfinalFileName) {
         getDownloadLink().setFinalFileName(newfinalFileName);
+    }
+
+    public void setForcedFileName(String newforcedFileName) {
+        getDownloadLink().setForcedFileName(newforcedFileName);
     }
 
     @Override
@@ -646,38 +651,6 @@ public class DownloadLinkDownloadable implements Downloadable {
         return (T) getDownloadLink().bindData(T);
     }
 
-    protected DispositionHeader parseDispositionHeader(URLConnectionAdapter connection) {
-        final PluginForHost plugin = getPlugin();
-        if (plugin != null) {
-            return plugin.getDispositionHeader(connection);
-        } else {
-            return Plugin.parseDispositionHeader(connection);
-        }
-    }
-
-    protected String getFileNameFromURL(URLConnectionAdapter connection) {
-        return Plugin.getFileNameFromURL(connection.getURL());
-    }
-
-    protected String getExtensionFromMimeType(URLConnectionAdapter connection) {
-        final PluginForHost plugin = getPlugin();
-        if (plugin != null) {
-            return plugin.getExtensionFromMimeType(connection);
-        } else {
-            return null;
-        }
-    }
-
-    /** Corrects or adds file-extension in given filename string based on mime-type of given URLConnection. */
-    protected String correctOrApplyFileNameExtension(final String name, final URLConnectionAdapter connection) {
-        final PluginForHost plugin = getPlugin();
-        if (plugin != null) {
-            return plugin.correctOrApplyFileNameExtension(name, null, connection);
-        } else {
-            return name;
-        }
-    }
-
     protected boolean isAllowFilenameFromURL(URLConnectionAdapter connection) {
         final DownloadInterface dl = getDownloadInterface();
         return dl != null && dl.allowFilenameFromURL;
@@ -699,53 +672,64 @@ public class DownloadLinkDownloadable implements Downloadable {
 
     @Override
     public void updateFinalFileName() {
-        final String existingFinalFilename = getFinalFileName();
         final LogInterface logger = getLogger();
         final DownloadInterface dl = getDownloadInterface();
         final URLConnectionAdapter connection = dl.getConnection();
-        final DispositionHeader dispositonHeader = parseDispositionHeader(connection);
-        if (dispositonHeader != null && StringUtils.isNotEmpty(dispositonHeader.getFilename())) {
-            /* Get filename from content-disposition header */
-            if (existingFinalFilename == null) {
-                final String fileNameFromDispositionHeader = dispositonHeader.getFilename();
-                final String newFinalFilename;
-                if (dispositonHeader.getEncoding() == null && isFixWrongEncoding(connection, fileNameFromDispositionHeader)) {
-                    newFinalFilename = fixWrongEncoding(connection, fileNameFromDispositionHeader);
-                } else {
-                    newFinalFilename = fileNameFromDispositionHeader;
-                }
-                logger.info("updateFinalFileName: set to '" + newFinalFilename + "' from connection:" + dispositonHeader + "|Content-Type:" + connection.getContentType() + "|fixEncoding:" + !StringUtils.equals(newFinalFilename, fileNameFromDispositionHeader));
-                setFinalFileName(newFinalFilename);
+        final SingleDownloadController controller = getDownloadLinkController();
+        final PluginForHost plugin = getPlugin();
+        final DownloadLink downloadLink = getDownloadLink();
+        if (controller.getSessionDownloadFilename() != null) {
+            // SessionDownloadFilename -> either ForcedFileName or due to rename of the file
+            final String forcedFileName = FILENAME_SOURCE.FORCED.getFilename(plugin, downloadLink, connection);
+            if (controller.getDownloadLink() == downloadLink) {
+                // required for the auto rename handling as we already have
+                controller.setSessionDownloadFilename(forcedFileName);
             }
-            /* never modify(correctOrApplyFileNameExtension) it in any way */
+            if (setFilename(FILENAME_SOURCE.FORCED, forcedFileName)) {
+                logger.info("updateForcedName: update to '" + forcedFileName + "' Content-Type:" + connection.getContentType());
+            }
             return;
         }
-        if (existingFinalFilename == null && isAllowFilenameFromURL(connection) && StringUtils.isNotEmpty(getFileNameFromURL(connection))) {
+        final String existingFinalFilename = FILENAME_SOURCE.FINAL.getFilename(plugin, downloadLink, connection);
+        if (existingFinalFilename != null) {
+            if (setFilename(FILENAME_SOURCE.FINAL, existingFinalFilename)) {
+                logger.info("updateFinalName: update to '" + existingFinalFilename + "' Content-Type:" + connection.getContentType());
+            }
+            return;
+        }
+        final String fileNameFromDispositionHeader = FILENAME_SOURCE.HEADER.getFilename(plugin, downloadLink, connection);
+        if (StringUtils.isNotEmpty(fileNameFromDispositionHeader)) {
+            /* Get filename from content-disposition header */
+            final DispositionHeader dispositonHeader = getPlugin().getDispositionHeader(connection);
+            final String newFinalFilename;
+            if ((dispositonHeader == null || dispositonHeader.getEncoding() == null) && isFixWrongEncoding(connection, fileNameFromDispositionHeader)) {
+                newFinalFilename = fixWrongEncoding(connection, fileNameFromDispositionHeader);
+            } else {
+                newFinalFilename = fileNameFromDispositionHeader;
+            }
+            if (setFilename(FILENAME_SOURCE.HEADER, newFinalFilename)) {
+                logger.info("updateFinalFileName: set to '" + newFinalFilename + "' from connection:" + dispositonHeader + "|Content-Type:" + connection.getContentType() + "|fixEncoding:" + !StringUtils.equals(newFinalFilename, fileNameFromDispositionHeader));
+            }
+            return;
+        }
+        final String fileNameFromURL = FILENAME_SOURCE.URL.getFilename(plugin, downloadLink, connection);
+        if (StringUtils.isNotEmpty(fileNameFromURL) && isAllowFilenameFromURL(connection)) {
             /* Get filename from URL */
-            final String fileNameFromURL = getFileNameFromURL(connection);
             final String newFinalFilename;
             if (isFixWrongEncoding(connection, fileNameFromURL)) {
                 newFinalFilename = fixWrongEncoding(connection, fileNameFromURL);
             } else {
                 newFinalFilename = fileNameFromURL;
             }
-            logger.info("updateFinalFileName: set to '" + newFinalFilename + "' from url:" + connection.getURL().getPath() + "|Content-Type:" + connection.getContentType() + "|fixEncoding:" + !StringUtils.equals(newFinalFilename, fileNameFromURL));
-            setFinalFileName(newFinalFilename);
-        }
-        if (StringUtils.isNotEmpty(getName())) {
-            /* Use pre given filename and correct extension if needed. */
-            final String name = getName();
-            final String newFinalFilename = correctOrApplyFileNameExtension(name, connection);
-            if (StringUtils.equals(existingFinalFilename, newFinalFilename)) {
-                // no changes in filename
-                return;
-            } else {
-                if (!StringUtils.equals(name, newFinalFilename)) {
-                    logger.info("updateFinalFileName: correct from '" + name + "' to '" + newFinalFilename + "'|Content-Type:" + connection.getContentType());
-                }
-                setFinalFileName(newFinalFilename);
+            if (setFilename(FILENAME_SOURCE.URL, newFinalFilename)) {
+                logger.info("updateFinalFileName: set to '" + newFinalFilename + "' from url:" + connection.getURL().getPath() + "|Content-Type:" + connection.getContentType() + "|fixEncoding:" + !StringUtils.equals(newFinalFilename, fileNameFromURL));
             }
+            return;
         }
+    }
+
+    protected boolean setFilename(FILENAME_SOURCE source, final String fileName) {
+        return source.setFilename(this, fileName);
     }
 
     protected String decodeURIComponent(final String name, String charSet) {

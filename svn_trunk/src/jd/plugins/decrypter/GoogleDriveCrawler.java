@@ -44,10 +44,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GoogleDrive;
 
-@DecrypterPlugin(revision = "$Revision: 51344 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51443 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { GoogleDrive.class })
 public class GoogleDriveCrawler extends PluginForDecrypt {
     /**
@@ -55,6 +54,13 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
      */
     public GoogleDriveCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     // DEV NOTES
@@ -160,7 +166,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 int redirectCounter = -1;
-                final PluginForHost hostPlg = this.getNewPluginForHostInstance(this.getHost());
+                final GoogleDrive hostPlg = (GoogleDrive) this.getNewPluginForHostInstance(this.getHost());
                 do {
                     redirectCounter++;
                     logger.info("Detected folder redirect: " + redirect);
@@ -219,8 +225,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Browser websiteBR = this.createNewBrowserInstance();
-        websiteBR.setFollowRedirects(true);
-        final PluginForHost hostPlugin = this.getNewPluginForHostInstance(this.getHost());
+        final GoogleDrive plg = (GoogleDrive) this.getNewPluginForHostInstance(this.getHost());
         /* Account is not yet usable in API mode. */
         // final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         final String subfolderPath = this.getAdoptedCloudFolderStructure();
@@ -246,7 +251,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         int page = 0;
         do {
             br.getPage(GoogleDrive.API_BASE + "/files?" + queryFolder.toString());
-            ((jd.plugins.hoster.GoogleDrive) hostPlugin).handleErrorsAPI(br, null, null);
+            plg.handleErrorsAPI(br, null, null);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             /**
              * Check for empty folders. </br>
@@ -300,7 +305,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
                 logger.warning("WTF incompleteSearch == true");
             }
             final int dupesListOldSize = dupes.size();
-            this.parseFolderJson(JsonSchemeType.API, ret, dupes, entries, this.getAdoptedCloudFolderStructure(), nameOfCurrentFolder);
+            this.parseFolderJson(plg, JsonSchemeType.API, ret, dupes, entries, this.getAdoptedCloudFolderStructure(), nameOfCurrentFolder);
             final int numberofNewItemsCrawledOnThisPage = ret.size() - dupesListOldSize;
             logger.info("Crawled page " + page + " | Items current page: " + numberofNewItemsCrawledOnThisPage + " | Total: " + ret.size());
             if (page == 0 && ret.size() == 0) {
@@ -350,7 +355,6 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
             logger.info("No account available");
             GoogleDrive.prepBrowser(this.br);
         }
-        br.setFollowRedirects(true);
         /* 2021-05-31: Folders can redirect to other folderIDs. Most likely we got a "Shortcut" then --> Very rare case */
         br.getPage(generateFolderURL(folderID, folderResourceKey));
         final String newFolderID = this.findFolderID(br.getURL());
@@ -462,6 +466,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         if (folderResourceKey != null) {
             setResourceKeyHeaderAPI(brc, folderID, folderResourceKey);
         }
+        final GoogleDrive plg = (GoogleDrive) this.getNewPluginForHostInstance(this.getHost());
         final ArrayList<String> dupes = new ArrayList<String>();
         logger.info("Start folder crawl process via WebAPI");
         do {
@@ -493,7 +498,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
             }
             nextPageToken = (String) entries.get("nextPageToken");
             final int dupesListOldSize = dupes.size();
-            parseFolderJson(JsonSchemeType.WEBSITE, ret, dupes, entries, subfolderPath, currentFolderTitle);
+            parseFolderJson(plg, JsonSchemeType.WEBSITE, ret, dupes, entries, subfolderPath, currentFolderTitle);
             final int newItemsThisPage = ret.size() - dupesListOldSize;
             logger.info("Crawled page " + page + " | New items current page: " + newItemsThisPage + " of max " + maxItemsPerRequest + " | Total: " + ret.size());
             if (this.isAbort()) {
@@ -545,7 +550,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
     }
 
     /** Crawls file/folder items from API and website. */
-    private void parseFolderJson(final JsonSchemeType type, final ArrayList<DownloadLink> ret, final ArrayList<String> dupes, final Map<String, Object> data, String subfolder, final String currentFolderTitle) throws PluginException {
+    private void parseFolderJson(final GoogleDrive plg, final JsonSchemeType type, final ArrayList<DownloadLink> ret, final ArrayList<String> dupes, final Map<String, Object> data, String subfolder, final String currentFolderTitle) throws PluginException {
         final String root_dir_name;
         /* 2020-12-07: Workaround: Use path as package name as long as we're unable to get the name of the folder we're currently in! */
         if (StringUtils.isEmpty(subfolder)) {
@@ -587,17 +592,16 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
             } else {
                 id = resource.get("id").toString();
             }
-            if (dupes.contains(id)) {
+            if (!dupes.add(id)) {
                 continue;
             }
-            dupes.add(id);
             final boolean isShortcutFolder = StringUtils.equalsIgnoreCase(mimeType, "application/vnd.google-apps.folder");
             final DownloadLink dl;
             /* Shortcuts to folders also come with "kind": "drive#file" so this check is really important! */
-            if (kind.equals("drive#file") && !isShortcutFolder) {
+            if (kind.equalsIgnoreCase("drive#file") && !isShortcutFolder) {
                 /* Single file */
                 dl = createDownloadlink(generateFileURL(id, resourceKey));
-                GoogleDrive.parseFileInfoAPIAndWebsiteWebAPI(this, type, dl, resource);
+                plg.parseFileInfoAPIAndWebsiteWebAPI(this, type, dl, resource);
                 if (subfolder != null) {
                     /*
                      * Packagizer property so user can e.g. merge all files of a folder and subfolders in a package named after the name of
@@ -610,7 +614,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
                     dl._setFilePackage(fp);
                 }
             } else {
-                /* Folder */
+                /* Folder or shortcut to folder */
                 dl = createDownloadlink(generateFolderURL(id, resourceKey));
                 if (subfolder != null) {
                     dl.setRelativeDownloadFolderPath(subfolder + "/" + title);

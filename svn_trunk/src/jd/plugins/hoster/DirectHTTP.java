@@ -41,7 +41,6 @@ import jd.controlling.linkcrawler.CheckableLink;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.LinkCrawler;
 import jd.controlling.linkcrawler.LinkCrawlerRule;
-import jd.controlling.reconnect.ipcheck.IP;
 import jd.http.Authentication;
 import jd.http.AuthenticationFactory;
 import jd.http.Browser;
@@ -80,11 +79,11 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
 import org.jdownloader.auth.AuthenticationController;
 import org.jdownloader.auth.AuthenticationInfo;
 import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -96,7 +95,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 /**
  * TODO: remove after next big update of core to use the public static methods!
  */
-@HostPlugin(revision = "$Revision: 51039 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
+@HostPlugin(revision = "$Revision: 51445 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
 "https?(viajd)?://[^/]+/.*\\.((jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|bin|ape|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nsf|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}$)(\\.\\d{1,4})?(?=\\?|$|#|\"|\r|\n|;))" })
 public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVerifier {
     public static final String  ENDINGS                                      = "\\.(jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|ape|bin|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nfs|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}(?=\\?|$|#|\"|\r|\n|;))";
@@ -879,55 +878,51 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
         return urlConnection;
     }
 
-    protected String updateFilename(final DownloadLink downloadLink, URLConnectionAdapter urlConnection) throws Exception {
-        /* if final filename already set, do not change */
-        if (downloadLink.getFinalFileName() != null && parseDispositionHeader(urlConnection) == null) {
-            final String oldFinalFilename = downloadLink.getFinalFileName();
-            final String newFinalFilename = correctOrApplyFileNameExtension(oldFinalFilename, null, urlConnection);
-            if (!StringUtils.equals(oldFinalFilename, newFinalFilename)) {
-                logger.info("Updated finalFilenames' file extension | Old: " + oldFinalFilename + " | New: " + newFinalFilename);
-                downloadLink.setFinalFileName(newFinalFilename);
-                return newFinalFilename;
-            }
-        } else if (downloadLink.getFinalFileName() == null) {
-            /* Restore filename from property */
-            boolean allowFileExtensionCorrection = true;
-            String fileName = downloadLink.getStringProperty(FIXNAME, null);
-            if (StringUtils.isEmpty(fileName)) {
-                final DispositionHeader dispositionHeader = parseDispositionHeader(urlConnection);
-                if (dispositionHeader != null) {
-                    // trust given filename extension via Content-Disposition header
-                    allowFileExtensionCorrection = false;
-                    fileName = dispositionHeader.getFilename();
-                }
-                if (StringUtils.isEmpty(fileName)) {
-                    fileName = Plugin.extractFileNameFromURL(urlConnection.getRequest().getUrl());
-                    if (StringUtils.isNotEmpty(fileName)) {
-                        // TODO: Check if this is still needed
-                        if (StringUtils.equalsIgnoreCase("php", Files.getExtension(fileName)) || fileName.matches(IP.IP_PATTERN)) {
-                            fileName = null;
-                        }
-                    }
-                }
-                if (StringUtils.isNotEmpty(fileName) && downloadLink.getBooleanProperty("urlDecodeFinalFileName", true)) {
-                    fileName = SimpleFTP.BestEncodingGuessingURLDecode(fileName);
-                }
-            }
-            if (StringUtils.isEmpty(fileName)) {
-                /* Get any cached name */
-                fileName = downloadLink.getName();
-            }
-            if (fileName != null) {
-                if (allowFileExtensionCorrection) {
-                    fileName = correctOrApplyFileNameExtension(fileName, null, urlConnection);
-                }
-                downloadLink.setFinalFileName(fileName);
-                /* save filename in property so we can restore in reset case */
-                downloadLink.setProperty(FIXNAME, fileName);
-                return fileName;
-            }
+    @Override
+    protected String correctOrApplyFileNameExtension(FILENAME_SOURCE source, DownloadLink link, String fileName, URLConnectionAdapter con, String... customValues) {
+        String extensionFromMimeType = null;
+        if (CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(CompiledFiletypeFilter.getExtensionsFilterInterface(Files.getExtension(fileName, true))) && CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(CompiledFiletypeFilter.getExtensionsFilterInterface(extensionFromMimeType = getExtensionFromMimeType(con)))) {
+            // fileName and mimeType have ImageExtensions, so we prefer the extension from mimeType
+            return super.correctOrApplyFileNameExtension(fileName, extensionFromMimeType, null);
         }
-        return null;
+        return super.correctOrApplyFileNameExtension(source, link, fileName, con, customValues);
+    }
+
+    protected String updateFilename(final DownloadLink downloadLink, URLConnectionAdapter urlConnection) throws Exception {
+        FILENAME_SOURCE source = FILENAME_SOURCE.FORCED;
+        String fileName = source.getFilename(this, downloadLink, urlConnection);
+        if (StringUtils.isEmpty(fileName)) {
+            source = FILENAME_SOURCE.FINAL;
+            fileName = source.getFilename(this, downloadLink, urlConnection);
+        }
+        if (StringUtils.isEmpty(fileName)) {
+            /* Restore filename from property */
+            source = FILENAME_SOURCE.CUSTOM;
+            fileName = source.getFilename(this, downloadLink, urlConnection, downloadLink.getStringProperty(FIXNAME, null));
+        }
+        if (StringUtils.isEmpty(fileName)) {
+            source = FILENAME_SOURCE.HEADER;
+            fileName = source.getFilename(this, downloadLink, urlConnection);
+        }
+        if (StringUtils.isEmpty(fileName)) {
+            source = FILENAME_SOURCE.URL;
+            fileName = source.getFilename(this, downloadLink, urlConnection);
+        }
+        if (StringUtils.isNotEmpty(fileName) && downloadLink.getBooleanProperty("urlDecodeFinalFileName", true)) {
+            fileName = SimpleFTP.BestEncodingGuessingURLDecode(fileName);
+        }
+        if (StringUtils.isEmpty(fileName)) {
+            /* Get any cached name */
+            source = FILENAME_SOURCE.PLUGIN;
+            fileName = source.getFilename(this, downloadLink, urlConnection);
+        }
+        if (fileName == null) {
+            return null;
+        }
+        source.setFilename(this, downloadLink, fileName);
+        /* save filename in property so we can restore in reset case */
+        downloadLink.setProperty(FIXNAME, fileName);
+        return fileName;
     }
 
     protected AvailableStatus requestFileInformation(final DownloadLink downloadLink, int retry, Set<String> optionSet) throws Exception {

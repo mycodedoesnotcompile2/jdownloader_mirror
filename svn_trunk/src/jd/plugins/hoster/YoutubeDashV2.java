@@ -155,7 +155,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@HostPlugin(revision = "$Revision: 51439 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -359,7 +359,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         return AvailableStatus.TRUE;
                     }
                 }
-                    break;
+                break;
                 case IMAGE: {
                     final String newID;
                     if (VariantGroup.IMAGE_PLAYLIST_COVER.equals(variant.getBaseVariant().getGroup()) && downloadLink.hasProperty(YoutubeHelper.YT_PLAYLIST_ID)) {
@@ -372,7 +372,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         return AvailableStatus.TRUE;
                     }
                 }
-                    break;
+                break;
                 case DESCRIPTION:
                     break;
                 default:
@@ -1358,6 +1358,10 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
 
             @Override
             public void setFinalFileName(String newfinalFileName) {
+            }
+
+            @Override
+            public void setForcedFileName(String newforcedFileName) {
             }
 
             @Override

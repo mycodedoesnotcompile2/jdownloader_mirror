@@ -16,13 +16,15 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -48,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51438 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51443 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornboxCom extends PluginForHost {
     public PornboxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,13 +61,7 @@ public class PornboxCom extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* Allow normal username:password login in IDE mode for devs for testing. */
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
-        } else {
-            // TODO: Fix username:password login
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
-        }
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
     }
 
     @Override
@@ -229,20 +225,34 @@ public class PornboxCom extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
+            final Browser brc = br.cloneBrowser();
+            brc.getPage("https://account.analvids.com/jdialog/box/1.js");
+            final String jdialog3_anti_bot_cookie = brc.getRegex("var pin_hash = '([^\"\\']+)';").getMatch(0);
+            if (jdialog3_anti_bot_cookie == null) {
+                /*
+                 * Without this we will not be able to access any pornbox.com login pages -> We cannot obtain a csrf cookie -> We cannot
+                 * login
+                 */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.setCookie(getHost(), "JDIALOG3", jdialog3_anti_bot_cookie);
             String reCaptchaSitekey = null;
             String lastLoginFailedMsg = null;
             int attempt = 0;
             while (!this.isAbort() && attempt <= 2) {
                 attempt++;
                 br.getPage("https://" + this.getHost() + "/signin");
+                final String csrftoken = br.getRegex("window\\.CSRF_TOKEN = \"([^\"]+)\";").getMatch(0);
+                if (csrftoken == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final long proofOfWork = this.generateProofOfWork(account.getUser(), account.getPass());
                 final Form loginform = new Form();
                 loginform.setMethod(MethodType.POST);
                 loginform.setAction("/user/auth");
                 loginform.put("login", Encoding.urlEncode(account.getUser()));
                 loginform.put("password", Encoding.urlEncode(account.getPass()));
-                // TODO: This parameters' value is wrong, fix it and then allow normal login in Stable (see code with
-                // "TRUE_IN_IDE_ELSE_FALSE").
-                loginform.put("proofOfWorkCode", System.currentTimeMillis() + "");
+                loginform.put("proofOfWorkCode", Long.toString(proofOfWork));
                 loginform.put("cache", "false");
                 loginform.put("showError", "false");
                 loginform.put("dataType", "json");
@@ -250,6 +260,7 @@ public class PornboxCom extends PluginForHost {
                     final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaSitekey).getToken();
                     loginform.put("captcha_public", Encoding.urlEncode(recaptchaV2Response));
                 }
+                br.getHeaders().put("x-csrf-token", csrftoken);
                 br.submitForm(loginform);
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 lastLoginFailedMsg = (String) entries.get("message");
@@ -258,15 +269,48 @@ public class PornboxCom extends PluginForHost {
                     reCaptchaSitekey = entries.get("sitekey").toString();
                     continue;
                 }
-                if ("error".equals(entries.get("result"))) {
-                    throw new AccountInvalidException(lastLoginFailedMsg);
-                }
+                checkErrorsAPI(entries);
+                logger.info("Login looks to be successful");
+                /**
+                 * e.g. "https://account.analvids.com//authorize?action=..." <br>
+                 * Accessing that URL will finally authorize us and get us valid login cookies.
+                 */
+                final String loginurl = entries.get("url").toString();
+                br.getPage(loginurl);
                 logger.info("Full login successful");
                 account.saveCookies(br.getCookies(br.getHost()), "");
                 return true;
             }
             throw new AccountInvalidException(lastLoginFailedMsg);
         }
+    }
+
+    private Object checkErrorsAPI(final Browser br) throws PluginException {
+        final Object entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        if (entries instanceof List) {
+            return entries;
+        }
+        final Map<String, Object> map = (Map<String, Object>) entries;
+        checkErrorsAPI(map);
+        return entries;
+    }
+
+    private void checkErrorsAPI(final Map<String, Object> map) throws PluginException {
+        String message = (String) map.get("message");
+        if ("error".equals(map.get("result"))) {
+            /* E.g. {"result":"error","message":" Username or password incorrect\n"} */
+            throw new AccountInvalidException(message);
+        }
+        final String code = (String) map.get("code");
+        if (code != null) {
+            /**
+             * E.g. accessing /member/subscription without valid cookies <br>
+             * {"text":"User not authenticated","code":"user_not_authenticated"}
+             */
+            final String message2 = (String) map.get("text");
+            throw new AccountInvalidException(message2);
+        }
+        /* No error */
     }
 
     @Override
@@ -280,7 +324,7 @@ public class PornboxCom extends PluginForHost {
         br.getPage("/member/subscription");
         /* This website doesn't have any traffic limited accounts. */
         ai.setUnlimitedTraffic();
-        final List<Map<String, Object>> memberships = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        final List<Map<String, Object>> memberships = (List<Map<String, Object>>) this.checkErrorsAPI(br);
         for (final Map<String, Object> membership : memberships) {
             final Number how_many_days_until_goods_expires = (Number) membership.get("how_many_days_until_goods_expires");
             if (how_many_days_until_goods_expires == null) {
@@ -311,6 +355,52 @@ public class PornboxCom extends PluginForHost {
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         this.handleDownload(link, account);
+    }
+
+    /* See: https://pornbox.com/assets/app-b39fbaab171d6410d58ece5de94999aa.js */
+    private long generateProofOfWork(String username, String password) throws NoSuchAlgorithmException, InterruptedException, PluginException {
+        Random random = new Random();
+        // Generate random 32-bit unsigned integer equivalent (0 to 4294967295)
+        long nonce = random.nextInt() & 0xFFFFFFFFL;
+        int attempts = 0;
+        MessageDigest md5 = MessageDigest.getInstance("MD5");
+        while (attempts < 10000) {
+            nonce++;
+            attempts++;
+            // Create the input string: username + password + nonce
+            String input = username + password + Long.toString(nonce);
+            // Compute MD5 hash
+            md5.reset();
+            byte[] hashBytes = md5.digest(input.getBytes());
+            // Convert to hex string
+            String hexHash = bytesToHex(hashBytes);
+            // Check if hash starts with "00"
+            if (hexHash.startsWith("00")) {
+                return nonce;
+            }
+        }
+        /* This should never happen */
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : bytes) {
+            String hex = Integer.toHexString(0xFF & b);
+            if (hex.length() == 1) {
+                hexString.append('0');
+            }
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+
+    private static boolean verifyProofOfWork(String username, String password, long nonce) throws NoSuchAlgorithmException {
+        MessageDigest md5 = MessageDigest.getInstance("MD5");
+        String input = username + password + Long.toString(nonce);
+        byte[] hashBytes = md5.digest(input.getBytes());
+        String hexHash = bytesToHex(hashBytes);
+        return hexHash.startsWith("00");
     }
 
     @Override

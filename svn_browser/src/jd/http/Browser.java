@@ -640,7 +640,7 @@ public class Browser {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     * 
+     *
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -2983,6 +2983,43 @@ public class Browser {
             @Override
             public BlockLevelType getBlockLevelType() {
                 return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
+        FORTINET_SECURE_DNS {
+            @Override
+            public String getLabel() {
+                return "DNS blocked by Fortinet Secure";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                } else if (con.getResponseCode() == 403) {
+                    // <title>Fortinet Secure DNS Service Portal</title>
+                    // <h2>Web Page Blocked!</h2>
+                    // You have tried to access a web page which belongs to a category that is blocked.
+                    if (request.containsHTML("<title>\\s*Fortinet Secure DNS Service Portal\\s*</title>") && request.containsHTML(">\\s*Web Page Blocked!\\s*<")) {
+                        return this;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.DNS;
             }
 
             @Override

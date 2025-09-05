@@ -765,7 +765,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             fileName = this.fixFilename(fileName);
             this.setProperty(PROPERTY_CUSTOM_LOCALFILENAME, fileName);
         }
-        cachedName = null;
+        clearNameCache();
     }
 
     /**
@@ -780,7 +780,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             fileName = this.fixFilename(fileName);
             this.setProperty(PROPERTY_CUSTOM_LOCALFILENAMEAPPEND, fileName);
         }
-        cachedName = null;
+        clearNameCache();
     }
 
     /**
@@ -1510,7 +1510,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             name = UNKNOWN_FILE_NAME;
         }
         this.name = name;
-        cachedName = null;
+        clearNameCache();
         final String newName = getName();
         if (!StringUtils.equals(oldName, newName)) {
             setLinkInfo(null);
@@ -1540,7 +1540,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 newForced = this.fixFilename(newForced);
                 this.setProperty(PROPERTY_FORCEDFILENAME, newForced);
             }
-            cachedName = null;
+            clearNameCache();
             final String newName = getName();
             if (!StringUtils.equals(oldName, newName)) {
                 setLinkInfo(null);
@@ -1581,7 +1581,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 this.setProperty(PROPERTY_FORCEDFILENAME, name);
             }
         }
-        cachedName = null;
+        clearNameCache();
         final String newName = getName();
         if (!StringUtils.equals(oldName, newName)) {
             setLinkInfo(null);
@@ -1589,6 +1589,10 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
             }
         }
+    }
+
+    private void clearNameCache() {
+        cachedName = null;
     }
 
     public void setComment(String comment) {
@@ -1627,12 +1631,12 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         if (!StringUtils.isEmpty(newfinalFileName)) {
             newfinalFileName = this.fixFilename(newfinalFileName);
             this.setProperty(PROPERTY_FINALFILENAME, newfinalFileName);
-            cachedName = null;// setName calls getName
+            clearNameCache();// setName calls getName
             setName(newfinalFileName);
         } else {
             this.removeProperty(PROPERTY_FINALFILENAME);
         }
-        cachedName = null;
+        clearNameCache();
         final String newName = getName();
         if (!StringUtils.equals(oldName, newName)) {
             setLinkInfo(null);
@@ -1666,7 +1670,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         } else {
             this.urlDownload = null;
         }
-        cachedName = null;
+        clearNameCache();
         if (hasNotificationListener()) {
             notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CONTENT, pluginPattern));
         }
@@ -2609,9 +2613,9 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     }
 
     public void setCustomExtension(String extension) {
-        String old = getCustomExtension();
+        final String old = getCustomExtension();
         setProperty("EXTENSION", extension);
-        cachedName = null;
+        clearNameCache();
         if (!StringUtils.equals(old, extension) && hasNotificationListener()) {
             notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, extension));
         }

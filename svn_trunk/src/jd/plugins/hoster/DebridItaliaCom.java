@@ -21,13 +21,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -45,10 +38,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
 public class DebridItaliaCom extends antiDDoSForHost {
     public DebridItaliaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -244,18 +242,12 @@ public class DebridItaliaCom extends antiDDoSForHost {
     }
 
     @Override
-    public Downloadable newDownloadable(DownloadLink downloadLink, final Browser br) {
-        return new DownloadLinkDownloadable(downloadLink, br) {
-            @Override
-            protected DispositionHeader parseDispositionHeader(URLConnectionAdapter connection) {
-                final DispositionHeader ret = super.parseDispositionHeader(connection);
-                if (ret != null && isValidFileNameFromHeader(ret.getFilename())) {
-                    return ret;
-                } else {
-                    return null;
-                }
-            }
-        };
+    public DispositionHeader getDispositionHeader(URLConnectionAdapter urlConnection) {
+        final DispositionHeader ret = super.getDispositionHeader(urlConnection);
+        if (ret != null && isValidFileNameFromHeader(ret.getFilename())) {
+            return ret;
+        }
+        return null;
     }
 
     public static String getFileNameFromHeader(final URLConnectionAdapter urlConnection) {

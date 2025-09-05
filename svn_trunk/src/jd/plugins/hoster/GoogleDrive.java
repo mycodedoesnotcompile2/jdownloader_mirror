@@ -87,7 +87,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51436 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51443 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -487,7 +487,7 @@ public class GoogleDrive extends PluginForHost {
         }
     }
 
-    public static void parseFileInfoAPIAndWebsiteWebAPI(final Plugin plugin, final JsonSchemeType schemetype, final DownloadLink link, final Map<String, Object> entries) {
+    public void parseFileInfoAPIAndWebsiteWebAPI(final Plugin plugin, final JsonSchemeType schemetype, final DownloadLink link, final Map<String, Object> entries) {
         /* Some field names are different in API and WebAPI. */
         /* Filesize is returned as String so we need to parse it to long. */
         final String filename;
@@ -552,7 +552,7 @@ public class GoogleDrive extends PluginForHost {
     }
 
     /** Sets filename- and required parameters for GDocs files. */
-    public static void parseGoogleDocumentPropertiesAPIAndSetFilename(final Plugin plg, final DownloadLink link, final String filename, final String googleDriveDocumentType, final Map<String, Object> exportFormatDownloadurls) {
+    public void parseGoogleDocumentPropertiesAPIAndSetFilename(final Plugin plg, final DownloadLink link, final String filename, final String googleDriveDocumentType, final Map<String, Object> exportFormatDownloadurls) {
         /**
          * Google Drive documents: Either created directly on Google Drive or user added a "real" document-file to GDrive and converted it
          * into a GDoc later. </br>
@@ -945,10 +945,17 @@ public class GoogleDrive extends PluginForHost {
         parseFileInfoAPIAndWebsiteWebAPI(this, JsonSchemeType.WEBSITE, link, entries);
     }
 
-    private static void setFilename(final Plugin plg, final DownloadLink link, final Boolean looksLikeGoogleDocument, String filename, final boolean setFinalFilename) {
+    private void setFilename(final Plugin plg, final DownloadLink link, final Boolean looksLikeGoogleDocument, String filename, final boolean setFinalFilename) {
         if (isGoogleDocument(link) || Boolean.TRUE.equals(looksLikeGoogleDocument)) {
             final String googleDocumentExt = link.getStringProperty(PROPERTY_GOOGLE_DOCUMENT_FILE_EXTENSION, ".zip");
             filename = plg.applyFilenameExtension(filename, googleDocumentExt);
+        } else if (!canDownloadOfficially(link) && videoStreamShouldBeAvailable(link)) {
+            /**
+             * Looks like video that is not officially downloadable -> Ensure to set correct file extension. <br>
+             * Such items sometimes only have a title set but not a "filename" so while Google knows it's a video stream, the title may not
+             * indicate it.
+             */
+            filename = plg.applyFilenameExtension(filename, ".mp4");
         }
         if (setFinalFilename) {
             link.setFinalFileName(filename);

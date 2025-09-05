@@ -542,20 +542,19 @@ public abstract class Plugin implements ActionListener {
      * @return Extracted filename.
      */
     public static String getFileNameFromConnection(final URLConnectionAdapter urlConnection) {
-        final Plugin plugin = getCurrentActivePlugin();
-        return getFileNameFromSource(plugin, FILENAME_SOURCE.CONNECTION, null, null, null, urlConnection);
+        return getFileNameFromSource(getCurrentActivePlugin(), FILENAME_SOURCE.CONNECTION, null, urlConnection);
     }
 
-    protected static String getFileNameFromSource(Plugin plugin, FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
+    protected static String getFileNameFromSource(Plugin plugin, FILENAME_SOURCE source, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
         if (plugin != null) {
-            return plugin.getFileNameFromSource(source, link, customName, customExtension, con);
+            return plugin.getFileNameFromSource(source, link, con, customValues);
         } else {
-            return source.getFilename(null, link, customName, customExtension, con);
+            return source.getFilename(null, link, con, customValues);
         }
     }
 
-    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
-        return source.getFilename(this, link, customName, customExtension, con);
+    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, URLConnectionAdapter con, final String... customValues) {
+        return source.getFilename(this, link, con, customValues);
     }
 
     protected String getExtensionFromConnection(URLConnectionAdapter connection) {
@@ -574,6 +573,40 @@ public abstract class Plugin implements ActionListener {
             ret = getFileNameExtensionFromString(connection.getURL().getPath(), null);
         }
         return ret;
+    }
+
+    protected String correctOrApplyFileNameExtension(FILENAME_SOURCE source, DownloadLink link, final String fileName, URLConnectionAdapter con, final String... customValues) {
+        if (fileName == null) {
+            return null;
+        }
+        switch (source) {
+        case FORCED:
+            // by default we do not correct forced names
+            return fileName;
+        case CONNECTION:
+            // dummy FILENAME_SOURCE that uses HEADER and URL
+            return fileName;
+        case HEADER:
+            // by default we trust the content-disposition header and do not correct it
+            return fileName;
+        default:
+            return correctOrApplyFileNameExtension(fileName, FILENAME_SOURCE.getCustomExtension(customValues), con);
+        }
+    }
+
+    protected boolean setFilename(FILENAME_SOURCE source, DownloadLink link, String fileName) {
+        if (fileName == null) {
+            return false;
+        }
+        switch (source) {
+        case FORCED:
+            CrawledLink.setForcedName(link, fileName);
+            link.setFinalFileName(fileName);
+            return true;
+        default:
+            link.setFinalFileName(fileName);
+            return true;
+        }
     }
 
     public String correctOrApplyFileNameExtension(final String filenameOrg, String newExtension, URLConnectionAdapter connection) {

@@ -296,7 +296,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
     }
 
     public String getName() {
-        final String lname = name;
+        final String lname = _getName();
         if (lname != null) {
             if (lname.contains("<jd:")) {
                 final CrawledPackage lparent = this.getParentNode();
@@ -340,7 +340,8 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
     }
 
     public void setName(String name) {
-        if (StringUtils.equals(name, this.name)) {
+        final String crawledLinkName = _getName();
+        if (StringUtils.equals(name, crawledLinkName)) {
             return;
         }
         final DownloadLink link = getDownloadLink();
@@ -348,7 +349,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
             if (StringUtils.equals(name, link.getName())) {
                 name = null;
             }
-            if (StringUtils.equals(name, this.name)) {
+            if (StringUtils.equals(name, crawledLinkName)) {
                 return;
             }
         }
@@ -357,7 +358,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
                 // see getName method
                 name = fixFilename(name);
             }
-            if (StringUtils.equals(name, this.name)) {
+            if (StringUtils.equals(name, crawledLinkName)) {
                 return;
             }
         }
@@ -376,13 +377,31 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
         return LinknameCleaner.cleanFilename(filename);
     }
 
+    public static String getForcedName(final DownloadLink downloadLink) {
+        final AbstractNodeNotifier nodeChangeListener = downloadLink.getNodeChangeListener();
+        if (nodeChangeListener instanceof CrawledLink) {
+            // DownloadLink is attached to a CrawledLink, get forced name of CrawledLink
+            return ((CrawledLink) nodeChangeListener)._getName();
+        }
+        return downloadLink.getForcedFileName();
+    }
+
+    public static void setForcedName(final DownloadLink downloadLink, final String forcedName) {
+        downloadLink.setForcedFileName(forcedName);
+        final AbstractNodeNotifier nodeChangeListener = downloadLink.getNodeChangeListener();
+        if (nodeChangeListener instanceof CrawledLink) {
+            // DownloadLink is attached to a CrawledLink, get forced name of CrawledLink
+            ((CrawledLink) nodeChangeListener).setName(forcedName);
+        }
+    }
+
     /* returns unmodified name variable */
     public String _getName() {
         return name;
     }
 
     public boolean isNameSet() {
-        return name != null;
+        return _getName() != null;
     }
 
     public String getHost() {

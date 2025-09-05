@@ -12,15 +12,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.encoding.URLEncode.Decoder;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -40,7 +31,16 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 51366 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.encoding.URLEncode.Decoder;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -475,14 +475,14 @@ public class Bunkr extends PluginForHost {
     }
 
     @Override
-    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
+    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, URLConnectionAdapter con, String... customValues) {
         if (source == FILENAME_SOURCE.URL && con != null) {
             final String ret = getNameFromURL(this, con.getURL().toExternalForm());
             if (ret != null) {
                 return ret;
             }
         }
-        return super.getFileNameFromSource(source, link, customName, customExtension, con);
+        return super.getFileNameFromSource(source, link, con, customValues);
     }
 
     private String getDirecturlFromSingleFileAvailablecheck(final DownloadLink link, String singleFileURL, final boolean accessURL, final boolean isDownload) throws PluginException, IOException {

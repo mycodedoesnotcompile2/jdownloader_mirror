@@ -50,7 +50,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@DecrypterPlugin(revision = "$Revision: 51435 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
+@DecrypterPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
 public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -161,10 +161,10 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
             }
             Long estimatedDurationMillis = null;
             for (HlsContainer hls : hlsContainer) {
-                final List<HlsContainer.MEDIA> audioMedia = new ArrayList<HlsContainer.MEDIA>();
-                audioMedia.addAll(hls.getMedia(HlsContainer.MEDIA.TYPE.AUDIO, null));
-                if (audioMedia == null) {
-                    audioMedia.add(null);// dummy entry when no audioMedia is set
+                List<HlsContainer.MEDIA> audioMedia = hls.getMedia(HlsContainer.MEDIA.TYPE.AUDIO, null);
+                if (audioMedia == null || audioMedia.size() == 0) {
+                    audioMedia = new ArrayList<HlsContainer.MEDIA>();
+                    audioMedia.add(null);// dummy entry for looping when no audioMedia are available
                 }
                 for (HlsContainer.MEDIA audioEntry : audioMedia) {
                     final DownloadLink link = new DownloadLink(null, null, plugin.getHost(), GenericM3u8.createURLForThisPlugin(hls.getStreamURL()), true);
