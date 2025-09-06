@@ -1,6 +1,6 @@
 package jd.plugins;
 
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 
 import jd.controlling.linkcollector.LinkOrigin;
 import jd.controlling.linkcollector.LinkOriginDetails;
@@ -15,7 +15,7 @@ import org.jdownloader.extensions.extraction.BooleanStatus;
 
 public class CrawledLinkStorable implements Storable {
     public static final TypeRef<CrawledLinkStorable> TYPEREF = new TypeRef<CrawledLinkStorable>() {
-                                                             };
+    };
     private CrawledLink                              link;
     private String                                   id      = null;
     private long                                     UID     = -1;
@@ -56,14 +56,23 @@ public class CrawledLinkStorable implements Storable {
 
     public void setSourceUrls(String[] urls) {
         if (urls != null) {
-            final ArrayList<String> deDuplicatedURLs = new ArrayList<String>();
+            final LinkedHashSet<String> cleanURLs = new LinkedHashSet<String>();
             for (final String url : urls) {
-                final String deDuplicatedURL = DownloadLink.dedupeString(LinkCrawler.cleanURL(url));
-                if (deDuplicatedURL != null) {
-                    deDuplicatedURLs.add(deDuplicatedURL);
+                final String cleanURL = LinkCrawler.cleanURL(url);
+                if (cleanURL != null) {
+                    if (cleanURLs.contains(cleanURL)) {
+                        continue;
+                    }
+                    if (cleanURLs.contains(cleanURL + "/")) {
+                        continue;
+                    }
+                    if (cleanURL.endsWith("/") && cleanURLs.contains(cleanURL.substring(0, cleanURL.length() - 1))) {
+                        continue;
+                    }
+                    cleanURLs.add(cleanURL);
                 }
             }
-            urls = deDuplicatedURLs.toArray(new String[deDuplicatedURLs.size()]);
+            urls = cleanURLs.toArray(new String[cleanURLs.size()]);
         }
         link.setSourceUrls(urls);
     }
@@ -170,19 +179,11 @@ public class CrawledLinkStorable implements Storable {
         if (UID != -1) {
             link.getUniqueID().setID(UID);
         }
-        _finalizeDeserialization(link, dll);
-        return link;
+        return _finalizeDeserialization(link, dll);
     }
 
-    public void _finalizeDeserialization(CrawledLink crawledLink, DownloadLink downloadLink) {
-        if (crawledLink != null && crawledLink.getSourceUrls() != null && downloadLink != null) {
-            final String[] sourceURLs = crawledLink.getSourceUrls();
-            for (final String sourceURL : sourceURLs) {
-                if (sourceURL != null && sourceURL.equals(downloadLink.getPluginPatternMatcher())) {
-                    downloadLink.setPluginPatternMatcherUnsafe(sourceURL);
-                }
-            }
-        }
+    public CrawledLink _finalizeDeserialization(CrawledLink crawledLink, DownloadLink downloadLink) {
+        return crawledLink;
     }
 
     public ArchiveInfoStorable getArchiveInfo() {

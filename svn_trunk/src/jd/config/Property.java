@@ -15,11 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.config;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.Serializable;
 import java.lang.ref.WeakReference;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -29,7 +25,6 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.ReflectionUtils;
 
 /**
@@ -39,42 +34,48 @@ import org.appwork.utils.ReflectionUtils;
  * @author JD-Team
  *
  */
-public class Property implements Serializable {
-    private final static WeakHashMap<String, WeakReference<String>> DEDUPEMAP   = new WeakHashMap<String, WeakReference<String>>();
-    private final static WeakStringCache                            DEDUPECACHE = new WeakStringCache();
+public class Property {
+    private final static WeakHashMap<String, WeakReference<String>> DEDUPEMAP = new WeakHashMap<String, WeakReference<String>>();
+
+    // private final static WeakStringCache DEDUPECACHE = new WeakStringCache();
 
     public static String dedupeString(String string) {
-        if (string != null) {
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                synchronized (DEDUPECACHE) {
-                    return DEDUPECACHE.cache(string);
-                }
-            } else {
-                synchronized (DEDUPEMAP) {
-                    String ret = null;
-                    WeakReference<String> ref = DEDUPEMAP.get(string);
-                    if (ref != null && (ret = ref.get()) != null) {
-                        return ret;
-                    }
-                    ref = new WeakReference<String>(string);
-                    DEDUPEMAP.put(string, ref);
-                    return string;
-                }
+        if (string == null) {
+            return null;
+        }
+        synchronized (DEDUPEMAP) {
+            String ret = null;
+            WeakReference<String> ref = DEDUPEMAP.get(string);
+            if (ref != null && (ret = ref.get()) != null) {
+                return ret;
             }
-        } else {
+            ref = new WeakReference<String>(string);
+            DEDUPEMAP.put(string, ref);
             return string;
         }
     }
 
-    private static final long   serialVersionUID  = -6093927038856757256L;
+    public static String returnDedupeStringInstance(String string) {
+        if (string == null) {
+            return null;
+        }
+        synchronized (DEDUPEMAP) {
+            final WeakReference<String> ref = DEDUPEMAP.get(string);
+            final String ret;
+            if (ref != null && (ret = ref.get()) != null) {
+                return ret;
+            }
+            return null;
+        }
+    }
+
+    private static final long  serialVersionUID  = -6093927038856757256L;
     /**
      * Null value used to remove a key completly.
      */
-    public static final Object  NULL              = new Object();
-    /* do not remove to keep stable compatibility */
-    private Map<String, Object> properties        = null;
-    private final Object        NEWIMPLEMENTATION = new Object();
-    private Object[]            propertiesList    = null;
+    public static final Object NULL              = new Object();
+    private final Object       NEWIMPLEMENTATION = new Object();
+    private Object[]           propertiesList    = null;
 
     private void ensureCapacity(final int capacity) {
         synchronized (NEWIMPLEMENTATION) {
@@ -185,12 +186,6 @@ public class Property implements Serializable {
         return setProperty(key, Property.NULL);
     }
 
-    private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
-        /* deserialize object and set all transient variables */
-        stream.defaultReadObject();
-        setProperties(properties);
-    }
-
     /**
      * Gibt einen Boolean zu key zurück. Es wird versuchtden Wert zu einem passendem Wert umzuformen
      *
@@ -283,29 +278,18 @@ public class Property implements Serializable {
     }
 
     public int getPropertiesSize() {
-        if (NEWIMPLEMENTATION != null) {
-            synchronized (NEWIMPLEMENTATION) {
-                final Object[] propertiesList = this.propertiesList;
-                int size = 0;
-                if (propertiesList != null) {
-                    final int length = propertiesList.length;
-                    for (int index = 0; index < length; index += 2) {
-                        if (propertiesList[index] != null) {
-                            size++;
-                        }
+        synchronized (NEWIMPLEMENTATION) {
+            final Object[] propertiesList = this.propertiesList;
+            int size = 0;
+            if (propertiesList != null) {
+                final int length = propertiesList.length;
+                for (int index = 0; index < length; index += 2) {
+                    if (propertiesList[index] != null) {
+                        size++;
                     }
                 }
-                return size;
             }
-        } else {
-            final Map<String, Object> lInternal = properties;
-            if (lInternal == null || lInternal.size() == 0) {
-                return 0;
-            } else {
-                synchronized (lInternal) {
-                    return lInternal.size();
-                }
-            }
+            return size;
         }
     }
 
@@ -315,30 +299,19 @@ public class Property implements Serializable {
      * @return
      */
     public Map<String, Object> getProperties() {
-        if (NEWIMPLEMENTATION != null) {
-            synchronized (NEWIMPLEMENTATION) {
-                final Object[] propertiesList = this.propertiesList;
-                final int size = getPropertiesSize();
-                final Map<String, Object> ret = newMapInstance(size);
-                if (propertiesList != null && size > 0) {
-                    final int length = propertiesList.length;
-                    for (int index = 0; index < length; index += 2) {
-                        if (propertiesList[index] != null) {
-                            ret.put((String) propertiesList[index], propertiesList[index + 1]);
-                        }
+        synchronized (NEWIMPLEMENTATION) {
+            final Object[] propertiesList = this.propertiesList;
+            final int size = getPropertiesSize();
+            final Map<String, Object> ret = newMapInstance(size);
+            if (propertiesList != null && size > 0) {
+                final int length = propertiesList.length;
+                for (int index = 0; index < length; index += 2) {
+                    if (propertiesList[index] != null) {
+                        ret.put((String) propertiesList[index], propertiesList[index + 1]);
                     }
                 }
-                return ret;
             }
-        } else {
-            final Map<String, Object> lInternal = properties;
-            if (lInternal == null || lInternal.size() == 0) {
-                return new HashMap<String, Object>();
-            } else {
-                synchronized (lInternal) {
-                    return new HashMap<String, Object>(lInternal);
-                }
-            }
+            return ret;
         }
     }
 
@@ -356,18 +329,7 @@ public class Property implements Serializable {
         if (key == null) {
             throw new WTFException("key ==null is forbidden!");
         } else {
-            if (NEWIMPLEMENTATION != null) {
-                return getObject(key);
-            } else {
-                final Map<String, Object> lInternal = properties;
-                if (lInternal == null || lInternal.size() == 0) {
-                    return null;
-                } else {
-                    synchronized (lInternal) {
-                        return lInternal.get(key);
-                    }
-                }
-            }
+            return getObject(key);
         }
     }
 
@@ -418,18 +380,7 @@ public class Property implements Serializable {
         if (key == null) {
             throw new WTFException("key ==null is forbidden!");
         } else {
-            if (NEWIMPLEMENTATION != null) {
-                return getObjectIndex(key) != -1;
-            } else {
-                final Map<String, Object> lInternal = properties;
-                if (lInternal == null || lInternal.size() == 0) {
-                    return false;
-                } else {
-                    synchronized (lInternal) {
-                        return lInternal.containsKey(key);
-                    }
-                }
-            }
+            return getObjectIndex(key) != -1;
         }
     }
 
@@ -478,24 +429,16 @@ public class Property implements Serializable {
     public void setProperties(final Map<String, Object> properties) {
         final Map<String, Object> newProperties = optimizeMapInstance(properties);
         if (newProperties != null && newProperties.size() > 0) {
-            if (NEWIMPLEMENTATION != null) {
-                synchronized (NEWIMPLEMENTATION) {
-                    propertiesList = null;
-                    ensureCapacity(newProperties.size());
-                    for (final Entry<String, Object> entry : newProperties.entrySet()) {
-                        putObject(entry.getKey(), entry.getValue());
-                    }
+            synchronized (NEWIMPLEMENTATION) {
+                propertiesList = null;
+                ensureCapacity(newProperties.size());
+                for (final Entry<String, Object> entry : newProperties.entrySet()) {
+                    putObject(entry.getKey(), entry.getValue());
                 }
-            } else {
-                this.properties = newProperties;
             }
         } else {
-            if (NEWIMPLEMENTATION != null) {
-                synchronized (NEWIMPLEMENTATION) {
-                    propertiesList = null;
-                }
-            } else {
-                this.properties = null;
+            synchronized (NEWIMPLEMENTATION) {
+                propertiesList = null;
             }
         }
     }
@@ -510,36 +453,7 @@ public class Property implements Serializable {
         if (key == null) {
             throw new WTFException("key ==null is forbidden!");
         }
-        if (NEWIMPLEMENTATION != null) {
-            return putObject(key, value);
-        } else {
-            final Map<String, Object> lInternal = properties;
-            if (lInternal == null) {
-                if (value == null || value == NULL) {
-                    return false;
-                } else {
-                    properties = newMapInstance(8);
-                    return setProperty(key, value);
-                }
-            } else {
-                synchronized (lInternal) {
-                    if (value == NULL || value == null) {
-                        return lInternal.remove(key) != null;
-                    } else {
-                        key = dedupeKeyString(key);
-                        if (value instanceof String) {
-                            value = dedupeValueString(key, (String) value);
-                        }
-                        final Object old = lInternal.put(key, value);
-                        if (old == null && value != null) {
-                            return true;
-                        } else {
-                            return !old.equals(value);
-                        }
-                    }
-                }
-            }
-        }
+        return putObject(key, value);
     }
 
     /**

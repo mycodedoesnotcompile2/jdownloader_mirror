@@ -95,7 +95,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 /**
  * TODO: remove after next big update of core to use the public static methods!
  */
-@HostPlugin(revision = "$Revision: 51445 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
+@HostPlugin(revision = "$Revision: 51460 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
 "https?(viajd)?://[^/]+/.*\\.((jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|bin|ape|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nsf|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}$)(\\.\\d{1,4})?(?=\\?|$|#|\"|\r|\n|;))" })
 public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVerifier {
     public static final String  ENDINGS                                      = "\\.(jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|ape|bin|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nfs|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}(?=\\?|$|#|\"|\r|\n|;))";
@@ -897,19 +897,16 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
         }
         if (StringUtils.isEmpty(fileName)) {
             /* Restore filename from property */
-            source = FILENAME_SOURCE.CUSTOM;
-            fileName = source.getFilename(this, downloadLink, urlConnection, downloadLink.getStringProperty(FIXNAME, null));
+            fileName = (source = FILENAME_SOURCE.CUSTOM).getFilename(this, downloadLink, urlConnection, downloadLink.getStringProperty(FIXNAME, null));
         }
         if (StringUtils.isEmpty(fileName)) {
-            source = FILENAME_SOURCE.HEADER;
-            fileName = source.getFilename(this, downloadLink, urlConnection);
-        }
-        if (StringUtils.isEmpty(fileName)) {
-            source = FILENAME_SOURCE.URL;
-            fileName = source.getFilename(this, downloadLink, urlConnection);
-        }
-        if (StringUtils.isNotEmpty(fileName) && downloadLink.getBooleanProperty("urlDecodeFinalFileName", true)) {
-            fileName = SimpleFTP.BestEncodingGuessingURLDecode(fileName);
+            fileName = (source = FILENAME_SOURCE.HEADER).getFilename(this, downloadLink, urlConnection);
+            if (StringUtils.isEmpty(fileName)) {
+                fileName = (source = FILENAME_SOURCE.URL).getFilename(this, downloadLink, urlConnection);
+            }
+            if (StringUtils.isNotEmpty(fileName) && downloadLink.getBooleanProperty("urlDecodeFinalFileName", true)) {
+                fileName = SimpleFTP.BestEncodingGuessingURLDecode(fileName);
+            }
         }
         if (StringUtils.isEmpty(fileName)) {
             /* Get any cached name */

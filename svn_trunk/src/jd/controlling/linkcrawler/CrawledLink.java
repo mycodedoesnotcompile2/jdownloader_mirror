@@ -263,7 +263,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
 
     private volatile ArchiveInfo     archiveInfo;
     private volatile UniqueAlltimeID previousParent = null;
-    private volatile String[]        sourceUrls;
+
     private volatile LinkInfo        linkInfo       = null;
 
     protected CrawledLink() {
@@ -858,12 +858,29 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
         }
     }
 
+    private volatile Object sourceUrls;
+
     public void setSourceUrls(String[] sourceUrls) {
-        this.sourceUrls = sourceUrls;
+        if (sourceUrls == null) {
+            this.sourceUrls = null;
+        } else if (sourceUrls.length == 1) {
+            this.sourceUrls = sourceUrls[0];
+        } else {
+            this.sourceUrls = sourceUrls;
+        }
     }
 
     public String[] getSourceUrls() {
-        return sourceUrls;
+        Object ret = sourceUrls;
+        if (ret == null) {
+            return null;
+        } else if (ret instanceof String) {
+            final String[] tmp = new String[1];
+            tmp[0] = (String) ret;
+            return tmp;
+        } else {
+            return (String[]) ret;
+        }
     }
 
     public void setComment(String comment) {

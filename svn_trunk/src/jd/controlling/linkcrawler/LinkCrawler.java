@@ -3122,6 +3122,7 @@ public class LinkCrawler {
     }
 
     public String[] getAndClearSourceURLs(final CrawledLink link) {
+        // TODO: merge "same" links with /a and /a/
         final ArrayList<String> sources = new ArrayList<String>();
         CrawledLink next = link;
         CrawledLink previous = link;

@@ -1,6 +1,5 @@
 package jd.controlling.linkcollector;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -11,10 +10,35 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.UniqueAlltimeID;
 
 public class LinkCollectingJob {
-    private String                jobContent;
-    private String                customSourceUrl;
-    private final UniqueAlltimeID uniqueAlltimeID = new UniqueAlltimeID();
-    private boolean               assignJobID     = false;
+    public final static class UniqueAlltimeLongID extends UniqueAlltimeID {
+
+        private UniqueAlltimeLongID() {
+            super();
+        }
+
+        private Long idLong = null;
+
+        public void setID(long ID) {
+            super.setID(ID);
+            this.idLong = Long.valueOf(ID);
+        }
+
+        public Long getIDLong() {
+            final Long ret = idLong;
+            if (ret == null) {
+                setID(getID());
+                return getIDLong();
+            } else {
+                return ret;
+            }
+        }
+
+    }
+
+    private String                    jobContent;
+    private String                    customSourceUrl;
+    private final UniqueAlltimeLongID uniqueAlltimeID = new UniqueAlltimeLongID();
+    private boolean                   assignJobID     = false;
 
     public boolean isAssignJobID() {
         return assignJobID;
@@ -24,7 +48,7 @@ public class LinkCollectingJob {
         this.assignJobID = assignJobID;
     }
 
-    public UniqueAlltimeID getUniqueAlltimeID() {
+    public UniqueAlltimeLongID getUniqueAlltimeID() {
         return uniqueAlltimeID;
     }
 
