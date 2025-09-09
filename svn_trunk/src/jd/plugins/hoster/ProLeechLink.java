@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51365 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51463 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
 public class ProLeechLink extends PluginForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,6 +60,11 @@ public class ProLeechLink extends PluginForHost {
             /* 2020-05-29: Try to avoid <div class="alert danger"><b>Too many requests! Please try again in a few seconds.</b></div> */
             this.setStartIntervall(5000l);
         }
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
     }
 
     private static MultiHosterManagement        mhm                                                               = new MultiHosterManagement("proleech.link");
@@ -76,7 +81,7 @@ public class ProLeechLink extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://proleech.link/page/terms";
+        return "https://" + getHost() + "/page/terms";
     }
 
     private boolean useAPIOnly() {
@@ -220,7 +225,7 @@ public class ProLeechLink extends PluginForHost {
                 /* 2022-19-08: Fallback: Static value taken from: https://proleech.link/page/hostlist */
                 /* 2023-09-03: asked by admin to increase to 200GB */
                 /* 2025-08-25: asked by admin to increase to 400GB */
-                trafficmaxDailyStr = "200 GB";
+                trafficmaxDailyStr = "400 GB";
             }
             final Object premiumO = entries.get("premium");
             final String premiumStatusStr = premiumO != null ? premiumO.toString() : null;
@@ -279,7 +284,10 @@ public class ProLeechLink extends PluginForHost {
         String apikey = null;
         if (!this.looksLikeValidAPIKey(account.getPass()) && !this.looksLikeValidAPIKey(saved_apikey) && !this.looksLikeValidAPIKey(account.getPass())) {
             this.apiInvalidApikey(account);
-        } else if (this.looksLikeValidAPIKey(account.getPass())) {
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (this.looksLikeValidAPIKey(account.getPass())) {
             apiuser = account.getUser();
             apikey = account.getPass();
         } else {
@@ -812,7 +820,7 @@ public class ProLeechLink extends PluginForHost {
                     }
                 }
             } catch (final Throwable e) {
-                e.printStackTrace();
+                logger.log(e);
                 logger.info("Error occured in delete-download-history handling");
             }
         }
@@ -823,24 +831,25 @@ public class ProLeechLink extends PluginForHost {
     }
 
     private long getCurrentServerTime(final Browser br, final String formatter, final long fallback_time) {
+        if (br == null || br.getHttpConnection() == null) {
+            return fallback_time;
+        }
         long serverTime = -1;
-        if (br != null && br.getHttpConnection() != null) {
-            // lets use server time to determine time out value; we then need to adjust timeformatter reference +- time against server time
-            final String dateString = br.getHttpConnection().getHeaderField("Date");
-            if (dateString != null) {
-                if (StringUtils.isNotEmpty(formatter) && dateString.matches("[A-Za-z]+, \\d{1,2} [A-Za-z]+ \\d{4} \\d{1,2}:\\d{1,2}:\\d{1,2} [A-Z]+")) {
-                    serverTime = TimeFormatter.getMilliSeconds(dateString, formatter, Locale.ENGLISH);
-                } else {
-                    final Date date = TimeFormatter.parseDateString(dateString);
-                    if (date != null) {
-                        serverTime = date.getTime();
-                    }
+        // lets use server time to determine time out value; we then need to adjust timeformatter reference +- time against server time
+        final String dateString = br.getHttpConnection().getHeaderField("Date");
+        if (dateString != null) {
+            if (StringUtils.isNotEmpty(formatter) && dateString.matches("[A-Za-z]+, \\d{1,2} [A-Za-z]+ \\d{4} \\d{1,2}:\\d{1,2}:\\d{1,2} [A-Z]+")) {
+                serverTime = TimeFormatter.getMilliSeconds(dateString, formatter, Locale.ENGLISH);
+            } else {
+                final Date date = TimeFormatter.parseDateString(dateString);
+                if (date != null) {
+                    serverTime = date.getTime();
                 }
             }
         }
         if (serverTime == -1) {
             /* Fallback */
-            serverTime = fallback_time;
+            return fallback_time;
         }
         return serverTime;
     }
@@ -952,24 +961,25 @@ public class ProLeechLink extends PluginForHost {
                 return null;
             }
             for (final String downloadHistoryRow : downloadHistoryRows) {
-                if (downloadHistoryRow.contains(internal_filename)) {
-                    logger.info("Looks like we found the row containing our cloud-download");
-                    foundDownloadHistoryRow = true;
-                    /* RegEx for cloud-forced-downloads ("Save To Cloud" column) */
-                    dllink = new Regex(downloadHistoryRow, "<a href=\"(https?://[^/]+/download/[^<>\"]+)\"").getMatch(0);
-                    /* TODO: Add proper errorhandling for broken final downloadurls, then enable this. */
-                    // if (dllink == null) {
-                    // /* RegEx for non-cloud-forced-downloads ("Direct link" column) */
-                    // dllink = new Regex(downloadHistoryRow, "<a href=\"(https?://[^/]+/d\\d+/[^<>\"]+)\"><u>Download</u>").getMatch(0);
-                    // }
-                    if (dllink != null) {
-                        logger.info("Successfully found final downloadurl");
-                        return dllink;
-                    } else {
-                        logger.info("Failed to find final downloadurl");
-                        cloud_download_progress = new Regex(downloadHistoryRow, "Transfering (\\d{1,3}\\.\\d{1,2})\\s*?\\%").getMatch(0);
-                        /* Continue! It can happen that there are multiple entries for the same filename! */
-                    }
+                if (!downloadHistoryRow.contains(internal_filename)) {
+                    continue;
+                }
+                logger.info("Looks like we found the row containing our cloud-download");
+                foundDownloadHistoryRow = true;
+                /* RegEx for cloud-forced-downloads ("Save To Cloud" column) */
+                dllink = new Regex(downloadHistoryRow, "<a href=\"(https?://[^/]+/download/[^<>\"]+)\"").getMatch(0);
+                /* TODO: Add proper errorhandling for broken final downloadurls, then enable this. */
+                // if (dllink == null) {
+                // /* RegEx for non-cloud-forced-downloads ("Direct link" column) */
+                // dllink = new Regex(downloadHistoryRow, "<a href=\"(https?://[^/]+/d\\d+/[^<>\"]+)\"><u>Download</u>").getMatch(0);
+                // }
+                if (dllink != null) {
+                    logger.info("Successfully found final downloadurl");
+                    return dllink;
+                } else {
+                    logger.info("Failed to find final downloadurl");
+                    cloud_download_progress = new Regex(downloadHistoryRow, "Transfering (\\d{1,3}\\.\\d{1,2})\\s*?\\%").getMatch(0);
+                    /* Continue! It can happen that there are multiple entries for the same filename! */
                 }
             }
             if (dllink == null && is_forced_cloud_download) {
@@ -1030,52 +1040,54 @@ public class ProLeechLink extends PluginForHost {
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Number errorcode = (Number) entries.get("error");
             final String message = (String) entries.get("message");
-            if (errorcode != null && message != null) {
-                /* 2022-09-15: Possible not explicitely implemented error(s): */
-                /*
-                 * {"error":9,"message":"Your file is big! (12.0 MB). You do not have traffic- bandwidth limit 10.0 GB :)\r\n\t\t\t\t Time
-                 * Left To Reset Your Bandwith For This Host: 9 Hours 11 Minutes 33 Seconds"}
+            if (errorcode == null || message == null) {
+                /* No error */
+                return;
+            }
+            /* 2022-09-15: Possible not explicitely implemented error(s): */
+            /*
+             * {"error":9,"message":"Your file is big! (12.0 MB). You do not have traffic- bandwidth limit 10.0 GB :)\r\n\t\t\t\t Time Left
+             * To Reset Your Bandwith For This Host: 9 Hours 11 Minutes 33 Seconds"}
+             */
+            switch (errorcode.intValue()) {
+            case 0:
+                /* No error */
+                break;
+            case 4:
+                /* {"error":4,"message":" No account is working. Try repost later. "} */
+                mhm.handleErrorGeneric(account, link, message, 5);
+            case -10:
+                /* 2020-05-06: According to admin: -10 Account is invalid. */
+                apiAccountInvalid(account);
+            case -9:
+                /* 2020-05-06: According to admin: -9 Your account is locked due to sharing account. */
+                throw new AccountInvalidException(message);
+            case -8:
+                /* 2020-05-06: According to admin: -8 Your account has problem. Please contact to admin. */
+                throw new AccountInvalidException(message);
+            case -6:
+                apiAccountInvalid(account);
+            case -5:
+                throw new AccountInvalidException("Free accounts are not supported");
+            case -1:
+                /* {"error":-1,"message":"API key is invalid. Please update new API key https:\/\/proleech.link\/jdownloader."} */
+                apiAccountInvalid(account);
+            case 1:
+                /* 2020-06-04: Rare error I guess? */
+                /* {"error":1,"message":"Link not supported or empty link."} */
+                mhm.handleErrorGeneric(account, link, message, 5);
+            default:
+                /* Handle all other errors */
+                /**
+                 * 0 Get details of account or Generated link1 Link not introduced or Link not supported or empty link.2 Please include
+                 * 'http//:' in your link3 Link not supported4 Another error (Filehost out of traffic, can't generate file ...)7 Error: Link
+                 * Dead or Host Temporarily Down8 Message reached the limits for host9 Your file is big
                  */
-                switch (errorcode.intValue()) {
-                case 0:
-                    /* No error */
-                    break;
-                case 4:
-                    /* {"error":4,"message":" No account is working. Try repost later. "} */
-                    mhm.handleErrorGeneric(account, link, message, 5);
-                case -10:
-                    /* 2020-05-06: According to admin: -10 Account is invalid. */
-                    apiAccountInvalid(account);
-                case -9:
-                    /* 2020-05-06: According to admin: -9 Your account is locked due to sharing account. */
-                    throw new AccountInvalidException(message);
-                case -8:
-                    /* 2020-05-06: According to admin: -8 Your account has problem. Please contact to admin. */
-                    throw new AccountInvalidException(message);
-                case -6:
-                    apiAccountInvalid(account);
-                case -5:
-                    throw new AccountInvalidException("Free accounts are not supported");
-                case -1:
-                    /* {"error":-1,"message":"API key is invalid. Please update new API key https:\/\/proleech.link\/jdownloader."} */
-                    apiAccountInvalid(account);
-                case 1:
-                    /* 2020-06-04: Rare error I guess? */
-                    /* {"error":1,"message":"Link not supported or empty link."} */
-                    mhm.handleErrorGeneric(account, link, message, 5);
-                default:
-                    /* Handle all other errors */
-                    /**
-                     * 0 Get details of account or Generated link1 Link not introduced or Link not supported or empty link.2 Please include
-                     * 'http//:' in your link3 Link not supported4 Another error (Filehost out of traffic, can't generate file ...)7 Error:
-                     * Link Dead or Host Temporarily Down8 Message reached the limits for host9 Your file is big
-                     */
-                    if (link == null) {
-                        /* Account error */
-                        throw new AccountUnavailableException(message, 5 * 60 * 1000l);
-                    } else {
-                        mhm.handleErrorGeneric(account, link, message, 50);
-                    }
+                if (link == null) {
+                    /* Account error */
+                    throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+                } else {
+                    mhm.handleErrorGeneric(account, link, message, 50);
                 }
             }
         } catch (final JSonMapperException xe) {
@@ -1176,15 +1188,6 @@ public class ProLeechLink extends PluginForHost {
     }
 
     @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        if (this.useAPIOnly()) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.API_KEY_LOGIN };
-        } else {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
-        }
-    }
-
-    @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -1201,6 +1204,7 @@ public class ProLeechLink extends PluginForHost {
 
     @Override
     public void handleFree(DownloadLink link) throws Exception {
+        /* handleFree should never get called. */
         throw new AccountRequiredException();
     }
 }

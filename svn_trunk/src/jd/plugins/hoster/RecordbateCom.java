@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51461 $", interfaceVersion = 3, names = {}, urls = {})
 public class RecordbateCom extends PluginForHost {
     public RecordbateCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +83,7 @@ public class RecordbateCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://recordbate.com/";
+        return "https://" + getHost();
     }
 
     @Override
@@ -111,10 +111,11 @@ public class RecordbateCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null, false);
+        return requestFileInformation(link, null);
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
         if (!link.isNameSet()) {
             link.setFinalFileName(this.getFID(link) + ".mp4");
         }
@@ -141,8 +142,8 @@ public class RecordbateCom extends PluginForHost {
             /* Maybe stored directurl is available. */
             dllink = link.getStringProperty(PROPERTY_DIRECTURL);
         }
-        final boolean lookForFilesize = true;
-        if (!StringUtils.isEmpty(dllink) && lookForFilesize) {
+        final boolean lookForFilesize = false;
+        if (!StringUtils.isEmpty(dllink) && lookForFilesize && !link.isSizeSet()) {
             URLConnectionAdapter con = null;
             try {
                 con = br.openHeadConnection(this.dllink);
@@ -167,9 +168,9 @@ public class RecordbateCom extends PluginForHost {
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception {
         if (!attemptStoredDownloadurlDownload(link)) {
-            requestFileInformation(link, account, true);
+            requestFileInformation(link, account);
             if (StringUtils.isEmpty(dllink)) {
-                if (br.getURL().matches("https?://[^/]+/upgrade")) {
+                if (br.getURL().matches("(?i)https?://[^/]+/upgrade")) {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Reached daily downloadlimit");
                 } else if (br.getHttpConnection().getResponseCode() == 400) {
                     /*

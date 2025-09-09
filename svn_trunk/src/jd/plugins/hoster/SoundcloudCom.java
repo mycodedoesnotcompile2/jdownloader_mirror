@@ -30,6 +30,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary;
+import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary.FLAG;
+import org.jdownloader.controlling.ffmpeg.FFmpeg;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -54,23 +70,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary;
-import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary.FLAG;
-import org.jdownloader.controlling.ffmpeg.FFmpeg;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51447 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
+@HostPlugin(revision = "$Revision: 51461 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
 public class SoundcloudCom extends PluginForHost {
     public SoundcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -300,9 +300,9 @@ public class SoundcloudCom extends PluginForHost {
             final boolean looksLikeOfficiallyDownloadable = looksLikeOfficiallyDownloadable(response);
             if (songPolicy != null && songPolicy.equalsIgnoreCase("SNIP")) {
                 /**
-                 * Typically previews will also have a duration value of only "30000" --> 30 seconds </br> When logged in with a Soundcloud
-                 * premium account, songs for which before only previews were available may change to "POLICY":"MONETIZE" --> Can be fully
-                 * streamed by the user.
+                 * Typically previews will also have a duration value of only "30000" --> 30 seconds </br>
+                 * When logged in with a Soundcloud premium account, songs for which before only previews were available may change to
+                 * "POLICY":"MONETIZE" --> Can be fully streamed by the user.
                  */
                 isOnlyPreviewDownloadable = true;
             }
@@ -429,8 +429,9 @@ public class SoundcloudCom extends PluginForHost {
         if (looksLikeOfficiallyDownloadable && userPrefersOfficialDownload()) {
             /* File is officially downloadable */
             /**
-             * Only set calculated filesize if wanted by user. </br> Officially downloadable files could come in any bitrate thus we do by
-             * default not calculate the filesize for such items based on an assumed bitrate.
+             * Only set calculated filesize if wanted by user. </br>
+             * Officially downloadable files could come in any bitrate thus we do by default not calculate the filesize for such items based
+             * on an assumed bitrate.
              */
             if (userEnforcesFilesizeEstimationEvenForNonStreamDownloads()) {
                 link.setDownloadSize(calculateFilesize(link));
@@ -620,6 +621,13 @@ public class SoundcloudCom extends PluginForHost {
             }
             final List<Map<String, Object>> transcodings = (List<Map<String, Object>>) media.get("transcodings");
             if (transcodings == null) {
+                return null;
+            } else if (transcodings.size() == 0) {
+                /**
+                 * e.g. GEO-blocked items with "policy" value == "BLOCK" <br>
+                 * Example: /teebsio/verbena-tea-with-rebekah-raff -> GEO-Blocked in Germany. <br>
+                 * Such items may have zero streams available, not even a preview.
+                 */
                 return null;
             }
             final List<Map<String, Object>> transcodingHQ = new ArrayList<Map<String, Object>>();
@@ -1021,28 +1029,22 @@ public class SoundcloudCom extends PluginForHost {
 
     public static enum PreferredStreamCodec implements LabelInterface {
         MP3 {
-
             @Override
             public String getLabel() {
                 return "MP3";
             }
-
         },
         AAC {
-
             @Override
             public String getLabel() {
                 return "AAC";
             }
-
         },
         OPUS {
-
             @Override
             public String getLabel() {
                 return "OPUS";
             }
-
         };
     }
 
@@ -1112,7 +1114,6 @@ public class SoundcloudCom extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, getPhrase("SETTING_LABEL_hoster")));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), AUDIO_QUALITY_SELECTION_MODE, getAudioQualitySelectionModeStrings(), getPhrase("SETTING_AUDIO_QUALITY_SELECTION_MODE")).setDefaultValue(defaultArrayPosAUDIO_QUALITY_SELECTION_MODE));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), AUDIO_PREFERRED_STREAM_CODEC, getPreferredStreamCodecStrings(), getPhrase("SETTING_AUDIO_PREFERRED_STREAM_CODEC")).setDefaultValue(defaultArrayPosAUDIO_PREFERRED_STREAM_CODEC));
-
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), ALLOW_PREVIEW_DOWNLOAD, getPhrase("SETTING_ALLOW_PREVIEW_DOWNLOAD")).setDefaultValue(defaultALLOW_PREVIEW_DOWNLOAD));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, getPhrase("SETTING_LABEL_fnames_top")));

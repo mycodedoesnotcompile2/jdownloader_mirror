@@ -73,7 +73,7 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 51216 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 51462 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -295,6 +295,7 @@ public class LinkSnappyCom extends PluginForHost {
             /* Free account information & downloading is only possible via website; not via API! */
             if (AccountType.FREE == account.getType()) {
                 /* Try to find Free Account limits to display them properly */
+                /* 2025-09-08: Looks like free accounts cannot be used for downloading anymore. */
                 logger.info("Trying to obtain free account information from website");
                 try {
                     br.getPage("/download");
@@ -304,7 +305,7 @@ public class LinkSnappyCom extends PluginForHost {
                      * extend">an Elite account</a> in order to start download." OR
                      * ">Activation code has been blocked due to violation of our terms of service. Buy Elite membership in order to Download."
                      */
-                    final Regex remainingURLS = br.getRegex("(?i)id\\s*=\\s*\"linkleft\">\\s*(\\d+)\\s*</span>\\s*out of (\\d+) premium link");
+                    final Regex remainingURLS = br.getRegex("id\\s*=\\s*\"linkleft\">\\s*(\\d+)\\s*</span>\\s*out of (\\d+) premium link");
                     final String remainingDailyURLsStr = remainingURLS.getMatch(0);
                     final String maxDailyURLsStr = remainingURLS.getMatch(1);
                     final int remainingURLs = Integer.parseInt(remainingDailyURLsStr);

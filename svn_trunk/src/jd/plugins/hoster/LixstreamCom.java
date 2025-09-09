@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51347 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51461 $", interfaceVersion = 3, names = {}, urls = {})
 public class LixstreamCom extends PluginForHost {
     public LixstreamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,9 +74,10 @@ public class LixstreamCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        /*
+        /**
          * Current list of domains can be found here: https://lixstream.com/#/file -> Select an uploaded file -> Share -> Dialog pops up ->
-         * See "Choose domain"
+         * See "Choose domain" <br>
+         * Current list of domains can be obtained from here: https://api.luxsioab.com/user_share_domains --> "X-Token" header is required!
          */
         ret.add(new String[] { "lixstream.com", "dood-hd.com", "videymv.com", "videymv.net", "videy.tv", "videy.red", "doodmv.com", "doodmv.net", "doodtv.net", "doodme.org", "doodlix.org", "poopmv.com", "poopmv.net", "poopmv.org", "poopxy.com", "teratvs.org", "vidcloudmv.org", "vide-q.com", "vide0.me", "teramv.com", "teraboxtv.net", "vidcloudtv.net", "videb.org", "lix0.org", "doey07sto.com", "videyii.co", "vdey.org" });
         return ret;

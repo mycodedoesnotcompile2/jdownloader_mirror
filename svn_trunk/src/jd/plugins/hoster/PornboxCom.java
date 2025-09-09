@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51443 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51463 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornboxCom extends PluginForHost {
     public PornboxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -182,11 +182,6 @@ public class PornboxCom extends PluginForHost {
         dl.startDownload();
     }
 
-    @Override
-    public int getMaxSimultanFreeDownloadNum() {
-        return Integer.MAX_VALUE;
-    }
-
     public boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
@@ -302,15 +297,16 @@ public class PornboxCom extends PluginForHost {
             throw new AccountInvalidException(message);
         }
         final String code = (String) map.get("code");
-        if (code != null) {
-            /**
-             * E.g. accessing /member/subscription without valid cookies <br>
-             * {"text":"User not authenticated","code":"user_not_authenticated"}
-             */
-            final String message2 = (String) map.get("text");
-            throw new AccountInvalidException(message2);
+        if (code == null) {
+            /* No error */
+            return;
         }
-        /* No error */
+        /**
+         * E.g. accessing /member/subscription without valid cookies <br>
+         * {"text":"User not authenticated","code":"user_not_authenticated"}
+         */
+        final String message2 = (String) map.get("text");
+        throw new AccountInvalidException(message2);
     }
 
     @Override
@@ -347,7 +343,37 @@ public class PornboxCom extends PluginForHost {
             ai.setStatus(membership.get("humanize_resource_name").toString() + " | Cancelled: " + cancelledStr);
             return ai;
         }
-        /* No premium package found -> User has a free account. */
+        /* No premium package found -> Check via 2nd way */
+        logger.info("No premium package found -> Check via 2nd way");
+        br.getPage("/application/studio/list");
+        final String json = br.getRegex("UserModel\\((\\{.*?), \\{parse: true\\}\\);").getMatch(0);
+        final Map<String, Object> user = restoreFromString(json, TypeRef.MAP);
+        final Map<String, Object> user_goods = (Map<String, Object>) user.get("goods");
+        final List<Map<String, Object>> user_goods_memberships = (List<Map<String, Object>>) user_goods.get("memberships");
+        final Map<String, Object> stat = (Map<String, Object>) user.get("stat");
+        final Map<String, Object> stat_dav = (Map<String, Object>) stat.get("dav");
+        final Map<String, Object> stat_tube = (Map<String, Object>) stat.get("tube");
+        long used_space_bytes = ((Number) stat_tube.get("space_used")).longValue();
+        used_space_bytes += ((Number) stat_dav.get("space_used")).longValue();
+        final String email = user.get("email").toString();
+        if (account.loadUserCookies() != null) {
+            /* Ensure that we are setting unique usernames. */
+            account.setUser(email);
+        }
+        ai.setUsedSpace(used_space_bytes);
+        for (final Map<String, Object> membership : user_goods_memberships) {
+            final Number expires = (Number) membership.get("expires");
+            if (expires == null) {
+                continue;
+            }
+            final long expires_long = expires.longValue() * 1000;
+            if (expires_long < System.currentTimeMillis()) {
+                continue;
+            }
+            account.setType(AccountType.PREMIUM);
+            ai.setValidUntil(expires_long, br);
+            return ai;
+        }
         account.setType(AccountType.FREE);
         return ai;
     }
@@ -404,6 +430,11 @@ public class PornboxCom extends PluginForHost {
     }
 
     @Override
+    public int getMaxSimultanFreeDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return Integer.MAX_VALUE;
     }
@@ -411,13 +442,5 @@ public class PornboxCom extends PluginForHost {
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
         return false;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
