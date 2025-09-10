@@ -64,7 +64,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 50885 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51468 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -981,13 +981,45 @@ public class PornportalCom extends PluginForHost {
                 /* Assume that we got a premium account */
                 account.setType(AccountType.PREMIUM);
             }
-            if (isCanceled != null) {
+            if (isCanceled != null && !Boolean.TRUE.equals(isExpired)) {
                 if (Boolean.TRUE.equals(isCanceled)) {
                     packageFeatures.add("subscription cancelled");
                 } else {
                     packageFeatures.add("subscription running");
                 }
             }
+            /**
+             * Try to find alternative bundle-expire-date inside users' additional purchased "bundles". </br>
+             * Each bundle can have different expire-dates and separate pricing.
+             */
+            final Map<String, Object> marketplaceProfile = (Map<String, Object>) user.get("marketplaceProfile");
+            long highestExpireTimestamp = -1;
+            String titleOfBundleWithHighestExpireDate = null;
+            int numberOfActiveBundles = 0;
+            if (marketplaceProfile != null) {
+                final List<Map<String, Object>> bundles = (List<Map<String, Object>>) marketplaceProfile.get("bundles");
+                if (bundles != null) {
+                    for (final Map<String, Object> bundle : bundles) {
+                        if (!(Boolean) bundle.get("isActive")) {
+                            continue;
+                        }
+                        numberOfActiveBundles++;
+                        final String expireDateStrTmp = (String) bundle.get("expirationDate");
+                        if (expireDateStrTmp == null) {
+                            /* Active bundle without expire-date, possible one with field "isUnlimited":true */
+                            continue;
+                        }
+                        final long expireTimestampTmp = TimeFormatter.getMilliSeconds(expireDateStrTmp, defaultDateFormat, Locale.ENGLISH);
+                        if (expireTimestampTmp < highestExpireTimestamp) {
+                            continue;
+                        }
+                        highestExpireTimestamp = expireTimestampTmp;
+                        titleOfBundleWithHighestExpireDate = (String) bundle.get("title");
+                    }
+                }
+            }
+            logger.info("Number of active bundles: " + numberOfActiveBundles);
+            packageFeatures.add("Active bundles: " + numberOfActiveBundles);
             String packageFeaturesCommaSeparated = "";
             for (final String packageFeature : packageFeatures) {
                 if (packageFeaturesCommaSeparated.length() > 0) {
@@ -996,43 +1028,19 @@ public class PornportalCom extends PluginForHost {
                 packageFeaturesCommaSeparated += packageFeature;
             }
             ai.setStatus(account.getType().getLabel() + " (" + packageFeaturesCommaSeparated + ")");
-            findExpireDate: if (account.getType() == AccountType.PREMIUM) {
-                /* TODO: 2024-10-04: Check if this is still needed. It has failed for me in all of my tests. */
-                /**
-                 * Try to find alternative expire-date inside users' additional purchased "bundles". </br>
-                 * Each bundle can have different expire-dates and also separate pricing and so on.
-                 */
-                logger.info("Looking for alternative expiredate");
-                final List<Map<String, Object>> bundles = (List<Map<String, Object>>) user.get("addons");
-                if (bundles == null) {
-                    logger.info("No bundles available -> Cannot find alternative expire date");
-                    break findExpireDate;
-                }
-                long highestExpireTimestamp = -1;
-                String titleOfBundleWithHighestExpireDate = null;
-                for (final Map<String, Object> bundle : bundles) {
-                    if (!(Boolean) bundle.get("isActive")) {
-                        continue;
-                    }
-                    final String expireDateStrTmp = (String) bundle.get("expirationDate");
-                    final long expireTimestampTmp = TimeFormatter.getMilliSeconds(expireDateStrTmp, defaultDateFormat, Locale.ENGLISH);
-                    if (expireTimestampTmp < highestExpireTimestamp) {
-                        continue;
-                    }
-                    highestExpireTimestamp = expireTimestampTmp;
-                    titleOfBundleWithHighestExpireDate = (String) bundle.get("title");
-                }
+            if (account.getType() == AccountType.PREMIUM) {
                 if (highestExpireTimestamp < System.currentTimeMillis()) {
                     logger.info("Failed to find alternative expiredate");
-                    break findExpireDate;
-                }
-                logger.info("Successfully found alternative expiredate");
-                ai.setValidUntil(highestExpireTimestamp, br);
-                if (!StringUtils.isEmpty(titleOfBundleWithHighestExpireDate)) {
-                    ai.setStatus(ai.getStatus() + " [" + titleOfBundleWithHighestExpireDate + "]");
+                } else {
+                    logger.info("Successfully found alternative expiredate");
+                    ai.setValidUntil(highestExpireTimestamp, br);
+                    if (!StringUtils.isEmpty(titleOfBundleWithHighestExpireDate)) {
+                        ai.setStatus(ai.getStatus() + " [" + titleOfBundleWithHighestExpireDate + "]");
+                    }
                 }
             }
-            if (account.getType() == AccountType.FREE) {
+            if (account.getType() == AccountType.FREE && numberOfActiveBundles == 0) {
+                /* Free account without any active bundles -> Cannot access more content than accessing website without account. */
                 ai.setExpired(true);
             }
             if (account.loadUserCookies() != null && !StringUtils.isEmpty(username)) {

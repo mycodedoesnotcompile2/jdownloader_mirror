@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50774 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51464 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdencodeOrg extends PluginForDecrypt {
     public HdencodeOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,6 +102,7 @@ public class HdencodeOrg extends PluginForDecrypt {
             if (br.containsHTML("\"version\"\\s*:\\s*\"(invisible|v3)")) {
                 /* Invisible reCaptchaV2 */
                 helper = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
+                    @Override
                     public TYPE getType() {
                         return TYPE.INVISIBLE;
                     }

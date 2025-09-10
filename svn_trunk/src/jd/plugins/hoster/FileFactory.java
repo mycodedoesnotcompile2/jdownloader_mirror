@@ -16,29 +16,26 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
-
-import org.appwork.utils.Application;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -48,13 +45,35 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51463 $", interfaceVersion = 2, names = {}, urls = {})
-public class FileFactory extends PluginForHost {
-    private String dllink = null;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Application;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
+@HostPlugin(revision = "$Revision: 51469 $", interfaceVersion = 2, names = {}, urls = {})
+public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + this.getHost() + "/pricing");
+    }
+
+    @Override
+    public FEATURE[] getFeatures() {
+        return new FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setCookie(getHost(), "filefactory_relaunch", "seen");
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -64,6 +83,10 @@ public class FileFactory extends PluginForHost {
 
     private String getContentURL(final DownloadLink link) throws PluginException {
         return "https://www." + getHost() + "/file/" + this.getFUID(link);
+    }
+
+    private String getWebapiBase() {
+        return "https://www." + getHost() + "/api";
     }
 
     @Override
@@ -107,16 +130,6 @@ public class FileFactory extends PluginForHost {
     }
 
     @Override
-    public FEATURE[] getFeatures() {
-        return new FEATURE[] { LazyPlugin.FEATURE.FAVICON, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
-    }
-
-    @Override
-    public Object getFavIcon(String host) throws IOException {
-        return "https://assets-global.website-files.com/65991d8455ab821f56e541e6/659ca0dba9444b12d9112616_favicon32x32.jpg";
-    }
-
-    @Override
     public String[] siteSupportedNames() {
         return buildSupportedNames(getPluginDomains());
     }
@@ -133,6 +146,66 @@ public class FileFactory extends PluginForHost {
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformationWebsite(null, link);
+    }
+
+    private AvailableStatus requestFileInformationWebsite(final Account account, final DownloadLink link) throws Exception {
+        setBrowserExclusive();
+        if (account != null) {
+            this.loginWebsite(account, false);
+        }
+        final String contenturl = this.getContentURL(link);
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
+        try {
+            URLConnectionAdapter con;
+            if (isDownload) {
+                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contenturl, this.isResumeable(link, account), this.getMaxChunks(link, account));
+                con = dl.getConnection();
+            } else {
+                con = br.openGetConnection(contenturl);
+            }
+            if (this.looksLikeDownloadableContent(con)) {
+                link.setFinalFileName(Plugin.getFileNameFromConnection(con));
+                if (con.getCompleteContentLength() > 0) {
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
+                }
+                link.setAvailable(true);
+                return AvailableStatus.TRUE;
+            }
+            br.followConnection();
+            checkErrorsWebsite(link, br);
+            this.dl = null;
+        } finally {
+            if (!isDownload) {
+                this.dl = null;
+            }
+        }
+        if (isPasswordProtectedFile(br)) {
+            link.setPasswordProtected(true);
+        } else {
+            link.setPasswordProtected(false);
+        }
+        /* Small hack: Correct json in html code to make br.getRegex calls down below work. */
+        final String unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+        br.getRequest().setHtmlCode(unescaped);
+        this.checkErrorsWebsite(link, br);
+        String filename = br.getRegex("\"disp_filename\":\"([^\"]+)").getMatch(0);
+        String filesizeBytesStr = br.getRegex("\"size\":\"\\$n(\\d+)").getMatch(0);
+        if (filename != null) {
+            link.setName(filename);
+        }
+        if (filesizeBytesStr != null) {
+            link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+        }
+        return AvailableStatus.TRUE;
     }
 
     public void checkErrorsWebsite(final DownloadLink link, final Browser br) throws PluginException {
@@ -155,202 +228,213 @@ public class FileFactory extends PluginForHost {
             return false;
         }
         final Browser br = this.createNewBrowserInstance();
-        // logic to grab account cookie to do fast linkchecking vs one at a time.
-        boolean loggedIn = false;
-        final List<Account> filteredAccounts = AccountController.getInstance().listAccounts(new AccountFilter(this.getHost()).setEnabled(true).setValid(true));
-        for (Account n : filteredAccounts) {
-            try {
-                loginWebsite(n, false, br);
-                loggedIn = true;
-                break;
-            } catch (Exception e) {
-                logger.log(e);
-            }
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account == null) {
+            // logger.info("Login impossible -> Cannot use mass-linkchecking");
+            return false;
         }
-        if (loggedIn) {
-            try {
-                final StringBuilder sb = new StringBuilder();
-                final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
-                int index = 0;
+        try {
+            loginWebsite(account, false);
+        } catch (Exception e) {
+            logger.log(e);
+            logger.info("Login failed -> Cannot use mass-linkchecking");
+            return false;
+        }
+        try {
+            final StringBuilder sb = new StringBuilder();
+            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            int index = 0;
+            while (true) {
+                links.clear();
                 while (true) {
-                    links.clear();
-                    while (true) {
-                        if (index == urls.length || links.size() == 100) {
-                            break;
-                        } else {
-                            links.add(urls[index]);
-                            index++;
-                        }
-                    }
-                    sb.delete(0, sb.capacity());
-                    sb.append("links=");
-                    for (final DownloadLink link : links) {
-                        sb.append(Encoding.urlEncode(this.getContentURL(link)));
-                        sb.append("%0D%0A");
-                    }
-                    // lets remove last "%0D%0A"
-                    sb.replace(sb.length() - 6, sb.length(), "");
-                    sb.append("&Submit=Check+Links");
-                    br.setFollowRedirects(false);
-                    br.setCurrentURL("https://www." + this.getHost() + "/account/tools/link-checker.php");
-                    br.postPage("https://www." + this.getHost() + "/account/tools/link-checker.php", sb.toString());
-                    final String trElements[] = br.getRegex("<tr>\\s*(.*?)\\s*</tr>").getColumn(0);
-                    for (final DownloadLink link : links) {
-                        String name;
-                        if (link.isNameSet()) {
-                            name = link.getName();
-                        } else {
-                            /* Obtain filename from URL */
-                            name = new Regex(link.getPluginPatternMatcher(), "(?i)https?://[^/]+/(.+)").getMatch(0);
-                        }
-                        try {
-                            if (br.getRedirectLocation() != null && (br.getRedirectLocation().endsWith("/member/setpwd.php") || br.getRedirectLocation().endsWith("/member/setdob.php"))) {
-                                // password needs changing or dob needs setting.
-                                link.setAvailable(true);
-                                continue;
-                            }
-                            final String fileID = getFUID(link);
-                            /* Search html snippet belonging to the link we are working on to determine online status. */
-                            String filehtml = null;
-                            for (final String trElement : trElements) {
-                                if (new Regex(trElement, ">\\s*(" + Pattern.quote(fileID) + ".*?</small>\\s*</span>)").getMatch(0) != null) {
-                                    filehtml = trElement;
-                                    break;
-                                }
-                            }
-                            if (filehtml == null) {
-                                link.setAvailable(false);
-                            } else {
-                                final String size = new Regex(filehtml, "Size:\\s*([\\d\\.]+\\s*(KB|MB|GB|TB))").getMatch(0);
-                                if (size != null) {
-                                    link.setDownloadSize(SizeFormatter.getSize(size));
-                                }
-                                final String filenameFromHTML = new Regex(filehtml, "Filename:\\s*(.*?)\\s*<br>").getMatch(0);
-                                if (filenameFromHTML != null) {
-                                    name = Encoding.htmlDecode(filenameFromHTML).trim();
-                                }
-                                if (filehtml.matches("(?s).*>\\s*(Gültig|Valid)\\s*</abbr>.*")) {
-                                    link.setAvailable(true);
-                                } else {
-                                    link.setAvailable(false);
-                                }
-                            }
-                        } finally {
-                            if (name != null) {
-                                link.setName(name.trim());
-                            }
-                        }
-                    }
-                    if (index == urls.length) {
+                    /* Check up to 100 items with one request */
+                    if (index == urls.length || links.size() == 100) {
                         break;
-                    }
-                }
-            } catch (final Exception e) {
-                logger.log(e);
-                return false;
-            }
-        } else {
-            // no account present or disabled account -> Fallback into requestFileInformation
-            for (final DownloadLink link : urls) {
-                try {
-                    link.setAvailableStatus(requestFileInformationWebsite(null, link));
-                } catch (final PluginException e) {
-                    logger.log(e);
-                    if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
-                        link.setAvailable(false);
                     } else {
-                        return false;
+                        links.add(urls[index]);
+                        index++;
                     }
-                } catch (Throwable e) {
-                    logger.log(e);
-                    return false;
+                }
+                sb.delete(0, sb.capacity());
+                for (final DownloadLink link : links) {
+                    if (sb.length() > 0) {
+                        sb.append("\n");
+                    }
+                    sb.append(this.getContentURL(link));
+                }
+                final Map<String, Object> postdata = new HashMap<String, Object>();
+                postdata.put("links", sb.toString());
+                // TODO: Fix this request
+                br.postPageRaw(this.getWebapiBase() + "/tools/link-checker", JSonStorage.serializeToJson(postdata));
+                /* Returns http response 401 when not logged in along with response {"error":"Unauthorized"} */
+                final Map<String, Object> entries = checkErrorsWebapi(br, account, null);
+                final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("results");
+                int this_index = -1;
+                for (final DownloadLink link : links) {
+                    this_index++;
+                    if (this_index > items.size() - 1) {
+                        logger.warning("Item missing in API response: " + link.getPluginPatternMatcher());
+                        link.setAvailable(false);
+                        continue;
+                    }
+                    final Map<String, Object> linkinfo = items.get(this_index);
+                    /* If "importEligible" equals "owned", this file is owned by the currently logged in user. */
+                    // final String importEligible = (String) linkinfo.get("importEligible");
+                    final String status = linkinfo.get("status").toString();
+                    if (status.equalsIgnoreCase("valid")) {
+                        link.setAvailable(true);
+                        final Map<String, Object> fileDetails = (Map<String, Object>) linkinfo.get("fileDetails");
+                        link.setFinalFileName(fileDetails.get("name").toString());
+                        link.setDownloadSize(SizeFormatter.getSize(fileDetails.get("size").toString()));
+                    } else {
+                        /* Assume that status equals "invalid" with error message "File not found or has been deleted.". */
+                        link.setAvailable(false);
+                    }
+                }
+                if (index == urls.length) {
+                    break;
                 }
             }
+        } catch (final Exception e) {
+            logger.log(e);
+            return false;
         }
         return true;
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        loginWebsite(account, true);
         final AccountInfo ai = new AccountInfo();
-        loginWebsite(account, true, br);
-        if (br.getURL() == null || !br.getURL().endsWith("/account/")) {
-            br.getPage("https://www." + this.getHost() + "/account/");
-        }
-        // <li class="tooltipster" title="Premium valid until: <strong>30th Jan, 2014</strong>">
-        boolean isPremiumLifetime = false;
-        boolean isPremium = false;
-        final String accountTypeStr = br.getRegex("member_type\"?\\s*:\\s*\"([^\"]+)").getMatch(0);
-        if (accountTypeStr != null) {
-            if (accountTypeStr.equalsIgnoreCase("lifetime")) {
-                isPremiumLifetime = true;
-            } else if (accountTypeStr.equalsIgnoreCase("premium")) {
-                // TODO: 2021-01-12: Not sure about this as I didn't have the html code for checking yet!
-                isPremium = true;
-            }
-            /**
-             * Other possible values: </br>
-             * "expired" -> Free Account
-             */
-        }
-        if (!isPremium && !isPremiumLifetime) {
-            /* Fallback/Old handling */
-            isPremiumLifetime = br.containsHTML("<strong>\\s*(Lebenszeit|Lifetime|Livstid|Levenslang|À vie|生涯|Vitalício|De por vida)\\s*</strong>") || br.containsHTML(">\\s*Lifetime Member\\s*<");
-            isPremium = br.containsHTML("(>|\")\\s*Premium valid until\\s*(<|:)");
-        }
-        long expireTimestamp = 0;
-        final String expireTimestampStr = br.getRegex("premium_ends\"?\\s*:\\s*\"?(\\d+)").getMatch(0);
-        if (expireTimestampStr != null) {
-            expireTimestamp = Long.parseLong(expireTimestampStr) * 1000;
-        } else {
-            /* Fallback/Old handling */
-            final String expireDateStr = br.getRegex("(?i)Premium valid until\\s*:\\s*<strong>(.*?)</strong>").getMatch(0);
-            if (expireDateStr != null) {
-                expireTimestamp = TimeFormatter.getMilliSeconds(expireDateStr.replaceFirst("(st|nd|rd|th)", ""), "dd MMM, yyyy", Locale.ENGLISH);
-            }
-        }
-        if (isPremium || isPremiumLifetime || expireTimestamp > System.currentTimeMillis()) {
+        br.getPage(this.getWebapiBase() + "/dashboard");
+        final Map<String, Object> entries = this.checkErrorsWebapi(br, account);
+        final Map<String, Object> settings = (Map<String, Object>) entries.get("settings");
+        if (Boolean.TRUE.equals(entries.get("isLifetime"))) {
+            account.setType(AccountType.LIFETIME);
+        } else if (Boolean.TRUE.equals(entries.get("isPremium"))) {
             account.setType(AccountType.PREMIUM);
-            if (isPremiumLifetime) {
-                account.setType(AccountType.LIFETIME);
-            } else {
-                if (expireTimestamp > System.currentTimeMillis()) {
-                    ai.setValidUntil(expireTimestamp);
-                }
-                final String space = br.getRegex("<strong>([0-9\\.]+ ?(KB|MB|GB|TB))\\s*</strong>\\s*Free Space").getMatch(0);
-                if (space != null) {
-                    ai.setUsedSpace(space);
-                }
-                final String traffic = br.getRegex("donoyet(.*?)xyz").getMatch(0);
-                if (traffic != null) {
-                    // OLD SHIT
-                    String loaded = br.getRegex("(?i)You have used (.*?) out").getMatch(0);
-                    String max = br.getRegex("limit of (.*?)\\. ").getMatch(0);
-                    if (max != null && loaded != null) {
-                        // you don't need to strip characters or reorder its structure. The source is fine!
-                        ai.setTrafficMax(SizeFormatter.getSize(max));
-                        ai.setTrafficLeft(ai.getTrafficMax() - SizeFormatter.getSize(loaded));
-                    } else {
-                        max = br.getRegex("(?i)You can now download up to (.*?) in").getMatch(0);
-                        if (max != null) {
-                            ai.setTrafficLeft(SizeFormatter.getSize(max));
-                        } else {
-                            ai.setUnlimitedTraffic();
-                        }
-                    }
-                } else {
-                    ai.setUnlimitedTraffic();
-                }
+            String nextRebillDate = "Never";
+            if (Boolean.TRUE.equals(entries.get("hasActiveRebill"))) {
+                nextRebillDate = entries.get("nextRebillDate").toString();
             }
+            final int daysRemaining = ((Number) entries.get("daysRemaining")).intValue();
+            ai.setValidUntil(System.currentTimeMillis() + daysRemaining * 24 * 60 * 60 * 1000, br);
+            ai.setStatus(AccountType.PREMIUM.getLabel() + " | Next rebill date: " + nextRebillDate);
         } else {
-            ai.setUnlimitedTraffic();
+            /* Expired/free account */
             account.setType(AccountType.FREE);
+            account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
         }
-        final String createTimestampStr = br.getRegex("created_at\"?\\s*:\\s*\"?(\\d+)").getMatch(0);
-        if (createTimestampStr != null) {
-            ai.setCreateTime(Long.parseLong(createTimestampStr) * 1000);
+        final String usedSpaceGB_Str = (String) entries.get("usedSpace");
+        if (usedSpaceGB_Str != null && usedSpaceGB_Str.matches("\\d+")) {
+            ai.setUsedSpace(Long.parseLong(usedSpaceGB_Str) * 1024 * 1024 * 1024);
+        }
+        if (account.loadUserCookies() != null) {
+            /* Ensure to have unique usernames when user is using cookie login */
+            final String email = (String) settings.get("email");
+            if (email != null) {
+                account.setUser(email);
+            } else {
+                /* Possibly Google login user? */
+                logger.warning("WTF account has no email?");
+            }
         }
         return ai;
+    }
+
+    private void loginWebsite(final Account account, final boolean validateCookies) throws Exception {
+        synchronized (account) {
+            setBrowserExclusive();
+            final Cookies cookies = account.loadCookies("");
+            final Cookies userCookies = account.loadUserCookies();
+            if (cookies != null || userCookies != null) {
+                if (userCookies != null) {
+                    br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
+                }
+                if (!validateCookies) {
+                    /* Do not verify cookies */
+                    return;
+                }
+                /* Verify cookies */
+                try {
+                    this.checkLoginStatus(account);
+                    logger.info("Cookie login successful");
+                    if (userCookies == null) {
+                        account.saveCookies(br.getCookies(br.getHost()), "");
+                    }
+                    return;
+                } catch (final AccountInvalidException e) {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
+                    if (userCookies != null) {
+                        logger.info("User Cookie login failed");
+                        if (account.hasEverBeenValid()) {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                        } else {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                        }
+                    }
+                }
+            }
+            logger.info("Performing full login");
+            br.getPage("https://www." + getHost() + "/signin?from=%2Fdashboard");
+            if (false) {
+                // not required at the moment
+                br.setCookie(br.getHost(), "cookieConsent", "accepted");
+                br.setCookie(br.getHost(), "cookieConsentTimestamp", "2025-09-09T14:12:12.097Z");
+            }
+            if (false) {
+                // not required at the moment?! only sets the recaptcha-verified cookie, LOL
+                final CaptchaHelperHostPluginRecaptchaV2 rc = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Le6wT0rAAAAAEOzVh77jsWDtqGkwbXcvuPdmaeW") {
+                    @Override
+                    protected boolean isEnterprise() {
+                        return true;
+                    }
+
+                    @Override
+                    protected String getSiteUrl() {
+                        return "https://www.filefactory.com/signin";
+                    }
+
+                    @Override
+                    protected Map<String, Object> getV3Action() {
+                        final Map<String, Object> ret = new HashMap<String, Object>();
+                        ret.put("action", "SIGNIN");
+                        return ret;
+                    }
+
+                };
+                final String recaptchaV2Response = rc.getToken();
+                final Map<String, Object> postdata1 = new HashMap<String, Object>();
+                postdata1.put("action", "SIGNIN");
+                postdata1.put("captchaToken", recaptchaV2Response);
+                final Browser brc = br.cloneBrowser();
+                brc.postPageRaw(this.getWebapiBase() + "/auth/pre-auth-check", JSonStorage.serializeToJson(postdata1));
+                final Map<String, Object> entries1 = checkErrorsWebapi(brc, account);
+                if (!Boolean.TRUE.equals(entries1.get("success"))) {
+                    // throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                }
+            }
+            br.setCookie(getHost(), "recaptcha-verified", "true");
+            br.setCookie(br.getHost(), "__Secure-authjs.callback-url", "https%3A%2F%2Fwww.filefactory.com");
+            Browser brc = br.cloneBrowser();
+            brc.getPage(this.getWebapiBase() + "/auth/csrf");
+            final Map<String, Object> entries2 = checkErrorsWebapi(brc, account);
+            final String csrfToken = entries2.get("csrfToken").toString();
+            final Form loginForm = new Form();
+            loginForm.setMethod(MethodType.POST);
+            loginForm.setAction(this.getWebapiBase() + "/auth/callback/credentials");
+            loginForm.put("email", URLEncoder.encode(account.getUser(), "UTF-8"));
+            loginForm.put("password", URLEncoder.encode(account.getPass(), "UTF-8"));
+            loginForm.put("csrfToken", csrfToken);
+            loginForm.put("callbackUrl", "%2Fdashboard");
+            br.submitForm(loginForm);
+            checkErrorsWebapi(br, account, null, null);
+            checkLoginStatus(account);
+            account.saveCookies(br.getCookies(br.getHost()), "");
+        }
     }
 
     @Override
@@ -364,242 +448,136 @@ public class FileFactory extends PluginForHost {
     }
 
     @Override
-    public int getTimegapBetweenConnections() {
-        return 200;
+    public void handleFree(final DownloadLink link) throws Exception {
+        handleDownloadWebsite(link, null);
+    }
+
+    public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception {
+        requestFileInformationWebsite(account, link);
+        /* If dl != null this means that we had a direct downloadable link. */
+        if (this.dl == null) {
+            final boolean isPremium = this.isPremiumAccount(account);
+            if (!isPremium) {
+                // ads
+                if (checkShowFreeDialog(getHost())) {
+                    showFreeDialog(getHost());
+                }
+            }
+            final String dltoken = br.getRegex("requestToken\":\"([^\"]+)").getMatch(0);
+            if (dltoken == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String fid = this.getFUID(link);
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("hash", fid);
+            postdata.put("token", dltoken);
+            // if (isPremium) {
+            // postdata.put("type", "premium");
+            // } else {
+            // postdata.put("type", "free");
+            // }
+            /* 2025-09-09: Even in premium mode, the value of this is "free". */
+            postdata.put("type", "free");
+            /* Website has 45-60 seconds of pre download wait time for free (& free-account) users which can be skipped. */
+            br.postPageRaw(this.getWebapiBase() + "/download/initiate", JSonStorage.serializeToJson(postdata));
+            final Map<String, Object> entries = checkErrorsWebapi(br, account, link);
+            String finallink = entries.get("url").toString();
+            if (Application.getJavaVersion() < Application.JAVA17) {
+                // TODO. Check if this is still working (if http redirects to https we do not need this)
+                finallink = finallink.replaceFirst("(?i)https", "http");
+            }
+            final Number fileSize = (Number) entries.get("fileSize");
+            if (fileSize != null) {
+                link.setVerifiedFileSize(fileSize.longValue());
+            }
+            final String filename = (String) entries.get("filename");
+            if (filename != null) {
+                link.setFinalFileName(filename);
+            }
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finallink, this.isResumeable(link, account), this.getMaxChunks(link, account));
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                handleConnectionErrors(br, dl.getConnection());
+                checkErrorsWebsite(link, br);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
+        dl.startDownload();
     }
 
     @Override
-    public void handleFree(final DownloadLink link) throws Exception {
-        if (checkShowFreeDialog(getHost())) {
-            showFreeDialog(getHost());
-        }
-        handleFreeWebsite(link, null);
-    }
-
-    public void handleFreeWebsite(final DownloadLink link, final Account account) throws Exception {
-        requestFileInformationWebsite(account, link);
-        if (true) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        // link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
-        dl.startDownload();
+    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
     }
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        if (true) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        /* Fallback to website-mode (old code, deprecated) */
-        if (this.isPremiumAccount(account)) {
-            loginWebsite(account, false, br);
-            final String contenturl = this.getContentURL(link);
-            // NOTE: no premium, pre download password handling yet...
-            br.setFollowRedirects(false);
-            br.getPage(contenturl);
-            String finallink = br.getRedirectLocation();
-            while (finallink != null && canHandle(finallink)) {
-                // follow http->https redirect
-                br.getPage(finallink);
-                finallink = br.getRedirectLocation();
-            }
-            if (finallink == null) {
-                // No directlink
-                finallink = br.getRegex("\"(https?://[a-z0-9]+\\.filefactory\\.com/get/[^<>\"]+)\"").getMatch(0);
-                if (finallink == null) {
-                    this.checkErrorsWebsite(link, br);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            }
-            br.setFollowRedirects(true);
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finallink, this.isResumeable(link, account), this.getMaxChunks(link, account));
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                br.followConnection(true);
-                checkErrorsWebsite(link, br);
-                String redirecturl = br.getRegex("\"(https?://[a-z0-9]+\\.filefactory\\.com/get/[^<>\"]+)\"").getMatch(0);
-                if (redirecturl == null) {
-                    redirecturl = br.getRegex(Pattern.compile("10px 0;\">.*<a href=\"(.*?)\">Download with FileFactory Premium", Pattern.DOTALL)).getMatch(0);
-                }
-                if (redirecturl == null) {
-                    redirecturl = br.getRegex("subPremium.*?ready.*?<a href=\"(.*?)\"").getMatch(0);
-                    if (redirecturl == null) {
-                        redirecturl = br.getRegex("downloadLink.*?href\\s*=\\s*\"(.*?)\"").getMatch(0);
-                        if (redirecturl == null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                    }
-                }
-                logger.finer("Indirect download");
-                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, redirecturl, this.isResumeable(link, account), this.getMaxChunks(link, account));
-                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                    br.followConnection(true);
-                    checkErrorsWebsite(link, br);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            } else {
-                logger.finer("DIRECT download");
-            }
-            dl.startDownload();
-        } else {
-            /* Free account handling */
-            if (checkShowFreeDialog(getHost())) {
-                showFreeDialog(getHost());
-            }
-            this.handleFreeWebsite(link, account);
-        }
+        this.handleDownloadWebsite(link, account);
     }
 
-    /*
-     * This is for filefactory.com/trafficshare/ sharing links or I guess what we call public premium links.
+    /**
+     * Checks if we're logged in via Web-API. <br>
+     * Throws AccountInvalidException on invalid login.
      */
-    public void handleTrafficShare(final DownloadLink link, final Account account) throws Exception {
-        logger.info("Traffic sharing link - Free Premium Download");
-        String finalLink = br.getRegex("<a href=\"(https?://\\w+\\.filefactory\\.com/get/t/[^\"]+)\"[^\r\n]*Download with FileFactory TrafficShare").getMatch(0);
-        if (finalLink == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    private Map<String, Object> checkLoginStatus(final Account account) throws IOException, PluginException, InterruptedException {
+        br.getPage(this.getWebapiBase() + "/auth/session");
+        final Map<String, Object> entries;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            /* Response "null" as plaintext */
+            throw new AccountInvalidException(ignore, "Session expired");
         }
-        if (Application.getJavaVersion() < Application.JAVA17) {
-            finalLink = finalLink.replaceFirst("(?i)https", "http");
-        }
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finalLink, true, 0);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            checkErrorsWebsite(link, br);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        dl.startDownload();
+        checkErrorsWebapi(br, account, null, entries);
+        return entries;
     }
 
-    @Deprecated
-    private void loginWebsite(final Account account, final boolean force, final Browser br) throws Exception {
-        synchronized (account) {
-            setBrowserExclusive();
-            br.getHeaders().put("Accept-Encoding", "gzip");
-            br.setFollowRedirects(true);
-            final Cookies cookies = account.loadCookies("");
-            if (cookies != null) {
-                br.setCookies(this.getHost(), cookies);
-                if (!force) {
-                    /* Do not verify cookies */
-                    return;
-                } else {
-                    br.getPage("https://www." + this.getHost() + "/");
-                    if (isLoggedinWebsite(br)) {
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(br.getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(null);
-                    }
-                }
+    private Map<String, Object> checkErrorsWebapi(final Browser br, final Account account) throws PluginException, InterruptedException {
+        return checkErrorsWebapi(br, account, null);
+    }
+
+    private Map<String, Object> checkErrorsWebapi(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
+        final Map<String, Object> entries;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long waitMillis = 60 * 1000l;
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis, ignore);
+            } else {
+                throw new AccountUnavailableException(ignore, msg, 60 * 1000);
             }
-            logger.info("Performing full login");
-            br.getPage("https://www." + this.getHost() + "/member/signin.php");
-            br.postPage("/member/signin.php", "loginEmail=" + Encoding.urlEncode(account.getUser()) + "&loginPassword=" + Encoding.urlEncode(account.getPass()) + "&Submit=Sign+In");
-            if (!this.isLoggedinWebsite(br)) {
-                this.checkErrorsWebsite(null, br);
+        }
+        checkErrorsWebapi(br, account, link, entries);
+        return entries;
+    }
+
+    private void checkErrorsWebapi(final Browser br, final Account account, final DownloadLink link, final Map<String, Object> entries) throws PluginException, InterruptedException {
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/api/auth/session")) {
+            if (entries == null || entries.size() == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else if (entries.get("user") == null) {
                 throw new AccountInvalidException();
             }
-            account.saveCookies(br.getCookies(br.getHost()), "");
         }
-    }
-
-    /** Checks html code and or cookies to see if we're logged in. */
-    private boolean isLoggedinWebsite(final Browser br) {
-        if (br.getCookie(br.getHost(), "auth", Cookies.NOTDELETEDPATTERN) != null) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        correctDownloadLink(link);
-        return requestFileInformationWebsite(null, link);
-    }
-
-    private AvailableStatus requestFileInformationWebsite(final Account account, final DownloadLink link) throws Exception {
-        dllink = null;
-        setBrowserExclusive();
-        br.setFollowRedirects(true);
-        for (int i = 0; i < 4; i++) {
-            try {
-                Thread.sleep(200);
-            } catch (final Exception e) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            URLConnectionAdapter con = null;
-            try {
-                final String contenturl = this.getContentURL(link);
-                con = br.openGetConnection(contenturl);
-                if (this.looksLikeDownloadableContent(con)) {
-                    link.setFinalFileName(Plugin.getFileNameFromConnection(con));
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    }
-                    dllink = con.getURL().toExternalForm();
-                    link.setAvailable(true);
-                    return AvailableStatus.TRUE;
-                } else {
-                    br.followConnection();
-                }
-                break;
-            } catch (final Exception e) {
-                logger.log(e);
-                if (i == 3) {
-                    throw e;
-                }
-            } finally {
-                try {
-                    if (con != null) {
-                        con.disconnect();
-                    }
-                } catch (final Throwable e) {
-                }
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/api/auth/csrf ")) {
+            if (entries == null || entries.size() == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else if (entries.get("csrfToken") == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        if (isPasswordProtectedFile(br)) {
-            link.setPasswordProtected(true);
-        } else {
-            link.setPasswordProtected(false);
+        if (StringUtils.containsIgnoreCase(br.getURL(), "signin?error=CredentialsSignin&code=credentials")) {
+            throw new AccountInvalidException();
         }
-        /* Correct json in html code to make br.getRegex calls down below work. */
-        final String unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
-        br.getRequest().setHtmlCode(unescaped);
-        this.checkErrorsWebsite(link, br);
-        String filename = br.getRegex("\"disp_filename\":\"([^\"]+)").getMatch(0);
-        String filesizeBytes = br.getRegex("\"size\":\"\\$n(\\d+)").getMatch(0);
-        if (filename != null) {
-            link.setName(Encoding.htmlDecode(filename).trim());
-        }
-        if (filesizeBytes != null) {
-            // TODO: Check if this is the exact filesize
-            // link.setVerifiedFileSize(Long.parseLong(filesizeBytes));
-            link.setDownloadSize(Long.parseLong(filesizeBytes));
-        }
-        return AvailableStatus.TRUE;
     }
 
     private boolean isPasswordProtectedFile(final Browser br) {
-        if (br.containsHTML("\"requiresPassword\":false")) {
+        if (br.containsHTML("\"requiresPassword\":true")) {
             return true;
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 
     @Override

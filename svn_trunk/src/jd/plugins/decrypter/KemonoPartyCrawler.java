@@ -57,7 +57,7 @@ import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51471 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -186,7 +186,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(usernameOrUserID) + "/posts?o=" + offset);
             final List<Map<String, Object>> posts = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
             if (posts == null || posts.isEmpty()) {
-                if (ret.isEmpty()) {
+                if (ret.isEmpty() && retryWithSinglePostAPI.isEmpty()) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     /* This should never happen */
@@ -195,6 +195,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 }
             }
             final int numberofUniqueItemsOld = dupes.size();
+            final int numberOfRetryPostsOld = retryWithSinglePostAPI.size();
             for (final Map<String, Object> post : posts) {
                 final ArrayList<DownloadLink> thisresults = this.crawlProcessPostAPI(post, dupes, useAdvancedDupecheck);
                 if (post.get("content") == null && StringUtils.isNotEmpty(StringUtils.valueOfOrNull(post.get("substring")))) {
@@ -203,19 +204,22 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     if (cfg.isCrawlHttpLinksFromPostContent() || mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && thisresults.isEmpty())) {
                         retryWithSinglePostAPI.add(post.get("id").toString());
                         logger.info("Need to process item:" + post.get("id") + " again due to maybe incomplete post content");
+                        // we have to skip and reprocess later, else duplicate check will prevent reprocessed files to be added
+                        continue;
                     }
                 }
                 for (final DownloadLink thisresult : thisresults) {
                     if (!perPostPackageEnabled) {
                         thisresult._setFilePackage(profileFilePackage);
                     }
-                    distribute(thisresult);
                 }
+                distribute(thisresults);
                 ret.addAll(thisresults);
             }
-            logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + " | Offset: " + offset);
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + " |Retry posts so far: " + retryWithSinglePostAPI.size() + " |Offset: " + offset);
             final int numberofUniqueItemsNew = dupes.size();
-            final int numberofNewItems = numberofUniqueItemsNew - numberofUniqueItemsOld;
+            final int numberOfRetryPostsNew = retryWithSinglePostAPI.size();
+            final int numberofNewItems = (numberofUniqueItemsNew - numberofUniqueItemsOld) + (numberOfRetryPostsNew - numberOfRetryPostsOld);
             if (numberofNewItems == 0) {
                 numberofContinuousPagesWithoutAnyNewItems++;
             } else {
@@ -248,8 +252,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 if (!perPostPackageEnabled) {
                     thisresult._setFilePackage(profileFilePackage);
                 }
-                distribute(thisresult);
             }
+            distribute(thisresults);
             ret.addAll(thisresults);
         }
         return ret;
@@ -473,10 +477,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                                                              return size() > 100;
-                                                          };
-                                                      };
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > 100;
+        };
+    };
 
     /**
      * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.

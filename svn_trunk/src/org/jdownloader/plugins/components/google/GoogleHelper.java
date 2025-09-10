@@ -281,13 +281,42 @@ public class GoogleHelper {
                 getSAPISidHash(br, br.getURL());
             } catch (final PluginException e) {
                 /* If this happens, we cannot perform authed requests with this account so effectively the login process is not complete. */
-                throw new AccountInvalidException("Login incomplete ('SAPISID' cookie missing?), try again with fresh cookies");
+                errorIncompleteLogin(account);
+                /* This code should never be reached. */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             validate(account);
-            /* Only store cookies if username via username + password has been used. */
+            /* Only store cookies if login via username + password has been used. */
             displayAdditionalCookieLoginInformation(account);
             return;
         }
+    }
+
+    private void errorIncompleteLogin(final Account account) throws PluginException {
+        final StringBuilder sb = new StringBuilder();
+        String language = System.getProperty("user.language").toLowerCase();
+        if ("de".equals(language)) {
+            sb.append("Login unvollständig - 'SAPISID' Cookie fehlt! Versuch folgendes:");
+            sb.append("\r\n1. Öffne oben rechts das Kontomenü. Wähle \"Google-Konto\". Es wird hoffentlich in einem neuen Tab geladen.");
+            sb.append("\r\n2. Wenn dies geladen ist, geh zurück zum vorherigen GDrive/YouTube-Tab und aktualisiere ihn, dann ist der Cookie da. Hinweis: Das ist der Tab, den du zum Öffnen des Kontomenüs verwendet hast. Geh nicht über das App-Menü (neun Punkte) oben rechts zurück zu YouTube/GDrive, da dies den Cookie wieder verlieren könnte.");
+            sb.append("\r\n3. Exportiere jetzt deine Cookies erneut und versuche den Login-Prozess in JDownloader erneut.");
+        } else if ("es".equals(language)) {
+            sb.append("Inicio de sesión incompleto - ¡Falta la cookie 'SAPISID'! Intenta esto:");
+            sb.append("\r\n1. En la esquina superior derecha, abre el menú de cuenta. Selecciona \"Cuenta de Google\". Esperemos que se cargue en una nueva pestaña.");
+            sb.append("\r\n2. Cuando esto se cargue, regresa a la pestaña anterior de GDrive/YouTube y actualiza, y la cookie estará ahí. Nota: esa es la pestaña que usaste para abrir el menú de cuenta. No regreses a YouTube/GDrive usando el menú de aplicaciones (nueve puntos) en la parte superior derecha, ya que esto puede hacer que se pierda la cookie nuevamente.");
+            sb.append("\r\n3. Ahora exporta tus cookies nuevamente e intenta el proceso de inicio de sesión en JDownloader otra vez.");
+        } else if ("fr".equals(language)) {
+            sb.append("Connexion incomplète - cookie 'SAPISID' manquant ! Essaie ceci :");
+            sb.append("\r\n1. Dans le coin supérieur droit, ouvre le menu de compte. Sélectionne \"Compte Google\". Il devrait se charger dans un nouvel onglet.");
+            sb.append("\r\n2. Quand cela se charge, retourne à l'onglet GDrive/YouTube précédent et actualise, et le cookie sera là. Note : c'est l'onglet que tu as utilisé pour ouvrir le menu de compte. Ne retourne pas à YouTube/GDrive en utilisant le menu des applications (neuf points) en haut à droite, car cela pourrait faire perdre le cookie à nouveau.");
+            sb.append("\r\n3. Maintenant, exporte à nouveau tes cookies et réessaie le processus de connexion dans JDownloader.");
+        } else {
+            sb.append("Login incomplete - 'SAPISID' cookie missing! Try this:");
+            sb.append("\r\n1. In the top-right corner, open the account menu. Select \"Google account\". It should load in a new tab.");
+            sb.append("\r\n2. When this loads, go back to the previous GDrive/YouTube tab and refresh, and the cookie is there. Note: that's the tab you used to open the account menu. Do not go back to YouTube/GDrive by using the app menu (nine dots) at the top right, as this may lose the cookie again.");
+            sb.append("\r\n3. Now export your cookies again and retry the login process in JDownloader.");
+        }
+        throw new AccountInvalidException(sb.toString());
     }
 
     private final String PROPERTY_HAS_SHOWN_ADDITIONAL_COOKIE_LOGIN_INFORMATION = "has_shown_additional_cookie_login_information";

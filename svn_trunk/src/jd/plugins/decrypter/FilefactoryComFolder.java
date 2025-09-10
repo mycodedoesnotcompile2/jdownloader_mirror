@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -38,7 +36,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-@DecrypterPlugin(revision = "$Revision: 50793 $", interfaceVersion = 2, names = { "filefactory.com" }, urls = { "https?://(?:www\\.)?filefactory\\.com/((?:folder|f)/[\\w]+|share/fi[a-z0-9,:]+)" })
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 51472 $", interfaceVersion = 2, names = { "filefactory.com" }, urls = { "https?://(?:www\\.)?filefactory\\.com/((?:folder|f)/[\\w]+|share/fi[a-z0-9,:]+)" })
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
@@ -78,6 +79,9 @@ public class FilefactoryComFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String[] fileIDs = new Regex(param.getCryptedUrl(), "fi:([a-z0-9]+)").getColumn(0);
         if (fileIDs != null && fileIDs.length > 0) {

@@ -45,7 +45,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51468 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -195,6 +195,8 @@ public class CivitaiCom extends PluginForHost {
                     /* Fallback */
                     filename = contentID;
                 }
+                final String type = imagemap.get("type").toString();
+                final boolean isVideo = type.equalsIgnoreCase("video");
                 final String mimeType = (String) imagemap.get("mimeType");
                 final String ext = getExtensionFromMimeType(mimeType);
                 if (ext != null) {
@@ -214,7 +216,11 @@ public class CivitaiCom extends PluginForHost {
                 if (directurlOriginal != null) {
                     /* Best case: We can download the original file. */
                     link.setProperty(PROPERTY_DIRECTURL, directurlOriginal);
-                } else {
+                } else if (!isVideo) {
+                    /**
+                     * Build image-URL manually. This only works for images. <br>
+                     * If done for videos, this would return the video thumbnail instead of the video.
+                     */
                     /* 2023-09-11: Base URL hardcoded from: https://civitai.com/_next/static/chunks/pages/_app-191d571abe9dc30e.js */
                     final String baseURL = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/";
                     final String directurl = baseURL + imagemap.get("url") + "/width=" + metadata.get("width") + "/" + Encoding.urlEncode(filename);

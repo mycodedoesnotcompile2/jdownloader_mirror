@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51423 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51467 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1860,7 +1860,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (StringUtils.isAllEmpty(filesizeWithUnit, filesizeBytesStr)) {
             filesizeWithUnit = new Regex(html, "id\\s*=\\s*\"fsize[^\"]*\"\\s*>\\s*([0-9\\.]+\\s*[MBTGK]+)\\s*<").getMatch(0);
             if (StringUtils.isEmpty(filesizeWithUnit)) {
-                /* 2019-07-12: Example: Katfile.com */
+                /* 2019-07-12: Example: katfile.cloud */
                 filesizeWithUnit = new Regex(html, "class\\s*=\\s*\"statd\"\\s*>\\s*size\\s*</span>\\s*<span>\\s*([0-9\\.]+\\s*[MBTGK]+)\\s*<").getMatch(0);
             }
             if (this.supports_availablecheck_filesize_html() && StringUtils.isEmpty(filesizeWithUnit)) {
