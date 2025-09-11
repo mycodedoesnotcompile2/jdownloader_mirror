@@ -35,6 +35,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -56,7 +57,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@HostPlugin(revision = "$Revision: 51469 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51480 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -138,7 +139,7 @@ public class FileFactory extends PluginForHost {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_FILE = Pattern.compile("/(?:file|stream)/([a-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_FILE = Pattern.compile("/(?:file|image|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -149,6 +150,17 @@ public class FileFactory extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE);
+        final String filenameFromURL = urlinfo.getMatch(2);
+        if (filenameFromURL != null) {
+            return filenameFromURL;
+        }
+        final String file_id = urlinfo.getMatch(0);
+        return file_id;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformationWebsite(null, link);
     }
@@ -156,12 +168,13 @@ public class FileFactory extends PluginForHost {
     private AvailableStatus requestFileInformationWebsite(final Account account, final DownloadLink link) throws Exception {
         setBrowserExclusive();
         if (account != null) {
-            this.loginWebsite(account, false);
+            this.loginWebsite(br, account, false);
         }
         final String contenturl = this.getContentURL(link);
         final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
+        boolean success = false;
+        URLConnectionAdapter con = null;
         try {
-            URLConnectionAdapter con;
             if (isDownload) {
                 dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contenturl, this.isResumeable(link, account), this.getMaxChunks(link, account));
                 con = dl.getConnection();
@@ -169,6 +182,7 @@ public class FileFactory extends PluginForHost {
                 con = br.openGetConnection(contenturl);
             }
             if (this.looksLikeDownloadableContent(con)) {
+                success = true;
                 link.setFinalFileName(Plugin.getFileNameFromConnection(con));
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
@@ -182,9 +196,11 @@ public class FileFactory extends PluginForHost {
             }
             br.followConnection();
             checkErrorsWebsite(link, br);
-            this.dl = null;
         } finally {
-            if (!isDownload) {
+            if (isDownload && !success) {
+                if (con != null) {
+                    con.disconnect();
+                }
                 this.dl = null;
             }
         }
@@ -234,7 +250,7 @@ public class FileFactory extends PluginForHost {
             return false;
         }
         try {
-            loginWebsite(account, false);
+            loginWebsite(br, account, false);
         } catch (Exception e) {
             logger.log(e);
             logger.info("Login failed -> Cannot use mass-linkchecking");
@@ -242,7 +258,7 @@ public class FileFactory extends PluginForHost {
         }
         try {
             final StringBuilder sb = new StringBuilder();
-            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            final Map<String, DownloadLink> links = new HashMap<String, DownloadLink>();
             int index = 0;
             while (true) {
                 links.clear();
@@ -250,13 +266,14 @@ public class FileFactory extends PluginForHost {
                     /* Check up to 100 items with one request */
                     if (index == urls.length || links.size() == 100) {
                         break;
-                    } else {
-                        links.add(urls[index]);
-                        index++;
                     }
+                    final DownloadLink link = urls[index];
+                    final String fid = getFUID(link);
+                    links.put(fid, link);
+                    index++;
                 }
                 sb.delete(0, sb.capacity());
-                for (final DownloadLink link : links) {
+                for (final DownloadLink link : links.values()) {
                     if (sb.length() > 0) {
                         sb.append("\n");
                     }
@@ -264,30 +281,31 @@ public class FileFactory extends PluginForHost {
                 }
                 final Map<String, Object> postdata = new HashMap<String, Object>();
                 postdata.put("links", sb.toString());
-                // TODO: Fix this request
                 br.postPageRaw(this.getWebapiBase() + "/tools/link-checker", JSonStorage.serializeToJson(postdata));
                 /* Returns http response 401 when not logged in along with response {"error":"Unauthorized"} */
                 final Map<String, Object> entries = checkErrorsWebapi(br, account, null);
                 final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("results");
-                int this_index = -1;
-                for (final DownloadLink link : links) {
-                    this_index++;
-                    if (this_index > items.size() - 1) {
-                        logger.warning("Item missing in API response: " + link.getPluginPatternMatcher());
-                        link.setAvailable(false);
-                        continue;
-                    }
-                    final Map<String, Object> linkinfo = items.get(this_index);
+                for (final Map<String, Object> item : items) {
                     /* If "importEligible" equals "owned", this file is owned by the currently logged in user. */
                     // final String importEligible = (String) linkinfo.get("importEligible");
-                    final String status = linkinfo.get("status").toString();
-                    if (status.equalsIgnoreCase("valid")) {
-                        link.setAvailable(true);
-                        final Map<String, Object> fileDetails = (Map<String, Object>) linkinfo.get("fileDetails");
-                        link.setFinalFileName(fileDetails.get("name").toString());
-                        link.setDownloadSize(SizeFormatter.getSize(fileDetails.get("size").toString()));
-                    } else {
-                        /* Assume that status equals "invalid" with error message "File not found or has been deleted.". */
+                    final Map<String, Object> fileDetails = (Map<String, Object>) item.get("fileDetails");
+                    if (fileDetails == null) {
+                        continue;
+                    }
+                    final String status = item.get("status").toString();
+                    final String viewhash = (String) fileDetails.get("viewhash");
+                    final DownloadLink link = links.remove(viewhash);
+                    if (link == null) {
+                        continue;
+                    }
+                    /* Assume that status equals "invalid" with error message "File not found or has been deleted.". */
+                    link.setAvailable("valid".equalsIgnoreCase(status));
+                    link.setFinalFileName(fileDetails.get("name").toString());
+                    link.setDownloadSize(SizeFormatter.getSize(fileDetails.get("size").toString()));
+                }
+                if (links.size() > 0) {
+                    /* Assume that all leftover items are offline. */
+                    for (final DownloadLink link : links.values()) {
                         link.setAvailable(false);
                     }
                 }
@@ -304,7 +322,7 @@ public class FileFactory extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        loginWebsite(account, true);
+        loginWebsite(br, account, true);
         final AccountInfo ai = new AccountInfo();
         br.getPage(this.getWebapiBase() + "/dashboard");
         final Map<String, Object> entries = this.checkErrorsWebapi(br, account);
@@ -342,7 +360,7 @@ public class FileFactory extends PluginForHost {
         return ai;
     }
 
-    private void loginWebsite(final Account account, final boolean validateCookies) throws Exception {
+    private void loginWebsite(final Browser br, final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             setBrowserExclusive();
             final Cookies cookies = account.loadCookies("");
@@ -359,7 +377,7 @@ public class FileFactory extends PluginForHost {
                 }
                 /* Verify cookies */
                 try {
-                    this.checkLoginStatus(account);
+                    this.checkLoginStatus(br, account);
                     logger.info("Cookie login successful");
                     if (userCookies == null) {
                         account.saveCookies(br.getCookies(br.getHost()), "");
@@ -404,7 +422,6 @@ public class FileFactory extends PluginForHost {
                         ret.put("action", "SIGNIN");
                         return ret;
                     }
-
                 };
                 final String recaptchaV2Response = rc.getToken();
                 final Map<String, Object> postdata1 = new HashMap<String, Object>();
@@ -432,7 +449,7 @@ public class FileFactory extends PluginForHost {
             loginForm.put("callbackUrl", "%2Fdashboard");
             br.submitForm(loginForm);
             checkErrorsWebapi(br, account, null, null);
-            checkLoginStatus(account);
+            checkLoginStatus(br, account);
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
@@ -456,6 +473,12 @@ public class FileFactory extends PluginForHost {
         requestFileInformationWebsite(account, link);
         /* If dl != null this means that we had a direct downloadable link. */
         if (this.dl == null) {
+            if (link.isPasswordProtected()) {
+                /*
+                 * 2025-09-10: Website json implies that password protected links exist but I was unable to create- or find such test-links.
+                 */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Password protected links are not yet supported");
+            }
             final boolean isPremium = this.isPremiumAccount(account);
             if (!isPremium) {
                 // ads
@@ -463,14 +486,20 @@ public class FileFactory extends PluginForHost {
                     showFreeDialog(getHost());
                 }
             }
-            final String dltoken = br.getRegex("requestToken\":\"([^\"]+)").getMatch(0);
-            if (dltoken == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (!isPremium && br.containsHTML("requiresPremium\":true")) {
+                throw new AccountRequiredException("Premium account required to download this file");
             }
+            final String dltoken = br.getRegex("requestToken\":\"([^\"]+)").getMatch(0);
             final String fid = this.getFUID(link);
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("hash", fid);
-            postdata.put("token", dltoken);
+            if (dltoken != null) {
+                /**
+                 * Not all items require a "download token". <br>
+                 * For example small images can be downloaded without that token.
+                 */
+                postdata.put("token", dltoken);
+            }
             // if (isPremium) {
             // postdata.put("type", "premium");
             // } else {
@@ -517,7 +546,7 @@ public class FileFactory extends PluginForHost {
      * Checks if we're logged in via Web-API. <br>
      * Throws AccountInvalidException on invalid login.
      */
-    private Map<String, Object> checkLoginStatus(final Account account) throws IOException, PluginException, InterruptedException {
+    private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
         br.getPage(this.getWebapiBase() + "/auth/session");
         final Map<String, Object> entries;
         try {

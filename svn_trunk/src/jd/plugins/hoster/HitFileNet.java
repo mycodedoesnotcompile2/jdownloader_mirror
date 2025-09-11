@@ -21,15 +21,20 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.HostPlugin;
+import jd.plugins.PluginException;
+
 import org.jdownloader.plugins.components.TurbobitCore;
 import org.jdownloader.plugins.components.config.TurbobitCoreConfigHitfileNet;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-import jd.PluginWrapper;
-import jd.plugins.HostPlugin;
-
-@HostPlugin(revision = "$Revision: 51174 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51473 $", interfaceVersion = 2, names = {}, urls = {})
 public class HitFileNet extends TurbobitCore {
     public HitFileNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,6 +55,25 @@ public class HitFileNet extends TurbobitCore {
     @Override
     public boolean downloadurls_need_html_ending() {
         return false;
+    }
+
+    @Override
+    protected Form findAndPrepareLoginForm(Browser br, final Account account) throws PluginException {
+        if (account == null) {
+            return null;
+        }
+        final Form loginForm = br.getFormbyAction("/user/login");
+        if (loginForm == null) {
+            return null;
+        }
+        loginForm.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
+        String password = account.getPass();
+        if (password.length() > 15) {
+            // website limits password to 15 chars, longer passwords result in <div class='login_error'>Incorrect login or password</div>
+            password = password.substring(0, 15);
+        }
+        loginForm.put("user%5Bpass%5D", Encoding.urlEncode(password));
+        return loginForm;
     }
 
     /**

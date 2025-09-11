@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48154 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51480 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidsharTv extends XFileSharingProBasic {
     public VidsharTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,6 +45,13 @@ public class VidsharTv extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "vidshar.org", "vedshare.com", "vidshar.tv", "viidshar.com" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("vedshare.com"); // 2025-09-10
+        return deadDomains;
     }
 
     @Override

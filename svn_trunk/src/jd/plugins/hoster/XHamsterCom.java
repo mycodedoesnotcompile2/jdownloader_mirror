@@ -72,7 +72,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51390 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51475 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -893,7 +893,8 @@ public class XHamsterCom extends PluginForHost {
         return getDllink(br, selected_format, null, new HashMap<Integer, Set<Object>>());
     }
 
-    private String decryptURL(final Browser br, String url) throws Exception {
+    private String decryptURL(final Browser br, String cryptedURL) throws Exception {
+        String url = cryptedURL;
         if (url.startsWith("/")) {
             url = br.getURL(url).toExternalForm();
         } else if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
@@ -921,6 +922,26 @@ public class XHamsterCom extends PluginForHost {
                 final StringBuilder ret = new StringBuilder();
                 for (int i = 0; i < input.length(); i++) {
                     ret.append(Character.toChars(input.codePointAt(i) ^ xor.charAt(i % xor.length())));
+                }
+                url = ret.toString();
+            }
+            if (url.startsWith("rot13_")) {
+                final String input = url.substring(6);
+                class rot13 {
+                    char rot13Char(char c) {
+                        int base = (c <= 'Z') ? 'A' : 'a';
+                        return (char) ((c - base + 13) % 26 + base);
+                    }
+                }
+                rot13 rot13 = new rot13();
+                final StringBuilder ret = new StringBuilder();
+                for (int i = 0; i < input.length(); i++) {
+                    char c = input.charAt(i);
+                    if (Character.isLetter(c)) {
+                        ret.append(rot13.rot13Char((c)));
+                    } else {
+                        ret.append(c);
+                    }
                 }
                 url = ret.toString();
             }

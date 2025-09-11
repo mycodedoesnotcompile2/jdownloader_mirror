@@ -24,12 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -53,7 +47,13 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.XvideosCom;
 import jd.plugins.hoster.XvideosCore;
 
-@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51473 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosComProfile extends PluginForDecrypt {
     public XvideosComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -159,7 +159,7 @@ public class XvideosComProfile extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 403) {
             /* E.g. no permission to access private favorites list of another user. */
             throw new AccountRequiredException();
-        } else if (br.getHttpConnection().getResponseCode() == 404) {
+        } else if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">\\s*Sorry but the page you requested was not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* E.g. xvideos.com can redirect to xvideos.red when account is active. */

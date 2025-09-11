@@ -16,13 +16,16 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
+
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -36,10 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-
-@DecrypterPlugin(revision = "$Revision: 51472 $", interfaceVersion = 2, names = { "filefactory.com" }, urls = { "https?://(?:www\\.)?filefactory\\.com/((?:folder|f)/[\\w]+|share/fi[a-z0-9,:]+)" })
+@DecrypterPlugin(revision = "$Revision: 51483 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
@@ -70,62 +70,135 @@ public class FilefactoryComFolder extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static Pattern PATTERN_SHARE_LINK_WITH_MULTIPLE_FUIDS = Pattern.compile("/share/(fi:[a-z0-9,:]+)", Pattern.CASE_INSENSITIVE);
+    private static Pattern PATTERN_FOLDER_NORMAL                  = Pattern.compile("/folder/([a-f0-9]{16})", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/((?:folder|f)/[\\w]+|share/fi[a-z0-9,:]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_SHARE_LINK_WITH_MULTIPLE_FUIDS.pattern() + "|" + PATTERN_FOLDER_NORMAL.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String[] fileIDs = new Regex(param.getCryptedUrl(), "fi:([a-z0-9]+)").getColumn(0);
-        if (fileIDs != null && fileIDs.length > 0) {
-            /* 2019-08-17: New type of folder which contains all fileIDs inside URL */
+        final String contenturl = param.getCryptedUrl();
+        String file_ids_text = new Regex(contenturl, PATTERN_SHARE_LINK_WITH_MULTIPLE_FUIDS).getMatch(0);
+        if (file_ids_text != null) {
+            /* Type of folder which contains all fileIDs inside URL -> No http request required to process this. */
+            file_ids_text = file_ids_text.replace("fi:", "");
+            final String[] fileIDs = file_ids_text.split(",");
             final FilePackage fp = FilePackage.getInstance();
             for (final String fileid : fileIDs) {
-                final String url = "http://www." + this.getHost() + "/file/" + fileid;
+                final String url = generateSingleFileLink(fileid);
                 final DownloadLink link = this.createDownloadlink(url);
                 link._setFilePackage(fp);
                 ret.add(link);
             }
         } else {
-            br.getHeaders().put("Accept-Language", "en-gb, en;q=0.8");
-            br.getPage(param.getCryptedUrl() + "/?sort=filename&order=ASC&show=100&page=1");
+            final String folder_id = new Regex(contenturl, PATTERN_FOLDER_NORMAL).getMatch(0);
+            br.getPage(contenturl);
             /* Error handling */
             if (br.getHttpConnection().getResponseCode() == 404) {
-                /* Offline folder */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML("(?i)No Files found in this folder")) {
-                /* Empty folder */
-                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
             }
-            final String fpName = br.getRegex("<h1>Files in <span>(.*?)</span>").getMatch(0);
+            int numberOfFiles = -1;
+            int maxItemsPerPage = -1;
+            String title = null;
+            FilePackage fp = null;
             int maxPage = 1;
-            final String maxPageStr = br.getRegex("data\\-paginator\\-totalPages=\"(\\d+)\"").getMatch(0);
-            if (maxPageStr != null) {
-                maxPage = Integer.parseInt(maxPageStr);
-            }
-            for (int i = 1; i <= maxPage; i++) {
-                if (i > 1) {
-                    br.getPage(param.getCryptedUrl() + "/?sort=filename&order=ASC&show=100&page=" + i);
+            int page = 1;
+            // TODO: Add support for password protected folders
+            /*
+             * 2025-09-10: Website json implies that password protected links exist but I was unable to create- or find such test-links.
+             */
+            boolean requiresPassword = false;
+            final HashSet<String> dupes = new HashSet<String>();
+            pagination: while (!this.isAbort()) {
+                // final String[] filenames = br.getRegex("\"disp_filename\":\"([^\"]+)\"").getColumn(0);
+                final String[] jsons = br.getRegex("<script>self\\.__next_f\\.push\\((.*?)\\)</script>").getColumn(0);
+                Map<String, Object> entries = null;
+                for (String json : jsons) {
+                    json = new Regex(json, "\\[\\s*\\d+\\s*,\\s*\"(.*?)\"\\s*\\]$").getMatch(0);
+                    if (json == null || !json.matches(".*\\{\\s*\\\\\"folder.*")) {
+                        continue;
+                    }
+                    json = new Regex((String) JavaScriptEngineFactory.jsonToJavaObject("\"" + json + "\""), "\\d+\\s*:\\s*(.+)").getMatch(0);
+                    final List<Object> object = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
+                    if (object == null) {
+                        continue;
+                    }
+                    entries = (Map<String, Object>) object.get(3);
+                    break;
                 }
-                final String links[] = br.getRegex(Pattern.compile("\"(https?://(?:www\\.)?filefactory\\.com/file/[^<>\"]*?)\"", Pattern.CASE_INSENSITIVE)).getColumn(0);
-                for (String element : links) {
-                    ret.add(createDownloadlink(element));
+                if (entries == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find json source");
                 }
-            }
-            if (!StringUtils.isEmpty(fpName)) {
-                final FilePackage fp = FilePackage.getInstance();
-                fp.setName(Encoding.htmlDecode(fpName).trim());
-                fp.addLinks(ret);
+                int numberofNewItemsThisPage = 0;
+                final Map<String, Object> folder = (Map<String, Object>) entries.get("folder");
+                final Map<String, Object> pagination = (Map<String, Object>) entries.get("pagination");
+                if (page == 1) {
+                    /* Init some vars */
+                    numberOfFiles = ((Number) entries.get("totalCount")).intValue();
+                    maxPage = ((Number) pagination.get("pageCount")).intValue();
+                    maxItemsPerPage = ((Number) pagination.get("itemsPerPage")).intValue();
+                    if (numberOfFiles == 0) {
+                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+                    }
+                    title = (String) folder.get("name");
+                    fp = FilePackage.getInstance();
+                    if (title != null) {
+                        fp.setName(title);
+                    } else {
+                        /* Fallback */
+                        fp.setName(folder_id);
+                    }
+                    fp.setPackageKey(this.getHost() + "://folder/" + folder_id);
+                    requiresPassword = ((Boolean) entries.get("requiresPassword")).booleanValue();
+                    if (requiresPassword) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Password protected folders are not yet supported!");
+                    }
+                }
+                final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
+                for (final Map<String, Object> file : files) {
+                    final String file_id = file.get("viewhash").toString();
+                    if (!dupes.add(file_id)) {
+                        continue;
+                    }
+                    numberofNewItemsThisPage++;
+                    final String url = generateSingleFileLink(file_id);
+                    final DownloadLink link = this.createDownloadlink(url);
+                    link.setFinalFileName(file.get("disp_filename").toString());
+                    link.setVerifiedFileSize(((Number) file.get("size")).longValue());
+                    link.setAvailable(true);
+                    link._setFilePackage(fp);
+                    ret.add(link);
+                    distribute(link);
+                }
+                logger.info("Crawled page " + page + "/" + maxPage + " | New this page: " + numberofNewItemsThisPage + "/" + maxItemsPerPage + " | Found items so far: " + ret.size());
+                if (page >= maxPage) {
+                    logger.info("Stopping because: Reached last page");
+                    break pagination;
+                } else if (ret.size() >= numberOfFiles) {
+                    logger.info("Stopping because: Found all items");
+                    break pagination;
+                } else if (numberofNewItemsThisPage == 0) {
+                    /* Additional fail safe to prevent infinite loops */
+                    logger.info("Stopping because: Failed to find new items on current page");
+                    break pagination;
+                } else {
+                    /* Continue to next page */
+                    page++;
+                    br.getPage("?page=" + page);
+                }
             }
         }
         return ret;
+    }
+
+    private String generateSingleFileLink(final String file_id) {
+        return "https://www." + this.getHost() + "/file/" + file_id;
     }
 
     @Override

@@ -71,7 +71,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 
-@HostPlugin(revision = "$Revision: 50993 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 51483 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
     private final String PROPERTY_normalTraffic                                            = "normalTraffic";
     private final String PROPERTY_specialTraffic                                           = "specialTraffic";
@@ -430,6 +430,7 @@ public class PremiumTo extends UseNet {
     private Thread showServersideDeactivatedHostInformation(final Account account, final String exampleHost) {
         final boolean userConfirmedDialogAlready = account.getBooleanProperty(PROPERTY_ACCOUNT_DEACTIVATED_FILEHOSTS_DIALOG_SHOWN_AND_CONFIRMED, false);
         if (userConfirmedDialogAlready) {
+            /* Do not display dialog again. */
             return null;
         }
         final String host = getHost();
@@ -588,10 +589,15 @@ public class PremiumTo extends UseNet {
                 final Map<String, Object> resp = handleErrorsAPI(link, account, true);
                 final String status = (String) resp.get("Status");
                 /* 2019-11-11: "Canceled" = URL has been added to Storage before but was deleted e.g. by user --> Add it again */
-                if ("Not in queue".equalsIgnoreCase(status) || "Canceled".equalsIgnoreCase(status)) {
+                if ("File not found".equalsIgnoreCase(status)) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if ("Not in queue".equalsIgnoreCase(status) || "Canceled".equalsIgnoreCase(status)) {
                     /* Not on their servers? Add to download-queue! */
                     this.callAPI(API_BASE_STORAGE + "/add.php", query, account, AuthType.PARAMETER);
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Added URL to premium.to Storage: Storage download pending", 1 * 60 * 1000);
+                } else if ("In queue".equalsIgnoreCase(status)) {
+                    /* Item has been added to queue before already */
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Storage download pending", 1 * 60 * 1000);
                 } else if ("completed".equalsIgnoreCase(status)) {
                     /* File has been downloaded to their servers and download should be possible now. */
                     req = this.getAPIRequest(API_BASE_STORAGE + "/download.php", query, account, AuthType.PARAMETER);

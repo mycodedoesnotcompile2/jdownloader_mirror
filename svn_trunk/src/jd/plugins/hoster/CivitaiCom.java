@@ -21,14 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.CivitaiComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -45,7 +37,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51468 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.CivitaiComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51482 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -209,20 +209,22 @@ public class CivitaiCom extends PluginForHost {
                 }
                 /**
                  * 2024-03-11: Important: Do not open up the regex for original image too much or you run into risk of accidentally
-                 * downloading the wrong image, see: </br>
-                 * https://board.jdownloader.org/showthread.php?t=95419
+                 * downloading the wrong image, see: </br> https://board.jdownloader.org/showthread.php?t=95419
                  */
+                /* 2023-09-11: Base URL hardcoded from: https://civitai.com/_next/static/chunks/pages/_app-191d571abe9dc30e.js */
+                final String baseURL = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/";
                 final String directurlOriginal = br.getRegex("class=\"mantine-it6rft\" src=\"(https?://image\\.civitai\\.com/[^\"]+/original=true/[^\"]+)").getMatch(0);
                 if (directurlOriginal != null) {
                     /* Best case: We can download the original file. */
                     link.setProperty(PROPERTY_DIRECTURL, directurlOriginal);
-                } else if (!isVideo) {
+                } else if (isVideo) {
+                    final String directurl = baseURL + imagemap.get("url") + "/optimized=true/" + Encoding.urlEncode(filename);
+                    link.setProperty(PROPERTY_DIRECTURL, directurl);
+                } else {
                     /**
                      * Build image-URL manually. This only works for images. <br>
                      * If done for videos, this would return the video thumbnail instead of the video.
                      */
-                    /* 2023-09-11: Base URL hardcoded from: https://civitai.com/_next/static/chunks/pages/_app-191d571abe9dc30e.js */
-                    final String baseURL = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/";
                     final String directurl = baseURL + imagemap.get("url") + "/width=" + metadata.get("width") + "/" + Encoding.urlEncode(filename);
                     link.setProperty(PROPERTY_DIRECTURL, directurl);
                 }

@@ -57,7 +57,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51331 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51474 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -1288,6 +1288,7 @@ public abstract class TurbobitCore extends PluginForHost {
             if (loginform != null) {
                 br.submitForm(loginform);
                 loginform = findAndPrepareLoginForm(br, account);
+                throwWebInvalidLoginOrPassword(br, account);// a captcha might be required first in order to get the password wrong error
                 if (!isLoggedIN(br) && loginform != null) {
                     logger.info("Loginform is present again after login attempt");
                     /* Check for stupid login captcha */
@@ -1296,7 +1297,7 @@ public abstract class TurbobitCore extends PluginForHost {
                         link = new DownloadLink(this, "Account", account.getHoster(), getMainpage(), true);
                         this.setDownloadLink(link);
                     }
-                    processCaptchaFormWebsiteV1(link, account, loginform, br, true);
+                    requiredLoginCaptcha = processCaptchaFormWebsiteV1(link, account, loginform, br, true);
                     if (loginform.containsHTML("class=\"reloadCaptcha\"")) {
                         /* Old captcha - e.g. wayupload.com */
                         requiredLoginCaptcha = true;
@@ -1310,7 +1311,15 @@ public abstract class TurbobitCore extends PluginForHost {
                         loginform.put("user%5Bcaptcha_type%5D", "securimg");
                         loginform.put("user%5Bcaptcha_subtype%5D", "9");
                     }
+                    if (!requiredLoginCaptcha) {
+                        if (isBrowserContainsLoginErrorInvalidCaptcha(br)) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                     br.submitForm(loginform);
+                    throwWebInvalidLoginOrPassword(br, account);
+                    throwWebIncorrectCaptchaCode(br, account);
                 }
                 if (br.containsHTML(">\\s*Limit of login attempts exceeded for your account")) {
                     if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
@@ -1360,6 +1369,7 @@ public abstract class TurbobitCore extends PluginForHost {
                     throw new AccountInvalidException(message);
                 }
                 if (!isLoggedIN(br)) {
+                    throwWebInvalidLoginOrPassword(br, account);
                     throw new AccountInvalidException();
                 }
                 if (requiredLoginCaptcha) {
@@ -1370,7 +1380,7 @@ public abstract class TurbobitCore extends PluginForHost {
                 /* Assume that we are on website version 2.0 (aka new.turbobit.net/login) */
                 final Map<String, Object> postdata = new HashMap<String, Object>();
                 postdata.put("email", account.getUser());
-                postdata.put("password", account.getPass());
+                postdata.put("password", account.getPass());// TODO: hitfile only allows 15 chars
                 postdata.put("captcha", true);
                 postdata.put("g-recaptcha-response", "");
                 postdata.put("g-captcha-index", 4);
@@ -1426,7 +1436,23 @@ public abstract class TurbobitCore extends PluginForHost {
         return br.containsHTML("/user/logout");
     }
 
-    private Form findAndPrepareLoginForm(Browser br, final Account account) throws PluginException {
+    protected void throwWebInvalidLoginOrPassword(final Browser br, final Account account) throws PluginException {
+        if (!isLoggedIN(br) && br.containsHTML("<div[^>]*class\\s*=\\s*'login_error'[^>]*>\\s*Incorrect login or password\\s*<")) {
+            throw new AccountInvalidException("Incorrect login or password");
+        }
+    }
+
+    protected void throwWebIncorrectCaptchaCode(final Browser br, final Account account) throws PluginException {
+        if (!isLoggedIN(br) && isBrowserContainsLoginErrorInvalidCaptcha(br)) {
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+        }
+    }
+
+    private boolean isBrowserContainsLoginErrorInvalidCaptcha(final Browser br) {
+        return br.containsHTML("<div[^>]*class\\s*=\\s*'login_error'[^>]*>\\s*Incorrect captcha code\\s*<");
+    }
+
+    protected Form findAndPrepareLoginForm(Browser br, final Account account) throws PluginException {
         if (account == null) {
             return null;
         }
