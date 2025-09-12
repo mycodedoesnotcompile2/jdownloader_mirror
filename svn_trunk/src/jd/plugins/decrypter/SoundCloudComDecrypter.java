@@ -50,7 +50,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51449 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 51489 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
 public class SoundCloudComDecrypter extends PluginForDecrypt {
     public SoundCloudComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,6 +98,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
     private boolean          crawl500Thumb                 = false;
     private boolean          crawlOriginalThumb            = false;
     private SoundcloudCom    hostPlugin                    = null;
+    private Account          account                       = null;
 
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
@@ -116,6 +117,12 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
         return url;
     }
 
+    @Override
+    public void clean() {
+        account = null;
+        super.clean();
+    }
+
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         if (new Regex(param.getCryptedUrl(), PATTERN_INVALID).patternFind()) {
@@ -128,9 +135,9 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
         crawlOriginalThumb = cfg.getBooleanProperty(GRABORIGINALTHUMB, SoundcloudCom.defaultGRABORIGINALTHUMB);
         /* They can have huge pages, allow eight times the normal load limit */
         /* Login whenever possible, helps to get links which need the user to be logged in e.g. users' own favorites. */
-        final Account acc = AccountController.getInstance().getValidAccount(this.getHost());
-        if (acc != null) {
-            hostPlugin.login(this.br, acc, false);
+        account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account != null) {
+            hostPlugin.login(this.br, account, false);
         }
         final String contenturl = getContentURL(param);
         if (isList(contenturl)) {
@@ -143,7 +150,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
             } else if (TYPE_GROUPS.matcher(contenturl).find()) {
                 return crawlGroups(contenturl);
             } else {
-                return crawlUser(contenturl, acc);
+                return crawlUser(contenturl, account);
             }
         } else {
             /* Single track */
@@ -816,7 +823,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
 
     private void parseFileInfo(final DownloadLink dl, final Map<String, Object> data) throws Exception {
         if (data != null) {
-            final AvailableStatus status = this.hostPlugin.checkStatusJson(this, dl, null, data);
+            final AvailableStatus status = this.hostPlugin.checkStatusJson(this, dl, account, data);
             dl.setAvailableStatus(status);
         }
     }

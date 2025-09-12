@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51483 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51484 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
@@ -86,7 +86,7 @@ public class FilefactoryComFolder extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         String file_ids_text = new Regex(contenturl, PATTERN_SHARE_LINK_WITH_MULTIPLE_FUIDS).getMatch(0);
         if (file_ids_text != null) {
-            /* Type of folder which contains all fileIDs inside URL -> No http request required to process this. */
+            /* Link which contains all fileIDs inside URL -> No http request required to process this. */
             file_ids_text = file_ids_text.replace("fi:", "");
             final String[] fileIDs = file_ids_text.split(",");
             final FilePackage fp = FilePackage.getInstance();
@@ -101,6 +101,13 @@ public class FilefactoryComFolder extends PluginForDecrypt {
             br.getPage(contenturl);
             /* Error handling */
             if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML("errorData\\\\?\"")) {
+                /*
+                 * e.g.
+                 * {\"errorData\":{\"title\":\"Invalid Folder Link\",\"message\":\"The requested folder cannot be displayed because the link is invalid.\"
+                 * }
+                 */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             int numberOfFiles = -1;

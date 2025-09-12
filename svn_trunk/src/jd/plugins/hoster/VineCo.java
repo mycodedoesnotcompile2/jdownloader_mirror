@@ -18,10 +18,12 @@ package jd.plugins.hoster;
 import java.io.IOException;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
-import jd.http.URLConnectionAdapter;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -30,18 +32,30 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48054 $", interfaceVersion = 3, names = { "vine.co" }, urls = { "https?://(www\\.)?vine\\.co/v/[A-Za-z0-9]+" })
+@HostPlugin(revision = "$Revision: 51485 $", interfaceVersion = 3, names = { "vine.co" }, urls = { "https?://(?:www\\.)?vine\\.co/v/([A-Za-z0-9]+)" })
 public class VineCo extends PluginForHost {
     public VineCo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private String  dllink        = null;
-    private boolean server_issues = false;
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setAllowedResponseCodes(410);
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private String dllink = null;
 
     @Override
     public String getAGBLink() {
-        return "https://vine.co/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -58,16 +72,25 @@ public class VineCo extends PluginForHost {
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink downloadLink) throws IOException, PluginException {
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         dllink = null;
-        server_issues = false;
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        this.br.setAllowedResponseCodes(410);
-        final String fid = downloadLink.getDownloadURL().substring(downloadLink.getDownloadURL().lastIndexOf("/") + 1);
-        downloadLink.setLinkID(getHost() + "://" + fid);
+        final String fid = this.getFID(link);
         br.getPage(String.format("https://archive.%s/posts/%s.json", this.getHost(), fid));
         final int responsecode = this.br.getHttpConnection().getResponseCode();
         if (responsecode == 403 || responsecode == 404 || responsecode == 410) {
@@ -79,44 +102,24 @@ public class VineCo extends PluginForHost {
             filename = fid;
         }
         dllink = PluginJSonUtils.getJsonValue(this.br, "videoUrl");
-        if (dllink == null || dllink.equals("")) {
-            logger.info("filename: " + filename + ", DLLINK: " + dllink);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         dllink = Encoding.htmlDecode(dllink);
         filename = Encoding.htmlDecode(filename);
         filename = filename.trim();
         /* Include linkid in filename to avoid false positive duplicate! */
         filename = filename + ".mp4";
-        downloadLink.setFinalFileName(filename);
-        URLConnectionAdapter con = null;
-        try {
-            con = br.openHeadConnection(dllink);
-            if (!con.getContentType().contains("html")) {
-                downloadLink.setDownloadSize(con.getLongContentLength());
-            } else {
-                server_issues = true;
-            }
-        } finally {
-            try {
-                con.disconnect();
-            } catch (Throwable e) {
-            }
-        }
+        link.setFinalFileName(filename);
         return AvailableStatus.TRUE;
     }
 
     @Override
-    public void handleFree(final DownloadLink downloadLink) throws Exception {
-        requestFileInformation(downloadLink);
-        if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
-        } else if (dllink == null) {
+    public void handleFree(final DownloadLink link) throws Exception {
+        requestFileInformation(link);
+        if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* We only download small files, chunkload makes no sense */
-        dl = jd.plugins.BrowserAdapter.openDownload(br, downloadLink, dllink, true, 1);
-        if (dl.getConnection().getContentType().contains("html")) {
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -125,7 +128,7 @@ public class VineCo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

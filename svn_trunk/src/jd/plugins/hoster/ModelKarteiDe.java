@@ -23,12 +23,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -45,11 +39,16 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51486 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModelKarteiDe extends PluginForHost {
     public ModelKarteiDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -239,7 +238,7 @@ public class ModelKarteiDe extends PluginForHost {
                 final Date lastModifiedDate = TimeFormatter.parseDateString(lastModifiedHeader);
                 dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(lastModifiedDate);
                 /* Now that the connection has been opened, we can also obtain the */
-                final String extensionFromMimeType = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
+                final String extensionFromMimeType = getExtensionFromMimeType(con);
                 if (extensionFromMimeType != null) {
                     ext = extensionFromMimeType;
                 }

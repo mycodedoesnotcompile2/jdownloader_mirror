@@ -29,6 +29,22 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -56,23 +72,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51475 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51484 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -103,9 +103,11 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
-         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br>
+         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
+         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br>
+         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -1720,9 +1722,10 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
-             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
-             * user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br>
+             * Redirects to mainpage if cookies are invalid. </br>
+             * Return json if cookies are valid. </br>
+             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */
@@ -1733,9 +1736,9 @@ public class XHamsterCom extends PluginForHost {
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             long expireTimestamp = 0;
             final String expireStr = (String) entries.get("expiredAt");
-            final Boolean isLifetime = (Boolean) entries.get("isLifetime");
-            final Boolean isTrial = (Boolean) entries.get("isTrial");
-            final Boolean hasGoldSubscription = (Boolean) entries.get("hasGoldSubscription");
+            final boolean isLifetime = ((Boolean) entries.get("isLifetime")).booleanValue();
+            final boolean isTrial = ((Boolean) entries.get("isTrial")).booleanValue();
+            final boolean hasGoldSubscription = ((Boolean) entries.get("hasGoldSubscription")).booleanValue();
             final Boolean isRebillEnabled = (Boolean) entries.get("isRebillEnabled");
             if (!StringUtils.isEmpty(expireStr)) {
                 if (expireStr.matches("^\\d{1,2} [A-Za-z]+ \\d{4}$")) {
@@ -1745,7 +1748,7 @@ public class XHamsterCom extends PluginForHost {
                     expireTimestamp = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
                 }
             }
-            if (Boolean.TRUE.equals(entries.get("isLifetime")) || Boolean.TRUE.equals(hasGoldSubscription) || Boolean.TRUE.equals(isTrial) || expireTimestamp > System.currentTimeMillis()) {
+            if (isLifetime || Boolean.TRUE.equals(hasGoldSubscription) || isTrial || expireTimestamp > System.currentTimeMillis()) {
                 if (isLifetime) {
                     account.setType(AccountType.LIFETIME);
                 } else {
@@ -1758,14 +1761,20 @@ public class XHamsterCom extends PluginForHost {
                 } else {
                     accountStatusText = account.getType().getLabel();
                 }
-                if (Boolean.TRUE.equals(isRebillEnabled)) {
-                    accountStatusText += " | Rebill: Yes";
-                } else {
-                    accountStatusText += " | Rebill: No";
+                /* Do not set expire date and rebill status for lifetime accounts. */
+                if (!isLifetime) {
+                    if (expireTimestamp > System.currentTimeMillis()) {
+                        ai.setValidUntil(expireTimestamp, br);
+                    } else {
+                        logger.warning("Failed to find premium/trial expire date");
+                    }
+                    if (Boolean.TRUE.equals(isRebillEnabled)) {
+                        accountStatusText += " | Rebill: Yes";
+                    } else {
+                        accountStatusText += " | Rebill: No";
+                    }
                 }
-                if (expireTimestamp > System.currentTimeMillis()) {
-                    ai.setValidUntil(expireTimestamp, br);
-                }
+                logger.info("Obtaining account download limits");
                 br.getPage(api_base_premium + "/user/download-limits");
                 final Map<String, Object> limitresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 /* E.g. {"isLimitReached":false,"monthlyDownloads":{"limit":300,"available":299}} */
@@ -1794,13 +1803,5 @@ public class XHamsterCom extends PluginForHost {
 
     @Override
     public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

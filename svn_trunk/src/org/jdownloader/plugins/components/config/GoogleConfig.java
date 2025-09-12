@@ -20,8 +20,7 @@ public interface GoogleConfig extends PluginConfigInterface {
     final String                    text_AllowStreamDownloadAsFallbackIfFileDownloadQuotaIsReached = "Allow stream download as fallback if original file is quota limited?";
     final String                    text_AllowStreamDownloadAsFallbackIfOfficialDownloadIsDisabled = "Allow stream download as fallback if original file download is disabled?";
     final String                    text_GoogleDriveAPIKey                                         = "Google Drive API key see: developers.google.com/drive/api/v3/enable-drive-api\r\nIt will be used for GDrive folder crawling, linkchecking and downloading.";
-    final String                    text_APIDownloadMode                                           = "API download mode (only relevant if API Key is provided.)";
-    final String                    text_AddStreamQualityIdentifierToFilename                      = "Add quality identifier to filename if audio/video stream is downloaded?";
+    final String                    text_AddStreamQualityIdentifierToFilename                      = "Stream download: Add quality identifier to filename?";
     final String                    text_WaitOnQuotaReachedMinutes                                 = "Wait time minutes on quota limit reached";
     final String                    text_DebugAccountLogin                                         = "Debug: Website mode: Perform extended account check (enable = slower account check)?";
     final String                    text_DebugForceValidateLoginAlways                             = "Debug: Website mode: Force validate login on every linkcheck/download attempt (enable = slower linkcheck!)?";
@@ -46,16 +45,16 @@ public interface GoogleConfig extends PluginConfigInterface {
             return text_AllowStreamDownloadAsFallbackIfOfficialDownloadIsDisabled;
         }
 
+        public String getAddStreamQualityIdentifierToFilename_label() {
+            return text_AddStreamQualityIdentifierToFilename;
+        }
+
         public String getGoogleDriveAPIKey_label() {
             return text_GoogleDriveAPIKey;
         }
 
         public String getAPIDownloadMode_label() {
-            return text_APIDownloadMode;
-        }
-
-        public String getAddStreamQualityIdentifierToFilename_label() {
-            return text_AddStreamQualityIdentifierToFilename;
+            return "API download mode";
         }
 
         public String getWaitOnQuotaReachedMinutes_label() {
@@ -81,15 +80,23 @@ public interface GoogleConfig extends PluginConfigInterface {
         public String getDebugWebsiteAlwaysPerformExtendedLinkcheck_label() {
             return text_DebugWebsiteAlwaysPerformExtendedLinkcheck;
         }
+
+        public String getGoogleDocumentFormatSelectionMode_label() {
+            return "Google document format selection mode";
+        }
+
+        public String getGoogleDocumentExportFormatForTypeDocument_label() {
+            return "Export format for GDoc type document";
+        }
+
+        public String getGoogleDocumentExportFormatForTypePresentation_label() {
+            return "Export format for GDoc type presentation";
+        }
+
+        public String getGoogleDocumentExportFormatForTypeSpreadsheet_label() {
+            return "Export format for GDoc type spreadsheet";
+        }
     }
-
-    @AboutConfig
-    @DefaultStringValue("JDDEFAULT")
-    @DescriptionForConfigEntry(text_UserAgent)
-    @Order(10)
-    String getUserAgent();
-
-    public void setUserAgent(final String userAgent);
 
     public static enum PreferredVideoQuality implements LabelInterface {
         ORIGINAL {
@@ -155,20 +162,190 @@ public interface GoogleConfig extends PluginConfigInterface {
     void setAllowStreamDownloadAsFallbackIfOfficialDownloadIsDisabled(boolean b);
 
     @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry(text_AddStreamQualityIdentifierToFilename)
+    @Order(18)
+    boolean isAddStreamQualityIdentifierToFilename();
+
+    void setAddStreamQualityIdentifierToFilename(boolean b);
+
+    @AboutConfig
+    @DefaultEnumValue("AUTO")
+    @DescriptionForConfigEntry("Controls format selection behavior for all google document types. Example: If on auto and original file is a pdf, pdf format will be preferred.")
+    @Order(60)
+    GoogleDocumentFormatSelectionMode getGoogleDocumentFormatSelectionMode();
+
+    void setGoogleDocumentFormatSelectionMode(final GoogleDocumentFormatSelectionMode mode);
+
+    public static enum GoogleDocumentFormatSelectionMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto: Prefer original format if file title contains extension";
+            }
+        },
+        USER_SETTING {
+            @Override
+            public String getLabel() {
+                return "Prefer selected format";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("ZIP")
+    @DescriptionForConfigEntry("Preferred download format for Google Document type document")
+    @Order(61)
+    GoogleDocumentExportFormat getGoogleDocumentExportFormatForTypeDocument();
+
+    void setGoogleDocumentExportFormatForTypeDocument(final GoogleDocumentExportFormat format);
+
+    @AboutConfig
+    @DefaultEnumValue("ZIP")
+    @DescriptionForConfigEntry("Preferred download format for Google Document type presentation")
+    @Order(62)
+    GoogleDocumentExportFormat getGoogleDocumentExportFormatForTypePresentation();
+
+    void setGoogleDocumentExportFormatForTypePresentation(final GoogleDocumentExportFormat format);
+
+    @AboutConfig
+    @DefaultEnumValue("ZIP")
+    @DescriptionForConfigEntry("Preferred download format for Google Document type spreadsheet")
+    @Order(63)
+    GoogleDocumentExportFormat getGoogleDocumentExportFormatForTypeSpreadsheet();
+
+    void setGoogleDocumentExportFormatForTypeSpreadsheet(final GoogleDocumentExportFormat format);
+
+    interface FileExtensionInterface {
+        String getFileExtension();
+    }
+
+    public static enum GoogleDocumentExportFormat implements LabelInterface, FileExtensionInterface {
+        ZIP {
+            @Override
+            public String getLabel() {
+                return "Archive (.zip)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "zip";
+            }
+        },
+        DOCX {
+            @Override
+            public String getLabel() {
+                return "Microsoft Word (.docx)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "docx";
+            }
+        },
+        ODT {
+            @Override
+            public String getLabel() {
+                return "OpenDocument Format (.odt)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "odt";
+            }
+        },
+        RTF {
+            @Override
+            public String getLabel() {
+                return "RTF File (.rtf)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "rtf";
+            }
+        },
+        PDF {
+            @Override
+            public String getLabel() {
+                return "PDF File (.pdf)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "pdf";
+            }
+        },
+        TXT {
+            @Override
+            public String getLabel() {
+                return "Plain Text File (.txt)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "txt";
+            }
+        },
+        HTML {
+            @Override
+            public String getLabel() {
+                return "Website (.html)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "html";
+            }
+        },
+        EPUB {
+            @Override
+            public String getLabel() {
+                return "EPUB Publication (.epub)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "epub";
+            }
+        },
+        MD {
+            @Override
+            public String getLabel() {
+                return "Markdown (.md)";
+            }
+
+            @Override
+            public String getFileExtension() {
+                return "md";
+            }
+        };
+    }
+
+    @AboutConfig
+    @SpinnerValidator(min = 10, max = 360, step = 1)
+    @DefaultIntValue(60)
+    @DescriptionForConfigEntry(text_WaitOnQuotaReachedMinutes)
+    @Order(70)
+    int getWaitOnQuotaReachedMinutes();
+
+    void setWaitOnQuotaReachedMinutes(int items);
+
+    @AboutConfig
     @DefaultStringValue("")
     @DescriptionForConfigEntry(text_GoogleDriveAPIKey)
-    @Order(20)
+    @Order(80)
     String getGoogleDriveAPIKey();
 
     public void setGoogleDriveAPIKey(String apikey);
 
     @AboutConfig
     @DefaultEnumValue("WEBSITE_IF_ACCOUNT_AVAILABLE_AND_FILE_IS_QUOTA_LIMITED")
-    @DescriptionForConfigEntry(text_APIDownloadMode)
-    @Order(25)
+    @DescriptionForConfigEntry("Controls plugin behavior when API key is provided.")
+    @Order(81)
     APIDownloadMode getAPIDownloadMode();
 
-    void setAPIDownloadMode(final APIDownloadMode apiDownloadMode);
+    void setAPIDownloadMode(final APIDownloadMode mode);
 
     public static enum APIDownloadMode implements LabelInterface {
         API_ONLY {
@@ -192,34 +369,25 @@ public interface GoogleConfig extends PluginConfigInterface {
     }
 
     @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_AddStreamQualityIdentifierToFilename)
-    @Order(50)
-    boolean isAddStreamQualityIdentifierToFilename();
-
-    void setAddStreamQualityIdentifierToFilename(boolean b);
-
-    @AboutConfig
-    @SpinnerValidator(min = 10, max = 360, step = 1)
-    @DefaultIntValue(60)
-    @DescriptionForConfigEntry(text_WaitOnQuotaReachedMinutes)
-    @Order(51)
-    int getWaitOnQuotaReachedMinutes();
-
-    void setWaitOnQuotaReachedMinutes(int items);
-
-    @AboutConfig
     @DefaultBooleanValue(false)
     @DescriptionForConfigEntry("Enable this to allow Google Drive links to be downloaded via multihoster accounts.")
-    @Order(52)
+    @Order(98)
     boolean isAllowMultihosterDownload();
 
     void setAllowMultihosterDownload(boolean b);
 
     @AboutConfig
+    @DefaultStringValue("JDDEFAULT")
+    @DescriptionForConfigEntry(text_UserAgent)
+    @Order(99)
+    String getUserAgent();
+
+    public void setUserAgent(final String userAgent);
+
+    @AboutConfig
     @DefaultBooleanValue(false)
     @DescriptionForConfigEntry(text_DebugAccountLogin)
-    @Order(60)
+    @Order(100)
     boolean isDebugAccountLogin();
 
     void setDebugAccountLogin(boolean b);
@@ -227,7 +395,7 @@ public interface GoogleConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(false)
     @DescriptionForConfigEntry(text_DebugForceValidateLoginAlways)
-    @Order(70)
+    @Order(101)
     boolean isDebugForceValidateLoginAlways();
 
     void setDebugForceValidateLoginAlways(boolean b);
@@ -235,7 +403,7 @@ public interface GoogleConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(false)
     @DescriptionForConfigEntry(text_DebugWebsiteTrustQuickLinkcheckOfflineStatus)
-    @Order(80)
+    @Order(102)
     boolean isDebugWebsiteTrustQuickLinkcheckOfflineStatus();
 
     void setDebugWebsiteTrustQuickLinkcheckOfflineStatus(boolean b);
@@ -243,7 +411,7 @@ public interface GoogleConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultBooleanValue(false)
     @DescriptionForConfigEntry(text_DebugWebsiteAlwaysPerformExtendedLinkcheck)
-    @Order(90)
+    @Order(103)
     boolean isDebugWebsiteAlwaysPerformExtendedLinkcheck();
 
     void setDebugWebsiteAlwaysPerformExtendedLinkcheck(boolean b);

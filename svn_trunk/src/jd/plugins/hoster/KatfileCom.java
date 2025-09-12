@@ -31,7 +31,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51467 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51484 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -94,7 +94,8 @@ public class KatfileCom extends XFileSharingProBasic {
     @Override
     public Form findFormDownload1Free(final Browser br) throws Exception {
         final Form download1 = super.findFormDownload1Free(br);
-        if (false && download1 != null) {
+        final boolean formFixRequired = false;
+        if (formFixRequired && download1 != null) {
             /* 2022-09-02 - fixed in Form class */
             final String formkey = "method_free";
             final InputField method_free = download1.getInputField(formkey);
@@ -168,7 +169,7 @@ public class KatfileCom extends XFileSharingProBasic {
 
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
-        if (br.containsHTML("/404-remove|>The file expired>The file was deleted by its owner")) {
+        if (br.containsHTML("/404-remove|>\\s*The file expired>The file was deleted by its owner")) {
             return true;
         } else {
             return super.isOffline(link, br);

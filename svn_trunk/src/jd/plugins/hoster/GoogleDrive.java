@@ -44,6 +44,8 @@ import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilte
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.config.GoogleConfig;
 import org.jdownloader.plugins.components.config.GoogleConfig.APIDownloadMode;
+import org.jdownloader.plugins.components.config.GoogleConfig.GoogleDocumentExportFormat;
+import org.jdownloader.plugins.components.config.GoogleConfig.GoogleDocumentFormatSelectionMode;
 import org.jdownloader.plugins.components.config.GoogleConfig.PreferredVideoQuality;
 import org.jdownloader.plugins.components.google.GoogleHelper;
 import org.jdownloader.plugins.components.hls.HlsContainer;
@@ -87,7 +89,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51443 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51487 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -211,7 +213,9 @@ public class GoogleDrive extends PluginForHost {
     private final static String   PROPERTY_CACHED_FILENAME                       = "cached_filename";
     private final static String   PROPERTY_CACHED_LAST_DISPOSITION_STATUS        = "cached_last_disposition_status";
     private final String          PROPERTY_TIMESTAMP_STREAM_DOWNLOAD_FAILED      = "timestamp_stream_download_failed";
+    /* Temporary properties */
     private final String          PROPERTY_TMP_ALLOW_OBTAIN_MORE_INFORMATION     = "tmp_allow_obtain_more_information";
+    private final String          PROPERTY_TMP_FILENAME_FROM_QUICK_LINKCHECK     = "tmp_filename_from_quick_linkcheck";
     /* Misc */
     private final String          DISPOSITION_STATUS_QUOTA_EXCEEDED              = "QUOTA_EXCEEDED";
     /* Pre defined exceptions */
@@ -490,7 +494,7 @@ public class GoogleDrive extends PluginForHost {
     public void parseFileInfoAPIAndWebsiteWebAPI(final Plugin plugin, final JsonSchemeType schemetype, final DownloadLink link, final Map<String, Object> entries) {
         /* Some field names are different in API and WebAPI. */
         /* Filesize is returned as String so we need to parse it to long. */
-        final String filename;
+        String filename;
         final long filesize;
         final String modifiedDate;
         if (schemetype == JsonSchemeType.WEBSITE) {
@@ -522,9 +526,16 @@ public class GoogleDrive extends PluginForHost {
             final Map<String, Object> exportLinks = (Map<String, Object>) entries.get("exportLinks");
             parseGoogleDocumentPropertiesAPIAndSetFilename(plugin, link, filename, googleDriveDocumentType, exportLinks);
         } else {
+            /* Normal file */
+            setGoogleDocStatus(link, false);
+            /* In some rare cases, filename has no extension -> Add it if needed. */
+            if (mimeType != null) {
+                final String extByMimeType = getExtensionFromMimeType(mimeType);
+                if (extByMimeType != null) {
+                    filename = this.correctOrApplyFileNameExtension(filename, extByMimeType, null);
+                }
+            }
             setFilename(plugin, link, Boolean.FALSE, filename, true);
-            /* Remove this flag just in case this item has been wrongly tagged as a Google Document before. */
-            link.removeProperty(PROPERTY_GOOGLE_DOCUMENT);
         }
         if (filesize > -1) {
             link.setVerifiedFileSize(filesize);
@@ -551,7 +562,20 @@ public class GoogleDrive extends PluginForHost {
         link.setAvailable(true);
     }
 
-    /** Sets filename- and required parameters for GDocs files. */
+    /** Sets google doc property on DownloadLink. Contains a bit of magic to avoid storing this property whenever possible. */
+    private void setGoogleDocStatus(final DownloadLink link, final boolean isGoogleDoc) {
+        if (isGoogleDoc) {
+            link.setProperty(PROPERTY_GOOGLE_DOCUMENT, true);
+        } else if (new Regex(link.getPluginPatternMatcher(), PATTERN_GDOC).patternFind()) {
+            /* Only set false boolean if link looks like a google document. */
+            link.setProperty(PROPERTY_GOOGLE_DOCUMENT, false);
+        }
+    }
+
+    /**
+     * Sets filename- and required parameters for GDocs files. <br>
+     * Only call this function if you know that the link is a google document!!
+     */
     public void parseGoogleDocumentPropertiesAPIAndSetFilename(final Plugin plg, final DownloadLink link, final String filename, final String googleDriveDocumentType, final Map<String, Object> exportFormatDownloadurls) {
         /**
          * Google Drive documents: Either created directly on Google Drive or user added a "real" document-file to GDrive and converted it
@@ -561,50 +585,62 @@ public class GoogleDrive extends PluginForHost {
          * For GDocs usually there is no filesize given because there is no "original" file anymore. The filesize depends on the format we
          * chose to download the file in.
          */
-        link.setProperty(PROPERTY_GOOGLE_DOCUMENT, true);
-        /* Assume that a filename/title has to be given. */
-        if (StringUtils.isEmpty(filename)) {
-            /* This should never happen */
-            return;
-        }
+        this.setGoogleDocStatus(link, true);
         if (exportFormatDownloadurls != null) {
             String docDownloadURL = null;
-            String preGivenFileExtensionLowercase = Plugin.getFileNameExtensionFromString(filename);
+            final GoogleConfig cfg = PluginJsonConfig.get(GoogleConfig.class);
+            final boolean enableAutoMode = GoogleDocumentFormatSelectionMode.AUTO.equals(cfg.getGoogleDocumentFormatSelectionMode());
             String finalFileExtensionWithoutDot = null;
-            if (preGivenFileExtensionLowercase != null) {
-                preGivenFileExtensionLowercase = preGivenFileExtensionLowercase.toLowerCase(Locale.ENGLISH).replace(".", "");
-            }
             final Map<String, String> extToDownloadlinkMap = new HashMap<String, String>();
             final Iterator<Entry<String, Object>> iterator = exportFormatDownloadurls.entrySet().iterator();
             while (iterator.hasNext()) {
-                final String docDownloadURLCandidate = (String) iterator.next().getValue();
+                final String url = (String) iterator.next().getValue();
                 try {
-                    final String extFromDownloadurlCandidate = UrlQuery.parse(docDownloadURLCandidate).get("exportFormat");
+                    final String extFromDownloadurlCandidate = UrlQuery.parse(url).get("exportFormat");
                     if (extFromDownloadurlCandidate != null) {
-                        extToDownloadlinkMap.put(extFromDownloadurlCandidate.toLowerCase(Locale.ENGLISH), docDownloadURLCandidate);
+                        final String extFromDownloadurlCandidateLowercase = extFromDownloadurlCandidate.toLowerCase(Locale.ENGLISH);
+                        extToDownloadlinkMap.put(extFromDownloadurlCandidateLowercase, url);
+                        /* Small workaround for markdown */
+                        if (extFromDownloadurlCandidateLowercase.equals("markdown")) {
+                            extToDownloadlinkMap.put("md", url);
+                        }
                     }
                 } catch (final MalformedURLException e) {
-                    e.printStackTrace();
+                    /* This should never happen */
+                    // logger.log(e);
+                    logger.warning("WTF failed to parse URL: " + url);
                 }
             }
-            if (preGivenFileExtensionLowercase != null && extToDownloadlinkMap.containsKey(preGivenFileExtensionLowercase)) {
-                docDownloadURL = extToDownloadlinkMap.get(preGivenFileExtensionLowercase);
-                finalFileExtensionWithoutDot = preGivenFileExtensionLowercase;
+            autoMode: if (enableAutoMode) {
+                String preGivenFileExtensionLowercaseWithoutDot = Plugin.getFileNameExtensionFromString(filename);
+                if (preGivenFileExtensionLowercaseWithoutDot == null) {
+                    break autoMode;
+                }
+                preGivenFileExtensionLowercaseWithoutDot = preGivenFileExtensionLowercaseWithoutDot.toLowerCase(Locale.ENGLISH).replace(".", "");
+                docDownloadURL = extToDownloadlinkMap.get(preGivenFileExtensionLowercaseWithoutDot);
+                if (docDownloadURL != null) {
+                    finalFileExtensionWithoutDot = preGivenFileExtensionLowercaseWithoutDot;
+                }
             }
             if (docDownloadURL == null) {
-                /* Fallback 1 */
+                /* Select preferred format by user pre configured preferred format */
+                final GoogleDocumentExportFormat format_document = cfg.getGoogleDocumentExportFormatForTypeDocument();
+                final GoogleDocumentExportFormat format_presentation = cfg.getGoogleDocumentExportFormatForTypePresentation();
+                final GoogleDocumentExportFormat format_spreadsheet = cfg.getGoogleDocumentExportFormatForTypeSpreadsheet();
                 final Map<String, String> documentTypeToPreferredExtMap = new HashMap<String, String>();
-                documentTypeToPreferredExtMap.put("document", "odt");
-                documentTypeToPreferredExtMap.put("presentation", "pdf");
-                documentTypeToPreferredExtMap.put("spreadsheet", "ods");
+                /* User can select different preferred format for each document type. */
+                documentTypeToPreferredExtMap.put("document", format_document.getFileExtension());
+                documentTypeToPreferredExtMap.put("presentation", format_presentation.getFileExtension());
+                documentTypeToPreferredExtMap.put("spreadsheet", format_spreadsheet.getFileExtension());
                 final String preferredExtByDocumentType = documentTypeToPreferredExtMap.get(googleDriveDocumentType);
                 if (preferredExtByDocumentType != null && extToDownloadlinkMap.containsKey(preferredExtByDocumentType)) {
                     docDownloadURL = extToDownloadlinkMap.get(preferredExtByDocumentType);
                     finalFileExtensionWithoutDot = preferredExtByDocumentType;
                 }
                 if (docDownloadURL == null) {
-                    /* Fallback 2 */
-                    final String[] fileExtFallbackPriorityList = new String[] { "pdf", "zip", "odt", "ods", "txt" };
+                    /* Fallback when user preferred format is not available. */
+                    // final String[] fileExtFallbackPriorityList = new String[] { "pdf", "zip", "odt", "ods", "txt" };
+                    final String[] fileExtFallbackPriorityList = new String[] { "pdf", "odt", "ods", "txt" };
                     for (final String fileExtFallback : fileExtFallbackPriorityList) {
                         docDownloadURL = extToDownloadlinkMap.get(fileExtFallback);
                         if (docDownloadURL != null) {
@@ -614,7 +650,10 @@ public class GoogleDrive extends PluginForHost {
                     }
                 }
             }
-            /* If docDownloadURL is still null here this means that this is a Google Document with a file-type we do not know. */
+            /**
+             * If docDownloadURL is still null here this means that this is a Google Document with a file-type we do not know.´<br>
+             * In this case, upper handling will try to download it as a .zip file.
+             */
             if (!StringUtils.isEmpty(docDownloadURL)) {
                 /* We found an export format suiting our filename-extension --> Prefer that */
                 link.setProperty(PROPERTY_FORCED_FINAL_DOWNLOADURL, docDownloadURL);
@@ -642,6 +681,7 @@ public class GoogleDrive extends PluginForHost {
         }
         final GoogleConfig cfg = PluginJsonConfig.get(GoogleConfig.class);
         final boolean isDownload = PluginEnvironment.DOWNLOAD == this.getPluginEnvironment();
+        boolean isGoogleDocumentThatRequiresDeeperLinkcheck = isGoogleDocument(link) && !this.hasObtainedInformationFromAPIOrWebAPI(link);
         prepBrowser(this.br);
         try {
             boolean performDeeperOfflineCheck = false;
@@ -652,12 +692,15 @@ public class GoogleDrive extends PluginForHost {
                     /* File is online. Now decide whether or not a deeper check is needed. */
                     final boolean itemIsEligableForObtainingMoreInformation = link.hasProperty(PROPERTY_TMP_ALLOW_OBTAIN_MORE_INFORMATION);
                     final boolean deeperCheckHasAlreadyBeenPerformed = link.getFinalFileName() != null || isGoogleDocument(link) || link.getView().getBytesTotal() > 0;
+                    /* Look for reasons to do a deeper check */
                     if (looksLikeImageFile(link.getName()) && !canDownloadOfficially(link)) {
                         /* Allow deeper linkcheck to find alternative downloadlink for officially non-downloadable images. */
                         logger.info("File is online but we'll be looking for more information about this un-downloadable image");
                     } else if (cfg.isDebugWebsiteAlwaysPerformExtendedLinkcheck() && !this.hasObtainedInformationFromAPIOrWebAPI(link)) {
                         /* Debug functionality. Can be used by anyone but shall only be used by devs. */
                         logger.info("Handling extra linkcheck because it is enabled by user and hasn't been done before");
+                    } else if (isGoogleDocumentThatRequiresDeeperLinkcheck) {
+                        logger.info("Performing deeper check for Google Drive document");
                     } else if (deeperCheckHasAlreadyBeenPerformed || !itemIsEligableForObtainingMoreInformation) {
                         return status;
                     } else {
@@ -680,7 +723,9 @@ public class GoogleDrive extends PluginForHost {
             }
             logger.info("Checking availablestatus via file overview");
             this.handleLinkcheckFileOverview(br, link, account, performDeeperOfflineCheck);
-            if (isGoogleDocument(link) && !this.hasObtainedInformationFromAPIOrWebAPI(link)) {
+            /* Status can change in between so obtain it again!! */
+            isGoogleDocumentThatRequiresDeeperLinkcheck = isGoogleDocument(link) && !this.hasObtainedInformationFromAPIOrWebAPI(link);
+            if (isGoogleDocumentThatRequiresDeeperLinkcheck) {
                 /* Important: Without this, some google documents will not be downloadable! */
                 logger.info("Handling extra linkcheck as preparation for google document download");
                 try {
@@ -723,14 +768,14 @@ public class GoogleDrive extends PluginForHost {
         link.setProperty(PROPERTY_TMP_ALLOW_OBTAIN_MORE_INFORMATION, true);
         br.getHeaders().put("X-Drive-First-Party", "DriveViewer");
         final UrlQuery query = new UrlQuery();
-        query.add("id", this.getFID(link));
+        query.appendEncoded("id", this.getFID(link));
         final String fileResourceKey = this.getFileResourceKey(link);
         if (fileResourceKey != null) {
-            query.add("resourcekey", Encoding.urlEncode(fileResourceKey));
+            query.appendEncoded("resourcekey", fileResourceKey);
         }
         /* 2020-12-01: authuser=0 also for logged-in users! */
-        query.add("authuser", "0");
-        query.add("export", "download");
+        query.appendEncoded("authuser", "0");
+        query.appendEncoded("export", "download");
         /* POST request with no data */
         br.postPage("https://drive.google.com/uc?" + query.toString(), "");
         if (br.getHttpConnection().getResponseCode() == 403) {
@@ -748,6 +793,7 @@ public class GoogleDrive extends PluginForHost {
         }
         final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
         final String filename = (String) entries.get("fileName");
+        link.setProperty(PROPERTY_TMP_FILENAME_FROM_QUICK_LINKCHECK, filename);
         final Number filesizeBytesO = (Number) entries.get("sizeBytes");
         if (filesizeBytesO != null) {
             /* Filesize field will be 0 for Google Documents and given downloadUrl will be broken. */
@@ -862,17 +908,30 @@ public class GoogleDrive extends PluginForHost {
             }
         }
         final boolean isGoogleDocument;
-        if (br.containsHTML("\"docs-dm\":\\s*\"application/vnd\\.google-apps")) {
+        final boolean looksLikeOfficialDownloadAllowed = br.containsHTML("6export\u003ddownload|export=download");
+        final boolean looksLikeGoogleDocument = br.containsHTML("\"docs-dm\":\\s*\"application/vnd\\.");
+        if (looksLikeGoogleDocument && looksLikeOfficialDownloadAllowed) {
+            logger.info("Item looks like google document but is a normal file!!");
+            isGoogleDocument = false;
+        } else if (looksLikeGoogleDocument) {
             isGoogleDocument = true;
-            link.setProperty(PROPERTY_GOOGLE_DOCUMENT, true);
         } else {
             isGoogleDocument = false;
-            /* Do not remove this property! */
-            // link.removeProperty(PROPERTY_GOOGLE_DOCUMENT);
         }
+        this.setGoogleDocStatus(link, isGoogleDocument);
         if (filename != null) {
-            filename = PluginJSonUtils.unescape(filename);
-            filename = Encoding.unicodeDecode(filename).trim();
+            final String filenameFromQuickLinkcheck = link.getStringProperty(PROPERTY_TMP_FILENAME_FROM_QUICK_LINKCHECK);
+            if (filenameFromQuickLinkcheck != null) {
+                /**
+                 * Prefer filename from quickLinkcheck as this is the better source. <br>
+                 * In some cases, filename from html code is missing file extension.
+                 */
+                filename = filenameFromQuickLinkcheck;
+            } else {
+                /* Filename from html code -> needs decoding */
+                filename = PluginJSonUtils.unescape(filename);
+                filename = Encoding.unicodeDecode(filename).trim();
+            }
             setFilename(this, link, isGoogleDocument, filename, true);
         } else {
             logger.warning("Failed to find filename");
@@ -989,6 +1048,7 @@ public class GoogleDrive extends PluginForHost {
     private String getGoogleDocumentDirecturl(final DownloadLink link) {
         final String forcedDocumentFinalDownloadlink = link.getStringProperty(PROPERTY_FORCED_FINAL_DOWNLOADURL);
         if (forcedDocumentFinalDownloadlink != null) {
+            /** This will be available if user selected any document format except .zip. */
             return forcedDocumentFinalDownloadlink;
         } else {
             /**
@@ -2304,10 +2364,9 @@ public class GoogleDrive extends PluginForHost {
             link.setProperty(PROPERTY_TIMESTAMP_QUOTA_REACHED_ACCOUNT, System.currentTimeMillis());
         }
     }
-
-    @Override
-    public void reset() {
-    }
+    // @Override
+    // public void reset() {
+    // }
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
@@ -2322,6 +2381,16 @@ public class GoogleDrive extends PluginForHost {
         link.removeProperty(PROPERTY_TIMESTAMP_STREAM_QUOTA_REACHED);
         link.removeProperty(PROPERTY_USED_STREAM_DOWNLOAD_TYPE);
         link.removeProperty(PROPERTY_LAST_IS_PRIVATE_FILE_TIMESTAMP);
+        /* Reset Google Document download properties */
+        link.removeProperty(PROPERTY_FORCED_FINAL_DOWNLOADURL);
+        link.removeProperty(PROPERTY_GOOGLE_DOCUMENT_FILE_EXTENSION);
+        /* Reset temporary properties which are not important at all */
+        removeTempProperties(link);
+    }
+
+    private void removeTempProperties(final DownloadLink link) {
+        link.removeProperty(PROPERTY_TMP_ALLOW_OBTAIN_MORE_INFORMATION);
+        link.removeProperty(PROPERTY_TMP_FILENAME_FROM_QUICK_LINKCHECK);
     }
 
     @Override

@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50771 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51485 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -960,7 +960,7 @@ public abstract class HighWayCore extends UseNet {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);
             case 15:
                 /*
-                 * Host specific download request limit has been reahed. This is basically the protection of this multihost against users
+                 * Host specific download request limit has been reached. This is basically the protection of this multihost against users
                  * trying to start a lot of downloads of limited hosts at the same time, trying to exceed the multihosts daily host specific
                  * limits.
                  */

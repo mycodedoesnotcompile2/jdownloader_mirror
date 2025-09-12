@@ -239,17 +239,6 @@ public abstract class Plugin implements ActionListener {
         return getExtensionFromMimeType(connection.getContentType());
     }
 
-    /** Mimics e.g.: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types */
-    @Deprecated
-    public static String getExtensionFromMimeTypeStatic(final String contentType) {
-        final List<CompiledFiletypeExtension> fileTypeExtensions = CompiledFiletypeFilter.getByMimeType(contentType);
-        if (fileTypeExtensions != null && fileTypeExtensions.size() > 0) {
-            return fileTypeExtensions.get(0).getExtensionFromMimeType(contentType);
-        } else {
-            return null;
-        }
-    }
-
     protected String[] buildSupportedNames(final List<String[]> pluginDomains) {
         for (final String[] domains : pluginDomains) {
             if (StringUtils.equalsIgnoreCase(getHost(), domains[0])) {
