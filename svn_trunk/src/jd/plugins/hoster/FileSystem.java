@@ -4,16 +4,8 @@ import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.IO;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.plugins.DownloadPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.settings.GeneralSettings;
 
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
@@ -31,8 +23,19 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
+import jd.plugins.download.raf.HTTPDownloader;
 
-@HostPlugin(revision = "$Revision: 49059 $", interfaceVersion = 2, names = { "filesystem" }, urls = { "filesystem:/.+" })
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.IO;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.plugins.DownloadPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.translate._JDT;
+
+@HostPlugin(revision = "$Revision: 51496 $", interfaceVersion = 2, names = { "filesystem" }, urls = { "filesystem:/.+" })
 public class FileSystem extends PluginForHost {
     public FileSystem(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +91,7 @@ public class FileSystem extends PluginForHost {
     @Override
     public void handleFree(DownloadLink link) throws Exception {
         if (true) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unfinished work in progress");
         }
         dl = new FileSystemDownloader(this, link);
         dl.startDownload();
@@ -180,12 +183,17 @@ public class FileSystem extends PluginForHost {
                         downloadPluginProgress = new DownloadPluginProgress(downloadable, this, Color.GREEN.darker());
                         downloadable.addPluginProgress(downloadPluginProgress);
                         downloadable.setAvailable(AvailableStatus.TRUE);
-                        IO.writeToFile(this.outputFinalCompleteFile, "".getBytes("UTF-8"), IO.SYNC.META_AND_DATA);
+                        if (true) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unfinished work in progress");
+                        } else {
+                            IO.writeToFile(this.outputFinalCompleteFile, "".getBytes("UTF-8"), IO.SYNC.META_AND_DATA);
+                        }
                         /* Set filesize so user can see it in UI. */
                         this.bytesWritten = this.outputFinalCompleteFile.length();
                         downloadable.setVerifiedFileSize(this.bytesWritten);
                         downloadable.setDownloadBytesLoaded(bytesWritten);
                         /* Set progress to finished - the "download" is complete. */
+                        finalizeDownload(outputCompleteFile, outputFinalCompleteFile);
                         downloadable.setLinkStatus(LinkStatus.FINISHED);
                     } finally {
                         try {
@@ -215,12 +223,13 @@ public class FileSystem extends PluginForHost {
             }
         }
 
-        protected boolean finalizeDownload(File outputPartFile, File outputCompleteFile, Long lastModified) throws Exception {
+        protected void finalizeDownload(File outputPartFile, File outputCompleteFile) throws Exception {
             if (downloadable.rename(outputPartFile, outputCompleteFile)) {
                 try {
-                    if (lastModified != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
-                        /* set original lastModified timestamp */
-                        outputCompleteFile.setLastModified(lastModified.longValue());
+                    boolean UseOriginalLastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
+                    final Date lastModifiedDate;
+                    if (UseOriginalLastModified && (lastModifiedDate = HTTPDownloader.getLastModifiedDate(getDownloadable(), null)) != null) {
+                        outputCompleteFile.setLastModified(lastModifiedDate.getTime());
                     } else {
                         /* set current timestamp as lastModified timestamp */
                         outputCompleteFile.setLastModified(System.currentTimeMillis());
@@ -228,9 +237,8 @@ public class FileSystem extends PluginForHost {
                 } catch (final Throwable ignore) {
                     LogSource.exception(downloadable.getLogger(), ignore);
                 }
-                return true;
             } else {
-                return false;
+                throw new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, _JDT.T.system_download_errors_couldnotrename(), LinkStatus.VALUE_LOCAL_IO_ERROR);
             }
         }
 

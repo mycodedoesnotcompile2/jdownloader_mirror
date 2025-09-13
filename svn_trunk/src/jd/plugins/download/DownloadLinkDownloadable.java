@@ -105,6 +105,10 @@ public class DownloadLinkDownloadable implements Downloadable {
         return getDownloadLink().getBooleanProperty(DirectHTTP.PROPERTY_ServerComaptibleForByteRangeRequest, false);
     }
 
+    public long getLastModifiedTimestamp() {
+        return getDownloadLink().getLastModifiedTimestamp();
+    }
+
     @Override
     public String getHost() {
         final DownloadInterface dli = getDownloadInterface();

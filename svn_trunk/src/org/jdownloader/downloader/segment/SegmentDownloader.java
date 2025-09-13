@@ -27,6 +27,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
+import jd.plugins.download.raf.HTTPDownloader;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
@@ -354,11 +355,6 @@ public class SegmentDownloader extends DownloadInterface {
             return false;
         } else {
             final boolean renameOkay = finalizeDownload(outputPartFile, outputCompleteFile, lastModified);
-            // last modofied date noch setzen
-            // final Date last = TimeFormatter.parseDateString(connection.getHeaderField("Last-Modified"));
-            // if (last != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
-            // /* set original lastModified timestamp */
-            // outputCompleteFile.setLastModified(last.getTime());
             if (!renameOkay) {
                 error(new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, _JDT.T.system_download_errors_couldnotrename(), LinkStatus.VALUE_LOCAL_IO_ERROR));
                 return false;
@@ -371,11 +367,13 @@ public class SegmentDownloader extends DownloadInterface {
     protected boolean finalizeDownload(File outputPartFile, File outputCompleteFile, Long lastModified) throws Exception {
         if (downloadable.rename(outputPartFile, outputCompleteFile)) {
             try {
-                if (lastModified != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
-                    /* set original lastModified timestamp */
-                    outputCompleteFile.setLastModified(lastModified.longValue());
+                boolean UseOriginalLastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
+                final Date lastModifiedDate;
+                if (UseOriginalLastModified && (lastModifiedDate = HTTPDownloader.getLastModifiedDate(getDownloadable(), null)) != null) {
+                    outputCompleteFile.setLastModified(lastModifiedDate.getTime());
+                } else if (UseOriginalLastModified && lastModified != null && lastModified != -1) {
+                    outputCompleteFile.setLastModified(lastModified);
                 } else {
-                    /* set current timestamp as lastModified timestamp */
                     outputCompleteFile.setLastModified(System.currentTimeMillis());
                 }
             } catch (final Throwable ignore) {

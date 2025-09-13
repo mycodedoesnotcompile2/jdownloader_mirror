@@ -9,8 +9,23 @@ import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP;
+import jd.nutils.SimpleFTP.STATE;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.download.raf.HTTPDownloader;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
@@ -29,19 +44,6 @@ import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
 
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP;
-import jd.nutils.SimpleFTP.STATE;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 public class SimpleFTPDownloadInterface extends DownloadInterface {
     private final Downloadable                      downloadable;
     private final ManagedThrottledConnectionHandler connectionHandler;
@@ -57,7 +59,6 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
     protected long                                  totalLinkBytesLoaded     = -1;
     protected final AtomicLong                      totalLinkBytesLoadedLive = new AtomicLong(0);
     private long                                    startTimeStamp           = -1;
-    private long                                    lastModifiedTimeStamp    = -1;
     private boolean                                 resumed                  = false;
 
     public SimpleFTPDownloadInterface(SimpleFTP simpleFTP, final DownloadLink link, String filePath) {
@@ -127,7 +128,8 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
         return totalLinkBytesLoadedLive.get();
     }
 
-    protected void download(String filename, boolean resume) throws IOException, PluginException, SkipReasonException {
+    protected Long download(String filename, boolean resume) throws IOException, PluginException, SkipReasonException {
+        Long lastModifiedTimeStamp = null;
         if (JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
             try {
                 lastModifiedTimeStamp = simpleFTP.getModTime(filename);
@@ -222,6 +224,7 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
                 downloadable.setDownloadBytesLoaded(totalLinkBytesLoaded);
             }
         }
+        return lastModifiedTimeStamp;
     }
 
     private void close(Closeable closable) {
@@ -239,6 +242,7 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
             downloadable.setConnectionHandler(this.getManagedConnetionHandler());
             final DiskSpaceReservation reservation = downloadable.createDiskSpaceReservation();
             DownloadPluginProgress downloadPluginProgress = null;
+            Long lastModified = null;
             try {
                 if (!downloadable.checkIfWeCanWrite(new ExceptionRunnable() {
                     @Override
@@ -259,7 +263,7 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
                 downloadPluginProgress = new DownloadPluginProgress(downloadable, this, Color.GREEN.darker());
                 downloadable.addPluginProgress(downloadPluginProgress);
                 downloadable.setAvailable(AvailableStatus.TRUE);
-                download(filePath, downloadable.isResumable());
+                lastModified = download(filePath, downloadable.isResumable());
             } finally {
                 try {
                     downloadable.free(reservation);
@@ -289,14 +293,14 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
                         throw new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, _JDT.T.system_download_doCRC2_failed(hashResult.getHashInfo().getType()));
                     }
                 }
-                finalizeDownload(outputPartFile, outputCompleteFile);
+                finalizeDownload(outputPartFile, outputCompleteFile, lastModified);
                 downloadable.setLinkStatus(LinkStatus.FINISHED);
                 return true;
-            }
-            if (externalDownloadStop() == false) {
+            } else if (externalDownloadStop() == false) {
                 throw new PluginException(LinkStatus.ERROR_DOWNLOAD_INCOMPLETE, _JDT.T.download_error_message_incomplete());
+            } else {
+                return false;
             }
-            return false;
         } finally {
             downloadable.unlockFiles(outputCompleteFile, outputFinalCompleteFile, outputPartFile);
             cleanupDownladInterface();
@@ -328,11 +332,15 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
         return terminated.get();
     }
 
-    private void finalizeDownload(final File outputPartFile, final File outputCompleteFile) throws Exception {
+    private void finalizeDownload(final File outputPartFile, final File outputCompleteFile, final Long lastModified) throws Exception {
         if (downloadable.rename(outputPartFile, outputCompleteFile)) {
             try {
-                if (lastModifiedTimeStamp != -1) {
-                    outputCompleteFile.setLastModified(lastModifiedTimeStamp);
+                boolean UseOriginalLastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
+                final Date lastModifiedDate;
+                if (UseOriginalLastModified && (lastModifiedDate = HTTPDownloader.getLastModifiedDate(getDownloadable(), null)) != null) {
+                    outputCompleteFile.setLastModified(lastModifiedDate.getTime());
+                } else if (UseOriginalLastModified && lastModified != null && lastModified != -1) {
+                    outputCompleteFile.setLastModified(lastModified);
                 } else {
                     outputCompleteFile.setLastModified(System.currentTimeMillis());
                 }

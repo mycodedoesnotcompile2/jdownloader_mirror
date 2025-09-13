@@ -155,7 +155,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 51496 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -519,7 +519,11 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                     IOException ioe = null;
                                     try {
                                         lastCon = null;
-                                        lastCon = br.openRequestConnection(new HeadRequest(url));
+                                        if (url.contains("&live=1")) {
+                                            lastCon = br.openRequestConnection(new GetRequest(url));
+                                        } else {
+                                            lastCon = br.openRequestConnection(new HeadRequest(url));
+                                        }
                                     } catch (IOException e) {
                                         ioe = e;
                                         logger.log(e);
@@ -605,7 +609,11 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                     IOException ioe = null;
                                     try {
                                         lastCon = null;
-                                        lastCon = br.openRequestConnection(new HeadRequest(url));
+                                        if (url.contains("&live=1")) {
+                                            lastCon = br.openRequestConnection(new GetRequest(url));
+                                        } else {
+                                            lastCon = br.openRequestConnection(new HeadRequest(url));
+                                        }
                                     } catch (IOException e) {
                                         ioe = e;
                                         logger.log(e);
@@ -1168,6 +1176,16 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         return ret;
     }
 
+    @Override
+    public Downloadable newDownloadable(DownloadLink downloadLink, Browser br) {
+        return new DownloadLinkDownloadable(downloadLink, br) {
+            @Override
+            public long getLastModifiedTimestamp() {
+                return getDownloadLink().getLongProperty(YoutubeHelper.YT_DATE, -1);
+            }
+        };
+    }
+
     private Boolean downloadDashStream(final DownloadLink downloadLink, final YoutubeProperties data, final boolean isVideoStream) throws Exception {
         final long totalSize = downloadLink.getDownloadSize();
         // VariantInfo urls = getUrlPair(downloadLink);
@@ -1269,6 +1287,11 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
             @Override
             public boolean isResumable() {
                 return true;
+            }
+
+            @Override
+            public long getLastModifiedTimestamp() {
+                return downloadLink.getLongProperty(YoutubeHelper.YT_DATE, -1);
             }
 
             @Override
@@ -2548,25 +2571,26 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
 
     @Override
     public void resetDownloadlink(DownloadLink downloadLink) {
-        if (downloadLink != null) {
-            resetStreamUrls(downloadLink);
-            final YoutubeProperties data = downloadLink.bindData(YoutubeProperties.class);
-            downloadLink.getTempProperties().removeProperty("ratebypass");
-            data.setDashAudioBytesLoaded(0);
-            data.setDashAudioFinished(false);
-            data.setDashAudioITag(-1);
-            data.setDashVideoBytesLoaded(0);
-            data.setDashVideoFinished(false);
-            data.setDashVideoITag(-1);
-            downloadLink.removeProperty(DASH_VIDEO_CHUNKS);
-            downloadLink.removeProperty(DASH_AUDIO_CHUNKS);
-            for (final Entry<String, Object> entry : downloadLink.getProperties().entrySet()) {
-                if (StringUtils.startsWithCaseInsensitive(entry.getKey(), "incomplete_")) {
-                    downloadLink.removeProperty(entry.getKey());
-                }
-            }
-            ClipDataCache.clearCache(downloadLink);
+        if (downloadLink == null) {
+            return;
         }
+        resetStreamUrls(downloadLink);
+        final YoutubeProperties data = downloadLink.bindData(YoutubeProperties.class);
+        downloadLink.getTempProperties().removeProperty("ratebypass");
+        data.setDashAudioBytesLoaded(0);
+        data.setDashAudioFinished(false);
+        data.setDashAudioITag(-1);
+        data.setDashVideoBytesLoaded(0);
+        data.setDashVideoFinished(false);
+        data.setDashVideoITag(-1);
+        downloadLink.removeProperty(DASH_VIDEO_CHUNKS);
+        downloadLink.removeProperty(DASH_AUDIO_CHUNKS);
+        for (final Entry<String, Object> entry : downloadLink.getProperties().entrySet()) {
+            if (StringUtils.startsWithCaseInsensitive(entry.getKey(), "incomplete_")) {
+                downloadLink.removeProperty(entry.getKey());
+            }
+        }
+        ClipDataCache.clearCache(downloadLink);
     }
 
     @Override

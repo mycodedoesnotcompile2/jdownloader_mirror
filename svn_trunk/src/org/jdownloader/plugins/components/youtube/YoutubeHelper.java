@@ -3042,6 +3042,11 @@ public class YoutubeHelper {
                     throttle = 1;
                 }
             }
+            if (StringUtils.contains(url, "source=yt_live_broadcast")) {
+                // not yet supported because we need to add segments here, but from where
+                logger.info("UNSUPPORTED live broadcast:" + JSonStorage.toString(entry));
+                return null;
+            }
         } catch (PluginException e) {
             logger.log(e);
             return null;
@@ -3075,13 +3080,17 @@ public class YoutubeHelper {
         }
         final YoutubeITAG itag = YoutubeITAG.get(itagID.intValue(), width.intValue(), height.intValue(), fps.intValue(), null, null, datePublished);
         if (itag == null) {
-            logger.info("UNSUPPORTED/UNKNOWN?:" + JSonStorage.toString(entry));
-            try {
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !Application.isJared(null)) {
-                    Dialog.getInstance().showMessageDialog("Unknown ITag found: " + itagID + "\r\nAsk Coalado to Update the ItagHelper for Video ID: " + vid.videoID);
+            if (StringUtils.contains(url, "yt_live_broadcast")) {
+                logger.info("UNSUPPORTED live broadcast:" + JSonStorage.toString(entry));
+            } else {
+                logger.info("UNSUPPORTED/UNKNOWN?:" + JSonStorage.toString(entry));
+                try {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !Application.isJared(null)) {
+                        Dialog.getInstance().showMessageDialog("Unknown ITag found: " + itagID + "\r\nAsk Coalado to Update the ItagHelper for Video ID: " + vid.videoID);
+                    }
+                } catch (Exception e) {
+                    logger.log(e);
                 }
-            } catch (Exception e) {
-                logger.log(e);
             }
             return null;
         } else if (Boolean.FALSE.equals(isSupported(itag))) {
@@ -3230,22 +3239,32 @@ public class YoutubeHelper {
         final NodeList representations = doc.getElementsByTagName("Representation");
         for (int r = 0; r < representations.getLength(); r++) {
             final Element representation = (Element) representations.item(r);
-            final Long itagID = JavaScriptEngineFactory.toLong(representation.getAttribute("id"), -1);
             final Long width = JavaScriptEngineFactory.toLong(representation.getAttribute("width"), -1);
             final Long height = JavaScriptEngineFactory.toLong(representation.getAttribute("height"), -1);
             final Long bitrate = JavaScriptEngineFactory.toLong(representation.getAttribute("bandwidth"), -1);
             final Long fps = JavaScriptEngineFactory.toLong(representation.getAttribute("frameRate"), -1);
             final Element baseUrlElement = (Element) representation.getElementsByTagName("BaseURL").item(0);
             final String baseURL = baseUrlElement.getTextContent();
+            final String itagString = new Regex(baseURL, "/itag/(\\d+)/").getMatch(0);
+            final Long itagID;
+            if (itagString != null) {
+                itagID = Long.parseLong(itagString);
+            } else {
+                itagID = JavaScriptEngineFactory.toLong(representation.getAttribute("id"), -1);
+            }
             final YoutubeITAG itag = YoutubeITAG.get(itagID.intValue(), width.intValue(), height.intValue(), fps.intValue(), null, null, this.vid != null ? vid.datePublished : null);
             if (itag == null) {
-                logger.info("UNSUPPORTED/UNKNOWN?");
-                try {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !Application.isJared(null)) {
-                        Dialog.getInstance().showMessageDialog("Unknown ITag found: " + itagID + "\r\nAsk Coalado to Update the ItagHelper for Video ID: " + vid.videoID);
+                if (StringUtils.contains(baseURL, "yt_live_broadcast")) {
+                    logger.info("UNSUPPORTED live broadcast");
+                } else {
+                    logger.info("UNSUPPORTED/UNKNOWN?");
+                    try {
+                        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !Application.isJared(null)) {
+                            Dialog.getInstance().showMessageDialog("Unknown ITag found: " + itagID + "\r\nAsk Coalado to Update the ItagHelper for Video ID: " + vid.videoID);
+                        }
+                    } catch (Exception e) {
+                        logger.log(e);
                     }
-                } catch (Exception e) {
-                    logger.log(e);
                 }
                 continue;
             } else if (Boolean.FALSE.equals(isSupported(itag))) {

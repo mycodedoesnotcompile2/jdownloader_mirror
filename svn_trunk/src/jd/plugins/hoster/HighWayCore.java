@@ -36,6 +36,7 @@ import org.jdownloader.gui.views.downloads.columns.ETAColumn;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.ConditionalSkipReasonException;
 import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.WaitForAccountTrafficSkipReason;
 import org.jdownloader.plugins.WaitingSkipReason;
 import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
@@ -66,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51485 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51491 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -1028,5 +1029,58 @@ public abstract class HighWayCore extends UseNet {
         } else {
             return false;
         }
+    }
+
+    @Override
+    public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
+        /**
+         * 2025-09-12: Special: When a link is cached, it can be downloaded even if host specific traffic is empty. <br>
+         * To account for this, this plugin contains a modified version of the original function.
+         */
+        if (account == null) {
+            return true;
+        }
+        final AccountInfo ai = account.getAccountInfo();
+        if (ai == null) {
+            return true;
+        }
+        final long trafficLeft = ai.getTrafficLeft();
+        final long minimum = 1024;
+        final long downloadSize = link.getView().getBytesTotalEstimated();
+        long trafficNeeded;
+        if (downloadSize > 0) {
+            trafficNeeded = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
+        } else {
+            trafficNeeded = minimum;
+        }
+        if (account.isMultiHost() && !account.getHoster().equals(link.getHost())) {
+            /* Check for domain specific limits of multihost items. */
+            /* Verify again if host is still supported because plugins can modify list on runtime */
+            final MultiHostHost mhost = ai.getMultihostSupportedHost(link.getHost());
+            if (mhost == null) {
+                /* Host is not supported (anymore) */
+                return false;
+            }
+            /**
+             * In some cases, individual hosts can have different traffic calculation values than 100%. <br>
+             * This calculation applies for the global account-traffic and not for the individual host. </br>
+             * Example: File size is 1GB, individual host traffic calculation factor is 400% <br>
+             * Account traffic needed: 4GB <br>
+             * Individual host traffic needed: 1GB
+             */
+            trafficNeeded = (trafficNeeded * mhost.getTrafficCalculationFactorPercent()) / 100;
+        }
+        if (!ai.isUnlimitedTraffic() && !ai.isSpecialTraffic()) {
+            /* Check if enough traffic is left */
+            if (trafficNeeded > trafficLeft) {
+                if (ai.isTrafficRefill()) {
+                    final long howMuchTrafficIsMissing = trafficNeeded - trafficLeft;
+                    throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReason(account, howMuchTrafficIsMissing));
+                } else {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }

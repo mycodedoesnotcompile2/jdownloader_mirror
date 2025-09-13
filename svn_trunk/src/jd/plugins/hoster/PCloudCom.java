@@ -25,11 +25,15 @@ import java.util.Random;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.http.Browser;
+import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
@@ -48,7 +52,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.PCloudComFolder;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50330 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51494 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PCloudComFolder.class })
 public class PCloudCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -56,6 +60,11 @@ public class PCloudCom extends PluginForHost {
         super(wrapper);
         setConfigElements();
         this.enablePremium("https://my." + getHost() + "/#page=register");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     private static List<String[]> getPluginDomains() {
@@ -125,10 +134,9 @@ public class PCloudCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://my.pcloud.com/#page=policies&tab=terms-of-service";
+        return "https://my." + getHost() + "/#page=policies&tab=terms-of-service";
     }
 
-    private static final String NICE_HOST                                       = "pcloud.com";
     /* Plugin Settings */
     private static final String DOWNLOAD_ZIP                                    = "DOWNLOAD_ZIP_2";
     private static final String MOVE_FILES_TO_ACCOUNT                           = "MOVE_FILES_TO_ACCOUNT";
@@ -143,6 +151,10 @@ public class PCloudCom extends PluginForHost {
     public static final int     STATUS_CODE_DOWNLOAD_PASSWORD_REQUIRED          = 2258;
     private static final int    STATUS_CODE_WRONG_LOCATION                      = 2321;
     private static final int    STATUS_CODE_PREMIUMONLY                         = 7005;
+    /* Account properties */
+    private static final String PROPERTY_ACCOUNT_API_HOST                       = "account_api";
+    private static final String PROPERTY_ACCOUNT_AUTH_TOKEN                     = "account_auth";
+    private static final String PROPERTY_ACCOUNT_DEVICE_ID                      = "account_device_id";
 
     public static String getAPIDomain(final String linkDomain) {
         if (linkDomain.matches("(?i).*e\\d*\\.pcloud\\.(com|link)")) {
@@ -242,7 +254,7 @@ public class PCloudCom extends PluginForHost {
         if (account != null) {
             synchronized (account) {
                 account_auth = login(account, false);
-                account_api = account.getStringProperty("account_api");
+                account_api = account.getStringProperty(PROPERTY_ACCOUNT_API_HOST);
                 if (account_api == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -382,65 +394,190 @@ public class PCloudCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     private String login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            if (!account.getUser().matches(".+@.+\\..+")) {
-                if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                    throw new AccountInvalidException("\r\nBitte gib deine E-Mail Adresse ins Benutzername Feld ein!");
-                } else {
-                    throw new AccountInvalidException("\r\nPlease enter your e-mail address in the username field!");
-                }
+            /* Re-use device_id once one has been stored to this account. */
+            String device_id = account.getStringProperty(PROPERTY_ACCOUNT_DEVICE_ID);
+            if (device_id == null) {
+                device_id = generateDeviceID();
             }
+            final String location_1_us = "api.pcloud.com";
+            final String location_2_eu = "eapi.pcloud.com";
             final Cookies cookies = account.loadCookies("");
-            String account_auth = account.getStringProperty("account_auth");
-            String account_api = account.getStringProperty("account_api");
-            if (cookies != null && StringUtils.isAllNotEmpty(account_auth, account_api)) {
-                br.setCookies(cookies);
+            final Cookies userCookies = account.loadUserCookies();
+            String auth_token = account.getStringProperty(PROPERTY_ACCOUNT_AUTH_TOKEN);
+            String account_api_host = account.getStringProperty(PROPERTY_ACCOUNT_API_HOST, location_1_us);
+            if (userCookies != null) {
+                /* Validate user cookies */
+                final Cookie auth_token_cookie = userCookies.get("pcauth");
+                final Cookie locationid = userCookies.get("locationid");
+                if (auth_token_cookie == null || StringUtils.isEmpty(auth_token_cookie.getValue()) || locationid == null || StringUtils.isEmpty(locationid.getValue())) {
+                    logger.info("Users' cookies are incomplete or invalid!");
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                }
+                auth_token = auth_token_cookie.getValue();
+                if ("1".equals(locationid.getValue())) {
+                    account_api_host = location_1_us;
+                } else {
+                    account_api_host = location_2_eu;
+                }
+                /* Save data as property so it can be used outside this function without the need to access/parse users' cookies again. */
+                account.setProperty(PROPERTY_ACCOUNT_API_HOST, account_api_host);
+                account.setProperty(PROPERTY_ACCOUNT_AUTH_TOKEN, auth_token);
+            }
+            if ((cookies != null || userCookies != null) && !StringUtils.isEmpty(auth_token)) {
+                if (userCookies != null) {
+                    br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
+                }
                 if (!force) {
                     logger.info("Trust token without checking");
-                    return account_auth;
+                    return auth_token;
                 }
-                br.getPage("https://" + account_api + "/userinfo?auth=" + Encoding.urlEncode(account_auth) + "&getlastsubscription=1");
+                br.getPage("https://" + account_api_host + "/userinfo?auth=" + Encoding.urlEncode(auth_token) + "&getlastsubscription=1");
                 try {
                     final Map<String, Object> resp = this.handleAPIErrors(br);
                     logger.info("Token login successful");
                     updateAccountInfo(account, resp);
-                    return account_auth;
+                    if (userCookies != null) {
+                        /*
+                         * Ensure that we have unique usernames since for cookie login, user could enter another/wrong e-mail into username
+                         * field.
+                         */
+                        final String email = (String) resp.get("email");
+                        if (email != null) {
+                            account.setUser(email);
+                        }
+                    }
+                    return auth_token;
                 } catch (final PluginException e) {
                     /* Wrong token = Will typically fail with errorcode 2000 */
                     logger.info("Token login failed");
                     logger.log(e);
                     br.clearCookies(null);
+                    if (userCookies != null) {
+                        if (account.hasEverBeenValid()) {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                        } else {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                        }
+                    }
                 }
             }
             logger.info("Performing full login");
             /* Depending on which selection the user met when he registered his account, a different endpoint is required for login. */
             logger.info("Trying to login via US-API endpoint");
-            br.postPage("https://api.pcloud.com/login", "logout=1&getauth=1&username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&_t=" + System.currentTimeMillis());
+            final UrlQuery query1 = new UrlQuery();
+            query1.appendEncoded("os", "4");
+            query1.appendEncoded("language", "en");
+            query1.appendEncoded("cannotusegooglelogin", "false");
+            query1.appendEncoded("cannotuseapplelogin", "false");
+            query1.appendEncoded("cannotusefacebooklogin", "false");
+            query1.appendEncoded("getlogins", "1");
+            query1.appendEncoded("email", account.getUser());
+            final String path = "/user/preparelogin";
+            br.getPage("https://" + location_1_us + path + "?" + query1.toString());
             Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final int statusCode = ((Number) resp.get("result")).intValue();
             if (statusCode == STATUS_CODE_WRONG_LOCATION || statusCode == STATUS_CODE_INVALID_LOGIN) {
                 logger.info("Trying to login via EU-API endpoint");
-                br.postPage("https://eapi.pcloud.com/login", "logout=1&getauth=1&username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&_t=" + System.currentTimeMillis());
+                br.getPage("https://" + location_2_eu + path + "?" + query1.toString());
                 resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 this.handleAPIErrors(resp);
             }
+            final boolean captchaRequired = ((Boolean) resp.get("usegrecaptcha")).booleanValue();
+            final List<Map<String, Object>> logins = (List<Map<String, Object>>) resp.get("logins");
+            boolean requiresTOTPEmailLogin = true;
+            if (logins != null) {
+                /* TODO: Evaluate all 4 different types of logins. */
+                for (final Map<String, Object> login : logins) {
+                    final int type = ((Number) login.get("type")).intValue();
+                    if (type == 4 && Boolean.TRUE.equals(login.get("preferred"))) {
+                        requiresTOTPEmailLogin = false;
+                        break;
+                    }
+                }
+            }
+            String twoFACode = null;
+            if (requiresTOTPEmailLogin) {
+                final UrlQuery query2 = new UrlQuery();
+                query2.appendEncoded("email", account.getUser());
+                query2.appendEncoded("os", "4");
+                query2.appendEncoded("language", "en");
+                br.getPage("/user/sendemailtfamail?" + query2.toString());
+                resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                this.handleAPIErrors(resp);
+                twoFACode = this.getTwoFACode(account, "\\d{8}");
+                final UrlQuery query3 = new UrlQuery();
+                query3.appendEncoded("email", account.getUser());
+                query3.appendEncoded("code", twoFACode);
+                br.getPage("/user/checkemailtfacode?" + query3.toString());
+                resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                this.handleAPIErrors(resp);
+                /* TOTP success -> Next step */
+                query1.appendEncoded("emailtfacode", twoFACode);
+                br.getPage("/user/preparelogin?" + query1.toString());
+                resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                this.handleAPIErrors(resp);
+            }
+            /* Final step: send password */
+            final UrlQuery query4 = new UrlQuery();
+            query4.appendEncoded("username", account.getUser());
+            query4.appendEncoded("password", account.getPass());
+            query4.appendEncoded("deviceid", device_id);
+            query4.appendEncoded("language", "en");
+            if (twoFACode != null) {
+                query4.appendEncoded("emailtfacode", twoFACode);
+            }
+            query4.appendEncoded("_t", Long.toString(System.currentTimeMillis()));
+            query4.appendEncoded("logout", "1");
+            query4.appendEncoded("getlastsubscription", "1");
+            query4.appendEncoded("promoinfo", "1");
+            query4.appendEncoded("os", "4");
+            query4.appendEncoded("osversion", "0.0.0");
+            if (captchaRequired) {
+                /* Obtain captcha token for login */
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Ld3iconAAAAAMeIhfk_3jTdIPSNX_OcSY6QlvZR") {
+                    @Override
+                    public TYPE getType() {
+                        return TYPE.INVISIBLE;
+                    }
+                }.getToken();
+                query4.appendEncoded("gresponse", recaptchaV2Response);
+            }
+            br.postPage("/login", query4);
+            resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            this.handleAPIErrors(resp);
             updateAccountInfo(account, resp);
-            account_auth = resp.get("auth").toString();
-            if (StringUtils.isEmpty(account_auth)) {
+            auth_token = resp.get("auth").toString();
+            if (StringUtils.isEmpty(auth_token)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            account_api = br.getHost(true);
-            getAPISafe("https://" + account_api + "/userinfo?auth=" + Encoding.urlEncode(account_auth) + "&getlastsubscription=1");
-            account.setProperty("account_api", account_api);
-            account.setProperty("account_auth", account_auth);
-            account.saveCookies(br.getCookies(br.getURL()), "");
-            return account_auth;
+            br.setCookie(br.getHost(), "pcauth", auth_token);
+            account_api_host = br.getHost(true);
+            getAPISafe("/userinfo?auth=" + Encoding.urlEncode(auth_token) + "&getlastsubscription=1");
+            account.setProperty(PROPERTY_ACCOUNT_API_HOST, account_api_host);
+            account.setProperty(PROPERTY_ACCOUNT_AUTH_TOKEN, auth_token);
+            account.setProperty(PROPERTY_ACCOUNT_DEVICE_ID, device_id);
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            return auth_token;
         }
+    }
+
+    public static String generateDeviceID() {
+        String characters = "abcdefghijklmnopqrstuvwxyz0123456789";
+        StringBuilder token = new StringBuilder(30);
+        java.util.Random random = new java.util.Random();
+        for (int i = 0; i < 30; i++) {
+            int index = random.nextInt(characters.length());
+            token.append(characters.charAt(index));
+        }
+        return token.toString();
     }
 
     private void updateAccountInfo(final Account account, final Map<String, Object> resp) throws PluginException {
@@ -460,9 +597,16 @@ public class PCloudCom extends PluginForHost {
         } else {
             account.setType(AccountType.FREE);
             /* Last checked: 2020-10-06 */
-            account.setMaxSimultanDownloads(20);
+            account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
         }
         account.setConcurrentUsePossible(true);
+        // final Number quota = (Number) resp.get("quota");
+        // if (quota != null) {
+        // }
+        // final Number usedquota_bytes = (Number) resp.get("usedquota");
+        // if (usedquota_bytes != null) {
+        // account.getAccountInfo().setUsedSpace(usedquota_bytes.longValue());
+        // }
     }
 
     @Override
@@ -530,6 +674,9 @@ public class PCloudCom extends PluginForHost {
             case 2009:
                 /* { "result": 2009, "error": "File not found."} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            case 2012:
+                /* Invalid email TOTP code */
+                throw new AccountInvalidException(errormessage);
             case STATUS_CODE_DOWNLOAD_PASSWORD_REQUIRED:
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Download password required");
             case STATUS_CODE_WRONG_LOCATION:
@@ -548,7 +695,7 @@ public class PCloudCom extends PluginForHost {
             case STATUS_CODE_MAYBE_OWNER_ONLY:
                 /* file might be set to preview only download */
                 /* "error": "Access denied. You do not have permissions to perform this operation." */
-                throw new AccountRequiredException();
+                throw new AccountRequiredException(errormessage);
             case 7014:
                 /*
                  * 2016-08-31: Added support for this though I'm not sure about this - I guess some kind of account traffic limit has been
@@ -560,7 +707,7 @@ public class PCloudCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, errormessage);
             }
         } catch (final PluginException e) {
-            logger.info(NICE_HOST + ": Exception: statusCode: " + statusCode + " statusMessage: " + errormessage);
+            logger.info(this.getHost() + ": Exception: statusCode: " + statusCode + " statusMessage: " + errormessage);
             throw e;
         }
         return entries;

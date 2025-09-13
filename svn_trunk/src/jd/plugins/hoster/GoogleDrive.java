@@ -89,7 +89,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51487 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51491 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -611,9 +611,18 @@ public class GoogleDrive extends PluginForHost {
                     logger.warning("WTF failed to parse URL: " + url);
                 }
             }
-            autoMode: if (enableAutoMode) {
+            final String linkPreferredFileExtensionWithoutDot = link.getStringProperty(PROPERTY_GOOGLE_DOCUMENT_FILE_EXTENSION);
+            if (linkPreferredFileExtensionWithoutDot != null) {
+                /* Try to find same format as chosen last time */
+                docDownloadURL = extToDownloadlinkMap.get(linkPreferredFileExtensionWithoutDot);
+                if (docDownloadURL != null) {
+                    finalFileExtensionWithoutDot = linkPreferredFileExtensionWithoutDot;
+                }
+            }
+            autoMode: if (docDownloadURL == null && enableAutoMode) {
                 String preGivenFileExtensionLowercaseWithoutDot = Plugin.getFileNameExtensionFromString(filename);
                 if (preGivenFileExtensionLowercaseWithoutDot == null) {
+                    /* No file extension available -> Auto mode cannot do anything */
                     break autoMode;
                 }
                 preGivenFileExtensionLowercaseWithoutDot = preGivenFileExtensionLowercaseWithoutDot.toLowerCase(Locale.ENGLISH).replace(".", "");
@@ -654,8 +663,11 @@ public class GoogleDrive extends PluginForHost {
              * If docDownloadURL is still null here this means that this is a Google Document with a file-type we do not know.´<br>
              * In this case, upper handling will try to download it as a .zip file.
              */
-            if (!StringUtils.isEmpty(docDownloadURL)) {
-                /* We found an export format suiting our filename-extension --> Prefer that */
+            if (!StringUtils.isEmpty(docDownloadURL) && StringUtils.isEmpty(finalFileExtensionWithoutDot)) {
+                /* This should never happen! */
+                logger.warning("!!Developer mistake: docDownloadURL exists but finalFileExtensionWithoutDot does not!!!");
+            } else if (!StringUtils.isEmpty(docDownloadURL)) {
+                /* We found an export format we want --> Store as property so we can re-use it later. */
                 link.setProperty(PROPERTY_FORCED_FINAL_DOWNLOADURL, docDownloadURL);
                 link.setProperty(PROPERTY_GOOGLE_DOCUMENT_FILE_EXTENSION, finalFileExtensionWithoutDot);
             }
@@ -681,7 +693,6 @@ public class GoogleDrive extends PluginForHost {
         }
         final GoogleConfig cfg = PluginJsonConfig.get(GoogleConfig.class);
         final boolean isDownload = PluginEnvironment.DOWNLOAD == this.getPluginEnvironment();
-        boolean isGoogleDocumentThatRequiresDeeperLinkcheck = isGoogleDocument(link) && !this.hasObtainedInformationFromAPIOrWebAPI(link);
         prepBrowser(this.br);
         try {
             boolean performDeeperOfflineCheck = false;
@@ -699,7 +710,7 @@ public class GoogleDrive extends PluginForHost {
                     } else if (cfg.isDebugWebsiteAlwaysPerformExtendedLinkcheck() && !this.hasObtainedInformationFromAPIOrWebAPI(link)) {
                         /* Debug functionality. Can be used by anyone but shall only be used by devs. */
                         logger.info("Handling extra linkcheck because it is enabled by user and hasn't been done before");
-                    } else if (isGoogleDocumentThatRequiresDeeperLinkcheck) {
+                    } else if (isGoogleDocumentAllowScanForAvailableFormats(link)) {
                         logger.info("Performing deeper check for Google Drive document");
                     } else if (deeperCheckHasAlreadyBeenPerformed || !itemIsEligableForObtainingMoreInformation) {
                         return status;
@@ -723,9 +734,7 @@ public class GoogleDrive extends PluginForHost {
             }
             logger.info("Checking availablestatus via file overview");
             this.handleLinkcheckFileOverview(br, link, account, performDeeperOfflineCheck);
-            /* Status can change in between so obtain it again!! */
-            isGoogleDocumentThatRequiresDeeperLinkcheck = isGoogleDocument(link) && !this.hasObtainedInformationFromAPIOrWebAPI(link);
-            if (isGoogleDocumentThatRequiresDeeperLinkcheck) {
+            if (isGoogleDocumentAllowScanForAvailableFormats(link)) {
                 /* Important: Without this, some google documents will not be downloadable! */
                 logger.info("Handling extra linkcheck as preparation for google document download");
                 try {
@@ -911,7 +920,7 @@ public class GoogleDrive extends PluginForHost {
         final boolean looksLikeOfficialDownloadAllowed = br.containsHTML("6export\u003ddownload|export=download");
         final boolean looksLikeGoogleDocument = br.containsHTML("\"docs-dm\":\\s*\"application/vnd\\.");
         if (looksLikeGoogleDocument && looksLikeOfficialDownloadAllowed) {
-            logger.info("Item looks like google document but is a normal file!!");
+            logger.info("Item looks like google document but is a normal file!! It can be opened in a Google Doc view but it is a normal file!!");
             isGoogleDocument = false;
         } else if (looksLikeGoogleDocument) {
             isGoogleDocument = true;
@@ -1746,6 +1755,33 @@ public class GoogleDrive extends PluginForHost {
         }
     }
 
+    private boolean isGoogleDocumentAllowScanForAvailableFormats(final DownloadLink link) {
+        if (!isGoogleDocument(link)) {
+            /* Item is not a google document -> No need to scan for document formats. */
+            return false;
+        }
+        if (link.hasProperty(PROPERTY_FORCED_FINAL_DOWNLOADURL) && link.hasProperty(PROPERTY_GOOGLE_DOCUMENT_FILE_EXTENSION)) {
+            /* Format has already been determined and is set -> No need to scan for formats. */
+            return false;
+        }
+        final GoogleConfig cfg = PluginJsonConfig.get(GoogleConfig.class);
+        final GoogleDocumentExportFormat format_document = cfg.getGoogleDocumentExportFormatForTypeDocument();
+        final GoogleDocumentExportFormat format_presentation = cfg.getGoogleDocumentExportFormatForTypePresentation();
+        final GoogleDocumentExportFormat format_spreadsheet = cfg.getGoogleDocumentExportFormatForTypeSpreadsheet();
+        /* If user wants non-zip format, we need to determine availability. */
+        if (format_document != GoogleDocumentExportFormat.ZIP) {
+            return true;
+        }
+        if (format_presentation != GoogleDocumentExportFormat.ZIP) {
+            return true;
+        }
+        if (format_spreadsheet != GoogleDocumentExportFormat.ZIP) {
+            return true;
+        }
+        /* All formats are default (zip) -> No need to scan for formats. */
+        return false;
+    }
+
     /** Returns true if this DownloadLink looks like it contains details that can only be fetched via API/Web-API. */
     private boolean hasObtainedInformationFromAPIOrWebAPI(final DownloadLink link) {
         if (link.getMD5Hash() != null || link.getSha256Hash() != null || link.getSha1Hash() != null || link.getLastModifiedTimestamp() != -1 || link.hasProperty(PROPERTY_FORCED_FINAL_DOWNLOADURL)) {
@@ -2402,18 +2438,6 @@ public class GoogleDrive extends PluginForHost {
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
         return false;
     }
-    // private boolean isMULTIHOST(PluginForHost plugin) {
-    // return plugin != null && plugin.hasFeature(LazyPlugin.FEATURE.MULTIHOST);
-    // }
-    //
-    // @Override
-    // public String buildExternalDownloadURL(final DownloadLink link, final PluginForHost buildForThisPlugin) {
-    // if (isMULTIHOST(buildForThisPlugin)) {
-    // return getFileViewURL(link);
-    // } else {
-    // return super.buildExternalDownloadURL(link, buildForThisPlugin);
-    // }
-    // }
 
     @Override
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {

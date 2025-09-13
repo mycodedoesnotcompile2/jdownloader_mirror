@@ -2,6 +2,7 @@ package org.jdownloader.downloader.text;
 
 import java.awt.Color;
 import java.io.File;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
@@ -18,6 +19,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
+import jd.plugins.download.raf.HTTPDownloader;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
@@ -34,7 +36,6 @@ public class TextDownloader extends DownloadInterface {
     private final Downloadable                downloadable;
     private File                              outputCompleteFile;
     private File                              outputFinalCompleteFile;
-    protected Long                            lastModified      = null;
     private String                            textToWrite       = null;
     private ManagedThrottledConnectionHandler connectionHandler = new ManagedThrottledConnectionHandler();
     private long                              startTimeStamp    = -1;
@@ -117,6 +118,7 @@ public class TextDownloader extends DownloadInterface {
                     downloadable.setVerifiedFileSize(this.bytesWritten);
                     downloadable.setDownloadBytesLoaded(bytesWritten);
                     /* Set progress to finished - the "download" is complete. */
+                    finalizeDownload(outputCompleteFile);
                     downloadable.setLinkStatus(LinkStatus.FINISHED);
                 } finally {
                     try {
@@ -146,23 +148,21 @@ public class TextDownloader extends DownloadInterface {
         }
     }
 
-    protected boolean finalizeDownload(File outputPartFile, File outputCompleteFile, Long lastModified) throws Exception {
-        if (downloadable.rename(outputPartFile, outputCompleteFile)) {
-            try {
-                if (lastModified != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
-                    /* set original lastModified timestamp */
-                    outputCompleteFile.setLastModified(lastModified.longValue());
-                } else {
-                    /* set current timestamp as lastModified timestamp */
-                    outputCompleteFile.setLastModified(System.currentTimeMillis());
-                }
-            } catch (final Throwable ignore) {
-                LogSource.exception(downloadable.getLogger(), ignore);
+    protected boolean finalizeDownload(File outputCompleteFile) throws Exception {
+        try {
+            final Date lastModified = HTTPDownloader.getLastModifiedDate(getDownloadable(), null);
+            if (lastModified != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
+                /* set original lastModified timestamp */
+                outputCompleteFile.setLastModified(lastModified.getTime());
+            } else {
+                /* set current timestamp as lastModified timestamp */
+                outputCompleteFile.setLastModified(System.currentTimeMillis());
             }
-            return true;
-        } else {
-            return false;
+        } catch (final Throwable ignore) {
+            LogSource.exception(downloadable.getLogger(), ignore);
         }
+        return true;
+
     }
 
     protected void cleanupDownladInterface() {
