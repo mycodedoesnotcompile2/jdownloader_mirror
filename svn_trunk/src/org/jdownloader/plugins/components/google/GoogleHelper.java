@@ -3,8 +3,10 @@ package org.jdownloader.plugins.components.google;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
 
@@ -16,6 +18,20 @@ import javax.swing.text.DocumentFilter;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
+
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
+import jd.nutils.JDHash;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.components.GoogleService;
 
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.TextComponentInterface;
@@ -38,20 +54,6 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.translate._JDT;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
-
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-import jd.nutils.JDHash;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.components.GoogleService;
 
 public class GoogleHelper {
     // private static final String COOKIES2 = "googleComCookies";
@@ -233,6 +235,23 @@ public class GoogleHelper {
         return thread;
     }
 
+    private static Cookies loadUserCookies(final Account account) {
+        synchronized (account) {
+            final Cookies ret = account.loadUserCookies();
+            if (ret == null || ret.isEmpty()) {
+                return ret;
+            }
+            final List<Cookie> cookies = new ArrayList<Cookie>(ret.getCookies());
+            for (final Cookie cookie : cookies) {
+                // remove these cookies as they are not required but there can be MANY of them*/
+                if (cookie.getKey().matches("^ST-.+")) {
+                    ret.remove(cookie);
+                }
+            }
+            return ret;
+        }
+    }
+
     public void login(final Account account, final boolean forceLoginValidation) throws Exception {
         synchronized (account) {
             /*
@@ -244,7 +263,7 @@ public class GoogleHelper {
             this.br.setCookiesExclusive(true);
             /* TODO: Do we still need this? */
             this.br.setCookie("https://google.com", "PREF", "hl=en-GB");
-            final Cookies userCookies = account.loadUserCookies();
+            final Cookies userCookies = loadUserCookies(account);
             if (userCookies == null) {
                 showCookieLoginInformation(account.getHoster());
                 throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
@@ -383,7 +402,7 @@ public class GoogleHelper {
     }
 
     public static void errorAccountInvalid(final Account account) throws AccountInvalidException {
-        final Cookies userCookies = account.loadUserCookies();
+        final Cookies userCookies = loadUserCookies(account);
         if (userCookies != null && !userCookies.isEmpty()) {
             account.removeProperty(PROPERTY_ACCOUNT_user_agent);
             if (account.hasEverBeenValid()) {
@@ -741,6 +760,7 @@ public class GoogleHelper {
     private boolean isCacheEnabled() {
         return cacheEnabled;
     }
+
     // public void followRedirect() throws IOException, InterruptedException {
     // int wait = 0;
     // String url = null;

@@ -34,7 +34,6 @@ import org.jdownloader.plugins.config.Order;
 
 import jd.PluginWrapper;
 import jd.plugins.Account;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginConfigPanelNG;
@@ -42,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49704 $", interfaceVersion = 4, names = { "simply-premium.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51503 $", interfaceVersion = 4, names = { "simply-premium.com" }, urls = { "" })
 public class SimplyPremiumCom2 extends HighWayCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("simply-premium.com");
 
@@ -89,10 +88,12 @@ public class SimplyPremiumCom2 extends HighWayCore {
     @Override
     protected void exceptionAccountInvalid(final Account account) throws PluginException {
         showAPILoginInformation();
+        final String host = this.getHost();
+        final String apikey_link = host + "/profile";
         if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nAPI Key!\r\nDeinen API Key findest du hier: simply-premium.com/profile", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nAPI Key!\r\nDeinen API Key findest du hier: " + apikey_link, PluginException.VALUE_ID_PREMIUM_DISABLE);
         } else {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid API Key!\r\nYou can find your API Key here: simply-premium.com/profile", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid API Key!\r\nYou can find your API Key here: " + apikey_link, PluginException.VALUE_ID_PREMIUM_DISABLE);
         }
     }
 
@@ -187,13 +188,5 @@ public class SimplyPremiumCom2 extends HighWayCore {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

@@ -12,6 +12,22 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.NullInputStream;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.net.throttledconnection.MeteredThrottledInputStream;
+import org.appwork.utils.speedmeter.AverageSpeedMeter;
+import org.jdownloader.plugins.DownloadPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.translate._JDT;
+
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
 import jd.controlling.downloadcontroller.FileIsLockedException;
@@ -28,22 +44,6 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.raf.HTTPDownloader;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.net.NullInputStream;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.net.throttledconnection.MeteredThrottledInputStream;
-import org.appwork.utils.speedmeter.AverageSpeedMeter;
-import org.jdownloader.plugins.DownloadPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.settings.GeneralSettings;
-import org.jdownloader.translate._JDT;
 
 //http://tools.ietf.org/html/draft-pantos-http-live-streaming-13
 public class SegmentDownloader extends DownloadInterface {
@@ -365,24 +365,27 @@ public class SegmentDownloader extends DownloadInterface {
     }
 
     protected boolean finalizeDownload(File outputPartFile, File outputCompleteFile, Long lastModified) throws Exception {
-        if (downloadable.rename(outputPartFile, outputCompleteFile)) {
-            try {
-                boolean UseOriginalLastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
-                final Date lastModifiedDate;
-                if (UseOriginalLastModified && (lastModifiedDate = HTTPDownloader.getLastModifiedDate(getDownloadable(), null)) != null) {
-                    outputCompleteFile.setLastModified(lastModifiedDate.getTime());
-                } else if (UseOriginalLastModified && lastModified != null && lastModified != -1) {
-                    outputCompleteFile.setLastModified(lastModified);
-                } else {
-                    outputCompleteFile.setLastModified(System.currentTimeMillis());
-                }
-            } catch (final Throwable ignore) {
-                LogSource.exception(logger, ignore);
-            }
-            return true;
-        } else {
+        if (!downloadable.rename(outputPartFile, outputCompleteFile)) {
             return false;
         }
+        try {
+            boolean useOriginalLastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
+            if (useOriginalLastModified) {
+                final Date lastModifiedDate = HTTPDownloader.getLastModifiedDate(getDownloadable(), null);
+                if (lastModifiedDate != null) {
+                    outputCompleteFile.setLastModified(lastModifiedDate.getTime());
+                    return true;
+                }
+                if (lastModified != null && lastModified != -1) {
+                    outputCompleteFile.setLastModified(lastModified);
+                    return true;
+                }
+            }
+            outputCompleteFile.setLastModified(System.currentTimeMillis());
+        } catch (final Throwable ignore) {
+            LogSource.exception(logger, ignore);
+        }
+        return true;
     }
 
     protected void cleanupDownladInterface() {

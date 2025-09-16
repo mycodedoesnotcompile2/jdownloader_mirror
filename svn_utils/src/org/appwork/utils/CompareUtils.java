@@ -92,14 +92,18 @@ public class CompareUtils {
      * @param y
      * @return <0 if x<y >0 if x>y 0 if x==y
      */
-    public static int compareDouble(final double x, final double y) {
+    public final static int compareDouble(final double x, final double y) {
         // since 1.4
         return Double.compare(x, y);
     }
 
-    public static int compareFloat(final float x, final float y) {
+    public final static int compareFloat(final float x, final float y) {
         // since 1.4
         return Float.compare(x, y);
+    }
+
+    public final static boolean exactlyOneNull(Object a, Object b) {
+        return (a == null) ^ (b == null);
     }
 
     /**
@@ -114,7 +118,7 @@ public class CompareUtils {
         return compareComparable(x, y);
     }
 
-    public static <T> int compareComparable(final Comparable<T> x, final Comparable<T> y) {
+    public final static <T> int compareComparable(final Comparable<T> x, final Comparable<T> y) {
         if (x == y) {
             return 0;
         } else if (x == null) {
@@ -137,7 +141,7 @@ public class CompareUtils {
      * @return
      */
     @Deprecated
-    public static boolean equals(final byte[] hash, final byte[] hash2) {
+    public final static boolean equals(final byte[] hash, final byte[] hash2) {
         return Arrays.equals(hash, hash2);
     }
 
@@ -148,7 +152,7 @@ public class CompareUtils {
      * @param b
      * @return
      */
-    public static boolean equals(final Object a, final Object b) {
+    public final static boolean equals(final Object a, final Object b) {
         if (a == b) {
             return true;
         } else if (a == null || b == null) {
@@ -169,7 +173,7 @@ public class CompareUtils {
      * @param extensions2
      * @return
      */
-    public static boolean equals(final Map<?, ?> a, final Map<?, ?> b) {
+    public final static boolean equals(final Map<?, ?> a, final Map<?, ?> b) {
         if (a == b) {
             return true;
         } else if (a == null || b == null) {
@@ -186,7 +190,7 @@ public class CompareUtils {
         }
     }
 
-    public static boolean equals(final Set<?> a, final Set<?> b) {
+    public final static boolean equals(final Set<?> a, final Set<?> b) {
         if (a == b) {
             return true;
         } else if (a == null || b == null) {
@@ -197,7 +201,7 @@ public class CompareUtils {
         }
     }
 
-    public static boolean equalsDeep(final Object objectX, final Object objectY, final Equalator equalator) {
+    public final static boolean equalsDeep(final Object objectX, final Object objectY, final Equalator equalator) {
         return equalsDeep(objectX, objectY, equalator, new HashSet<Couple>());
     }
 

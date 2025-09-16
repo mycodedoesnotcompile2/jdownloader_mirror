@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51503 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornktuBe extends KernelVideoSharingComV2 {
     public PornktuBe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class PornktuBe extends KernelVideoSharingComV2 {
     /** 2022-07-26: Seems like they're GEO-blocking all IPs except for US IPs. */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "pornktube.club", "pornktube.tv", "pornktube.vip", "pornktube.com", "pornktu.be" });
+        ret.add(new String[] { "pornktube.com", "pornktube.club", "pornktube.tv", "pornktube.vip", "pornktu.be" });
         return ret;
     }
 
@@ -56,7 +56,15 @@ public class PornktuBe extends KernelVideoSharingComV2 {
         deadDomains.add("pornktube.vip");
         deadDomains.add("pornktube.com");
         deadDomains.add("pornktu.be");
+        deadDomains.add("pornktube.club"); // 2025-09-15
         return deadDomains;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2022-07-26: Main domain has changed frequently. */
+        /* 2025-09-15: main domain changed from pornktube.club to pornktube.com */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -80,12 +88,6 @@ public class PornktuBe extends KernelVideoSharingComV2 {
             ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + pattern_special);
         }
         return ret.toArray(new String[0]);
-    }
-
-    @Override
-    public String rewriteHost(final String host) {
-        /* 2022-07-26: Main domain has changed frequently. */
-        return this.rewriteHost(getPluginDomains(), host);
     }
 
     @Override
@@ -196,6 +198,11 @@ public class PornktuBe extends KernelVideoSharingComV2 {
 
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
-        return "https://www." + host + "/view/" + fuid + "/";
+        return "https://" + host + "/view/" + fuid + "/";
+    }
+
+    @Override
+    protected String getWorkingDomain(final DownloadLink link) {
+        return "best." + getHost();
     }
 }
