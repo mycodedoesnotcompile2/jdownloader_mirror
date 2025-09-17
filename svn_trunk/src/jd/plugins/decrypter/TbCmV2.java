@@ -102,7 +102,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 51502 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51507 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -823,7 +823,7 @@ public class TbCmV2 extends PluginForDecrypt {
                  * This helps to speed up crawl process for items that would fail either way.
                  */
                 if (lastVideoFailedErrorMessage != null) {
-                    if (lastVideoFailedErrorMessage.matches("(?i.*This live event will begin in a few moments.*")) {
+                    if (lastVideoFailedErrorMessage.matches("(?i).*This live event will begin in a few moments.*")) {
                         // ignore per video error
                     } else if (lastVideoFailedErrorMessage.matches("(?i).*(confirm your age|age-restricted|inappropriate).*")) {
                         // ignore per video error

@@ -357,9 +357,8 @@ public class RuleWrapper<T extends FilterRule> {
         final DownloadLink downloadLink = link.getDownloadLink();
         if (downloadLink != null) {
             // final or forced filename available
-            String fileName = null;
-            if ((fileName = downloadLink.getFinalFileName()) != null || (fileName = downloadLink.getForcedFileName()) != null) {
-                return rule.matches(pattern, fileName);
+            if (link.isNameSet() || downloadLink.getForcedFileName() != null || downloadLink.getFinalFileName() != null) {
+                return rule.matches(pattern, link.getName());
             }
             // file is online
             if (link.getLinkState() == AvailableLinkState.ONLINE) {

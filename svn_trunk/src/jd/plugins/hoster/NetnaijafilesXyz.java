@@ -18,15 +18,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.YetiShareCore;
-
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51349 $", interfaceVersion = 2, names = {}, urls = {})
+import org.jdownloader.plugins.components.YetiShareCore;
+
+@HostPlugin(revision = "$Revision: 51506 $", interfaceVersion = 2, names = {}, urls = {})
 public class NetnaijafilesXyz extends YetiShareCore {
     public NetnaijafilesXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +55,12 @@ public class NetnaijafilesXyz extends YetiShareCore {
     @Override
     public String[] siteSupportedNames() {
         return buildSupportedNames(getPluginDomains());
+    }
+
+    @Override
+    protected boolean requiresWWW() {
+        // doesn't work with www. , returns 404
+        return false;
     }
 
     public static String[] getAnnotationUrls() {
