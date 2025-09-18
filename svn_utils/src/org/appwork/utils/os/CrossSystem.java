@@ -302,8 +302,7 @@ public class CrossSystem {
         WINDOWS_11_22H2(OSFamily.WINDOWS),
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
-        WINDOWS_11_25H1(OSFamily.WINDOWS);
-
+        WINDOWS_11_25H2(OSFamily.WINDOWS);
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -370,7 +369,6 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -407,7 +405,7 @@ public class CrossSystem {
     }
 
     private static volatile String[]                     BROWSER_COMMANDLINE = null;
-    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>();;
+    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>(); ;
     private static String[]                              FILE_COMMANDLINE    = null;
     private static String                                JAVAINT             = null;
     /**
@@ -824,7 +822,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);
@@ -839,8 +837,8 @@ public class CrossSystem {
                     // https://en.wikipedia.org/wiki/Windows_11_version_history
                     // https://betawiki.net/wiki/Windows_as_a_service
                     // https://ss64.com/nt/ver.html
-                    if (buildNumber >= 27548 || buildNumber >= 27686) {
-                        this.set(OperatingSystem.WINDOWS_11_25H1);
+                    if (buildNumber >= 26200) {
+                        this.set(OperatingSystem.WINDOWS_11_25H2);
                     } else if (buildNumber >= 26052 || buildNumber >= 26080 || buildNumber >= 26100) {
                         // https://blogs.windows.com/windows-insider/2024/02/08/announcing-windows-11-insider-preview-build-26052-canary-and-dev-channels/
                         // TODO: update buildNumber

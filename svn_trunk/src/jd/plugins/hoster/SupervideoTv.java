@@ -18,10 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideo;
-import org.jdownloader.plugins.components.config.XFSConfigVideoSupervideoTv;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.Account;
@@ -29,7 +25,11 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51300 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideo;
+import org.jdownloader.plugins.components.config.XFSConfigVideoSupervideoTv;
+
+@HostPlugin(revision = "$Revision: 51515 $", interfaceVersion = 3, names = {}, urls = {})
 public class SupervideoTv extends XFileSharingProBasic {
     public SupervideoTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,7 +103,7 @@ public class SupervideoTv extends XFileSharingProBasic {
     }
 
     @Override
-    protected String findAPIKey(final Browser br) throws Exception {
+    protected String findAPIKey(final Browser br) {
         /* 2020-01-04: Special: Their API is broken! */
         return null;
     }

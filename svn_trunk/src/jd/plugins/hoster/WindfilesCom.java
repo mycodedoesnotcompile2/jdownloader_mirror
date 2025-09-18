@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51514 $", interfaceVersion = 3, names = {}, urls = {})
 public class WindfilesCom extends PluginForHost {
     public WindfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -126,6 +126,8 @@ public class WindfilesCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*分享不存在")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Share does not exist")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex(">\\s*(?:文件名称|File Name)\\s*</th>\\s*<th class=\"encn\"[^>]*>([^<]+)</th>").getMatch(0);
         String filesize = br.getRegex("(?:文件大小|File Size)\\s*</th>\\s*<th>([^<]+)</th>").getMatch(0);
@@ -133,9 +135,13 @@ public class WindfilesCom extends PluginForHost {
             filename = Encoding.htmlDecode(filename).trim();
             filename = decodeString(filename);
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -201,7 +207,7 @@ public class WindfilesCom extends PluginForHost {
             // Decode from Base64
             String decoded = Encoding.Base64Decode(str);
             // Apply character shift
-            StringBuilder result = new StringBuilder();
+            final StringBuilder result = new StringBuilder();
             for (int i = 0; i < decoded.length(); i++) {
                 result.append((char) (decoded.charAt(i) - key));
             }
@@ -284,9 +290,9 @@ public class WindfilesCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
         br.getPage("/user/my");
+        final AccountInfo ai = new AccountInfo();
         final String space = br.getRegex("Space Used (\\d[^<]+)</div>").getMatch(0);
         if (space != null) {
             ai.setUsedSpace(space.trim());

@@ -67,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51491 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51509 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -696,6 +696,7 @@ public abstract class HighWayCore extends UseNet {
             /* Get- and store usenet logindata. These can differ from the logindata the user has added but may as well be equal to those. */
             final Map<String, Object> usenetLogins;
             if (supportsUsenet && (usenetLogins = (Map<String, Object>) accountInfo.get("usenet")) != null && !usenetLogins.isEmpty()) {
+                logger.info("Usenet is supported");
                 final String usenetUsername = usenetLogins.get("username").toString();
                 if (this.useApikeyLogin()) {
                     /* Try to set unique username as user could enter anything in the username field in this case */
@@ -707,6 +708,7 @@ public abstract class HighWayCore extends UseNet {
                 account.setProperty(PROPERTY_ACCOUNT_USENET_PASSWORD, usenetLogins.get("pass"));
                 account.setProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, accountInfo.get("usenet_connection"));
             } else {
+                logger.info("Usenet is NOT supported");
                 account.removeProperty(PROPERTY_ACCOUNT_USENET_USERNAME);
                 account.removeProperty(PROPERTY_ACCOUNT_USENET_PASSWORD);
                 account.removeProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET);

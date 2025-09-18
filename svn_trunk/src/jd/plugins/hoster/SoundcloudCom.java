@@ -30,6 +30,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary;
+import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary.FLAG;
+import org.jdownloader.controlling.ffmpeg.FFmpeg;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -54,23 +70,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary;
-import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary.FLAG;
-import org.jdownloader.controlling.ffmpeg.FFmpeg;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51502 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
+@HostPlugin(revision = "$Revision: 51509 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
 public class SoundcloudCom extends PluginForHost {
     public SoundcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -126,14 +126,13 @@ public class SoundcloudCom extends PluginForHost {
     public static final String   PROPERTY_directurl                                                    = "directurl";
     public static final String   PROPERTY_filetype                                                     = "type";
     public static final String   PROPERTY_chosen_quality                                               = "chosen_quality";
+    /* Bitrate of chosen audio quality in format "128k". */
     public static final String   PROPERTY_chosen_preset                                                = "chosen_preset";
     public static final String   PROPERTY_chosen_codec                                                 = "chosen_codec";
     public static final String   PROPERTY_chosen_protocol                                              = "chosen_protocol";
-
     public static final String   PROPERTY_duration_seconds                                             = "duration_seconds";
     public static final String   PROPERTY_QUALITY_sq                                                   = "sq";
     public static final String   PROPERTY_QUALITY_hq                                                   = "hq";
-
     public static final String   PROPERTY_STATE                                                        = "state";
     /* Account properties */
     private final String         PROPERTY_ACCOUNT_oauthtoken                                           = "oauthtoken";
@@ -304,9 +303,9 @@ public class SoundcloudCom extends PluginForHost {
             final boolean looksLikeOfficiallyDownloadable = looksLikeOfficiallyDownloadable(response);
             if (songPolicy != null && songPolicy.equalsIgnoreCase("SNIP")) {
                 /**
-                 * Typically previews will also have a duration value of only "30000" --> 30 seconds </br> When logged in with a Soundcloud
-                 * premium account, songs for which before only previews were available may change to "POLICY":"MONETIZE" --> Can be fully
-                 * streamed by the user.
+                 * Typically previews will also have a duration value of only "30000" --> 30 seconds </br>
+                 * When logged in with a Soundcloud premium account, songs for which before only previews were available may change to
+                 * "POLICY":"MONETIZE" --> Can be fully streamed by the user.
                  */
                 isOnlyPreviewDownloadable = true;
             }
@@ -433,8 +432,9 @@ public class SoundcloudCom extends PluginForHost {
         if (looksLikeOfficiallyDownloadable && userPrefersOfficialDownload()) {
             /* File is officially downloadable */
             /**
-             * Only set calculated filesize if wanted by user. </br> Officially downloadable files could come in any bitrate thus we do by
-             * default not calculate the filesize for such items based on an assumed bitrate.
+             * Only set calculated filesize if wanted by user. </br>
+             * Officially downloadable files could come in any bitrate thus we do by default not calculate the filesize for such items based
+             * on an assumed bitrate.
              */
             if (userEnforcesFilesizeEstimationEvenForNonStreamDownloads()) {
                 link.setDownloadSize(calculateFilesize(link));
@@ -475,7 +475,7 @@ public class SoundcloudCom extends PluginForHost {
     /** Returns expected audio bitrate in kbit/s. */
     public static int getExpectedAudioBitrate(final DownloadLink link) {
         final String chosenPreset = link.getStringProperty(PROPERTY_chosen_preset);
-        final String k = new Regex(chosenPreset, "(\\d+)k").getMatch(0);
+        final String k = new Regex(chosenPreset, "(?i)(\\d+)k").getMatch(0);
         if (k != null) {
             return Integer.parseInt(k);
         }

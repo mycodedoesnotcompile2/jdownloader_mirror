@@ -21,7 +21,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.DecrypterArrayList;
 
-@DecrypterPlugin(revision = "$Revision: 50142 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51509 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class PornEmbedParser extends PluginForDecrypt {
     public PornEmbedParser(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,7 +48,7 @@ public abstract class PornEmbedParser extends PluginForDecrypt {
     }
 
     /** Place dead domains here so crawler will change URLs containing dead domains in an attempt to make them work. */
-    protected ArrayList<String> getDeadDomains() {
+    protected List<String> getDeadDomains() {
         return null;
     }
 
@@ -69,7 +69,7 @@ public abstract class PornEmbedParser extends PluginForDecrypt {
 
     protected String getContentURL(final CryptedLink param) {
         final String addedLinkDomain = Browser.getHost(param.getCryptedUrl(), true);
-        final ArrayList<String> deadDomains = this.getDeadDomains();
+        final List<String> deadDomains = this.getDeadDomains();
         if (deadDomains != null && deadDomains.contains(addedLinkDomain)) {
             /* Change domain in URL. */
             return param.getCryptedUrl().replaceFirst(Pattern.quote(addedLinkDomain), this.getHost());

@@ -102,7 +102,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 51507 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51512 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -2059,9 +2059,9 @@ public class TbCmV2 extends PluginForDecrypt {
     }
 
     private String findPlaylistOwnerName(final Object o) {
-        final Set<Object> found = search(o, null, "playlistSidebarSecondaryInfoRenderer/videoOwner/videoOwnerRenderer/title/runs/{0}/text");
+        final Set<Object> found = search(o, null, "playlistSidebarSecondaryInfoRenderer/videoOwner/videoOwnerRenderer/title/runs");
         if (found != null && found.size() > 0) {
-            return found.iterator().next().toString();
+            return helper.concatText(br, found);
         }
         return null;
     }
@@ -2076,8 +2076,14 @@ public class TbCmV2 extends PluginForDecrypt {
 
     private String findNumberOfVideosText(final Object o) {
         if (o instanceof Map) {
-            String result = null;
             final Map<String, Object> map = (Map<String, Object>) o;
+            final Set<Object> numVideosTextRuns = search(map, null, "numVideosText/runs");
+            if (numVideosTextRuns != null) {
+                final String numVideosText = helper.concatText(br, numVideosTextRuns);
+                if (numVideosText != null && numVideosText.matches("(?i)[0-9\\.,]+\\s*Videos")) {
+                    return numVideosText.replaceFirst("(?i)\\s*Videos", "").replace(",", ".");
+                }
+            }
             final Object metadataPartsO = map.get("metadataParts");
             if (metadataPartsO instanceof List) {
                 final List<Object> metadataParts = (List<Object>) metadataPartsO;
@@ -2097,7 +2103,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 // final String key = entry.getKey();
                 final Object value = entry.getValue();
                 if (value instanceof List || value instanceof Map) {
-                    result = findNumberOfVideosText(value);
+                    final String result = findNumberOfVideosText(value);
                     if (result != null) {
                         return result;
                     }

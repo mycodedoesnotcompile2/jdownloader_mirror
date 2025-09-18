@@ -61,6 +61,7 @@ import org.appwork.swing.components.ExtButton;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -214,7 +215,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                 stats.add(new JLabel("Java:"), "");
                 final java.lang.management.MemoryUsage memory = java.lang.management.ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
                 ExtButton comp;
-                stats.add(comp = createLink(System.getProperty("java.vendor") + " - " + System.getProperty("java.runtime.name") + " - " + System.getProperty("java.version") + (Application.is64BitJvm() ? "(64bit/" : "(32bit/") + CrossSystem.getARCHFamily() + ")"));
+                stats.add(comp = createLink(System.getProperty("java.vendor") + " - " + System.getProperty("java.runtime.name") + " - " + System.getProperty("java.version") + (JavaVersion.getVersion().isLTS() ? "(LTS/" : "(") + (Application.is64BitJvm() ? "64bit/" : "32bit/") + CrossSystem.getARCHFamily() + ")"));
                 comp.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {

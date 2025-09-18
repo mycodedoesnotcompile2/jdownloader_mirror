@@ -38,7 +38,7 @@ public enum JavaVersion implements JavaVersionInterface {
     JVM_22_0(66, "22"),
     JVM_23_0(67, "23"),
     JVM_24_0(68, "24"),
-    JVM_25_0(69, "25", true/* planned */),
+    JVM_25_0(69, "25", true),
     JVM_26_0(70, "26"/* not verified */) {
         private final long next;
         {

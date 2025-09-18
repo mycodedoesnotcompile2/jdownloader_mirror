@@ -10,6 +10,7 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -62,6 +63,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
 import org.appwork.txtresource.TranslationFactory;
 import org.appwork.utils.Application;
+import org.appwork.utils.CharSequenceUtils;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
@@ -1940,32 +1942,47 @@ public class YoutubeHelper {
             final List<Object> tmp = (List<Object>) JavaScriptEngineFactory.walkJson(map, "contents/twoColumnWatchNextResults/results/results/contents/{}/videoSecondaryInfoRenderer/description/runs");
             if (tmp != null) {
                 // Construct the "text"
-                final StringBuilder sb = new StringBuilder();
-                for (final Object t : tmp) {
-                    final Map<String, Object> o = (Map<String, Object>) t;
-                    final String url = (String) JavaScriptEngineFactory.walkJson(o, "navigationEndpoint/urlEndpoint/url");
-                    final String text = (String) o.get("text");
-                    if (text != null) {
-                        if (url != null) {
-                            try {
-                                sb.append(br.getURL(url).toString());
-                            } catch (IOException e) {
-                                sb.append(url);
-                            }
-                        } else {
-                            sb.append(text);
-                        }
-                    }
-                }
-                if (sb.length() > 0) {
-                    final String description = sb.toString();
-                    if (description != null && !ret.contains(description)) {
-                        ret.add(description);
-                    }
+                final String description = concatText(br, tmp);
+                if (description != null && !ret.contains(description)) {
+                    ret.add(description);
                 }
             }
         }
         return ret.toArray(new String[0]);
+    }
+
+    public String concatText(final Browser br, Collection<Object> texts) {
+        if (texts == null || texts.size() == 0) {
+            return null;
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (final Object textObject : texts) {
+            if (textObject instanceof List) {
+                final String ret = concatText(br, (List<Object>) textObject);
+                if (ret != null) {
+                    sb.append(ret);
+                }
+                continue;
+            }
+            final Map<String, Object> textMap = (Map<String, Object>) textObject;
+            final String url = (String) JavaScriptEngineFactory.walkJson(textMap, "navigationEndpoint/urlEndpoint/url");
+            final String text = (String) textMap.get("text");
+            if (text != null) {
+                if (url != null) {
+                    try {
+                        sb.append(br.getURL(url).toString());
+                    } catch (IOException e) {
+                        sb.append(url);
+                    }
+                } else {
+                    sb.append(text);
+                }
+            }
+        }
+        if (CharSequenceUtils.isEmptyAfterTrim(sb)) {
+            return null;
+        }
+        return sb.toString();
     }
 
     public int getVidDurationFromMaps() {

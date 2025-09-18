@@ -26,6 +26,36 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -61,37 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
-
-@HostPlugin(revision = "$Revision: 51467 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51515 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -473,8 +473,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * <b> Enabling this will eventually lead to at least one additional website-request! </b> <br/>
      * DO NOT CALL THIS DIRECTLY - ALWAYS USE {@link #internal_supports_availablecheck_filename_abuse()}!!<br />
      *
-     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing.
-     *         <br />
+     * @return true: Implies that website supports {@link #getFnameViaAbuseLink() } call as an alternative source for filename-parsing. <br />
      *         false: Implies that website does NOT support {@link #getFnameViaAbuseLink()}. <br />
      *         default: true
      */
@@ -507,8 +506,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br />
      * CAUTION: Only set this to true if a filehost: <br />
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br />
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
-     * <br />
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br />
      * 3. Allows a lot of simultaneous connections. <br />
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br />
      * 5. Allows using a generated direct-URL at least two times.
@@ -1072,27 +1070,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-        try {
-            /* Check if response is plaintext and contains any known error messages. */
-            final byte[] probe = urlConnection.peek(32);
-            if (probe.length > 0) {
-                final String probeContext = new String(probe, "UTF-8");
-                final Request clone = urlConnection.getRequest().cloneRequest();
-                clone.setHtmlCode(probeContext);
-                final Browser br = createNewBrowserInstance();
-                br.setRequest(clone);
-                try {
-                    // TODO: extract the html checks into own method to avoid Browser instance
-                    checkServerErrors(br, getDownloadLink(), null);
-                } catch (PluginException e) {
-                    logger.log(e);
-                    return false;
-                }
+    try {
+        /* Check if response is plaintext and contains any known error messages. */
+        final byte[] probe = urlConnection.peek(32);
+        if (probe.length > 0) {
+            final String probeContext = new String(probe, "UTF-8");
+            final Request clone = urlConnection.getRequest().cloneRequest();
+            clone.setHtmlCode(probeContext);
+            final Browser br = createNewBrowserInstance();
+            br.setRequest(clone);
+            try {
+                // TODO: extract the html checks into own method to avoid Browser instance
+                checkServerErrors(br, getDownloadLink(), null);
+            } catch (PluginException e) {
+                logger.log(e);
+                return false;
             }
-        } catch (IOException e) {
-            logger.log(e);
         }
-        return true;
+    } catch (IOException e) {
+        logger.log(e);
+    }
+    return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -2173,8 +2171,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br />
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br />
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
-     * it)!<br />
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br />
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br/>
      *
@@ -2801,8 +2798,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
-     * <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -4353,31 +4349,31 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     protected void fetchAccountInfoWebsiteTraffic(final Browser br, final Account account, final AccountInfo ai) throws Exception {
         /*
-         * trafficleft is usually not given via API so we'll have to check for it via website. Also we do not trsut 'unlimited traffic' via
+         * trafficleft is usually not given via API so we'll have to check for it via website. Also we do not trust 'unlimited traffic' via
          * API yet.
          */
         String trafficLeftStr = regExTrafficLeft(br);
         /* Example non english: brupload.net */
         final boolean userHasUnlimitedTraffic = trafficLeftStr != null && trafficLeftStr.matches(".*?(nlimited|Ilimitado).*?");
-        if (trafficLeftStr != null && !userHasUnlimitedTraffic && !trafficLeftStr.equalsIgnoreCase("Mb")) {
-            trafficLeftStr = Encoding.htmlDecode(trafficLeftStr).trim();
-            /* Need to set 0 traffic left, as getSize returns positive result, even when negative value supplied. */
-            long trafficLeft = 0;
-            if (trafficLeftStr.startsWith("-")) {
-                /* Negative traffic value = User downloaded more than he is allowed to (rare case) --> No traffic left */
-                trafficLeft = 0;
-            } else {
-                trafficLeft = SizeFormatter.getSize(trafficLeftStr);
-            }
-            /* 2019-02-19: Users can buy additional traffic packages: Example(s): subyshare.com */
-            final String usableBandwidth = br.getRegex("Usable Bandwidth\\s*<span[^>]*>\\s*([0-9\\.]+\\s*[TGMKB]+)\\s*/\\s*[0-9\\.]+\\s*[TGMKB]+\\s*<").getMatch(0);
-            if (usableBandwidth != null) {
-                trafficLeft = Math.max(trafficLeft, SizeFormatter.getSize(usableBandwidth));
-            }
-            ai.setTrafficLeft(trafficLeft);
-        } else {
+        // Early return for unlimited traffic or invalid traffic string
+        if (trafficLeftStr == null || userHasUnlimitedTraffic || trafficLeftStr.equalsIgnoreCase("Mb")) {
             ai.setUnlimitedTraffic();
+            return;
         }
+        trafficLeftStr = Encoding.htmlDecode(trafficLeftStr).trim();
+        /* Need to set 0 traffic left, as getSize returns positive result, even when negative value supplied. */
+        long trafficLeft = 0;
+        if (!trafficLeftStr.startsWith("-")) {
+            /* Positive traffic value */
+            trafficLeft = SizeFormatter.getSize(trafficLeftStr);
+        }
+        // If trafficLeftStr starts with "-", trafficLeft remains 0 (negative traffic = no traffic left)
+        /* 2019-02-19: Users can buy additional traffic packages: Example(s): subyshare.com */
+        final String usableBandwidth = br.getRegex("Usable Bandwidth\\s*<span[^>]*>\\s*([0-9\\.]+\\s*[TGMKB]+)\\s*/\\s*[0-9\\.]+\\s*[TGMKB]+\\s*<").getMatch(0);
+        if (usableBandwidth != null) {
+            trafficLeft = Math.max(trafficLeft, SizeFormatter.getSize(usableBandwidth));
+        }
+        ai.setTrafficLeft(trafficLeft);
     }
 
     protected AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
@@ -4390,58 +4386,51 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             getPage(this.getMainPage() + getRelativeAccountInfoURL());
         }
         AccountInfo ai = new AccountInfo();
-        boolean apiSuccess = false;
-        obtainAccountInfoFromAPI: try {
+        AccountType apiAccountType = null;
+        obtainAccountInfoFromAPI: {
             final String apikey = this.findAPIKey(this.br.cloneBrowser());
             if (apikey == null) {
+                logger.info("No apikey found");
                 break obtainAccountInfoFromAPI;
             }
-            logger.info("Found apikey --> Trying to get AccountInfo via API: " + apikey);
+            logger.info("Found apikey --> Trying to get AccountInfo via account API: " + apikey);
             /* Save apikey for later usage */
             synchronized (account) {
                 account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
+                if (Boolean.FALSE.equals(trustAccountInfoAPI(account))) {
+                    /* This avoids one http request if we already know that we cannot trust account-information from the API. */
+                    logger.info("--> Not trying to get AccountInfo via untrusted account API");
+                    break obtainAccountInfoFromAPI;
+                }
                 try {
                     ai = this.fetchAccountInfoAPI(this.br.cloneBrowser(), account);
-                    apiSuccess = true;
+                    apiAccountType = account.getType();
+                    logger.info("Found AccountInfo via API but trying to obtain trafficleft value from website as it is usually not given via API");
                 } catch (final Throwable e) {
+                    /**
+                     * All kinds of errors may happen when trying to access the API. <br>
+                     * API is preferable if it works but we cannot rely on it working so we need that website fallback!
+                     */
                     e.printStackTrace();
                     logger.warning("Failed to find accountinfo via API even though apikey is given; probably serverside API failure --> Fallback to website handling");
                     /* Do not store invalid API key */
                     account.removeProperty(PROPERTY_ACCOUNT_apikey);
                 }
             }
-        } catch (final Throwable e) {
-            /*
-             * 2019-08-16: All kinds of errors may happen when trying to access the API. It is preferable if it works but we cannot rely on
-             * it working so we need that website fallback!
-             */
-            logger.info("Failed to find apikey (with Exception) --> Continuing via website");
-            logger.log(e);
-        }
-        final boolean devDebugTrustAPIInfo = false;
-        if (apiSuccess && devDebugTrustAPIInfo && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* Trust API info */
-            logger.info("Successfully found complete AccountInfo via API");
-            /* API with trafficleft value is uncommon -> Make sure devs easily take note of this! */
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                /* Devs only */
-                String accStatus;
-                if (ai.getStatus() != null && !ai.getStatus().startsWith("[API] ")) {
-                    accStatus = ai.getStatus();
-                } else {
-                    accStatus = account.getType().toString();
-                }
-                ai.setStatus("[API] " + accStatus);
-            }
-            return ai;
-        }
-        if (apiSuccess) {
-            /* No info from API available */
-            logger.info("Found AccountInfo via API but trying to obtain trafficleft value from website as it is usually not given via API");
         }
         fetchAccountInfoWebsiteTraffic(br, account, ai);
-        if (apiSuccess) {
+        if (apiAccountType != null && Boolean.TRUE.equals(trustAccountInfoAPI(account))) {
             logger.info("Successfully found AccountInfo without trafficleft via API (fetched trafficleft via website)");
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                /* Devs only */
+                String statusText;
+                if (ai.getStatus() != null && !StringUtils.startsWithCaseInsensitive(ai.getStatus(), "[API] ")) {
+                    statusText = ai.getStatus();
+                } else {
+                    statusText = account.getType().toString();
+                }
+                ai.setStatus("[API] | DLs: " + account.hasProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE) + " | " + statusText);
+            }
             return ai;
         }
         fetchAccountInfoWebsiteStorage(br, account, ai);
@@ -4468,85 +4457,115 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 setAccountLimitsByType(account, AccountType.PREMIUM);
             }
         }
+        if (apiAccountType != null) {
+            synchronized (TRUST_ACCOUNT_API) {
+                if (!AccountType.FREE.equals(apiAccountType) && !AccountType.FREE.equals(account.getType())) {
+                    logger.info("Trust AccountInfo via account API!");
+                    TRUST_ACCOUNT_API.put(account, Boolean.TRUE);
+                } else if (AccountType.FREE.equals(apiAccountType) && !AccountType.FREE.equals(account.getType())) {
+                    logger.info("Don't trust AccountInfo via account API!");
+                    TRUST_ACCOUNT_API.put(account, Boolean.FALSE);
+                } else if (AccountType.FREE.equals(apiAccountType) && AccountType.FREE.equals(account.getType())) {
+                    TRUST_ACCOUNT_API.remove(account);
+                }
+            }
+        }
         return ai;
+    }
+
+    private static WeakHashMap<Account, Boolean> TRUST_ACCOUNT_API = new WeakHashMap<Account, Boolean>();
+
+    protected Boolean trustAccountInfoAPI(Account account) {
+        // eg. musiclibrary.takefile.link returns wrong/expired premium_expire date while website shows correct one
+        synchronized (TRUST_ACCOUNT_API) {
+            return TRUST_ACCOUNT_API.get(account);
+        }
     }
 
     protected Long fetchAccountInfoWebsiteExpireDate(Browser br, Account account, AccountInfo ai) throws Exception {
         /* 2019-07-11: It is not uncommon for XFS websites to display expire-dates even though the account is not premium anymore! */
         final AtomicBoolean isPreciseTimestampFlag = new AtomicBoolean(false);
         final Long expire_milliseconds_from_expiredate = findExpireTimestamp(account, br, isPreciseTimestampFlag);
-        long expire_milliseconds_precise_to_the_second = -1;
         final String[] supports_precise_expire_date = (isPreciseTimestampFlag.get() && expire_milliseconds_from_expiredate != null) ? null : this.supportsPreciseExpireDate();
-        if (supports_precise_expire_date != null && supports_precise_expire_date.length > 0) {
-            /*
-             * A more accurate expire time, down to the second. Usually shown on 'extend premium account' page. Case[0] e.g. 'flashbit.cc',
-             * Case [1] e.g. takefile.link, example website which has no precise expiredate at all: anzfile.net
-             */
-            final List<String> paymentURLs;
-            final String last_working_payment_url = this.getPluginConfig().getStringProperty("property_last_working_payment_url", null);
-            if (StringUtils.isNotEmpty(last_working_payment_url)) {
-                paymentURLs = new ArrayList<String>();
-                logger.info("Found stored last_working_payment_url --> Trying this first in an attempt to save http requests: " + last_working_payment_url);
-                paymentURLs.add(last_working_payment_url);
-                /* Add all remaining URLs, start with the last working one */
-                for (final String paymentURL : supports_precise_expire_date) {
-                    if (!paymentURLs.contains(paymentURL)) {
-                        paymentURLs.add(paymentURL);
-                    }
-                }
-            } else {
-                /* Add all possible payment URLs. */
-                logger.info("last_working_payment_url is not available --> Going through all possible paymentURLs");
-                paymentURLs = Arrays.asList(supports_precise_expire_date);
+        if (supports_precise_expire_date == null || supports_precise_expire_date.length == 0) {
+            return null;
+        }
+        /*
+         * A more accurate expire time, down to the second. Usually shown on 'extend premium account' page. Case[0] e.g. 'flashbit.cc', Case
+         * [1] e.g. takefile.link
+         */
+        long expire_milliseconds_precise_to_the_second = -1;
+        final LinkedHashSet<String> paymentURLs;
+        final String last_working_payment_url = this.getPluginConfig().getStringProperty("property_last_working_payment_url", null);
+        if (StringUtils.isNotEmpty(last_working_payment_url)) {
+            paymentURLs = new LinkedHashSet<String>();
+            logger.info("Found stored last_working_payment_url --> Trying this first in an attempt to save http requests: " + last_working_payment_url);
+            paymentURLs.add(last_working_payment_url);
+            /* Add all remaining URLs, start with the last working one */
+            for (final String paymentURL : supports_precise_expire_date) {
+                paymentURLs.add(paymentURL);
             }
-            /* Go through possible paymentURLs in an attempt to find an exact expiredate if the account is premium. */
-            for (final String paymentURL : paymentURLs) {
-                if (StringUtils.isEmpty(paymentURL)) {
-                    continue;
-                } else {
-                    try {
-                        getPage(paymentURL);
-                    } catch (final Throwable e) {
-                        logger.log(e);
-                        /* Skip failures due to timeout or bad http error-responses */
-                        continue;
-                    }
-                }
-                /* Find html snippet which should contain our expiredate. */
-                final String expireSecond = findExpireDate(br);
-                if (!StringUtils.isEmpty(expireSecond)) {
-                    final String tmpYears = new Regex(expireSecond, "(\\d+)\\s+years?").getMatch(0);
-                    final String tmpdays = new Regex(expireSecond, "(\\d+)\\s+days?").getMatch(0);
-                    final String tmphrs = new Regex(expireSecond, "(\\d+)\\s+hours?").getMatch(0);
-                    final String tmpmin = new Regex(expireSecond, "(\\d+)\\s+minutes?").getMatch(0);
-                    final String tmpsec = new Regex(expireSecond, "(\\d+)\\s+seconds?").getMatch(0);
-                    long years = 0, days = 0, hours = 0, minutes = 0, seconds = 0;
-                    if (!StringUtils.isEmpty(tmpYears)) {
-                        years = Integer.parseInt(tmpYears);
-                    }
-                    if (!StringUtils.isEmpty(tmpdays)) {
-                        days = Integer.parseInt(tmpdays);
-                    }
-                    if (!StringUtils.isEmpty(tmphrs)) {
-                        hours = Integer.parseInt(tmphrs);
-                    }
-                    if (!StringUtils.isEmpty(tmpmin)) {
-                        minutes = Integer.parseInt(tmpmin);
-                    }
-                    if (!StringUtils.isEmpty(tmpsec)) {
-                        seconds = Integer.parseInt(tmpsec);
-                    }
-                    expire_milliseconds_precise_to_the_second = ((years * 86400000 * 365) + (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
-                }
-                if (expire_milliseconds_precise_to_the_second > 0) {
-                    /* Later we will decide whether we are going to use this value or not. */
-                    logger.info("Successfully found precise expire-date via paymentURL: \"" + paymentURL + "\" : " + expireSecond);
-                    this.getPluginConfig().setProperty("property_last_working_payment_url", paymentURL);
-                    break;
-                } else {
-                    logger.info("Failed to find precise expire-date via paymentURL: \"" + paymentURL + "\"");
-                }
+        } else {
+            /* Add all possible payment URLs. */
+            logger.info("last_working_payment_url is not available --> Going through all possible paymentURLs");
+            paymentURLs = new LinkedHashSet<String>(Arrays.asList(supports_precise_expire_date));
+        }
+        /* Go through possible paymentURLs in an attempt to find an exact expiredate if the account is premium. */
+        int i = -1;
+        for (final String paymentURL : paymentURLs) {
+            i++;
+            if (StringUtils.isEmpty(paymentURL)) {
+                /* Skip invalid items */
+                continue;
             }
+            try {
+                getPage(paymentURL);
+            } catch (final InterruptedException e) {
+                throw e;
+            } catch (final Exception e) {
+                if (i == paymentURLs.size() - 1) {
+                    /* Last item -> Throw exception */
+                    throw e;
+                }
+                logger.log(e);
+                /* Skip failures due to timeout or bad http error-responses */
+                continue;
+            }
+            /* Find html snippet which should contain our expiredate. */
+            final String expireSecond = findExpireDate(br);
+            if (StringUtils.isEmpty(expireSecond)) {
+                continue;
+            }
+            final String tmpYears = new Regex(expireSecond, "(\\d+)\\s+years?").getMatch(0);
+            final String tmpdays = new Regex(expireSecond, "(\\d+)\\s+days?").getMatch(0);
+            final String tmphrs = new Regex(expireSecond, "(\\d+)\\s+hours?").getMatch(0);
+            final String tmpmin = new Regex(expireSecond, "(\\d+)\\s+minutes?").getMatch(0);
+            final String tmpsec = new Regex(expireSecond, "(\\d+)\\s+seconds?").getMatch(0);
+            long years = 0, days = 0, hours = 0, minutes = 0, seconds = 0;
+            if (!StringUtils.isEmpty(tmpYears)) {
+                years = Integer.parseInt(tmpYears);
+            }
+            if (!StringUtils.isEmpty(tmpdays)) {
+                days = Integer.parseInt(tmpdays);
+            }
+            if (!StringUtils.isEmpty(tmphrs)) {
+                hours = Integer.parseInt(tmphrs);
+            }
+            if (!StringUtils.isEmpty(tmpmin)) {
+                minutes = Integer.parseInt(tmpmin);
+            }
+            if (!StringUtils.isEmpty(tmpsec)) {
+                seconds = Integer.parseInt(tmpsec);
+            }
+            expire_milliseconds_precise_to_the_second = ((years * 86400000 * 365) + (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
+            if (expire_milliseconds_precise_to_the_second <= 0) {
+                logger.info("Failed to find precise expire-date via paymentURL: \"" + paymentURL + "\"");
+                continue;
+            }
+            /* Later we will decide whether we are going to use this value or not. */
+            logger.info("Successfully found precise expire-date via paymentURL: \"" + paymentURL + "\" : " + expireSecond);
+            this.getPluginConfig().setProperty("property_last_working_payment_url", paymentURL);
+            break;
         }
         final long currentTime = br.getCurrentServerTime(System.currentTimeMillis());
         if (expire_milliseconds_precise_to_the_second > 0) {
@@ -4649,13 +4668,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
-     * installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
      * apikey will usually be located here: "/?op=my_account"
      */
-    protected String findAPIKey(final Browser brc) throws Exception {
+    protected String findAPIKey(final Browser brc) {
         String apikey = regexAPIKey(brc);
         generateAPIKey: if (StringUtils.isEmpty(apikey)) {
             if (!allowToGenerateAPIKeyInWebsiteMode()) {
@@ -4839,8 +4857,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available
-                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
+                 * data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = SizeFormatter.getSize(trafficDetails[0]);
                 final long max = SizeFormatter.getSize(trafficDetails[1]);
@@ -4851,8 +4869,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
-             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
+             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);
@@ -5749,16 +5767,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else if (StringUtils.equals(account.getUser(), this.getAPIKeyFromAccount(account))) {
             logger.info("User has entered API key as username & password -> Set email as username: " + email);
             account.setUser(email);
-        }
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* Devs only */
-            String accStatus;
-            if (ai.getStatus() != null && !ai.getStatus().startsWith("[API] ")) {
-                accStatus = ai.getStatus();
-            } else {
-                accStatus = account.getType().toString();
-            }
-            ai.setStatus("[API] | DLs: " + account.hasProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE) + " | " + accStatus);
         }
         return ai;
     }

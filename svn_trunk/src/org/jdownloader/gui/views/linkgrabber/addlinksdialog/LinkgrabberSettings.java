@@ -213,7 +213,7 @@ public interface LinkgrabberSettings extends ConfigInterface {
     @DefaultBooleanValue(true)
     @AboutConfig
     @RequiresRestart("A JDownloader Restart is Required")
-    @org.appwork.storage.config.annotations.DescriptionForConfigEntry("Retain filtered links and provide a restore button for them. When disabled, filtered links will not be stored.")
+    @DescriptionForConfigEntry("Retain filtered links and provide a restore button for them. When disabled, filtered links will not be stored and the 'restore' button will be hidden.")
     boolean isRestoreButtonEnabled();
 
     void setRestoreButtonEnabled(boolean b);

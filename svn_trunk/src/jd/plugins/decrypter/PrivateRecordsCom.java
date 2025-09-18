@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -26,7 +27,7 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51509 $", interfaceVersion = 3, names = {}, urls = {})
 public class PrivateRecordsCom extends PornEmbedParser {
     public PrivateRecordsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -39,8 +40,16 @@ public class PrivateRecordsCom extends PornEmbedParser {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "private-records.com", "webcamvau.com", "privat-zapisi.biz" });
+        /* 20256-09-17: Main domain has changed from private-records.com to privaterecords.life */
+        ret.add(new String[] { "privaterecords.life", "private-records.com", "webcamvau.com", "privat-zapisi.biz" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("webcamvau.com");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -73,7 +82,7 @@ public class PrivateRecordsCom extends PornEmbedParser {
     protected boolean isOffline(final Browser br) {
         if (br.getHttpConnection().getResponseCode() == 404) {
             return true;
-        } else if (br.getURL().endsWith("/404.php")) {
+        } else if (StringUtils.endsWithCaseInsensitive(br.getURL(), "/404.php")) {
             return true;
         } else {
             return false;

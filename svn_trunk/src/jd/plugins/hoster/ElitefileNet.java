@@ -21,6 +21,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -30,12 +35,7 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51515 $", interfaceVersion = 3, names = {}, urls = {})
 public class ElitefileNet extends XFileSharingProBasic {
     public ElitefileNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -131,24 +131,12 @@ public class ElitefileNet extends XFileSharingProBasic {
             /*
              * 2019-07-11: apikey handling - prefer account info via API instead of website if allowed.
              */
-            String apikey = null;
-            try {
-                /*
-                 * 2019-08-13: Do not hand over corrected_br as source as correctBR() might remove important parts of the html and because
-                 * XFS owners will usually not add html traps into the html of accounts (especially ) we can use the original unmodified
-                 * html here.
-                 */
-                apikey = this.findAPIKey(this.br);
-            } catch (InterruptedException e) {
-                throw e;
-            } catch (final Throwable e) {
-                /*
-                 * 2019-08-16: All kinds of errors may happen when trying to access the API. It is preferable if it works but we cannot rely
-                 * on it working so we need that website fallback!
-                 */
-                logger.info("Failed to find apikey (with Exception) --> Continuing via website");
-                logger.log(e);
-            }
+
+            /*
+             * 2019-08-13: Do not hand over corrected_br as source as correctBR() might remove important parts of the html and because XFS
+             * owners will usually not add html traps into the html of accounts (especially ) we can use the original unmodified html here.
+             */
+            final String apikey = this.findAPIKey(this.br);
             if (apikey != null) {
                 /*
                  * 2019-07-11: Use API even if 'supports_api()' is disabled because if it works it is a much quicker and more reliable way
@@ -242,7 +230,7 @@ public class ElitefileNet extends XFileSharingProBasic {
         if (supports_precise_expire_date != null && supports_precise_expire_date.length > 0 && expire_milliseconds_precise_to_the_second <= 0) {
             /*
              * A more accurate expire time, down to the second. Usually shown on 'extend premium account' page. Case[0] e.g. 'flashbit.cc',
-             * Case [1] e.g. takefile.link, example website which has no precise expiredate at all: anzfile.net
+             * Case [1] e.g. takefile.link
              */
             final List<String> paymentURLs;
             final String last_working_payment_url = this.getPluginConfig().getStringProperty("property_last_working_payment_url", null);

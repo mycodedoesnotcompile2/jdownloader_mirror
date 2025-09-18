@@ -16,9 +16,12 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
@@ -34,7 +37,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50685 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51514 $", interfaceVersion = 3, names = {}, urls = {})
 public class KenfilesCom extends XFileSharingProBasic {
     public KenfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -170,7 +173,10 @@ public class KenfilesCom extends XFileSharingProBasic {
     @Override
     protected Form findFormDownload2Free(final Browser br) {
         /* 2020-09-02: Special */
-        Form dlForm = super.findFormDownload2Free(br);
+        final Form dlForm = super.findFormDownload2Free(br);
+        if (dlForm == null) {
+            return null;
+        }
         // if (dlForm != null) {
         // dlForm.remove("method_premium");
         // }
@@ -197,14 +203,29 @@ public class KenfilesCom extends XFileSharingProBasic {
 
     @Override
     protected Long fetchAccountInfoWebsiteExpireDate(Browser br, Account account, AccountInfo ai) throws Exception {
-        getPage("/?op=my_account");
+        if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/?op=my_account")) {
+            getPage("/?op=my_account");
+        }
         final String[] datesStr = br.getRegex("(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})").getColumn(0);
         if (datesStr != null && datesStr.length > 0) {
+            final HashSet<String> dupes = new HashSet<String>();
             for (final String expiredateStr : datesStr) {
-                final long timestamp = TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd hh:mm:ss", Locale.ENGLISH);
-                if (timestamp > System.currentTimeMillis()) {
-                    return timestamp;
+                /* Filter/skip invalid dates */
+                final String date_quoted = Pattern.quote(expiredateStr);
+                if (br.containsHTML(">\\s*Last Visit:\\s*</span>\\s*<span>\\s*" + date_quoted)) {
+                    continue;
+                } else if (br.containsHTML(date_quoted + " UTC\\+1")) {
+                    continue;
                 }
+                if (!dupes.add(expiredateStr)) {
+                    /* Ignore dates we've already parsed */
+                    continue;
+                }
+                final long timestamp = TimeFormatter.getMilliSeconds(expiredateStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+                if (timestamp <= System.currentTimeMillis()) {
+                    continue;
+                }
+                return timestamp;
             }
         }
         return super.fetchAccountInfoWebsiteExpireDate(br, account, ai);
@@ -234,30 +255,6 @@ public class KenfilesCom extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         super.doFree(link, account);
     }
-    // @Override
-    // public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-    // if (this.enableAccountApiOnlyMode()) {
-    // /* API-only mode */
-    // handleDownload(link, account, null, getDllinkAPI(link, account), null);
-    // } else {
-    // super.handlePremium(link, account);
-    // }
-    // }
-    //
-    // @Override
-    // protected boolean supportsAPIMassLinkcheck() {
-    // if (isAPIKey(this.getAPIKey())) {
-    // return true;
-    // } else {
-    // return false;
-    // }
-    // }
-    //
-    // @Override
-    // /** API docs: https://kenfiles.com/pages/api */
-    // protected boolean enableAccountApiOnlyMode() {
-    // return true;
-    // }
 
     @Override
     protected void waitTime(final DownloadLink link, final long timeBefore) throws PluginException {
@@ -265,8 +262,7 @@ public class KenfilesCom extends XFileSharingProBasic {
             final Form download1free = this.findFormDownload1Free(br);
             if (download1free != null) {
                 /*
-                 * Small hack: Do not wait here because the "wait 30 seconds" text only really initiales a wait time counter on download2
-                 * page.
+                 * Small hack: Do not wait here because the "wait 30 seconds" text only really inits a wait time counter on download2 page.
                  */
                 return;
             }
