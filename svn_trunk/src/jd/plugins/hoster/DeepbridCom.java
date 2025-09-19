@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -38,8 +39,10 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -48,6 +51,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -59,18 +63,70 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50771 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 51522 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
-    private static final int             defaultMAXDOWNLOADS        = -1;
     private static final int             defaultMAXCHUNKS           = 1;
     private static final boolean         defaultRESUME              = true;
     private static final String          PROPERTY_ACCOUNT_maxchunks = "maxchunks";
+    /* Supported links patterns */
+    public static final Pattern          PATTERN_F                  = Pattern.compile("/dl\\?f=([a-f0-9]{32})", Pattern.CASE_INSENSITIVE);
+    public static final Pattern          PATTERN_TORRENT            = Pattern.compile("/mytorrents\\?torrent=(\\d+)&file=([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);
+    /* DownloadLink properties */
+    private static final String          PROPERTY_TICKET_URL        = "ticketurl";
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        final String contenturl = link.getPluginPatternMatcher();
+        Regex finfo = new Regex(contenturl, PATTERN_TORRENT);
+        if (finfo.patternFind()) {
+            return finfo.getMatch(0) + "_" + finfo.getMatch(1);
+        }
+        finfo = new Regex(contenturl, PATTERN_F);
+        return finfo.getMatch(0);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "deepbrid.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_F.pattern() + "|" + PATTERN_TORRENT.pattern() + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     public DeepbridCom(PluginWrapper wrapper) {
@@ -95,34 +151,76 @@ public class DeepbridCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        final String filename_url = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        Account account = null;
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_TORRENT).patternFind()) {
+            /* Account required to check/download such links -> Get account */
+            account = AccountController.getInstance().getValidAccount(this.getHost());
+        }
+        return requestFileInformation(link, account);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        if (account != null) {
+            this.login(account, false);
+        }
         if (!link.isNameSet()) {
             /* Fallback-filename */
-            link.setName(filename_url);
+            final String weak_filename = this.getFID(link);
+            link.setName(weak_filename);
         }
         this.setBrowserExclusive();
-        getPage(br, link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">\\s*Wrong request code")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        String filename = br.getRegex("<b>File Name:?\\s*?</b></font><font[^>]+>([^<>\"]+)<").getMatch(0);
-        final String filesize = br.getRegex("<b>File Size:?\\s*?</b></font><font[^>]+>([^<>\"]+)<").getMatch(0);
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
-        }
-        if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize));
+        final String contenturl = link.getPluginPatternMatcher();
+        final Regex regex_f = new Regex(contenturl, PATTERN_F);
+        if (regex_f.patternFind()) {
+            getPage(br, contenturl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML(">\\s*Wrong request code")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            String filename = br.getRegex("Filename\\s*</div>\\s*<h2[^>]*>([^<]+)</h2>").getMatch(0);
+            final String filesize = br.getRegex("Filesize\\s*</div>\\s*<h2[^>]*>([^<]+)</h2>").getMatch(0);
+            if (filename != null) {
+                filename = Encoding.htmlDecode(filename).trim();
+                link.setName(filename);
+            } else {
+                logger.warning("Failed to find filename");
+            }
+            if (filesize != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesize));
+            } else {
+                logger.warning("Failed to find filesize");
+            }
+        } else {
+            /* PATTERN_TORRENT */
+            if (account == null) {
+                logger.info("Torrent cloud files can only be checked when account is available!");
+                return AvailableStatus.UNCHECKABLE;
+            }
+            final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
+            if (!isDownload) {
+                /**
+                 * 2025-09-18: HEAD-request takes a very long time to be processed. <br>
+                 * I've reported this to their support and switched to using a GET-request until they send me a confirmation that
+                 * HEAD-request is working as expected.
+                 */
+                // this.basicLinkCheck(br, br.createHeadRequest(contenturl), link, null, null);
+                this.basicLinkCheck(br, br.createGetRequest(contenturl), link, null, null);
+            }
         }
         return AvailableStatus.TRUE;
+    }
+
+    protected void throwConnectionExceptions(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (con.getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
     }
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         if (account == null && link.getPluginPatternMatcher() != null && canHandle(link.getPluginPatternMatcher())) {
-            /* Without account itis only possible to download URLs for files which are on the server of this multihost! */
+            /* Without account it is only possible to download URLs for files which are on the server of this multihost! */
             return true;
         } else {
             return super.canHandle(link, account);
@@ -131,7 +229,12 @@ public class DeepbridCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        requestFileInformation(link);
+        handleSelfhostedFileDownload(link, null);
+    }
+
+    private void handleSelfhostedFileDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        requestFileInformation(link, account);
+        final String contenturl = link.getPluginPatternMatcher();
         final String directlinkproperty = "directurl";
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
         String dllink;
@@ -139,37 +242,52 @@ public class DeepbridCom extends PluginForHost {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            final String ticketurl = link.getStringProperty("ticketurl");
-            if (ticketurl != null) {
-                logger.info("Re-using stored ticketurl: " + ticketurl);
-                getPage(br, ticketurl);
+            if (new Regex(contenturl, PATTERN_TORRENT).patternFind()) {
+                /* Direct download */
+                if (account == null) {
+                    throw new AccountRequiredException("Account required to download torrent cloud files");
+                }
+                dllink = contenturl;
             } else {
-                final Form dlform = br.getFormbyKey("download");
-                if (dlform == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                final InputField dlfield = dlform.getInputField("download");
-                if (dlfield != null && dlfield.getValue() == null) {
-                    dlform.put("download", "");
-                }
-                submitForm(br, dlform);
-                /* Store that URL as we can use it multiple times to generate new directurls for that particular file! */
-                link.setProperty("ticketurl", br.getURL());
-            }
-            dllink = br.getRegex("(https?://[^\"\\']+/dl/[^\"\\']+)").getMatch(0);
-            if (StringUtils.isEmpty(dllink)) {
-                dllink = br.getRegex("href\\s*=\\s*\"(https?://[^\"]+)\"\\s*>\\s*DOWNLOAD NOW\\!").getMatch(0);
-            }
-            if (StringUtils.isEmpty(dllink)) {
+                final String ticketurl = link.getStringProperty(PROPERTY_TICKET_URL);
                 if (ticketurl != null) {
-                    /* Trash stored ticket-URL and try again! */
-                    link.removeProperty("ticketurl");
-                    throw new PluginException(LinkStatus.ERROR_RETRY);
+                    logger.info("Re-using stored ticketurl: " + ticketurl);
+                    getPage(br, ticketurl);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    final Form dlform = br.getFormbyKey("download");
+                    if (dlform == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    /** 2025-09-18: Captcha not required anymore. */
+                    final boolean requiresCaptcha = false;
+                    if (requiresCaptcha) {
+                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                        dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                    }
+                    final InputField dlfield = dlform.getInputField("download");
+                    if (dlfield != null && dlfield.getValue() == null) {
+                        dlform.put("download", "");
+                    }
+                    submitForm(br, dlform);
                 }
+                dllink = br.getRegex("(https?://[^\"\\']+/dl/[^\"\\']+)").getMatch(0);
+                if (StringUtils.isEmpty(dllink)) {
+                    dllink = br.getRegex("location\\.href='(https?://[^']+)';\">\\s*<i data-feather=\"download\"").getMatch(0);
+                }
+                if (StringUtils.isEmpty(dllink)) {
+                    if (ticketurl != null) {
+                        /* Trash stored ticket-URL and try again! */
+                        link.removeProperty(PROPERTY_TICKET_URL);
+                        throw new PluginException(LinkStatus.ERROR_RETRY, "Try again with fresh ticket-URL");
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                }
+                /*
+                 * Store that URL as we can use it multiple times to generate new direct-urls for that particular file without wasting
+                 * traffic!
+                 */
+                link.setProperty(PROPERTY_TICKET_URL, br.getURL());
             }
         }
         try {
@@ -200,8 +318,7 @@ public class DeepbridCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        /* handle premium should never be called */
-        handleFree(link);
+        this.handleSelfhostedFileDownload(link, account);
     }
 
     private void handleDL(final Account account, final DownloadLink link) throws Exception {
@@ -220,7 +337,7 @@ public class DeepbridCom extends PluginForHost {
                 postPage(br, API_BASE + "?page=api&action=generateLink", "pass=&link=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
             }
             final Map<String, Object> resp = this.handleErrorsAPI(br, account, link);
-            dllink = (String) resp.get("link");
+            dllink = resp.get("link").toString();
             if (StringUtils.isEmpty(dllink)) {
                 /* This should never happen! */
                 mhm.handleErrorGeneric(account, link, "Failed to find final downloadurl", 10, 20 * 60 * 1000l);
@@ -257,14 +374,14 @@ public class DeepbridCom extends PluginForHost {
             this.dl.startDownload();
         } catch (final Exception e) {
             /* Special errorhandling */
-            final File part = new File(dl.getDownloadable().getFileOutputPart());
-            if (part.exists() && part.length() < 5000) {
-                final String content = IO.readFileToString(part);
+            final File file = new File(dl.getDownloadable().getFileOutputPart());
+            if (file.exists() && file.length() < 5000) {
+                final String content = IO.readFileToString(file);
                 if (StringUtils.containsIgnoreCase(content, "VinaGet")) {
                     logger.log(e);
                     logger.info("ServerError workaround: VinaGet");
                     link.setChunksProgress(null);
-                    part.delete();
+                    file.delete();
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "ServerError, retry later!", 15 * 60 * 1000l, e);
                 }
             }
@@ -293,12 +410,13 @@ public class DeepbridCom extends PluginForHost {
      */
     private void handleRedirects(final Browser br) throws IOException {
         final String redirect = br.getRedirectLocation();
-        if (redirect != null) {
-            if (br.getURL().contains(API_BASE) || br.getURL().contains(API_BASE.replaceFirst("www\\.", ""))) {
-                logger.info("Ignoring redirect to keep json in browser | Redirect: " + redirect);
-            } else {
-                br.followRedirect(true);
-            }
+        if (redirect == null) {
+            return;
+        }
+        if (br.getURL().contains(API_BASE) || StringUtils.containsIgnoreCase(br.getURL(), API_BASE.replaceFirst("www\\.", ""))) {
+            logger.info("Ignoring redirect to keep json in browser | Redirect: " + redirect);
+        } else {
+            br.followRedirect(true);
         }
     }
 
@@ -325,32 +443,33 @@ public class DeepbridCom extends PluginForHost {
         }
         final String type = userinfo.get("type").toString();
         final Number maxSimultaneousDownloads = (Number) userinfo.get("maxDownloads");
-        if (!"premium".equalsIgnoreCase(type)) {
+        if ("premium".equalsIgnoreCase(type)) {
+            account.setType(AccountType.PREMIUM);
+            if (maxSimultaneousDownloads != null) {
+                logger.info("Using API maxdownloads: " + maxSimultaneousDownloads);
+                account.setMaxSimultanDownloads(maxSimultaneousDownloads.intValue());
+            } else {
+                /* Set to default/unlimited */
+                account.setMaxSimultanDownloads(-1);
+            }
+            final String validuntil = userinfo.get("expiration").toString();
+            /* Correct expire-date - add 24 hours */
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(validuntil, "yyyy-MM-dd", Locale.ENGLISH) + 24 * 60 * 60 * 1000, br);
+            ai.setUnlimitedTraffic();
+        } else {
             account.setType(AccountType.FREE);
             /*
              * 2021-01-03: Usually there are 15 Minutes wait time between downloads in free mode -> Do not allow simultaneous downloads or
              * no downloads at all.
              */
             account.setMaxSimultanDownloads(1);
-            /*
-             * No downloads possible via free account via API. Via website, free downloads are possible but we were too lazy to add extra
-             * login support via website in order to allow free account downloads.
+            /**
+             * No downloads possible via free account via API. <br>
+             * Via website, free downloads are possible but we were too lazy to add extra login support via website in order to allow free
+             * account downloads.
              */
             ai.setTrafficLeft(0);
             ai.setExpired(true); // 2023-07-21
-        } else {
-            account.setType(AccountType.PREMIUM);
-            if (maxSimultaneousDownloads != null) {
-                logger.info("Using API maxdownloads: " + maxSimultaneousDownloads);
-                account.setMaxSimultanDownloads(maxSimultaneousDownloads.intValue());
-            } else {
-                logger.info("Using DEFAULT maxdownloads: " + defaultMAXDOWNLOADS);
-                account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
-            }
-            final String validuntil = userinfo.get("expiration").toString();
-            /* Correct expire-date - add 24 hours */
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(validuntil, "yyyy-MM-dd", Locale.ENGLISH) + 24 * 60 * 60 * 1000, br);
-            ai.setUnlimitedTraffic();
         }
         final Number maxConnections = (Number) userinfo.get("maxConnections");
         if (maxConnections != null) {
@@ -542,15 +661,12 @@ public class DeepbridCom extends PluginForHost {
                 throw new AccountInvalidException();
             }
             final Map<String, Object> userinfo = checkLoginAPI(br, account, false);
-            if (userinfo == null) {
-                throw new AccountInvalidException();
-            }
             account.saveCookies(br.getCookies(br.getHost()), "");
             return userinfo;
         }
     }
 
-    private Map<String, Object> checkLoginAPI(final Browser br, final Account account, final boolean setUsernameOnAccount) throws Exception {
+    private Map<String, Object> checkLoginAPI(final Browser br, final Account account, final boolean allowSetUsernameOnAccount) throws Exception {
         final String urlpart = "?page=api&action=accountInfo";
         getPage(br, API_BASE + urlpart);
         if (StringUtils.endsWithCaseInsensitive(br.getRedirectLocation(), "/login")) {
@@ -565,7 +681,7 @@ public class DeepbridCom extends PluginForHost {
         /* Failure would redirect us to /login */
         final boolean urlOk = br.getURL().contains(urlpart);
         if (loggedInViaCookies && urlOk) {
-            if (setUsernameOnAccount) {
+            if (allowSetUsernameOnAccount) {
                 /*
                  * For cookie login user can enter whatever he wants in "username" field. We want unique usernames so user cannot add the
                  * same account twice!
@@ -627,7 +743,7 @@ public class DeepbridCom extends PluginForHost {
                 throw new AccountUnavailableException(errorMsg, 5 * 60 * 1000l);
             }
         } else if (errorCode == 9) {
-            /* Hosters limit reached for this day */
+            /* Hosters' limit reached for this day */
             mhm.putError(account, link, 5 * 60 * 1000l, errorMsg);
         } else if (errorCode == 10) {
             /* Filehoster under maintenance on our site */

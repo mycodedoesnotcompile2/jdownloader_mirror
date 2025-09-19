@@ -17,6 +17,9 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -29,10 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "pornziz.com", "xnhub.com" }, urls = { "https?://(?:www\\.)?pornziz\\.com/video/[a-z0-9\\-]+\\-\\d+\\.html", "https?://(?:www\\.)?xnhub\\.com/(?:video/[a-z0-9\\-]+\\-\\d+\\.html|embed/\\d+)" })
+@HostPlugin(revision = "$Revision: 51517 $", interfaceVersion = 2, names = { "pornziz.com", "xnhub.com" }, urls = { "https?://(?:www\\.)?pornziz\\.com/video/[a-z0-9\\-]+\\-\\d+\\.html", "https?://(?:www\\.)?xnhub\\.com/(?:video/[a-z0-9\\-]+\\-\\d+\\.html|embed/\\d+)" })
 public class UnknownPornScript8 extends PluginForHost {
     public UnknownPornScript8(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,6 +103,7 @@ public class UnknownPornScript8 extends PluginForHost {
         if (StringUtils.isEmpty(title)) {
             title = filename_url;
         }
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
         dllink = br.getRegex("<source src=\"(https?[^<>\"]+)\"").getMatch(0);
         if (dllink == null) {
             /*
@@ -113,6 +114,10 @@ public class UnknownPornScript8 extends PluginForHost {
             if (iframe != null) {
                 br.getPage(iframe);
                 dllink = br.getRegex("<source src=\"(https?[^<>\"]+)\"").getMatch(0);
+                if (dllink == null && br.getRequest().getHtmlCode().length() <= 100) {
+                    /* e.g. https://www.tubedelta.com/embed/7976 */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Broken video");
+                }
             }
         }
         if (dllink == null) {
@@ -124,7 +129,7 @@ public class UnknownPornScript8 extends PluginForHost {
             title = title.trim();
             link.setFinalFileName(this.applyFilenameExtension(title, extDefault));
         }
-        if (!StringUtils.isEmpty(dllink)) {
+        if (!StringUtils.isEmpty(dllink) && !isDownload && !link.isSizeSet()) {
             basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, title, extDefault);
         }
         return AvailableStatus.TRUE;

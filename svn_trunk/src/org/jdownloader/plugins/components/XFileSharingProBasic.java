@@ -91,7 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 51515 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51516 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1018,7 +1018,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Override
     public boolean checkLinks(final DownloadLink[] urls) {
         final String apiKey = this.getAPIKey();
-        if (enableAccountApiOnlyMode() || (this.looksLikeValidAPIKey(apiKey) && this.supportsAPIMassLinkcheck())) {
+        if (enableAccountApiOnlyMode() || (this.supportsAPIMassLinkcheck() && this.looksLikeValidAPIKey(apiKey))) {
             return massLinkcheckerAPI(urls, apiKey);
         } else if (supportsMassLinkcheckOverWebsite()) {
             return this.massLinkcheckerWebsite(urls);
@@ -5844,8 +5844,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Checks multiple URLs via API. Only works when an apikey is given!
      */
     public boolean massLinkcheckerAPI(final DownloadLink[] urls, final String apikey) {
-        if (urls == null || urls.length == 0 || !this.looksLikeValidAPIKey(apikey)) {
+        if (urls == null || urls.length == 0) {
             return false;
+        } else if (!this.looksLikeValidAPIKey(apikey)) {
+            throw new IllegalArgumentException("apikey cannot be null");
         }
         boolean linkcheckerHasFailed = false;
         try {

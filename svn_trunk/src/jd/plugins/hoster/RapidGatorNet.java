@@ -68,9 +68,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51188 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51521 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1639,7 +1638,7 @@ public class RapidGatorNet extends PluginForHost {
 
     private void handleErrorsWebsite(final Browser br, final DownloadLink link, final Account account, final String currentIP, final boolean doExtendedOfflineCheck) throws PluginException {
         /* 2020-07-28: Resume can now also fail with error 500 and json: {"error":"Unexpected range request","success":false} */
-        String errorMsgFromJson = PluginJSonUtils.getJson(br, "error");
+        String errorMsgFromJson = null;
         if (br.getRequest().getHtmlCode().startsWith("{")) {
             /* Check for json response and parse it to extract error message from json. */
             try {
@@ -1647,7 +1646,9 @@ public class RapidGatorNet extends PluginForHost {
                 if (Boolean.FALSE.equals(entries.get("success"))) {
                     errorMsgFromJson = entries.get("error").toString();
                 }
-            } catch (final Exception ignore) {
+            } catch (final Exception e) {
+                logger.log(e);
+                logger.warning("Response looked like json but is not json");
             }
         }
         final String errorMsgHeader = br.getHttpConnection().getRequest().getResponseHeader("X-Error");
@@ -1664,6 +1665,7 @@ public class RapidGatorNet extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown resume related server error");
             }
         } else if (errorMsgFromJson != null) {
+            /* e.g. {"error":"Denied by IP","success":false} */
             throw new PluginException(LinkStatus.ERROR_FATAL, errorMsgFromJson);
         }
         if (account != null) {

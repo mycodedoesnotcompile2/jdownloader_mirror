@@ -16,6 +16,7 @@ import java.util.TimeZone;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -64,13 +65,13 @@ import jd.plugins.decrypter.Keep2ShareCcDecrypter;
 import jd.plugins.download.DownloadInterface;
 
 /**
- * Abstract class supporting keep2share/fileboom/publish2<br/>
+ * Abstract class supporting tezfiles.com/keep2share.cc (k2s.cc)/fileboom(fboom.me)/publish2.me <br>
  * <a href="https://github.com/keep2share/api/">Github documentation</a>
  *
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51519 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -282,7 +283,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 51437 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 51519 $"));
     }
 
     /**
@@ -552,7 +553,7 @@ public abstract class K2SApi extends PluginForHost {
         return true;
     }
 
-    public static void parseFileInfo(final DownloadLink link, final Map<String, Object> fileInfo, final String sourceFileID) {
+    public void parseFileInfo(final DownloadLink link, final Map<String, Object> fileInfo, final String sourceFileID) {
         final String id = (String) fileInfo.get("id");
         if (id != null && isSpecialFileID(sourceFileID) && !StringUtils.equals(id, sourceFileID)) {
             /* ID from URL is special fileID -> Find internal/"real" fileID as we use this for better dupe-checking. */
@@ -577,9 +578,6 @@ public abstract class K2SApi extends PluginForHost {
         final Object sizeO = fileInfo.get("size");
         final String md5 = (String) fileInfo.get("md5");// only available for file owner
         final String access = (String) fileInfo.get("access");
-        if (!StringUtils.isEmpty(name)) {
-            link.setFinalFileName(name);
-        }
         if (sizeO instanceof Number) {
             link.setVerifiedFileSize(((Number) sizeO).longValue());
         }
@@ -596,6 +594,7 @@ public abstract class K2SApi extends PluginForHost {
         /* Set additional properties for Packagizer usage */
         final Map<String, Object> video_info;
         final Map<String, Object> extended_info = (Map<String, Object>) fileInfo.get("extended_info");
+        String content_type = null;
         if (extended_info != null) {
             video_info = (Map<String, Object>) extended_info.get("video_info");
         } else {
@@ -606,6 +605,20 @@ public abstract class K2SApi extends PluginForHost {
             link.setProperty("video_width", video_info.get("width"));
             link.setProperty("video_height", video_info.get("height"));
             link.setProperty("video_format", video_info.get("format"));
+            /* Small workaround for video files with missing file extension. */
+            content_type = (String) extended_info.get("content_type");
+            if (content_type != null && name != null) {
+                final String ext = this.getExtensionFromMimeType(content_type);
+                if (ext != null) {
+                    /* Fix 1: remove "mp4" ending without dot. */
+                    name = name.replaceFirst(Pattern.quote(ext.replace(".", "")) + "$", "");
+                    /* Fix 2: add/fix file extension */
+                    name = this.correctOrApplyFileNameExtension(name, ext, null);
+                }
+            }
+        }
+        if (!StringUtils.isEmpty(name)) {
+            link.setFinalFileName(name);
         }
     }
 
@@ -947,6 +960,7 @@ public abstract class K2SApi extends PluginForHost {
     /** Checks for cached free account limits. */
     private void checkForFreeAccountLimits(final Account account) throws PluginException {
         if (this.isPremium(account)) {
+            /* Not a free account -> No free account limits to check for. */
             return;
         }
         /* Check for limit sitting on account */
@@ -1882,7 +1896,7 @@ public abstract class K2SApi extends PluginForHost {
         // postdataGetfilestatus.put("offset", 0);
         try {
             final Map<String, Object> response = this.postPageRaw(br, "/getfilestatus", postdataGetfilestatus, null);
-            K2SApi.parseFileInfo(link, response, fileID);
+            parseFileInfo(link, response, fileID);
             if (response.containsKey("files") || Boolean.TRUE.equals(response.get("is_folder"))) {
                 /* User added folder as '/file/' link so it wasn't processed as a folder in our crawler plugin -> Dead end. */
                 if (link.getComment() == null) {

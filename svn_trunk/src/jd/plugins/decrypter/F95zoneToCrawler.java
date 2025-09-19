@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -42,11 +43,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.F95zoneTo;
 
-@DecrypterPlugin(revision = "$Revision: 48814 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51517 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { F95zoneTo.class })
 public class F95zoneToCrawler extends PluginForDecrypt {
     public F95zoneToCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -78,14 +86,14 @@ public class F95zoneToCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(masked/.+|threads/([^/#\\?]+\\.\\d+|\\d+)/((page|post)-\\d+)?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_SINGLE.pattern() + "|" + PATTERN_THREAD_1.pattern() + "|" + PATTERN_THREAD_2.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
-    private final String PATTERN_SINGLE   = "(?i)https?://[^/]+/masked/.+";
-    private final String PATTERN_THREAD_1 = "(?i)https?://[^/]+/threads/([^/#\\?]+)\\.\\d+/((page|post)-\\d+)?";
-    private final String PATTERN_THREAD_2 = "(?i)https?://[^/]+/threads/\\d+/((page|post)-\\d+)?";
+    private static final Pattern PATTERN_SINGLE   = Pattern.compile("/masked/.+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_THREAD_1 = Pattern.compile("/threads/([^/#\\?]+)\\.\\d+/((page|post)-\\d+)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_THREAD_2 = Pattern.compile("/threads/\\d+/((page|post)-\\d+)?", Pattern.CASE_INSENSITIVE);
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
@@ -94,10 +102,10 @@ public class F95zoneToCrawler extends PluginForDecrypt {
         }
         final F95zoneTo hosterplugin = (F95zoneTo) this.getNewPluginForHostInstance(this.getHost());
         hosterplugin.login(account, false);
-        br.setFollowRedirects(true);
-        if (param.getCryptedUrl().matches(PATTERN_SINGLE)) {
+        final String contenturl = param.getCryptedUrl();
+        if (new Regex(contenturl, PATTERN_SINGLE).patternFind()) {
             return crawlSingleLink(param);
-        } else if (param.getCryptedUrl().matches(PATTERN_THREAD_1) || param.getCryptedUrl().matches(PATTERN_THREAD_2)) {
+        } else if (new Regex(contenturl, PATTERN_THREAD_1).patternFind() || new Regex(contenturl, PATTERN_THREAD_2).patternFind()) {
             return crawlForumThreadPage(param);
         } else {
             /* Unsupported URL */
@@ -109,15 +117,16 @@ public class F95zoneToCrawler extends PluginForDecrypt {
         br.setAllowedResponseCodes(400);
         final boolean superfastCrawling = true;
         final String action;
-        if (!superfastCrawling) {
+        if (superfastCrawling) {
+            /* Do not access page, just set referer */
+            br.getHeaders().put("Referer", param.getCryptedUrl());
+            action = param.getCryptedUrl();
+        } else {
             br.getPage(param.getCryptedUrl());
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             action = br.getURL();
-        } else {
-            br.getHeaders().put("Referer", param.getCryptedUrl());
-            action = param.getCryptedUrl();
         }
         final UrlQuery query = new UrlQuery();
         query.add("xhr", "1");
@@ -169,6 +178,11 @@ public class F95zoneToCrawler extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String[] externalURLs = br.getRegex("<a href=\"(https?://[^\"]+)\"[^<]*class=\"link link--external\"").getColumn(0);
+        if (externalURLs == null || externalURLs.length == 0) {
+            /* e.g. forum thread page that contains text only. */
+            logger.info("Found zero external URLs");
+            return ret;
+        }
         for (final String externalURL : externalURLs) {
             ret.add(this.createDownloadlink(externalURL));
         }

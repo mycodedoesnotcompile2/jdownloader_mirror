@@ -29,6 +29,17 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.proxy.AbstractProxySelectorImpl;
@@ -54,17 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
-@HostPlugin(revision = "$Revision: 50622 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51519 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepositFiles extends antiDDoSForHost {
     public static AtomicReference<String>          MAINPAGE = new AtomicReference<String>();
     /* don't touch the following! */
@@ -233,7 +234,7 @@ public class DepositFiles extends antiDDoSForHost {
         br.getPage(this.getContentURL(link));
         if (br.containsHTML("class=\"no_download_msg\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)<strong>\\s*Achtung! Sie haben ein Limit|Sie haben Ihre Download Zeitfrist erreicht\\.\\s*<")) {
+        } else if (br.containsHTML("<strong>\\s*Achtung! Sie haben ein Limit|Sie haben Ihre Download Zeitfrist erreicht\\.\\s*<")) {
             /* Filename- and filesize are not visible in this state. */
             link.getLinkStatus().setStatusText("Download limit reached");
             return AvailableStatus.TRUE;
@@ -316,7 +317,7 @@ public class DepositFiles extends antiDDoSForHost {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, 30 * 60 * 1000l);
         }
         /* country slots full */
-        if (br.containsHTML("(?i)but all downloading slots for your country")) {
+        if (br.containsHTML("but all downloading slots for your country")) {
             // String wait = br.getRegex("html_download_api-limit_country\">(\\d+)</span>").getMatch(0);
             // if (wait != null) throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, Integer.parseInt(wait.trim()) *
             // 1000l);
@@ -448,39 +449,70 @@ public class DepositFiles extends antiDDoSForHost {
                 /* Long wait -> IP limit reached */
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, preDownloadWaittimeMillis);
             }
-            final CaptchaHelperHostPluginRecaptchaV2 rc = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LdyfgcTAAAAAArE1fk9cGyExtKfT4a12dWcViye");
-            if (preDownloadWaittimeMillis > rc.getSolutionTimeout()) {
-                final long prePrePreDownloadWait = preDownloadWaittimeMillis - rc.getSolutionTimeout();
+            final boolean isCloudflareTurnstileCaptcha = true;
+            CaptchaHelperHostPluginRecaptchaV2 rc = null;
+            CaptchaHelperHostPluginCloudflareTurnstile ts = null;
+            final long solutionTimeout;
+            if (isCloudflareTurnstileCaptcha) {
+                /* 2025-09-18 */
+                ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, "0x4AAAAAABpm3gTLyzhq7c8b");
+                solutionTimeout = ts.getSolutionTimeout();
+            } else {
+                rc = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LdyfgcTAAAAAArE1fk9cGyExtKfT4a12dWcViye");
+                solutionTimeout = rc.getSolutionTimeout();
+            }
+            if (preDownloadWaittimeMillis > solutionTimeout) {
+                final long prePrePreDownloadWait = preDownloadWaittimeMillis - solutionTimeout;
                 logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid timeouts");
                 logger.info("Pre-pre download waittime seconds: " + (prePrePreDownloadWait / 1000));
                 this.sleep(prePrePreDownloadWait, link);
                 preDownloadWaittimeMillis = preDownloadWaittimeMillis - rc.getSolutionTimeout();
             }
             String recaptchaV2Response = null;
+            String cfTurnstileResponse = null;
             final boolean needsCaptcha = account == null || account.getType() != AccountType.PREMIUM;
             final boolean allowCaptchaSolvingBeforeFinalWaitStep = true;
             if (allowCaptchaSolvingBeforeFinalWaitStep && needsCaptcha) {
                 final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
-                recaptchaV2Response = rc.getToken();
+                if (isCloudflareTurnstileCaptcha) {
+                    cfTurnstileResponse = ts.getToken();
+                } else {
+                    recaptchaV2Response = rc.getToken();
+                }
                 final long timePassed = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
                 preDownloadWaittimeMillis = preDownloadWaittimeMillis - timePassed;
             }
+            /* Wait pre download time if captcha solving didn't already take enough time. */
             if (preDownloadWaittimeMillis > 0) {
                 sleep(Long.parseLong(waitStr) * 1001, link);
             }
             final Browser ajax = br.cloneBrowser();
             ajax.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             ajax.getHeaders().put("Accept", "*/*");
-            // // ajax request, here they give you more html && js. Think this is where the captcha type is determined.
+            // // ajax request, here they give you more html & js. Think this is where the captcha type is determined.
             ajax.getPage("/get_file.php?abspeed=0&fid=" + fid);
-            if (ajax.containsHTML("(?i)But currently no free download slots for")) {
+            if (ajax.containsHTML("But currently no free download slots for")) {
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "No free slots available", 5 * 60 * 1000l);
             }
-            if (recaptchaV2Response == null && needsCaptcha) {
+            if (needsCaptcha && recaptchaV2Response == null && cfTurnstileResponse == null) {
                 /* Captcha hasn't been requested before -> Do it now. */
-                recaptchaV2Response = rc.getToken();
+                if (isCloudflareTurnstileCaptcha) {
+                    cfTurnstileResponse = ts.getToken();
+                } else {
+                    recaptchaV2Response = rc.getToken();
+                }
             }
-            ajax.getPage("/get_file.php?fid=" + fid + "&challenge=null&g-recaptcha-response=" + Encoding.urlEncode(recaptchaV2Response) + "&response=null");
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("fid", fid);
+            if (isCloudflareTurnstileCaptcha) {
+                query.appendEncoded("g-recaptcha-response", "null");
+                query.appendEncoded("cf-turnstile-response", cfTurnstileResponse);
+            } else {
+                query.appendEncoded("g-recaptcha-response", recaptchaV2Response);
+            }
+            // query.appendEncoded("challenge", "null");
+            // query.appendEncoded("response", "null");
+            ajax.getPage("/get_file.php?" + query.toString());
             if (ajax.containsHTML("(onclick=\"check_recaptcha|load_recaptcha)") || CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(ajax)) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
@@ -554,7 +586,7 @@ public class DepositFiles extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Download-Error: " + downloadErrorTextFromHeader);
             }
         }
-        if (br.containsHTML("(?i)File does't exist")) {
+        if (br.containsHTML("File does't exist")) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (dl.getConnection().getHeaderField("Guest-Limit") != null) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, 10 * 60 * 1000l);
@@ -567,7 +599,7 @@ public class DepositFiles extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -739,7 +771,7 @@ public class DepositFiles extends antiDDoSForHost {
     }
 
     private boolean isLoggedIN(final Browser br) {
-        if (br.containsHTML("(?i)logout\\.php") && br.getCookie(br.getHost(), "autologin", Cookies.NOTDELETEDPATTERN) != null) {
+        if (br.containsHTML("logout\\.php") && br.getCookie(br.getHost(), "autologin", Cookies.NOTDELETEDPATTERN) != null) {
             return true;
         } else {
             return false;
@@ -863,8 +895,8 @@ public class DepositFiles extends antiDDoSForHost {
             }
             saveAccountData(accountData, account);
             /**
-             * We can't validate logins so we always need to generate a fresh token. </br> API will request login captchas if we're doing
-             * this too frequently.
+             * We can't validate logins so we always need to generate a fresh token. </br>
+             * API will request login captchas if we're doing this too frequently.
              */
             account.setRefreshTimeout(5 * 60 * 60 * 1000l);
         } catch (final PluginException e) {

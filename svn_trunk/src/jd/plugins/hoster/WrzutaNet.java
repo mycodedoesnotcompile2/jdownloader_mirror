@@ -39,6 +39,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -47,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51521 $", interfaceVersion = 3, names = {}, urls = {})
 public class WrzutaNet extends PluginForHost {
     public WrzutaNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +69,7 @@ public class WrzutaNet extends PluginForHost {
         return "https://" + getHost() + "/page/privacy";
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "wrzuta.net" });
@@ -141,6 +142,16 @@ public class WrzutaNet extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws IOException, PluginException {
+        if (!link.isNameSet()) {
+            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+            final String filenameFromURL = urlinfo.getMatch(2);
+            if (filenameFromURL != null) {
+                link.setName(Encoding.htmlDecode(filenameFromURL));
+            } else {
+                final String fileID = urlinfo.getMatch(0);
+                link.setName(fileID);
+            }
+        }
         final boolean useAPI = true;
         if (useAPI) {
             return this.requestFileInformationAPI(link, account);
@@ -150,16 +161,6 @@ public class WrzutaNet extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-            final String fileID = urlinfo.getMatch(0);
-            final String filenameFromURL = urlinfo.getMatch(2);
-            if (filenameFromURL != null) {
-                link.setName(Encoding.htmlDecode(filenameFromURL));
-            } else {
-                link.setName(fileID);
-            }
-        }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
@@ -183,16 +184,6 @@ public class WrzutaNet extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformationAPI(final DownloadLink link, final Account account) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-            final String fileID = urlinfo.getMatch(0);
-            final String filenameFromURL = urlinfo.getMatch(2);
-            if (filenameFromURL != null) {
-                link.setName(Encoding.htmlDecode(filenameFromURL));
-            } else {
-                link.setName(fileID);
-            }
-        }
         br.getPage(API_BASE + "/link.php?link=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
         if (br.getHttpConnection().getResponseCode() == 403) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -205,7 +196,7 @@ public class WrzutaNet extends PluginForHost {
             /* {"status":"Not found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = null; // TODO
+        String filename = (String) entries.get("FileName");
         String filesizeStr = entries.get("size").toString();
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename.trim()));
@@ -243,6 +234,10 @@ public class WrzutaNet extends PluginForHost {
             requestFileInformationWebsite(link, account);
             final Form dlform = br.getFormbyKey("download_file");
             if (dlform == null) {
+                if (account == null) {
+                    /* 2025-09-18: Looks like [free] account is required to download any file from this website. */
+                    throw new AccountRequiredException("Account required to download this file");
+                }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br);

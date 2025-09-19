@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49141 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51517 $", interfaceVersion = 3, names = {}, urls = {})
 /**
  * This is a dummy plugin only used to provide login functionality. There is a crawler plugin using this plugin to login in order to be able
  * to crawl links to other websites.
@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 public class F95zoneTo extends PluginForHost {
     public F95zoneTo(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://f95zone.to/register/");
+        this.enablePremium("https://" + getHost() + "/register/");
     }
 
     @Override
@@ -56,7 +56,7 @@ public class F95zoneTo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://f95zone.to/help/terms/";
+        return "https://" + getHost() + "/help/terms/";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -197,13 +197,5 @@ public class F95zoneTo extends PluginForHost {
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
         return false;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
