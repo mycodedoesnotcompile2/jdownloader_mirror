@@ -7,24 +7,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.plugins.hoster.GenericM3u8;
-
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
+import jd.plugins.hoster.GenericM3u8;
+
 public class HlsContainer {
-
     public static class MEDIA {
-
         public static enum TYPE {
             AUDIO,
             SUBTITLES,
             CLOSEDCAPTIONS;
+
             public static TYPE parse(final String type) {
                 if ("AUDIO".equals(type)) {
                     return TYPE.AUDIO;
@@ -260,11 +259,9 @@ public class HlsContainer {
     public static List<HlsContainer> parseHlsQualities(final String m3u8, final Browser br) throws Exception {
         final ArrayList<HlsContainer> hlsqualities = new ArrayList<HlsContainer>();
         final List<MEDIA> media = parseMedia(m3u8, br);
-
         // TODO: update to support #EXT-X-SESSION-DATA:DATA-ID="com.example.title",LANGUAGE="en", VALUE="This is an example",see
         // GenericM3u8Decrypter
         // https://hlsbook.net/adding-session-data-to-a-playlist/
-
         final String[][] streams = new Regex(m3u8, "#EXT-X-STREAM-INF:?([^\r\n]+)[\r\n]+([^\r\n]+)").getMatches();
         if (streams != null) {
             for (final String stream[] : streams) {
@@ -277,7 +274,6 @@ public class HlsContainer {
                     final String framerate = new Regex(streamInfo, "(?:,|^)\\s*FRAME-RATE\\s*=\\s*(\\d+)").getMatch(0);
                     final String codecs = new Regex(streamInfo, "(?:,|^)\\s*CODECS\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                     final String name = new Regex(streamInfo, "(?:,|^)\\s*NAME\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
-
                     // final String uri = new Regex(streamInfo, "(?:,|^)\\s*URI\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                     // final String language = new Regex(streamInfo, "(?:,|^)\\s*LANGUAGE\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                     // final String type = new Regex(streamInfo, "(?:,|^)\\s*TYPE\\s*=\\s*([^<>\"]+)").getMatch(0);
@@ -304,7 +300,6 @@ public class HlsContainer {
                     if (codecs != null) {
                         hls.codecs = codecs.trim();
                     }
-
                     hls.streamURL = url;
                     hls.m3u8URL = br.getURL();
                     if (resolution != null) {
@@ -318,7 +313,7 @@ public class HlsContainer {
                         hls.framerate = Integer.parseInt(framerate);
                     }
                     final List<MEDIA> containerMedia = new ArrayList<MEDIA>();
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && false) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         final String audioID = new Regex(streamInfo, "(?:,|^)\\s*AUDIO\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                         hls.audioGroupID = audioID;
                         containerMedia.addAll(filterMedia(media, TYPE.AUDIO, audioID));
@@ -351,7 +346,6 @@ public class HlsContainer {
 
     private List<M3U8Playlist> m3u8List = null;
     private int                width    = -1;
-
     private List<MEDIA>        media    = null;
 
     public List<MEDIA> getMedia() {
@@ -738,5 +732,4 @@ public class HlsContainer {
         link.setProperty(GenericM3u8.PROPERTY_M3U8_AUDIO_GROUP, getAudioGroupID());
         // TODO: Set type of content e.g. audio, video, subtitle
     }
-
 }

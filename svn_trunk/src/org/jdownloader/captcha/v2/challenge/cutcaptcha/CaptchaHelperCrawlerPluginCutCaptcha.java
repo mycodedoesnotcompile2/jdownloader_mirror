@@ -22,4 +22,9 @@ public class CaptchaHelperCrawlerPluginCutCaptcha extends AbstractCaptchaHelperC
         final PluginForDecrypt plugin = getPlugin();
         return plugin.handleCaptchaChallenge(challenge);
     }
+
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
 }

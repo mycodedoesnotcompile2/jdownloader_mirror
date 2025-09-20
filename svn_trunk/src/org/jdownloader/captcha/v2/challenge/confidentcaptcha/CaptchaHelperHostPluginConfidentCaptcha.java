@@ -39,4 +39,9 @@ public class CaptchaHelperHostPluginConfidentCaptcha extends AbstractCaptchaHelp
         };
         return plugin.handleCaptchaChallenge(link, challenge);
     }
+
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
 }

@@ -23,4 +23,9 @@ public class CaptchaHelperHostPluginCutCaptcha extends AbstractCaptchaHelperCutC
         final DownloadLink link = plugin.getDownloadLink();
         return plugin.handleCaptchaChallenge(link, challenge);
     }
+
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
 }

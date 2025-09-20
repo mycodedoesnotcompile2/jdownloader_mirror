@@ -82,6 +82,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     private final PackagizerControllerEventSender eventSender;
     private volatile List<PackagizerRuleWrapper>  rules                          = null;
     /* Replacer rules ids */
+    public static final String                    JOB_ID                         = "job.id";
+    public static final String                    JOB_SOURCE                     = "job.source";
     public static final String                    ORGFILENAME                    = "orgfilename";
     public static final String                    ORGFILENAMEWITHOUTEXT          = "orgfilenamewithoutext";
     public static final String                    ORGFILETYPE                    = "orgfiletype";
@@ -92,6 +94,40 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
     public static final String                    PACKAGENAME                    = "packagename";
     public static final String                    SIMPLEDATE                     = "simpledate";
     public static final String                    INDEXOF                        = "indexof";
+    private final static PackagizerReplacer       JOB_ID_REPLACER                = new PackagizerReplacer() {
+                                                                                     public String getID() {
+                                                                                         return JOB_ID;
+                                                                                     }
+
+                                                                                     private final Pattern pat = Pattern.compile("<jd:" + JOB_ID + "/?>");
+
+                                                                                     public String replace(REPLACEVARIABLE replaceVariable, String modifiers, CrawledLink link, String input, PackagizerRuleWrapper lgr) {
+                                                                                         final LinkCollectingJob job = link.getSourceJob();
+                                                                                         if (job == null) {
+                                                                                             return pat.matcher(input).replaceAll(Matcher.quoteReplacement(""));
+                                                                                         } else {
+                                                                                             return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, job.getUniqueAlltimeID().toString())));
+                                                                                         }
+                                                                                     }
+                                                                                 };
+
+    private final static PackagizerReplacer       JOB_SOURCE_REPLACER            = new PackagizerReplacer() {
+                                                                                     public String getID() {
+                                                                                         return JOB_SOURCE;
+                                                                                     }
+
+                                                                                     private final Pattern pat = Pattern.compile("<jd:" + JOB_SOURCE + "/?>");
+
+                                                                                     public String replace(REPLACEVARIABLE replaceVariable, String modifiers, CrawledLink link, String input, PackagizerRuleWrapper lgr) {
+                                                                                         final LinkCollectingJob job = link.getSourceJob();
+                                                                                         if (job == null) {
+                                                                                             return pat.matcher(input).replaceAll(Matcher.quoteReplacement(""));
+                                                                                         } else {
+                                                                                             return pat.matcher(input).replaceAll(Matcher.quoteReplacement(preprocessReplacement(replaceVariable, job.getOrigin().getOrigin().name())));
+                                                                                         }
+                                                                                     }
+                                                                                 };
+
     private final static PackagizerReplacer       DATE_REPLACER                  = new PackagizerReplacer() {
                                                                                      public String getID() {
                                                                                          return SIMPLEDATE;
@@ -335,6 +371,8 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
      * Initializes and adds all standard replacers to the controller. This method should be called during constructor initialization.
      */
     private void addReplacers() {
+        addReplacer(JOB_SOURCE_REPLACER);
+        addReplacer(JOB_ID_REPLACER);
         addReplacer(ENV_REPLACER);
         addReplacer(DATE_REPLACER);
         addReplacer(DEFAULT_DOWNLOAD_PATH_REPLACER);

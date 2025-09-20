@@ -8,6 +8,8 @@ import java.util.List;
 
 import jd.http.Browser;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment.X_KEY_METHOD;
@@ -23,6 +25,7 @@ public class M3U8Playlist {
             // SAMPLE-AES means that the Media Segments contain media samples, such as audio or video, that are encrypted
             // https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/HLS_Sample_Encryption/Encryption/Encryption.html
             SAMPLE_AES("SAMPLE-AES");
+
             private final String method;
 
             public String getMethod() {
@@ -70,7 +73,16 @@ public class M3U8Playlist {
             this.xKeyURI = xKeyURI;
         }
 
-        private String xKeyURI = null;
+        private String  xKeyURI     = null;
+        private boolean isEXT_X_MAP = false;
+
+        public boolean isEXT_X_MAP() {
+            return isEXT_X_MAP;
+        }
+
+        protected void setEXT_X_MAP(boolean isEXT_X_MAP) {
+            this.isEXT_X_MAP = isEXT_X_MAP;
+        }
 
         public X_KEY_METHOD getxKeyMethod() {
             return xKeyMethod;
@@ -151,6 +163,18 @@ public class M3U8Playlist {
             }
         }
 
+        public long addSize(long size) {
+            if (size < 1) {
+                return getSize();
+            }
+            if (getSize() == -1) {
+                setSize(size);
+            } else {
+                setSize(getSize() + size);
+            }
+            return getSize();
+        }
+
         public void setSize(long size) {
             if (size == -1) {
                 this.size = -1;
@@ -167,7 +191,19 @@ public class M3U8Playlist {
             return duration;
         }
 
-        private volatile long duration;
+        private volatile long duration = -1;
+
+        private long addDuration(long duration) {
+            if (duration < 1) {
+                return this.duration;
+            }
+            if (this.duration == -1) {
+                this.duration = duration;
+            } else {
+                this.duration += duration;
+            }
+            return this.duration;
+        }
 
         private void setDuration(long duration) {
             if (duration < 0) {
@@ -199,11 +235,27 @@ public class M3U8Playlist {
 
         @Override
         public String toString() {
-            if (isByteRange()) {
-                return "M3U8Segment:Encrypted:" + isEncrypted() + "|Duration:" + getDuration() + "ms|ByteRange:" + Arrays.toString(getByteRange()) + "|URL:" + getUrl();
-            } else {
-                return "M3U8Segment:Encrypted:" + isEncrypted() + "|Duration:" + getDuration() + "ms|URL:" + getUrl();
+            StringBuilder sb = new StringBuilder();
+            sb.append("M3U8Segment:");
+            if (isEncrypted()) {
+                sb.append("|Encrypted");
             }
+            if (isEXT_X_MAP()) {
+                sb.append("|X-MAP");
+            }
+            final long duration = getDuration();
+            if (duration > 0) {
+                sb.append("|Duration:").append(duration).append("ms");
+            }
+            if (isByteRange()) {
+                sb.append("|ByteRange:").append(Arrays.toString(getByteRange()));
+            }
+            final long size = getSize();
+            if (size >= 0) {
+                sb.append("|Size:").append(size);
+            }
+            sb.append("|URL:").append(getUrl());
+            return sb.toString();
         }
     }
 
@@ -212,7 +264,7 @@ public class M3U8Playlist {
         return "M3U8:Encrypted:" + getEncryptionMethod() + "|Segments:" + size() + "|Duration:" + getEstimatedDuration() + "ms|Estimated Size:" + getEstimatedSize();
     }
 
-    private static final boolean X_BYTERANGE_SUPPORT = false;
+    private static final boolean X_BYTERANGE_SUPPORT = DebugMode.TRUE_IN_IDE_ELSE_FALSE;
 
     public static List<M3U8Playlist> loadM3U8(final String m3u8, final Browser br) throws IOException {
         return loadM3U8(m3u8, br, X_BYTERANGE_SUPPORT);
@@ -248,11 +300,10 @@ public class M3U8Playlist {
         long lastSegmentDuration = -1;
         long byteRange[] = null;
         int sequenceOffset = 0;
-        String extXMapURL = null;
         M3U8Segment.X_KEY_METHOD xKeyMethod = M3U8Segment.X_KEY_METHOD.NONE;
         String xKeyIV = null;
         String xKeyURI = null;
-        for (final String line : Regex.getLines(br.toString())) {
+        nextLine: for (final String line : Regex.getLines(br.toString())) {
             if (StringUtils.isEmpty(line)) {
                 continue;
             }
@@ -260,105 +311,106 @@ public class M3U8Playlist {
                 if (current != null && current.size() > 0) {
                     ret.add(current);
                 }
-                M3U8Playlist before = current;
+                final M3U8Playlist previousPlaylist = current;
                 current = new M3U8Playlist();
                 current.setMediaSequenceOffset(sequenceOffset);
-                current.setExtTargetDuration(before.getExtTargetDuration());
+                current.setExtTargetDuration(previousPlaylist.getExtTargetDuration());
                 lastSegmentDuration = -1;
-            }
-            if (StringUtils.startsWithCaseInsensitive(line, "concat") || StringUtils.contains(line, "file:")) {
+                continue nextLine;
+            } else if (StringUtils.startsWithCaseInsensitive(line, "concat") || StringUtils.contains(line, "file:")) {
                 // http://habrahabr.ru/company/mailru/blog/274855/
-            } else if (line.matches("^https?://.+") || !line.trim().startsWith("#") || line.startsWith("#EXT-X-MAP:URI")) {
-                final String segmentURL;
-                if (line.matches("^https?://.+") || !line.trim().startsWith("#")) {
-                    segmentURL = br.getURL(line).toString();
+                continue nextLine;
+            } else if (line.startsWith("#EXT-X-MAP:URI")) {
+                final String URI = new Regex(line, "URI\\s*=\\s*\"(.*?)\"").getMatch(0);
+                if (StringUtils.isEmpty(URI)) {
+                    throw new IOException("Unsupported EXT-X-MAP:URI:" + line);
                 } else {
-                    // TODO: add BYTERANGE support
-                    final String URI = new Regex(line, "URI\\s*=\\s*\"(.*?)\"").getMatch(0);
-                    if (URI == null) {
-                        throw new IOException("Unsupported EXT-X-MAP:URI:" + line);
-                    } else {
-                        segmentURL = br.getURL(URI).toString();
-                        extXMapURL = segmentURL;
-                    }
-                }
-                final M3U8Segment existing = current.getSegment(segmentURL, null);
-                if (existing == null || existing.isByteRange()) {
-                    final M3U8Segment lastSegment = current.getLastSegment();
-                    final int index = current.addSegment(segmentURL, lastSegmentDuration);
-                    if (!M3U8Segment.X_KEY_METHOD.NONE.equals(xKeyMethod)) {
-                        final M3U8Segment segment = current.getSegment(index);
-                        segment.setxKeyMethod(xKeyMethod);
-                        segment.setxKeyIV(xKeyIV);
-                        segment.setxKeyURI(xKeyURI);
-                    }
-                    if (byteRange != null) {
-                        final M3U8Segment segment = current.getSegment(index);
-                        if (X_BYTERANGE_SUPPORT) {
-                            if (lastSegment == null || !lastSegment.getUrl().endsWith(segmentURL)) {
-                                byteRange[0] = byteRange[0] + byteRange[1];
-                                byteRange[1] = 0;
+                    final String xMapURL = br.getURL(URI).toString();
+                    long[] xMapByteRane = null;
+                    if (line.contains("BYTERANGE=")) {
+                        final long byteRangeLength = Long.parseLong(new Regex(line, "BYTERANGE=\"(\\d+)").getMatch(0));
+                        final String byteRangeStart = new Regex(line, "BYTERANGE=\"\\d+@(\\d+)").getMatch(0);
+                        if (byteRangeStart != null) {
+                            xMapByteRane = new long[] { byteRangeLength, Long.parseLong(byteRangeStart) };
+                        } else {
+                            final M3U8Segment lastSegment = current.getLastSegment();
+                            if (lastSegment != null && lastSegment.isByteRange()) {
+                                xMapByteRane = new long[] { byteRangeLength, lastSegment.getByteRange()[0] + lastSegment.getByteRange()[1] };
+                            } else {
+                                xMapByteRane = new long[] { byteRangeLength, -1l };
                             }
-                            segment.setByteRange(byteRange);
                         }
-                        segment.setSize(byteRange[0]);
                     }
-                } else if (existing != null && byteRange != null) {
-                    if (lastSegmentDuration > 0) {
-                        existing.setDuration(existing.getDuration() + lastSegmentDuration);
+                    final int index = current.addSegment(xMapURL, lastSegmentDuration);
+                    final M3U8Segment xMapSegment = current.getSegment(index);
+                    xMapSegment.setEXT_X_MAP(true);
+                    xMapSegment.setByteRange(xMapByteRane);
+                }
+            } else if (line.matches("^https?://.+") || !line.trim().startsWith("#")) {
+                final String segmentURL = br.getURL(line).toString();
+                final M3U8Segment existing = current.getSegment(segmentURL, null);
+                if (existing == null) {
+                    // no existing segment with segmentURL -> create new one
+                    final int index = current.addSegment(segmentURL, lastSegmentDuration);
+                    final M3U8Segment currentSegment = current.getSegment(index);
+                    if (!M3U8Segment.X_KEY_METHOD.NONE.equals(xKeyMethod)) {
+                        currentSegment.setxKeyMethod(xKeyMethod);
+                        currentSegment.setxKeyIV(xKeyIV);
+                        currentSegment.setxKeyURI(xKeyURI);
                     }
-                    if (existing.getSize() > 0) {
-                        existing.setSize(existing.getSize() + byteRange[0]);
+                    currentSegment.setByteRange(byteRange);
+                } else if (existing.isByteRange()) {
+                    // existing with same segmentURL but with byteRange
+                    if (byteRange == null) {
+                        // existing segment has byteRange but next one does not?!
+                        throw new WTFException();
                     }
+                    final int index = current.addSegment(segmentURL, lastSegmentDuration);
+                    final M3U8Segment currentSegment = current.getSegment(index);
+                    if (!M3U8Segment.X_KEY_METHOD.NONE.equals(xKeyMethod)) {
+                        currentSegment.setxKeyMethod(xKeyMethod);
+                        currentSegment.setxKeyIV(xKeyIV);
+                        currentSegment.setxKeyURI(xKeyURI);
+                    }
+                    currentSegment.setByteRange(byteRange);
+                } else {
+                    // existing with same segmentURL but without byteRange
+                    throw new WTFException();
                 }
                 lastSegmentDuration = -1;
                 byteRange = null;
-            } else {
-                if (line.startsWith("#EXT-X-BYTERANGE")) {
-                    // TODO: extract BYTERANGE parser into own method
-                    final long byteRangeLength = Long.parseLong(new Regex(line, "#EXT-X-BYTERANGE:(\\d+)").getMatch(0));
-                    final String byteRangeStart = new Regex(line, "#EXT-X-BYTERANGE:\\d+@(\\d+)").getMatch(0);
-                    if (byteRangeStart != null) {
-                        byteRange = new long[] { byteRangeLength, Long.parseLong(byteRangeStart) };
+            } else if (line.startsWith("#EXT-X-BYTERANGE")) {
+                final long byteRangeLength = Long.parseLong(new Regex(line, "#EXT-X-BYTERANGE:(\\d+)").getMatch(0));
+                final String byteRangeStart = new Regex(line, "#EXT-X-BYTERANGE:\\d+@(\\d+)").getMatch(0);
+                if (byteRangeStart != null) {
+                    byteRange = new long[] { byteRangeLength, Long.parseLong(byteRangeStart) };
+                } else {
+                    final M3U8Segment lastSegment = current.getLastSegment();
+                    if (lastSegment != null && lastSegment.isByteRange()) {
+                        byteRange = new long[] { byteRangeLength, lastSegment.getByteRange()[0] + lastSegment.getByteRange()[1] };
                     } else {
-                        final M3U8Segment lastSegment = current.getLastSegment();
-                        if (lastSegment != null && lastSegment.isByteRange()) {
-                            byteRange = new long[] { byteRangeLength, lastSegment.getByteRange()[0] + lastSegment.getByteRange()[1] };
-                        } else {
-                            byteRange = new long[] { byteRangeLength, -1l };
-                        }
-                    }
-                } else if (line.startsWith("#EXT-X-MEDIA-SEQUENCE")) {
-                    sequenceOffset = Integer.parseInt(new Regex(line, "#EXT-X-MEDIA-SEQUENCE:(\\d+)").getMatch(0));
-                    current.setMediaSequenceOffset(sequenceOffset);
-                } else if (line.startsWith("#EXTINF:")) {
-                    lastSegmentDuration = M3U8Segment.fromExtInfDuration(line);
-                    sequenceOffset++;
-                } else if (line.startsWith("#EXT-X-KEY")) {
-                    xKeyMethod = M3U8Segment.X_KEY_METHOD.get(new Regex(line, "METHOD=(NONE|AES-128|SAMPLE-AES)").getMatch(0));
-                    xKeyIV = new Regex(line, "IV=0x([a-fA-F0-9]{32})").getMatch(0);
-                    xKeyURI = new Regex(line, "URI=\"(.*?)\"").getMatch(0);
-                    if (xKeyURI != null) {
-                        xKeyURI = br.getURL(xKeyURI).toString();
-                    }
-                } else if (line.startsWith("#EXT-X-TARGETDURATION")) {
-                    final String targetDuration = new Regex(line, "#EXT-X-TARGETDURATION:(\\d+)").getMatch(0);
-                    if (targetDuration != null) {
-                        current.setExtTargetDuration(Long.parseLong(targetDuration));
+                        byteRange = new long[] { byteRangeLength, -1l };
                     }
                 }
-            }
-        }
-        if (current != null && current.size() > 0) {
-            if (extXMapURL != null && false) {
-                // continue with old handling as normal M3U8Segment
-                final M3U8Segment extXMapSegment = current.getSegment(extXMapURL, null);
-                if (extXMapSegment != null) {
-                    current.extXMap = extXMapSegment;
-                    current.removeSegment(current.indexOf(extXMapSegment));
+            } else if (line.startsWith("#EXT-X-MEDIA-SEQUENCE")) {
+                sequenceOffset = Integer.parseInt(new Regex(line, "#EXT-X-MEDIA-SEQUENCE:(\\d+)").getMatch(0));
+                current.setMediaSequenceOffset(sequenceOffset);
+            } else if (line.startsWith("#EXTINF:")) {
+                lastSegmentDuration = M3U8Segment.fromExtInfDuration(line);
+                sequenceOffset++;
+            } else if (line.startsWith("#EXT-X-KEY")) {
+                xKeyMethod = M3U8Segment.X_KEY_METHOD.get(new Regex(line, "METHOD=(NONE|AES-128|SAMPLE-AES)").getMatch(0));
+                xKeyIV = new Regex(line, "IV=0x([a-fA-F0-9]{32})").getMatch(0);
+                xKeyURI = new Regex(line, "URI=\"(.*?)\"").getMatch(0);
+                if (xKeyURI != null) {
+                    xKeyURI = br.getURL(xKeyURI).toString();
+                }
+            } else if (line.startsWith("#EXT-X-TARGETDURATION")) {
+                final String targetDuration = new Regex(line, "#EXT-X-TARGETDURATION:(\\d+)").getMatch(0);
+                if (targetDuration != null) {
+                    current.setExtTargetDuration(Long.parseLong(targetDuration));
                 }
             }
-            ret.add(current);
         }
         return ret;
     }
@@ -372,11 +424,6 @@ public class M3U8Playlist {
     private final HashMap<String, List<M3U8Segment>> map                 = new HashMap<String, List<M3U8Segment>>();
     protected int                                    mediaSequenceOffset = 0;
     protected long                                   averageBandwidth    = -1;
-    protected M3U8Segment                            extXMap             = null;
-
-    public M3U8Segment getExtXMap() {
-        return extXMap;
-    }
 
     public void setAverageBandwidth(long averageBandwidth) {
         this.averageBandwidth = averageBandwidth;

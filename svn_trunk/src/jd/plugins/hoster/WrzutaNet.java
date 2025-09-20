@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51521 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51525 $", interfaceVersion = 3, names = {}, urls = {})
 public class WrzutaNet extends PluginForHost {
     public WrzutaNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -331,6 +331,7 @@ public class WrzutaNet extends PluginForHost {
         final Map<String, Object> userinfo = loginAndGetDirectDownloadlink(account, null);
         final String premium_date_expire = (String) userinfo.get("premium_date_expire");
         if (premium_date_expire != null) {
+            /* Premium account or expired premium account */
             ai.setValidUntil(TimeFormatter.getMilliSeconds(premium_date_expire, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
             account.setType(AccountType.PREMIUM);
         } else {

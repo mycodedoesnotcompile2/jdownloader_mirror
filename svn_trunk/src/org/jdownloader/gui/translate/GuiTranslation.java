@@ -1168,6 +1168,10 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Chunks/Connections" })
     String PackagizerFilterRuleDialog_layoutDialogContent_chunks();
 
+    @Default(lngs = { "en" }, values = { "Reset selected link(s)?\r\nThis would reset %s1 Link(s) & delete %s3 file(s)(%s2) from harddisk." })
+    @Deprecated
+    String gui_downloadlist_reset2(int totalCount, String formatBytes, int localFileCount);
+
     @Default(lngs = { "en" }, values = { "... then set (before downloading)" })
     String PackagizerFilterRuleDialog_layoutDialogContent_then();
 
@@ -1176,6 +1180,12 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Date or Time" })
     String PackagizerFilterRuleDialog_createVariablesMenu_date();
+
+    @Default(lngs = { "en" }, values = { "Crawljob id" })
+    String PackagizerFilterRuleDialog_createVariablesMenu_job_id();
+
+    @Default(lngs = { "en" }, values = { "Crawljob source" })
+    String PackagizerFilterRuleDialog_createVariablesMenu_job_source();
 
     @Default(lngs = { "en" }, values = { "Dynamic Variables" })
     String PackagizerFilterRuleDialog_createVariablesMenu_menu();

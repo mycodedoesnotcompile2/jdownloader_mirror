@@ -5,4 +5,6 @@ import jd.plugins.PluginException;
 
 public interface CaptchaCrawlerHelperInterface {
     public String getToken() throws PluginException, InterruptedException, DecrypterException;
+
+    public int getSolutionTimeout();
 }

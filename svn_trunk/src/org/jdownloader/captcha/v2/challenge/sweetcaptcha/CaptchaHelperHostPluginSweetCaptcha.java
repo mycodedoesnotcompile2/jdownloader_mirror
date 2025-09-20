@@ -47,4 +47,9 @@ public class CaptchaHelperHostPluginSweetCaptcha extends AbstractCaptchaHelperSw
         return plugin.handleCaptchaChallenge(link, challenge);
     }
 
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
+
 }

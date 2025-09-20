@@ -36,4 +36,9 @@ public class CaptchaHelperCrawlerPluginAreYouHuman extends AbstractCaptchaHelper
         };
         return plugin.handleCaptchaChallenge(c);
     }
+
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
 }

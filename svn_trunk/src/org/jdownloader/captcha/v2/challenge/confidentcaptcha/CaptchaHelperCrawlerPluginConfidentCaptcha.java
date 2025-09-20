@@ -38,4 +38,9 @@ public class CaptchaHelperCrawlerPluginConfidentCaptcha extends AbstractCaptchaH
         };
         return plugin.handleCaptchaChallenge(c);
     }
+
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
 }

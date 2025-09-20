@@ -29,17 +29,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.proxy.AbstractProxySelectorImpl;
@@ -65,7 +54,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 51519 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+
+@HostPlugin(revision = "$Revision: 51532 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepositFiles extends antiDDoSForHost {
     public static AtomicReference<String>          MAINPAGE = new AtomicReference<String>();
     /* don't touch the following! */
@@ -449,36 +450,27 @@ public class DepositFiles extends antiDDoSForHost {
                 /* Long wait -> IP limit reached */
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, preDownloadWaittimeMillis);
             }
-            final boolean isCloudflareTurnstileCaptcha = true;
-            CaptchaHelperHostPluginRecaptchaV2 rc = null;
-            CaptchaHelperHostPluginCloudflareTurnstile ts = null;
-            final long solutionTimeout;
+            final boolean isCloudflareTurnstileCaptcha = true; // TODO: add autodetect support
+            final CaptchaHosterHelperInterface captchaHelper;
             if (isCloudflareTurnstileCaptcha) {
                 /* 2025-09-18 */
-                ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, "0x4AAAAAABpm3gTLyzhq7c8b");
-                solutionTimeout = ts.getSolutionTimeout();
+                captchaHelper = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, "0x4AAAAAABpm3gTLyzhq7c8b");
             } else {
-                rc = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LdyfgcTAAAAAArE1fk9cGyExtKfT4a12dWcViye");
-                solutionTimeout = rc.getSolutionTimeout();
+                captchaHelper = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LdyfgcTAAAAAArE1fk9cGyExtKfT4a12dWcViye");
             }
-            if (preDownloadWaittimeMillis > solutionTimeout) {
-                final long prePrePreDownloadWait = preDownloadWaittimeMillis - solutionTimeout;
+            final boolean needsCaptcha = account == null || account.getType() != AccountType.PREMIUM;
+            if (needsCaptcha && captchaHelper.getSolutionTimeout() > 0 && preDownloadWaittimeMillis > captchaHelper.getSolutionTimeout()) {
+                final long prePrePreDownloadWait = preDownloadWaittimeMillis - captchaHelper.getSolutionTimeout();
                 logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid timeouts");
                 logger.info("Pre-pre download waittime seconds: " + (prePrePreDownloadWait / 1000));
                 this.sleep(prePrePreDownloadWait, link);
-                preDownloadWaittimeMillis = preDownloadWaittimeMillis - rc.getSolutionTimeout();
+                preDownloadWaittimeMillis = preDownloadWaittimeMillis - captchaHelper.getSolutionTimeout();
             }
-            String recaptchaV2Response = null;
-            String cfTurnstileResponse = null;
-            final boolean needsCaptcha = account == null || account.getType() != AccountType.PREMIUM;
+            String captchaResponse = null;
             final boolean allowCaptchaSolvingBeforeFinalWaitStep = true;
-            if (allowCaptchaSolvingBeforeFinalWaitStep && needsCaptcha) {
+            if (needsCaptcha && allowCaptchaSolvingBeforeFinalWaitStep) {
                 final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
-                if (isCloudflareTurnstileCaptcha) {
-                    cfTurnstileResponse = ts.getToken();
-                } else {
-                    recaptchaV2Response = rc.getToken();
-                }
+                captchaResponse = captchaHelper.getToken();
                 final long timePassed = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
                 preDownloadWaittimeMillis = preDownloadWaittimeMillis - timePassed;
             }
@@ -494,21 +486,17 @@ public class DepositFiles extends antiDDoSForHost {
             if (ajax.containsHTML("But currently no free download slots for")) {
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "No free slots available", 5 * 60 * 1000l);
             }
-            if (needsCaptcha && recaptchaV2Response == null && cfTurnstileResponse == null) {
+            if (needsCaptcha && captchaResponse == null) {
                 /* Captcha hasn't been requested before -> Do it now. */
-                if (isCloudflareTurnstileCaptcha) {
-                    cfTurnstileResponse = ts.getToken();
-                } else {
-                    recaptchaV2Response = rc.getToken();
-                }
+                captchaResponse = captchaHelper.getToken();
             }
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("fid", fid);
-            if (isCloudflareTurnstileCaptcha) {
+            if (captchaHelper instanceof CaptchaHelperHostPluginCloudflareTurnstile) {
                 query.appendEncoded("g-recaptcha-response", "null");
-                query.appendEncoded("cf-turnstile-response", cfTurnstileResponse);
-            } else {
-                query.appendEncoded("g-recaptcha-response", recaptchaV2Response);
+                query.appendEncoded("cf-turnstile-response", captchaResponse);
+            } else if (captchaHelper instanceof CaptchaHelperHostPluginRecaptchaV2) {
+                query.appendEncoded("g-recaptcha-response", captchaResponse);
             }
             // query.appendEncoded("challenge", "null");
             // query.appendEncoded("response", "null");
@@ -895,8 +883,8 @@ public class DepositFiles extends antiDDoSForHost {
             }
             saveAccountData(accountData, account);
             /**
-             * We can't validate logins so we always need to generate a fresh token. </br>
-             * API will request login captchas if we're doing this too frequently.
+             * We can't validate logins so we always need to generate a fresh token. </br> API will request login captchas if we're doing
+             * this too frequently.
              */
             account.setRefreshTimeout(5 * 60 * 60 * 1000l);
         } catch (final PluginException e) {

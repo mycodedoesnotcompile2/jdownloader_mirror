@@ -39,4 +39,9 @@ public class CaptchaHelperHostPluginAreYouHuman extends AbstractCaptchaHelperAre
         final DownloadLink link = plugin.getDownloadLink();
         return plugin.handleCaptchaChallenge(link, challenge);
     }
+
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
 }

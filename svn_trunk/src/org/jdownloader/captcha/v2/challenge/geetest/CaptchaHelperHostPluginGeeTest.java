@@ -39,4 +39,9 @@ public class CaptchaHelperHostPluginGeeTest extends AbstractCaptchaHelperGeeTest
         };
         return plugin.handleCaptchaChallenge(link, challenge);
     }
+
+    @Override
+    public int getSolutionTimeout() {
+        return -1;
+    }
 }

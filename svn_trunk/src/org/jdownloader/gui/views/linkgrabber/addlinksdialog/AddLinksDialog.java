@@ -37,6 +37,24 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.ClipboardMonitoring.ClipboardContent;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.controlling.linkcrawler.CrawledLinkModifiers;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.modifier.CommentModifier;
+import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
+import jd.controlling.linkcrawler.modifier.PackageNameModifier;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.HTMLParser.HtmlParserCharSequence;
+import jd.parser.html.HTMLParser.HtmlParserResultSet;
+import jd.plugins.DownloadLink;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -81,24 +99,6 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.ClipboardMonitoring.ClipboardContent;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.controlling.linkcrawler.CrawledLinkModifiers;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.modifier.CommentModifier;
-import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
-import jd.controlling.linkcrawler.modifier.PackageNameModifier;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.HTMLParser.HtmlParserCharSequence;
-import jd.parser.html.HTMLParser.HtmlParserResultSet;
-import jd.plugins.DownloadLink;
-
 public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private ExtTextArea                         input;
     private PathChooser                         destination;
@@ -112,7 +112,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     @Override
     protected void _init() {
         super._init();
-        this.autoDisablePackagizerCheckbox();
+        this.autoTogglePackagizerCheckbox();
     }
 
     /**
@@ -481,13 +481,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
 
             @Override
             public void onChanged() {
-                if (!StringUtils.isEmpty(this.getText())) {
-                    /* Non default value */
-                    autoEnablePackagizerCheckbox();
-                } else {
-                    /* Default value */
-                    autoDisablePackagizerCheckbox();
-                }
+                autoTogglePackagizerCheckbox();
             }
         };
         packagename.setBadColor(null);
@@ -498,13 +492,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         comment = new ExtTextField() {
             @Override
             public void onChanged() {
-                if (!StringUtils.isEmpty(this.getText())) {
-                    /* Non default value */
-                    autoEnablePackagizerCheckbox();
-                } else {
-                    /* Default value */
-                    autoDisablePackagizerCheckbox();
-                }
+                autoTogglePackagizerCheckbox();
             }
         };
         comment.setDragEnabled(true);
@@ -553,13 +541,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         password = new ExtTextField() {
             @Override
             public void onChanged() {
-                if (!StringUtils.isEmpty(this.getText())) {
-                    /* Non default value */
-                    autoEnablePackagizerCheckbox();
-                } else {
-                    /* Default value */
-                    autoDisablePackagizerCheckbox();
-                }
+                autoTogglePackagizerCheckbox();
             }
         };
         password.setDragEnabled(true);
@@ -575,20 +557,14 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             }
         });
         priority.setSelectedItem(getPriorityFieldDefaultValue());
-        priority.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JComboBox source = (JComboBox) e.getSource();
-                Priority priority = (Priority) source.getSelectedItem();
-                if (priority == getPriorityFieldDefaultValue()) {
-                    /* Default value */
-                    autoDisablePackagizerCheckbox();
-                } else {
-                    /* Non default value */
-                    autoEnablePackagizerCheckbox();
+        if (packagizerAutoModeEnabled) {
+            priority.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    autoTogglePackagizerCheckbox();
                 }
-            }
-        });
+            });
+        }
         downloadPassword = new ExtTextField();
         downloadPassword.setDragEnabled(true);
         downloadPassword.setHelpText(_GUI.T.AddLinksDialog_createExtracOptionsPanel_downloadpassword());
@@ -597,19 +573,13 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         extractToggle.setSelected(getAutoExtractionFieldDefaultValue());
         // extractToggle.setBorderPainted(false);
         extractToggle.setToolTipText(_GUI.T.AddLinksDialog_layoutDialogContent_autoextract_tooltip());
-        extractToggle.addChangeListener(new ChangeListener() {
-            public void stateChanged(ChangeEvent e) {
-                JCheckBox source = (JCheckBox) e.getSource();
-                boolean isSelected = source.isSelected();
-                if (isSelected == getAutoExtractionFieldDefaultValue()) {
-                    /* Default value */
-                    autoDisablePackagizerCheckbox();
-                } else {
-                    /* Non default value */
-                    autoEnablePackagizerCheckbox();
+        if (packagizerAutoModeEnabled) {
+            extractToggle.addChangeListener(new ChangeListener() {
+                public void stateChanged(ChangeEvent e) {
+                    autoTogglePackagizerCheckbox();
                 }
-            }
-        });
+            });
+        }
         int height = Math.max(24, (int) (comment.getPreferredSize().height * 0.9));
         MigPanel p = new MigPanel("ins 0 0 3 0,wrap 3", "[][grow,fill][]", "[fill,grow][grow," + height + "!][grow," + height + "!][grow," + height + "!][grow," + height + "!]");
         p.add(new JLabel(new AbstractIcon(IconKey.ICON_LINKGRABBER, 32)), "aligny top,height 32!,width 32!");
@@ -944,12 +914,12 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
                     return StringUtils.join(result, "\r\n");
                 }
                 // Try with www. replaced
-                result = tryExtractLinks(parseTextAuto.replace("www.", "http://www."), base);
+                result = tryExtractLinks(parseTextAuto.replace("www.", "https://www."), base);
                 if (result.length > 0) {
                     return StringUtils.join(result, "\r\n");
                 }
                 // Try with http:// prefix
-                result = tryExtractLinks("http://" + parseTextAuto, base);
+                result = tryExtractLinks("https://" + parseTextAuto, base);
                 return StringUtils.join(result, "\r\n");
             }
 
@@ -979,9 +949,9 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
         thread.start();
     }
 
-    /** Auto disables override packagizer rules checkbox if any relevant fields has a non default value && auto mode is enabled. */
-    private void autoEnablePackagizerCheckbox() {
+    private void autoTogglePackagizerCheckbox() {
         if (this.overwritePackagizer == null) {
+            // component not yet initialized
             return;
         } else if (!packagizerAutoModeEnabled) {
             return;
@@ -989,50 +959,24 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             /* User has already altered this checkbox -> Do not touch */
             return;
         }
-        this.overwritePackagizer.setSelected(true);
-        /* ChangeListener on overwritePackagizer will set this to true so we'll correct that here. */
-        hasUserClickedOverwritePackagizerButton = false;
-    }
-
-    /** Auto disables override packagizer rules checkbox if all relevant fields have their default settings && auto mode is enabled. */
-    private void autoDisablePackagizerCheckbox() {
-        if (this.overwritePackagizer == null) {
-            return;
-        } else if (!packagizerAutoModeEnabled) {
-            return;
-        } else if (hasUserClickedOverwritePackagizerButton) {
-            /* User has already altered this checkbox -> Do not touch */
-            return;
-        }
-        /* Check for non-default values for all relevant fields. If any field is non default, do not touch Packagizer checkbox. */
-        final String finalPackageName = getPackageName();
-        if (!StringUtils.isEmpty(finalPackageName)) {
-            return;
-        }
-        final String finalComment = getComment();
-        if (!StringUtils.isEmpty(finalComment)) {
-            return;
-        }
-        final String finalDownloadPassword = getDownloadPassword();
-        if (!StringUtils.isEmpty(finalDownloadPassword)) {
-            return;
-        }
-        final Priority priority = this.getPriority();
-        if (priority != this.getPriorityFieldDefaultValue()) {
-            return;
-        }
-        /* ChangeListener on overwritePackagizer will set this to true so we'll correct that here. */
-        this.overwritePackagizer.setSelected(false);
+        boolean hasCustomValueFlag = false;
+        hasCustomValueFlag = hasCustomValueFlag || !StringUtils.isEmpty(getComment());
+        hasCustomValueFlag = hasCustomValueFlag || !StringUtils.isEmpty(getPackageName());
+        hasCustomValueFlag = hasCustomValueFlag || !StringUtils.isEmpty(getDownloadPassword());
+        hasCustomValueFlag = hasCustomValueFlag || this.getPriority() != getPriorityFieldDefaultValue();
+        hasCustomValueFlag = hasCustomValueFlag || extractToggle != null && this.extractToggle.isSelected() != getAutoExtractionFieldDefaultValue();
+        // no handling for getDestination because custom directory will be used instead of default download directory
+        this.overwritePackagizer.setSelected(hasCustomValueFlag);
     }
 
     private Component createIconLabel(String iconKey, String tooltip) {
-        JLabel ret = new JLabel(new AbstractIcon(iconKey, 24));
+        final JLabel ret = new JLabel(new AbstractIcon(iconKey, 24));
         ret.setToolTipText(tooltip);
         return ret;
     }
 
     protected String preprocessFind(String text) {
-        if (text == null) {
+        if (StringUtils.isEmpty(text)) {
             return null;
         }
         return new LinkCrawler(false, false).preprocessFind(text, null, false);

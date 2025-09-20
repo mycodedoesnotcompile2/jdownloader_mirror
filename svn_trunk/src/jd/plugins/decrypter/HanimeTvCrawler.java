@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.HanimeTv;
 
-@DecrypterPlugin(revision = "$Revision: 51304 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51530 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { HanimeTv.class })
 public class HanimeTvCrawler extends PluginForDecrypt {
     public HanimeTvCrawler(PluginWrapper wrapper) {
@@ -204,6 +204,6 @@ public class HanimeTvCrawler extends PluginForDecrypt {
 
     @Override
     public boolean hasCaptcha(CryptedLink link, Account acc) {
-        return false;
+        return true;
     }
 }

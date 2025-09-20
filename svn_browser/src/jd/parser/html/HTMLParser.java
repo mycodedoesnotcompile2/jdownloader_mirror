@@ -29,8 +29,6 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.nutils.encoding.Encoding;
-
 import org.appwork.utils.Application;
 import org.appwork.utils.CharSequenceUtils;
 import org.appwork.utils.StringUtils;
@@ -38,6 +36,8 @@ import org.appwork.utils.encoding.Hex;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.PublicSuffixList;
 import org.appwork.utils.net.URLHelper;
+
+import jd.nutils.encoding.Encoding;
 
 public class HTMLParser {
     private static class ConcatCharSequence implements CharSequence {
@@ -1119,7 +1119,7 @@ public class HTMLParser {
                             final HtmlParserCharSequence missingProtocol = new HtmlParserCharSequence(new ConcatCharSequence("http://", data));
                             return HTMLParser._getHttpLinksFinder(HTMLParser.next(path, missingProtocol), results, options);
                         }
-                    /* no href inside */}
+                        /* no href inside */}
                     return results.stop();
                 }
             } else if (c == 1 && data.length() < 256) {
@@ -1553,8 +1553,8 @@ public class HTMLParser {
     /**
      * Diese Methode sucht die vordefinierten input type="hidden" und formatiert sie zu einem poststring z.b. wÃ¼rde bei:
      *
-     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" /> <input type="hidden"
-     * name="b" value="9" />
+     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" />
+     * <input type="hidden" name="b" value="9" />
      *
      * f=f50b0f&h=390b4be0182b85b0&b=9 ausgegeben werden
      *

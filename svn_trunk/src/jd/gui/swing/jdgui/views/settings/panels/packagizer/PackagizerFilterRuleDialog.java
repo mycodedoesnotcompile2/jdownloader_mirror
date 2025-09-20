@@ -276,6 +276,8 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         // ret.add(new VariableAction(txtPackagename2,
         // _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_source(),
         // "<jd:source>"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_job_id(), "<jd:" + PackagizerController.JOB_ID + ">"));
+        ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_job_source(), "<jd:" + PackagizerController.JOB_SOURCE + ">"));
         ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_date(), "<jd:" + PackagizerController.SIMPLEDATE + ":dd.MM.yyyy>"));
         ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename_org(), "<jd:" + PackagizerController.ORGFILENAME + ">"));
         ret.add(new VariableAction(tc, _GUI.T.PackagizerFilterRuleDialog_createVariablesMenu_filename_org_without_file_extension(), "<jd:" + PackagizerController.ORGFILENAMEWITHOUTEXT + ">"));

@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -63,18 +64,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51522 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51530 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
     private static final int             defaultMAXCHUNKS           = 1;
     private static final boolean         defaultRESUME              = true;
+    /* DownloadLink properties */
     private static final String          PROPERTY_ACCOUNT_maxchunks = "maxchunks";
+    private static final String          PROPERTY_TICKET_URL        = "ticketurl";
     /* Supported links patterns */
     public static final Pattern          PATTERN_F                  = Pattern.compile("/dl\\?f=([a-f0-9]{32})", Pattern.CASE_INSENSITIVE);
     public static final Pattern          PATTERN_TORRENT            = Pattern.compile("/mytorrents\\?torrent=(\\d+)&file=([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);
-    /* DownloadLink properties */
-    private static final String          PROPERTY_TICKET_URL        = "ticketurl";
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -160,9 +161,6 @@ public class DeepbridCom extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
-        if (account != null) {
-            this.login(account, false);
-        }
         if (!link.isNameSet()) {
             /* Fallback-filename */
             final String weak_filename = this.getFID(link);
@@ -172,6 +170,15 @@ public class DeepbridCom extends PluginForHost {
         final String contenturl = link.getPluginPatternMatcher();
         final Regex regex_f = new Regex(contenturl, PATTERN_F);
         if (regex_f.patternFind()) {
+            /**
+             * 2025-09-19: Do not login if user owns a premium account! <br>
+             * Such links only work for anonymous users and free account users! <br>
+             * Logged in users will be redirected to "/service". <br>
+             * This is a possible website bug which I've reported to the website owners.
+             */
+            if (account != null && AccountType.FREE.equals(account.getType())) {
+                this.login(account, false);
+            }
             getPage(br, contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -197,6 +204,7 @@ public class DeepbridCom extends PluginForHost {
                 logger.info("Torrent cloud files can only be checked when account is available!");
                 return AvailableStatus.UNCHECKABLE;
             }
+            this.login(account, false);
             final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
             if (!isDownload) {
                 /**
@@ -269,6 +277,8 @@ public class DeepbridCom extends PluginForHost {
                         dlform.put("download", "");
                     }
                     submitForm(br, dlform);
+                    logger.info("Newly generated Ticket-URL: " + br.getURL());
+                    ;
                 }
                 dllink = br.getRegex("(https?://[^\"\\']+/dl/[^\"\\']+)").getMatch(0);
                 if (StringUtils.isEmpty(dllink)) {
@@ -343,7 +353,7 @@ public class DeepbridCom extends PluginForHost {
                 mhm.handleErrorGeneric(account, link, "Failed to find final downloadurl", 10, 20 * 60 * 1000l);
             }
         }
-        link.setProperty(this.getHost() + "directlink", dllink);
+        link.setProperty(directlinkproperty, dllink);
         int maxchunks = account.getIntegerProperty(PROPERTY_ACCOUNT_maxchunks, defaultMAXCHUNKS);
         if (maxchunks == 1) {
             maxchunks = 1;
@@ -476,9 +486,6 @@ public class DeepbridCom extends PluginForHost {
             logger.info("Setting maxchunks value: " + maxConnections);
             account.setProperty(PROPERTY_ACCOUNT_maxchunks, maxConnections.intValue());
         }
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            ai.setStatus(account.getType().getLabel() + " | MaxDls: " + maxSimultaneousDownloads + " MaxCon: " + maxConnections + " | Points: " + humanReadablePointsStr);
-        }
         getPage(br, API_BASE + "?page=api&action=hosters");
         final List<Object> supportedhostslistO;
         final Object supportedhostsO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
@@ -497,13 +504,12 @@ public class DeepbridCom extends PluginForHost {
             supportedhostslistO = (List<Object>) supportedhostsO;
         }
         final ArrayList<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
-        final HashSet<String> dupes = new HashSet<String>();
+        final HashMap<String, MultiHostHost> crippledDomainToMultihostHost = new HashMap<String, MultiHostHost>();
         final Map<String, String> domainWorkarounds = new HashMap<String, String>();
         /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
         domainWorkarounds.put("icerbox", "icerbox.com");
         domainWorkarounds.put("filestore", "filestore.me");
-        final HashSet<String> foundWorkaroundHosts = new HashSet<String>();
-        final Map<String, String> unavailableHosts = new HashMap<String, String>();
+        final Map<String, String> hostsToDownSinceDate = new HashMap<String, String>();
         for (final Object hostO : supportedhostslistO) {
             /* List can be given in two different varieties */
             if (hostO instanceof Map) {
@@ -518,89 +524,172 @@ public class DeepbridCom extends PluginForHost {
                     } else {
                         isOnline = false;
                         downSinceDate = new Regex(onlineStatus, "down \\((.+)\\)$").getMatch(0);
-                        mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                        if (downSinceDate != null) {
-                            mhost.setStatusText("Down since " + downSinceDate);
-                        }
                     }
                     final String[] domains = entry.getKey().split(",");
-                    boolean thisIsWorkaroundHost = false;
+                    int numberOfNewDomains = 0;
                     for (String domain : domains) {
                         domain = domain.toLowerCase(Locale.ENGLISH);
-                        if (!isOnline) {
-                            unavailableHosts.put(domain, downSinceDate);
-                        }
-                        if (domainWorkarounds.containsKey(domain)) {
-                            thisIsWorkaroundHost = true;
-                            foundWorkaroundHosts.add(domain);
+                        if (crippledDomainToMultihostHost.containsKey(domain)) {
                             continue;
-                        } else {
-                            mhost.addDomain(domain);
                         }
+                        numberOfNewDomains++;
+                        if (!isOnline) {
+                            hostsToDownSinceDate.put(domain, downSinceDate);
+                        }
+                        mhost.addDomain(domain);
+                        crippledDomainToMultihostHost.put(domain, mhost);
                     }
-                    if (thisIsWorkaroundHost) {
-                        /* Skip entry here as it will be processed down below. */
+                    if (numberOfNewDomains == 0) {
                         continue;
                     }
                     supportedhosts.add(mhost);
                 }
-            } else if (hostO instanceof String) {
-                /* Legacy handling TODO: Remove this after 2025-05 */
-                final MultiHostHost mhost = new MultiHostHost();
-                final String[] hosts = ((String) hostO).split(",");
-                for (String domain : hosts) {
-                    domain = domain.toLowerCase(Locale.ENGLISH);
-                    if (domainWorkarounds.containsKey(domain)) {
-                        foundWorkaroundHosts.add(domain);
-                        continue;
-                    } else {
-                        mhost.addDomain(domain);
-                    }
-                }
-                supportedhosts.add(mhost);
             } else {
                 logger.warning("Found invalid host object: " + hostO);
             }
         }
-        try {
+        boolean findHostersFromWebsiteSuccess = false;
+        findHosterInfoFromWebsite: try {
             /*
              * Neither their API nor their website contains TLDs which is very bad ... but also their API-List and website list differ so
              * this is another workaround ...
              */
             logger.info("Checking for additional supported hosts on website (API list = unreliable)");
             getPage(br, "/service");
-            final String[] crippled_hosts = br.getRegex("class=\"hosters_([A-Za-z0-9]+)[^\"]*\"").getColumn(0);
-            for (String crippled_host : crippled_hosts) {
+            final HashSet<String> crippled_hosts_from_website = new HashSet<String>();
+            final String[] crippled_hosts1 = br.getRegex("class=\"tooltip hosters[^\"]+\" title=\"([^\"]+)\"").getColumn(0);
+            if (crippled_hosts1 != null && crippled_hosts1.length > 0) {
+                crippled_hosts_from_website.addAll(Arrays.asList(crippled_hosts1));
+            }
+            final String[] crippled_hosts2 = br.getRegex("class=\"hosters [^\"]* tooltip\" title=\"([^\"]+)\"").getColumn(0);
+            if (crippled_hosts2 != null && crippled_hosts2.length > 0) {
+                crippled_hosts_from_website.addAll(Arrays.asList(crippled_hosts2));
+            }
+            final String[] crippled_hosts3 = br.getRegex("<div class=\"ml-4 mr-auto\">\\s*<div class=\"font-medium\">([^<]+)</div>").getColumn(0);
+            if (crippled_hosts3 != null && crippled_hosts3.length > 0) {
+                crippled_hosts_from_website.addAll(Arrays.asList(crippled_hosts3));
+            }
+            if (crippled_hosts_from_website.isEmpty()) {
+                logger.warning("Failed to find any supported hosts on website -> Parser broken?");
+                break findHosterInfoFromWebsite;
+            }
+            for (String crippled_host : crippled_hosts_from_website) {
                 crippled_host = crippled_host.toLowerCase(Locale.ENGLISH);
-                if (domainWorkarounds.containsKey(crippled_host)) {
-                    foundWorkaroundHosts.add(crippled_host);
-                    continue;
-                } else if (!dupes.add(crippled_host)) {
+                if (crippledDomainToMultihostHost.containsKey(crippled_host)) {
+                    /* Skip items we already found */
                     continue;
                 }
                 logger.info("Adding host from website which has not been given via API: " + crippled_host);
                 final MultiHostHost mhost = new MultiHostHost(crippled_host);
+                crippledDomainToMultihostHost.put(crippled_host, mhost);
                 supportedhosts.add(mhost);
             }
+            /*
+             * TODO: For free accounts: parse global free account limits from html such as "max links per day" and "filenext files per day"
+             */
+            /* Get and set hoster detail limits -> This is where it gets really ugly as parsing their html is hell! */
+            final String[] hoster_details_htmls = br.getRegex("<div class=\"ml-4 mr-auto\">(.*?)</div></div>").getColumn(-1);
+            if (hoster_details_htmls != null && hoster_details_htmls.length > 0) {
+                for (final String hoster_details_html : hoster_details_htmls) {
+                    String crippled_host = new Regex(hoster_details_html, "<div class=\"font-medium\">([^<]+)</div>").getMatch(0);
+                    if (crippled_host == null) {
+                        logger.warning("Possible parser failure: " + hoster_details_html);
+                        continue;
+                    }
+                    crippled_host = Encoding.htmlDecode(crippled_host).trim();
+                    boolean addToResults = false;
+                    boolean foundAndSetIndividualHostLimits = false;
+                    MultiHostHost mhost = crippledDomainToMultihostHost.get(crippled_host);
+                    if (mhost == null) {
+                        mhost = new MultiHostHost(crippled_host);
+                        addToResults = true;
+                    }
+                    final String limit_text = new Regex(hoster_details_html, "<div class=\"text-xs font-medium text-right\">([^<]+)</div>").getMatch(0);
+                    setIndividualHostTrafficLimits: if (limit_text != null) {
+                        if (!limit_text.contains("/")) {
+                            logger.warning("Cannot parse limit string: " + limit_text);
+                            break setIndividualHostTrafficLimits;
+                        }
+                        if (StringUtils.containsIgnoreCase(limit_text, "links")) {
+                            final String[] link_limits_list = limit_text.replaceFirst("(?i)\\s*links", "").split("/");
+                            final String link_limit_used_str = link_limits_list[0].trim();
+                            final String link_limit_max_str = link_limits_list[1].trim();
+                            if (!link_limit_used_str.matches("\\d+")) {
+                                logger.warning("Cannot parse links used string: " + link_limit_used_str);
+                                break setIndividualHostTrafficLimits;
+                            }
+                            if (!link_limit_max_str.matches("\\d+")) {
+                                logger.warning("Cannot parse links max string: " + link_limit_max_str);
+                                break setIndividualHostTrafficLimits;
+                            }
+                            final long links_max = Long.parseLong(link_limit_max_str);
+                            final long links_used = Long.parseLong(link_limit_used_str);
+                            mhost.setLinksMax(links_max);
+                            mhost.setLinksLeft(links_max - links_used);
+                        } else {
+                            final String[] traffic_limit_list = limit_text.split("/");
+                            final String traffic_limit_used_str = traffic_limit_list[0].trim();
+                            final String traffic_limit_max_str = traffic_limit_list[1].trim();
+                            if (!traffic_limit_used_str.matches("\\d+.*")) {
+                                logger.warning("Cannot parse traffic used string: " + traffic_limit_used_str);
+                                break setIndividualHostTrafficLimits;
+                            }
+                            if (!traffic_limit_max_str.matches("\\d+.*")) {
+                                logger.warning("Cannot parse traffic max string: " + traffic_limit_max_str);
+                                break setIndividualHostTrafficLimits;
+                            }
+                            final long traffic_max_bytes = SizeFormatter.getSize(traffic_limit_max_str);
+                            final long traffic_used_bytes = SizeFormatter.getSize(traffic_limit_used_str);
+                            mhost.setTrafficMax(traffic_max_bytes);
+                            mhost.setTrafficLeft(traffic_max_bytes - traffic_used_bytes);
+                        }
+                        foundAndSetIndividualHostLimits = true;
+                    }
+                    if (addToResults) {
+                        logger.info("Added domain found only in individual limits text: " + crippled_host);
+                        crippledDomainToMultihostHost.put(crippled_host, mhost);
+                        supportedhosts.add(mhost);
+                    } else if (foundAndSetIndividualHostLimits) {
+                        logger.info("Added individual host limits for domain: " + crippled_host);
+                    }
+                }
+            } else {
+                logger.warning("Failed to find host detail limits");
+            }
+            findHostersFromWebsiteSuccess = true;
         } catch (final Throwable e) {
             logger.log(e);
             logger.warning("Website-workaround to find additional supported hosts failed");
         }
-        /* Add workaround-hosts to list of results */
-        for (final String domain : foundWorkaroundHosts) {
-            final String realDomain = domainWorkarounds.get(domain);
-            final MultiHostHost mhost = new MultiHostHost(realDomain);
-            if (unavailableHosts.containsKey(domain)) {
-                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                final String downSinceDate = unavailableHosts.get(domain);
-                if (downSinceDate != null) {
-                    mhost.setStatusText("Down since " + downSinceDate);
+        for (final MultiHostHost mhost : supportedhosts) {
+            /* Fix domains if any domain of this multihost is on our domain workaround list */
+            String downSinceDate = null;
+            String realDomain = null;
+            for (final String domain : mhost.getDomains()) {
+                if (downSinceDate == null) {
+                    downSinceDate = hostsToDownSinceDate.get(domain);
+                }
+                if (realDomain == null) {
+                    realDomain = domainWorkarounds.get(domain);
                 }
             }
-            supportedhosts.add(mhost);
+            if (realDomain != null) {
+                mhost.setDomain(realDomain);
+            }
+            /* Set special down flag if any domain of this entry is down */
+            if (downSinceDate != null) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                mhost.setStatusText("Down since " + downSinceDate);
+            }
         }
         account.setConcurrentUsePossible(true);
         ai.setMultiHostSupportV2(this, supportedhosts);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            ai.setStatus(account.getType().getLabel() + " | MaxDls: " + maxSimultaneousDownloads + " MaxCon: " + maxConnections + " | WebsiteHostsParser: " + findHostersFromWebsiteSuccess);
+            // if (!findHostersFromWebsiteSuccess) {
+            // throw new AccountInvalidException("!!DEV!! Website hosts parser failed!!");
+            // }
+        }
         return ai;
     }
 
@@ -611,16 +700,16 @@ public class DeepbridCom extends PluginForHost {
             final Cookies cookies = account.loadCookies("");
             final Cookies userCookies = account.loadUserCookies();
             if (cookies != null || userCookies != null) {
-                if (cookies != null) {
-                    br.setCookies(cookies);
-                } else {
+                if (userCookies != null) {
                     br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
                 }
                 if (!verifyCookies) {
                     /* Do not verify cookies */
                     return null;
                 }
-                logger.info("Trying to login via usercookies");
+                logger.info("Trying to login via cookies");
                 try {
                     final Map<String, Object> userinfo = checkLoginAPI(br, account, true);
                     logger.info("UserCookie login successful");
@@ -630,6 +719,7 @@ public class DeepbridCom extends PluginForHost {
                     }
                     return userinfo;
                 } catch (final PluginException e) {
+                    logger.info("Cookie login failed");
                     if (userCookies != null) {
                         if (account.hasEverBeenValid()) {
                             throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
