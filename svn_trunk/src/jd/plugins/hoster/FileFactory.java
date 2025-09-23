@@ -27,6 +27,7 @@ import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -46,6 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -57,7 +59,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@HostPlugin(revision = "$Revision: 51480 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51540 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -72,6 +74,8 @@ public class FileFactory extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        // blocking default UA
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("142.0"));
         br.setCookie(getHost(), "filefactory_relaunch", "seen");
         br.setFollowRedirects(true);
         return br;

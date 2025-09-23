@@ -18,15 +18,17 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51542 $", interfaceVersion = 3, names = {}, urls = {})
 public class XdiskSite extends XFileSharingProBasic {
     public XdiskSite(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +105,31 @@ public class XdiskSite extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public String regexFilenameAbuse(final Browser br) {
+        final String filename = br.getRegex("h1 class=\"download-title[^\"]+\"[^>]*>([^<]+)</h1>").getMatch(-1);
+        if (filename != null) {
+            return filename;
+        } else {
+            return super.regexFilenameAbuse(br);
+        }
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        String filename = new Regex(html, "name=\"fname\"[^>]*value=\"([^\"]+)\"").getMatch(0);
+        if (filename != null) {
+            fileInfo[0] = filename;
+        }
+        return fileInfo;
+    }
+
+    @Override
+    public ArrayList<String> getCleanupHTMLRegexes() {
+        /* 2025-09-22: They have commented out html code which contains information we need (filesize). */
+        return null;
     }
 }

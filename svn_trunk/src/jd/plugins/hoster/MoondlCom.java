@@ -20,9 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.Account;
@@ -30,7 +27,10 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49781 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 51538 $", interfaceVersion = 3, names = {}, urls = {})
 public class MoondlCom extends XFileSharingProBasic {
     public MoondlCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +106,7 @@ public class MoondlCom extends XFileSharingProBasic {
 
     @Override
     protected Long findExpireTimestamp(final Account account, final Browser br, AtomicBoolean isPreciseTimestampFlag) throws Exception {
-        String expireStr = br.getRegex("Premium account expire\\s*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})").getMatch(0);
+        final String expireStr = br.getRegex("Premium account expire\\s*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})").getMatch(0);
         if (expireStr != null) {
             isPreciseTimestampFlag.set(true);
             return TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);

@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -91,7 +92,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 51516 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51537 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4324,7 +4325,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Deprecated
     /** TODO: Find out where this is used. Lifetime accounts are usually not used for XFS filehosts. */
     protected boolean is_lifetime_account(final Browser br) {
-        return br.getRegex("(?i)>\\s*Premium account expire\\s*</TD><TD><b>Lifetime</b>").matches();
+        return br.getRegex("(?i)>\\s*Premium\\s*(Pro)?\\s*account expire\\s*</TD>\\s*<TD>\\s*<b>\\s*Lifetime\\s*</b>").matches();
     }
 
     @Override
@@ -4487,85 +4488,87 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final AtomicBoolean isPreciseTimestampFlag = new AtomicBoolean(false);
         final Long expire_milliseconds_from_expiredate = findExpireTimestamp(account, br, isPreciseTimestampFlag);
         final String[] supports_precise_expire_date = (isPreciseTimestampFlag.get() && expire_milliseconds_from_expiredate != null) ? null : this.supportsPreciseExpireDate();
-        if (supports_precise_expire_date == null || supports_precise_expire_date.length == 0) {
-            return null;
-        }
-        /*
-         * A more accurate expire time, down to the second. Usually shown on 'extend premium account' page. Case[0] e.g. 'flashbit.cc', Case
-         * [1] e.g. takefile.link
-         */
         long expire_milliseconds_precise_to_the_second = -1;
-        final LinkedHashSet<String> paymentURLs;
-        final String last_working_payment_url = this.getPluginConfig().getStringProperty("property_last_working_payment_url", null);
-        if (StringUtils.isNotEmpty(last_working_payment_url)) {
-            paymentURLs = new LinkedHashSet<String>();
-            logger.info("Found stored last_working_payment_url --> Trying this first in an attempt to save http requests: " + last_working_payment_url);
-            paymentURLs.add(last_working_payment_url);
-            /* Add all remaining URLs, start with the last working one */
-            for (final String paymentURL : supports_precise_expire_date) {
-                paymentURLs.add(paymentURL);
+        supports_precise_expire_date_handling: {
+            if (supports_precise_expire_date == null || supports_precise_expire_date.length == 0) {
+                break supports_precise_expire_date_handling;
             }
-        } else {
-            /* Add all possible payment URLs. */
-            logger.info("last_working_payment_url is not available --> Going through all possible paymentURLs");
-            paymentURLs = new LinkedHashSet<String>(Arrays.asList(supports_precise_expire_date));
-        }
-        /* Go through possible paymentURLs in an attempt to find an exact expiredate if the account is premium. */
-        int i = -1;
-        for (final String paymentURL : paymentURLs) {
-            i++;
-            if (StringUtils.isEmpty(paymentURL)) {
-                /* Skip invalid items */
-                continue;
-            }
-            try {
-                getPage(paymentURL);
-            } catch (final InterruptedException e) {
-                throw e;
-            } catch (final Exception e) {
-                if (i == paymentURLs.size() - 1) {
-                    /* Last item -> Throw exception */
-                    throw e;
+            /*
+             * A more accurate expire time, down to the second. Usually shown on 'extend premium account' page. Case[0] e.g. 'flashbit.cc',
+             * Case [1] e.g. takefile.link
+             */
+            final LinkedHashSet<String> paymentURLs;
+            final String last_working_payment_url = this.getPluginConfig().getStringProperty("property_last_working_payment_url", null);
+            if (StringUtils.isNotEmpty(last_working_payment_url)) {
+                paymentURLs = new LinkedHashSet<String>();
+                logger.info("Found stored last_working_payment_url --> Trying this first in an attempt to save http requests: " + last_working_payment_url);
+                paymentURLs.add(last_working_payment_url);
+                /* Add all remaining URLs, start with the last working one */
+                for (final String paymentURL : supports_precise_expire_date) {
+                    paymentURLs.add(paymentURL);
                 }
-                logger.log(e);
-                /* Skip failures due to timeout or bad http error-responses */
-                continue;
+            } else {
+                /* Add all possible payment URLs. */
+                logger.info("last_working_payment_url is not available --> Going through all possible paymentURLs");
+                paymentURLs = new LinkedHashSet<String>(Arrays.asList(supports_precise_expire_date));
             }
-            /* Find html snippet which should contain our expiredate. */
-            final String expireSecond = findExpireDate(br);
-            if (StringUtils.isEmpty(expireSecond)) {
-                continue;
+            /* Go through possible paymentURLs in an attempt to find an exact expiredate if the account is premium. */
+            int i = -1;
+            for (final String paymentURL : paymentURLs) {
+                i++;
+                if (StringUtils.isEmpty(paymentURL)) {
+                    /* Skip invalid items */
+                    continue;
+                }
+                try {
+                    getPage(paymentURL);
+                } catch (final InterruptedException e) {
+                    throw e;
+                } catch (final Exception e) {
+                    if (i == paymentURLs.size() - 1) {
+                        /* Last item -> Throw exception */
+                        throw e;
+                    }
+                    logger.log(e);
+                    /* Skip failures due to timeout or bad http error-responses */
+                    continue;
+                }
+                /* Find html snippet which should contain our expiredate. */
+                final String expireSecond = findExpireDate(br);
+                if (StringUtils.isEmpty(expireSecond)) {
+                    continue;
+                }
+                final String tmpYears = new Regex(expireSecond, "(\\d+)\\s+years?").getMatch(0);
+                final String tmpdays = new Regex(expireSecond, "(\\d+)\\s+days?").getMatch(0);
+                final String tmphrs = new Regex(expireSecond, "(\\d+)\\s+hours?").getMatch(0);
+                final String tmpmin = new Regex(expireSecond, "(\\d+)\\s+minutes?").getMatch(0);
+                final String tmpsec = new Regex(expireSecond, "(\\d+)\\s+seconds?").getMatch(0);
+                long years = 0, days = 0, hours = 0, minutes = 0, seconds = 0;
+                if (!StringUtils.isEmpty(tmpYears)) {
+                    years = Integer.parseInt(tmpYears);
+                }
+                if (!StringUtils.isEmpty(tmpdays)) {
+                    days = Integer.parseInt(tmpdays);
+                }
+                if (!StringUtils.isEmpty(tmphrs)) {
+                    hours = Integer.parseInt(tmphrs);
+                }
+                if (!StringUtils.isEmpty(tmpmin)) {
+                    minutes = Integer.parseInt(tmpmin);
+                }
+                if (!StringUtils.isEmpty(tmpsec)) {
+                    seconds = Integer.parseInt(tmpsec);
+                }
+                expire_milliseconds_precise_to_the_second = ((years * 86400000 * 365) + (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
+                if (expire_milliseconds_precise_to_the_second <= 0) {
+                    logger.info("Failed to find precise expire-date via paymentURL: \"" + paymentURL + "\"");
+                    continue;
+                }
+                /* Later we will decide whether we are going to use this value or not. */
+                logger.info("Successfully found precise expire-date via paymentURL: \"" + paymentURL + "\" : " + expireSecond);
+                this.getPluginConfig().setProperty("property_last_working_payment_url", paymentURL);
+                break;
             }
-            final String tmpYears = new Regex(expireSecond, "(\\d+)\\s+years?").getMatch(0);
-            final String tmpdays = new Regex(expireSecond, "(\\d+)\\s+days?").getMatch(0);
-            final String tmphrs = new Regex(expireSecond, "(\\d+)\\s+hours?").getMatch(0);
-            final String tmpmin = new Regex(expireSecond, "(\\d+)\\s+minutes?").getMatch(0);
-            final String tmpsec = new Regex(expireSecond, "(\\d+)\\s+seconds?").getMatch(0);
-            long years = 0, days = 0, hours = 0, minutes = 0, seconds = 0;
-            if (!StringUtils.isEmpty(tmpYears)) {
-                years = Integer.parseInt(tmpYears);
-            }
-            if (!StringUtils.isEmpty(tmpdays)) {
-                days = Integer.parseInt(tmpdays);
-            }
-            if (!StringUtils.isEmpty(tmphrs)) {
-                hours = Integer.parseInt(tmphrs);
-            }
-            if (!StringUtils.isEmpty(tmpmin)) {
-                minutes = Integer.parseInt(tmpmin);
-            }
-            if (!StringUtils.isEmpty(tmpsec)) {
-                seconds = Integer.parseInt(tmpsec);
-            }
-            expire_milliseconds_precise_to_the_second = ((years * 86400000 * 365) + (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
-            if (expire_milliseconds_precise_to_the_second <= 0) {
-                logger.info("Failed to find precise expire-date via paymentURL: \"" + paymentURL + "\"");
-                continue;
-            }
-            /* Later we will decide whether we are going to use this value or not. */
-            logger.info("Successfully found precise expire-date via paymentURL: \"" + paymentURL + "\" : " + expireSecond);
-            this.getPluginConfig().setProperty("property_last_working_payment_url", paymentURL);
-            break;
         }
         final long currentTime = br.getCurrentServerTime(System.currentTimeMillis());
         if (expire_milliseconds_precise_to_the_second > 0) {
@@ -5728,7 +5731,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else {
             /* Expire date is in the future --> Premium account */
             ai.setValidUntil(System.currentTimeMillis() + premiumDurationMilliseconds);
-            setAccountLimitsByType(account, AccountType.PREMIUM);
+            if (premiumDurationMilliseconds > TimeUnit.DAYS.toMillis(365 * 6)) {
+                // katfile, premium_expire":"2032...
+                setAccountLimitsByType(account, AccountType.LIFETIME);
+            } else {
+                setAccountLimitsByType(account, AccountType.PREMIUM);
+            }
         }
         final String premium_bandwidthBytesStr = (String) result.get("premium_bandwidth"); // Double as string
         final String traffic_leftBytesStr = (String) result.get("traffic_left");

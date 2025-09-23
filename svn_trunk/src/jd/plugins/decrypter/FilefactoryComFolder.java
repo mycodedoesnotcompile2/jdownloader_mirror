@@ -21,11 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -39,7 +38,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51484 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51541 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
@@ -49,6 +51,9 @@ public class FilefactoryComFolder extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        // blocking default UA
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("142.0"));
+        br.setCookie(getHost(), "filefactory_relaunch", "seen");
         br.setFollowRedirects(true);
         return br;
     }
@@ -104,9 +109,8 @@ public class FilefactoryComFolder extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML("errorData\\\\?\"")) {
                 /*
-                 * e.g.
-                 * {\"errorData\":{\"title\":\"Invalid Folder Link\",\"message\":\"The requested folder cannot be displayed because the link is invalid.\"
-                 * }
+                 * e.g. {\"errorData\":{\"title\":\"Invalid Folder Link\",\"message\":\"The requested folder cannot be displayed because the
+                 * link is invalid.\" }
                  */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

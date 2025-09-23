@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51530 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51543 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -154,7 +154,7 @@ public class DeepbridCom extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         Account account = null;
         if (new Regex(link.getPluginPatternMatcher(), PATTERN_TORRENT).patternFind()) {
-            /* Account required to check/download such links -> Get account */
+            /* Account required to check/download such links -> Try to get account */
             account = AccountController.getInstance().getValidAccount(this.getHost());
         }
         return requestFileInformation(link, account);
@@ -174,7 +174,7 @@ public class DeepbridCom extends PluginForHost {
              * 2025-09-19: Do not login if user owns a premium account! <br>
              * Such links only work for anonymous users and free account users! <br>
              * Logged in users will be redirected to "/service". <br>
-             * This is a possible website bug which I've reported to the website owners.
+             * This is not a bug but intended behavior by the deepbrid admins.
              */
             if (account != null && AccountType.FREE.equals(account.getType())) {
                 this.login(account, false);
@@ -280,13 +280,13 @@ public class DeepbridCom extends PluginForHost {
                     logger.info("Newly generated Ticket-URL: " + br.getURL());
                     ;
                 }
-                dllink = br.getRegex("(https?://[^\"\\']+/dl/[^\"\\']+)").getMatch(0);
+                dllink = br.getRegex("(https?://[^\"']+/dl/[^\"']+)").getMatch(0);
                 if (StringUtils.isEmpty(dllink)) {
                     dllink = br.getRegex("location\\.href='(https?://[^']+)';\">\\s*<i data-feather=\"download\"").getMatch(0);
                 }
                 if (StringUtils.isEmpty(dllink)) {
                     if (ticketurl != null) {
-                        /* Trash stored ticket-URL and try again! */
+                        /* Delete stored ticket-URL and try again! */
                         link.removeProperty(PROPERTY_TICKET_URL);
                         throw new PluginException(LinkStatus.ERROR_RETRY, "Try again with fresh ticket-URL");
                     } else {
@@ -383,7 +383,7 @@ public class DeepbridCom extends PluginForHost {
         try {
             this.dl.startDownload();
         } catch (final Exception e) {
-            /* Special errorhandling */
+            /* Special errorhandling, see https://board.jdownloader.org/showthread.php?t=80906 */
             final File file = new File(dl.getDownloadable().getFileOutputPart());
             if (file.exists() && file.length() < 5000) {
                 final String content = IO.readFileToString(file);
@@ -445,11 +445,9 @@ public class DeepbridCom extends PluginForHost {
         if (points == null) {
             points = (Number) userinfo.get("fidelity_points");
         }
-        String humanReadablePointsStr = "N/A";
         if (points != null) {
             final int pointsInt = points.intValue();
             ai.setPremiumPoints(pointsInt);
-            humanReadablePointsStr = Integer.toString(pointsInt);
         }
         final String type = userinfo.get("type").toString();
         final Number maxSimultaneousDownloads = (Number) userinfo.get("maxDownloads");
@@ -503,7 +501,6 @@ public class DeepbridCom extends PluginForHost {
         } else {
             supportedhostslistO = (List<Object>) supportedhostsO;
         }
-        final ArrayList<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final HashMap<String, MultiHostHost> crippledDomainToMultihostHost = new HashMap<String, MultiHostHost>();
         final Map<String, String> domainWorkarounds = new HashMap<String, String>();
         /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
@@ -512,40 +509,42 @@ public class DeepbridCom extends PluginForHost {
         final Map<String, String> hostsToDownSinceDate = new HashMap<String, String>();
         for (final Object hostO : supportedhostslistO) {
             /* List can be given in two different varieties */
-            if (hostO instanceof Map) {
-                final Map<String, Object> entries = (Map<String, Object>) hostO;
-                for (final Map.Entry<String, Object> entry : entries.entrySet()) {
-                    final MultiHostHost mhost = new MultiHostHost();
-                    final boolean isOnline;
-                    String downSinceDate = null;
-                    final String onlineStatus = (String) entry.getValue();
-                    if ("up".equalsIgnoreCase(onlineStatus)) {
-                        isOnline = true;
-                    } else {
-                        isOnline = false;
-                        downSinceDate = new Regex(onlineStatus, "down \\((.+)\\)$").getMatch(0);
-                    }
-                    final String[] domains = entry.getKey().split(",");
-                    int numberOfNewDomains = 0;
-                    for (String domain : domains) {
-                        domain = domain.toLowerCase(Locale.ENGLISH);
-                        if (crippledDomainToMultihostHost.containsKey(domain)) {
-                            continue;
-                        }
-                        numberOfNewDomains++;
-                        if (!isOnline) {
-                            hostsToDownSinceDate.put(domain, downSinceDate);
-                        }
-                        mhost.addDomain(domain);
-                        crippledDomainToMultihostHost.put(domain, mhost);
-                    }
-                    if (numberOfNewDomains == 0) {
+            if (!(hostO instanceof Map)) {
+                logger.warning("Found invalid host object: " + hostO);
+                continue;
+            }
+            final Map<String, Object> entries = (Map<String, Object>) hostO;
+            for (final Map.Entry<String, Object> entry : entries.entrySet()) {
+                final MultiHostHost mhost = new MultiHostHost();
+                final boolean isOnline;
+                String downSinceDate = null;
+                final String onlineStatus = (String) entry.getValue();
+                if ("up".equalsIgnoreCase(onlineStatus)) {
+                    isOnline = true;
+                } else {
+                    isOnline = false;
+                    downSinceDate = new Regex(onlineStatus, "down \\((.+)\\)$").getMatch(0);
+                }
+                final String[] domains = entry.getKey().split(",");
+                for (String domain : domains) {
+                    domain = domain.toLowerCase(Locale.ENGLISH);
+                    if (crippledDomainToMultihostHost.containsKey(domain)) {
                         continue;
                     }
-                    supportedhosts.add(mhost);
+                    if (!isOnline) {
+                        hostsToDownSinceDate.put(domain, downSinceDate);
+                    }
+                    mhost.addDomain(domain);
+                    crippledDomainToMultihostHost.put(domain, mhost);
+                    /**
+                     * Add domain variations to internal mapping in an attempt to avoid double-entries. <br>
+                     * Only do this for domains containing exactly one dot.
+                     */
+                    final String[] domainParts = domain.split("\\.");
+                    if (domainParts.length == 2) {
+                        crippledDomainToMultihostHost.put(domainParts[0], mhost);
+                    }
                 }
-            } else {
-                logger.warning("Found invalid host object: " + hostO);
             }
         }
         boolean findHostersFromWebsiteSuccess = false;
@@ -582,7 +581,6 @@ public class DeepbridCom extends PluginForHost {
                 logger.info("Adding host from website which has not been given via API: " + crippled_host);
                 final MultiHostHost mhost = new MultiHostHost(crippled_host);
                 crippledDomainToMultihostHost.put(crippled_host, mhost);
-                supportedhosts.add(mhost);
             }
             /*
              * TODO: For free accounts: parse global free account limits from html such as "max links per day" and "filenext files per day"
@@ -597,12 +595,13 @@ public class DeepbridCom extends PluginForHost {
                         continue;
                     }
                     crippled_host = Encoding.htmlDecode(crippled_host).trim();
-                    boolean addToResults = false;
+                    crippled_host = crippled_host.toLowerCase(Locale.ENGLISH);
+                    boolean isNew = false;
                     boolean foundAndSetIndividualHostLimits = false;
                     MultiHostHost mhost = crippledDomainToMultihostHost.get(crippled_host);
                     if (mhost == null) {
                         mhost = new MultiHostHost(crippled_host);
-                        addToResults = true;
+                        isNew = true;
                     }
                     final String limit_text = new Regex(hoster_details_html, "<div class=\"text-xs font-medium text-right\">([^<]+)</div>").getMatch(0);
                     setIndividualHostTrafficLimits: if (limit_text != null) {
@@ -645,12 +644,13 @@ public class DeepbridCom extends PluginForHost {
                         }
                         foundAndSetIndividualHostLimits = true;
                     }
-                    if (addToResults) {
+                    if (isNew) {
                         logger.info("Added domain found only in individual limits text: " + crippled_host);
                         crippledDomainToMultihostHost.put(crippled_host, mhost);
-                        supportedhosts.add(mhost);
                     } else if (foundAndSetIndividualHostLimits) {
                         logger.info("Added individual host limits for domain: " + crippled_host);
+                    } else {
+                        /* Entry hasn't been changed */
                     }
                 }
             } else {
@@ -661,7 +661,22 @@ public class DeepbridCom extends PluginForHost {
             logger.log(e);
             logger.warning("Website-workaround to find additional supported hosts failed");
         }
-        for (final MultiHostHost mhost : supportedhosts) {
+        /* 2025-09-22: Small workaround for their API returning both domains as separate entries. */
+        if (crippledDomainToMultihostHost.containsKey("drop.download") && crippledDomainToMultihostHost.containsKey("dropapk.to")) {
+            crippledDomainToMultihostHost.remove("dropapk.to");
+            crippledDomainToMultihostHost.remove("dropapk");
+        }
+        if (crippledDomainToMultihostHost.containsKey("drop") && crippledDomainToMultihostHost.containsKey("dropapk")) {
+            crippledDomainToMultihostHost.remove("dropapk.to");
+            crippledDomainToMultihostHost.remove("dropapk");
+        }
+        final ArrayList<MultiHostHost> supportedhostsWithoutDupes = new ArrayList<MultiHostHost>();
+        for (final MultiHostHost mhost : crippledDomainToMultihostHost.values()) {
+            if (supportedhostsWithoutDupes.contains(mhost)) {
+                /* Skip dupes */
+                continue;
+            }
+            supportedhostsWithoutDupes.add(mhost);
             /* Fix domains if any domain of this multihost is on our domain workaround list */
             String downSinceDate = null;
             String realDomain = null;
@@ -674,6 +689,8 @@ public class DeepbridCom extends PluginForHost {
                 }
             }
             if (realDomain != null) {
+                /* Overwrite previously set domains with real ones. */
+                logger.info("Corrected domain: " + mhost.getDomain() + " -->" + realDomain);
                 mhost.setDomain(realDomain);
             }
             /* Set special down flag if any domain of this entry is down */
@@ -683,7 +700,7 @@ public class DeepbridCom extends PluginForHost {
             }
         }
         account.setConcurrentUsePossible(true);
-        ai.setMultiHostSupportV2(this, supportedhosts);
+        ai.setMultiHostSupportV2(this, supportedhostsWithoutDupes);
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             ai.setStatus(account.getType().getLabel() + " | MaxDls: " + maxSimultaneousDownloads + " MaxCon: " + maxConnections + " | WebsiteHostsParser: " + findHostersFromWebsiteSuccess);
             // if (!findHostersFromWebsiteSuccess) {

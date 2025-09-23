@@ -19,11 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.parser.Regex;
+import jd.parser.html.HTMLSearch;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51542 $", interfaceVersion = 3, names = {}, urls = {})
 public class XcumCom extends KernelVideoSharingComV2 {
     public XcumCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -70,5 +72,15 @@ public class XcumCom extends KernelVideoSharingComV2 {
     @Override
     protected boolean useEmbedWorkaround() {
         return true;
+    }
+
+    @Override
+    protected String regexNormalTitleWebsite(final Browser br) {
+        final String ogTitle = HTMLSearch.searchMetaTag(br, "og:title");
+        if (ogTitle != null) {
+            return ogTitle;
+        } else {
+            return super.regexNormalTitleWebsite(br);
+        }
     }
 }

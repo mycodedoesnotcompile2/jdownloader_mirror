@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.XChinaCoCrawler;
 
-@HostPlugin(revision = "$Revision: 47886 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51542 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XChinaCoCrawler.class })
 public class XChinaCo extends PluginForHost {
     public XChinaCo(PluginWrapper wrapper) {
@@ -122,10 +122,12 @@ public class XChinaCo extends PluginForHost {
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        final String url_hls = br.getRegex("var hlsUrl = \"(https?://[^\"]+)\";").getMatch(0);
+        String url_hls = br.getRegex("var hlsUrl = \"(https?://[^\"]+)\";").getMatch(0);
         if (StringUtils.isEmpty(url_hls)) {
-            logger.warning("Failed to find final downloadurl");
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            url_hls = br.getRegex("src:\\s*'(http[^']+)").getMatch(0);
+        }
+        if (StringUtils.isEmpty(url_hls)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
         checkFFmpeg(link, "Download a HLS Stream");
         dl = new HLSDownloader(link, br, url_hls);

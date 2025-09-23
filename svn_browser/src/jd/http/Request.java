@@ -473,7 +473,7 @@ public abstract class Request {
 
     protected RequestHeader getDefaultRequestHeader(final URL url) {
         final RequestHeader headers = new RequestHeader();
-        headers.put("User-Agent", this.getSuggestedUserAgent());
+        headers.put("User-Agent", Request.getSuggestedUserAgent("76.0"));
         headers.put("Accept", this.getSuggestedAcceptHeader(url));
         headers.put("Accept-Language", "de,en-gb;q=0.7,en;q=0.3");
         if (Application.getJavaVersion() >= Application.JAVA16) {
@@ -494,7 +494,7 @@ public abstract class Request {
         return headers;
     }
 
-    protected String getSuggestedUserAgent() {
+    public static String getSuggestedUserAgent(final String firefoxRevision) {
         final OperatingSystem os = CrossSystem.getOS();
         final String archString = CrossSystem.getARCHString();
         final String osString;
@@ -521,7 +521,6 @@ public abstract class Request {
         // https://wiki.mozilla.org/Release_Management/Calendar
         // 08.05.2020 - current is 76.0
         // 30.11.2020 - current is 83
-        final String firefoxRevision = "76.0";
         if (archString != null && osString != null && !new Regex(archString, "(arm|aarch)").matches()) {
             // do not return ARM based strings as it will revert to mobile websites. We do not want that behaviour by default -raztoki
             return "Mozilla/5.0 (X11; Ubuntu; " + osString.trim() + " " + archString.trim() + "; rv:" + firefoxRevision + ") Gecko/20100101 Firefox/" + firefoxRevision;

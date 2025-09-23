@@ -33,7 +33,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51403 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51543 $", interfaceVersion = 3, names = {}, urls = {})
 public class DropapkCom extends XFileSharingProBasic {
     public DropapkCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -194,11 +194,21 @@ public class DropapkCom extends XFileSharingProBasic {
     @Override
     protected String regExTrafficLeft(final Browser br) {
         /* 2023-03-02 */
-        final String betterResult = br.getRegex("(?i)>\\s*Traffic available today</div>\\s*<div[^>]*>([^<>\"]+)</div>").getMatch(0);
+        final String betterResult = br.getRegex(">\\s*Traffic available today</div>\\s*<div[^>]*>([^<>\"]+)</div>").getMatch(0);
         if (betterResult != null) {
             return betterResult;
         } else {
             return super.regExTrafficLeft(br);
+        }
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*Not allowed")) {
+            /* 2025-09-22: e.g. /d/d5crlwftz980 */
+            return true;
+        } else {
+            return super.isOffline(link, br);
         }
     }
 }

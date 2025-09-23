@@ -35,7 +35,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51517 $", interfaceVersion = 2, names = { "winporn.com", "proporn.com", "vivatube.com", "tubeon.com", "viptube.com", "hd21.com", "iceporn.com", "nuvid.com", "yeptube.com" }, urls = { "https?://(?:(?:www|m)\\.)?winporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?proporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?vivatube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?tubeon\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?viptube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?hd21\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?iceporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?nuvid\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?",
+@HostPlugin(revision = "$Revision: 51542 $", interfaceVersion = 2, names = { "winporn.com", "proporn.com", "vivatube.com", "tubeon.com", "viptube.com", "hd21.com", "iceporn.com", "nuvid.com", "yeptube.com" }, urls = { "https?://(?:(?:www|m)\\.)?winporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?proporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?vivatube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?tubeon\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?viptube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?hd21\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?iceporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?nuvid\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?",
         "https?://(?:(?:www|m)\\.)?yeptube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?" })
 public class UnknownPornScript9 extends PluginForHost {
     public UnknownPornScript9(PluginWrapper wrapper) {
@@ -112,11 +112,18 @@ public class UnknownPornScript9 extends PluginForHost {
         final boolean fetchDirecturlOnlyOnDownload = true;
         String title = null;
         if (!fetchDirecturlOnlyOnDownload || isDownload) {
-            if (br.containsHTML("/video/download/" + fid)) {
-                /* e.g. winporn.com, hd21.com */
+            String config_url = br.getRegex("(?:config_url|configUrl)\\s*:\\s*'(.*?)'").getMatch(0);
+            if (br.containsHTML("/video/download/" + fid) && config_url == null) {
+                /**
+                 * e.g. winporn.com, hd21.com <br>
+                 * Important: This does not mean that official download will really work e.g. <br>
+                 * Example official DL not working (hd21):
+                 * /pt/video/110124/wonderful-blonde-screams-with-pleasure-as-a-hard-stick-invades-her-ass
+                 */
+                /* Alternative: download via mobile website: m.hd21.com -> /mp4/110124 */
                 dllink = "/video/download/save/" + fid;
             } else {
-                /* e.g. vivatube.com */
+                /* e.g. vivatube.com, hd21.com */
                 /* Access player json */
                 final String videoid = PluginJSonUtils.getJson(br, "vid");
                 if (StringUtils.isEmpty(videoid)) {
@@ -124,13 +131,10 @@ public class UnknownPornScript9 extends PluginForHost {
                 }
                 br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
                 br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                String config_url = br.getRegex("config_url\\s*:\\s*'(.*?)'").getMatch(0);
                 String embed = br.getRegex("embed\\s*:\\s*(\\d+)").getMatch(0);
                 if (config_url == null) {
                     /* Fallback */
                     config_url = "/player_config_json/";
-                } else {
-                    config_url = config_url.replace("\\", "");
                 }
                 if (embed == null) {
                     embed = "0";

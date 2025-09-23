@@ -55,7 +55,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51019 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51543 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -106,17 +106,6 @@ public class TorboxApp extends UseNet {
     public String getLinkID(final DownloadLink link) {
         return this.getHost() + "://type/" + link.getStringProperty(PROPERTY_DOWNLOAD_TYPE) + "/download_id/" + link.getStringProperty(PROPERTY_DOWNLOAD_ID) + "/file_id/" + link.getStringProperty(PROPERTY_DOWNLOAD_FILE_ID);
     }
-    // public static String getDownloadTypeAPIPath(final String dl_type) {
-    // if (dl_type.equalsIgnoreCase("torrents")) {
-    // return "torrents";
-    // } else if (dl_type.equalsIgnoreCase("web_downloads")) {
-    // return "webdl";
-    // } else if (dl_type.equalsIgnoreCase("usenet_downloads")) {
-    // return "usenet";
-    // } else {
-    // throw new IllegalArgumentException();
-    // }
-    // }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -152,7 +141,6 @@ public class TorboxApp extends UseNet {
             return;
         } else {
             /* Download selfhosted file */
-            // throw new AccountRequiredException();
             final String file_id = link.getStringProperty(PROPERTY_DOWNLOAD_FILE_ID);
             final String dl_type = link.getStringProperty(PROPERTY_DOWNLOAD_TYPE);
             final String dl_id = link.getStringProperty(PROPERTY_DOWNLOAD_ID);
@@ -180,7 +168,7 @@ public class TorboxApp extends UseNet {
                 query_requestdl.appendEncoded("zip", "false");
                 req_requestdl = br.createGetRequest(API_BASE + "/usenet/requestdl?" + query_requestdl.toString());
             } else {
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException("Unexpected download_type");
             }
             final String dllink = this.callAPI(br, req_requestdl, account, link).toString();
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -236,7 +224,7 @@ public class TorboxApp extends UseNet {
                 if (!doCachecheck) {
                     break cacheCheck;
                 }
-                /* Items need to be cached before they can be downloaded -> Check cache status */
+                /* Some items need to be cached before they can be downloaded -> Check cache status */
                 logger.info("Checking downloadability of internal file_id: " + file_id + " | hash: " + hash);
                 final UrlQuery query_checkcached = new UrlQuery();
                 query_checkcached.appendEncoded("hash", hash);
@@ -327,8 +315,8 @@ public class TorboxApp extends UseNet {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user = login(account, true);
+        final AccountInfo ai = new AccountInfo();
         final String premium_expires_at = (String) user.get("premium_expires_at");
         final Object total_bytes_downloaded = user.get("total_bytes_downloaded");
         final Map<String, Object> user_settings = (Map<String, Object>) user.get("settings");
@@ -377,7 +365,6 @@ public class TorboxApp extends UseNet {
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         hosterloop: for (final Map<String, Object> host : hosts) {
             List<String> domains = (List<String>) host.get("domains");
-            // final String domain = hosterlistitem.get("domain").toString();
             final String name = host.get("name").toString();
             final String note = (String) host.get("note");
             final long daily_link_limit = ((Number) host.get("daily_link_limit")).longValue();
@@ -410,7 +397,7 @@ public class TorboxApp extends UseNet {
                 mhost.setLinksLeft(daily_link_limit - daily_link_used);
             }
             if (daily_bandwidth_limit != 0) {
-                mhost.setTrafficLeft(daily_bandwidth_limit);
+                mhost.setTrafficMax(daily_bandwidth_limit);
                 mhost.setTrafficLeft(daily_bandwidth_limit - daily_bandwidth_used);
             }
             supportedhosts.add(mhost);
@@ -454,11 +441,11 @@ public class TorboxApp extends UseNet {
         ai.setMultiHostSupportV2(this, supportedhosts);
         /* Handle notifications */
         notificationHandling: if (true) {
-            if (!Boolean.TRUE.equals(user_settings.get("jdownloader_notifications"))) {
-                logger.info("User has disabled notifications in web interface of " + getHost());
-                break notificationHandling;
-            } else if (BubbleNotifyEnabledState.NEVER.equals(CFG_BUBBLE.CFG.getBubbleNotifyEnabledState())) {
+            if (BubbleNotifyEnabledState.NEVER.equals(CFG_BUBBLE.CFG.getBubbleNotifyEnabledState())) {
                 /* User has disabled BubbleNotifications globally in JDownloader settings */
+                break notificationHandling;
+            } else if (!Boolean.TRUE.equals(user_settings.get("jdownloader_notifications"))) {
+                logger.info("User has disabled notifications in web interface of " + getHost());
                 break notificationHandling;
             }
             long highestNotificationTimestamp = 0;
