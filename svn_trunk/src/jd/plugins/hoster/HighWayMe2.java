@@ -18,6 +18,16 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -32,17 +42,7 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.Order;
 
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-
-@HostPlugin(revision = "$Revision: 50385 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
+@HostPlugin(revision = "$Revision: 51552 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
 public class HighWayMe2 extends HighWayCore {
     protected static MultiHosterManagement mhm                      = new MultiHosterManagement("high-way.me");
     private static final String            urlWebsiteAPICredentials = "high-way.me/pages/cred/";
@@ -85,8 +85,15 @@ public class HighWayMe2 extends HighWayCore {
     @Override
     public List<UsenetServer> getAvailableUsenetServer() {
         final List<UsenetServer> ret = new ArrayList<UsenetServer>();
-        ret.addAll(UsenetServer.createServerList("reader.high-way.me", false, 119));
-        ret.addAll(UsenetServer.createServerList("reader.high-way.me", true, 563));
+        /* Information obtained from: https://high-way.me/download.php#usenet */
+        final int[] ports_noSSL = new int[] { 119, 21, 25, 990, 8081 };
+        final int[] ports_SSL = new int[] { 563, 465, 993, 4242 };
+        ret.addAll(UsenetServer.createServerList("news.dwld.link", false, ports_noSSL));
+        ret.addAll(UsenetServer.createServerList("news.dwld.link", true, ports_SSL));
+        ret.addAll(UsenetServer.createServerList("news-alt.dwld.link", false, ports_noSSL));
+        ret.addAll(UsenetServer.createServerList("news-alt.dwld.link", true, ports_SSL));
+        ret.addAll(UsenetServer.createServerList("news-us.dwld.link", false, ports_noSSL));
+        ret.addAll(UsenetServer.createServerList("news-us.dwld.link", true, ports_SSL));
         return ret;
     }
 

@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
@@ -31,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51484 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51545 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -169,7 +170,7 @@ public class KatfileCom extends XFileSharingProBasic {
 
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
-        if (br.containsHTML("/404-remove|>\\s*The file expired>The file was deleted by its owner")) {
+        if (br.containsHTML("/404-remove|>\\s*The file expired|>\\s*The file was deleted by its owner")) {
             return true;
         } else {
             return super.isOffline(link, br);
@@ -196,5 +197,16 @@ public class KatfileCom extends XFileSharingProBasic {
         } else {
             return super.getPremiumOnlyErrorMessage(br);
         }
+    }
+
+    @Override
+    protected String regexWaittime(final String html) {
+        final String waitStr = new Regex(html, "var estimated_time = (\\d+)").getMatch(0);
+        if (waitStr != null) {
+            /* Small hack: These aren't seconds but tenths of a second */
+            final int realSeconds = Integer.parseInt(waitStr) / 10;
+            return Integer.toString(realSeconds);
+        }
+        return super.regexWaittime(html);
     }
 }

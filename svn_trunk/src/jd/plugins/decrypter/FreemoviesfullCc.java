@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -32,8 +33,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51544 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51550 $", interfaceVersion = 3, names = {}, urls = {})
 public class FreemoviesfullCc extends PluginForDecrypt {
     public FreemoviesfullCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,6 +96,7 @@ public class FreemoviesfullCc extends PluginForDecrypt {
         if (mirror_ids == null || mirror_ids.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        HashSet<String> dupes = new HashSet<String>();
         FilePackage fp = FilePackage.getInstance();
         fp.setName(br._getURL().getPath());
         int i = -1;
@@ -103,6 +106,10 @@ public class FreemoviesfullCc extends PluginForDecrypt {
             if (this.isAbort()) {
                 /* Aborted by user */
                 throw new InterruptedException();
+            }
+            if (!dupes.add(mirror_id)) {
+                /* Skip dupes */
+                continue;
             }
             logger.info("Crawled mirror " + (i + 1) + "/" + mirror_ids.length);
             br.getPage("/ajax/episode/sources/" + mirror_id);
@@ -116,11 +123,14 @@ public class FreemoviesfullCc extends PluginForDecrypt {
             if (fp == null || i == 0) {
                 fp = FilePackage.getInstance();
                 fp.setName(entries.get("title").toString());
-                fp.setPackageKey(this.getHost() + "://épisode/" + episode_id);
+                fp.setPackageKey(this.getHost() + "://episode/" + episode_id);
             }
             final String url = entries.get("link").toString();
             final DownloadLink link = this.createDownloadlink(url);
             link._setFilePackage(fp);
+            /* Set extra information important for VidcloudStreameeeeee crawler. */
+            link.setReferrerUrl(br.getURL());
+            link.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, fp.getName());
             ret.add(link);
             distribute(link);
         }

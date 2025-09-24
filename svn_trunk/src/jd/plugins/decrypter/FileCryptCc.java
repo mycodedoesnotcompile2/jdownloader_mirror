@@ -23,6 +23,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.FileCryptConfig;
+import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -47,23 +64,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.utils.JDUtilities;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.FileCryptConfig;
-import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 51264 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51553 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +80,9 @@ public class FileCryptCc extends PluginForDecrypt {
         br.setLoadLimit(br.getLoadLimit() * 2);
         br.getHeaders().put("Accept-Encoding", "gzip, deflate");
         br.setFollowRedirects(true);
+        /* Prefer english language */
+        br.setCookie(getHost(), "lang_v2", "en_US");
+        br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
         return br;
     }
 
@@ -121,17 +125,23 @@ public class FileCryptCc extends PluginForDecrypt {
     private String              successfullyUsedFolderPassword     = null;
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        /*
-         * Not all captcha types change when re-loading page without cookies (recaptchav2 doesn't).
-         */
-        final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        final String mirrorIdFromURL = UrlQuery.parse(param.getCryptedUrl()).get("mirror");
-        String contenturl = param.getCryptedUrl();
-        if (mirrorIdFromURL == null && !StringUtils.endsWithCaseInsensitive(contenturl, ".html")) {
+        final FileCryptConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        String contenturl = URLHelper.getUrlWithoutParams(param.getCryptedUrl());
+        if (!StringUtils.endsWithCaseInsensitive(contenturl, ".html")) {
             /* Fix url */
             contenturl += ".html";
         }
-        /* Nullification */
+        final String contenturl_without_params = contenturl;
+        final String folderID = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        String mirrorIdFromAddedURL = UrlQuery.parse(param.getCryptedUrl()).get("mirror");
+        if (!mirrorIdFromAddedURL.matches("\\d+")) {
+            logger.info("User added URL with invalid mirror_id value (not a number) -> " + mirrorIdFromAddedURL);
+            mirrorIdFromAddedURL = null;
+        }
+        if (mirrorIdFromAddedURL != null) {
+            contenturl += "?mirror=" + mirrorIdFromAddedURL;
+        }
+        /* Nullification of our beloved global variables */
         this.logoPW = null;
         this.successfullyUsedFolderPassword = null;
         this.handlePasswordAndCaptcha(param, folderID, contenturl);
@@ -147,6 +157,14 @@ public class FileCryptCc extends PluginForDecrypt {
                 extractionPasswordList.add(logoPW);
             }
         }
+        if (mirrorIdFromAddedURL != null && looksLikeUploaderHasDeactivatedAllMirrors(br)) {
+            logger.info("Attempting workaround for misleading error message 'user has deactivated all mirrors for this folder' while maybe only the mirror_id inside the added URL is offline");
+            this.getPage(contenturl_without_params);
+            if (looksLikeUploaderHasDeactivatedAllMirrors(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            logger.info("Workaround successful -> mirror_id from added url does not exist: " + mirrorIdFromAddedURL);
+        }
         /* Crawl mirrors */
         FilePackage fp = null;
         final String fpName = br.getRegex("<h2>([^<]+)<").getMatch(0);
@@ -157,46 +175,49 @@ public class FileCryptCc extends PluginForDecrypt {
         String[] availableMirrorurls = br.getRegex("\"([^\"]*/Container/[A-Z0-9]+\\.html\\?mirror=\\d+)").getColumn(0);
         if (availableMirrorurls == null || availableMirrorurls.length == 0) {
             /* Fallback -> Probably 1 mirror available */
-            if (br.containsHTML(">\\s*Der Inhaber dieses Ordners hat leider alle Hoster in diesem Container in seinen Einstellungen deaktiviert")) {
+            if (looksLikeUploaderHasDeactivatedAllMirrors(br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             logger.info("Failed to find any mirrors in html -> Looks like only one mirror is available");
             availableMirrorurls = new String[1];
-            if (mirrorIdFromURL != null) {
+            if (mirrorIdFromAddedURL != null) {
                 availableMirrorurls[0] = contenturl;
             } else {
                 availableMirrorurls[0] = contenturl + "?mirror=0";
             }
         }
-        final List<String> mirrorurls = new ArrayList<String>();
+        final List<String> mirror_urls = new ArrayList<String>();
+        final List<String> mirror_ids = new ArrayList<String>();
         String urlWithUserPreferredMirrorID = null;
         for (final String mirrorurl : availableMirrorurls) {
-            final String mirrorID = UrlQuery.parse(mirrorurl).get("mirror");
-            if (StringUtils.equals(mirrorID, mirrorIdFromURL)) {
+            final String mirror_id = UrlQuery.parse(mirrorurl).get("mirror");
+            /* Prevent duplicates */
+            if (mirror_ids.contains(mirror_id)) {
+                continue;
+            }
+            mirror_ids.add(mirror_id);
+            if (StringUtils.equals(mirror_id, mirrorIdFromAddedURL)) {
+                logger.info("Found user preferred mirrorID " + mirrorIdFromAddedURL);
                 urlWithUserPreferredMirrorID = mirrorurl;
             }
-            /* Prevent duplicates */
-            if (!mirrorurls.contains(mirrorurl)) {
-                mirrorurls.add(mirrorurl);
-            }
+            mirror_urls.add(mirrorurl);
         }
-        if (urlWithUserPreferredMirrorID != null) {
-            logger.info("Found user preferred mirrorID " + mirrorIdFromURL);
-        } else {
-            logger.info("User preferred mirrorID " + mirrorIdFromURL + " does not exist in list of really existing mirrors");
+        logger.info("Available mirrors: " + mirror_ids.size() + " | mirror_ids: " + mirror_ids);
+        if (mirrorIdFromAddedURL != null && urlWithUserPreferredMirrorID == null) {
+            logger.info("User preferred mirrorID " + mirrorIdFromAddedURL + " does not exist in list of really existing mirrors");
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int numberofOfflineMirrors = 0;
         int numberofSkippedFakeAdvertisementMirrors = 0;
-        mirrorLoop: for (int mirrorindex = 0; mirrorindex < mirrorurls.size(); mirrorindex++) {
-            final String mirrorurl = mirrorurls.get(mirrorindex);
+        mirrorLoop: for (int mirrorindex = 0; mirrorindex < mirror_urls.size(); mirrorindex++) {
+            final String mirrorurl = mirror_urls.get(mirrorindex);
             final String currentMirrorID = UrlQuery.parse(mirrorurl).get("mirror");
-            logger.info("Crawling mirror " + (mirrorindex + 1) + "/" + mirrorurls.size() + " | MirrorID: " + currentMirrorID + " | " + mirrorurl);
+            logger.info("Crawling mirror " + (mirrorindex + 1) + "/" + mirror_urls.size() + " | MirrorID: " + currentMirrorID + " | " + mirrorurl);
             if (mirrorindex > 0) {
                 /* Password and captcha can be required for each mirror */
                 this.handlePasswordAndCaptcha(param, folderID, mirrorurl);
             } else {
-                logger.info("Do not access mirrirurl because we are currently crawling the first mirror");
+                logger.info("Do not access mirrorurl because we are currently crawling the first mirror");
             }
             boolean mirrorLooksToBeOffline = false;
             boolean mirrorLooksToBeAdvertisement = false;
@@ -357,17 +378,17 @@ public class FileCryptCc extends PluginForDecrypt {
                 }
             }
             ret.addAll(thisMirrorResults);
-            if (PluginJsonConfig.get(this.getConfigInterface()).getCrawlMode() == CrawlMode.PREFER_GIVEN_MIRROR_ID && mirrorIdFromURL != null && currentMirrorID.equals(mirrorIdFromURL)) {
-                logger.info("Stopping because: Found user desired mirror: " + mirrorIdFromURL);
+            if (cfg.getCrawlMode() == CrawlMode.PREFER_GIVEN_MIRROR_ID && mirrorIdFromAddedURL != null && currentMirrorID.equals(mirrorIdFromAddedURL)) {
+                logger.info("Stopping because: Found user desired mirror: " + mirrorIdFromAddedURL);
                 break mirrorLoop;
             }
         }
         if (ret.isEmpty()) {
-            if (numberofOfflineMirrors == mirrorurls.size() - numberofSkippedFakeAdvertisementMirrors) {
+            if (numberofOfflineMirrors == mirror_urls.size() - numberofSkippedFakeAdvertisementMirrors) {
                 /* In this case filecrypt is only using the link to show ads. */
-                logger.info("All mirrors are offline -> Whole folder is offline");
+                logger.info("All mirrors are offline and only fake mirrors/usenet/ads exist -> Whole folder is offline");
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (numberofOfflineMirrors == mirrorurls.size() - numberofSkippedFakeAdvertisementMirrors) {
+            } else if (numberofOfflineMirrors == mirror_urls.size() - numberofSkippedFakeAdvertisementMirrors) {
                 /* In this case filecrypt is only using the link to show ads. */
                 logger.info("All mirrors are offline -> Whole folder is offline");
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -378,9 +399,16 @@ public class FileCryptCc extends PluginForDecrypt {
         return ret;
     }
 
+    private boolean looksLikeUploaderHasDeactivatedAllMirrors(final Browser br) {
+        if (br.containsHTML(">\\s*Der Inhaber dieses Ordners hat leider alle Hoster in diesem Container in seinen Einstellungen deaktiviert")) {
+            return true;
+        } else if (br.containsHTML(">\\s*The owner of this folder has deactivated all hosts in this container in their settings")) {
+            return true;
+        }
+        return false;
+    }
+
     private void handlePasswordAndCaptcha(final CryptedLink param, final String folderID, final String url) throws Exception {
-        /* Prepare browser */
-        br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
         int cutCaptchaRetryIndex = -1;
         final FileCryptConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         final int cutCaptchaAvoidanceMaxRetries = cfg.getMaxCutCaptchaAvoidanceRetries();
@@ -407,19 +435,21 @@ public class FileCryptCc extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.getURL().matches("(?i)https?://[^/]+/404\\.html.*")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML("(?i)>\\s*Dieser Ordner enthält keine Mirror")) {
+            } else if (br.containsHTML(">\\s*Dieser Ordner enthält keine Mirror")) {
                 /* Empty link/folder. */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             if (cutCaptchaRetryIndex == 0 && logoPW == null) {
                 /**
-                 * Search password based on folder-logo. </br> Only do this one time in the first run of this loop.
+                 * Search password based on folder-logo. </br>
+                 * Only do this one time in the first run of this loop.
                  */
                 final String customLogoID = br.getRegex("custom/([a-z0-9]+)\\.png").getMatch(0);
                 if (customLogoID != null) {
                     /**
-                     * Magic auto passwords: </br> Creators can set custom logos on each folder. Each logo has a unique ID. This way we can
-                     * try specific passwords first that are typically associated with folders published by those sources.
+                     * Magic auto passwords: </br>
+                     * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first
+                     * that are typically associated with folders published by those sources.
                      */
                     if ("53d1b".equals(customLogoID) || "80d13".equals(customLogoID) || "fde1d".equals(customLogoID) || "8abe0".equals(customLogoID) || "8f073".equals(customLogoID)) {
                         logoPW = "serienfans.org";

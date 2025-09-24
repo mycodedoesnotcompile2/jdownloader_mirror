@@ -15,6 +15,7 @@ import jd.plugins.PluginConfigPanelNG;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -68,8 +69,8 @@ public class UsenetConfigPanel extends PluginConfigPanelNG {
 
             @Override
             public void setSelectedItem(Object anObject) {
-                if (anObject == null) {
-                    super.setSelectedItem(hosts.get(0));
+                if (anObject == null || !hosts.contains(anObject)) {
+                    super.setSelectedItem(availableServers.get(0).getHost());
                 } else {
                     super.setSelectedItem(anObject);
                 }
@@ -80,10 +81,7 @@ public class UsenetConfigPanel extends PluginConfigPanelNG {
         panel.addPair(_GUI.T.UsenetConfigPanel_port(), null, cmbPort = new ComboBox<Integer>(new Integer[] {}) {
             @Override
             protected String getLabel(int index, Integer port) {
-                String host = cf.getHost();
-                if (host == null) {
-                    host = availableServers.get(0).getHost();
-                }
+                final String host = getHost(cf, availableServers);
                 boolean sslSupported = false;
                 boolean nonsslSupported = false;
                 for (UsenetServer us : availableServers) {
@@ -113,7 +111,7 @@ public class UsenetConfigPanel extends PluginConfigPanelNG {
             @Override
             public void setSelectedItem(Object anObject) {
                 if (anObject == null) {
-                    super.setSelectedItem(0);
+                    super.setSelectedItem(availableServers.get(0).getPort());
                 } else {
                     super.setSelectedItem(anObject);
                 }
@@ -123,7 +121,7 @@ public class UsenetConfigPanel extends PluginConfigPanelNG {
         panel.addPair(_GUI.T.UsenetConfigPanel_ssl(), null, cbSSL = new jd.gui.swing.jdgui.views.settings.components.Checkbox());
         // IntegerKeyHandler handler = cf._getStorageHandler().getKeyHandler("Connections", IntegerKeyHandler.class);
         // panel.addHandler(cf, handler);
-        ActionListener al = new ActionListener() {
+        final ActionListener al = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (e.getSource() == cmbServer) {
@@ -147,10 +145,19 @@ public class UsenetConfigPanel extends PluginConfigPanelNG {
                 new EDTRunner() {
                     @Override
                     protected void runInEDT() {
-                        cf.setHost(availableServers.get(0).getHost());
-                        cf.setSSLEnabled(availableServers.get(0).isSSL());
-                        cf.setPort(availableServers.get(0).getPort());
-                        updateModels(cf, availableServers, cmbServer, cmbPort, cbSSL);
+                        try {
+                            cmbPort.removeActionListener(al);
+                            cmbServer.removeActionListener(al);
+                            cbSSL.removeActionListener(al);
+                            cf.setHost(availableServers.get(0).getHost());
+                            cf.setSSLEnabled(availableServers.get(0).isSSL());
+                            cf.setPort(availableServers.get(0).getPort());
+                            updateModels(cf, availableServers, cmbServer, cmbPort, cbSSL);
+                        } finally {
+                            cmbPort.addActionListener(al);
+                            cmbServer.addActionListener(al);
+                            cbSSL.addActionListener(al);
+                        }
                     }
                 };
             }
@@ -158,11 +165,18 @@ public class UsenetConfigPanel extends PluginConfigPanelNG {
         panel.add(Box.createGlue(), "gapbottom 5,pushx,growx,spanx" + panel.getRightGap());
     }
 
-    protected static void updateModels(UsenetAccountConfigInterface cf, List<UsenetServer> availableServers, ComboBox<String> cmbServer, ComboBox<Integer> cmbPort, Checkbox cbSSL) {
-        String host = cf.getHost();
-        if (host == null) {
-            host = availableServers.get(0).getHost();
+    private static String getHost(UsenetAccountConfigInterface cf, List<UsenetServer> availableServers) {
+        final String accHost = cf.getHost();
+        for (UsenetServer availableServer : availableServers) {
+            if (StringUtils.equals(availableServer.getHost(), accHost)) {
+                return accHost;
+            }
         }
+        return availableServers.get(0).getHost();
+    }
+
+    protected static void updateModels(UsenetAccountConfigInterface cf, List<UsenetServer> availableServers, ComboBox<String> cmbServer, ComboBox<Integer> cmbPort, Checkbox cbSSL) {
+        final String host = getHost(cf, availableServers);
         int port = cf.getPort();
         ArrayList<Integer> ports = new ArrayList<Integer>();
         for (UsenetServer us : availableServers) {

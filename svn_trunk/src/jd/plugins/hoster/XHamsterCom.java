@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,22 +29,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
-
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -72,7 +57,24 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51484 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51546 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -103,11 +105,9 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br>
-         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
-         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br>
-         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
+         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -948,11 +948,103 @@ public class XHamsterCom extends PluginForHost {
                 url = ret.toString();
             }
             url = url.replaceFirst("^encrypted_", "");
+            if (!StringUtils.startsWithCaseInsensitive(url, "http") && cryptedURL.matches("(?i)([a-f0-9]{2})*$")) {
+                try {
+                    url = new Decoder().decode(HexFormatter.hexToByteArray(cryptedURL));
+                } catch (Exception e) {
+                    logger.log(e);
+                }
+            }
             if (!StringUtils.startsWithCaseInsensitive(url, "http")) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
         return url;
+    }
+
+    private static class Decoder {
+        // 32-bit multiply like JS Math.imul (keine Vorzeichenverlängerung in den oberen Bits)
+        private int nk(int x, int y) {
+            long lx = x & 0xFFFFFFFFL;
+            long ly = y & 0xFFFFFFFFL;
+            return (int) ((lx * ly) & 0xFFFFFFFFL);
+        }
+
+        private interface ByteGenerator {
+            int next();
+        }
+
+        private ByteGenerator makeGenerator(int algoId, final int seed) {
+            switch (algoId) {
+            case 1:
+                return new ByteGenerator() {
+                    int i = seed;
+
+                    @Override
+                    public int next() {
+                        i = nk(i, 1664525) + 1013904223;
+                        return i & 0xFF;
+                    }
+                };
+            case 2:
+                return new ByteGenerator() {
+                    int i = seed;
+
+                    @Override
+                    public int next() {
+                        i |= 0;
+                        i ^= (i << 13);
+                        i ^= (i >>> 17); // unsigned right shift like JS >>>
+                        i ^= (i << 5);
+                        i |= 0;
+                        return i & 0xFF;
+                    }
+                };
+            case 3:
+                return new ByteGenerator() {
+                    int i = seed;
+
+                    @Override
+                    public int next() {
+                        // add 2654435769 modulo 2^32: hex 0x9E3779B9 (fits as int literal)
+                        i = i + 0x9E3779B9;
+                        int e = i;
+                        e ^= (e >>> 16);
+                        e = nk(e, 0x85EBCA77); // 2246822519 -> 0x85EBCA77
+                        e ^= (e >>> 13);
+                        e = nk(e, 0xC2B2AE3D); // 3266489917 -> 0xC2B2AE3D
+                        e ^= (e >>> 16);
+                        return e & 0xFF;
+                    }
+                };
+            default:
+                throw new IllegalArgumentException("Unknown algoId: " + algoId);
+            }
+        }
+
+        private String decode(byte[] data) throws Exception {
+            int algoId = data[0] & 0xFF;
+            int seed = (data[1] & 0xFF) | ((data[2] & 0xFF) << 8) | ((data[3] & 0xFF) << 16) | ((data[4] & 0xFF) << 24);
+            final ByteGenerator gen = makeGenerator(algoId, seed);
+            final byte[] r = new byte[data.length - 5];
+            for (int o = 5, a = 0; o < data.length; o++, a++) {
+                r[a] = (byte) ((data[o] ^ gen.next()) & 0xFF);
+            }
+            return URLDecoder.decode(toPercentEncoding(r), "UTF-8");
+
+        }
+
+        private String toPercentEncoding(byte[] e) {
+            StringBuilder sb = new StringBuilder();
+            for (byte b : e) {
+                String hex = Integer.toHexString(b & 0xFF);
+                if (hex.length() < 2) {
+                    hex = "0" + hex;
+                }
+                sb.append("%").append(hex);
+            }
+            return sb.toString();
+        }
     }
 
     public Object[] getDllink(final Browser br, int selected_format, Map<String, Object> hlsMap, final Map<Integer, Set<Object>> availableQualities) throws Exception {
@@ -1722,10 +1814,9 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br>
-             * Redirects to mainpage if cookies are invalid. </br>
-             * Return json if cookies are valid. </br>
-             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
+             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
+             * user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */

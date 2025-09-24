@@ -45,7 +45,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -59,7 +58,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@HostPlugin(revision = "$Revision: 51540 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51549 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -199,7 +198,7 @@ public class FileFactory extends PluginForHost {
                 return AvailableStatus.TRUE;
             }
             br.followConnection();
-            checkErrorsWebsite(link, br);
+            checkErrorsWebsite(link, account, br);
         } finally {
             if (isDownload && !success) {
                 if (con != null) {
@@ -213,12 +212,8 @@ public class FileFactory extends PluginForHost {
         } else {
             link.setPasswordProtected(false);
         }
-        /* Small hack: Correct json in html code to make br.getRegex calls down below work. */
-        final String unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
-        br.getRequest().setHtmlCode(unescaped);
-        this.checkErrorsWebsite(link, br);
-        String filename = br.getRegex("\"disp_filename\":\"([^\"]+)").getMatch(0);
-        String filesizeBytesStr = br.getRegex("\"size\":\"\\$n(\\d+)").getMatch(0);
+        String filename = getString(br, "disp_filename");
+        String filesizeBytesStr = getString(br, "size");
         if (filename != null) {
             link.setName(filename);
         }
@@ -228,14 +223,54 @@ public class FileFactory extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    public void checkErrorsWebsite(final DownloadLink link, final Browser br) throws PluginException {
+    private Boolean getBoolean(Browser br, final String key) {
+        final String value = br.getRegex("\"" + Pattern.quote(key) + "(?:\\\\)?\"\\s*:\\s*(true|false)").getMatch(0);
+        if (value == null) {
+            return null;
+        }
+        return "true".equals(value);
+    }
+
+    private String getString(Browser br, final String key) {
+        final String value = br.getRegex("\"" + Pattern.quote(key) + "(?:\\\\)?\"\\s*:\\s*(?:\\\\)?\"(.*?)(?:\\\\)?\"").getMatch(0);
+        if (value == null) {
+            return null;
+        }
+        return restoreFromString("\"" + value + "\"", TypeRef.STRING);
+    }
+
+    public void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException {
         // TODO: Add more error handling
-        final String error_code = br.getRegex("\"errorCode\":\"([^\"]+)\"").getMatch(0);
+        final Boolean requiresPremium = getBoolean(br, "requiresPremium");
+        final Boolean isFree = getBoolean(br, "isFree");
+        final Boolean userIsPremium = getBoolean(br, "userIsPremium");
+        String error_code = null;
+        String errorData = br.getRegex("\"errorData\\\\\"\\s*:\\s*(\\{.*?\\})\\s*,").getMatch(0);
+        Map<String, Object> errorDataMap = null;
+        if (errorData != null) {
+            try {
+                errorData = "\"" + errorData + "\"";
+                errorData = restoreFromString(errorData, TypeRef.STRING);
+                errorDataMap = restoreFromString(errorData, TypeRef.MAP);
+                error_code = errorDataMap.get("errorCode").toString();
+            } catch (Exception e) {
+                logger.log(e);
+            }
+        }
+        if (error_code == null) {
+            error_code = br.getRegex("\"errorCode(?:\\\\)?\":(?:\\\\)?\"(.*?)(?:\\\\)?\"").getMatch(0);
+        }
         if (error_code == null) {
             return;
         }
-        if (error_code.equalsIgnoreCase("FILE_NOT_FOUND")) {
+        if ("266".equals(error_code)) {
+            // Please wait a moment before downloading. Free users must wait between downloads. This typically takes 5 minutes after your
+            // last download completed
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, errorDataMap != null ? StringUtils.valueOfOrNull(errorDataMap.get("message")) : null);
+        } else if ("FILE_NOT_FOUND".equals(error_code)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (Boolean.FALSE.equals(userIsPremium) && Boolean.TRUE.equals(requiresPremium)) {
+            throw new AccountRequiredException();
         } else {
             logger.info("Unknown error happened: " + error_code);
             throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
@@ -490,10 +525,10 @@ public class FileFactory extends PluginForHost {
                     showFreeDialog(getHost());
                 }
             }
-            if (!isPremium && br.containsHTML("requiresPremium\":true")) {
+            if (!isPremium && isPasswordProtectedFile(br)) {
                 throw new AccountRequiredException("Premium account required to download this file");
             }
-            final String dltoken = br.getRegex("requestToken\":\"([^\"]+)").getMatch(0);
+            final String dltoken = getString(br, "requestToken");
             final String fid = this.getFUID(link);
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("hash", fid);
@@ -530,7 +565,7 @@ public class FileFactory extends PluginForHost {
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finallink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 handleConnectionErrors(br, dl.getConnection());
-                checkErrorsWebsite(link, br);
+                checkErrorsWebsite(link, account, br);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
@@ -606,7 +641,7 @@ public class FileFactory extends PluginForHost {
     }
 
     private boolean isPasswordProtectedFile(final Browser br) {
-        if (br.containsHTML("\"requiresPassword\":true")) {
+        if (Boolean.TRUE.equals(getBoolean(br, "requiresPassword"))) {
             return true;
         } else {
             return false;

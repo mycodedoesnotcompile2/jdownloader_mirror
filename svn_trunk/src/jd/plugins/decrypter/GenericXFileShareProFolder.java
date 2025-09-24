@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -55,7 +56,7 @@ import jd.plugins.hoster.TakefileLink;
 import jd.plugins.hoster.UploadBoyCom;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 51467 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51550 $", interfaceVersion = 2, names = {}, urls = {})
 public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
     private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "youwatch.org", "salefiles.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.cloud", "katfile.com", "filefox.cc", "cosmobox.org", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "rapidbytez.com", "filextras.com" };
     /* This list contains all hosts which need special Patterns (see below) - all other XFS hosts have the same folder patterns! */
@@ -177,7 +178,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
                 if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("No such user exist|No such folder")) {
                     logger.info("Incorrect URL, Invalid user or empty folder");
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (br.containsHTML(">\\s*?Guest access not possible")) {
+                } else if (br.containsHTML(">\\s*Guest access not possible")) {
                     /* 2019-08-13: Rare special case E.g. easybytez.com */
                     if (loggedIN) {
                         logger.info("We are loggedIN but still cannot view this folder --> Wrong account or crawler plugin failure");
@@ -278,42 +279,42 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
     }
 
     protected String regexPackagenameFromHTML(final Browser br) {
-        String fpName;
+        String title;
         if ("hotlink.cc".equals(br.getHost())) {
-            fpName = br.getRegex("<i class=\"glyphicon glyphicon-folder-open\"></i>\\s*(.*?)\\s*</span>").getMatch(0);
+            title = br.getRegex("<i class=\"glyphicon glyphicon-folder-open\"></i>\\s*(.*?)\\s*</span>").getMatch(0);
         } else if ("imagetwist.com".equals(br.getHost())) {
             /* 2023-11-09 */
-            fpName = br.getRegex("page_main_title\"[^>]*>([^<]+)<").getMatch(0);
+            title = br.getRegex("page_main_title\"[^>]*>([^<]+)<").getMatch(0);
         } else {
             // ex-load.com
-            fpName = br.getRegex("Files in\\s+([^<]+?)\\s+folder[^<]*</").getMatch(0);
-            if (fpName == null) {
+            title = br.getRegex("Files in\\s+([^<]+?)\\s+folder[^<]*</").getMatch(0);
+            if (title == null) {
                 // file-al, katfile.com
                 // File of USER_NAME: FOLDER_NAME folder....
-                fpName = br.getRegex("Files of(\\s+[a-zA-Z0-9]+: )?\\s*([^<>]+?)\\s+folder[^<>]*(<|>)").getMatch(1);
+                title = br.getRegex("Files of(\\s+[a-zA-Z0-9]+: )?\\s*([^<>]+?)\\s+folder[^<>]*(<|>)").getMatch(1);
             }
-            if (fpName == null) {
+            if (title == null) {
                 // katfile.com
-                fpName = br.getRegex("Files\\s+in\\s+folder\\s+([^<]+?)\\s*</").getMatch(0);
+                title = br.getRegex("Files\\s+in\\s+folder\\s+([^<]+?)\\s*</").getMatch(0);
             }
-            if (fpName == null) {
-                fpName = br.getRegex("<title>\\s*([^<]+?)\\s+folder\\s*</title>").getMatch(0);
+            if (title == null) {
+                title = br.getRegex("<title>\\s*([^<]+?)\\s+folder\\s*</title>").getMatch(0);
             }
-            if (fpName == null) {
-                fpName = br.getRegex("<h1.*?</i>\\s*([^<]+?)\\s*</h1>").getMatch(0);
+            if (title == null) {
+                title = br.getRegex("<h1.*?</i>\\s*([^<]+?)\\s*</h1>").getMatch(0);
             }
-            if (fpName == null) {
+            if (title == null) {
                 /* 2019-02-08: E.g. for photo galleries (e.g. imgbaron.com) */
-                fpName = br.getRegex("<H1>\\s*?([^<]+?)\\s*?</H1>").getMatch(0);
+                title = br.getRegex("<H1>\\s*([^<]+?)\\s*</H1>").getMatch(0);
             }
         }
-        if (fpName != null) {
-            return Encoding.htmlOnlyDecode(fpName);
+        if (title != null) {
+            return Encoding.htmlOnlyDecode(title);
         }
         return null;
     }
 
-    private ArrayList<DownloadLink> parsePage(final Set<String> dupes, final FilePackage fp, final CryptedLink param) throws PluginException {
+    private ArrayList<DownloadLink> parsePage(final Set<String> dupes, final FilePackage fp, final CryptedLink param) throws PluginException, IOException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int numberofNewItemsThisPage = 0;
         final String pathPattern = "/[a-z0-9]{12}(?:\\.html|/.*?)?";
@@ -452,27 +453,39 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
             if (folders == null || folders.length == 0) {
                 /* 2024-06-28: New attempt */
                 folders = br.getRegex("\"([^\"]*/users/[^\"']+)").getColumn(0);
+                if (folders == null || folders.length == 0) {
+                    /* 2025-09-23: e.g. katfile.cloud */
+                    folders = br.getRegex("(/f/[a-z0-9]{32})\"").getColumn(0);
+                }
             }
         }
         if (folders != null && folders.length > 0) {
-            for (final String folderlink : folders) {
+            for (String folderlink : folders) {
                 final String path;
                 if (folderlink.startsWith("/")) {
+                    /* Ensure that we got an absolute URL. */
+                    folderlink = br.getURL(folderlink).toExternalForm();
                     path = folderlink;
                 } else {
                     path = new Regex(folderlink, "https?://[^/]+/(.+)").getMatch(0);
                 }
                 /* Make sure that we're not grabbing the parent folder but only the folder that the user has added + eventual subfolders! */
                 final boolean folderIsChildFolder = path.length() > currentFolderPath.length();
-                if (this.canHandle(folderlink) && !dupes.contains(folderlink) && folderIsChildFolder) {
-                    numberofNewItemsThisPage++;
-                    final DownloadLink dlfolder = createDownloadlink(folderlink);
-                    ret.add(dlfolder);
-                    distribute(dlfolder);
-                    dupes.add(folderlink);
-                } else {
-                    logger.info("Skipping possible result: " + folderlink);
+                if (!this.canHandle(folderlink)) {
+                    logger.info("Skipping possible result (canHandle returns false): " + folderlink);
+                    continue;
+                } else if (!folderIsChildFolder) {
+                    logger.info("Skipping possible result (not a child folder): " + folderlink);
+                    continue;
+                } else if (!dupes.add(folderlink)) {
+                    logger.info("Skipping possible result (duplicate): " + folderlink);
+                    continue;
                 }
+                numberofNewItemsThisPage++;
+                final DownloadLink dlfolder = createDownloadlink(folderlink);
+                ret.add(dlfolder);
+                distribute(dlfolder);
+                dupes.add(folderlink);
             }
         }
         logger.info("Number of new items found on current page: " + numberofNewItemsThisPage);

@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49006 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51548 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -145,52 +145,56 @@ public class SerienStreamTo extends PluginForDecrypt {
         final String itemSlug = new Regex(br.getURL(), "https?://[^/]+/[^/]+/[^/]+/(.*)").getMatch(0);
         // If we're on a show site, add the seasons, if we're on a season page, add the episodes and so on ...
         final String[][] itemLinks = br.getRegex("href=\"([^\"]+" + Pattern.quote(itemSlug) + "/[^\"]+)\"").getMatches();
-        for (String[] itemLink : itemLinks) {
-            final String url = br.getURL(Encoding.htmlDecode(itemLink[0])).toExternalForm();
-            if (dupes.add(url)) {
-                ret.add(createDownloadlink(url));
-            }
-        }
         /* Videos are on external sites (not in embeds), so harvest those if we can get our hands on them. */
         final String[] episodeHTMLs = br.getRegex("<li class=\"[^\"]*episodeLink\\d+\"(.*?)</a>").getColumn(0);
-        if (episodeHTMLs.length > 0) {
+        if ((episodeHTMLs == null || episodeHTMLs.length == 0) && (itemLinks == null || itemLinks.length == 0)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (itemLinks != null && itemLinks.length > 0) {
+            for (final String[] itemLink : itemLinks) {
+                final String url = br.getURL(Encoding.htmlDecode(itemLink[0])).toExternalForm();
+                if (dupes.add(url)) {
+                    ret.add(createDownloadlink(url));
+                }
+            }
+        }
+        if (episodeHTMLs != null && episodeHTMLs.length > 0) {
             final Set<String> userLanguageIDsPrioList = new LinkedHashSet<String>();
             final Set<String> userHosterPrioList = new LinkedHashSet<String>();
             /* Collect language name -> ID mapping if needed */
             final String userLanguagePrioListStr = PluginJsonConfig.get(SerienStreamToConfig.class).getLanguagePriorityString();
-            if (userLanguagePrioListStr != null) {
+            findUserPreferredLanguages: if (userLanguagePrioListStr != null) {
                 /* Find internal ID of user preferred languages e.g. */
                 final List<String> userAllowedLanguageTitles = new ArrayList<String>();
                 userAllowedLanguageTitles.addAll(Arrays.asList(userLanguagePrioListStr.split(",")));
                 final String languageFlagsHTML = br.getRegex("<div class=\"changeLanguage\">(.*?)</div>").getMatch(0);
-                if (languageFlagsHTML != null) {
-                    final String[][] languageTitleIDMappings = new Regex(languageFlagsHTML, "<img[^>]*data-lang-key=\"(\\d+)\" title=\"([^\"]+)\"").getMatches();
-                    if (languageTitleIDMappings.length > 0) {
-                        for (final String userPreferredLanguageTitle : userAllowedLanguageTitles) {
-                            final String userPreferredLanguageTitleMatcher[] = userPreferredLanguageTitle.split("\\s+");
-                            for (String[] languageTitleIDMapping : languageTitleIDMappings) {
-                                boolean match = true;
-                                for (String userPreferredLanguageTitleMatch : userPreferredLanguageTitleMatcher) {
-                                    if (!StringUtils.containsIgnoreCase(languageTitleIDMapping[1], userPreferredLanguageTitleMatch)) {
-                                        match = false;
-                                        break;
-                                    }
-                                }
-                                if (match) {
-                                    userLanguageIDsPrioList.add(languageTitleIDMapping[0]);
-                                }
+                if (languageFlagsHTML == null) {
+                    logger.warning("Failed to find languagesFlagsHTML");
+                    break findUserPreferredLanguages;
+                }
+                final String[][] languageTitleIDMappings = new Regex(languageFlagsHTML, "<img[^>]*data-lang-key=\"(\\d+)\" title=\"([^\"]+)\"").getMatches();
+                if (languageTitleIDMappings == null || languageTitleIDMappings.length == 0) {
+                    logger.warning("Failed to find any languageTitleIDMappings");
+                    break findUserPreferredLanguages;
+                }
+                for (final String userPreferredLanguageTitle : userAllowedLanguageTitles) {
+                    final String userPreferredLanguageTitleMatcher[] = userPreferredLanguageTitle.split("\\s+");
+                    for (String[] languageTitleIDMapping : languageTitleIDMappings) {
+                        final String language_id = languageTitleIDMapping[0];
+                        final String language_title = languageTitleIDMapping[1];
+                        // final boolean contains_subtitle = StringUtils.containsIgnoreCase(language_title, "Untertitel");
+                        for (String userPreferredLanguageTitleMatch : userPreferredLanguageTitleMatcher) {
+                            if (StringUtils.containsIgnoreCase(language_title, userPreferredLanguageTitleMatch)) {
+                                userLanguageIDsPrioList.add(language_id);
+                                break;
                             }
                         }
-                        logger.info("Found " + userLanguageIDsPrioList.size() + "/" + userAllowedLanguageTitles.size() + " user preferred languages");
-                    } else {
-                        logger.warning("Failed to find any languageTitleIDMappings");
                     }
-                } else {
-                    logger.warning("Failed to find languagesFlagsHTML");
                 }
+                logger.info("Found " + userLanguageIDsPrioList.size() + " user preferred languages --> " + userLanguageIDsPrioList);
             }
             String userHosterPrioListStr = PluginJsonConfig.get(SerienStreamToConfig.class).getHosterPriorityString();
-            if (userHosterPrioListStr != null) {
+            if (!StringUtils.isEmpty(userHosterPrioListStr)) {
                 userHosterPrioListStr = userHosterPrioListStr.replace(" ", "").toLowerCase(Locale.ENGLISH);
                 userHosterPrioList.addAll(Arrays.asList(userHosterPrioListStr.split(",")));
             }
@@ -200,8 +204,8 @@ public class SerienStreamTo extends PluginForDecrypt {
             final HashMap<String, List<String>> packagesByHoster = new HashMap<String, List<String>>();
             final HashMap<String, List<String>> packagesByLanguageKey = new HashMap<String, List<String>>();
             for (final String episodeHTML : episodeHTMLs) {
-                final String redirectURL = new Regex(episodeHTML, "href=\"([^\"]+redirect[^\"]+)\" target=\"_blank\"").getMatch(0);
-                final String languageKey = new Regex(episodeHTML, "data-lang-key=\"(\\d+)\"").getMatch(0);
+                final String redirectURL = new Regex(episodeHTML, "(?i)href=\"([^\"]+redirect[^\"]+)\" target=\"_blank\"").getMatch(0);
+                final String languageKey = new Regex(episodeHTML, "(?i)data-lang-key=\"(\\d+)\"").getMatch(0);
                 final String hoster = new Regex(episodeHTML, "(?i)title=\"Hoster ([^\"]+)\"").getMatch(0).toLowerCase(Locale.ENGLISH);
                 if (redirectURL == null || languageKey == null || hoster == null) {
                     logger.warning("Something is null: redirectURL =" + redirectURL + " | languageKey = " + languageKey + " | hoster = " + hoster);
@@ -243,41 +247,44 @@ public class SerienStreamTo extends PluginForDecrypt {
                 allRedirectURLs.add(redirectURL);
             }
             List<String> urlsToProcess = null;
-            if (!userHosterPrioList.isEmpty()) {
+            if (userHosterPrioList.size() > 0) {
                 /* Get user preferred mirrors by host (+ language) */
                 for (final String userAllowedHoster : userHosterPrioList) {
                     if (urlsToProcess != null && urlsToProcess.size() > 0) {
                         break;
                     }
                     if (packagesByHoster.containsKey(userAllowedHoster)) {
-                        final List<String> preferredMirrorsByHost = packagesByHoster.get(userAllowedHoster);
-                        if (preferredMirrorsByHost != null && preferredMirrorsByHost.size() > 0) {
-                            logger.info("Found user priorized mirrors by host:" + userAllowedHoster);
-                            /* Combine this with users' language priority if given. */
-                            for (final String languageKey : userLanguageIDsPrioList) {
-                                if (packagesByLanguageKey.containsKey(languageKey)) {
-                                    final List<String> preferredMirrorsByLanguage = packagesByLanguageKey.get(languageKey);
-                                    if (preferredMirrorsByLanguage != null) {
-                                        logger.info("Combining users preferred mirrors by host + language:" + userAllowedHoster + "|" + languageKey);
-                                        urlsToProcess = new ArrayList<String>();
-                                        for (final String preferredMirrorByHost : preferredMirrorsByHost) {
-                                            if (preferredMirrorsByLanguage.contains(preferredMirrorByHost)) {
-                                                urlsToProcess.add(preferredMirrorByHost);
-                                            }
-                                        }
-                                        if (urlsToProcess.size() > 0) {
-                                            break;
-                                        }
-                                    } else {
-                                        urlsToProcess = preferredMirrorsByHost;
-                                    }
+                        continue;
+                    }
+                    final List<String> preferredMirrorsByHost = packagesByHoster.get(userAllowedHoster);
+                    if (preferredMirrorsByHost == null || preferredMirrorsByHost.size() == 0) {
+                        continue;
+                    }
+                    logger.info("Found user priorized mirrors by host:" + userAllowedHoster);
+                    /* Combine this with users' language priority if given. */
+                    for (final String languageKey : userLanguageIDsPrioList) {
+                        if (!packagesByLanguageKey.containsKey(languageKey)) {
+                            continue;
+                        }
+                        final List<String> preferredMirrorsByLanguage = packagesByLanguageKey.get(languageKey);
+                        if (preferredMirrorsByLanguage != null) {
+                            logger.info("Combining users preferred mirrors by host + language:" + userAllowedHoster + "|" + languageKey);
+                            urlsToProcess = new ArrayList<String>();
+                            for (final String preferredMirrorByHost : preferredMirrorsByHost) {
+                                if (preferredMirrorsByLanguage.contains(preferredMirrorByHost)) {
+                                    urlsToProcess.add(preferredMirrorByHost);
                                 }
                             }
+                            if (urlsToProcess.size() > 0) {
+                                break;
+                            }
+                        } else {
+                            urlsToProcess = preferredMirrorsByHost;
                         }
                     }
                 }
                 if (urlsToProcess == null) {
-                    logger.info("Failed to find user priorized mirrors by host");
+                    logger.info("Failed to find user priorized mirrors by host: " + userHosterPrioList);
                 }
             } else if (!userLanguageIDsPrioList.isEmpty()) {
                 /* Get user preferred mirrors by language only */

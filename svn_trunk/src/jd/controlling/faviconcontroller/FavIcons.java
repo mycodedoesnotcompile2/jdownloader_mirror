@@ -849,13 +849,22 @@ public class FavIcons {
                 }
                 try {
                     List<BufferedImage> ret = null;
-                    if (bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71) {
+                    if (bytes.length > 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff) {
+                        // JPG magic
                         final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
                         if (img != null) {
                             ret = new ArrayList<BufferedImage>();
                             ret.add(img);
                         }
-                    } else if (bytes[0] == 71 && bytes[1] == 73 && bytes[2] == 70) {
+                    } else if (bytes.length >= 67 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71) {
+                        // smalltest single pixel png has 67 bytes with PNG magic
+                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                        if (img != null) {
+                            ret = new ArrayList<BufferedImage>();
+                            ret.add(img);
+                        }
+                    } else if (bytes.length >= 35 && bytes[0] == 71 && bytes[1] == 73 && bytes[2] == 70) {
+                        // smalltest single pixel gif has 35 bytes with GIF magic
                         final GifDecoder gifDecoder = new GifDecoder();
                         /* reset bufferedinputstream to begin from start */
                         if (gifDecoder.read(new ByteArrayInputStream(bytes)) == 0) {
@@ -867,7 +876,8 @@ public class FavIcons {
                         }
                     }
                     /* try first with iconloader */
-                    if (ret == null) {
+                    if (ret == null && bytes.length >= 70) {
+                        // smallest single pixel icon has 70 bytes
                         try {
                             ret = ICODecoder.read(new ByteArrayInputStream(bytes));
                         } catch (final IOException e) {
@@ -880,6 +890,13 @@ public class FavIcons {
                                 throw e;
                             }
                         }
+                    }
+                    if (ret == null) {
+                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                        if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
+                            return img;
+                        }
+                        return null;
                     }
                     final BufferedImage img = returnBestImage(ret);
                     if (img != null) {
