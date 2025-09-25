@@ -145,19 +145,24 @@ public class InterfaceStorage<InterfaceType> implements InvocationHandler {
                 final Property property = cType.getClassCache().getProperty(key);
                 boolean requiresWrite = true;
                 synchronized (this) {
+
                     oldValue = property.getter == null ? null : getWithUsingTheCache(property.getter, key);
-                    if (oldValue == null && newValue == null) {
+                    if (oldValue == newValue) {
+                        if (property.type.isPrimitive() || property.type.isEnum(true) || property.type.isString()) {
+                            requiresWrite = false;
+                        } else {
+                            // keep true - we cannot detect changes
+                        }
+                    } else if (oldValue == null && newValue == null) {
                         requiresWrite = false;
-                    } else if ((oldValue == null && newValue != null) || (oldValue != null || newValue == null)) {
+                    } else if ((oldValue == null && newValue != null) || (oldValue != null && newValue == null)) {
                         requiresWrite = true;
                     } else if (property.type.isPrimitive() || property.type.isEnum(true) || property.type.isString()) {
                         if (CompareUtils.equals(oldValue, newValue)) {
                             requiresWrite = false;
                         }
                     } else {
-                        if (oldValue == newValue) {
-                            // keep true - we cannot detect changes
-                        } else if (property.type.isListContainer() || property.type.isMap()) {
+                        if (property.type.isListContainer() || property.type.isMap()) {
                             if (property.type.getComponentType().isPrimitive() || property.type.getComponentType().isEnum(true) || property.type.getComponentType().isString()) {
                                 if (CompareUtils.equalsDeep(oldValue, newValue)) {
                                     requiresWrite = false;

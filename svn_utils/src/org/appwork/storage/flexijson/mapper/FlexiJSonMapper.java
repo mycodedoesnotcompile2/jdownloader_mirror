@@ -1408,6 +1408,7 @@ public class FlexiJSonMapper {
                 } catch (final Exception e) {
                     return this.returnFallbackOrThrowException(new FailedToCreateInstanceFlexiMapperException(json, cType, e));
                 }
+                // kann auch ein ExtValue sein - wenn man etwas falsches eingetragen hat - also z.B. ein string an die stelle eines Objects
                 DebugMode.breakIf(!(json instanceof FlexiJSonObject));
                 final FlexiJSonObject obj = (FlexiJSonObject) json;
                 final CompiledType[] componentTypes = cType.getComponentTypes(Map.class);

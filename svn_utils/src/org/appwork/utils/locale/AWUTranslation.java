@@ -594,4 +594,9 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "No", "Nein" })
     String lit_no_upper();
+
+    @Default(lngs = { "en", "de" }, values = { "Please wait...", "Bitte warten..." })
+
+    String lit_please_wait_dot_dot_dot();
+
 }

@@ -798,7 +798,7 @@ public class HttpClient {
 
             private void onDone() throws IOException {
                 this.close();
-                if (context.getConnection().getCompleteContentLength() >= 0) {
+                if (context.getConnection().getCompleteContentLength() >= 0 && !RequestMethod.HEAD.equals(context.getMethod())) {
                     final long completeLength = Math.max(0, context.getResumePosition()) + ((CountingConnection) is).transferedBytes();
                     if (completeLength != context.getConnection().getCompleteContentLength()) {
                         throw new IncompleteResponseException(context, completeLength);
@@ -1016,10 +1016,41 @@ public class HttpClient {
             if (context.redirectCounter > context.getMaxRedirects()) {
                 throw new TooManyRedirectsException(context, null);
             }
+            switch (context.getCode()) {
+            case 301:
+                // The resource has been permanently moved and request method conversion from POST to GET is allowed.
+                context.setPostDataStream(null);
+                context.setPostDataLength(-1);
+                if (!RequestMethod.HEAD.equals(context.method) && !RequestMethod.GET.equals(context.method)) {
+                    context.method = RequestMethod.GET;
+                }
+                break;
+            case 302:
+                // The resource has been temporarily moved and request method conversion from POST to GET is allowed.
+                context.setPostDataStream(null);
+                context.setPostDataLength(-1);
+                if (!RequestMethod.HEAD.equals(context.method) && !RequestMethod.GET.equals(context.method)) {
+                    context.method = RequestMethod.GET;
+                }
+                break;
+            case 303:
+                // See Other
+                context.setPostDataStream(null);
+                context.setPostDataLength(-1);
+                if (!RequestMethod.HEAD.equals(context.method) && !RequestMethod.GET.equals(context.method)) {
+                    context.method = RequestMethod.GET;
+                }
+                break;
+            case 307:
+                // The resource has been temporarily moved and request method conversion from POST to GET is forbidden.
+                break;
+            case 308:
+                // The resource has been permanently moved and request method conversion from POST to GET is forbidden.
+                break;
+            default:
+                break;
+            }
             // the redirect will not be a POST again
-            context.setPostDataStream(null);
-            context.setPostDataLength(-1);
-            context.method = RequestMethod.GET;
             return this.execute(context);
         }
         return context;

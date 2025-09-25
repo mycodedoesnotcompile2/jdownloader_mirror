@@ -201,7 +201,11 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
     @Override
     public List<ProcessInfo> listByPids(int... pids) throws IOException, InterruptedException {
         try {
+
             final ArrayList<ProcessInfo> ret = new ArrayList<ProcessInfo>();
+            if (pids.length == 0) {
+                return ret;
+            }
             final String where = new Joiner(" OR ") {
                 protected String elementToString(Object s) {
                     if (s == getSeparator()) {
@@ -486,6 +490,9 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
     @Override
     public boolean terminateForcedAfterRequest(TimeSpan timeout, int exitCode, ProcessInfo... proccesses) throws IOException, InterruptedException {
         boolean result = true;
+        if (proccesses.length == 0) {
+            return false;
+        }
         for (ProcessInfo p : proccesses) {
             fill(p);
             try {
@@ -543,6 +550,9 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
      */
     @Override
     public List<ProcessInfo> waitForExit(final TimeSpan timeSpan, ProcessInfo... processes) throws IOException, InterruptedException {
+        if (processes.length == 0) {
+            return new ArrayList<ProcessInfo>();
+        }
         final long started = Time.systemIndependentCurrentJVMTimeMillis();
         List<ProcessInfo> running = listByProcessInfo(processes);
         while (timeSpan == null || !timeSpan.isExpired(started)) {
@@ -562,6 +572,9 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
      */
     @Override
     public int toFront(ProcessInfo... processes) throws IOException, InterruptedException {
+        if (processes.length == 0) {
+            return 0;
+        }
         final HashSet<Integer> set = new HashSet<Integer>();
         // update pids based on the extended process ids
         for (ProcessInfo p : listByProcessInfo(processes)) {

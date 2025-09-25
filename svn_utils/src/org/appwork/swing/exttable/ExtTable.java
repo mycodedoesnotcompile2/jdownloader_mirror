@@ -205,19 +205,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                 return "renameClickDelayer_" + ExtTable.this.getModel().getModelID();
             }
         };
-        this.setTableHeader(new JTableHeader(this.getColumnModel()) {
-            /**
-             *
-             */
-            private static final long serialVersionUID = 6099615257824836337L;
-
-            @Override
-            public Dimension getPreferredSize() {
-                final Dimension ret = super.getPreferredSize();
-                ret.height = 19;
-                return ret;
-            }
-        });
+        this.setTableHeader(createTableHeader());
         this.createColumns();
         getModel().autoColumnWidth();
         // get defaultbackground and Foregroundcolors
@@ -363,6 +351,25 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
             public void columnSelectionChanged(final ListSelectionEvent e) {
             }
         });
+    }
+
+    /**
+     * @return
+     */
+    protected JTableHeader createTableHeader() {
+        return new JTableHeader(this.getColumnModel()) {
+            /**
+             *
+             */
+            private static final long serialVersionUID = 6099615257824836337L;
+
+            @Override
+            public Dimension getPreferredSize() {
+                final Dimension ret = super.getPreferredSize();
+                ret.height = 19;
+                return ret;
+            }
+        };
     }
 
     protected void initTooltipHandler() {

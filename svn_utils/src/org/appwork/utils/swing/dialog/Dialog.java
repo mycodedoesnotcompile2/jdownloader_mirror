@@ -620,7 +620,7 @@ public class Dialog {
                 } else if (BinaryLogic.containsSome(mask, Dialog.RETURN_CANCEL)) {
                     throw new DialogCanceledException(mask);
                 } else {
-                    DebugMode.breakIf(mask == 0, "Bad Dialog? Mask should never be 0");
+                    DebugMode.breakIf(mask == 0, "Bad Dialog? Mask should never be 0 - except it gets disposed by a disposed parent window.");
                     return ret;
                 }
             }

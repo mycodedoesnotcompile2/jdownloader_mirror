@@ -306,12 +306,12 @@ public class PostBuildRunner {
                 logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 LogV3.disableSysout();
-                System.exit(3);
+                System.exit(4);
             } else if (Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
                 logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 LogV3.disableSysout();
-                System.exit(3);
+                System.exit(5);
             }
             LogV3.disableSysout();
             System.exit(1);

@@ -412,6 +412,9 @@ public class M3U8Playlist {
                 }
             }
         }
+        if (current != null && current.size() > 0) {
+            ret.add(current);
+        }
         return ret;
     }
 

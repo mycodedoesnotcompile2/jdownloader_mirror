@@ -807,6 +807,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
         if (!this.initialized) {
             throw new IllegalStateException("Dialog has not been initialized yet. call displayDialog()");
         }
+        // This happens if you dispose a frame - which will dispose all children as well. - without settings a returnmask
         DebugMode.breakIf(getReturnmask() == 0, "YOu should set a returnmask first");
         AbstractDialog.this.stopTimer();
         new EDTRunner() {
@@ -1204,7 +1205,8 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
     }
 
     /**
-     * Return the returnbitmask
+     * Return the returnbitmask. NOTE: If a dialog returns with return mask 0, it has most likly be closed via dispose without settings a
+     * returnmask - e.g. if its parent window got disposed.
      *
      * @return
      */

@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51548 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51558 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -97,7 +97,7 @@ public class SerienStreamTo extends PluginForDecrypt {
     private DownloadLink crawlSingleRedirect(String url, final Browser br) throws PluginException, InterruptedException, DecrypterException, IOException {
         br.setFollowRedirects(false);
         /* Enforce https */
-        url = url.replaceFirst("(?i)http://", "https://");
+        url = url.replaceFirst("^(?i)http://", "https://");
         final String initialHost = Browser.getHost(url, true);
         String redirectPage = br.getPage(url);
         String finallink = null;
@@ -141,8 +141,15 @@ public class SerienStreamTo extends PluginForDecrypt {
         }
         final Set<String> dupes = new HashSet<String>();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String title = br.getRegex("<meta property=\"og:title\" content=\"(?:Episode\\s*\\d+\\s|Staffel\\s*\\d+\\s|Filme?\\s*\\d*\\s|von\\s)+([^\"]+)\"/>").getMatch(0);
+        String title = br.getRegex("<meta property=\"og:title\" content=\"(?:Episode\\s*\\d+\\s|Staffel\\s*\\d+\\s|Filme?\\s*\\d*\\s|von\\s)+([^\"]+)\"/>").getMatch(0);
         final String itemSlug = new Regex(br.getURL(), "https?://[^/]+/[^/]+/[^/]+/(.*)").getMatch(0);
+        if (title == null && itemSlug != null) {
+            logger.warning("Failed to find title -> Using fallback: " + itemSlug);
+            title = itemSlug.replace("-", " ").replace("/", "").trim();
+        }
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+        }
         // If we're on a show site, add the seasons, if we're on a season page, add the episodes and so on ...
         final String[][] itemLinks = br.getRegex("href=\"([^\"]+" + Pattern.quote(itemSlug) + "/[^\"]+)\"").getMatches();
         /* Videos are on external sites (not in embeds), so harvest those if we can get our hands on them. */
@@ -160,6 +167,7 @@ public class SerienStreamTo extends PluginForDecrypt {
         }
         if (episodeHTMLs != null && episodeHTMLs.length > 0) {
             final Set<String> userLanguageIDsPrioList = new LinkedHashSet<String>();
+            final Set<String> userLanguageIDsPrioListGreedy = new LinkedHashSet<String>();
             final Set<String> userHosterPrioList = new LinkedHashSet<String>();
             /* Collect language name -> ID mapping if needed */
             final String userLanguagePrioListStr = PluginJsonConfig.get(SerienStreamToConfig.class).getLanguagePriorityString();
@@ -179,17 +187,38 @@ public class SerienStreamTo extends PluginForDecrypt {
                 }
                 for (final String userPreferredLanguageTitle : userAllowedLanguageTitles) {
                     final String userPreferredLanguageTitleMatcher[] = userPreferredLanguageTitle.split("\\s+");
-                    for (String[] languageTitleIDMapping : languageTitleIDMappings) {
+                    for (final String[] languageTitleIDMapping : languageTitleIDMappings) {
                         final String language_id = languageTitleIDMapping[0];
-                        final String language_title = languageTitleIDMapping[1];
-                        // final boolean contains_subtitle = StringUtils.containsIgnoreCase(language_title, "Untertitel");
-                        for (String userPreferredLanguageTitleMatch : userPreferredLanguageTitleMatcher) {
-                            if (StringUtils.containsIgnoreCase(language_title, userPreferredLanguageTitleMatch)) {
+                        final String language_title_text = languageTitleIDMapping[1];
+                        // final boolean contains_subtitle = StringUtils.containsIgnoreCase(language_title_text, "Untertitel");
+                        final String[] language_titles = language_title_text.split("/"); // Covers strings like "Deutsch/German"
+                        userPreferredLanguageTitleMatcherLoop: for (final String userPreferredLanguageTitleMatch : userPreferredLanguageTitleMatcher) {
+                            if (language_titles != null && language_titles.length > 1) {
+                                for (final String language_title : language_titles) {
+                                    if (StringUtils.equalsIgnoreCase(language_title, userPreferredLanguageTitleMatch)) {
+                                        /* Precise match */
+                                        userLanguageIDsPrioList.add(language_id);
+                                        logger.info("Found precise language match: " + language_title);
+                                        break userPreferredLanguageTitleMatcherLoop;
+                                    }
+                                }
+                            }
+                            if (StringUtils.equalsIgnoreCase(language_title_text, userPreferredLanguageTitleMatch)) {
+                                /* Precise match */
+                                logger.info("Found precise language match: " + language_title_text);
                                 userLanguageIDsPrioList.add(language_id);
-                                break;
+                                break userPreferredLanguageTitleMatcherLoop;
+                            }
+                            if (StringUtils.containsIgnoreCase(language_title_text, userPreferredLanguageTitleMatch)) {
+                                userLanguageIDsPrioListGreedy.add(language_id);
+                                break userPreferredLanguageTitleMatcherLoop;
                             }
                         }
                     }
+                }
+                if (userLanguageIDsPrioList.size() == 0 && userLanguageIDsPrioListGreedy.size() > 0) {
+                    logger.info("Failed to find precise language matches -> Fallback to greedy list: " + userLanguageIDsPrioListGreedy);
+                    userLanguageIDsPrioList.addAll(userLanguageIDsPrioListGreedy);
                 }
                 logger.info("Found " + userLanguageIDsPrioList.size() + " user preferred languages --> " + userLanguageIDsPrioList);
             }
@@ -308,7 +337,7 @@ public class SerienStreamTo extends PluginForDecrypt {
             final FilePackage filePackage;
             if (title != null) {
                 filePackage = FilePackage.getInstance();
-                filePackage.setName(Encoding.htmlDecode(title).trim());
+                filePackage.setName(title);
                 filePackage.setAllowMerge(true);
             } else {
                 filePackage = null;

@@ -219,6 +219,14 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
             return aborted || wasCollecting;
         }
 
+        @Override
+        public boolean isDoDuplicateFinderFinalCheck() {
+            if (!linkCollector.isDupeManagerEnabled()) {
+                return false;
+            }
+            return super.isDoDuplicateFinderFinalCheck();
+        }
+
         protected JobLinkCrawler(final LinkCollector linkCollector, final LinkCollectingJob job) {
             this.job = job;
             this.linkCollector = linkCollector;
@@ -268,7 +276,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
 
         @Override
         protected void enqueueFinalCrawledLink(final LinkCrawlerGeneration generation, final CrawledLink link) {
-            if (linkCollector.isDupeManagerEnabled) {
+            if (linkCollector.isDupeManagerEnabled()) {
                 final LinkCrawlerTask task;
                 if ((task = checkStartNotify(generation, "enqueueFinalCrawledLink")) != null) {
                     linkCollector.getQueue().add(new QueueAction<Boolean, RuntimeException>() {
@@ -1467,9 +1475,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
 
     /*
      * converts a CrawledPackage into a FilePackage
-     * 
+     *
      * if plinks is not set, then the original children of the CrawledPackage will get added to the FilePackage
-     * 
+     *
      * if plinks is set, then only plinks will get added to the FilePackage
      */
     private FilePackage createFilePackage(final CrawledPackage pkg, List<CrawledLink> plinks) {
@@ -3431,8 +3439,12 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         return true;
     }
 
+    public boolean isDupeManagerEnabled() {
+        return isDupeManagerEnabled;
+    }
+
     private CrawledLink putCrawledLinkByLinkID(final String linkID, final CrawledLink link) {
-        if (!isDupeManagerEnabled) {
+        if (!isDupeManagerEnabled()) {
             return null;
         }
         final WeakReference<CrawledLink> item = dupeCheckMap.put(linkID, new WeakReference<CrawledLink>(link));

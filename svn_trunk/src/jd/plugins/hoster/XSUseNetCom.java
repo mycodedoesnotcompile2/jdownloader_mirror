@@ -24,16 +24,17 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "xsusenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51558 $", interfaceVersion = 3, names = { "xsusenet.com" }, urls = { "" })
 public class XSUseNetCom extends UseNet {
+    /** 2025-09-24: TODO: Change this to easyusenet.com, see: https://board.jdownloader.org/showthread.php?t=97899 */
     public XSUseNetCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.xsusenet.com/sign-up/");
+        this.enablePremium("https://www." + getHost() + "/sign-up/");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.xsusenet.com/terms-of-service/";
+        return "https://www." + getHost() + "/terms-of-service/";
     }
 
     public static interface XSUseNetComConfigInterface extends UsenetAccountConfigInterface {
@@ -153,7 +154,7 @@ public class XSUseNetCom extends UseNet {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             br.getPage(subscriptionInfoURL + "&widget=logindetails");
-            final String username = br.getRegex(">Username</td>\\s*<td>([^<]*)<").getMatch(0);
+            final String username = br.getRegex(">\\s*Username\\s*</td>\\s*<td>([^<]*)<").getMatch(0);
             final String password = br.getRegex("id=\"showpassword\">([^<]+)</span>").getMatch(0);
             if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find UseNet login credentials");

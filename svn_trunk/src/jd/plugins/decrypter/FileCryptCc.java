@@ -64,7 +64,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51553 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51559 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -72,6 +72,7 @@ public class FileCryptCc extends PluginForDecrypt {
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
+        /* Limit to 1 to avoid getting IP-banned by filecrypt or filecrypt forcing user to always enter CutCaptcha captchas. */
         return 1;
     }
 
@@ -109,7 +110,7 @@ public class FileCryptCc extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/Container/([A-Z0-9]{10,16})(\\.html\\?mirror=\\d+)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/Container/([A-Z0-9]{10,16})(\\.html)?(\\?mirror=\\d+)?");
         }
         return ret.toArray(new String[0]);
     }
@@ -128,13 +129,14 @@ public class FileCryptCc extends PluginForDecrypt {
         final FileCryptConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         String contenturl = URLHelper.getUrlWithoutParams(param.getCryptedUrl());
         if (!StringUtils.endsWithCaseInsensitive(contenturl, ".html")) {
-            /* Fix url */
+            /* Fix url in case user added URL without .html ending. */
             contenturl += ".html";
         }
         final String contenturl_without_params = contenturl;
         final String folderID = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         String mirrorIdFromAddedURL = UrlQuery.parse(param.getCryptedUrl()).get("mirror");
-        if (!mirrorIdFromAddedURL.matches("\\d+")) {
+        if (mirrorIdFromAddedURL != null && !mirrorIdFromAddedURL.matches("\\d+")) {
+            /* This should never happen */
             logger.info("User added URL with invalid mirror_id value (not a number) -> " + mirrorIdFromAddedURL);
             mirrorIdFromAddedURL = null;
         }
@@ -164,6 +166,8 @@ public class FileCryptCc extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             logger.info("Workaround successful -> mirror_id from added url does not exist: " + mirrorIdFromAddedURL);
+            /* Nullify so later checks ignore this mirror_id as if it never existed */
+            mirrorIdFromAddedURL = null;
         }
         /* Crawl mirrors */
         FilePackage fp = null;

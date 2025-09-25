@@ -108,9 +108,9 @@ public class WindowsWindowManager extends WindowManager {
             } else {
                 throw new IOException("Reg add execution failed");
             }
-        } catch (final UnsupportedEncodingException e) {            
+        } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
-        } catch (final IOException e) {            
+        } catch (final IOException e) {
             e.printStackTrace();
         }
     }
@@ -142,11 +142,14 @@ public class WindowsWindowManager extends WindowManager {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.swing.WindowManager#toFront(java.awt.Window)
      */
     @Override
     public void setZState(final Window w, final FrameState state) {
+        if (w == null) {
+            return;
+        }
         switch (state) {
         case OS_DEFAULT:
             // do nothing
@@ -334,7 +337,7 @@ public class WindowsWindowManager extends WindowManager {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.swing.WindowManager#setVisible(java.awt.Window, boolean, boolean, boolean)
      */
     @Override
@@ -448,6 +451,9 @@ public class WindowsWindowManager extends WindowManager {
     }
 
     protected WindowResetListener findListener(final Window w) {
+        if (w == null) {
+            return null;
+        }
         WindowResetListener hasListener = null;
         for (final WindowListener wl : w.getWindowListeners()) {
             if (wl != null && wl instanceof WindowResetListener) {
@@ -464,12 +470,12 @@ public class WindowsWindowManager extends WindowManager {
         }
         w.addWindowFocusListener(new WindowFocusListener() {
             @Override
-            public void windowLostFocus(final WindowEvent windowevent) {                
+            public void windowLostFocus(final WindowEvent windowevent) {
                 log(windowevent);
             }
 
             @Override
-            public void windowGainedFocus(final WindowEvent windowevent) {                
+            public void windowGainedFocus(final WindowEvent windowevent) {
                 log(windowevent);
             }
         });
@@ -580,25 +586,25 @@ public class WindowsWindowManager extends WindowManager {
         /* 389 */switch (id) {
         /* 391 */case 200: /* 391 */
             return "WINDOW_OPENED";
-            /* 394 */case 201: /* 394 */
+        /* 394 */case 201: /* 394 */
             return "WINDOW_CLOSING";
-            /* 397 */case 202: /* 397 */
+        /* 397 */case 202: /* 397 */
             return "WINDOW_CLOSED";
-            /* 400 */case 203: /* 400 */
+        /* 400 */case 203: /* 400 */
             return "WINDOW_ICONIFIED";
-            /* 403 */case 204: /* 403 */
+        /* 403 */case 204: /* 403 */
             return "WINDOW_DEICONIFIED";
-            /* 406 */case 205: /* 406 */
+        /* 406 */case 205: /* 406 */
             return "WINDOW_ACTIVATED";
-            /* 409 */case 206: /* 409 */
+        /* 409 */case 206: /* 409 */
             return "WINDOW_DEACTIVATED";
-            /* 412 */case 207: /* 412 */
+        /* 412 */case 207: /* 412 */
             return "WINDOW_GAINED_FOCUS";
-            /* 415 */case 208: /* 415 */
+        /* 415 */case 208: /* 415 */
             return "WINDOW_LOST_FOCUS";
-            /* 418 */case 209: /* 418 */
+        /* 418 */case 209: /* 418 */
             return "WINDOW_STATE_CHANGED";
-            /* 421 */default:/* 421 */
+        /* 421 */default:/* 421 */
             return "unknown type";
         }
     }

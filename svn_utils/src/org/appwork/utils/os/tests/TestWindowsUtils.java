@@ -43,6 +43,7 @@ import org.appwork.processes.ProcessInfo;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Time;
+import org.appwork.utils.Timeout;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
 
@@ -137,8 +138,22 @@ public class TestWindowsUtils extends AWTest {
         logInfoAnyway("The TestWindowUtils Test will now try to start cmd.exe via UAC");
         // Test startElevatedProcess
         long started = Time.now();
-        INT_PTR processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "heise.de" }, null, false);
+        Timeout timeout = new Timeout(60 * 60000l);
+        INT_PTR processHandle = null;
+        while (true) {
+            try {
+                processHandle = WindowsUtils.startElevatedProcess(new String[] { "cmd.exe", "/c", "ping", "-n", "100", "heise.de" }, null, false);
+                break;
+            } catch (com.sun.jna.platform.win32.Win32Exception e) {
+                if (timeout.isAlive() && 1223 == e.getErrorCode()) {
+                    continue;
+                } else {
+                    logInfoAnyway("ErrorCode: " + e.getErrorCode());
 
+                    throw e;
+                }
+            }
+        }
         assertNotNull(processHandle);
         assertTrue(Time.now() - started > 1000);
         // Test getProcessId

@@ -476,7 +476,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
                         ReflectionUtils.invoke("javax.swing.PopupFactory", "setPopupType", popupFactory, void.class, ToolTipController.MEDIUM_WEIGHT_POPUP);
                     } catch (final InvocationTargetException exception) {
 
-                        LogV3.log(exception);
+                        LogV3.info("Failed to call javax.swing.PopupFactory.setPopupType via Reflection");
                         setPopupType = false;
                     }
                 }

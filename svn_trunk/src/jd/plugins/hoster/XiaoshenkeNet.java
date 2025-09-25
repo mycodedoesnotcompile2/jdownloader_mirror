@@ -22,7 +22,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
-import jd.http.URLConnectionAdapter;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47473 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51559 $", interfaceVersion = 3, names = {}, urls = {})
 public class XiaoshenkeNet extends PluginForHost {
     public XiaoshenkeNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,11 +43,10 @@ public class XiaoshenkeNet extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
-    public static final String   PROPERTY_TITLE    = "title";
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
+    public static final String   PROPERTY_TITLE = "title";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -75,7 +74,7 @@ public class XiaoshenkeNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://xiaoshenke.net/";
+        return "https://" + getHost();
     }
 
     @Override
@@ -88,6 +87,12 @@ public class XiaoshenkeNet extends PluginForHost {
         }
     }
 
+    @Override
+    public void clean() {
+        dllink = null;
+        super.clean();
+    }
+
     private String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
@@ -95,45 +100,45 @@ public class XiaoshenkeNet extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         /* No title given in html code --> Use title set by crawler if existent. */
+        final String extDefault = ".mp4";
         if (link.hasProperty(PROPERTY_TITLE)) {
-            link.setFinalFileName(link.getStringProperty(PROPERTY_TITLE) + ".mp4");
+            link.setFinalFileName(link.getStringProperty(PROPERTY_TITLE) + extDefault);
         } else if (!link.isNameSet()) {
-            link.setName(this.getFID(link) + ".mp4");
+            link.setName(this.getFID(link) + extDefault);
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Oops\\! This video has been deleted")) {
+        } else if (br.containsHTML(">\\s*Oops\\! This video has been deleted")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String[] qualities = br.getRegex("(//[^\"]+/\\d+\\.mp4)").getColumn(0);
-        int bestQualityHeight = 0;
-        for (final String quality : qualities) {
-            final int height = Integer.parseInt(new Regex(quality, "(\\d+)\\.mp4$").getMatch(0));
-            if (height > bestQualityHeight) {
-                bestQualityHeight = height;
-                dllink = quality;
-            }
+        String id = br.getRegex("var\\s*id\\s*=\\s*\"([^\"]*)\"").getMatch(0);
+        if (id == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (!StringUtils.isEmpty(dllink)) {
-            URLConnectionAdapter con = null;
-            try {
-                con = br.openHeadConnection(this.dllink);
-                if (!this.looksLikeDownloadableContent(con)) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video broken?");
-                } else {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (final Throwable e) {
-                }
-            }
+        final String qualityString = br.getRegex("var\\s*quality\\s*=\\s*parseInt\\(\"(\\d+)").getMatch(0);
+        if (qualityString == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        id = new StringBuilder(id).reverse().toString();
+        final int quality = Integer.parseInt(qualityString);
+        if ((quality & 8) != 0) {
+            dllink = "https://xiaoshenke.net/vid/" + id + "/1080";
+        } else if ((quality & 4) != 0) {
+            dllink = "https://xiaoshenke.net/vid/" + id + "/720";
+        } else if ((quality & 2) != 0) {
+            dllink = "https://xiaoshenke.net/vid/" + id + "/480";
+        } else if ((quality & 1) != 0) {
+            dllink = "https://xiaoshenke.net/vid/" + id + "/360";
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (!PluginEnvironment.getPluginEnvironment().equals(PluginEnvironment.DOWNLOAD) && !link.isSizeSet() && !StringUtils.isEmpty(dllink)) {
+            final Browser brc = br.cloneBrowser();
+            brc.setFollowRedirects(true);
+            basicLinkCheck(brc, brc.createHeadRequest(dllink), link, null, null);
         }
         return AvailableStatus.TRUE;
     }
@@ -145,22 +150,13 @@ public class XiaoshenkeNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error");
-            }
-        }
+        handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -38,7 +38,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51548 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51559 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidcloudStreameeeeee extends PluginForDecrypt {
     public VidcloudStreameeeeee(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,16 +118,6 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
         final String content_id = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         br.getPage("/embed-1/v3/e-1/getSources?id=" + content_id + "&_k=" + key);
-        final FilePackage fp = FilePackage.getInstance();
-        if (title != null) {
-            fp.setName(title);
-        }
-        if (referer != null) {
-            /* Allow for auto merge with other mirrors */
-            fp.setPackageKey(referer);
-        } else {
-            fp.setPackageKey(this.getHost() + "://" + content_id);
-        }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final List<Map<String, Object>> sources = (List<Map<String, Object>>) entries.get("sources");
         final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) entries.get("tracks");
@@ -136,7 +126,7 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
             logger.warning("Content is encrypted -> Ignoring video content");
             /* Continue and possible crawl subtitle */
             if (subtitles.isEmpty()) {
-                /* Nothing there for us to crawl. */
+                /* Video is encrypted and no subtitles there for us to crawl. */
                 throw new DecrypterRetryException(RetryReason.UNSUPPORTED_DRM);
             }
         } else {
@@ -149,13 +139,15 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
                 if (title != null) {
                     video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
                 }
-                video.setReferrerUrl(referer);
+                /* Without correct referer, mirror "UpCloud" which has internal server_id "29"will fail with Cloudflare error. */
+                video.setReferrerUrl("https://streameeeeee.site/");
                 ret.add(video);
             }
         }
         for (final Map<String, Object> subtitle : subtitles) {
             final String kind = subtitle.get("kind").toString();
             if (!"captions".equalsIgnoreCase(kind)) {
+                logger.info("Skipping unsupported subtitle type: " + kind);
                 continue;
             }
             final String url = subtitle.get("file").toString();
@@ -163,6 +155,16 @@ public class VidcloudStreameeeeee extends PluginForDecrypt {
             /* Skip linkcheck */
             sub.setAvailable(true);
             ret.add(sub);
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            fp.setName(title);
+        }
+        if (referer != null) {
+            /* Allow for auto merge with other mirrors */
+            fp.setPackageKey(referer);
+        } else {
+            fp.setPackageKey(this.getHost() + "://" + content_id);
         }
         fp.addLinks(ret);
         return ret;

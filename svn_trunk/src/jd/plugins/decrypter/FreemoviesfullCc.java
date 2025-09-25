@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51550 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51559 $", interfaceVersion = 3, names = {}, urls = {})
 public class FreemoviesfullCc extends PluginForDecrypt {
     public FreemoviesfullCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,6 +83,7 @@ public class FreemoviesfullCc extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String contenturl_after_browser_call = br.getURL();
         final String episode_id = br.getRegex("data-episode=\"(\\d+)").getMatch(0);
         if (episode_id == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -129,7 +130,7 @@ public class FreemoviesfullCc extends PluginForDecrypt {
             final DownloadLink link = this.createDownloadlink(url);
             link._setFilePackage(fp);
             /* Set extra information important for VidcloudStreameeeeee crawler. */
-            link.setReferrerUrl(br.getURL());
+            link.setReferrerUrl(contenturl_after_browser_call);
             link.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, fp.getName());
             ret.add(link);
             distribute(link);

@@ -81,4 +81,5 @@ public interface LogSenderTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Preparing your logs", "Logs werden vorbereitet" })
     String LogAction_getString_uploading_();
+
 }

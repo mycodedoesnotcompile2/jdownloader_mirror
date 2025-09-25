@@ -173,6 +173,7 @@ public class JNAWMIUtils {
         }
         // DebugMode.debugger();
         final ArrayList<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+
         try {
             OleAuto oleAuto = OleAuto.INSTANCE;
             Ole32 ole32 = Ole32.INSTANCE;
@@ -423,7 +424,7 @@ public class JNAWMIUtils {
                 if (WMI_ERRORS.containsKey(code)) {
                     // Known error. no reason to try the fallback
                     LogV3.info("Known Error Code: " + code);
-                    throw WMIException.wrap(org);
+                    throw WMIException.wrap(org, "query:" + query + ";namespace:" + namespace);
                 }
             }
             LogV3.log(org);
@@ -435,7 +436,7 @@ public class JNAWMIUtils {
             } catch (WMIException e1) {
                 LogV3.log(e1);
             }
-            throw WMIException.wrap(org);
+            throw WMIException.wrap(org, "query:" + query + ";namespace:" + namespace);
         }
     }
 
@@ -474,7 +475,7 @@ public class JNAWMIUtils {
                 return ret;
             }
         } catch (IOException e) {
-            throw WMIException.wrap(e);
+            throw WMIException.wrap(e, "query:" + query + ";namespace:" + namespace);
         }
     }
 
