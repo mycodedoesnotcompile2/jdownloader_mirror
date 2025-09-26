@@ -16,10 +16,13 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -29,15 +32,22 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48043 $", interfaceVersion = 3, names = { "yapfiles.ru" }, urls = { "http://(?:www\\.)?yapfiles\\.ru/(?:show|files)/\\d+/[a-f0-9]{32}\\.(?:mp4|flv)" })
+@HostPlugin(revision = "$Revision: 51564 $", interfaceVersion = 3, names = {}, urls = {})
 public class YapfilesRu extends PluginForHost {
     public YapfilesRu(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
     public void correctDownloadLink(final DownloadLink link) {
         final String important_part = getLinkpart(link);
-        final String url_corrected = "http://www.yapfiles.ru/show" + important_part + ".html";
+        final String url_corrected = "https://www." + getHost() + "/show" + important_part + ".html";
         link.setUrlDownload(url_corrected);
         link.setContentUrl(url_corrected);
     }
@@ -47,26 +57,63 @@ public class YapfilesRu extends PluginForHost {
     // other:
 
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
-    private boolean              server_issues     = false;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "yapfiles.ru", "yapfiles.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:show|files)/(\\d+)/([a-f0-9]{32}\\.(?:mp4|flv))(\\.html)?");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
 
     @Override
     public String getAGBLink() {
-        return "http://www.yapfiles.ru/help/agreement/";
+        return "https://www." + getHost() + "/help/agreement/";
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         dllink = null;
-        server_issues = false;
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getPage(link.getDownloadURL() + "?hq=1&adlt=1");
-        if (br.getHttpConnection().getResponseCode() == 404 || this.br.containsHTML("/404\\.gif\"")) {
+        br.getPage(link.getPluginPatternMatcher() + "?hq=1&adlt=1");
+        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("/404\\.gif\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String linkpart = getLinkpart(link);
@@ -76,59 +123,45 @@ public class YapfilesRu extends PluginForHost {
             filename = br.getRegex("property=\"og:title\" content=\"([^<>\"]+)\"").getMatch(0);
         }
         if (filename == null) {
+            /* Fallback */
             filename = url_filename;
         }
-        String token = br.getRegex("token=(.*?)(\"|&)").getMatch(0);
+        String filesize = br.getRegex("размер:\\s*([0-9]+(\\.[0-9]{1,2})? [^<]+)").getMatch(0);
+        String token = br.getRegex("token=([^\"&]+)(\"|&)").getMatch(0);
         if (token == null) {
             token = "";
         } else {
             token = "&token=" + token;
         }
-        dllink = "http://www.yapfiles.ru/files" + getLinkpart(link) + "?hq=1" + token;
-        if (filename == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
+        dllink = "/files" + getLinkpart(link) + "?hq=1" + token;
         dllink = Encoding.htmlDecode(dllink);
-        filename = Encoding.htmlDecode(filename);
-        filename = filename.trim();
-        final String ext = getFileNameExtensionFromString(dllink, ".mp4");
-        if (!filename.endsWith(ext)) {
-            filename += ext;
+        if (filename != null) {
+            filename = Encoding.htmlDecode(filename);
+            filename = filename.trim();
+            final String ext = getFileNameExtensionFromString(dllink, ".mp4");
+            if (!filename.endsWith(ext)) {
+                filename += ext;
+            }
+            link.setFinalFileName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
-        link.setFinalFileName(filename);
-        final Browser br2 = br.cloneBrowser();
-        // In case the link redirects to the finallink
-        br2.setFollowRedirects(true);
-        URLConnectionAdapter con = null;
-        try {
-            con = br2.openHeadConnection(dllink);
-            if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (!con.getContentType().contains("html")) {
-                link.setDownloadSize(con.getLongContentLength());
-                link.setProperty("directlink", dllink);
-            } else {
-                server_issues = true;
-            }
-            return AvailableStatus.TRUE;
-        } finally {
-            try {
-                con.disconnect();
-            } catch (final Throwable e) {
-            }
+        if (filesize != null) {
+            filesize = filesize.replace("Гб", "GB").replaceAll("(МБ|Мб)", "MB").replace("Кб", "kb");
+            link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
+        return AvailableStatus.TRUE;
     }
 
     @Override
-    public void handleFree(final DownloadLink downloadLink) throws Exception {
-        requestFileInformation(downloadLink);
-        if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
-        } else if (dllink == null) {
+    public void handleFree(final DownloadLink link) throws Exception {
+        requestFileInformation(link);
+        if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, downloadLink, dllink, free_resume, free_maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {
@@ -144,11 +177,11 @@ public class YapfilesRu extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     private String getLinkpart(final DownloadLink link) {
-        return new Regex(link.getDownloadURL(), "(/\\d+/[a-f0-9]{32}\\.(?:mp4|flv))").getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), "(/\\d+/[a-f0-9]{32}\\.(?:mp4|flv))").getMatch(0);
     }
 
     @Override

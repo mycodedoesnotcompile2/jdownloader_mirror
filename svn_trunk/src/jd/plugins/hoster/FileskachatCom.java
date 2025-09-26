@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47664 $", interfaceVersion = 3, names = { "fileskachat.com" }, urls = { "https?://(?:www\\.)?fileskachat\\.com/file/\\d+_[A-Fa-f0-9]{32}\\.html" })
+@HostPlugin(revision = "$Revision: 51564 $", interfaceVersion = 3, names = { "fileskachat.com" }, urls = { "https?://(?:www\\.)?fileskachat\\.com/file/\\d+_[A-Fa-f0-9]{32}\\.html" })
 public class FileskachatCom extends PluginForHost {
     public FileskachatCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,13 +42,12 @@ public class FileskachatCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://fileskachat.com/contact.html";
+        return "https://" + getHost() + "/contact.html";
     }
 
     /* Connection stuff */
-    private final boolean FREE_RESUME       = true;
-    private final int     FREE_MAXCHUNKS    = 0;
-    private final int     FREE_MAXDOWNLOADS = 20;
+    private final boolean FREE_RESUME    = true;
+    private final int     FREE_MAXCHUNKS = 0;
 
     // private final boolean ACCOUNT_FREE_RESUME = true;
     // private final int ACCOUNT_FREE_MAXCHUNKS = 0;
@@ -130,7 +129,7 @@ public class FileskachatCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -2463,9 +2463,9 @@ public class YoutubeHelper {
         }
         handleRentalVideos();
         html5PlayerJs = getHtml5PlayerJs();
-        if (html5PlayerJs != null && html5PlayerJs.contains("/2b83d2e0/")) {
+        if (html5PlayerJs != null) {
             // last known working player
-            html5PlayerJs = html5PlayerJs.replace("/2b83d2e0/", "/0004de42/");
+            html5PlayerJs = html5PlayerJs.replaceFirst("/player/[^/]+/", "/player/0004de42/");
         }
         final Map<String, Object> map = getYtInitialPlayerResponse();
         fmtMaps = new LinkedHashSet<StreamMap>();

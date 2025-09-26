@@ -50,7 +50,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@DecrypterPlugin(revision = "$Revision: 51444 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
+@DecrypterPlugin(revision = "$Revision: 51571 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
 public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -81,6 +81,7 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                     br.setCookies(host, Cookies.parseCookies(cookiesString, host, null));
                 }
                 preSetTitle = downloadLink.getStringProperty(GenericM3u8.PRESET_NAME_PROPERTY);
+                refererURL = downloadLink.getReferrerUrl();
             }
             if (!StringUtils.equals(source.getURL(), param.getCryptedUrl())) {
                 if (source instanceof BrowserCrawledLink) {
@@ -88,7 +89,8 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                     refererURL = source.getURL();
                     br = bcl.cloneBrowser();
                     logger.info("Reuse BrowserCrawledLink browser: " + br.getURL());
-                } else if (source.getCryptedLink() != null) {
+                } else if (source.getCryptedLink() != null && refererURL == null) {
+                    /* TODO: Maybe don't access URL here and just set referer header down below */
                     try {
                         refererURL = source.getURL();
                         br.getPage(source.getURL());
@@ -119,18 +121,20 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
             }
             if (ref != null) {
                 try {
-                    br.getPage(ref);
                     refererURL = ref;
+                    br.getPage(ref);
                     logger.info("Actually used referer: " + ref);
                 } catch (final IOException ignore) {
                     logger.log(ignore);
-                    logger.info("Given referer is invalid: " + ref);
                 }
             }
         }
         br.setFollowRedirects(true);
         final String m3u8 = param.getCryptedUrl().replaceFirst("(?i)^m3u8://", "");
         final GetRequest get = br.createGetRequest(m3u8);
+        if (refererURL != null) {
+            get.getHeaders().put("Referer", refererURL);
+        }
         br.getPage(get);
         if (br.getHttpConnection() == null || br.getHttpConnection().getResponseCode() == 403 || br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

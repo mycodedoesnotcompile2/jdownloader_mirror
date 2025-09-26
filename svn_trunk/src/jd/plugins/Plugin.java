@@ -598,7 +598,7 @@ public abstract class Plugin implements ActionListener {
         }
     }
 
-    public String correctOrApplyFileNameExtension(final String filenameOrg, String newExtension, URLConnectionAdapter connection) {
+    public String correctOrApplyFileNameExtension(final String filenameArg, String newExtension, URLConnectionAdapter connection) {
         final String newExtensionParam = newExtension;
         if (connection != null) {
             final String extensionFromConnection = getExtensionFromConnection(connection);
@@ -606,55 +606,69 @@ public abstract class Plugin implements ActionListener {
                 newExtension = extensionFromConnection;
             }
         }
-        if (filenameOrg == null) {
+        if (filenameArg == null) {
             return null;
         } else if (StringUtils.isEmpty(newExtension)) {
-            return filenameOrg;
+            return filenameArg;
         } else if (!newExtension.startsWith(".")) {
             newExtension = "." + newExtension;
         }
         if (!StringUtils.equalsIgnoreCase(newExtensionParam, newExtension)) {
             // call again with newExtension set
-            return correctOrApplyFileNameExtension(filenameOrg, newExtension, connection);
+            return correctOrApplyFileNameExtension(filenameArg, newExtension, connection);
+        }
+        if (StringUtils.endsWithCaseInsensitive(filenameArg, newExtension)) {
+            /* Filename already ends with target-extension. */
+            return filenameArg;
         }
         final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
-        if (!filenameOrg.contains(".")) {
+        /* Fix ugly filenames that e.-g. end with " mp4" */
+        String filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(newExtension.replace(".", "")) + "$", "").trim();
+        if (filename.equals(filenameArg) && filetypeNew != null) {
+            for (int length = 4; length >= 1; length--) {
+                final String maybeExtension = new Regex(filename, "[^\\.]([a-zA-Z0-9]{" + length + "})$").getMatch(0);
+                final CompiledFiletypeExtension maybeExtensionFileType = CompiledFiletypeFilter.getExtensionsFilterInterface(maybeExtension);
+                if (maybeExtensionFileType != null && filetypeNew.isSameExtensionGroup(maybeExtensionFileType)) {
+                    // remove extension(without leading dot) of same ExtensionGroup as newExtension
+                    filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(maybeExtension) + "$", "").trim();
+                    break;
+                }
+            }
+        }
+        if (!filename.contains(".")) {
             /* Filename doesn't contain an extension at all -> Add extension to filename. */
-            if (allowFileNameExtension(filenameOrg, null, filetypeNew)) {
-                return filenameOrg + newExtension;
+            if (allowFileNameExtension(filename, null, filetypeNew)) {
+                return filename + newExtension;
             } else {
                 logger.info("blocked new extension:" + newExtension + "|" + filetypeNew);
-                return filenameOrg;
+                return filename;
             }
-        } else if (StringUtils.endsWithCaseInsensitive(filenameOrg, newExtension)) {
-            /* Filename already ends with target-extension. */
-            return filenameOrg;
         } else if (filetypeNew == null) {
             /* Unknown new filetype -> Do not touch given filename */
             logger.info("unknown new extension:" + newExtension);
-            return filenameOrg;
+            return filename;
         }
-        final int lastIndex = filenameOrg.lastIndexOf(".");
-        final String currentFileExtension = lastIndex < filenameOrg.length() ? filenameOrg.substring(lastIndex) : null;
+        final int lastIndex = filename.lastIndexOf(".");
+        final String currentFileExtension = lastIndex < filename.length() ? filename.substring(lastIndex) : null;
         if (StringUtils.isEmpty(currentFileExtension)) {
-            return filenameOrg;
+            return filename;
         }
         final CompiledFiletypeExtension filetypeOld = CompiledFiletypeFilter.getExtensionsFilterInterface(currentFileExtension);
         if (filetypeOld == null) {
-            if (allowFileNameExtension(filenameOrg, filetypeOld, filetypeNew)) {
-                return filenameOrg + newExtension;
+            if (allowFileNameExtension(filename, filetypeOld, filetypeNew)) {
+                return filename + newExtension;
             } else {
                 logger.info("blocked new extension:" + newExtension + "|" + filetypeNew);
-                return filenameOrg;
+                return filename;
             }
         } else if (filetypeNew.isValidExtension(currentFileExtension)) {
             /* Filename already contains valid/alternative target-extension e.g. webm/mp4 or jpg/jpeg */
-            return filenameOrg;
-        } else if (allowFileNameExtension(filenameOrg, filetypeOld, filetypeNew)) {
-            final String filenameWithoutExtension = filenameOrg.substring(0, lastIndex);
+            return filename;
+        } else if (allowFileNameExtension(filename, filetypeOld, filetypeNew)) {
+            final String filenameWithoutExtension = filename.substring(0, lastIndex);
             return filenameWithoutExtension + newExtension;
         } else {
-            return filenameOrg;
+            return filename;
         }
     }
 
@@ -679,41 +693,56 @@ public abstract class Plugin implements ActionListener {
      * Do not use this to replace a file extension with another one if you clearly know what to replace with what because this will auto
      * decide whether to replace or append the new extension!
      */
-    public String applyFilenameExtension(final String filenameOrg, String newExtension) {
-        if (filenameOrg == null) {
+    public String applyFilenameExtension(final String filenameArg, String newExtension) {
+        if (filenameArg == null) {
             return null;
         } else if (StringUtils.isEmpty(newExtension)) {
-            return filenameOrg;
-        } else if (!newExtension.startsWith(".")) {
+            return filenameArg;
+        }
+        if (!newExtension.startsWith(".")) {
             newExtension = "." + newExtension;
         }
-        if (StringUtils.endsWithCaseInsensitive(filenameOrg, newExtension)) {
+        if (StringUtils.endsWithCaseInsensitive(filenameArg, newExtension)) {
             /* Filename already contains target-extension. */
-            return filenameOrg;
-        } else if (!filenameOrg.contains(".")) {
-            /* Filename has no extension at all -> Apply extension */
-            return filenameOrg + newExtension;
+            return filenameArg;
         }
-        final int lastIndex = filenameOrg.lastIndexOf(".");
-        final String currentFileExtension = lastIndex < filenameOrg.length() ? filenameOrg.substring(lastIndex) : null;
+        final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
+        /* Fix ugly filenames that e.-g. end with " mp4" */
+        String filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(newExtension.replace(".", "")) + "$", "").trim();
+        if (filename.equals(filenameArg) && filetypeNew != null) {
+            for (int length = 4; length >= 1; length--) {
+                final String maybeExtension = new Regex(filename, "[^\\.]([a-zA-Z0-9]{" + length + "})$").getMatch(0);
+                final CompiledFiletypeExtension maybeExtensionFileType = CompiledFiletypeFilter.getExtensionsFilterInterface(maybeExtension);
+                if (maybeExtensionFileType != null && filetypeNew.isSameExtensionGroup(maybeExtensionFileType)) {
+                    // remove extension(without leading dot) of same ExtensionGroup as newExtension
+                    filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(maybeExtension) + "$", "").trim();
+                    break;
+                }
+            }
+        }
+        if (!filename.contains(".")) {
+            /* Filename has no extension at all -> Apply extension */
+            return filename + newExtension;
+        }
+        final int lastIndex = filename.lastIndexOf(".");
+        final String currentFileExtension = lastIndex < filename.length() ? filename.substring(lastIndex) : null;
         final CompiledFiletypeExtension filetypeOld = CompiledFiletypeFilter.getExtensionsFilterInterface(currentFileExtension);
         if (filetypeOld == null) {
             /* We don't know the type of the current/old file extension -> No "smart handling" possible -> Apply new extension */
-            return filenameOrg + newExtension;
+            return filename + newExtension;
         }
-        final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
         if (filetypeNew != null) {
             if (filetypeNew.isValidExtension(currentFileExtension)) {
                 /* Filename already contains valid/alternative target-extension e.g. webm/mp4 or jpg/jpeg */
-                return filenameOrg;
+                return filename;
             } else if (filetypeNew.isSameExtensionGroup(filetypeOld)) {
                 /* Same filetype (e.g. old is image, new is image) -> Replace old extension with new extension e.g. .png to .jpg */
-                final String filenameWithoutExtension = filenameOrg.substring(0, lastIndex);
+                final String filenameWithoutExtension = filename.substring(0, lastIndex);
                 return filenameWithoutExtension + newExtension;
             }
         }
         /* Apply new extension */
-        return filenameOrg + newExtension;
+        return filename + newExtension;
     }
 
     protected boolean isConnectionOffline(Throwable e) {
@@ -869,7 +898,6 @@ public abstract class Plugin implements ActionListener {
                 return PluginEnvironment.UNKNOWN;
             }
         }
-
     }
 
     protected final PluginEnvironment getPluginEnvironment() {

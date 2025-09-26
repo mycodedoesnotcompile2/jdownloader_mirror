@@ -18,13 +18,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51564 $", interfaceVersion = 3, names = {}, urls = {})
-public class YogapornNet extends KernelVideoSharingComV2 {
-    public YogapornNet(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 51575 $", interfaceVersion = 3, names = {}, urls = {})
+public class KernelVideoSharingComV2NudeyogaNet extends KernelVideoSharingComV2 {
+    public KernelVideoSharingComV2NudeyogaNet(final PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -32,7 +34,7 @@ public class YogapornNet extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "yogaporn.net" });
+        ret.add(new String[] { "nudeyoga.net" });
         return ret;
     }
 
@@ -61,11 +63,28 @@ public class YogapornNet extends KernelVideoSharingComV2 {
 
     @Override
     protected boolean isOfflineWebsite(final Browser br) {
-        if (br._getURL().getPath().matches("/\\d+/?") && !br.containsHTML("/embed/\\d+")) {
-            /* e.g. link to a category: yogaporn[dot]net/2/ */
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/embed/")) {
+            /* Embed link -> Use upper code for offline detection, the special code down below will fail for embed items. */
+            return super.isOfflineWebsite(br);
+        } else if (!br.containsHTML("/embed/\\d+") && !br.containsHTML("video_id:") && !br.containsHTML("params\\['video_id'\\]")) {
+            /* e.g. https://nudeyoga.net/contact/ */
             return true;
         } else {
             return super.isOfflineWebsite(br);
+        }
+    }
+
+    @Override
+    protected String getPrivateVideoWebsiteMessage(final Browser br) {
+        if (br.containsHTML("class=\"player\"[^>]*>\\s*This video is a unique video uploaded by our users and friends")) {
+            /**
+             * Examples: <br>
+             * /naked-couple/ <br>
+             * /ballet-teacher-humiliate-young-ballerina/
+             */
+            return "This video is a private video. Only active members can watch private videos.";
+        } else {
+            return super.getPrivateVideoWebsiteMessage(br);
         }
     }
 }

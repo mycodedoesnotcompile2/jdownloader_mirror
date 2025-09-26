@@ -79,7 +79,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51501 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51573 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1423,9 +1423,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                     if (decryptedDllinkTmp == null) {
                         logger.warning("Failed to decrypt URL: " + dllinkTmp);
                         continue;
-                    } else {
-                        dllinkTmp = decryptedDllinkTmp;
                     }
+                    dllinkTmp = decryptedDllinkTmp;
                 } else if (!this.isValidDirectURL(dllinkTmp)) {
                     logger.info("Skipping invalid directurl: " + dllinkTmp);
                     continue;
@@ -1438,7 +1437,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 /* Wider attempt */
                 foundQualities = 0;
                 logger.info("Crawling crypted qualities #2");
-                final String functions[] = br.getRegex("(function/0/https?://[A-Za-z0-9\\.\\-/]+/get_file/[^<>\"]*?)(?:\\&amp|'|\")").getColumn(0);
+                final String functions[] = br.getRegex("(function/0/https?://[A-Za-z0-9\\.\\-/]+/get_file/[^<>\"']*?)(?:\\&amp|'|\")").getColumn(0);
                 if (functions != null && functions.length > 0) {
                     logger.info("Found " + functions.length + " possible crypted downloadurls");
                     for (final String cryptedDllinkTmp : functions) {
@@ -1584,7 +1583,13 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                 dllink = br.getRegex("(?:file|video)\\s*?:\\s*?(?:\"|')(http[^<>\"\\']*?\\.(?:m3u8|mp4|flv)[^<>\"]*?)(?:\"|')").getMatch(0);
             }
             if (StringUtils.isEmpty(dllink)) {
-                dllink = br.getRegex("(?:file|url):\\s*(\"|')(http[^<>\"\\']*?\\.(?:m3u8|mp4|flv)[^<>\"]*?)\\1").getMatch(1);
+                /**
+                 * Word-boundary in this regex is important! <br>
+                 * It shouldn't pickup stuff like this: <br>
+                 * preview_url: 'https://.../contents/videos_screenshots/0/123/preview.mp4.jpg' <br>
+                 * e.g. yogaporn[DOT]net /naked-yoga-nude-gymnast-svetlana/
+                 */
+                dllink = br.getRegex("\\b(?:file|video_url|url)\\b:\\s*(\"|')(http[^<>\"']*?\\.(?:m3u8|mp4|flv)[^<>\"']*?)\\1").getMatch(1);
             }
             if (StringUtils.isEmpty(dllink)) { // tryboobs.com
                 dllink = br.getRegex("<video src=\"(https?://[^<>\"]*?)\" controls").getMatch(0);
@@ -1900,9 +1905,6 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     protected boolean isValidDirectURL(final String url) {
         if (url == null) {
             return false;
-        } else if (!url.matches("(?i)^(?:https?://|/).*get_file.+\\.mp4.*")) {
-            // logger.info("Skipping invalid video URL (= doesn't match expected pattern): " + url);
-            return false;
         } else if (StringUtils.endsWithCaseInsensitive(url, "jpg/")) {
             // logger.info("Skipping invalid video URL (= picture): " + url);
             return false;
@@ -1914,6 +1916,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             /* 2020-11-04: E.g. privat-zapisi.biz! */
             // logger.info("Skipping invalid video URL (= trailer): " + url);
             return false;
+        } else if (url.matches("(?i)^(?:https?://|/).*get_file.+\\.mp4.*")) {
+            return true;
         } else if (this.canHandle(url)) {
             /* 2025-04-17: Important for embed URLs from anysex.com e.g. "/embed/121620" */
             return false;
