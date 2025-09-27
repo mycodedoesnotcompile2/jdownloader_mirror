@@ -8,11 +8,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 
-import jd.controlling.AccountController;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.MultiHostHost;
-
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
@@ -24,6 +19,12 @@ import org.jdownloader.gui.views.components.AbstractAddAction;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.MultiHostHost;
 
 public class NewRuleAction extends AbstractAddAction {
     /**
@@ -37,37 +38,37 @@ public class NewRuleAction extends AbstractAddAction {
 
     public void actionPerformed(final ActionEvent e) {
         final ArrayList<DomainInfo> list = getAvailableDomainInfoList();
-        /* Allow only one rule per hoster -> Remove items from list which a rule already exists for. */
-        final boolean allowNewRuleIfRuleForSameDomainAlreadyExists = true;
         final HosterRuleController hrc = HosterRuleController.getInstance();
-        if (!allowNewRuleIfRuleForSameDomainAlreadyExists) {
-            for (final AccountUsageRule aur : hrc.list()) {
-                list.remove(aur.getDomainInfo());
-            }
-        }
         final ChooseHosterDialog d = new ChooseHosterDialog(_GUI.T.NewRuleAction_actionPerformed_choose_hoster_message(), list.toArray(new DomainInfo[] {}));
+        final DomainInfo di;
         try {
             Dialog.getInstance().showDialog(d);
-            final DomainInfo di = d.getSelectedItem();
+            di = d.getSelectedItem();
             if (di == null) {
                 return;
             }
-            /* Add rule for selected item [unless user cancels edit dialog]. */
-            final String domain = di.getTld();
-            final AccountUsageRule rule = new AccountUsageRule(domain);
-            rule.setEnabled(true);
-            if (HosterRuleController.getInstance().validateRule(rule) && HosterRuleController.getInstance().showEditPanel(rule)) {
-                if (allowNewRuleIfRuleForSameDomainAlreadyExists) {
-                    /* Remove already existing rule(s) for same domain as we only want one rule per domain */
-                    hrc.removeRulesByDomain(domain);
-                }
-                hrc.add(rule);
-            }
         } catch (DialogClosedException e1) {
             e1.printStackTrace();
+            return;
         } catch (DialogCanceledException e1) {
             e1.printStackTrace();
+            return;
         }
+        /* Add rule for selected item [unless user cancels edit dialog]. */
+        final String domain = di.getTld();
+        final AccountUsageRule rule = new AccountUsageRule(domain);
+        rule.setEnabled(true);
+        if (!HosterRuleController.getInstance().validateRule(rule)) {
+            /* Rule is invalid -> Do not add it */
+            return;
+        }
+        if (!HosterRuleController.getInstance().showEditPanel(rule)) {
+            /* User canceled editing the new rule -> Do not add it */
+            return;
+        }
+        /* Remove already existing rule(s) for same domain as we only want one rule per domain */
+        hrc.removeRulesByDomain(domain);
+        hrc.add(rule);
     }
 
     /** Returns list of possible domains which an AccountUsageRule can be added for. */
@@ -76,10 +77,8 @@ public class NewRuleAction extends AbstractAddAction {
         /* List of all hosts supported by all multi hoster accounts the user owns */
         final List<MultiHostHost> all_mhosts = new ArrayList<MultiHostHost>();
         /* Collect domains of all multihoster accounts which the user currently has. */
-        for (final Account acc : AccountController.getInstance().list()) {
-            if (!acc.getPlugin().hasFeature(FEATURE.MULTIHOST)) {
-                continue;
-            }
+        final List<Account> multihoster_accounts = AccountController.getInstance().listAccounts(new AccountFilter().setFeature(FEATURE.MULTIHOST));
+        for (final Account acc : multihoster_accounts) {
             final AccountInfo ai = acc.getAccountInfo();
             if (ai == null) {
                 /* Multihost without any AccountInfo -> Shouldn't happen. */

@@ -32,9 +32,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
 /**
- * Plugin for 2Captcha captcha solving service (https://2captcha.com/).
+ * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 50878 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51582 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {

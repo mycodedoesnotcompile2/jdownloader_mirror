@@ -16,9 +16,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 
 public class OrderColumn extends ExtComponentColumn<PackagizerRule> {
-    /**
-     *
-     */
     private static final long serialVersionUID = 5932073061658364800L;
     private MigPanel          renderer;
     private MigPanel          editor;
@@ -108,7 +105,8 @@ public class OrderColumn extends ExtComponentColumn<PackagizerRule> {
 
     @Override
     public void configureRendererComponent(PackagizerRule value, boolean isSelected, boolean hasFocus, int row, int column) {
-        rendererLbl.setText(row + "");
+        /* Row is an index value. Add 1 so that it starts from 1 and not 0 since this is what the user will see. */
+        rendererLbl.setText(row + 1 + "");
         rendererDown.setEnabled(row != getModel().getRowCount() - 1);
         rendererUp.setEnabled(row != 0);
     }

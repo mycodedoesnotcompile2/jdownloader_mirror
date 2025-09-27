@@ -5,27 +5,28 @@ import java.util.HashSet;
 import javax.swing.Icon;
 import javax.swing.JComponent;
 
-import jd.plugins.Account;
-
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 
+import jd.plugins.Account;
+
 public class AccountServiceCollection extends ServiceCollection<Account> {
     /**
      *
      */
-    private static final long serialVersionUID   = -6958497120849521678L;
+    private static final long serialVersionUID            = -6958497120849521678L;
     private DomainInfo        domainInfo;
     private boolean           enabled;
     private HashSet<Account>  hashSet;
-    private Boolean           multi              = null;
-    private long              lastValidTimeStamp = -1;
+    private Boolean           account_type_multi          = null;
+    private Boolean           account_type_captcha_solver = null;
+    private long              lastValidTimeStamp          = -1;
     private int               invalid;
     private boolean           inuse;
-    private volatile Icon     icon               = null;
+    private volatile Icon     icon                        = null;
 
     public DomainInfo getDomainInfo() {
         return domainInfo;
@@ -56,8 +57,10 @@ public class AccountServiceCollection extends ServiceCollection<Account> {
         if (!hashSet.add(acc)) {
             return false;
         }
-        if (multi == null && acc.isMultiHost()) {
-            multi = true;
+        if (account_type_multi == null && acc.isMultiHost()) {
+            account_type_multi = acc.isMultiHost();
+        } else if (account_type_captcha_solver == null && acc.isCaptchaSolverPlugin()) {
+            account_type_captcha_solver = true;
         }
         if (acc.isEnabled()) {
             enabled = true;
@@ -77,11 +80,18 @@ public class AccountServiceCollection extends ServiceCollection<Account> {
         if (size() == 1) {
             return get(0).isMultiHost();
         }
-        return Boolean.TRUE.equals(multi);
+        return Boolean.TRUE.equals(account_type_multi);
+    }
+
+    public boolean isCaptchaSolver() {
+        if (size() == 1) {
+            return get(0).isCaptchaSolverPlugin();
+        }
+        return Boolean.TRUE.equals(account_type_captcha_solver);
     }
 
     protected void disableMulti() {
-        this.multi = false;
+        this.account_type_multi = false;
     }
 
     @Override

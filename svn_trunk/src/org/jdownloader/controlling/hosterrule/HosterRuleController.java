@@ -529,11 +529,11 @@ public class HosterRuleController implements AccountControllerListener {
     /**
      * Returns true if user confirmed edited rule. </br> Returns false if used closed or cancelled dialog.
      */
-    public boolean showEditPanel(final AccountUsageRule editing) {
-        if (editing == null) {
+    public boolean showEditPanel(final AccountUsageRule rule) {
+        if (rule == null) {
             return false;
         }
-        EditHosterRuleDialog d = new EditHosterRuleDialog(editing);
+        EditHosterRuleDialog d = new EditHosterRuleDialog(rule);
         try {
             Dialog.getInstance().showDialog(d);
             final AccountUsageRule newRule = d.getRule();
@@ -541,7 +541,7 @@ public class HosterRuleController implements AccountControllerListener {
                 @Override
                 protected Void run() throws RuntimeException {
                     if (validateRule(newRule)) {
-                        editing.set(newRule.isEnabled(), newRule.getAccounts());
+                        rule.set(newRule.isEnabled(), newRule.getAccounts());
                     }
                     return null;
                 }

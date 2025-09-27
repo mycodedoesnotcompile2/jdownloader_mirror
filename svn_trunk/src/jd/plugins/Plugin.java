@@ -624,7 +624,8 @@ public abstract class Plugin implements ActionListener {
         final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
         /* Fix ugly filenames that e.-g. end with " mp4" */
         String filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(newExtension.replace(".", "")) + "$", "").trim();
-        if (filename.equals(filenameArg) && filetypeNew != null) {
+        if (false && filename.equals(filenameArg) && filetypeNew != null) {
+            // currently disabled to avoid any side effects
             for (int length = 4; length >= 1; length--) {
                 final String maybeExtension = new Regex(filename, "[^\\.]([a-zA-Z0-9]{" + length + "})$").getMatch(0);
                 final CompiledFiletypeExtension maybeExtensionFileType = CompiledFiletypeFilter.getExtensionsFilterInterface(maybeExtension);
@@ -709,7 +710,8 @@ public abstract class Plugin implements ActionListener {
         final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
         /* Fix ugly filenames that e.-g. end with " mp4" */
         String filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(newExtension.replace(".", "")) + "$", "").trim();
-        if (filename.equals(filenameArg) && filetypeNew != null) {
+        if (false && filename.equals(filenameArg) && filetypeNew != null) {
+            // currently disabled to avoid any side effects
             for (int length = 4; length >= 1; length--) {
                 final String maybeExtension = new Regex(filename, "[^\\.]([a-zA-Z0-9]{" + length + "})$").getMatch(0);
                 final CompiledFiletypeExtension maybeExtensionFileType = CompiledFiletypeFilter.getExtensionsFilterInterface(maybeExtension);

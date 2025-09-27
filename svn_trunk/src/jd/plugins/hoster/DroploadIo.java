@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51374 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51577 $", interfaceVersion = 3, names = {}, urls = {})
 public class DroploadIo extends XFileSharingProBasic {
     public DroploadIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -163,9 +163,4 @@ public class DroploadIo extends XFileSharingProBasic {
         }
         return new Regex(url, "/([a-z0-9]{12})$").getMatch(0);
     }
-    /* Auto handling works fine thus no override is needed. */
-    // @Override
-    // protected boolean isVideohoster_enforce_video_filename() {
-    // return false;
-    // }
 }

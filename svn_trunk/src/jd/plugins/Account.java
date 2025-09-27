@@ -27,12 +27,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.config.Property;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
@@ -44,9 +38,16 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
+
+import jd.config.Property;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
 
 public class Account extends Property {
     private static final String VALID_UNTIL              = "VALID_UNTIL";
@@ -273,13 +274,14 @@ public class Account extends Property {
         }
     }
 
-    private AccountInfo                     accinfo       = null;
-    private long                            updatetime    = 0;
-    private int                             maxDownloads  = 0;
-    private transient AccountController     ac            = null;
-    private transient PluginForHost         plugin        = null;
-    private transient boolean               isMulti       = false;
-    private transient boolean               isMultiPlugin = false;
+    private AccountInfo                     accinfo               = null;
+    private long                            updatetime            = 0;
+    private int                             maxDownloads          = 0;
+    private transient AccountController     ac                    = null;
+    private transient PluginForHost         plugin                = null;
+    private transient boolean               isMulti               = false;
+    private transient boolean               isMultiPlugin         = false;
+    private transient boolean               isCaptchaSolverPlugin = false;
     private transient volatile AccountError error;
     private transient volatile String       errorString;
 
@@ -291,6 +293,7 @@ public class Account extends Property {
         this.plugin = plugin;
         if (plugin != null) {
             isMultiPlugin = plugin.isHandlingMultipleHosts();
+            isCaptchaSolverPlugin = plugin.hasFeature(FEATURE.CAPTCHA_SOLVER);
         } else {
             isMultiPlugin = false;
         }
@@ -300,10 +303,14 @@ public class Account extends Property {
         return isMultiPlugin;
     }
 
+    public boolean isCaptchaSolverPlugin() {
+        return isCaptchaSolverPlugin;
+    }
+
     /**
-     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br> Most of all services will
-     * store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account limits by changing their
-     * IP.
+     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br>
+     * Most of all services will store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account
+     * limits by changing their IP.
      */
     public void setAllowReconnectToResetLimits(final boolean b) {
         /* 2022-07-19: TODO: Dummy function, see: https://svn.jdownloader.org/issues/87351 */

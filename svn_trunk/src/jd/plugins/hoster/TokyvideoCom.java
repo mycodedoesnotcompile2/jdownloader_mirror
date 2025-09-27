@@ -37,15 +37,24 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51582 $", interfaceVersion = 3, names = {}, urls = {})
-public class YourporntubeCom extends PluginForHost {
-    public YourporntubeCom(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 51579 $", interfaceVersion = 3, names = {}, urls = {})
+public class TokyvideoCom extends PluginForHost {
+    public TokyvideoCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        /* Prefer English language */
+        br.setCookie(getHost(), "lang", "en_US");
+        return br;
+    }
+
+    @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     private String dllink = null;
@@ -62,7 +71,7 @@ public class YourporntubeCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "yourporntube.com" });
+        ret.add(new String[] { "tokyvideo.com" });
         return ret;
     }
 
@@ -79,8 +88,8 @@ public class YourporntubeCom extends PluginForHost {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_NORMAL    = Pattern.compile("/video/(\\d+)(/([a-z0-9\\-]+)/?)?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_EMBED     = Pattern.compile("/embed/([a-f0-9]{20})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_NORMAL    = Pattern.compile("/video/([\\w-]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_EMBED     = Pattern.compile("/embed/(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final String  PROPERTY_VIDEO_ID = "video_id";
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -93,7 +102,7 @@ public class YourporntubeCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www." + getHost() + "/feedback";
+        return "https://www." + getHost() + "/tos";
     }
 
     @Override
@@ -112,10 +121,6 @@ public class YourporntubeCom extends PluginForHost {
             /* Return internal video_id stored as plugin property. */
             return fid;
         }
-        fid = new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(0);
-        if (fid != null) {
-            return fid;
-        }
         fid = new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED).getMatch(0);
         return fid;
     }
@@ -131,77 +136,38 @@ public class YourporntubeCom extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/notfound/video_missing")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String urlSlug = null;
-        String title = null;
-        final Regex regex_type_normal = new Regex(br._getURL().getPath(), PATTERN_NORMAL);
-        String originalUrlFromEmbed = null;
-        if (regex_type_normal.patternFind()) {
-            urlSlug = regex_type_normal.getMatch(2);
-            dllink = this.findDirecturl(br);
-            title = findTitle(br);
-        } else {
-            /* PATTERN_EMBED */
-            final Regex original_url_info = new Regex(br.getRequest().getHtmlCode(), PATTERN_NORMAL);
-            originalUrlFromEmbed = original_url_info.getMatch(-1);
-            urlSlug = original_url_info.getMatch(2);
+        String title;
+        if (new Regex(br._getURL().getPath(), PATTERN_NORMAL).patternFind()) {
+            title = HTMLSearch.searchMetaTag(br, "og:title");
+            if (title == null) {
+                /* Fallback */
+                title = br._getURL().getPath();
+            }
             if (!link.hasProperty(PROPERTY_VIDEO_ID)) {
                 /* Find internal video_id for better duplicate matching. */
-                String video_id = br.getRegex("video_id\\s*=\\s*\"(\\d+)").getMatch(0);
-                if (video_id == null) {
-                    video_id = br.getRegex("/video/(\\d+)").getMatch(0);
-                }
+                final String video_id = br.getRegex("/embed/(\\d+)").getMatch(0);
                 if (video_id != null) {
                     link.setProperty(PROPERTY_VIDEO_ID, video_id);
                 } else {
                     logger.warning("Failed to find video_id");
                 }
             }
-            this.dllink = this.findDirecturl(br);
-            boolean use_embed_workaround = false;
-            if (this.dllink == null) {
-                logger.info("Enabled embed workaround because: Failed to find directurl");
-                use_embed_workaround = true;
-            } else if (!StringUtils.containsIgnoreCase(this.dllink, "md5=") || !StringUtils.containsIgnoreCase(this.dllink, "expires=")) {
-                /* 2025-09-26: Embedded items are not playable because required parameters are missing -> Fallback to using normal link */
-                logger.info("Enabled embed workaround because: Directurls looks to be broken");
-                use_embed_workaround = true;
-            }
-            if (use_embed_workaround) {
-                if (originalUrlFromEmbed != null) {
-                    br.getPage(originalUrlFromEmbed);
-                    dllink = this.findDirecturl(br);
-                    title = findTitle(br);
-                } else {
-                    logger.warning("Embed workaround not possible because original URL was not found");
-                }
-            }
+        } else {
+            /* PATTERN_EMBED */
+            title = br.getRegex("global_tokyvideo_endcard_title\\s*= \"([^\"]+)\";").getMatch(0);
         }
-        if (title == null && urlSlug != null) {
-            title = urlSlug.replace("-", " ").trim();
-        }
+        dllink = br.getRegex("<source src=\"(https://[^\"]+)\"[^>]*type=\"video/mp4\">").getMatch(0);
         if (title != null) {
             title = Encoding.htmlDecode(title);
             title = title.trim();
             link.setFinalFileName(title + extDefault);
-        } else {
-            logger.warning("Failed to find video title");
         }
         final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
-        if (!isDownload && !StringUtils.isEmpty(dllink)) {
+        if (!isDownload && !link.isSizeSet() && !StringUtils.isEmpty(dllink)) {
             this.basicLinkCheck(br, br.createHeadRequest(dllink), link, title, extDefault);
         }
         return AvailableStatus.TRUE;
-    }
-
-    private String findTitle(final Browser br) {
-        return HTMLSearch.searchMetaTag(br, "og:description");
-    }
-
-    private String findDirecturl(final Browser br) {
-        return br.getRegex("<source src=\"(https?://[^\"]+)\" type=.video/mp4.").getMatch(0);
     }
 
     @Override
