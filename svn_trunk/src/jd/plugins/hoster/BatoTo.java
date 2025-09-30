@@ -18,6 +18,8 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -36,14 +38,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51587 $", interfaceVersion = 3, names = {}, urls = {})
 public class BatoTo extends PluginForHost {
     public BatoTo(PluginWrapper wrapper) {
         super(wrapper);
-        /* 2021-06-14: Disabled for now (login is broken and maybe not even required anymore) */
-        // this.enablePremium("https://id.bato.to/register");
         setRequestLimits();
         setStartIntervall(250);
     }
@@ -69,7 +67,7 @@ public class BatoTo extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bato.to", "battwo.com", "batotoo.com", "dto.to", "hto.to", "mangatoto.to", "mto.to", "wto.to", "comiko.net", "batocomic.com", "batocomic.net", "batocomic.org", "comiko.org", "mangatoto.com", "mangatoto.net", "mangatoto.org", "readtoto.com", "readtoto.net", "readtoto.org", "xbato.com", "xbato.net", "xbato.org", "zbato.com", "zbato.net", "zbato.org" });
+        ret.add(new String[] { "bato.to", "battwo.com", "batotoo.com", "dto.to", "hto.to", "mangatoto.to", "mto.to", "wto.to", "comiko.net", "batocomic.com", "batocomic.net", "batocomic.org", "comiko.org", "mangatoto.com", "mangatoto.net", "mangatoto.org", "readtoto.com", "readtoto.net", "readtoto.org", "xbato.com", "xbato.net", "xbato.org", "zbato.com", "zbato.net", "zbato.org", "ato.to", "bato.ac", "bato.bz", "bato.cc", "bato.cx", "bato.day", "bato.id", "bato.pw", "bato.red", "bato.run", "bato.sh", "bato.vc", "batoto.in", "batoto.tv", "batotwo.com", "batpub.com", "batread.com", "jto.to", "kuku.to", "lto.to", "nto.to", "okok.to", "ruru.to", "vba.to", "vto.to", "wba.to", "xba.to", "xdxd.to", "xto.to", "yba.to", "yto.to", "zba.to" });
         return ret;
     }
 

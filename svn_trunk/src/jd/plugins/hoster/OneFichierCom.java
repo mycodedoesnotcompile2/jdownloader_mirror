@@ -66,21 +66,22 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 51244 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51590 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
-    private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS             = "use_cdn_credits";
-    private final String       PROPERTY_ACCOUNT_CDN_CREDITS_BYTES           = "cdn_credits_bytes";
-    private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT             = "is_gold_account";
-    private final String       PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED      = "timestamp_vpn_detected";
-    private final String       PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING = "has_shown_vpn_login_warning";
+    private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
+    private final String       PROPERTY_ACCOUNT_CDN_CREDITS_BYTES                                = "cdn_credits_bytes";
+    private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT                                  = "is_gold_account";
+    private final String       PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED                           = "timestamp_vpn_detected";
+    private final String       PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING                      = "has_shown_vpn_login_warning";
+    private final String       PROPERTY_ACCOUNT_HAS_SHOWN_UNKNOWN_ACCOUNT_TYPE_WARNING_TIMESTAMP = "unknown_account_type_timestamp";
     /* DownloadLink properties */
-    private final String       PROPERTY_HOTLINK                             = "hotlink";
+    private final String       PROPERTY_HOTLINK                                                  = "hotlink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
-    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT            = "acl_access_control_limit";
+    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT                                 = "acl_access_control_limit";
     /** 2019-04-04: Documentation: https://1fichier.com/api.html */
-    public static final String API_BASE                                     = "https://api.1fichier.com/v1";
-    private final boolean      allowFreeAccountDownloadsViaAPI              = false;
+    public static final String API_BASE                                                          = "https://api.1fichier.com/v1";
+    private final boolean      allowFreeAccountDownloadsViaAPI                                   = false;
 
     @Override
     public String[] siteSupportedNames() {
@@ -828,20 +829,19 @@ public class OneFichierCom extends PluginForHost {
         performAPIRequest(API_BASE + "/user/info.cgi", "");
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> entries = this.parseAPIResponse(account);
-        final String apierror = (String) entries.get("message");
-        final boolean apiTempBlocked = apierror != null && apierror.matches("(?i)Flood detected: (User|User APK|IP) Locked.*?");
-        if (apiTempBlocked) {
+        final String api_error = (String) entries.get("message");
+        if (api_error != null && api_error.matches("(?i)Flood detected: (User|User APK|IP) Locked.*?")) {
+            logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
             final long cachedCdnCreditsBytes = account.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, -1);
-            AccountType type = null;
+            AccountType type = AccountType.UNKNOWN;
             if (account.lastUpdateTime() > 0) {
-                logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
                 final AccountType oldAccountType = account.getType();
                 if (AccountType.FREE.equals(oldAccountType) && !allowFreeAccountDownloadsViaAPI) {
                     errorPremiumNeededForAPIDownloading(account);
                     /* This code should never be reached */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                if (oldAccountType != null && oldAccountType != AccountType.UNKNOWN) {
+                if (!AccountType.UNKNOWN.equals(oldAccountType)) {
                     final AccountInfo existing = account.getAccountInfo();
                     if (existing != null) {
                         /* return previously set AccountInfo */
@@ -853,24 +853,26 @@ public class OneFichierCom extends PluginForHost {
                         setCdnCreditsStatus(account, existing, cachedCdnCreditsBytes);
                         return existing;
                     }
-                    type = oldAccountType;
                 }
+                type = oldAccountType;
             } else {
                 /*
                  * Account got added for the first time but API is blocked at the moment. We know the account must be premium because only
                  * premium users can generate APIKeys but we cannot get any information at the moment ...
                  */
                 logger.info("Cannot get account details because of API limits and account has never been checked before --> Adding account without info");
+                type = AccountType.UNKNOWN;
+                displayAPIMode_UnknownAccountTypeWarning(account);
             }
             if (type == null) {
-                /* If in doubt, treat account as premium. */
-                type = AccountType.PREMIUM;
+                /* If in doubt, treat account as unknown. */
+                type = AccountType.UNKNOWN;
             }
             account.setType(type);
             ai.setStatus(type.getLabel() + " | Try account-check again later, downloads are not affected by this message!");
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
-            if (type == AccountType.PREMIUM) {
+            if (type == AccountType.PREMIUM || type == AccountType.UNKNOWN) {
                 ai.setUnlimitedTraffic();
             } else {
                 /*
@@ -1093,7 +1095,7 @@ public class OneFichierCom extends PluginForHost {
             throw new AccountUnavailableException(message, 60 * 60 * 1000l);
         } else if (message.matches("(?i).*Must be a customer.*")) {
             /* 2020-06-09: E.g. {"message":"Must be a customer (Premium, Access) #200","status":"KO"} */
-            /* Free account api key entered by user --> API can only be used by premium users */
+            /* Free account API key entered by user --> API can only be used by premium users */
             errorPremiumNeededForAPIDownloading(account);
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -1585,6 +1587,86 @@ public class OneFichierCom extends PluginForHost {
                         message += "\r\nThis is not a JDownloader bug but a server side error message which we are simply forwarding to you here.";
                         message += "\r\nMore information about this topic: https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
                     }
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    dialog.setTimeout(300 * 1000);
+                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+                    ret.throwCloseExceptions();
+                } catch (final Throwable e) {
+                    getLogger().log(e);
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void displayAPIMode_UnknownAccountTypeWarning(final Account account) {
+        if (account == null) {
+            throw new IllegalArgumentException();
+        }
+        synchronized (account) {
+            if (account.hasProperty(PROPERTY_ACCOUNT_HAS_SHOWN_UNKNOWN_ACCOUNT_TYPE_WARNING_TIMESTAMP)) {
+                /* Message has already been displayed for this account */
+                return;
+            }
+            account.setProperty(PROPERTY_ACCOUNT_HAS_SHOWN_UNKNOWN_ACCOUNT_TYPE_WARNING_TIMESTAMP, System.currentTimeMillis());
+        }
+        final Thread thread = new Thread() {
+            public void run() {
+                try {
+                    String message = "<html>";
+                    final String title;
+                    String language = System.getProperty("user.language").toLowerCase();
+                    if ("de".equals(language)) {
+                        title = "Information über unbekannten Kontotyp";
+                        message += "\r\nJDownloader konnte den Typ deines Kontos momentan nicht erkennen.";
+                        message += "\r\nDies kann aufgrund von API-Beschränkungen von 1fichier passieren.";
+                        message += "\r\nWenn dein Konto ein Premium-Konto ist, kannst du diese Nachricht ignorieren.";
+                        message += "\r\nWenn dein Konto ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits ist, wirst du nicht über die API herunterladen können.";
+                        message += "\r\nIn letzterem Fall gehe so vor:";
+                        message += "\r\n1. Gehe zu Einstellungen -> Account Manager und entferne dieses Konto";
+                        message += "\r\n2. Gehe zu Einstellungen -> Plugins -> 1fichier.com -> Premium-API verwenden -> Deaktiviere dies";
+                        message += "\r\n3. Gehe zu Einstellungen -> Account Manager -> Füge dein 1fichier-Konto mit Benutzername & Passwort hinzu.";
+                        message += "\r\n";
+                        message += "\r\n<b>Warnung:</b> Wenn du ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits besitzt und versuchst, den API-Key-Login zu verwenden, werden Downloads fehlschlagen und dein Konto wird in einen roten Fehlerzustand wechseln!";
+                    } else if ("es".equals(language)) {
+                        title = "Información sobre tipo de cuenta desconocido";
+                        message += "\r\nJDownloader no pudo detectar el tipo de tu cuenta en este momento.";
+                        message += "\r\nEsto puede ocurrir debido a limitaciones de la API de 1fichier.";
+                        message += "\r\nSi tu cuenta es una cuenta premium, puedes ignorar este mensaje.";
+                        message += "\r\nSi tu cuenta es una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b>, no podrás descargar mediante la API.";
+                        message += "\r\nEn este último caso, haz lo siguiente:";
+                        message += "\r\n1. Ve a Configuración -> Administrador de cuentas y elimina esta cuenta";
+                        message += "\r\n2. Ve a Configuración -> Plugins -> 1fichier.com -> Usar API premium -> Desactiva esto";
+                        message += "\r\n3. Ve a Configuración -> Administrador de cuentas -> Añade tu cuenta de 1fichier con usuario y contraseña.";
+                        message += "\r\n";
+                        message += "\r\n<b>Advertencia:</b> Si tienes una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b> e intentas usar el inicio de sesión con clave API, las descargas fallarán y tu cuenta entrará en estado de error rojo!";
+                    } else if ("fr".equals(language)) {
+                        title = "Informations sur le type de compte inconnu";
+                        message += "\r\nJDownloader n’a pas pu détecter le type de votre compte pour le moment.";
+                        message += "\r\nCela peut se produire en raison de limitations de l’API de 1fichier.";
+                        message += "\r\nSi votre compte est un compte premium, vous pouvez ignorer ce message.";
+                        message += "\r\nSi votre compte est un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b>, vous ne pourrez pas télécharger via l’API.";
+                        message += "\r\nDans ce dernier cas, procédez ainsi :";
+                        message += "\r\n1. Allez dans Paramètres -> Gestionnaire de comptes et supprimez ce compte";
+                        message += "\r\n2. Allez dans Paramètres -> Plugins -> 1fichier.com -> Utiliser l’API premium -> Désactivez ceci";
+                        message += "\r\n3. Allez dans Paramètres -> Gestionnaire de comptes -> Ajoutez votre compte 1fichier avec identifiant et mot de passe.";
+                        message += "\r\n";
+                        message += "\r\n<b>Avertissement :</b> Si vous possédez un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b> et essayez d’utiliser la connexion par clé API, les téléchargements échoueront et votre compte passera en état d’erreur rouge !";
+                    } else {
+                        title = "Information about unknown account type";
+                        message += "\r\nJDownloader was unable to detect the type of your account at this moment.";
+                        message += "\r\nThis can happen sometimes due to API limitations from 1fichier.";
+                        message += "\r\nIf your account is a premium account, you can safely ignore this message and start downloading.";
+                        message += "\r\nIf your account is a free account or a free account with <b>paid</b> CDN credits, you will not be able to download via API.";
+                        message += "\r\nIn the latter case, do this:";
+                        message += "\r\n1. Go to Settings -> Account Manager and remove this account";
+                        message += "\r\n2. Go to Settings -> Plugins -> 1fichier.com -> Use premium API -> Disable this";
+                        message += "\r\n3. Go to Settings -> Account Manager -> Add your 1fichier account via username & password.";
+                        message += "\r\n";
+                        message += "\r\n<b>Warning:</b> If you own a free account or a free account with <b>paid</b> CDN credits and try to use the API key login, downloads will fail and your account will go into a red error state!";
+                    }
+                    message += "</html>";
                     final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
                     dialog.setTimeout(300 * 1000);
                     final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);

@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49272 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51590 $", interfaceVersion = 3, names = {}, urls = {})
 public class RecurbateCom extends PluginForHost {
     public RecurbateCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -283,6 +283,10 @@ public class RecurbateCom extends PluginForHost {
                 logger.info("Failed to find highspeed downloadurl -> Trying to download stream");
                 String token = br.getRegex("data-token\\s*=\\s*\"([^\"]+)\"\\s*data-video-id").getMatch(0);
                 if (token == null) {
+                    /* 2025-09-29 */
+                    token = br.getRegex("data-video-id=\"\\d+\"\\s*data-token\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+                }
+                if (token == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 token = Encoding.htmlOnlyDecode(token);
@@ -294,9 +298,10 @@ public class RecurbateCom extends PluginForHost {
                 brc.getHeaders().put("Accept", "*/*");
                 /* Do not url-encode token - it can contain further parameters!! */
                 brc.getPage("/api/video/" + this.getVideoID(link) + "?token=" + token);
-                final String streamLink = brc.getRegex("<source\\s*src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*type=\"video/mp4\"\\s*/>").getMatch(0);
+                final String progressiveStreamLink = brc.getRegex("<source\\s*src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*type=\"video/mp4\"\\s*/>").getMatch(0);
                 final String hlsURL = brc.getRegex("<source\\s*src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*type=\"application/x-mpegURL\"").getMatch(0);
-                if (streamLink == null && hlsURL == null) {
+                if (progressiveStreamLink == null && hlsURL == null) {
+                    /* Streaming not possible -> Try to find out why */
                     final String html = brc.getRequest().getHtmlCode();
                     if (StringUtils.containsIgnoreCase(html, "shall_signin")) {
                         /**
@@ -310,8 +315,8 @@ public class RecurbateCom extends PluginForHost {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                 }
-                if (streamLink != null) {
-                    dllink = streamLink;
+                if (progressiveStreamLink != null) {
+                    dllink = progressiveStreamLink;
                 } else {
                     dllink = hlsURL;
                 }
