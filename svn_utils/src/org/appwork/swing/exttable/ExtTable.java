@@ -36,7 +36,6 @@ package org.appwork.swing.exttable;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -48,10 +47,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.EventObject;
 import java.util.LinkedHashMap;
@@ -97,7 +94,6 @@ import org.appwork.swing.exttable.columnmenu.SearchContextAction;
 import org.appwork.swing.exttable.columns.CellHeightProvider;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
-import org.appwork.utils.JavaVersion;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
@@ -147,7 +143,6 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
     private JComponent                                     columnButton         = null;
     private boolean                                        columnButtonVisible  = true;
     private int                                            verticalScrollPolicy;
-    protected boolean                                      headerDragging;
     private ExtColumn<E>                                   lastTooltipCol;
     private int                                            lastTooltipRow;
     private ExtDataFlavor<E>                               flavor;
@@ -228,63 +223,27 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
 
             @Override
             public void mousePressed(final MouseEvent e) {
-                ExtTable.this.headerDragging = true;
-                // only if we are not in resize mode
-                if (ExtTable.this.getTableHeader().getCursor().getType() == Cursor.getDefaultCursor().getType()) {
-                    if (e.getButton() == MouseEvent.BUTTON3) {
-                        final JPopupMenu ccm = ExtTable.this.columnControlMenu(ExtTable.this.getExtColumnAtPoint(e.getPoint()));
-                        if (ccm == null) {
-                            return;
-                        }
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                Point point = e.getPoint();
-                                point = SwingUtilities.convertPoint(e.getComponent(), point, ExtTable.this);
-                                showPopup(ccm, point);
-                                if (ccm.getComponentCount() == 0) {
-                                    Toolkit.getDefaultToolkit().beep();
-                                }
-                            }
-                        });
-                    }
-                }
             }
 
             @Override
             public void mouseReleased(final MouseEvent e) {
-                ExtTable.this.headerDragging = false;
-                try {
-                    // this is a workaround. we dis
-                    if (ExtTable.this.getTableHeader().getCursor().getType() == Cursor.getDefaultCursor().getType()) {
-                        for (final MouseListener ms : ExtTable.this.getTableHeader().getMouseListeners()) {
-                            if (ms instanceof javax.swing.plaf.basic.BasicTableHeaderUI.MouseInputHandler) {
-                                // java.lang.reflect.InaccessibleObjectException: Unable to make field private java.awt.Cursor
-                                // javax.swing.plaf.basic.BasicTableHeaderUI$MouseInputHandler.otherCursor accessible: module java.desktop
-                                // does not "opens javax.swing.plaf.basic" to unnamed module @5677323c
-                                // at
-                                // java.base/java.lang.reflect.AccessibleObject.throwInaccessibleObjectException(AccessibleObject.java:391)
-                                // at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:367)
-                                // at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:315)
-                                // at java.base/java.lang.reflect.Field.checkCanSetAccessible(Field.java:183)
-                                // at java.base/java.lang.reflect.Field.setAccessible(Field.java:177)
-                                // at org.appwork.swing.exttable.ExtTable$3.mouseReleased(ExtTable.java:276)
-                                if (JavaVersion.getVersion().isLowerThan(JavaVersion.JVM_16_0)) {
-                                    Field field;
-                                    field = javax.swing.plaf.basic.BasicTableHeaderUI.MouseInputHandler.class.getDeclaredField("otherCursor");
-                                    field.setAccessible(true);
-                                    field.set(ms, Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR));
-                                } else {
-                                    // todo...
-                                }
+                if (e.getButton() == MouseEvent.BUTTON3) {
+                    final JPopupMenu ccm = ExtTable.this.columnControlMenu(ExtTable.this.getExtColumnAtPoint(e.getPoint()));
+                    if (ccm == null) {
+                        return;
+                    }
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            Point point = e.getPoint();
+                            point = SwingUtilities.convertPoint(e.getComponent(), point, ExtTable.this);
+                            showPopup(ccm, point);
+                            if (ccm.getComponentCount() == 0) {
+                                Toolkit.getDefaultToolkit().beep();
                             }
                         }
-                    }
-                } catch (final Throwable e1) {
-                    org.appwork.loggingv3.LogV3.log(e1);
+                    });
                 }
-                // BasicTableHeaderUI.class.getField(name)
-                // ((BasicTableHeaderUI) getTableHeader())
             }
         });
         // mouselistener to display column header tooltips
@@ -620,13 +579,6 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
     @Override
     public void doLayout() {
         final TableColumn resizeColumn = this.getTableHeader().getResizingColumn();
-        // for(ExtColumn<E> c:getModel().getColumns()){
-        // if(!c.isResizable()){
-        // c.getInternalColumn().setMinWidth(c.getInternalColumn().getPreferredWidth());
-        // c.getInternalColumn().setMaxWidth(c.getInternalColumn().getPreferredWidth())
-        //
-        // }
-        // }
         if (resizeColumn == null) {
             super.doLayout();
             return;
@@ -642,16 +594,18 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                     this.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
                     resizeColumn.setWidth(beforeWidth);
                     super.doLayout();
-                    if (this.headerDragging && resizeColumn.getWidth() - beforeWidth != 0) {
-                        Toolkit.getDefaultToolkit().beep();
-                        this.getTableHeader().setCursor(null);
-                        this.headerDragging = false;
-                    }
                 }
-            } else {
             }
             this.saveWidthsRatio();
-            this.setAutoResizeMode(orgResizeMode);
+            if (getAutoResizeMode() != orgResizeMode) {
+                this.setAutoResizeMode(orgResizeMode);
+                if (getTableHeader().getResizingColumn() != resizeColumn) {
+                    // restore resizing column
+                    // JDK>=25 JTable.setAutoResizeMode sets TableHeader.setResizingColumn to last column JTable.AUTO_RESIZE_LAST_COLUMN
+                    // we don't want this to happen during doLayout(eg changing column size via mouse)
+                    getTableHeader().setResizingColumn(resizeColumn);
+                }
+            }
         }
     }
 

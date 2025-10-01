@@ -30,23 +30,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -74,7 +57,24 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51590 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51594 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -105,11 +105,9 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br>
-         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
-         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br>
-         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
+         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -1222,6 +1220,9 @@ public class XHamsterCom extends PluginForHost {
         } catch (final JSonMapperException e) {
             logger.log(e);
         }
+        if (availableQualities.isEmpty()) {
+            return null;
+        }
         if (selectedQualityHeight == -1) {
             Set<Object> sources = null;
             int bestHeigh = -1;
@@ -1234,18 +1235,16 @@ public class XHamsterCom extends PluginForHost {
                     sources = qualitySources.getValue();
                 }
             }
-            if (sources != null) {
-                for (final Object source : sources) {
-                    if (source instanceof String) {
-                        logger.info("Returning best progressive quality: " + bestHeigh + "|" + source);
-                        return new Object[] { source, bestHeigh };
-                    }
+            for (final Object source : sources) {
+                if (source instanceof String) {
+                    logger.info("Returning best progressive quality: " + bestHeigh + "|" + source);
+                    return new Object[] { source, bestHeigh };
                 }
-                for (final Object source : sources) {
-                    if (source instanceof HlsContainer) {
-                        logger.info("Returning best hls quality: " + bestHeigh + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
-                        return new Object[] { source, bestHeigh };
-                    }
+            }
+            for (final Object source : sources) {
+                if (source instanceof HlsContainer) {
+                    logger.info("Returning best hls quality: " + bestHeigh + "|" + ((HlsContainer) source).getM3U8URL() + "|" + source);
+                    return new Object[] { source, bestHeigh };
                 }
             }
         } else {
@@ -1816,10 +1815,9 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br>
-             * Redirects to mainpage if cookies are invalid. </br>
-             * Return json if cookies are valid. </br>
-             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
+             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
+             * user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */

@@ -41,7 +41,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51373 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51591 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,9 +150,11 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                     throw new InterruptedException();
                 }
                 if (false) {
-                    /*
-                     * 2025-08-25 -> api reports max 25 pages with 40 items/page, max 1000 but more pages may still exist e.g.
-                     * /users/romythicc
+                    /**
+                     * 2025-08-25 -> api reports max 25 pages with 40 items/page, max 1000 but more pages may still exist e.g. <br>
+                     * /users/romythicc <br>
+                     * 2025-09-30: Also API allows max 100 pages due to a bug, see:
+                     * https://www.reddit.com/r/jdownloader/comments/1ntrn9q/redgif_plugin_is_broken_again/
                      */
                     if (isLastPage) {
                         logger.info("Stopping because: Reached last page: " + pageMax);

@@ -34,6 +34,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
@@ -66,7 +67,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 51590 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51591 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -862,11 +863,13 @@ public class OneFichierCom extends PluginForHost {
                  */
                 logger.info("Cannot get account details because of API limits and account has never been checked before --> Adding account without info");
                 type = AccountType.UNKNOWN;
-                displayAPIMode_UnknownAccountTypeWarning(account);
             }
             if (type == null) {
                 /* If in doubt, treat account as unknown. */
                 type = AccountType.UNKNOWN;
+            }
+            if (type == AccountType.UNKNOWN) {
+                displayAPIMode_UnknownAccountTypeWarning(account);
             }
             account.setType(type);
             ai.setStatus(type.getLabel() + " | Try account-check again later, downloads are not affected by this message!");
@@ -1667,7 +1670,7 @@ public class OneFichierCom extends PluginForHost {
                         message += "\r\n<b>Warning:</b> If you own a free account or a free account with <b>paid</b> CDN credits and try to use the API key login, downloads will fail and your account will go into a red error state!";
                     }
                     message += "</html>";
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_HTML, title, message);
                     dialog.setTimeout(300 * 1000);
                     final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
                     ret.throwCloseExceptions();

@@ -43,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51331 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51591 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
     public RedGifsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -191,6 +191,7 @@ public class RedGifsCom extends GfyCatCom {
         } else if (req.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "410 gone");
         } else if (req.getHttpConnection().getResponseCode() != 200) {
+            /** e.g. {"error":{"code":"BadPageNumber","message":"Page number must be between 1 and 100","status":400}} */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Map<String, Object> response = restoreFromString(req.getHtmlCode(), TypeRef.MAP);
