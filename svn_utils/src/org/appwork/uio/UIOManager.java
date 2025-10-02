@@ -80,5 +80,10 @@ public class UIOManager {
 
     public static final int LOGIC_DONT_SHOW_AGAIN_IGNORES_OK     = 1 << 10;
     public static final int STYLE_SHOW_DO_NOT_DISPLAY_AGAIN      = Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN;
+    /**
+     * If set, the dialog does not handle do not show again - just shows the ui and sets the flag if the user clicked it. this can be used
+     * to handle the result externaly
+     */
+    public static final int LOGIC_DONT_SHOW_AGAIN_GUI_ONLY       = 1 << 11;
 
 }

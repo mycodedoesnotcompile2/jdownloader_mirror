@@ -21,19 +21,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -47,7 +39,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 51305 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51605 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,7 +117,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     private static final Pattern TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/?)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_TAGS_BOOKS = Pattern.compile("/(([a-z]{2,3})/?)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_TAGS_POSTS = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
-    public static final String   API_BASE        = "https://capi-v2.sankakucomplex.com";
+
+    public static final String   API_BASE_NEW    = "https://sankakuapi.com";
     private SankakucomplexCom    hosterplugin    = null;
 
     @Override
@@ -132,9 +135,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         final String contenturl = param.getCryptedUrl();
         if (new Regex(contenturl, TYPE_TAGS_BOOKS).patternFind()) {
-            return crawlTagsBooksAPI(param);
+            return crawlTagsBooksAPI(param, account);
         } else if (new Regex(contenturl, TYPE_BOOK).patternFind()) {
-            return crawlBook(param);
+            return crawlBook(param, account);
         } else {
             return crawlTagsPosts(param, account);
         }
@@ -158,8 +161,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br>
-         * For this reason, some user may prefer website mode.
+         * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
+         * website mode.
          */
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && ACCESS_MODE_AUTO_PREFER_API_MODE)) {
             return crawlTagsPostsAPI(account, param, tags, language);
@@ -353,7 +356,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         int page = 1;
         int position = 1;
         pagination: do {
-            br.getPage(API_BASE + "/posts/keyset?" + query.toString());
+            if (true) {
+                // unfinished API stuff
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.getPage(API_BASE_NEW + "/posts/keyset?" + query.toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
             final String nextPageHash = (String) meta.get("next");
@@ -400,7 +407,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     }
 
     /** Crawls books via tag. Typically used to crawl all books of a user. */
-    private ArrayList<DownloadLink> crawlTagsBooksAPI(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlTagsBooksAPI(final CryptedLink param, final Account account) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
         final int maxPage = cfg.getBookTagCrawlerMaxPageLimit();
@@ -425,7 +432,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         query.appendEncoded("pool_type", "0");
         int page = 1;
         pagination: do {
-            br.getPage(API_BASE + "/pools/keyset?" + query.toString());
+            if (true) {
+                // unfinished API stuff
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.getPage(API_BASE_NEW + "/pools/keyset?" + query.toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
             final String nextPageHash = (String) meta.get("next");
@@ -469,7 +480,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     }
 
     /** Crawls all pages of a book. */
-    private ArrayList<DownloadLink> crawlBook(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlBook(final CryptedLink param, final Account account) throws Exception {
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_BOOK);
         String language = urlinfo.getMatch(1);
         final String bookID = urlinfo.getMatch(2);
@@ -482,11 +493,20 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             language = "en";
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage(API_BASE + "/pools/" + bookID + "?lang=" + language + "&includes[]=series&exceptStatuses[]=deleted");
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        final Browser brc = this.createNewBrowserInstance();
+        brc.setAllowedResponseCodes(400);
+        final GetRequest request = brc.createGetRequest(SankakucomplexComCrawler.API_BASE_NEW + "/pools/" + bookID + "?lang=" + language + "&includes[]=series&exceptStatuses[]=deleted");
+        if (account != null) {
+            final String accessToken = hosterplugin.getAPIToken(account);
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + accessToken);
+        }
+        brc.getPage(request);
+        if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> author = (Map<String, Object>) entries.get("author");
         String bookTitle = (String) entries.get("name_en");
         if (StringUtils.isEmpty(bookTitle)) {

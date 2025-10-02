@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -48,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImgurComHoster;
 
 /*Only accept single-imag URLs with an LID-length or either 5 OR 7 - everything else are invalid links or thumbnails*/
-@DecrypterPlugin(revision = "$Revision: 49122 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51595 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgurComGallery extends PluginForDecrypt {
     public ImgurComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +80,23 @@ public class ImgurComGallery extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern    PATTERN_ALBUM                  = Pattern.compile("/a/([A-Za-z0-9]{5,7})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern    PATTERN_GALLERY                = Pattern.compile("/gallery/(?:[a-zA-Z0-9-]+\\-)?([A-Za-z0-9]{5,7})", Pattern.CASE_INSENSITIVE);
+    // TODO: Change all patterns down below to object type Pattern vs string when working on this plugin next time
+    private final String            type_subreddit_single_post     = "(?i)https?://[^/]+/r/([^/]+/[A-Za-z0-9]{5,7})";
+    private final String            type_subreddit_gallery         = "(?i)https?://[^/]+/r/([^/]+)$";
+    private final String            type_tag                       = "(?i)https?://[^/]+/t/[^/]+/([A-Za-z0-9]{5,7})";
+    public static final String      type_single_direct             = "(?i)https?://i\\.[^/]+/([A-Za-z0-9]{5,7})\\..+";
+    public static final String      type_single_direct_without_ext = "(?i)https?://i\\.[^/]+/([A-Za-z0-9]{5,7})$";
+    /* Constants */
+    private static Object           CTRLLOCK                       = new Object();
+    private ArrayList<DownloadLink> ret                            = new ArrayList<DownloadLink>();
+    private String                  contenturl                     = null;
+    private String                  itemID                         = null;
+    private String                  author                         = null;
+    private boolean                 grabVideoSource                = false;
+    private FilePackage             fp                             = null;
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
@@ -89,7 +107,9 @@ public class ImgurComGallery extends PluginForDecrypt {
             sb.append(protocolPart + hostsPatternPart + "/(?:t/[^/]+)/[A-Za-z0-9]{5,7}");
             sb.append("|");
             /* Gallery URLs */
-            sb.append(protocolPart + hostsPatternPart + "/(?:gallery|a)/[A-Za-z0-9]{5,7}");
+            sb.append(protocolPart + hostsPatternPart + PATTERN_ALBUM.pattern());
+            sb.append("|");
+            sb.append(protocolPart + hostsPatternPart + PATTERN_GALLERY.pattern());
             sb.append("|");
             /* Direct-URLs (and those without file-extension) */
             sb.append("https?://i\\." + hostsPatternPart + "/(?:[A-Za-z0-9]{7}|[A-Za-z0-9]{5})(?:\\.[A-Za-z0-9]{3,5})?");
@@ -109,22 +129,6 @@ public class ImgurComGallery extends PluginForDecrypt {
         /* 2020-09-29: Preventive measure */
         return 1;
     }
-
-    private final String            type_subreddit_single_post     = "(?i)https?://[^/]+/r/([^/]+/[A-Za-z0-9]{5,7})";
-    private final String            type_subreddit_gallery         = "(?i)https?://[^/]+/r/([^/]+)$";
-    private final String            type_album                     = "(?i)https?://[^/]+/a/([A-Za-z0-9]{5,7})";
-    private final String            type_tag                       = "(?i)https?://[^/]+/t/[^/]+/([A-Za-z0-9]{5,7})";
-    private final String            type_gallery                   = "(?i)https?://[^/]+/gallery/([A-Za-z0-9]{5,7})";
-    public static final String      type_single_direct             = "(?i)https?://i\\.[^/]+/([A-Za-z0-9]{5,7})\\..+";
-    public static final String      type_single_direct_without_ext = "(?i)https?://i\\.[^/]+/([A-Za-z0-9]{5,7})$";
-    /* Constants */
-    private static Object           CTRLLOCK                       = new Object();
-    private ArrayList<DownloadLink> ret                            = new ArrayList<DownloadLink>();
-    private String                  contenturl                     = null;
-    private String                  itemID                         = null;
-    private String                  author                         = null;
-    private boolean                 grabVideoSource                = false;
-    private FilePackage             fp                             = null;
 
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
@@ -149,13 +153,13 @@ public class ImgurComGallery extends PluginForDecrypt {
                 } else {
                     this.siteCrawlSubredditStyleGallery();
                 }
-            } else if (contenturl.matches(type_album) || contenturl.matches(type_tag)) {
+            } else if (new Regex(contenturl, PATTERN_ALBUM).patternFind() || contenturl.matches(type_tag)) {
                 if (useAPI) {
                     this.apiCrawlAlbum();
                 } else {
                     this.siteCrawlAlbum();
                 }
-            } else if (contenturl.matches(type_gallery)) {
+            } else if (new Regex(contenturl, PATTERN_GALLERY).patternFind()) {
                 if (useAPI) {
                     this.apiCrawlGallery();
                 } else {
@@ -538,12 +542,11 @@ public class ImgurComGallery extends PluginForDecrypt {
     }
 
     private void siteCrawlAlbum() throws DecrypterException, ParseException, IOException, PluginException {
-        final String albumID;
-        if (contenturl.matches(type_album)) {
-            albumID = new Regex(this.contenturl, type_album).getMatch(0);
-        } else if (contenturl.matches(type_tag)) {
+        String albumID = new Regex(contenturl, PATTERN_ALBUM).getMatch(0);
+        if (albumID == null) {
             albumID = new Regex(this.contenturl, type_tag).getMatch(0);
-        } else {
+        }
+        if (albumID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Browser brc = br.cloneBrowser();
@@ -604,7 +607,7 @@ public class ImgurComGallery extends PluginForDecrypt {
         if (is_albumO != null && is_albumO instanceof Boolean) {
             is_album = ((Boolean) is_albumO).booleanValue();
         }
-        if (contenturl.matches(type_gallery) && !is_album) {
+        if (new Regex(contenturl, PATTERN_GALLERY).patternFind() && !is_album) {
             /* We have a single picture and not an album. */
             final DownloadLink dl = this.apiCrawlJsonSingleItem(entries);
             ret.add(dl);
@@ -641,7 +644,7 @@ public class ImgurComGallery extends PluginForDecrypt {
     }
 
     private void siteCrawlGallery() throws DecrypterException, ParseException, IOException, PluginException {
-        final String galleryID = new Regex(this.contenturl, type_gallery).getMatch(0);
+        final String galleryID = new Regex(this.contenturl, PATTERN_GALLERY).getMatch(0);
         this.fp = FilePackage.getInstance();
         final Browser brc = br.cloneBrowser();
         brc.setFollowRedirects(true);

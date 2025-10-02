@@ -83,7 +83,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
     }
 
     @Override
-    public void openFile(final File file) throws IOException {
+    public void openFile(final File file, boolean tryToReuseWindows) throws IOException {
         // workaround for windows
         // see http://bugs.sun.com/view_bug.do?bug_id=6599987
         if (!file.exists()) {
@@ -106,7 +106,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupportJavaDesktop#reboot(int)
      */
     /**
@@ -347,7 +347,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupport#hibernate()
      */
     @Override
@@ -504,7 +504,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
 
     /*
      * (non-Javadoc) from java.io.WinNTFileSystem.prefixLength(String);
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupport#getPrefixLength(java.lang.String)
      */
     @Override

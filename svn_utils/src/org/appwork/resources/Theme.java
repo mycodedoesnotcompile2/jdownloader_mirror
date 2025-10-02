@@ -1200,17 +1200,21 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @return
      */
     public String getIconType(String key) {
-        URL url = getIconURL(key);
+        final URL url = getIconURL(key);
         if (url == null) {
             return null;
         }
         String path = url.getPath().toLowerCase(Locale.ROOT);
         int nameIndex = path.lastIndexOf("/");
-        int index = path.lastIndexOf(".", nameIndex > 0 ? nameIndex + 1 : 0);
-        if (index < 0) {
+        int index = path.lastIndexOf(".");
+        if (index <= nameIndex) {
+            // no . after the last /
+            return null;
+        } else if (index < 0) {
             return "";
+        } else {
+            return path.substring(index + 1);
         }
-        return path.substring(index + 1);
     }
 
     public URL getIconURL(final String string) {
@@ -1227,7 +1231,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.storage.config.MinTimeWeakReferenceCleanup# onMinTimeWeakReferenceCleanup
      * (org.appwork.storage.config.MinTimeWeakReference)
      */

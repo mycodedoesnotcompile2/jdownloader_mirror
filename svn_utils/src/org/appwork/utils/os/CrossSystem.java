@@ -303,6 +303,7 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H2(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -369,6 +370,7 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -405,7 +407,7 @@ public class CrossSystem {
     }
 
     private static volatile String[]                     BROWSER_COMMANDLINE = null;
-    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>(); ;
+    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>();;
     private static String[]                              FILE_COMMANDLINE    = null;
     private static String                                JAVAINT             = null;
     /**
@@ -457,18 +459,19 @@ public class CrossSystem {
      * internal function to open a file/folder
      *
      * @param file
+     * @param trySingleInstance
      * @throws IOException
      */
-    private static void _openFILE(final File file) throws IOException {
+    private static void _openFILE(final File file, boolean trySingleInstance) throws IOException {
         try {
             if (CrossSystem.openCustom(CrossSystem.FILE_COMMANDLINE, file.getAbsolutePath())) {
                 return;
             } else if (CrossSystem.isOpenFileSupported()) {
-                CrossSystem.getDesktopSupport().openFile(file);
+                CrossSystem.getDesktopSupport().openFile(file, trySingleInstance);
             }
         } catch (final IOException e) {
             if (CrossSystem.isOpenFileSupported()) {
-                CrossSystem.getDesktopSupport().openFile(file);
+                CrossSystem.getDesktopSupport().openFile(file, trySingleInstance);
             } else {
                 throw e;
             }
@@ -822,7 +825,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);
@@ -1794,13 +1797,18 @@ public class CrossSystem {
      * @throws IOException
      */
     public static void openFile(final File file) {
+        openFile(file, false);
+    }
+
+    public static void openFile(final File file, final boolean trySingleInstance) {
         // I noticed a bug: desktop.open freezes under win7 java 1.7u25 in some
         // cases... we should at least avoid a gui freeze in such cases..
+
         final Runnable runnable = new Runnable() {
             @Override
             public void run() {
                 try {
-                    CrossSystem._openFILE(file);
+                    CrossSystem._openFILE(file, trySingleInstance);
                 } catch (final IOException e) {
                     org.appwork.loggingv3.LogV3.log(e);
                 }
@@ -1845,12 +1853,24 @@ public class CrossSystem {
         CrossSystem.FILE_COMMANDLINE = fILE_COMMANDLINE;
     }
 
+    @Deprecated
+    public static void showInExplorer(final File saveTo) {
+        showInExplorer(saveTo, false);
+    }
+
     /**
      * @param saveTo
      */
-    public static void showInExplorer(final File saveTo) {
+    public static void showInExplorer(final File saveTo, boolean useExitingWindow) {
         if (saveTo.exists()) {
             if (CrossSystem.isWindows()) {
+                if (useExitingWindow) {
+
+                    File openFolder = saveTo.getParentFile();
+                    if (WindowsUtils.explorerToFront(openFolder)) {
+                        return;
+                    }
+                }
                 try {
                     // we need to go this cmd /c way, because explorer.exe seems to
                     // do some strange parameter parsing.

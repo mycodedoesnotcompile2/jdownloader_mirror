@@ -12,4 +12,11 @@ public interface Kernel32Ext extends Kernel32 {
     boolean SetConsoleCtrlHandler(HANDLER_ROUTINE HandlerRoutine, boolean Add);
 
     boolean GetFileInformationByHandle(HANDLE hFile, ByHandleFileInformation lpFileInformation);
+
+    /**
+     * Retrieves the session ID of the console session.
+     *
+     * @return session id, or 0xFFFFFFFF if none
+     */
+    int WTSGetActiveConsoleSessionId();
 }

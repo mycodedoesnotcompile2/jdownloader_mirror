@@ -49,7 +49,7 @@ public interface DesktopSupport {
 
     boolean isOpenFileSupported();
 
-    public void openFile(File file) throws IOException;
+    public void openFile(File file, boolean trySingleInstance) throws IOException;
 
     public boolean shutdown(boolean force) throws InterruptedException;
 
@@ -74,4 +74,5 @@ public interface DesktopSupport {
      * @throws InterruptedException
      */
     boolean reboot(boolean force, int waitms) throws InterruptedException;
+
 }

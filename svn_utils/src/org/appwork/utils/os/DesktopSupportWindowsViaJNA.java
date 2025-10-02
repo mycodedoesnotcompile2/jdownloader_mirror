@@ -1,5 +1,7 @@
 package org.appwork.utils.os;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -58,6 +60,21 @@ public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {
             LogV3.log(e);
         }
         return null;
+    }
+
+    /**
+     * @see org.appwork.utils.os.DesktopSupportWindows#openFile(java.io.File, boolean)
+     */
+    @Override
+    public void openFile(File file, boolean tryToReuseWindows) throws IOException {
+        if (tryToReuseWindows) {
+            if (file.isDirectory()) {
+                if (WindowsUtils.explorerToFront(file)) {
+                    return;
+                }
+            }
+        }
+        super.openFile(file, tryToReuseWindows);
     }
 
     @Override

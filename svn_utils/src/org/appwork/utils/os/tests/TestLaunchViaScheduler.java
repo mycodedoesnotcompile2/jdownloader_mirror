@@ -29,7 +29,7 @@ public class TestLaunchViaScheduler extends AWTest {
             for (ProcessInfo p : before) {
                 pids.add(p.getPid());
             }
-            WindowsUtils.runViaWindowsScheduler("cmd.exe", null, "/c", "ping", "-w", id + "", "-n", "2000", "localhost");
+            WindowsUtils.runViaWindowsScheduler("cmd.exe", null, null, "/c", "ping", "-w", id + "", "-n", "2000", "localhost");
             Timeout timeout = new Timeout(30000);
             boolean found = false;
             Exception exception = null;

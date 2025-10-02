@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -53,12 +54,13 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@HostPlugin(revision = "$Revision: 51549 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51605 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -198,6 +200,19 @@ public class FileFactory extends PluginForHost {
                 return AvailableStatus.TRUE;
             }
             br.followConnection();
+            if (isPasswordProtectedFile(br)) {
+                link.setPasswordProtected(true);
+            } else {
+                link.setPasswordProtected(false);
+            }
+            final String filename = getString(br, "disp_filename");
+            final String filesizeBytesStr = getString(br, "size");
+            if (filename != null) {
+                link.setName(filename);
+            }
+            if (filesizeBytesStr != null) {
+                link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+            }
             checkErrorsWebsite(link, account, br);
         } finally {
             if (isDownload && !success) {
@@ -206,19 +221,6 @@ public class FileFactory extends PluginForHost {
                 }
                 this.dl = null;
             }
-        }
-        if (isPasswordProtectedFile(br)) {
-            link.setPasswordProtected(true);
-        } else {
-            link.setPasswordProtected(false);
-        }
-        String filename = getString(br, "disp_filename");
-        String filesizeBytesStr = getString(br, "size");
-        if (filename != null) {
-            link.setName(filename);
-        }
-        if (filesizeBytesStr != null) {
-            link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
         }
         return AvailableStatus.TRUE;
     }
@@ -239,10 +241,10 @@ public class FileFactory extends PluginForHost {
         return restoreFromString("\"" + value + "\"", TypeRef.STRING);
     }
 
-    public void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException {
+    public void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException, MalformedURLException {
         // TODO: Add more error handling
         final Boolean requiresPremium = getBoolean(br, "requiresPremium");
-        final Boolean isFree = getBoolean(br, "isFree");
+        // final Boolean isFree = getBoolean(br, "isFree");
         final Boolean userIsPremium = getBoolean(br, "userIsPremium");
         String error_code = null;
         String errorData = br.getRegex("\"errorData\\\\\"\\s*:\\s*(\\{.*?\\})\\s*,").getMatch(0);
@@ -260,20 +262,36 @@ public class FileFactory extends PluginForHost {
         if (error_code == null) {
             error_code = br.getRegex("\"errorCode(?:\\\\)?\":(?:\\\\)?\"(.*?)(?:\\\\)?\"").getMatch(0);
         }
-        if (error_code == null) {
-            return;
-        }
-        if ("266".equals(error_code)) {
-            // Please wait a moment before downloading. Free users must wait between downloads. This typically takes 5 minutes after your
-            // last download completed
-            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, errorDataMap != null ? StringUtils.valueOfOrNull(errorDataMap.get("message")) : null);
-        } else if ("FILE_NOT_FOUND".equals(error_code)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (Boolean.FALSE.equals(userIsPremium) && Boolean.TRUE.equals(requiresPremium)) {
+        if (Boolean.FALSE.equals(userIsPremium) && Boolean.TRUE.equals(requiresPremium)) {
             throw new AccountRequiredException();
-        } else {
-            logger.info("Unknown error happened: " + error_code);
-            throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
+        } else if (error_code != null) {
+                if ("266".equals(error_code)) {
+                    // Please wait a moment before downloading. Free users must wait between downloads. This typically takes 5 minutes after
+                    // your
+                    // last download completed
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, errorDataMap != null ? StringUtils.valueOfOrNull(errorDataMap.get("message")) : null);
+                } else if ("FILE_NOT_FOUND".equals(error_code)) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    logger.info("Unknown error happened: " + error_code);
+                    throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
+                }
+            }
+        /* Handle errors inside url parameters */
+        final UrlQuery query = UrlQuery.parse(br.getURL());
+        final String error_type = query.get("type");
+        if (error_type != null) {
+            long waitMillis = 30 * 60 * 1000;
+            final String waitMinutesStr = query.get("minutesLeft");
+            if (waitMinutesStr != null && waitMinutesStr.matches("\\d+")) {
+                waitMillis = Long.parseLong(waitMinutesStr) * 60 * 1000;
+            }
+            if (error_type.equalsIgnoreCase("rate_limit")) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Rate limit reached", waitMillis);
+            } else {
+                logger.info("Unknown error happened: " + error_type);
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_type);
+            }
         }
     }
 
@@ -549,12 +567,23 @@ public class FileFactory extends PluginForHost {
             /* Website has 45-60 seconds of pre download wait time for free (& free-account) users which can be skipped. */
             br.postPageRaw(this.getWebapiBase() + "/download/initiate", JSonStorage.serializeToJson(postdata));
             final Map<String, Object> entries = checkErrorsWebapi(br, account, link);
-            String finallink = entries.get("url").toString();
+            String finallink = (String) entries.get("url");
+            if (finallink == null) {
+                /* 2025-10-01 */
+                finallink = (String) entries.get("downloadUrl");
+            }
+            if (StringUtils.isEmpty(finallink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+            }
             if (Application.getJavaVersion() < Application.JAVA17) {
                 // TODO. Check if this is still working (if http redirects to https we do not need this)
                 finallink = finallink.replaceFirst("(?i)https", "http");
             }
-            final Number fileSize = (Number) entries.get("fileSize");
+            Number fileSize = (Number) entries.get("fileSize");
+            if (fileSize == null) {
+                /* 2025-10-01: atm fields "fileSize" and "filesize" both exist at the same time. */
+                fileSize = (Number) entries.get("filesize");
+            }
             if (fileSize != null) {
                 link.setVerifiedFileSize(fileSize.longValue());
             }

@@ -255,9 +255,9 @@ public class DesktopSupportLinux implements DesktopSupport {
     }
 
     @Override
-    public void openFile(final File file) throws IOException {
+    public void openFile(final File file, boolean tryToReuseWindow) throws IOException {
         if (!this.openCustom(this.linuxFileOpen, file.getAbsolutePath())) {
-            this.fallBack.openFile(file);
+            this.fallBack.openFile(file, tryToReuseWindow);
         }
     }
 

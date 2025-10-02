@@ -34,6 +34,7 @@
 package org.appwork.utils.crypto.tests;
 
 import java.io.File;
+import java.net.URL;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -75,7 +76,8 @@ public class AWSignTest extends AWTest {
         // final URL loc = AWSignTest.class.getProtectionDomain().getCodeSource().getLocation();
         // System.out.println(loc);
         // only works if the test is not part of a jar
-        final File file = new File(AWSignTest.class.getResource(AWSignTest.class.getSimpleName() + ".class").toURI());
+        URL url = AWSignTest.class.getResource(AWSignTest.class.getSimpleName() + ".class");
+        final File file = new File(url.toURI());
         byte[] additionalData = new byte[] { 1, 2, 3 };
         sign = AWSign.createSign(file, pk, true, additionalData);
         AWSign.verify(file, pub, sign, true, additionalData);

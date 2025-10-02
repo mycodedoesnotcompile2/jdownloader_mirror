@@ -83,6 +83,26 @@ public class PostBuildRunner {
     /**
      *
      */
+    private static final int              EXIT_ERROR_BUT_NO_BREAK_JUST_LOG           = 3;
+    /**
+     *
+     */
+    private static final int              EXIT_ERROR                                 = 1;
+    /**
+     *
+     */
+    private static final int              EXIT_NO_CLASS_DEF_FOUND_3                  = 5;
+    /**
+     *
+     */
+    private static final int              EXIT_NO_CLASS_DEF_FOUND_2                  = 4;
+    /**
+     *
+     */
+    private static final int              EXIT_SUCCESS                               = 0;
+    /**
+     *
+     */
     public static final String            POSTBUILDTEST                              = "POSTBUILDTEST";
     /**
      *
@@ -96,6 +116,7 @@ public class PostBuildRunner {
      *
      */
     private static final String           MUST_RUN_WITHOUT_CLASSLOADER_ERRORS_MARKER = "-force=";
+    private static final int              EXIT_NO_CLASS_DEF_FOUND_1                  = 2;
     public static HashMap<String, Object> CONFIG                                     = null;
 
     /**
@@ -270,7 +291,7 @@ public class PostBuildRunner {
                 LogV3.info(header("ERROR") + "Class file(s) not in JAR: " + e.getMessage());
                 LogV3.disableSysout();
                 // LogV3.log(e);
-                System.exit(2);
+                System.exit(EXIT_NO_CLASS_DEF_FOUND_1);
             }
             // Force to cached error log.
             AWTest.setLoggerSilent(false, true);
@@ -296,7 +317,7 @@ public class PostBuildRunner {
             runTest(args[1], args[2], args);
             LogV3.info(header("SUCCESS") + "Test Finished Successfuly");
             LogV3.disableSysout();
-            System.exit(0);
+            System.exit(EXIT_SUCCESS);
             // } catch (java.lang.InstantiationException e) {
         } catch (Throwable e) {
             // Force to cached error log.
@@ -306,15 +327,15 @@ public class PostBuildRunner {
                 logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 LogV3.disableSysout();
-                System.exit(4);
+                System.exit(EXIT_NO_CLASS_DEF_FOUND_2);
             } else if (Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
                 logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 LogV3.disableSysout();
-                System.exit(5);
+                System.exit(EXIT_NO_CLASS_DEF_FOUND_3);
             }
             LogV3.disableSysout();
-            System.exit(1);
+            System.exit(EXIT_ERROR);
         }
     }
 
@@ -447,7 +468,7 @@ public class PostBuildRunner {
             }
             int exit = result.getExitCode();
             AWTest.setLoggerSilent(false, false);
-            if (exit == 3) {
+            if (exit == EXIT_ERROR_BUT_NO_BREAK_JUST_LOG) {
                 // error, but do not stop tests - just log
                 LogV3.info("  >>" + header("failed") + "Exit with ExitCode " + exit);
                 if (result.getStdOutString().length() > 0) {
@@ -457,7 +478,7 @@ public class PostBuildRunner {
                     LogV3.info("      " + result.getErrOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
                 }
                 TESTS_FAILED.put(cls.getName(), "Exit Code " + exit);
-            } else if (exit == 2) {
+            } else if (exit == EXIT_NO_CLASS_DEF_FOUND_1 || exit == EXIT_NO_CLASS_DEF_FOUND_2 || exit == EXIT_NO_CLASS_DEF_FOUND_3) {
                 if (mustRunWithoutClassloaderErrors(cls.getName())) {
                     if (result.getStdOutString().length() > 0) {
                         LogV3.info("      " + result.getStdOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
@@ -483,7 +504,16 @@ public class PostBuildRunner {
                 }
                 TESTS_OK.add(cls.getName());
                 return;
-            } else if (exit == 1) {
+            } else if (exit == EXIT_ERROR) {
+                LogV3.info("  >>" + header("failed") + "Exit with ExitCode " + exit);
+                if (result.getStdOutString().length() > 0) {
+                    LogV3.info("      " + result.getStdOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
+                }
+                if (result.getErrOutString().length() > 0) {
+                    LogV3.info("      " + result.getErrOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
+                }
+                System.exit(exit);
+            } else if (exit != 0) {
                 LogV3.info("  >>" + header("failed") + "Exit with ExitCode " + exit);
                 if (result.getStdOutString().length() > 0) {
                     LogV3.info("      " + result.getStdOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));

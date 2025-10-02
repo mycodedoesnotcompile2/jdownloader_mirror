@@ -7,25 +7,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import jd.http.Browser;
+import jd.plugins.DownloadLink;
+import jd.plugins.hoster.GenericM3u8;
+
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.plugins.hoster.GenericM3u8;
-
 public class HlsContainer {
     public static class MEDIA {
         public static enum TYPE {
+            VIDEO,
             AUDIO,
             SUBTITLES,
             CLOSEDCAPTIONS;
 
             public static TYPE parse(final String type) {
-                if ("AUDIO".equals(type)) {
+                if ("VIDEO".equals(type)) {
+                    return TYPE.VIDEO;
+                } else if ("AUDIO".equals(type)) {
                     return TYPE.AUDIO;
                 } else if ("SUBTITLES".equals(type)) {
                     return TYPE.SUBTITLES;
@@ -313,6 +316,9 @@ public class HlsContainer {
                         hls.framerate = Integer.parseInt(framerate);
                     }
                     final List<MEDIA> containerMedia = new ArrayList<MEDIA>();
+                    if (false) {
+                        final String videoID = new Regex(streamInfo, "(?:,|^)\\s*VIDEO\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+                    }
                     if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         final String audioID = new Regex(streamInfo, "(?:,|^)\\s*AUDIO\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
                         hls.audioGroupID = audioID;

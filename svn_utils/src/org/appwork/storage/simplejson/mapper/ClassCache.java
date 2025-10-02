@@ -618,7 +618,10 @@ public class ClassCache {
                     sb.append(ca[i]);
                 }
             }
-            if (lowerCase) {
+            if (key.equals(sb.toString())) {
+                // avoid new String instance
+                return key;
+            } else if (lowerCase) {
                 return sb.toString();
             } else {
                 return key;

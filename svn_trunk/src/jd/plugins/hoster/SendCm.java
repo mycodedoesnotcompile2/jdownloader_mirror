@@ -71,7 +71,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51366 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51595 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -756,6 +756,11 @@ public class SendCm extends XFileSharingProBasic {
     }
 
     @Override
+    protected String getAPILoginHelpURL() {
+        return "https://" + getHost() + "/?op=my_account";
+    }
+
+    @Override
     public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
         return new SendCmAccountFactory(callback, this);
     }
@@ -833,9 +838,8 @@ public class SendCm extends XFileSharingProBasic {
             this.usernameIsEmail = this.plg.hasFeature(FEATURE.USERNAME_IS_EMAIL);
             this.websiteLoginCookieLoginOnly = this.plg.hasFeature(FEATURE.COOKIE_LOGIN_ONLY);
             this.websiteLoginCookieLoginOptional = this.plg.hasFeature(FEATURE.COOKIE_LOGIN_OPTIONAL);
-            final String domain = this.plg.getHost();
-            final String apikey_help_url_without_protocol = domain + "/?op=my_account";
-            final String apikey_help_url = "https://" + apikey_help_url_without_protocol;
+            final String apikey_help_url_without_protocol = plg.getAPILoginHelpURL().replaceFirst("^https?://", "");
+            final String apikey_help_url = plg.getAPILoginHelpURL();
             // Add account type dropdown
             add(new JLabel("Account Type:"));
             accountTypeComboBox = new JComboBox<String>(new String[] { "Premium Account", "Free Account" });

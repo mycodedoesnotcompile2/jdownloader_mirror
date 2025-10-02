@@ -95,7 +95,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
     }
 
     @Override
-    public void openFile(final File file) throws IOException {
+    public void openFile(final File file, boolean tryToReuseWindow) throws IOException {
         if (this.isOpenFileSupported()) {
             final Desktop desktop = Desktop.getDesktop();
             final URI uri = file.getCanonicalFile().toURI();
@@ -105,7 +105,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupport#shutdown()
      */
     @Override
@@ -115,7 +115,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupport#standby()
      */
     @Override
@@ -125,7 +125,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupport#hibernate()
      */
     @Override
@@ -135,7 +135,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupport#getDefaultDownloadDirectory()
      */
     @Override
@@ -154,11 +154,12 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.os.DesktopSupport#reboot(boolean, int)
      */
     @Override
     public boolean reboot(boolean force, int waitms) throws InterruptedException {
         return false;
     }
+
 }

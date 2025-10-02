@@ -42,6 +42,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.AbstractAction;
+import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -354,6 +355,8 @@ public class ExtTextField extends JTextField implements CaretListener, FocusList
         this.setEditable(!b);
         this.setFocusable(!b);
         this.setBorder(b ? null : new JTextArea().getBorder());
+        setForeground(new JLabel().getForeground());
+
         SwingUtils.setOpaque(this, !b);
         return this;
     }

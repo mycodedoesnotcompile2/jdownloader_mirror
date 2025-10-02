@@ -25,20 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -55,7 +48,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 51232 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51605 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,13 +86,14 @@ public class SankakucomplexCom extends PluginForHost {
         br.setCookie(host, "v", "0");
     }
 
-    private static final boolean ACCESS_MODE_AUTO_PREFER_API_MODE      = false;
     public static final String   PROPERTY_UPLOADER                     = "uploader";
     public static final String   PROPERTY_DIRECTURL                    = "directurl";
     public static final String   PROPERTY_DIRECTURL_FILENAME           = "directurl_filename";
     public static final String   PROPERTY_BOOK_TITLE                   = "book_title";
     public static final String   PROPERTY_TAGS_COMMA_SEPARATED         = "tags_comma_separated";
     public static final String   PROPERTY_IS_PREMIUMONLY               = "is_premiumonly";
+    public static final String   PROPERTY_IS_ACCOUNT_REQUIRED          = "is_account_required";
+    public static final String   PROPERTY_RATING                       = "rating";
     public static final String   PROPERTY_POSITION_NUMBER              = "position_number";
     public static final String   PROPERTY_PAGE_NUMBER                  = "page_number";
     public static final String   PROPERTY_PAGE_NUMBER_MAX              = "page_number_max";
@@ -98,6 +103,9 @@ public class SankakucomplexCom extends PluginForHost {
     public static final String   PROPERTY_EXT_HINT                     = "ext_hint";
     private final String         TIMESTAMP_LAST_TIME_FILE_MAYBE_BROKEN = "timestamp_last_time_file_maybe_broken";
     private static final String  PROPERTY_ACCOUNT_ACCESS_TOKEN         = "access_token";
+
+    private static final String  PROPERTY_API_ACCESS_TOKEN             = "api_token";
+    private static final String  PROPERTY_API_REFRESH_TOKEN            = "api_refresh";
     /* 2024-04-26: Refresh-token is currently not used. */
     private static final String  PROPERTY_ACCOUNT_REFRESH_TOKEN        = "refresh_token";
     /* Don't touch the following! */
@@ -147,12 +155,29 @@ public class SankakucomplexCom extends PluginForHost {
         return "https://chan." + getHost() + "/posts/" + fileID;
     }
 
-    private boolean allowUseAPI(final Account account) {
+    public static enum API_METHOD {
+        POSTS {
+            @Override
+            public boolean isAutoModePreferAPI(Account account, DownloadLink link) {
+                return true;
+            }
+        },
+        OTHER {
+            @Override
+            public boolean isAutoModePreferAPI(Account account, DownloadLink link) {
+                return false;
+            }
+        };
+
+        public abstract boolean isAutoModePreferAPI(Account account, DownloadLink link);
+    }
+
+    private boolean allowUseAPI(final Account account, final DownloadLink link, API_METHOD apiMethod) {
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
         final AccessMode mode = cfg.getLinkcheckAccessMode();
         if (mode == AccessMode.API) {
             return true;
-        } else if (mode == AccessMode.API && ACCESS_MODE_AUTO_PREFER_API_MODE) {
+        } else if (mode == AccessMode.AUTO && apiMethod.isAutoModePreferAPI(account, link)) {
             return true;
         } else {
             return false;
@@ -161,15 +186,35 @@ public class SankakucomplexCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        final AvailableStatus status = requestFileInformation(link, null);
+        /* Use account whenever possible to cover mature content. */
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        if (status == AvailableStatus.TRUE && link.hasProperty(PROPERTY_IS_PREMIUMONLY) && allowUseAPI(null) && !link.isSizeSet() && account != null) {
+        final AvailableStatus status = requestFileInformation(link, account);
+        if (status == AvailableStatus.TRUE && link.hasProperty(PROPERTY_IS_PREMIUMONLY) && allowUseAPI(account, link, API_METHOD.POSTS) && !link.isSizeSet() && account != null) {
             /* Workaround for when some file information is missing when link leads to account-only content and is checked via API. */
             logger.info("Failed to find file size via API and item is only available via account while we have an account -> Checking status again via website in hope to obtain all information");
             return requestFileInformationWebsite(link, account, false);
         } else {
             return status;
         }
+    }
+
+    @Override
+    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
+        if (downloadLink != null) {
+            if ("s".equals(downloadLink.getStringProperty(PROPERTY_RATING)) && account == null) {
+                // rating requires an account
+                return false;
+            }
+            if (downloadLink.hasProperty(PROPERTY_IS_ACCOUNT_REQUIRED) && account == null) {
+                // account required, rating unknown
+                return false;
+            }
+            if (downloadLink.hasProperty(PROPERTY_IS_PREMIUMONLY) && !AccountType.PREMIUM.is(account)) {
+                // premium account required
+                return false;
+            }
+        }
+        return super.canHandle(downloadLink, account);
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
@@ -180,7 +225,7 @@ public class SankakucomplexCom extends PluginForHost {
         } else {
             fileIDIsAPICompatible = true;
         }
-        if (fileIDIsAPICompatible && allowUseAPI(account)) {
+        if (fileIDIsAPICompatible && allowUseAPI(account, link, API_METHOD.POSTS)) {
             return requestFileInformationAPI(link, account, false);
         } else {
             return requestFileInformationWebsite(link, account, false);
@@ -214,9 +259,13 @@ public class SankakucomplexCom extends PluginForHost {
         } else if (!this.canHandle(br.getURL())) {
             /* E.g. redirect to https://chan.sankakucomplex.com/de/posts */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.endsWithCaseInsensitive(br.getURL(), "/show_empty")) {
+        } else if (StringUtils.endsWithCaseInsensitive(br.getURL(), "posts/show_empty")) {
             /* E.g. redirect to https://chan.sankakucomplex.com/de/posts/show_empty */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            if (account == null) {
+                return requestFileInformationAPI(link, null, isDownload);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
         }
         if (br.containsHTML(">\\s*You lack the access rights required to view this content") || br.containsHTML(">\\s*Nothing is visible to you here")) {
             /* Content can only be downloaded by premium users or mature content which can only be downloaded by logged in users. */
@@ -239,7 +288,7 @@ public class SankakucomplexCom extends PluginForHost {
         if (dllink == null) {
             /* 2021-02-23: Image download - if the upper handling fails on videos, this may make us download an image vs a video */
             logger.info("Download of original file is not possible");
-            dllink = br.getRegex("<meta content=\"(//[^<>\"]+)\" property=og:image>").getMatch(0);
+            dllink = br.getRegex("<meta content=\"(//[^\"]+)\" property=og:image>").getMatch(0);
         }
         if (dllink != null) {
             dllink = Encoding.htmlOnlyDecode(dllink);
@@ -296,12 +345,17 @@ public class SankakucomplexCom extends PluginForHost {
     private AvailableStatus requestFileInformationAPI(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         setWeakFilename(link);
         final String fileID = this.getFID(link);
-        if (account != null) {
-            this.login(account, false);
-        }
         final Browser brc = this.createNewBrowserInstance();
         brc.setAllowedResponseCodes(400);
-        brc.getPage(SankakucomplexComCrawler.API_BASE + "/posts?lang=en&page=1&limit=1&tags=id_range:" + fileID);
+        // Hint: https://sankakuapi.com/posts/ID/fu?lang=en -> return fileURLs even without being logged in?!
+        final GetRequest request = brc.createGetRequest(SankakucomplexComCrawler.API_BASE_NEW + "/v2/posts?lang=en&page=1&limit=1&tags=id_range:" + fileID);
+        if (account != null) {
+            final String accessToken = getAPIToken(account);
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + accessToken);
+        }
+        brc.getPage(request);
         if (brc.getHttpConnection().getResponseCode() == 400) {
             /* {"success":false,"code":"invalid id","error":"invalid id","errorId":"error_<someHash>"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -312,12 +366,12 @@ public class SankakucomplexCom extends PluginForHost {
             final Map<String, Object> errormap = (Map<String, Object>) obj;
             final String errorcode = (String) errormap.get("code");
             if (StringUtils.equalsIgnoreCase(errorcode, "snackbar__content-belongs-to-premium-client")) {
-                link.setProperty(PROPERTY_IS_PREMIUMONLY, true);
+                link.setProperty(PROPERTY_IS_ACCOUNT_REQUIRED, true);
                 return AvailableStatus.TRUE;
             } else if (brc.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "API error: " + errorcode);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "API error: " + errorcode);
             }
         }
         final List<Object> ressourcelist = (List<Object>) obj;
@@ -325,6 +379,9 @@ public class SankakucomplexCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> item = (Map<String, Object>) ressourcelist.get(0);
+        if (item == null || !fileID.equals(item.get("id"))) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         parseFileInfoAndSetFilenameAPI(this, link, item);
         return AvailableStatus.TRUE;
     }
@@ -334,7 +391,13 @@ public class SankakucomplexCom extends PluginForHost {
         link.setProperty(PROPERTY_UPLOADER, author.get("name"));
         // final boolean isActive = StringUtils.equalsIgnoreCase(item.get("status").toString(), "active");
         final String mimeType = item.get("file_type").toString();
-        final String ext = plugin.getExtensionFromMimeType(mimeType);
+        String file_ext = plugin.getExtensionFromMimeType(mimeType);
+        if (file_ext == null) {
+            file_ext = item.get("file_ext").toString();
+        }
+        if (file_ext != null) {
+            link.setProperty(PROPERTY_EXT_HINT, file_ext);
+        }
         final Number file_size = (Number) item.get("file_size");
         if (file_size != null) {
             /*
@@ -343,12 +406,13 @@ public class SankakucomplexCom extends PluginForHost {
             // link.setVerifiedFileSize(file_size.longValue());
             link.setDownloadSize(file_size.longValue());
         }
-        if ((Boolean) item.get("is_premium")) {
+        if (Boolean.TRUE.equals(item.get("is_premium"))) {
             // throw new AccountRequiredException();
             link.setProperty(PROPERTY_IS_PREMIUMONLY, true);
         } else {
             link.removeProperty(PROPERTY_IS_PREMIUMONLY);
         }
+        link.setProperty(PROPERTY_RATING, item.get("rating"));
         final List<Map<String, Object>> tags = (List<Map<String, Object>>) item.get("tags");
         if (tags != null && tags.size() > 0) {
             String tagsCommaSeparated = "";
@@ -373,7 +437,7 @@ public class SankakucomplexCom extends PluginForHost {
             /*
              * Do not set md5 hash since we don't know if we will download the original file in the end or a lower quality version.
              */
-            // link.setMD5Hash(md5hash);
+            // link.setHashInfo(HashInfo.parse(md5hash, false,false));
         }
         storeDirecturl(link, item.get("file_url").toString());
         link.setProperty(PROPERTY_SOURCE, item.get("source"));
@@ -381,9 +445,9 @@ public class SankakucomplexCom extends PluginForHost {
         final int pageNumber = link.getIntegerProperty(PROPERTY_PAGE_NUMBER, 0) + 1;
         final int pageNumberMax = link.getIntegerProperty(PROPERTY_PAGE_NUMBER_MAX, 0) + 1;
         if (pageNumberMax > 1 && bookTitle != null) {
-            link.setFinalFileName(StringUtils.formatByPadLength(StringUtils.getPadLength(pageNumberMax), pageNumber) + "_" + item.get("id") + "." + ext);
+            link.setFinalFileName(StringUtils.formatByPadLength(StringUtils.getPadLength(pageNumberMax), pageNumber) + "_" + item.get("id") + "." + file_ext);
         } else {
-            link.setFinalFileName(item.get("id") + "." + ext);
+            link.setFinalFileName(item.get("id") + "." + file_ext);
         }
         final Map<String, Object> created_at_map = (Map<String, Object>) item.get("created_at");
         if (created_at_map != null) {
@@ -445,8 +509,8 @@ public class SankakucomplexCom extends PluginForHost {
 
     private static void prepareDownloadHeaders(final Browser br) {
         /**
-         * 2024-11-12: Do not send a referer header! </br>
-         * This is really important else we may get redirected to a dummy image. Looks to be some kind of pseudo protection.
+         * 2024-11-12: Do not send a referer header! </br> This is really important else we may get redirected to a dummy image. Looks to be
+         * some kind of pseudo protection.
          */
         br.getHeaders().put("Referer", "");
         // br.setCurrentURL(null);
@@ -476,8 +540,8 @@ public class SankakucomplexCom extends PluginForHost {
         final String errortext = "Broken or temporarily unavailable file";
         if (System.currentTimeMillis() - timestampLastTimeFileMaybeBroken <= 5 * 60 * 1000l) {
             /**
-             * Failed again in a short time even with fresh direct URL: </br>
-             * Wait longer time before retry as we've just recently tried and it failed again.
+             * Failed again in a short time even with fresh direct URL: </br> Wait longer time before retry as we've just recently tried and
+             * it failed again.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext, 5 * 60 * 1000l);
         } else {
@@ -565,17 +629,17 @@ public class SankakucomplexCom extends PluginForHost {
                 /* E.g. {"success":false,"code":"snackbar-message__not_found"} */
                 throw new AccountInvalidException();
             }
-            final String access_token = entries.get("access_token").toString();
-            final String refresh_token = entries.get("refresh_token").toString();
-            if (StringUtils.isEmpty(access_token)) {
+            final String account_access_token = entries.get("access_token").toString();
+            final String account_refresh_token = entries.get("refresh_token").toString();
+            if (StringUtils.isEmpty(account_access_token)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            br.setCookie(br.getHost(), "accessToken", access_token);
+            br.setCookie(br.getHost(), "accessToken", account_access_token);
             br.setCookie(br.getHost(), "position", "0");
-            br.setCookie(br.getHost(), "refreshToken", refresh_token);
+            br.setCookie(br.getHost(), "refreshToken", account_refresh_token);
             // br.setCookie(br.getHost(), "ssoLoginValid", System.currentTimeMillis() + "");
             final UrlQuery query = new UrlQuery();
-            query.add("access_token", Encoding.urlEncode(access_token));
+            query.add("access_token", Encoding.urlEncode(account_access_token));
             query.add("state", "lang=en&theme=white");
             br.postPage("/oidc/interaction/" + _grant + "/login", query);
             /* Double-check */
@@ -584,9 +648,110 @@ public class SankakucomplexCom extends PluginForHost {
                 throw new AccountInvalidException("Unknown login failure");
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
-            account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN, access_token);
-            account.setProperty(PROPERTY_ACCOUNT_REFRESH_TOKEN, refresh_token);
+            account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN, account_access_token);
+            account.setProperty(PROPERTY_ACCOUNT_REFRESH_TOKEN, account_refresh_token);
+            refreshAPIToken(account);
+            getAPIAccountDetails(account);
             return true;
+        }
+    }
+
+    public boolean isTokenValid(final String token) {
+        if (token == null) {
+            return false;
+        }
+        try {
+            String jwtContent = new Regex(token, ".*?\\.(.*?)\\.").getMatch(0);
+            final int pad = jwtContent.length() % 4;
+            switch (pad) {
+            case 1:
+                jwtContent += "===";
+                break;
+            case 2:
+                jwtContent += "==";
+                break;
+            case 3:
+                jwtContent += "=";
+                break;
+            case 0:
+                break;
+            }
+            final String jwt = Base64.decodeToString(jwtContent);
+            final String exp = new Regex(jwt, "\"exp\"\\s*:\\s*(\\d+)").getMatch(0);
+            final long expireOn = Long.parseLong(exp) * 1000;
+            if (System.currentTimeMillis() + (5 * 60 * 1000) < expireOn) {
+                // only use if still valid for at last 5 minutes
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            logger.log(e);
+            return false;
+        }
+    }
+
+    public String getAPIToken(Account account) throws Exception {
+        synchronized (account) {
+            final String ret = account.getStringProperty(PROPERTY_API_ACCESS_TOKEN);
+            if (isTokenValid(ret)) {
+                return ret;
+            }
+            return refreshAPIToken(account);
+        }
+    }
+
+    protected Map<String, Object> getAPIAccountDetails(Account account) throws Exception {
+        synchronized (account) {
+            final String apiToken = getAPIToken(account);
+            final Browser brc = createNewBrowserInstance();
+            final GetRequest request = brc.createGetRequest("https://sankakuapi.com/users/me?lang=en");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + apiToken);
+            final String response = brc.getPage(request);
+            final Map<String, Object> entries = restoreFromString(response, TypeRef.MAP);
+            if (!Boolean.TRUE.equals(entries.get("success"))) {
+                throw new AccountInvalidException();
+            }
+            return entries;
+        }
+    }
+
+    protected String refreshAPIToken(Account account) throws Exception {
+        synchronized (account) {
+            final Browser brc = createNewBrowserInstance();
+            final Map<String, Object> json = new HashMap<String, Object>();
+            json.put("access_token", getAccountToken(account));
+            json.put("client_id", "sankaku-web-app");
+            json.put("url", "https://www.sankakucomplex.com");
+            final PostRequest request = brc.createJSonPostRequest("https://sankakuapi.com/sso/token-exchange?lang=en", json);
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
+            final String response = brc.getPage(request);
+            final Map<String, Object> entries = restoreFromString(response, TypeRef.MAP);
+            if (!Boolean.TRUE.equals(entries.get("success"))) {
+                throw new AccountInvalidException();
+            }
+            final String api_access_token = entries.get("access_token").toString();
+            final String api_refresh_token = entries.get("refresh_token").toString();
+            if (StringUtils.isEmpty(api_access_token)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            account.setProperty(PROPERTY_API_ACCESS_TOKEN, api_access_token);
+            account.setProperty(PROPERTY_API_REFRESH_TOKEN, api_refresh_token);
+            return api_access_token;
+        }
+    }
+
+    public String getAccountToken(Account account) throws Exception {
+        synchronized (account) {
+            final String ret = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
+            if (isTokenValid(ret)) {
+                return ret;
+            }
+            login(account, true);
+            return account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
         }
     }
 
@@ -603,10 +768,15 @@ public class SankakucomplexCom extends PluginForHost {
         login(account, true);
         final AccountInfo ai = new AccountInfo();
         ai.setUnlimitedTraffic();
-        if (br.containsHTML(">\\s*Subscription Level\\s*:\\s*<a href=\"[^\"]+\">\\s*Plus\\s*<")) {
-            account.setType(AccountType.PREMIUM);
+        if (false) {
+            // TODO: finish use of api when a premium account is at hand
+            final Map<String, Object> accountDetails = getAPIAccountDetails(account);
         } else {
-            account.setType(AccountType.FREE);
+            if (br.containsHTML(">\\s*Subscription Level\\s*:\\s*<a href=\"[^\"]+\">\\s*Plus\\s*<")) {
+                account.setType(AccountType.PREMIUM);
+            } else {
+                account.setType(AccountType.FREE);
+            }
         }
         return ai;
     }

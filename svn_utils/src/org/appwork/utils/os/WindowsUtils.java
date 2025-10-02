@@ -65,6 +65,8 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.jna.windows.Kernel32Ext;
 import org.appwork.jna.windows.Rm;
 import org.appwork.jna.windows.RmProcessInfo;
+import org.appwork.jna.windows.User32Ext;
+import org.appwork.jna.windows.Wtsapi32Ext;
 import org.appwork.jna.windows.interfaces.Advapi32Ext;
 import org.appwork.jna.windows.interfaces.ByHandleFileInformation;
 import org.appwork.jna.windows.interfaces.ExplicitAccess;
@@ -90,6 +92,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.StringArray;
 import com.sun.jna.Structure;
 import com.sun.jna.WString;
+import com.sun.jna.platform.DesktopWindow;
 import com.sun.jna.platform.win32.AccCtrl;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
@@ -103,6 +106,7 @@ import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinDef.BOOLByReference;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.DWORDByReference;
+import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinDef.INT_PTR;
 import com.sun.jna.platform.win32.WinError;
 import com.sun.jna.platform.win32.WinNT;
@@ -117,6 +121,8 @@ import com.sun.jna.platform.win32.WinNT.SECURITY_DESCRIPTOR_RELATIVE;
 import com.sun.jna.platform.win32.WinNT.SECURITY_IMPERSONATION_LEVEL;
 import com.sun.jna.platform.win32.WinNT.SID_NAME_USE;
 import com.sun.jna.platform.win32.WinNT.TOKEN_ELEVATION;
+import com.sun.jna.platform.win32.WinUser;
+import com.sun.jna.platform.win32.Wtsapi32;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.LongByReference;
 import com.sun.jna.ptr.PointerByReference;
@@ -1747,7 +1753,54 @@ public class WindowsUtils {
         return input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;");
     }
 
-    public static void runViaWindowsScheduler(String binary, String workingDir, String... args) throws IOException, InterruptedException {
+    /**
+     * works only under local system
+     *
+     * @return
+     */
+    public static Advapi32Util.Account getActiveConsoleAccount() {
+        // 1. Get active console session id
+        int sessionId = Kernel32Ext.INSTANCE.WTSGetActiveConsoleSessionId();
+        if (sessionId == 0xFFFFFFFF) {
+            return null; // no active session
+        }
+        // 2. Get user token from that session
+        final PointerByReference token = new PointerByReference();
+        if (!Wtsapi32Ext.INSTANCE.WTSQueryUserToken(sessionId, token)) {
+            final int code = Kernel32.INSTANCE.GetLastError();
+            throw new Win32Exception(code);
+        }
+        final HANDLE handle = new HANDLE(token.getValue());
+        try {
+            // 3. Use Advapi32Util helper to resolve account info
+            final Advapi32Util.Account acc = Advapi32Util.getTokenAccount(handle);
+            return acc;
+        } finally {
+            // cleanup
+            Kernel32.INSTANCE.CloseHandle(handle);
+        }
+    }
+
+    private static String querySessionInfo(int sessionId, int infoClass) {
+        final PointerByReference ppBuffer = new PointerByReference();
+        final IntByReference pBytesReturned = new IntByReference();
+        final boolean ok = Wtsapi32.INSTANCE.WTSQuerySessionInformation(Wtsapi32.WTS_CURRENT_SERVER_HANDLE, sessionId, infoClass, ppBuffer, pBytesReturned);
+        if (!ok) {
+            return null;
+        }
+        final Pointer p = ppBuffer.getValue();
+        try {
+            return p.getWideString(0);
+        } finally {
+            Wtsapi32.INSTANCE.WTSFreeMemory(p);
+        }
+    }
+
+    public static void main(String[] args) {
+        System.out.println(getActiveConsoleAccount());
+    }
+
+    public static void runViaWindowsScheduler(String binary, String workingDir, String sid, String... args) throws IOException, InterruptedException {
         String taskName = "TempAppWorkJavaTask_" + UniqueAlltimeID.next();
         LogV3.info("Launch via Scheduler: " + binary + "  " + Arrays.toString(args) + " in " + workingDir);
         File file = Application.getResource("tmp/" + taskName + ".xml");
@@ -1760,6 +1813,18 @@ public class WindowsUtils {
         String argumentsXMLNode = "";
         if (args.length > 0) {
             argumentsXMLNode = "<Arguments>" + escapeXml(ShellParser.createCommandLine(Style.WINDOWS, args)) + "</Arguments>\n";
+        }
+        if (sid == null) {
+            try {
+                // works only for local sytsem processes
+                Account activeUser = getActiveConsoleAccount();
+                if (activeUser != null) {
+                    sid = activeUser.sidString;
+                }
+            } catch (Win32Exception e) {
+                LogV3.log(e);
+                // not found
+            }
         }
         // @formatter:off
         String xml =
@@ -1778,6 +1843,7 @@ public class WindowsUtils {
                 "  </Triggers>\n" +
                 "  <Principals>\n" +
                 "    <Principal id=\"Author\">\n" +
+               ( sid==null?"": ("      <UserId>"+sid+"</UserId>\n") )+
                 "      <LogonType>InteractiveToken</LogonType>\n" +
                 "      <RunLevel>LeastPrivilege</RunLevel>\n" +
                 "    </Principal>\n" +
@@ -1801,6 +1867,7 @@ public class WindowsUtils {
                 "  </Actions>\n" +
                 "</Task>";
      // @formatter:on
+        LogV3.info("XML:\r\n" + xml);
         ByteArrayOutputStream bao = new ByteArrayOutputStream();
         bao.write(BOM.UTF16LE.getBOM());
         bao.write(xml.getBytes("UTF-16LE"));
@@ -1831,5 +1898,49 @@ public class WindowsUtils {
         } finally {
             file.delete();
         }
+    }
+
+    protected static void flashWindow(HWND hwnd) {
+        User32Ext.FLASHWINFO fwi = new User32Ext.FLASHWINFO();
+        fwi.cbSize = fwi.size();
+        fwi.hwnd = hwnd;
+        fwi.dwFlags = User32Ext.FLASHW_ALL | User32Ext.FLASHW_TIMERNOFG;
+        fwi.uCount = 0; // flash until window comes to foreground
+        fwi.dwTimeout = 0;
+        User32Ext.INSTANCE.FlashWindowEx(fwi);
+    }
+
+    /**
+     * @param openFolder
+     */
+    public static boolean explorerToFront(File openFolder) {
+        for (DesktopWindow window : com.sun.jna.platform.WindowUtils.getAllWindows(true)) {
+            if (StringUtils.isEmpty(window.getTitle())) {
+                continue;
+            }
+            String filepath = window.getFilePath();
+            if (StringUtils.equalsIgnoreCase(filepath, System.getenv("WINDIR") + "\\explorer.exe")) {
+                String title = window.getTitle();
+                int i = title.lastIndexOf(" – ");
+                if (i > 0) {
+                    title = title.substring(0, i);
+                }
+                if (StringUtils.equalsIgnoreCase(title, openFolder.getAbsolutePath())) {
+                    HWND hwnd = window.getHWND();
+                    // Get current placement
+                    WinUser.WINDOWPLACEMENT placement = new WinUser.WINDOWPLACEMENT();
+                    User32Ext.INSTANCE.GetWindowPlacement(hwnd, placement);
+                    if (placement.showCmd == WinUser.SW_SHOWMINIMIZED) {
+                        // Restore only if minimized
+                        User32Ext.INSTANCE.ShowWindow(hwnd, WinUser.SW_RESTORE);
+                    }
+                    // Always bring to front
+                    // flashWindow(hwnd);
+                    User32Ext.INSTANCE.SetForegroundWindow(hwnd);
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

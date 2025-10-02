@@ -869,6 +869,9 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * @return
      */
     public boolean evaluateDontShowAgainFlag() {
+        if (BinaryLogic.containsAll(this.flagMask, UIOManager.LOGIC_DONT_SHOW_AGAIN_GUI_ONLY)) {
+            return false;
+        }
         if (this.isDontShowAgainFlagEabled()) {
             final String key = this.getDontShowAgainKey();
             if (key != null) {
@@ -1742,6 +1745,9 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
 
     public int writeDontShowAgainAnswer(final boolean clickedOK, boolean isDontShowAgainSelected) {
         int ret = clickedOK ? Dialog.RETURN_OK : Dialog.RETURN_CANCEL;
+        if (BinaryLogic.containsAll(this.flagMask, UIOManager.LOGIC_DONT_SHOW_AGAIN_GUI_ONLY)) {
+            return ret;
+        }
         if (isDontShowAgainSelected) {
             ret |= Dialog.RETURN_DONT_SHOW_AGAIN;
             if (BinaryLogic.containsAll(this.flagMask, UIOManager.LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL) && !clickedOK) {

@@ -141,7 +141,7 @@ public class ParameterParser {
                     var = var.substring(1);
                 }
                 if (switchCommand != null || params.size() > 0) {
-                    final CommandSwitch commandSwitch = new CommandSwitch(switchCommand, params.toArray(new String[] {}));
+                    final CommandSwitch commandSwitch = new CommandSwitch(this, switchCommand, params.toArray(new String[] {}));
                     map.put(commandSwitch.getCaseInsensitiveSwitchCommand(), commandSwitch);
                     list.add(commandSwitch);
                 }
@@ -152,7 +152,7 @@ public class ParameterParser {
             }
         }
         if (switchCommand != null || params.size() > 0) {
-            final CommandSwitch commandSwitch = new CommandSwitch(switchCommand, params.toArray(new String[] {}));
+            final CommandSwitch commandSwitch = new CommandSwitch(this, switchCommand, params.toArray(new String[] {}));
             map.put(commandSwitch.getCaseInsensitiveSwitchCommand(), commandSwitch);
             list.add(commandSwitch);
         }

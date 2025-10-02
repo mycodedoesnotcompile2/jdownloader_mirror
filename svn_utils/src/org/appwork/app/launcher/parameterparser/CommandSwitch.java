@@ -48,23 +48,38 @@ public class CommandSwitch {
     /**
      * the parameters that follow the {@link #switchCommand} without leading -
      */
-    private String[]     parameters;
+    protected String[]              parameters;
     /**
      * command. given at startup with --command or -command
      */
-    private final String caseInsensitiveSwitchCommand;
-    private final String caseSensitiveSwitchCommand;
+    protected final String          caseInsensitiveSwitchCommand;
+    protected final String          caseSensitiveSwitchCommand;
+    protected final ParameterParser parser;
 
     /**
+     * @param parameterParser
      * @param switchCommand
      * @param caseSensitiveSwitch
      *            *
      * @param array
      */
+    @Deprecated
     public CommandSwitch(final String switchCommand, final String[] array) {
+        this(null, switchCommand, array);
+    }
+
+    public CommandSwitch(ParameterParser parameterParser, final String switchCommand, final String[] array) {
+        parser = parameterParser;
         this.caseInsensitiveSwitchCommand = StringUtils.toLowerCaseOrNull(switchCommand);
         this.caseSensitiveSwitchCommand = switchCommand;
         parameters = array;
+    }
+
+    /**
+     * @return the parser
+     */
+    public ParameterParser getParser() {
+        return parser;
     }
 
     @Override

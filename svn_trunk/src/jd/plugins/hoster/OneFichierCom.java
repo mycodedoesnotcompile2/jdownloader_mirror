@@ -15,6 +15,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,8 +29,19 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter.HighlightPainter;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.DebugMode;
@@ -35,17 +50,22 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
+import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.requests.PostRequest;
@@ -66,23 +86,26 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
+import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51591 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51599 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
-    private final String       PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
-    private final String       PROPERTY_ACCOUNT_CDN_CREDITS_BYTES                                = "cdn_credits_bytes";
-    private final String       PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT                                  = "is_gold_account";
-    private final String       PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED                           = "timestamp_vpn_detected";
-    private final String       PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING                      = "has_shown_vpn_login_warning";
-    private final String       PROPERTY_ACCOUNT_HAS_SHOWN_UNKNOWN_ACCOUNT_TYPE_WARNING_TIMESTAMP = "unknown_account_type_timestamp";
+    private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
+    private final String        PROPERTY_ACCOUNT_CDN_CREDITS_BYTES                                = "cdn_credits_bytes";
+    private final String        PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT                                  = "is_gold_account";
+    private final String        PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED                           = "timestamp_vpn_detected";
+    private final String        PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING                      = "has_shown_vpn_login_warning";
+    private final String        PROPERTY_ACCOUNT_HAS_SHOWN_UNKNOWN_ACCOUNT_TYPE_WARNING_TIMESTAMP = "unknown_account_type_timestamp";
+    private static final String PROPERTY_ACCOUNT_FORCE_API_LOGIN                                  = "force_api_login";
+    private static final String PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN                              = "force_website_login";
     /* DownloadLink properties */
-    private final String       PROPERTY_HOTLINK                                                  = "hotlink";
+    private final String        PROPERTY_HOTLINK                                                  = "hotlink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
-    public static final String PROPERTY_ACL_ACCESS_CONTROL_LIMIT                                 = "acl_access_control_limit";
+    public static final String  PROPERTY_ACL_ACCESS_CONTROL_LIMIT                                 = "acl_access_control_limit";
     /** 2019-04-04: Documentation: https://1fichier.com/api.html */
-    public static final String API_BASE                                                          = "https://api.1fichier.com/v1";
-    private final boolean      allowFreeAccountDownloadsViaAPI                                   = false;
+    public static final String  API_BASE                                                          = "https://api.1fichier.com/v1";
+    private final boolean       allowFreeAccountDownloadsViaAPI                                   = false;
 
     @Override
     public String[] siteSupportedNames() {
@@ -834,7 +857,7 @@ public class OneFichierCom extends PluginForHost {
         if (api_error != null && api_error.matches("(?i)Flood detected: (User|User APK|IP) Locked.*?")) {
             logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
             final long cachedCdnCreditsBytes = account.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, -1);
-            AccountType type = AccountType.UNKNOWN;
+            AccountType type = null;
             if (account.lastUpdateTime() > 0) {
                 final AccountType oldAccountType = account.getType();
                 if (AccountType.FREE.equals(oldAccountType) && !allowFreeAccountDownloadsViaAPI) {
@@ -872,7 +895,7 @@ public class OneFichierCom extends PluginForHost {
                 displayAPIMode_UnknownAccountTypeWarning(account);
             }
             account.setType(type);
-            ai.setStatus(type.getLabel() + " | Try account-check again later, downloads are not affected by this message!");
+            ai.setStatus(type.getLabel() + " | Cannot obtain account info atm. | Try account-check again later. | Downloads are not affected by this message!");
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
             if (type == AccountType.PREMIUM || type == AccountType.UNKNOWN) {
@@ -1702,10 +1725,320 @@ public class OneFichierCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
+    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            return new OneFichierAccountFactory(callback, this);
+        } else {
+            return super.getAccountFactory(callback);
+        }
     }
 
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+    public static class OneFichierAccountFactory extends MigPanel implements AccountBuilderInterface {
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+
+        protected String getPassword() {
+            if (this.pass == null) {
+                return null;
+            } else {
+                return new String(this.pass.getPassword());
+            }
+        }
+
+        protected String getUsername() {
+            if (name == null) {
+                return "";
+            } else {
+                if (_GUI.T.jd_gui_swing_components_AccountDialog_help_username().equals(this.name.getText())) {
+                    return null;
+                }
+                return this.name.getText();
+            }
+        }
+
+        protected String getApikey() {
+            if (apikey == null) {
+                return null;
+            } else {
+                return this.apikey.getText();
+            }
+        }
+
+        private final ExtTextField                  name;
+        private final ExtPasswordField              pass;
+        private final ExtPasswordField              apikey;
+        private final JLabel                        apikeyLabel;
+        private final InputChangedCallbackInterface callback;
+        private JLabel                              usernameLabel         = null;
+        private final JLabel                        passwordLabel;
+        private final OneFichierCom                 plg;
+        private final boolean                       usernameIsEmail;
+        // New components for account type selection
+        private final JComboBox                     accountTypeComboBox;
+        private final JPanel                        premiumAccountPanel;
+        private final JPanel                        freeAccountPanel;
+        private final JLabel                        premiumInstructionsLabel;
+        private final JLabel                        premiumInstructionsLink;
+        private JLabel                              freeInstructionsLabel = null;
+        private JLabel                              freeInstructionsLink  = null;
+
+        public boolean updateAccount(Account input, Account output) {
+            boolean changed = false;
+            if (!StringUtils.equals(input.getUser(), output.getUser())) {
+                output.setUser(input.getUser());
+                changed = true;
+            }
+            if (!StringUtils.equals(input.getPass(), output.getPass())) {
+                output.setPass(input.getPass());
+                changed = true;
+            }
+            return changed;
+        }
+
+        public OneFichierAccountFactory(final InputChangedCallbackInterface callback, final OneFichierCom plg) {
+            super("ins 0, wrap 2", "[][grow,fill]", "");
+            this.plg = plg;
+            this.callback = callback;
+            this.usernameIsEmail = this.plg.hasFeature(FEATURE.USERNAME_IS_EMAIL);
+            final String apikey_help_url_without_protocol = plg.getAPILoginHelpURL().replaceFirst("^https?://", "");
+            final String apikey_help_url = plg.getAPILoginHelpURL();
+            // Add account type dropdown
+            add(new JLabel("Account Type:"));
+            accountTypeComboBox = new JComboBox<String>(new String[] { "Premium Account", "Premium GOLD Account", "Free Account with paid CDN credits", "Free Account" });
+            accountTypeComboBox.setSelectedIndex(0);
+            accountTypeComboBox.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    updateVisibleComponents();
+                    callback.onChangedInput(accountTypeComboBox);
+                }
+            });
+            add(accountTypeComboBox);
+            // Create premium account panel
+            premiumAccountPanel = new JPanel(new MigLayout("ins 0, wrap 2", "[][grow,fill]", ""));
+            premiumInstructionsLabel = new JLabel("Premium account users:");
+            premiumInstructionsLink = new JLink("Enter API key (click here to find it)", apikey_help_url);
+            premiumAccountPanel.add(premiumInstructionsLabel);
+            premiumAccountPanel.add(premiumInstructionsLink);
+            apikeyLabel = new JLink("Premium API Key: ", apikey_help_url);
+            premiumAccountPanel.add(apikeyLabel);
+            this.apikey = new ExtPasswordField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(apikey);
+                }
+            };
+            this.apikey.setHelpText("Obtain API key here: " + apikey_help_url_without_protocol);
+            premiumAccountPanel.add(this.apikey);
+            // Create free account panel
+            freeAccountPanel = new JPanel(new MigLayout("ins 0, wrap 2", "[][grow,fill]", ""));
+            JLabel freeInstructionsLabel = new JLabel("E-Mail & pass");
+            JLabel premiumInstructionsLabel = new JLabel("API Key");
+            freeAccountPanel.add(freeInstructionsLabel);
+            freeAccountPanel.add(premiumInstructionsLabel);
+            // Username/E-Mail field
+            if (this.usernameIsEmail) {
+                usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_email());
+            } else {
+                usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name());
+            }
+            freeAccountPanel.add(usernameLabel);
+            this.name = new ExtTextField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(name);
+                }
+
+                {
+                    final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")));
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")));
+                    refreshTextHighlighter();
+                }
+            };
+            if (this.usernameIsEmail) {
+                name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_email());
+            } else {
+                name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_username());
+            }
+            freeAccountPanel.add(name);
+            // Password field
+            /* Normal username & password login */
+            passwordLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass());
+            freeAccountPanel.add(passwordLabel);
+            this.pass = new ExtPasswordField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(pass);
+                }
+
+                {
+                    final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")) {
+                        public boolean highlight(javax.swing.text.Highlighter highlighter, CharSequence charSequence) {
+                            if (Cookies.parseCookiesFromString(charSequence.toString()) != null) {
+                                return false;
+                            } else {
+                                return super.highlight(highlighter, charSequence);
+                            }
+                        };
+                    });
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")) {
+                        public boolean highlight(javax.swing.text.Highlighter highlighter, CharSequence charSequence) {
+                            if (Cookies.parseCookiesFromString(charSequence.toString()) != null) {
+                                return false;
+                            } else {
+                                return super.highlight(highlighter, charSequence);
+                            }
+                        };
+                    });
+                    applyTextHighlighter(null);
+                }
+            };
+            /* Normal username & password login */
+            pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
+            freeAccountPanel.add(pass);
+            // Add panels to main container
+            add(premiumAccountPanel, "span 2, grow");
+            add(freeAccountPanel, "span 2, grow");
+            // Handle clipboard auto-fill
+            handleClipboardAutoFill(apikey_help_url_without_protocol);
+            // Set initial visibility
+            updateVisibleComponents();
+        }
+
+        private void handleClipboardAutoFill(String apikey_help_url_without_protocol) {
+            final ExtTextField dummy = new ExtTextField();
+            dummy.paste();
+            final String clipboard = dummy.getText();
+            if (StringUtils.isEmpty(clipboard)) {
+                return;
+            }
+            /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
+            final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
+            if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
+                this.apikey.setText(clipboard);
+            } else if (userCookies == null && clipboard.trim().length() > 0) {
+                /* Auto fill username field with clipboard content. */
+                name.setText(clipboard);
+            }
+            updateVisibleComponents();
+        }
+
+        private void updateVisibleComponents() {
+            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            premiumAccountPanel.setVisible(isPremium);
+            freeAccountPanel.setVisible(!isPremium);
+            if (isPremium) {
+                this.remove(freeAccountPanel);
+                this.add(premiumAccountPanel);
+            } else {
+                this.remove(premiumAccountPanel);
+                this.add(freeAccountPanel);
+            }
+            // Trigger layout update
+            revalidate();
+            repaint();
+            // Notify parent container to update its layout
+            Container parent = getParent();
+            while (parent != null) {
+                parent.revalidate();
+                parent.repaint();
+                parent = parent.getParent();
+            }
+        }
+
+        public InputChangedCallbackInterface getCallback() {
+            return callback;
+        }
+
+        public void setAccount(final Account defaultAccount) {
+            if (defaultAccount == null) {
+                return;
+            }
+            /* If user edits existing account ensure that GUI matches users' account type. */
+            if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN)) {
+                /* Free account / website login */
+                accountTypeComboBox.setSelectedIndex(1);
+            } else if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
+                if (plg.looksLikeValidAPIKey(defaultAccount.getPass())) {
+                    /* Premium account / API key login */
+                    apikey.setText(defaultAccount.getPass());
+                    accountTypeComboBox.setSelectedIndex(0);
+                }
+            } else {
+                /* Do nothing */
+            }
+            updateVisibleComponents();
+        }
+
+        @Override
+        public boolean validateInputs() {
+            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            if (isPremium) {
+                // Premium account validation - only API key needed
+                final String apikey = this.getApikey();
+                if (plg.looksLikeValidAPIKey(apikey)) {
+                    this.apikeyLabel.setForeground(Color.BLACK);
+                    return true;
+                } else {
+                    this.apikeyLabel.setForeground(Color.RED);
+                    return false;
+                }
+            } else {
+                // Free account validation - username and password/cookies needed
+                final boolean userok;
+                final boolean passok;
+                if (StringUtils.isEmpty(this.getUsername())) {
+                    usernameLabel.setForeground(Color.RED);
+                    userok = false;
+                } else if (this.usernameIsEmail && !plg.looksLikeValidEmailAddress(null, this.getUsername())) {
+                    /* E-Mail is needed but user did not enter a valid-looking e-mail address. */
+                    usernameLabel.setForeground(Color.RED);
+                    userok = false;
+                } else {
+                    usernameLabel.setForeground(Color.BLACK);
+                    userok = true;
+                }
+                final String pw = getPassword();
+                final Cookies cookies = Cookies.parseCookiesFromString(pw);
+                if (StringUtils.isEmpty(pw) || cookies != null) {
+                    /* Password field is never allowed to be empty/null. */
+                    passok = false;
+                } else {
+                    passok = true;
+                }
+                if (!passok) {
+                    passwordLabel.setForeground(Color.RED);
+                } else {
+                    passwordLabel.setForeground(Color.BLACK);
+                }
+                return userok && passok;
+            }
+        }
+
+        @Override
+        public Account getAccount() {
+            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            final String apikey = this.getApikey();
+            if (isPremium && plg.looksLikeValidAPIKey(apikey)) {
+                /* Use API key as password */
+                final Account account = new Account(getUsername(), apikey);
+                // account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
+                account.setProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN, true);
+                return account;
+            } else {
+                final Account account = new Account(getUsername(), getPassword());
+                account.setProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN, true);
+                return account;
+            }
+        }
+
+        @Override
+        public JComponent getComponent() {
+            return this;
+        }
     }
 }
