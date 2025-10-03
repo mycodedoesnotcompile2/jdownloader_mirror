@@ -22,13 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -48,7 +42,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "multiup.io" }, urls = { "" })
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "multiup.io" }, urls = { "" })
 public class MultiupOrg extends PluginForHost {
     private static final String          API_BASE                   = "https://multiup.io/api";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("multiup.io");
@@ -207,7 +208,7 @@ public class MultiupOrg extends PluginForHost {
             final String premium_days_left = usermap.get("premium_days_left").toString();
             is_premium = account_type != null && account_type.equalsIgnoreCase("premium");
             if (premium_days_left != null && premium_days_left.matches("\\d+")) {
-                validuntiltimestamp = System.currentTimeMillis() + Integer.parseInt(premium_days_left) * 24 * 60 * 60 * 1000l;
+                validuntiltimestamp = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(Integer.parseInt(premium_days_left));
             }
         }
         if (is_premium) {

@@ -9,20 +9,24 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51614 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
-public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
+@HostPlugin(revision = "$Revision: 51614 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
+    // public Object getFavIcon(final String host) throws IOException {
+    // // TODO: Fix missing fav-icon (missing due to Cloudflare blocking when accessing main page).
+    // return null;
+    // }
 
-    public PluginForCaptchaSolverTwoCaptcha(PluginWrapper wrapper) {
+    public PluginForCaptchaSolverCapmonsterCloud(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
     public String getBuyPremiumUrl() {
-        return "https://" + getHost() + "?from=15779444";
+        return "https://" + getHost() + "/#new-plans";
     }
 
     @Override
@@ -34,8 +38,9 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        types.add(CAPTCHA_TYPE.HCAPTCHA);
-        types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
+        // TODO: Check if they support this captcha type
+        // types.add(CAPTCHA_TYPE.HCAPTCHA);
+        // types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         types.add(CAPTCHA_TYPE.MT_CAPTCHA);
         return types;
@@ -47,7 +52,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
 
     @Override
     public String getAGBLink() {
-        return "https://" + getHost() + "/terms-of-service";
+        return "https://" + getHost() + "/en/terms-of-service/";
     }
 
     @Override
@@ -60,6 +65,7 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
 
     @Override
     protected String getAPILoginHelpURL() {
+        // TODO: Put correct url here
         return "https://" + getHost() + "/enterpage";
     }
 }

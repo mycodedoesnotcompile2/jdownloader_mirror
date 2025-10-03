@@ -20,18 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -51,7 +39,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
     // private static final String WEBSITE_BASE = "https://fakirdebrid.net";
     private static final String          API_BASE           = "https://fakirdebrid.net/api";
@@ -180,8 +180,7 @@ public class FakirdebridNet extends PluginForHost {
                 for (final String url : urls) {
                     try {
                         /**
-                         * E.g. server2.turkleech.com/TransLoad/?id=bla </br>
-                         * Such URLs will also work fine without login cookies
+                         * E.g. server2.turkleech.com/TransLoad/?id=bla </br> Such URLs will also work fine without login cookies
                          */
                         br.getPage(url);
                         transloadURL = url;
@@ -269,7 +268,7 @@ public class FakirdebridNet extends PluginForHost {
         }
         ai.setTrafficLeft(((Number) entries.get("trafficleft")).longValue());
         ai.setTrafficMax(((Number) entries.get("trafficlimit")).longValue());
-        ai.setValidUntil(JavaScriptEngineFactory.toLong(entries.get("premium_until"), 0) * 1000, br);
+        ai.setValidUntil(JavaScriptEngineFactory.toLong(entries.get("premium_until"), 0) * 1000l, br);
         br.getPage(API_BASE + "/supportedhosts.php?pin=" + Encoding.urlEncode(account.getPass()));
         final Map<String, Object> supportedhosts_root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final List<Map<String, Object>> arrayHoster;
@@ -315,24 +314,17 @@ public class FakirdebridNet extends PluginForHost {
     }
 
     /**
-     * 'PIN_Required' => 'PIN Required', </br>
-     * 'URL_Required' => 'You did not add URL data', </br>
-     * 'PIN_Invalid' => 'Invalid PIN',</br>
-     * 'NOT_Supported' => 'This service is not supported or not supported by API.',</br>
-     * 'Limit_Error_Transfer' => 'You have exhausted all transfer limits of your account, You need to purchase a new package.',</br>
-     * 'Limit_Error_Premium' => 'You have filled the daily limits of your account. Please try again after the limits are reset.',</br>
-     * 'Link_Error_Browser' => 'This link can only be downloaded via the browser.',</br>
-     * 'Link_Error' => 'An unknown error occurred while creating the link.',</br>
-     * 'File_not_found' => 'File not found',</br>
-     * 'Password_Required' => 'This file is protected by password. Please add link Password.',</br>
-     * 'Wrong_Password' => 'Wrong Password, Please try again.',</br>
-     * 'File_Unavailable' => 'This link is currently unavailable. Please try again later.',</br>
+     * 'PIN_Required' => 'PIN Required', </br> 'URL_Required' => 'You did not add URL data', </br> 'PIN_Invalid' => 'Invalid PIN',</br>
+     * 'NOT_Supported' => 'This service is not supported or not supported by API.',</br> 'Limit_Error_Transfer' => 'You have exhausted all
+     * transfer limits of your account, You need to purchase a new package.',</br> 'Limit_Error_Premium' => 'You have filled the daily
+     * limits of your account. Please try again after the limits are reset.',</br> 'Link_Error_Browser' => 'This link can only be downloaded
+     * via the browser.',</br> 'Link_Error' => 'An unknown error occurred while creating the link.',</br> 'File_not_found' => 'File not
+     * found',</br> 'Password_Required' => 'This file is protected by password. Please add link Password.',</br> 'Wrong_Password' => 'Wrong
+     * Password, Please try again.',</br> 'File_Unavailable' => 'This link is currently unavailable. Please try again later.',</br>
      * 'Price_File' => 'This link cannot be downloaded with premium account, You can download it by purchasing this link only.',</br>
-     * 'Download_Server_Error' => 'Download server with your file is temporarily unavailable.',</br>
-     * 'OVH_Yangin' => 'This file seems to have been affected by the fire in the OVH datacenter.',</br>
-     * 'Size_Error' => 'The premium download link for this file is not working.',</br>
-     * 'Banned_Account' => 'Banned Account',</br>
-     * 'Free_Account' => 'Not supported for free members.',
+     * 'Download_Server_Error' => 'Download server with your file is temporarily unavailable.',</br> 'OVH_Yangin' => 'This file seems to
+     * have been affected by the fire in the OVH datacenter.',</br> 'Size_Error' => 'The premium download link for this file is not
+     * working.',</br> 'Banned_Account' => 'Banned Account',</br> 'Free_Account' => 'Not supported for free members.',
      */
     private void handleErrorsAPI(final Browser br, final DownloadLink link, final Account account) throws PluginException, InterruptedException {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);

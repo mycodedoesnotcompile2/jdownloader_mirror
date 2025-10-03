@@ -67,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51509 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51614 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -911,6 +911,14 @@ public abstract class HighWayCore extends UseNet {
             retrySeconds = Integer.parseInt(retryInSecondsO.toString());
         }
         if (code != null) {
+            if (msg != null) {
+                /*
+                 * 2025-10-02: Do a small correction in misleading german error message
+                 * "Kontaktiere den Support um den Hoster freischalten zu lassen!"
+                 */
+                final String newString = "Kontaktiere den " + getHost() + " Support";
+                msg = msg.replace("Kontaktiere den Support", newString);
+            }
             switch (code.intValue()) {
             case 0:
                 /* No error */

@@ -19,13 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -46,7 +40,14 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
 public class CboxeraCom extends PluginForHost {
     private static final String          API_BASE            = "https://api.cboxera.com";
     /* 2020-03-24: Static implementation as key is nowhere to be found via API request. */
@@ -172,7 +173,7 @@ public class CboxeraCom extends PluginForHost {
         } else {
             account.setType(AccountType.PREMIUM);
             final long premium_days_left = JavaScriptEngineFactory.toLong(subscription.get("days"), -1);
-            final long validuntil = System.currentTimeMillis() + premium_days_left * 24 * 60 * 60 * 1000l;
+            final long validuntil = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(premium_days_left);
             ai.setValidUntil(validuntil, this.br);
         }
         ai.setTrafficLeft(SizeFormatter.getSize(trafficleft));

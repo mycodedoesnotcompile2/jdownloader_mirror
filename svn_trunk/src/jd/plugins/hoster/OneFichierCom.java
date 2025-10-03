@@ -36,6 +36,7 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
@@ -47,6 +48,7 @@ import org.appwork.uio.UIOManager;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -65,9 +67,14 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -88,17 +95,18 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51599 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
-    private final String        PROPERTY_ACCOUNT_CDN_CREDITS_BYTES                                = "cdn_credits_bytes";
+    private final static String PROPERTY_ACCOUNT_CDN_CREDITS_BYTES                                = "cdn_credits_bytes";
     private final String        PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT                                  = "is_gold_account";
     private final String        PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED                           = "timestamp_vpn_detected";
     private final String        PROPERTY_ACCOUNT_HAS_SHOWN_VPN_LOGIN_WARNING                      = "has_shown_vpn_login_warning";
     private final String        PROPERTY_ACCOUNT_HAS_SHOWN_UNKNOWN_ACCOUNT_TYPE_WARNING_TIMESTAMP = "unknown_account_type_timestamp";
-    private static final String PROPERTY_ACCOUNT_FORCE_API_LOGIN                                  = "force_api_login";
-    private static final String PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN                              = "force_website_login";
+    private static final String PROPERTY_ACCOUNT_LOGIN_TYPE                                       = "login_type";
+    private static final int    ACCOUNT_LOGIN_TYPE_API                                            = 0;
+    private static final int    ACCOUNT_LOGIN_TYPE_WEBSITE                                        = 1;
     /* DownloadLink properties */
     private final String        PROPERTY_HOTLINK                                                  = "hotlink";
     /** URLs can be restricted for various reason: https://1fichier.com/console/acl.pl */
@@ -195,6 +203,16 @@ public class OneFichierCom extends PluginForHost {
     /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
+        /*
+         * Do not return feature USERNAME_IS_EMAIL since this will enforce/validate username field but if user enters API key, no username
+         * (email) is given.
+         */
+        // if (true) {
+        // return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
+        // }
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            return super.getFeatures();
+        }
         if (PluginJsonConfig.get(OneFichierConfigInterface.class).isUsePremiumAPIEnabled()) {
             return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.API_KEY_LOGIN };
         } else {
@@ -534,6 +552,31 @@ public class OneFichierCom extends PluginForHost {
         }
     }
 
+    @Override
+    protected boolean looksLikeDownloadableContent(URLConnectionAdapter urlConnection) {
+        final LinkCrawlerDeepInspector inspector = new LinkCrawlerDeepInspector() {
+            @Override
+            public List<CrawledLink> deepInspect(LinkCrawler lc, LinkCrawlerGeneration generation, Browser br, URLConnectionAdapter urlConnection, CrawledLink link) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        };
+        if (inspector.looksLikeDownloadableContent(urlConnection)) {
+            return true;
+        }
+        if (StringUtils.containsIgnoreCase(getDownloadLink().getName(), ".htm") && urlConnection.isContentDisposition() && (urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206)) {
+            // special handling to allow download of inline html files
+            final String contentDispositionHeader = urlConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_DISPOSITION);
+            final String contentDispositionFileName = HTTPConnectionUtils.getFileNameFromDispositionHeader(contentDispositionHeader);
+            final boolean inlineFlag = contentDispositionHeader.matches("(?i)^\\s*inline\\s*;?.*");
+            final String contentType = urlConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE);
+            final boolean hasContentType = StringUtils.isNotEmpty(contentType);
+            if (inlineFlag && (contentDispositionFileName != null && contentDispositionFileName.matches("(?i)^.*\\.html?$") && hasContentType && inspector.isHtmlContent(urlConnection))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (account != null) {
             this.loginWebsite(account, false);
@@ -763,6 +806,47 @@ public class OneFichierCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         /* Clear this property on every account check so it will get refreshed. */
         account.removeProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* 2025-10-03: Testing */
+            final Number loginType = (Number) account.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
+            if (loginType != null) {
+                if (loginType.intValue() == ACCOUNT_LOGIN_TYPE_API) {
+                    return fetchAccountInfoAPI(account);
+                } else {
+                    return fetchAccountInfoWebsite(account);
+                }
+            }
+            if (this.looksLikeValidAPIKey(account.getPass())) {
+                /* Auto mode e.g. headless login or older accounts */
+                try {
+                    logger.info("Attempting API login");
+                    /* Important for getAPIKeyFromAccount !! */
+                    final AccountInfo ai_api = fetchAccountInfoAPI(account);
+                    /* API login successful -> Always login via API with this account in the future */
+                    account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);
+                    return ai_api;
+                } catch (final InterruptedException ie1) {
+                    throw ie1;
+                } catch (final Exception pe1) {
+                    logger.info("API login failed -> Trying website login");
+                    /* Remove property again as API login failed. */
+                    try {
+                        final AccountInfo ai_website = this.fetchAccountInfoWebsite(account);
+                        /* Website login successful -> Always login via website with this account in the future */
+                        account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_WEBSITE);
+                        return ai_website;
+                    } catch (final InterruptedException ie2) {
+                        throw ie2;
+                    } catch (final PluginException pe2) {
+                        logger.log(pe2);
+                        logger.info("API login and website login failed -> Throwing API login exception");
+                        throw pe1;
+                    }
+                }
+            } else {
+                return this.fetchAccountInfoWebsite(account);
+            }
+        }
         if (canUseAPI(account)) {
             return fetchAccountInfoAPI(account);
         } else {
@@ -1241,6 +1325,9 @@ public class OneFichierCom extends PluginForHost {
 
     private void loginWebsite(final Account account, final boolean force) throws Exception {
         synchronized (account) {
+            if (!looksLikeValidEmailAddress(account, account.getUser())) {
+                throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorInputIsNotEmailAddress());
+            }
             /* Load cookies */
             prepareBrowserWebsite(br);
             final Cookies cookies = account.loadCookies("");
@@ -1391,13 +1478,9 @@ public class OneFichierCom extends PluginForHost {
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
          * 2019-04-05: At the moment there are no benefits for us when using this. </br>
-         * 2021-01-29: Removed this because if login is blocked because of "flood control" this won't work either!
+         * 2021-01-29: Removed this because if login/API is blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
-        final boolean dev_mode_check_via_api = false;
-        if (dev_mode_check_via_api && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            checkFileInfoBeforeDownloadAttempt = true;
-        }
         if (checkFileInfoBeforeDownloadAttempt) {
             requestFileInformationAPI(br, link, account);
         }
@@ -1459,6 +1542,12 @@ public class OneFichierCom extends PluginForHost {
          * true = use premium API, false = use combination of website + OLD basic auth API - ONLY RELEVANT FOR PREMIUM USERS; IF ENABLED,
          * USER HAS TO ENTER API_KEY INSTEAD OF USERNAME:PASSWORD (or APIKEY:APIKEY)!!
          */
+        final Number loginType = (Number) account.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
+        if (loginType != null) {
+            if (loginType.intValue() == ACCOUNT_LOGIN_TYPE_API) {
+                return true;
+            }
+        }
         if (canUseAPI(account) && (account.getType() == null || account.getType() == AccountType.PREMIUM || account.getType() == AccountType.UNKNOWN)) {
             return PluginJsonConfig.get(OneFichierConfigInterface.class).isUsePremiumAPIEnabled();
         } else {
@@ -1557,63 +1646,64 @@ public class OneFichierCom extends PluginForHost {
         final Thread thread = new Thread() {
             public void run() {
                 try {
-                    String message = "";
+                    String message = "<html>";
                     final String title;
                     String language = System.getProperty("user.language").toLowerCase();
                     if ("de".equals(language)) {
                         title = "VPN/Proxy oder Rechenzentrum-IP erkannt!";
-                        message += "\r\nEs scheint, dass Du eine VPN/Proxy oder Rechenzentrum-IP verwendest, die laut den Nutzungsbedingungen von 1fichier nicht für Premium-Nutzer erlaubt ist";
-                        message += "\r\nWas kann dagegen getan werden?";
-                        message += "\r\n1. Melde Dich über die 1fichier-Website an '1fichier.com/login.pl'.";
-                        message += "\r\n2. Gehe zu '1fichier.com/network.html'\r\nWenn Du eine rote oder gelbe Warnmeldung wie \"VPN erkannt\" oder \"Erfordert die Nutzung von CDN-Guthaben oder das Premium GOLD Angebot\" siehst, wurde Deine IP aus einem bestimmten Grund markiert.";
-                        message += "\r\n3. Stelle sicher, dass Du eine normale Heim-IP verwendest, deaktiviere alle Proxys/VPNs und versuche es erneut.";
-                        message += "\r\n4. Wenn Du bewusst einen VPN/Proxy/Rechenzentrum-IP verwendest, musst Du ein 'Premium GOLD' Konto und/oder CDN-Guthaben kaufen und zum Herunterladen verwenden, siehe 1fichier.com/tarifs.html";
-                        message += "\r\n";
-                        message += "\r\nWenn das Problem weiterhin besteht:";
-                        message += "\r\nWenn Du denkst, dass dies ein Fehler ist, kontaktiere den 1fichier Support: 1fichier.com/contact.html";
-                        message += "\r\nDies ist kein JDownloader-Fehler, sondern eine serverseitige Fehlermeldung, die wir Dir hier einfach weiterleiten.";
-                        message += "\r\nWeitere Informationen zu diesem Thema: https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                        message += "<br>Es scheint, dass du eine <b>VPN/Proxy- oder Rechenzentrum-IP</b> verwendest, die laut den <b>Nutzungsbedingungen von 1fichier</b> nicht für Premium-Nutzer erlaubt ist.";
+                        message += "<br><br><b>Was kann dagegen getan werden?</b>";
+                        message += "<br>1. Melde dich über die 1fichier-Website an: <a href=\"https://1fichier.com/login.pl\">1fichier.com/login.pl</a>";
+                        message += "<br>2. Gehe zu: <a href=\"https://1fichier.com/network.html\">1fichier.com/network.html</a>";
+                        message += "<br>   Wenn du eine rote oder gelbe Warnmeldung wie <b>\"VPN erkannt\"</b> oder <b>\"Erfordert CDN-Guthaben oder Premium GOLD\"</b> siehst, wurde deine IP markiert.";
+                        message += "<br>3. Stelle sicher, dass du eine normale Heim-IP verwendest, deaktiviere alle Proxys/VPNs und versuche es erneut.";
+                        message += "<br>4. Wenn du bewusst VPN/Proxy/Rechenzentrum-IP nutzt, musst du ein <b>Premium GOLD Konto</b> und/oder <b>CDN-Guthaben</b> kaufen: <a href=\"https://1fichier.com/tarifs.html\">1fichier.com/tarifs.html</a>";
+                        message += "<br><br><b>Wenn das Problem weiterhin besteht:</b>";
+                        message += "<br>Falls du denkst, dass dies ein Fehler ist, kontaktiere den 1fichier-Support: <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
+                        message += "<br><br>Dies ist <b>kein JDownloader-Fehler</b>, sondern eine serverseitige Meldung, die hier weitergeleitet wird.";
+                        message += "<br>Weitere Infos: <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Support-Artikel</a>";
                     } else if ("es".equals(language)) {
                         title = "¡VPN/proxy o IP de centro de datos detectada!";
-                        message += "\r\nParece que estás usando una VPN/proxy o IP de centro de datos que los usuarios premium no pueden usar según los términos de servicio de 1fichier";
-                        message += "\r\n¿Qué se puede hacer al respecto?";
-                        message += "\r\n1. Inicia sesión a través del sitio web de 1fichier '1fichier.com/login.pl'.";
-                        message += "\r\n2. Ve a '1fichier.com/network.html'\r\nSi puedes ver un mensaje de advertencia rojo o amarillo similar a \"VPN detectada\" o \"Requiere el uso de créditos CDN o la oferta Premium GOLD\", tu IP ha sido marcada por algún motivo.";
-                        message += "\r\n3. Asegúrate de usar una IP doméstica normal, desactiva cualquier proxy/VPN e intenta nuevamente.";
-                        message += "\r\n4. Si estás usando conscientemente una VPN/proxy/IP de centro de datos, debes comprar una cuenta 'Premium GOLD' y/o créditos CDN y usarlos para descargar, ve a 1fichier.com/tarifs.html";
-                        message += "\r\n";
-                        message += "\r\nSi el problema no desaparece:";
-                        message += "\r\nSi crees que esto es un error, contacta al soporte de 1fichier: 1fichier.com/contact.html";
-                        message += "\r\nEsto no es un error de JDownloader sino un mensaje de error del servidor que simplemente te reenviamos aquí.";
-                        message += "\r\nMás información sobre este tema: https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                        message += "<br>Parece que estás usando una <b>VPN/proxy o IP de centro de datos</b> que, según los <b>términos de servicio de 1fichier</b>, los usuarios premium no pueden usar.";
+                        message += "<br><br><b>¿Qué se puede hacer?</b>";
+                        message += "<br>1. Inicia sesión en el sitio web de 1fichier: <a href=\"https://1fichier.com/login.pl\">1fichier.com/login.pl</a>";
+                        message += "<br>2. Ve a: <a href=\"https://1fichier.com/network.html\">1fichier.com/network.html</a>";
+                        message += "<br>   Si ves un mensaje rojo o amarillo como <b>\"VPN detectada\"</b> o <b>\"Requiere créditos CDN o Premium GOLD\"</b>, tu IP ha sido marcada.";
+                        message += "<br>3. Asegúrate de usar una IP doméstica normal, desactiva cualquier proxy/VPN e intenta de nuevo.";
+                        message += "<br>4. Si usas conscientemente VPN/proxy/IP de centro de datos, debes comprar una <b>cuenta Premium GOLD</b> y/o <b>créditos CDN</b>: <a href=\"https://1fichier.com/tarifs.html\">1fichier.com/tarifs.html</a>";
+                        message += "<br><br><b>Si el problema persiste:</b>";
+                        message += "<br>Si crees que es un error, contacta con el soporte de 1fichier: <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
+                        message += "<br><br>Esto <b>no es un error de JDownloader</b> sino un mensaje del servidor que simplemente reenviamos.";
+                        message += "<br>Más información: <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Artículo de soporte</a>";
                     } else if ("fr".equals(language)) {
                         title = "VPN/proxy ou IP de centre de données détecté !";
-                        message += "\r\nIl semble que tu utilises un VPN/proxy ou une IP de centre de données que les utilisateurs premium ne sont pas autorisés à utiliser selon les conditions d'utilisation de 1fichier";
-                        message += "\r\nQue peut-on faire à ce sujet ?";
-                        message += "\r\n1. Connecte-toi via le site web de 1fichier '1fichier.com/login.pl'.";
-                        message += "\r\n2. Va sur '1fichier.com/network.html'\r\nSi tu peux voir un message d'avertissement rouge ou jaune similaire à \"VPN détecté\" ou \"Nécessite l'utilisation de crédits CDN ou l'offre Premium GOLD\", ton IP a été signalée pour une raison quelconque.";
-                        message += "\r\n3. Assure-toi d'utiliser une IP domestique régulière, désactive tout proxy/VPN et réessaie.";
-                        message += "\r\n4. Si tu utilises sciemment un VPN/proxy/IP de centre de données, tu dois acheter un compte 'Premium GOLD' et/ou des crédits CDN et les utiliser pour télécharger, voir 1fichier.com/tarifs.html";
-                        message += "\r\n";
-                        message += "\r\nSi le problème ne disparaît pas :";
-                        message += "\r\nSi tu penses qu'il s'agit d'une erreur, contacte le support de 1fichier : 1fichier.com/contact.html";
-                        message += "\r\nCe n'est pas un bug de JDownloader mais un message d'erreur côté serveur que nous te transmettons simplement ici.";
-                        message += "\r\nPlus d'informations sur ce sujet : https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                        message += "<br>Il semble que tu utilises une <b>VPN/proxy ou IP de centre de données</b> qui, selon les <b>conditions d'utilisation de 1fichier</b>, n'est pas autorisée pour les utilisateurs premium.";
+                        message += "<br><br><b>Que faire ?</b>";
+                        message += "<br>1. Connecte-toi via le site web de 1fichier : <a href=\"https://1fichier.com/login.pl\">1fichier.com/login.pl</a>";
+                        message += "<br>2. Va sur : <a href=\"https://1fichier.com/network.html\">1fichier.com/network.html</a>";
+                        message += "<br>   Si tu vois un message rouge ou jaune comme <b>\"VPN détecté\"</b> ou <b>\"Nécessite crédits CDN ou Premium GOLD\"</b>, ton IP a été signalée.";
+                        message += "<br>3. Assure-toi d'utiliser une IP domestique normale, désactive tout proxy/VPN et réessaie.";
+                        message += "<br>4. Si tu utilises volontairement VPN/proxy/IP de centre de données, tu dois acheter un <b>compte Premium GOLD</b> et/ou des <b>crédits CDN</b> : <a href=\"https://1fichier.com/tarifs.html\">1fichier.com/tarifs.html</a>";
+                        message += "<br><br><b>Si le problème persiste :</b>";
+                        message += "<br>Si tu penses qu'il s'agit d'une erreur, contacte le support de 1fichier : <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
+                        message += "<br><br>Ce n'est <b>pas un bug de JDownloader</b> mais un message du serveur que nous transmettons.";
+                        message += "<br>Plus d'informations : <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Article de support</a>";
                     } else {
                         title = "VPN/proxy or datacenter IP detected!";
-                        message += "\r\nIt looks like you are using a VPN/proxy or datacenter IP which premium users are not allowed to use according to the terms of service of 1fichier";
-                        message += "\r\nWhat can be done about this?";
-                        message += "\r\n1. Login via the 1fichier website '1fichier.com/login.pl'.";
-                        message += "\r\n2. Go to '1fichier.com/network.html'\r\nIf you can see a red or yellow warning message similar to \"VPN detected\" or \"Requires the use of CDN credits or the Premium GOLD offer\", your IP was flagged for some reason.";
-                        message += "\r\n3. Ensure that you are using a regular home IP, disable any proxy/VPN and try again.";
-                        message += "\r\n4. If you are knowingly using a VPN/proxy/datacenter IP, you need to purchase a 'Premium GOLD' account and/or CDN credits and use them for downloading, see 1fichier.com/tarifs.html";
-                        message += "\r\n";
-                        message += "\r\nIf the problem does not disappear:";
-                        message += "\r\nIf you think this is a mistake, contact the 1fichier support: 1fichier.com/contact.html";
-                        message += "\r\nThis is not a JDownloader bug but a server side error message which we are simply forwarding to you here.";
-                        message += "\r\nMore information about this topic: https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting";
+                        message += "<br>It looks like you are using a <b>VPN/proxy or datacenter IP</b> which, according to the <b>terms of service of 1fichier</b>, is not allowed for premium users.";
+                        message += "<br><br><b>What can be done?</b>";
+                        message += "<br>1. Login via the 1fichier website: <a href=\"https://1fichier.com/login.pl\">1fichier.com/login.pl</a>";
+                        message += "<br>2. Go to: <a href=\"https://1fichier.com/network.html\">1fichier.com/network.html</a>";
+                        message += "<br>   If you see a red or yellow warning like <b>\"VPN detected\"</b> or <b>\"Requires CDN credits or Premium GOLD\"</b>, your IP was flagged.";
+                        message += "<br>3. Ensure you are using a regular home IP, disable any proxy/VPN and try again.";
+                        message += "<br>4. If you are knowingly using VPN/proxy/datacenter IP, you need to purchase a <b>Premium GOLD account</b> and/or <b>CDN credits</b>: <a href=\"https://1fichier.com/tarifs.html\">1fichier.com/tarifs.html</a>";
+                        message += "<br><br><b>If the problem does not disappear:</b>";
+                        message += "<br>If you think this is a mistake, contact 1fichier support: <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
+                        message += "<br><br>This is <b>not a JDownloader bug</b> but a server-side error message that we are forwarding to you.";
+                        message += "<br>More information: <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Support article</a>";
                     }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    message += "</html>";
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_HTML, title, message);
                     dialog.setTimeout(300 * 1000);
                     final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
                     ret.throwCloseExceptions();
@@ -1645,52 +1735,52 @@ public class OneFichierCom extends PluginForHost {
                     String language = System.getProperty("user.language").toLowerCase();
                     if ("de".equals(language)) {
                         title = "Information über unbekannten Kontotyp";
-                        message += "\r\nJDownloader konnte den Typ deines Kontos momentan nicht erkennen.";
-                        message += "\r\nDies kann aufgrund von API-Beschränkungen von 1fichier passieren.";
-                        message += "\r\nWenn dein Konto ein Premium-Konto ist, kannst du diese Nachricht ignorieren.";
-                        message += "\r\nWenn dein Konto ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits ist, wirst du nicht über die API herunterladen können.";
-                        message += "\r\nIn letzterem Fall gehe so vor:";
-                        message += "\r\n1. Gehe zu Einstellungen -> Account Manager und entferne dieses Konto";
-                        message += "\r\n2. Gehe zu Einstellungen -> Plugins -> 1fichier.com -> Premium-API verwenden -> Deaktiviere dies";
-                        message += "\r\n3. Gehe zu Einstellungen -> Account Manager -> Füge dein 1fichier-Konto mit Benutzername & Passwort hinzu.";
-                        message += "\r\n";
-                        message += "\r\n<b>Warnung:</b> Wenn du ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits besitzt und versuchst, den API-Key-Login zu verwenden, werden Downloads fehlschlagen und dein Konto wird in einen roten Fehlerzustand wechseln!";
+                        message += "<br>JDownloader konnte den Typ deines Kontos momentan nicht erkennen.";
+                        message += "<br>Dies kann manchmal aufgrund von API-Beschränkungen von 1fichier passieren.";
+                        message += "<br>Wenn dein Konto ein Premium-Konto ist, kannst du diese Nachricht ignorieren und mit dem Herunterladen beginnen.";
+                        message += "<br>Wenn dein Konto ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits ist, wirst du nicht über die API herunterladen können.";
+                        message += "<br>In diesem Fall gehe so vor:";
+                        message += "<br>1. Gehe zu Einstellungen -> Account Manager und entferne dieses Konto";
+                        message += "<br>2. Gehe zu Einstellungen -> Plugins -> 1fichier.com -> Premium-API verwenden -> Deaktiviere dies";
+                        message += "<br>3. Gehe zu Einstellungen -> Account Manager -> Füge dein 1fichier-Konto mit E-Mail & Passwort hinzu.";
+                        message += "<br>";
+                        message += "<br><b>Warnung:</b> Wenn du ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits besitzt und versuchst, den API-Key-Login zu verwenden, werden Downloads fehlschlagen und dein Konto wird in einen roten Fehlerzustand wechseln!";
                     } else if ("es".equals(language)) {
                         title = "Información sobre tipo de cuenta desconocido";
-                        message += "\r\nJDownloader no pudo detectar el tipo de tu cuenta en este momento.";
-                        message += "\r\nEsto puede ocurrir debido a limitaciones de la API de 1fichier.";
-                        message += "\r\nSi tu cuenta es una cuenta premium, puedes ignorar este mensaje.";
-                        message += "\r\nSi tu cuenta es una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b>, no podrás descargar mediante la API.";
-                        message += "\r\nEn este último caso, haz lo siguiente:";
-                        message += "\r\n1. Ve a Configuración -> Administrador de cuentas y elimina esta cuenta";
-                        message += "\r\n2. Ve a Configuración -> Plugins -> 1fichier.com -> Usar API premium -> Desactiva esto";
-                        message += "\r\n3. Ve a Configuración -> Administrador de cuentas -> Añade tu cuenta de 1fichier con usuario y contraseña.";
-                        message += "\r\n";
-                        message += "\r\n<b>Advertencia:</b> Si tienes una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b> e intentas usar el inicio de sesión con clave API, las descargas fallarán y tu cuenta entrará en estado de error rojo!";
+                        message += "<br>JDownloader no pudo detectar el tipo de tu cuenta en este momento.";
+                        message += "<br>Esto puede ocurrir a veces debido a limitaciones de la API de 1fichier.";
+                        message += "<br>Si tu cuenta es una cuenta premium, puedes ignorar este mensaje y empezar a descargar.";
+                        message += "<br>Si tu cuenta es una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b>, no podrás descargar mediante la API.";
+                        message += "<br>En este caso, haz lo siguiente:";
+                        message += "<br>1. Ve a Configuración -> Administrador de cuentas y elimina esta cuenta";
+                        message += "<br>2. Ve a Configuración -> Plugins -> 1fichier.com -> Usar API premium -> Desactiva esto";
+                        message += "<br>3. Ve a Configuración -> Administrador de cuentas -> Añade tu cuenta de 1fichier con E-Mail y contraseña.";
+                        message += "<br>";
+                        message += "<br><b>Advertencia:</b> Si tienes una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b> e intentas usar el inicio de sesión con clave API, las descargas fallarán y tu cuenta entrará en estado de error rojo!";
                     } else if ("fr".equals(language)) {
                         title = "Informations sur le type de compte inconnu";
-                        message += "\r\nJDownloader n’a pas pu détecter le type de votre compte pour le moment.";
-                        message += "\r\nCela peut se produire en raison de limitations de l’API de 1fichier.";
-                        message += "\r\nSi votre compte est un compte premium, vous pouvez ignorer ce message.";
-                        message += "\r\nSi votre compte est un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b>, vous ne pourrez pas télécharger via l’API.";
-                        message += "\r\nDans ce dernier cas, procédez ainsi :";
-                        message += "\r\n1. Allez dans Paramètres -> Gestionnaire de comptes et supprimez ce compte";
-                        message += "\r\n2. Allez dans Paramètres -> Plugins -> 1fichier.com -> Utiliser l’API premium -> Désactivez ceci";
-                        message += "\r\n3. Allez dans Paramètres -> Gestionnaire de comptes -> Ajoutez votre compte 1fichier avec identifiant et mot de passe.";
-                        message += "\r\n";
-                        message += "\r\n<b>Avertissement :</b> Si vous possédez un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b> et essayez d’utiliser la connexion par clé API, les téléchargements échoueront et votre compte passera en état d’erreur rouge !";
+                        message += "<br>JDownloader n’a pas pu détecter le type de votre compte pour le moment.";
+                        message += "<br>Cela peut parfois se produire en raison de limitations de l’API de 1fichier.";
+                        message += "<br>Si votre compte est un compte premium, vous pouvez ignorer ce message et commencer le téléchargement.";
+                        message += "<br>Si votre compte est un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b>, vous ne pourrez pas télécharger via l’API.";
+                        message += "<br>Dans ce cas, procédez ainsi :";
+                        message += "<br>1. Allez dans Paramètres -> Gestionnaire de comptes et supprimez ce compte";
+                        message += "<br>2. Allez dans Paramètres -> Plugins -> 1fichier.com -> Utiliser l’API premium -> Désactivez ceci";
+                        message += "<br>3. Allez dans Paramètres -> Gestionnaire de comptes -> Ajoutez votre compte 1fichier avec E-Mail et mot de passe.";
+                        message += "<br>";
+                        message += "<br><b>Avertissement :</b> Si vous possédez un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b> et essayez d’utiliser la connexion par clé API, les téléchargements échoueront et votre compte passera en état d’erreur rouge !";
                     } else {
                         title = "Information about unknown account type";
-                        message += "\r\nJDownloader was unable to detect the type of your account at this moment.";
-                        message += "\r\nThis can happen sometimes due to API limitations from 1fichier.";
-                        message += "\r\nIf your account is a premium account, you can safely ignore this message and start downloading.";
-                        message += "\r\nIf your account is a free account or a free account with <b>paid</b> CDN credits, you will not be able to download via API.";
-                        message += "\r\nIn the latter case, do this:";
-                        message += "\r\n1. Go to Settings -> Account Manager and remove this account";
-                        message += "\r\n2. Go to Settings -> Plugins -> 1fichier.com -> Use premium API -> Disable this";
-                        message += "\r\n3. Go to Settings -> Account Manager -> Add your 1fichier account via username & password.";
-                        message += "\r\n";
-                        message += "\r\n<b>Warning:</b> If you own a free account or a free account with <b>paid</b> CDN credits and try to use the API key login, downloads will fail and your account will go into a red error state!";
+                        message += "<br>JDownloader was unable to detect the type of your account at this moment.";
+                        message += "<br>This can happen sometimes due to API limitations from 1fichier.";
+                        message += "<br>If your account is a premium account, you can safely ignore this message and start downloading.";
+                        message += "<br>If your account is a free account or a free account with <b>paid</b> CDN credits, you will not be able to download via API.";
+                        message += "<br>In the latter case, do this:";
+                        message += "<br>1. Go to Settings -> Account Manager and remove this account";
+                        message += "<br>2. Go to Settings -> Plugins -> 1fichier.com -> Use premium API -> Disable this";
+                        message += "<br>3. Go to Settings -> Account Manager -> Add your 1fichier account via E-Mail & password.";
+                        message += "<br>";
+                        message += "<br><b>Warning:</b> If you own a free account or a free account with <b>paid</b> CDN credits and try to use the API key login, downloads will fail and your account will go into a red error state!";
                     }
                     message += "</html>";
                     final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_HTML, title, message);
@@ -1771,7 +1861,7 @@ public class OneFichierCom extends PluginForHost {
         private final ExtPasswordField              apikey;
         private final JLabel                        apikeyLabel;
         private final InputChangedCallbackInterface callback;
-        private JLabel                              usernameLabel         = null;
+        private JLabel                              usernameLabel = null;
         private final JLabel                        passwordLabel;
         private final OneFichierCom                 plg;
         private final boolean                       usernameIsEmail;
@@ -1781,8 +1871,6 @@ public class OneFichierCom extends PluginForHost {
         private final JPanel                        freeAccountPanel;
         private final JLabel                        premiumInstructionsLabel;
         private final JLabel                        premiumInstructionsLink;
-        private JLabel                              freeInstructionsLabel = null;
-        private JLabel                              freeInstructionsLink  = null;
 
         public boolean updateAccount(Account input, Account output) {
             boolean changed = false;
@@ -1807,6 +1895,7 @@ public class OneFichierCom extends PluginForHost {
             // Add account type dropdown
             add(new JLabel("Account Type:"));
             accountTypeComboBox = new JComboBox<String>(new String[] { "Premium Account", "Premium GOLD Account", "Free Account with paid CDN credits", "Free Account" });
+            /* Select premium account as default value */
             accountTypeComboBox.setSelectedIndex(0);
             accountTypeComboBox.addActionListener(new ActionListener() {
                 @Override
@@ -1834,10 +1923,6 @@ public class OneFichierCom extends PluginForHost {
             premiumAccountPanel.add(this.apikey);
             // Create free account panel
             freeAccountPanel = new JPanel(new MigLayout("ins 0, wrap 2", "[][grow,fill]", ""));
-            JLabel freeInstructionsLabel = new JLabel("E-Mail & pass");
-            JLabel premiumInstructionsLabel = new JLabel("API Key");
-            freeAccountPanel.add(freeInstructionsLabel);
-            freeAccountPanel.add(premiumInstructionsLabel);
             // Username/E-Mail field
             if (this.usernameIsEmail) {
                 usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_email());
@@ -1865,7 +1950,6 @@ public class OneFichierCom extends PluginForHost {
             }
             freeAccountPanel.add(name);
             // Password field
-            /* Normal username & password login */
             passwordLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass());
             freeAccountPanel.add(passwordLabel);
             this.pass = new ExtPasswordField() {
@@ -1916,19 +2000,21 @@ public class OneFichierCom extends PluginForHost {
             if (StringUtils.isEmpty(clipboard)) {
                 return;
             }
-            /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
-            final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
             if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
                 this.apikey.setText(clipboard);
-            } else if (userCookies == null && clipboard.trim().length() > 0) {
+            } else if (clipboard.trim().length() > 0) {
                 /* Auto fill username field with clipboard content. */
                 name.setText(clipboard);
             }
             updateVisibleComponents();
         }
 
+        private boolean isPremiumAccountTypeSelected() {
+            return accountTypeComboBox.getSelectedIndex() == 0 || accountTypeComboBox.getSelectedIndex() == 1;
+        }
+
         private void updateVisibleComponents() {
-            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            final boolean isPremium = isPremiumAccountTypeSelected();
             premiumAccountPanel.setVisible(isPremium);
             freeAccountPanel.setVisible(!isPremium);
             if (isPremium) {
@@ -1956,27 +2042,39 @@ public class OneFichierCom extends PluginForHost {
 
         public void setAccount(final Account defaultAccount) {
             if (defaultAccount == null) {
+                /* This should never happen */
                 return;
             }
             /* If user edits existing account ensure that GUI matches users' account type. */
-            if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN)) {
-                /* Free account / website login */
-                accountTypeComboBox.setSelectedIndex(1);
-            } else if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
-                if (plg.looksLikeValidAPIKey(defaultAccount.getPass())) {
+            final Number loginType = (Number) defaultAccount.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
+            if (loginType != null) {
+                if (loginType.intValue() == ACCOUNT_LOGIN_TYPE_API) {
                     /* Premium account / API key login */
                     apikey.setText(defaultAccount.getPass());
-                    accountTypeComboBox.setSelectedIndex(0);
+                    if (plg.isGoldAccount(defaultAccount)) {
+                        accountTypeComboBox.setSelectedIndex(1);
+                    } else {
+                        accountTypeComboBox.setSelectedIndex(0);
+                    }
+                } else {
+                    /* Website login */
+                    if (defaultAccount.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, 0) > 0) {
+                        /* Set account type selection on "Free Account with paid CDN credits" */
+                        accountTypeComboBox.setSelectedIndex(2);
+                    } else {
+                        /* Set account type selection on "Free Account" */
+                        accountTypeComboBox.setSelectedIndex(3);
+                    }
                 }
             } else {
-                /* Do nothing */
+                /* Do nothing (leave defaults) */
             }
             updateVisibleComponents();
         }
 
         @Override
         public boolean validateInputs() {
-            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            final boolean isPremium = isPremiumAccountTypeSelected();
             if (isPremium) {
                 // Premium account validation - only API key needed
                 final String apikey = this.getApikey();
@@ -2021,17 +2119,16 @@ public class OneFichierCom extends PluginForHost {
 
         @Override
         public Account getAccount() {
-            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            final boolean isPremium = isPremiumAccountTypeSelected();
             final String apikey = this.getApikey();
             if (isPremium && plg.looksLikeValidAPIKey(apikey)) {
                 /* Use API key as password */
                 final Account account = new Account(getUsername(), apikey);
-                // account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
-                account.setProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN, true);
+                account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);
                 return account;
             } else {
                 final Account account = new Account(getUsername(), getPassword());
-                account.setProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN, true);
+                account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_WEBSITE);
                 return account;
             }
         }

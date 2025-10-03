@@ -7,6 +7,7 @@ public class DecrypterRetryException extends Exception {
         CAPTCHA(_JDT.T.decrypter_wrongcaptcha()),
         EMPTY_FOLDER(_JDT.T.decrypter_empty_folder()),
         EMPTY_PROFILE(_JDT.T.decrypter_empty_profile()),
+        EMPTY_SEARCH_QUERY("Search query without search results"),
         NO_ACCOUNT(_JDT.T.decrypter_invalidaccount()),
         FILE_NOT_FOUND(_JDT.T.decrypter_contentoffline()),
         PLUGIN_DEFECT(_JDT.T.decrypter_plugindefect()),
@@ -48,6 +49,8 @@ public class DecrypterRetryException extends Exception {
         /* Return default comment for some states. */
         if (this.reason == RetryReason.EMPTY_FOLDER) {
             return _JDT.T.decrypter_empty_folder_description();
+        } else if (this.reason == RetryReason.EMPTY_SEARCH_QUERY) {
+            return "The search query you've entered did not lead to any search results.";
         } else if (this.reason == RetryReason.GEO) {
             return _JDT.T.decrypter_unavailable_geo_description();
         } else if (this.reason == RetryReason.PLUGIN_SETTINGS) {

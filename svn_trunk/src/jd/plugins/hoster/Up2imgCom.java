@@ -19,11 +19,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -36,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.Up2imgComAlbum;
 
-@HostPlugin(revision = "$Revision: 51603 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { Up2imgComAlbum.class })
 public class Up2imgCom extends PluginForHost {
     public Up2imgCom(PluginWrapper wrapper) {
@@ -100,6 +102,7 @@ public class Up2imgCom extends PluginForHost {
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
+        // disable so our "File not found" image detection/peek does work
         return false;
     }
 
@@ -119,7 +122,6 @@ public class Up2imgCom extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        // TODO: Add better offline detection
         final String directurl = this.getDllink(br);
         if (directurl != null) {
             String filename = getFileNameFromURL(br.getURL(directurl));
@@ -136,6 +138,13 @@ public class Up2imgCom extends PluginForHost {
                 }
                 link.setFinalFileName(filename);
             }
+            /* 2025-10-02: Do not try to find filesize since their servers never return a content-length header. */
+            final boolean findFilesize = false;
+            if (findFilesize && !PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment()) && !link.isSizeSet()) {
+                /* Do not use HEAD request here since we need to look into the file content. */
+                // this.basicLinkCheck(br, br.createHeadRequest(directurl), link, filename, null);
+                this.basicLinkCheck(br, br.createGetRequest(directurl), link, filename, null);
+            }
         } else {
             logger.warning("Cannot find filename because: Failed to find directurl");
         }
@@ -147,6 +156,57 @@ public class Up2imgCom extends PluginForHost {
         handleDownload(link);
     }
 
+    @Override
+    protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
+        if (!super.looksLikeDownloadableContent(urlConnection)) {
+            return false;
+        }
+        try {
+            /* try to detect special "File not found" image */
+            final int knownImageSize = 106684;
+            final byte[] probe = urlConnection.peek(knownImageSize + 1);// +1 more to only check hash on exactly 106684 content length
+            if (probe.length != knownImageSize) {
+                return true;
+            }
+            final String hash = Hash.getSHA256(probe);
+            // TODO: Change to this value? 4a963b95bf081c3ea02923dceaeb3f8085e1a654fc54840aac61a57a60903fef
+            if ("9d452fef9e7a588aeff42ea2f1e145a4f3fac5596898d99994b39db126fd7497".equals(hash)) {
+                logger.info("Detected dummy \"File not found\" image");
+                return false;
+            }
+            return true;
+        } catch (IOException e) {
+            logger.log(e);
+        }
+        return true;
+    }
+
+    @Override
+    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (!this.looksLikeDownloadableContent(con)) {
+            br.followConnection(true);
+            throwConnectionExceptions(br, con);
+            throwFinalConnectionException(br, con);
+        }
+        /* Looks like downloadable content -> Check for dummy image which we do not want to download. */
+        try {
+            /* try to detect special "File not found" image */
+            final int knownImageSize = 106684;
+            final byte[] probe = con.peek(knownImageSize + 1);// +1 more to only check hash on exactly 106684 content length
+            if (probe.length != knownImageSize) {
+                return;
+            }
+            final String hash = Hash.getSHA256(probe);
+            if ("9d452fef9e7a588aeff42ea2f1e145a4f3fac5596898d99994b39db126fd7497".equals(hash)) {
+                /* e.g. /album/MTg2NDA/hardcore-Jasmine-Rouge-George-Titus-Steel/viewimage/Mg/666wMjkxOTA1MjAyMTEzMg/MTQw/MDAwMDE.html */
+                logger.info("Detected dummy \"File not found\" image");
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+        } catch (IOException e) {
+            logger.log(e);
+        }
+    }
+
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
         final String dllink = getDllink(br);
@@ -155,19 +215,14 @@ public class Up2imgCom extends PluginForHost {
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());
-        if (dl.startDownload()) {
-            // TODO: Find a better way to detect invalid/offline images and/or delete downloaded file in this case.
-            if (link.getView().getBytesLoaded() == 106684) {
-                /*
-                 * E.g. dummy/offline image file:
-                 * https://cdn3.up2img.com/album/MTg2NDA/43597922/showimage/Mg/666wMjkxOTA1MjAyMTEzMg/MDAwMDE.up2img.com.jpg
-                 */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-        }
+        dl.startDownload();
     }
 
     private String getDllink(final Browser br) {
+        /* @Dev: Commented out code down below returns direct-URL that leads to empty dummy image. */
+        // if (true) {
+        // return "https://cdn1.up2img.com/album/MTg2NDA/54842993/showimage/Mg/666wMjkxOTA1MjAyMTEzMg/MDAwMDE.up2img.com.jpg";
+        // }
         return br.getRegex("<img src=\"([^\"]+)\"[^>]*style=\"max-width:100%; height:auto;\"[^>]*>").getMatch(0);
     }
 

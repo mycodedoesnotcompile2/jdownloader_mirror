@@ -886,6 +886,10 @@ public abstract class Plugin implements ActionListener {
         LINK_CHECK,
         ACCOUNT_CHECK;
 
+        public boolean isCurrentPluginEnvironment() {
+            return this == getPluginEnvironment();
+        }
+
         public static PluginEnvironment getPluginEnvironment() {
             final Thread thread = Thread.currentThread();
             if (thread instanceof SingleDownloadController) {

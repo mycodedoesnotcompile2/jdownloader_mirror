@@ -6,8 +6,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
 
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
@@ -19,7 +26,6 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.api.captcha.CaptchaAPISolver;
@@ -58,12 +64,6 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
@@ -207,10 +207,9 @@ public class ChallengeResponseController {
         eventSender.fireEvent(new ChallengeResponseEvent(this, ChallengeResponseEvent.Type.JOB_DONE, job));
     }
 
-    private final List<ChallengeSolver<?>>               solverList                                                  = new CopyOnWriteArrayList<ChallengeSolver<?>>();
-    private final List<SolverJob<?>>                     activeJobs                                                  = new ArrayList<SolverJob<?>>();
-    private final HashMap<UniqueAlltimeID, SolverJob<?>> challengeIDToJobMap                                         = new HashMap<UniqueAlltimeID, SolverJob<?>>();
-    protected static AtomicLong                          TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new AtomicLong(-1);
+    private final List<ChallengeSolver<?>>               solverList          = new CopyOnWriteArrayList<ChallengeSolver<?>>();
+    private final List<SolverJob<?>>                     activeJobs          = new ArrayList<SolverJob<?>>();
+    private final HashMap<UniqueAlltimeID, SolverJob<?>> challengeIDToJobMap = new HashMap<UniqueAlltimeID, SolverJob<?>>();
 
     /**
      * When one job gets a skiprequest, we have to check all pending jobs if this skiprequest affects them as well. if so, we have to skip
@@ -331,87 +330,87 @@ public class ChallengeResponseController {
         }
     }
 
+    protected final static AtomicLong TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new AtomicLong(-1);
+
     public <T> Thread showNoBrowserSolverInformation(final Challenge<T> c) {
-        synchronized (TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED) {
-            if (Time.systemIndependentCurrentJVMTimeMillis() - TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.longValue() < 1 * 60 * 60 * 1000) {
+        while (true) {
+            final long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get();
+            if ((Time.systemIndependentCurrentJVMTimeMillis() - lastDisplay) < TimeUnit.HOURS.toMillis(1)) {
                 /* Dialog has been shown already just recently -> Do not display now. */
                 return null;
+            } else if (TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.compareAndSet(lastDisplay, Time.systemIndependentCurrentJVMTimeMillis())) {
+                break;
             }
-            // TODO: Get a nicer captcha type string here once possible
-            String captcha_challenge_type = c.getTypeID();
-            if (captcha_challenge_type != null && captcha_challenge_type.contains("turnstile")) {
-                captcha_challenge_type = "Cloudflare Turnstile";
-            }
-            final String captcha_challenge_type_final = captcha_challenge_type;
-            final Thread thread = new Thread() {
-                public void run() {
-                    try {
-                        final String help_article_url = "https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required";
-                        String message = "<html>";
-                        final String title;
-                        String lang = System.getProperty("user.language").toLowerCase();
-                        if ("de".equals(lang)) {
-                            title = "Externer Solver erforderlich für diese Captcha-Challenge";
-                            message += "Die interaktive Art der Captcha-Herausforderung '" + captcha_challenge_type_final + "', die gelöst werden muss, kann derzeit nicht lokal in deinem Browser gelöst werden.<br><br>";
-                            message += "Daher bleibt dir nur die Möglichkeit, einen [kostenpflichtigen] Captcha-Lösungsdienst zu nutzen, der diesen Captcha-Typ verarbeiten kann.<br><br>";
-                            message += "Dies ist keine Werbung, sondern ein technischer Hinweisdialog.<br><br>";
-                            message += "Für detailliertere Informationen lies bitte den unten stehenden Hilfe-Artikel:<br>";
-                            message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                        } else if ("es".equals(lang)) {
-                            title = "Se requiere un solucionador externo para este desafío de captcha";
-                            message += "El tipo interactivo de desafío captcha '" + captcha_challenge_type_final + "' que debe resolverse actualmente no puede resolverse localmente en tu navegador.<br><br>";
-                            message += "Por lo tanto, tu única opción es obtener un servicio de resolución de captchas [de pago] que pueda manejar este tipo de captcha.<br><br>";
-                            message += "Esto no es un anuncio sino un cuadro de diálogo de información técnica.<br><br>";
-                            message += "Para obtener más información detallada, lee el artículo de ayuda a continuación:<br>";
-                            message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                        } else if ("fr".equals(lang)) {
-                            title = "Solveur externe requis pour ce défi captcha";
-                            message += "Le type interactif de défi captcha '" + captcha_challenge_type_final + "' qui doit être résolu ne peut actuellement pas être résolu localement dans votre navigateur.<br><br>";
-                            message += "Par conséquent, votre seule option est d'utiliser un service de résolution de captchas [payant] capable de traiter ce type de captcha.<br><br>";
-                            message += "Ceci n'est pas une publicité mais une boîte de dialogue d'information technique.<br><br>";
-                            message += "Pour plus d'informations détaillées, veuillez lire l'article d'aide ci-dessous :<br>";
-                            message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                        } else if ("hi".equals(lang)) {
-                            title = "इस कैप्चा चुनौती के लिए बाहरी सॉल्वर आवश्यक है";
-                            message += "इंटरएक्टिव प्रकार का कैप्चा चुनौती '" + captcha_challenge_type_final + "', जिसे हल करना है, वर्तमान में आपके ब्राउज़र में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>";
-                            message += "इसलिए आपका एकमात्र विकल्प एक [सशुल्क] कैप्चा समाधान सेवा प्राप्त करना है जो इस प्रकार के कैप्चा को संभाल सकती है।<br><br>";
-                            message += "यह कोई विज्ञापन नहीं है बल्कि एक तकनीकी सूचना संवाद है।<br><br>";
-                            message += "अधिक विस्तृत जानकारी के लिए, कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>";
-                            message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                        } else if ("zh".equals(lang) || "zh-cn".equals(lang)) {
-                            title = "此验证码挑战需要外部解答器";
-                            message += "交互式验证码挑战 '" + captcha_challenge_type_final + "' 目前无法在您的浏览器中本地解决。<br><br>";
-                            message += "因此，您唯一的选择是使用可以处理此类验证码的 [付费] 验证码解答服务。<br><br>";
-                            message += "这不是广告，而是一个技术信息对话框。<br><br>";
-                            message += "有关更多详细信息，请阅读以下帮助文章：<br>";
-                            message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                        } else {
-                            // Default English
-                            title = "External solver required for this captcha challenge";
-                            message += "The interactive type of captcha challenge '" + captcha_challenge_type_final + "' that needs to be solved currently cannot be solved locally in your browser.<br><br>";
-                            message += "Therefore your only option is to get a [paid] captcha solver service which can handle this type of captcha.<br><br>";
-                            message += "This is not an advertisement but a technical information dialog.<br><br>";
-                            message += "For more detailed information, please read the help article down below:<br>";
-                            message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                        }
-                        message += "</html>";
-                        final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_HTML, title, message);
-                        dialog.setTimeout(3 * 60 * 1000);
-                        if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                            CrossSystem.openURL(help_article_url);
-                        }
-                        TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.set(Time.systemIndependentCurrentJVMTimeMillis());
-                        final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                        ret.throwCloseExceptions();
-                    } catch (final Throwable e) {
-                        // getLogger().log(e);
-                    }
-                };
-            };
-            thread.setDaemon(true);
-            thread.start();
-            return thread;
         }
+        // TODO: Get a nicer captcha type string here once possible
+        String captcha_challenge_type = c.getTypeID();
+        if (captcha_challenge_type != null && captcha_challenge_type.contains("turnstile")) {
+            captcha_challenge_type = "Cloudflare Turnstile";
+        }
+        final String captcha_challenge_type_final = captcha_challenge_type;
+        final Thread thread = new Thread() {
+            public void run() {
+                try {
+                    final String help_article_url = "https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required";
+                    String message = "<html>";
+                    final String title;
+                    String lang = System.getProperty("user.language").toLowerCase();
+                    if ("de".equals(lang)) {
+                        title = "Externer Solver erforderlich für diese Captcha-Challenge";
+                        message += "Die interaktive Art der Captcha-Herausforderung '" + captcha_challenge_type_final + "', die gelöst werden muss, kann derzeit nicht lokal in deinem Browser gelöst werden.<br><br>";
+                        message += "Daher bleibt dir nur die Möglichkeit, einen [kostenpflichtigen] Captcha-Lösungsdienst zu nutzen, der diesen Captcha-Typ verarbeiten kann.<br><br>";
+                        message += "Dies ist keine Werbung, sondern ein technischer Hinweisdialog.<br><br>";
+                        message += "Für detailliertere Informationen lies bitte den unten stehenden Hilfe-Artikel:<br>";
+                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
+                    } else if ("es".equals(lang)) {
+                        title = "Se requiere un solucionador externo para este desafío de captcha";
+                        message += "El tipo interactivo de desafío captcha '" + captcha_challenge_type_final + "' que debe resolverse actualmente no puede resolverse localmente en tu navegador.<br><br>";
+                        message += "Por lo tanto, tu única opción es obtener un servicio de resolución de captchas [de pago] que pueda manejar este tipo de captcha.<br><br>";
+                        message += "Esto no es un anuncio sino un cuadro de diálogo de información técnica.<br><br>";
+                        message += "Para obtener más información detallada, lee el artículo de ayuda a continuación:<br>";
+                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
+                    } else if ("fr".equals(lang)) {
+                        title = "Solveur externe requis pour ce défi captcha";
+                        message += "Le type interactif de défi captcha '" + captcha_challenge_type_final + "' qui doit être résolu ne peut actuellement pas être résolu localement dans votre navigateur.<br><br>";
+                        message += "Par conséquent, votre seule option est d'utiliser un service de résolution de captchas [payant] capable de traiter ce type de captcha.<br><br>";
+                        message += "Ceci n'est pas une publicité mais une boîte de dialogue d'information technique.<br><br>";
+                        message += "Pour plus d'informations détaillées, veuillez lire l'article d'aide ci-dessous :<br>";
+                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
+                    } else if ("hi".equals(lang)) {
+                        title = "इस कैप्चा चुनौती के लिए बाहरी सॉल्वर आवश्यक है";
+                        message += "इंटरएक्टिव प्रकार का कैप्चा चुनौती '" + captcha_challenge_type_final + "', जिसे हल करना है, वर्तमान में आपके ब्राउज़र में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>";
+                        message += "इसलिए आपका एकमात्र विकल्प एक [सशुल्क] कैप्चा समाधान सेवा प्राप्त करना है जो इस प्रकार के कैप्चा को संभाल सकती है।<br><br>";
+                        message += "यह कोई विज्ञापन नहीं है बल्कि एक तकनीकी सूचना संवाद है।<br><br>";
+                        message += "अधिक विस्तृत जानकारी के लिए, कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>";
+                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
+                    } else if ("zh".equals(lang) || "zh-cn".equals(lang)) {
+                        title = "此验证码挑战需要外部解答器";
+                        message += "交互式验证码挑战 '" + captcha_challenge_type_final + "' 目前无法在您的浏览器中本地解决。<br><br>";
+                        message += "因此，您唯一的选择是使用可以处理此类验证码的 [付费] 验证码解答服务。<br><br>";
+                        message += "这不是广告，而是一个技术信息对话框。<br><br>";
+                        message += "有关更多详细信息，请阅读以下帮助文章：<br>";
+                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
+                    } else {
+                        // Default English
+                        title = "External solver required for this captcha challenge";
+                        message += "The interactive type of captcha challenge '" + captcha_challenge_type_final + "' that needs to be solved currently cannot be solved locally in your browser.<br><br>";
+                        message += "Therefore your only option is to get a [paid] captcha solver service which can handle this type of captcha.<br><br>";
+                        message += "This is not an advertisement but a technical information dialog.<br><br>";
+                        message += "For more detailed information, please read the help article down below:<br>";
+                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
+                    }
+                    message += "</html>";
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_HTML, title, message);
+                    dialog.setTimeout((int) TimeUnit.MINUTES.toMillis(3));
+                    UIOManager.I().show(ConfirmDialogInterface.class, dialog).throwCloseExceptions();
+                } catch (final Throwable e) {
+                    // getLogger().log(e);
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
     }
 
     @SuppressWarnings("unchecked")

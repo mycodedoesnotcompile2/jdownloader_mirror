@@ -20,12 +20,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -44,7 +38,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 51002 $", interfaceVersion = 2, names = { "tropicshare.com" }, urls = { "https?://(?:www\\.)?tropicshare\\.com/files/(\\d+)" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 2, names = { "tropicshare.com" }, urls = { "https?://(?:www\\.)?tropicshare\\.com/files/(\\d+)" })
 public class TropicShareCom extends PluginForHost {
     public TropicShareCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -276,7 +276,7 @@ public class TropicShareCom extends PluginForHost {
         final String days = expireInfo.getMatch(1);
         final long monthsSeconds = Integer.parseInt(months) * 31 * 24 * 60 * 60;
         final long daysSeconds = Integer.parseInt(days) * 24 * 60 * 60;
-        final long expireMilliseconds = (monthsSeconds + daysSeconds) * 1001;
+        final long expireMilliseconds = (monthsSeconds + daysSeconds) * 1000l;
         ai.setValidUntil(System.currentTimeMillis() + expireMilliseconds, br);
         account.setType(AccountType.PREMIUM);
         return ai;

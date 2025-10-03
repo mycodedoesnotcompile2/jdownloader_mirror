@@ -286,6 +286,11 @@ public class M3U8Playlist {
         return parseM3U8(br, X_BYTERANGE_SUPPORT);
     }
 
+    @Deprecated
+    public M3U8Segment getExtXMap() {
+        return null;
+    }
+
     /**
      * https://en.wikipedia.org/wiki/M3U
      *

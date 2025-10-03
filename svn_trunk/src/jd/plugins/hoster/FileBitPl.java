@@ -19,14 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -51,7 +44,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "filebit.pl" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "filebit.pl" }, urls = { "" })
 public class FileBitPl extends PluginForHost {
     private static final String          APIKEY   = "YWI3Y2E2NWM3OWQxYmQzYWJmZWU3NTRiNzY0OTM1NGQ5ODI3ZjlhNmNkZWY3OGE1MjQ0ZjU4NmM5NTNiM2JjYw==";
     private static final String          API_BASE = "https://filebit.pl/api/index.php";
@@ -272,8 +273,8 @@ public class FileBitPl extends PluginForHost {
     }
 
     /**
-     * 2019-08-19: Keep in mind: This may waste traffic as it is not (yet) able to re-use previously generated "filebit.pl fileIDs".</br>
-     * DO NOT USE THIS AS LONG AS THEIR API IS WORKING FINE!!!
+     * 2019-08-19: Keep in mind: This may waste traffic as it is not (yet) able to re-use previously generated "filebit.pl fileIDs".</br> DO
+     * NOT USE THIS AS LONG AS THEIR API IS WORKING FINE!!!
      */
     @Deprecated
     private String getDllinkWebsite(final Account account, final DownloadLink link) throws Exception {
@@ -399,13 +400,13 @@ public class FileBitPl extends PluginForHost {
         final String timeleftHours = timeleftHoursMinutes.getMatch(0);
         final String timeleftMinutes = timeleftHoursMinutes.getMatch(1);
         if (timeleftDays != null) {
-            timeleftMilliseconds += Long.parseLong(timeleftDays) * 24 * 60 * 60 * 1000;
+            timeleftMilliseconds += TimeUnit.DAYS.toMillis(Long.parseLong(timeleftDays));
         }
         if (timeleftHours != null) {
-            timeleftMilliseconds += Long.parseLong(timeleftHours) * 60 * 60 * 1000;
+            timeleftMilliseconds += TimeUnit.HOURS.toMillis(Long.parseLong(timeleftHours));
         }
         if (timeleftMinutes != null) {
-            timeleftMilliseconds += Long.parseLong(timeleftMinutes) * 60 * 1000;
+            timeleftMilliseconds += TimeUnit.MINUTES.toMillis(Long.parseLong(timeleftMinutes));
         }
         if (timeleftMilliseconds > 0) {
             ai.setValidUntil(System.currentTimeMillis() + timeleftMilliseconds, this.br);

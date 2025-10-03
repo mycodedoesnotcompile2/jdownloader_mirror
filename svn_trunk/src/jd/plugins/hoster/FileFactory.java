@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -60,7 +61,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@HostPlugin(revision = "$Revision: 51605 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -265,18 +266,18 @@ public class FileFactory extends PluginForHost {
         if (Boolean.FALSE.equals(userIsPremium) && Boolean.TRUE.equals(requiresPremium)) {
             throw new AccountRequiredException();
         } else if (error_code != null) {
-                if ("266".equals(error_code)) {
-                    // Please wait a moment before downloading. Free users must wait between downloads. This typically takes 5 minutes after
-                    // your
-                    // last download completed
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, errorDataMap != null ? StringUtils.valueOfOrNull(errorDataMap.get("message")) : null);
-                } else if ("FILE_NOT_FOUND".equals(error_code)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else {
-                    logger.info("Unknown error happened: " + error_code);
-                    throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
-                }
+            if ("266".equals(error_code)) {
+                // Please wait a moment before downloading. Free users must wait between downloads. This typically takes 5 minutes after
+                // your
+                // last download completed
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, errorDataMap != null ? StringUtils.valueOfOrNull(errorDataMap.get("message")) : null);
+            } else if ("FILE_NOT_FOUND".equals(error_code)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                logger.info("Unknown error happened: " + error_code);
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
             }
+        }
         /* Handle errors inside url parameters */
         final UrlQuery query = UrlQuery.parse(br.getURL());
         final String error_type = query.get("type");
@@ -393,7 +394,7 @@ public class FileFactory extends PluginForHost {
                 nextRebillDate = entries.get("nextRebillDate").toString();
             }
             final int daysRemaining = ((Number) entries.get("daysRemaining")).intValue();
-            ai.setValidUntil(System.currentTimeMillis() + daysRemaining * 24 * 60 * 60 * 1000, br);
+            ai.setValidUntil(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(daysRemaining), br);
             ai.setStatus(AccountType.PREMIUM.getLabel() + " | Next rebill date: " + nextRebillDate);
         } else {
             /* Expired/free account */

@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51603 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
 public class Up2imgComAlbum extends PluginForDecrypt {
     public Up2imgComAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -99,27 +99,54 @@ public class Up2imgComAlbum extends PluginForDecrypt {
             title = album_slug.replace("-", " ").trim();
         }
         final HashSet<String> dupes = new HashSet<String>();
-        final String[] links = br.getRegex("(viewimage/[^/\"]+/[^/\"]+/[^/\"]+/[^/\"]+\\.html)").getColumn(0);
-        if (links == null || links.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final FilePackage fp = FilePackage.getInstance();
-        fp.setName(Encoding.htmlDecode(title).trim());
-        fp.setPackageKey(this.getHost() + "//album/" + album_id);
-        for (String url : links) {
-            if (!dupes.add(url)) {
-                continue;
+        int pageMax = 1;
+        final String[] pages = br.getRegex("page-(\\d+).html\"").getColumn(0);
+        for (final String pageStr : pages) {
+            final int page = Integer.parseInt(pageStr);
+            if (page > pageMax) {
+                pageMax = page;
             }
-            /* Create absolute url */
-            url = br.getURL(url).toExternalForm();
-            final String[] urlparts = url.split("/");
-            final String lastPart = urlparts[urlparts.length - 1].replace(".html", "");
-            final String image_position = Encoding.Base64Decode(lastPart);
-            final DownloadLink link = createDownloadlink(url);
-            /* Mimic server side filenames. */
-            link.setName(image_position + ".up2img.com.jpg");
-            link.setAvailable(true);
-            ret.add(link);
+        }
+        int page = 1;
+        pagination: while (!this.isAbort()) {
+            final String[] links = br.getRegex("(viewimage/[^/\"]+/[^/\"]+/[^/\"]+/[^/\"]+\\.html)").getColumn(0);
+            if (links == null || links.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(Encoding.htmlDecode(title).trim());
+            fp.setPackageKey(this.getHost() + "//album/" + album_id);
+            int numberofNewItemsThisPage = 0;
+            for (String url : links) {
+                if (!dupes.add(url)) {
+                    continue;
+                }
+                /* Create absolute url */
+                url = br.getURL(url).toExternalForm();
+                final String[] urlparts = url.split("/");
+                final String lastPart = urlparts[urlparts.length - 1].replace(".html", "");
+                final String image_position = Encoding.Base64Decode(lastPart);
+                final DownloadLink link = createDownloadlink(url);
+                link._setFilePackage(fp);
+                /* Mimic server side filenames. */
+                link.setName(image_position + ".up2img.com.jpg");
+                link.setAvailable(true);
+                ret.add(link);
+                distribute(link);
+                numberofNewItemsThisPage++;
+            }
+            logger.info("Crawled page " + page + "/" + pageMax + " | Found items so far: " + ret.size());
+            if (numberofNewItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find any new items on current page");
+                break pagination;
+            } else if (page >= pageMax) {
+                logger.info("Stopping because: Reached end");
+                break pagination;
+            }
+            /* Access next page */
+            page++;
+            final String nextPageURL = br.getURL("page-" + page + ".html").toExternalForm();
+            br.getPage(nextPageURL);
         }
         return ret;
     }

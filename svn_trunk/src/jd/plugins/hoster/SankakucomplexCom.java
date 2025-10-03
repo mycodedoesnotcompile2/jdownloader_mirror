@@ -29,6 +29,7 @@ import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
 import jd.http.requests.PostRequest;
@@ -59,7 +60,7 @@ import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@HostPlugin(revision = "$Revision: 51605 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51610 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -158,26 +159,26 @@ public class SankakucomplexCom extends PluginForHost {
     public static enum API_METHOD {
         POSTS {
             @Override
-            public boolean isAutoModePreferAPI(Account account, DownloadLink link) {
+            public boolean isAutoModePreferAPI(Account account) {
                 return true;
             }
         },
         OTHER {
             @Override
-            public boolean isAutoModePreferAPI(Account account, DownloadLink link) {
-                return false;
+            public boolean isAutoModePreferAPI(Account account) {
+                return true;
             }
         };
 
-        public abstract boolean isAutoModePreferAPI(Account account, DownloadLink link);
+        public abstract boolean isAutoModePreferAPI(Account account);
     }
 
-    private boolean allowUseAPI(final Account account, final DownloadLink link, API_METHOD apiMethod) {
+    public boolean allowUseAPI(final Account account, API_METHOD apiMethod) {
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
         final AccessMode mode = cfg.getLinkcheckAccessMode();
         if (mode == AccessMode.API) {
             return true;
-        } else if (mode == AccessMode.AUTO && apiMethod.isAutoModePreferAPI(account, link)) {
+        } else if (mode == AccessMode.AUTO && apiMethod.isAutoModePreferAPI(account)) {
             return true;
         } else {
             return false;
@@ -189,10 +190,10 @@ public class SankakucomplexCom extends PluginForHost {
         /* Use account whenever possible to cover mature content. */
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         final AvailableStatus status = requestFileInformation(link, account);
-        if (status == AvailableStatus.TRUE && link.hasProperty(PROPERTY_IS_PREMIUMONLY) && allowUseAPI(account, link, API_METHOD.POSTS) && !link.isSizeSet() && account != null) {
+        if (status == AvailableStatus.TRUE && link.hasProperty(PROPERTY_IS_PREMIUMONLY) && allowUseAPI(account, API_METHOD.POSTS) && !link.isSizeSet() && account != null) {
             /* Workaround for when some file information is missing when link leads to account-only content and is checked via API. */
             logger.info("Failed to find file size via API and item is only available via account while we have an account -> Checking status again via website in hope to obtain all information");
-            return requestFileInformationWebsite(link, account, false);
+            return requestFileInformationWebsite(link, account);
         } else {
             return status;
         }
@@ -201,8 +202,8 @@ public class SankakucomplexCom extends PluginForHost {
     @Override
     public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
         if (downloadLink != null) {
-            if ("s".equals(downloadLink.getStringProperty(PROPERTY_RATING)) && account == null) {
-                // rating requires an account
+            if (!"s".equals(downloadLink.getStringProperty(PROPERTY_RATING, "s")) && account == null) {
+                // e(explicit) and q(questionable) rating require an account
                 return false;
             }
             if (downloadLink.hasProperty(PROPERTY_IS_ACCOUNT_REQUIRED) && account == null) {
@@ -225,10 +226,10 @@ public class SankakucomplexCom extends PluginForHost {
         } else {
             fileIDIsAPICompatible = true;
         }
-        if (fileIDIsAPICompatible && allowUseAPI(account, link, API_METHOD.POSTS)) {
-            return requestFileInformationAPI(link, account, false);
+        if (fileIDIsAPICompatible && allowUseAPI(account, API_METHOD.POSTS)) {
+            return requestFileInformationAPI(link, account);
         } else {
-            return requestFileInformationWebsite(link, account, false);
+            return requestFileInformationWebsite(link, account);
         }
     }
 
@@ -241,7 +242,7 @@ public class SankakucomplexCom extends PluginForHost {
         link.setName(fileID + "." + assumedExt);
     }
 
-    private AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    private AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
         setWeakFilename(link);
         final String fileID = this.getFID(link);
         final String host = new URL(link.getPluginPatternMatcher()).getHost();
@@ -262,7 +263,7 @@ public class SankakucomplexCom extends PluginForHost {
         } else if (StringUtils.endsWithCaseInsensitive(br.getURL(), "posts/show_empty")) {
             /* E.g. redirect to https://chan.sankakucomplex.com/de/posts/show_empty */
             if (account == null) {
-                return requestFileInformationAPI(link, null, isDownload);
+                return requestFileInformationAPI(link, null);
             } else {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -326,7 +327,7 @@ public class SankakucomplexCom extends PluginForHost {
         }
         if (dllink != null) {
             this.storeDirecturl(link, dllink);
-            if (!isDownload && !link.isSizeSet()) {
+            if (!PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment() && !link.isSizeSet()) {
                 /* Obtain file size from header */
                 try {
                     final Browser brc = br.cloneBrowser();
@@ -342,19 +343,23 @@ public class SankakucomplexCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    private AvailableStatus requestFileInformationAPI(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    public Request addAPIToken(Request request, final Account account) throws Exception {
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
+        if (account != null) {
+            final String accessToken = getAPIToken(account);
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + accessToken);
+        }
+        return request;
+    }
+
+    private AvailableStatus requestFileInformationAPI(final DownloadLink link, final Account account) throws Exception {
         setWeakFilename(link);
         final String fileID = this.getFID(link);
         final Browser brc = this.createNewBrowserInstance();
         brc.setAllowedResponseCodes(400);
         // Hint: https://sankakuapi.com/posts/ID/fu?lang=en -> return fileURLs even without being logged in?!
-        final GetRequest request = brc.createGetRequest(SankakucomplexComCrawler.API_BASE_NEW + "/v2/posts?lang=en&page=1&limit=1&tags=id_range:" + fileID);
-        if (account != null) {
-            final String accessToken = getAPIToken(account);
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + accessToken);
-        }
+        final Request request = addAPIToken(brc.createGetRequest(SankakucomplexComCrawler.API_BASE + "/v2/posts?lang=en&page=1&limit=1&tags=id_range:" + fileID), account);
         brc.getPage(request);
         if (brc.getHttpConnection().getResponseCode() == 400) {
             /* {"success":false,"code":"invalid id","error":"invalid id","errorId":"error_<someHash>"} */
@@ -412,6 +417,9 @@ public class SankakucomplexCom extends PluginForHost {
         } else {
             link.removeProperty(PROPERTY_IS_PREMIUMONLY);
         }
+        // e -> explicit(R18+)
+        // q-> questionable (R15+)
+        // s -> safe (G)
         link.setProperty(PROPERTY_RATING, item.get("rating"));
         final List<Map<String, Object>> tags = (List<Map<String, Object>>) item.get("tags");
         if (tags != null && tags.size() > 0) {
@@ -483,7 +491,7 @@ public class SankakucomplexCom extends PluginForHost {
         }
         String dllink = link.getStringProperty(PROPERTY_DIRECTURL);
         if (dllink == null) {
-            requestFileInformationWebsite(link, account, true);
+            requestFileInformation(link, account);
             dllink = link.getStringProperty(PROPERTY_DIRECTURL);
             if (dllink == null) {
                 if (link.hasProperty(PROPERTY_IS_PREMIUMONLY) && account == null) {

@@ -16,9 +16,7 @@
 package jd.plugins.hoster;
 
 import java.util.Arrays;
-
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -37,7 +35,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
 public class ContasturboCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("contasturbo.com");
 
@@ -159,7 +160,7 @@ public class ContasturboCom extends PluginForHost {
             if (expireExtraHours != null) {
                 hours_total += Long.parseLong(expireExtraHours);
             }
-            ai.setValidUntil(System.currentTimeMillis() + hours_total * 60 * 60 * 1000, br);
+            ai.setValidUntil(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(hours_total), br);
         } else {
             account.setType(AccountType.FREE);
             ai.setTrafficLeft(0);

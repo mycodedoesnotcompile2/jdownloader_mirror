@@ -25,6 +25,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -43,21 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51471 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,12 +107,12 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?o=(\\d+))?)(/post/[a-z0-9]+)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?.+)?)(/post/[a-z0-9]+)?");
         }
         return ret.toArray(new String[0]);
     }
 
-    private final String TYPE_PROFILE = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)(\\?o=(\\d+))?$";
+    private final String TYPE_PROFILE = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)(\\?.+)?$";
     private final String TYPE_POST    = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)/post/([a-z0-9]+)$";
     private KemonoParty  hostPlugin   = null;
     private CryptedLink  cl           = null;
@@ -150,19 +150,15 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         }
         final String service = urlinfo.getMatch(0);
         final String userID = urlinfo.getMatch(1);
-        final String startOffsetStr = urlinfo.getMatch(3);
-        Integer startOffset = null;
-        if (startOffsetStr != null) {
-            startOffset = Integer.parseInt(startOffsetStr);
-        }
-        return crawlProfileAPI(service, userID, startOffset);
+        final UrlQuery query = UrlQuery.parse(urlinfo.getMatch(2));
+        return crawlProfileAPI(service, userID, query);
     }
 
     /**
      * @param startOffset
      *            : If provided, only this offset/page will be crawled.
      */
-    private ArrayList<DownloadLink> crawlProfileAPI(final String service, final String usernameOrUserID, final Integer startOffset) throws Exception {
+    private ArrayList<DownloadLink> crawlProfileAPI(final String service, final String usernameOrUserID, final UrlQuery query) throws Exception {
         if (service == null || usernameOrUserID == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -173,25 +169,42 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final FilePackage profileFilePackage = getFilePackageForProfileCrawler(service, usernameOrUserID);
         int offset = 0;
-        if (startOffset != null) {
-            logger.info("Starting from offset: " + startOffset);
-            offset = startOffset.intValue();
+        String offsetString = null;
+        String qString = null;
+        if (query != null) {
+            qString = query.get("q");
+            offsetString = query.getDecoded("o");
+            if (offsetString != null && offsetString.matches("^\\d+$")) {
+                logger.info("Starting from offset: " + offsetString);
+                offset = Integer.parseInt(offsetString);
+            }
+        }
+        if (qString == null) {
+            qString = "";
+        } else {
+            qString = "&q=" + qString;
         }
         int page = 1;
         final int maxItemsPerPage = 50;
         int numberofContinuousPagesWithoutAnyNewItems = 0;
         final int maxPagesWithoutNewItems = 15;
         final Set<String> retryWithSinglePostAPI = new HashSet<String>();
-        do {
-            getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(usernameOrUserID) + "/posts?o=" + offset);
+        pagination: do {
+            getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(usernameOrUserID) + "/posts?o=" + offset + qString);
             final List<Map<String, Object>> posts = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
             if (posts == null || posts.isEmpty()) {
                 if (ret.isEmpty() && retryWithSinglePostAPI.isEmpty()) {
+                    if (!StringUtils.isEmpty(qString)) {
+                        // TODO: Use exception down below once RetryReason.EMPTY_SEARCH_QUERY is live.
+                        // throw new DecrypterRetryException(RetryReason.EMPTY_SEARCH_QUERY);
+                        logger.info("Stopping because: Search query revealed zero results");
+                        break pagination;
+                    }
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     /* This should never happen */
                     logger.info("Stopping because: Got empty page");
-                    break;
+                    break pagination;
                 }
             }
             final int numberofUniqueItemsOld = dupes.size();
@@ -227,16 +240,16 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break;
-            } else if (startOffset != null) {
-                logger.info("Stopping because: User provided specific offset to crawl: " + startOffset);
-                break;
+                break pagination;
+            } else if (StringUtils.isNotEmpty(offsetString)) {
+                logger.info("Stopping because: User provided specific offset to crawl: " + offsetString);
+                break pagination;
             } else if (numberofContinuousPagesWithoutAnyNewItems >= maxPagesWithoutNewItems) {
                 logger.info("Stopping because: Too many pages without any new items: " + maxPagesWithoutNewItems);
-                break;
+                break pagination;
             } else if (posts.size() < maxItemsPerPage) {
                 logger.info("Stopping because: Reached last page(?) Page: " + page);
-                break;
+                break pagination;
             } else {
                 /* Continue to next page */
                 offset += posts.size();
@@ -483,7 +496,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     };
 
     /**
-     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br>
+     * Uses API to find userID. </br>
+     * Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {

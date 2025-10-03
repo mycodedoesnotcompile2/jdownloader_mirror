@@ -25,7 +25,7 @@ import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.http.requests.GetRequest;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -39,7 +39,6 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
@@ -49,17 +48,11 @@ import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessM
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51605 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51610 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
-
-    /*
-     * 2025-04-22: Looks like API doesn't work anymore or at least it fails for a lot of items so for now let's always prefer website in
-     * auto mode.
-     */
-    private static final boolean ACCESS_MODE_AUTO_PREFER_API_MODE = false;
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -118,7 +111,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     private static final Pattern TYPE_TAGS_BOOKS = Pattern.compile("/(([a-z]{2,3})/?)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TYPE_TAGS_POSTS = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
 
-    public static final String   API_BASE_NEW    = "https://sankakuapi.com";
+    public static final String   API_BASE    = "https://sankakuapi.com";
     private SankakucomplexCom    hosterplugin    = null;
 
     @Override
@@ -128,9 +121,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account != null) {
-            hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
             hosterplugin.login(account, false);
         }
         final String contenturl = param.getCryptedUrl();
@@ -164,7 +157,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
          * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
          * website mode.
          */
-        if (mode == AccessMode.API || (mode == AccessMode.AUTO && ACCESS_MODE_AUTO_PREFER_API_MODE)) {
+        if (mode == AccessMode.API || (mode == AccessMode.AUTO && hosterplugin.allowUseAPI(account, SankakucomplexCom.API_METHOD.OTHER))) {
             return crawlTagsPostsAPI(account, param, tags, language);
         } else {
             return crawlTagsPostsWebsite(account, param, tags, language);
@@ -356,12 +349,10 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         int page = 1;
         int position = 1;
         pagination: do {
-            if (true) {
-                // unfinished API stuff
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            br.getPage(API_BASE_NEW + "/posts/keyset?" + query.toString());
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Browser brc = createNewBrowserInstance();
+            final Request request = hosterplugin.addAPIToken(brc.createGetRequest(API_BASE + "/posts/keyset?" + query.toString()), account);
+            brc.getPage(request);
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
             final String nextPageHash = (String) meta.get("next");
             final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
@@ -416,9 +407,12 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             return ret;
         }
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_TAGS_BOOKS);
-        final String languageFromURL = urlinfo.getMatch(1);
+        String languageFromURL = urlinfo.getMatch(1);
+        if (languageFromURL == null) {
+            languageFromURL = "en";
+        }
         String tags = urlinfo.getMatch(2);
-        if (languageFromURL == null || tags == null) {
+        if (tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -432,12 +426,10 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         query.appendEncoded("pool_type", "0");
         int page = 1;
         pagination: do {
-            if (true) {
-                // unfinished API stuff
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            br.getPage(API_BASE_NEW + "/pools/keyset?" + query.toString());
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Browser brc = createNewBrowserInstance();
+            final Request request = hosterplugin.addAPIToken(brc.createGetRequest(API_BASE + "/pools/keyset?" + query.toString()), account);
+            brc.getPage(request);
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
             final String nextPageHash = (String) meta.get("next");
             final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
@@ -495,13 +487,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Browser brc = this.createNewBrowserInstance();
         brc.setAllowedResponseCodes(400);
-        final GetRequest request = brc.createGetRequest(SankakucomplexComCrawler.API_BASE_NEW + "/pools/" + bookID + "?lang=" + language + "&includes[]=series&exceptStatuses[]=deleted");
-        if (account != null) {
-            final String accessToken = hosterplugin.getAPIToken(account);
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + accessToken);
-        }
+        final Request request = hosterplugin.addAPIToken(brc.createGetRequest(SankakucomplexComCrawler.API_BASE + "/pools/" + bookID + "?lang=" + language + "&includes[]=series&exceptStatuses[]=deleted"), account);
         brc.getPage(request);
         if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

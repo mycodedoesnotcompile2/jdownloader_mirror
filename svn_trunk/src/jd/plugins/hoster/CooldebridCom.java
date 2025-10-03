@@ -20,12 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -48,7 +43,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
@@ -195,9 +196,9 @@ public class CooldebridCom extends PluginForHost {
             final String daysLeft = br.getRegex("(?i)([\\d+\\.]+)\\s*Days\\s*Left\\s*<").getMatch(0);
             final String hoursLeft = br.getRegex("(?i)([\\d+\\.]+)\\s*Hours\\s*Left\\s*<").getMatch(0);
             if (daysLeft != null) {
-                ai.setValidUntil(System.currentTimeMillis() + (long) (Double.parseDouble(daysLeft) * 24 * 60 * 60 * 1000l), this.br);
+                ai.setValidUntil(System.currentTimeMillis() + (long) (Double.parseDouble(daysLeft) * TimeUnit.DAYS.toMillis(1)), this.br);
             } else if (hoursLeft != null) {
-                ai.setValidUntil(System.currentTimeMillis() + (long) (Double.parseDouble(hoursLeft) * 60 * 60 * 1000l), this.br);
+                ai.setValidUntil(System.currentTimeMillis() + (long) (Double.parseDouble(hoursLeft) * TimeUnit.HOURS.toMillis(1)), this.br);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

@@ -19,14 +19,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -50,7 +44,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SuicidegirlsComCrawler;
 
-@HostPlugin(revision = "$Revision: 51299 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+
+@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
 public class SuicidegirlsCom extends PluginForHost {
     public SuicidegirlsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -309,7 +310,7 @@ public class SuicidegirlsCom extends PluginForHost {
             final String weeks = info.getMatch(0);
             final String days = info.getMatch(1);
             final long days_total = Long.parseLong(weeks) * 7 * +Long.parseLong(days);
-            expire_long = System.currentTimeMillis() + days_total * 24 * 60 * 60 * 1000l;
+            expire_long = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(days_total);
         }
         if (expire_long == -1) {
             final String expireStr = br.getRegex("Your account will be cancelled on (\\w+ \\d+, \\d{4})").getMatch(0);

@@ -71,7 +71,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51595 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1033,15 +1033,13 @@ public class SendCm extends XFileSharingProBasic {
                 return;
             }
             /* If user edits existing account ensure that GUI matches users' account type. */
-            if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN)) {
+            if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
+                /* Premium account / API key login */
+                apikey.setText(defaultAccount.getPass());
+                accountTypeComboBox.setSelectedIndex(0);
+            } else if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN)) {
                 /* Free account / website login */
                 accountTypeComboBox.setSelectedIndex(1);
-            } else if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
-                if (plg.looksLikeValidAPIKey(defaultAccount.getPass())) {
-                    /* Premium account / API key login */
-                    apikey.setText(defaultAccount.getPass());
-                    accountTypeComboBox.setSelectedIndex(0);
-                }
             } else {
                 /* Do nothing */
             }
@@ -1050,7 +1048,7 @@ public class SendCm extends XFileSharingProBasic {
 
         @Override
         public boolean validateInputs() {
-            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            final boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
             if (isPremium) {
                 // Premium account validation - only API key needed
                 final String apikey = this.getApikey();
@@ -1108,10 +1106,12 @@ public class SendCm extends XFileSharingProBasic {
                 final Account account = new Account(getUsername(), apikey);
                 account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
                 account.setProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN, true);
+                account.removeProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN);
                 return account;
             } else {
                 final Account account = new Account(getUsername(), getPassword());
                 account.setProperty(PROPERTY_ACCOUNT_FORCE_WEBSITE_LOGIN, true);
+                account.removeProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN);
                 return account;
             }
         }
