@@ -27,12 +27,11 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.decrypter.Keep2ShareCcDecrypter;
 
-@HostPlugin(revision = "$Revision: 48371 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51620 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { Keep2ShareCcDecrypter.class })
 public class TezFilesCom extends K2SApi {
     public TezFilesCom(PluginWrapper wrapper) {
@@ -92,14 +91,6 @@ public class TezFilesCom extends K2SApi {
     protected boolean fetchAdditionalAccountInfo(final Account account, final AccountInfo ai, final Browser br, final String auth_token) {
         // untested, had no test account with lifetime status
         return false;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

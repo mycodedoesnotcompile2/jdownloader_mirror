@@ -38,11 +38,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51192 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamflashSx extends PluginForHost {
     public StreamflashSx(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
@@ -90,10 +89,13 @@ public class StreamflashSx extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_WATCH    = Pattern.compile("/watch\\.php\\?(?:id|v)=([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_DOWNLOAD = Pattern.compile("/download_page\\.php\\?video_id=([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/watch\\.php\\?id=(\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_WATCH.pattern() + "|" + PATTERN_DOWNLOAD.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -109,7 +111,13 @@ public class StreamflashSx extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        final String url = link.getPluginPatternMatcher();
+        String fid = new Regex(url, PATTERN_WATCH).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, PATTERN_DOWNLOAD).getMatch(0);
+        return fid;
     }
 
     @Override
@@ -147,7 +155,12 @@ public class StreamflashSx extends PluginForHost {
                 /* Use preferred host */
                 host = urlHost;
             }
-            return originalURL.replaceFirst("(?i)^https?://[^/]+", protocol + host);
+            if (new Regex(originalURL, PATTERN_DOWNLOAD).patternFind()) {
+                /* Build URL-type we need. */
+                return protocol + host + "/watch.php?v=" + this.getFID(link);
+            } else {
+                return originalURL.replaceFirst("(?i)^https?://[^/]+", protocol + host);
+            }
         } catch (final MalformedURLException e) {
             /* Return unmodified url. */
             logger.log(e);
@@ -166,6 +179,8 @@ public class StreamflashSx extends PluginForHost {
         this.setBrowserExclusive();
         br.getPage(this.getContentURL(link));
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*This video was deleted")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* 2025-07-08: Filename in h5 tag is only available for original file uploader */
@@ -197,10 +212,11 @@ public class StreamflashSx extends PluginForHost {
             brc.getPage("/record_view.php?id=" + fid + "&token=" + viewToken);
         } catch (final Throwable e) {
             logger.log(e);
-            logger.warning("View count handling failed");
+            logger.info("View count handling failed");
         }
         final String officialVideoDownload = br.getRegex("\"(download_page\\.php\\?video_id=" + fid + ")").getMatch(0);
         if (officialVideoDownload != null) {
+            /* Prefer official video download */
             logger.info("Performing official video download");
             br.getPage(officialVideoDownload);
             final Form dlform = br.getFormbyKey("video_id");

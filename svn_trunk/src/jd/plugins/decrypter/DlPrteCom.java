@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
  * @version raz_Template
  * @author raztoki, psp
  */
-@DecrypterPlugin(revision = "$Revision: 50684 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
 public class DlPrteCom extends antiDDoSForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -192,15 +192,15 @@ public class DlPrteCom extends antiDDoSForDecrypt {
         /* Error handling */
         if (br.getHttpConnection() == null || br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("Page Not Found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Lien introuvable")) {
+        } else if (br.containsHTML(">\\s*Lien introuvable")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         {
             // additional form
-            Form continu = br.getFormBySubmitvalue("Continuer");
+            Form continu = findContinueForm(br);
             if (continu != null) {
                 submitForm(continu);
-                continu = br.getFormBySubmitvalue("Continuer");
+                continu = findContinueForm(br);
                 if (continu != null) {
                     submitForm(continu);
                 }
@@ -273,6 +273,10 @@ public class DlPrteCom extends antiDDoSForDecrypt {
         }
         ret.add(createDownloadlink(link));
         return ret;
+    }
+
+    private Form findContinueForm(final Browser br) {
+        return br.getFormBySubmitvalue("Continuer");
     }
 
     @Override

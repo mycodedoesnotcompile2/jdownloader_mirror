@@ -29,6 +29,17 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.IO;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -54,18 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.IO;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51621 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -340,7 +340,7 @@ public class DeepbridCom extends PluginForHost {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            if (account.getType() == AccountType.PREMIUM) {
+            if (AccountType.PREMIUM.equals(account.getType())) {
                 /* Use API in premium mode */
                 postPage(br, API_BASE + "?page=api&app=jdownloader&action=generateLink", "pass=&link=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
             } else {
@@ -507,47 +507,55 @@ public class DeepbridCom extends PluginForHost {
         /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
         domainWorkarounds.put("icerbox", "icerbox.com");
         domainWorkarounds.put("filestore", "filestore.me");
-        final Map<String, String> hostsToDownSinceDate = new HashMap<String, String>();
+        final Map<String, String> hostsDownSinceDateMapping = new HashMap<String, String>();
         for (final Object hostO : supportedhostslistO) {
             /* List can be given in two different varieties */
-            if (!(hostO instanceof Map)) {
+            if ((hostO instanceof Map)) {
+                final Map<String, Object> entries = (Map<String, Object>) hostO;
+                for (final Map.Entry<String, Object> entry : entries.entrySet()) {
+                    final MultiHostHost mhost = new MultiHostHost();
+                    final boolean isOnline;
+                    String downSinceDate = null;
+                    final String onlineStatus = (String) entry.getValue();
+                    if ("up".equalsIgnoreCase(onlineStatus)) {
+                        isOnline = true;
+                    } else {
+                        isOnline = false;
+                        downSinceDate = new Regex(onlineStatus, "down \\((.+)\\)$").getMatch(0);
+                    }
+                    final String[] domains = entry.getKey().split(",");
+                    for (String domain : domains) {
+                        domain = domain.toLowerCase(Locale.ENGLISH);
+                        if (crippledDomainToMultihostHost.containsKey(domain)) {
+                            continue;
+                        }
+                        if (!isOnline) {
+                            hostsDownSinceDateMapping.put(domain, downSinceDate);
+                        }
+                        mhost.addDomain(domain);
+                        crippledDomainToMultihostHost.put(domain, mhost);
+                        /**
+                         * Add domain variations to internal mapping in an attempt to avoid double-entries. <br>
+                         * Only do this for domains containing exactly one dot.
+                         */
+                        final String[] domainParts = domain.split("\\.");
+                        if (domainParts.length == 2) {
+                            crippledDomainToMultihostHost.put(domainParts[0], mhost);
+                        }
+                    }
+                }
+            } else if (hostO instanceof String) {
+                /* Free account: No info given except for crippled domain */
+                final String domain_crippled = hostO.toString().toLowerCase(Locale.ENGLISH);
+                final MultiHostHost mhost = new MultiHostHost(domain_crippled);
+                crippledDomainToMultihostHost.put(domain_crippled, mhost);
+            } else {
                 logger.warning("Found invalid host object: " + hostO);
-                continue;
-            }
-            final Map<String, Object> entries = (Map<String, Object>) hostO;
-            for (final Map.Entry<String, Object> entry : entries.entrySet()) {
-                final MultiHostHost mhost = new MultiHostHost();
-                final boolean isOnline;
-                String downSinceDate = null;
-                final String onlineStatus = (String) entry.getValue();
-                if ("up".equalsIgnoreCase(onlineStatus)) {
-                    isOnline = true;
-                } else {
-                    isOnline = false;
-                    downSinceDate = new Regex(onlineStatus, "down \\((.+)\\)$").getMatch(0);
-                }
-                final String[] domains = entry.getKey().split(",");
-                for (String domain : domains) {
-                    domain = domain.toLowerCase(Locale.ENGLISH);
-                    if (crippledDomainToMultihostHost.containsKey(domain)) {
-                        continue;
-                    }
-                    if (!isOnline) {
-                        hostsToDownSinceDate.put(domain, downSinceDate);
-                    }
-                    mhost.addDomain(domain);
-                    crippledDomainToMultihostHost.put(domain, mhost);
-                    /**
-                     * Add domain variations to internal mapping in an attempt to avoid double-entries. <br>
-                     * Only do this for domains containing exactly one dot.
-                     */
-                    final String[] domainParts = domain.split("\\.");
-                    if (domainParts.length == 2) {
-                        crippledDomainToMultihostHost.put(domainParts[0], mhost);
-                    }
-                }
             }
         }
+        Long global_free_links_max = null;
+        Long global_free_links_left = null;
+        Long global_free_max_filesize = null;
         boolean findHostersFromWebsiteSuccess = false;
         findHosterInfoFromWebsite: try {
             /*
@@ -583,11 +591,16 @@ public class DeepbridCom extends PluginForHost {
                 final MultiHostHost mhost = new MultiHostHost(crippled_host);
                 crippledDomainToMultihostHost.put(crippled_host, mhost);
             }
-            /*
-             * TODO: For free accounts: parse global free account limits from html such as "max links per day" and "filenext files per day"
-             */
+            final String max_free_filesize_str = br.getRegex("<li>Max\\. Filesize - (\\d+[^<]+)</li>").getMatch(0);
+            if (max_free_filesize_str != null) {
+                global_free_max_filesize = SizeFormatter.getSize(max_free_filesize_str);
+            }
             /* Get and set hoster detail limits -> This is where it gets really ugly as parsing their html is hell! */
-            final String[] hoster_details_htmls = br.getRegex("<div class=\"ml-4 mr-auto\">(.*?)</div></div>").getColumn(-1);
+            String[] hoster_details_htmls = br.getRegex("<div class=\"ml-4 mr-auto\"[^>]*>(.*?)</div></div>").getColumn(-1);
+            if (hoster_details_htmls == null || hoster_details_htmls.length == 0) {
+                /* Free account */
+                hoster_details_htmls = br.getRegex("<div class=\"ml-4 mr-auto\"[^>]*>(.*?)</div>\\s*</div>\\s*</div>").getColumn(-1);
+            }
             if (hoster_details_htmls != null && hoster_details_htmls.length > 0) {
                 for (final String hoster_details_html : hoster_details_htmls) {
                     String crippled_host = new Regex(hoster_details_html, "<div class=\"font-medium\">([^<]+)</div>").getMatch(0);
@@ -597,6 +610,7 @@ public class DeepbridCom extends PluginForHost {
                     }
                     crippled_host = Encoding.htmlDecode(crippled_host).trim();
                     crippled_host = crippled_host.toLowerCase(Locale.ENGLISH);
+                    final boolean isGlobalMaxLinksLimit = crippled_host.equalsIgnoreCase("Files per day");
                     boolean isNew = false;
                     boolean foundAndSetIndividualHostLimits = false;
                     MultiHostHost mhost = crippledDomainToMultihostHost.get(crippled_host);
@@ -610,7 +624,7 @@ public class DeepbridCom extends PluginForHost {
                             logger.warning("Cannot parse limit string: " + limit_text);
                             break setIndividualHostTrafficLimits;
                         }
-                        if (StringUtils.containsIgnoreCase(limit_text, "links")) {
+                        if (StringUtils.containsIgnoreCase(limit_text, "links") || limit_text.matches("\\d+/\\d+")) {
                             final String[] link_limits_list = limit_text.replaceFirst("(?i)\\s*links", "").split("/");
                             final String link_limit_used_str = link_limits_list[0].trim();
                             final String link_limit_max_str = link_limits_list[1].trim();
@@ -624,8 +638,17 @@ public class DeepbridCom extends PluginForHost {
                             }
                             final long links_max = Long.parseLong(link_limit_max_str);
                             final long links_used = Long.parseLong(link_limit_used_str);
+                            final long links_left = links_max - links_used;
                             mhost.setLinksMax(links_max);
-                            mhost.setLinksLeft(links_max - links_used);
+                            mhost.setLinksLeft(links_left);
+                            if (isGlobalMaxLinksLimit) {
+                                global_free_links_max = links_max;
+                                global_free_links_left = links_left;
+                                /* Do not add this dummy entry to list of supported hosts, just collect the information and use it later. */
+                                logger.info("Found global limit: left/max -> " + links_left + "/" + links_max);
+                                findHostersFromWebsiteSuccess = true;
+                                continue;
+                            }
                         } else {
                             final String[] traffic_limit_list = limit_text.split("/");
                             final String traffic_limit_used_str = traffic_limit_list[0].trim();
@@ -683,7 +706,7 @@ public class DeepbridCom extends PluginForHost {
             String realDomain = null;
             for (final String domain : mhost.getDomains()) {
                 if (downSinceDate == null) {
-                    downSinceDate = hostsToDownSinceDate.get(domain);
+                    downSinceDate = hostsDownSinceDateMapping.get(domain);
                 }
                 if (realDomain == null) {
                     realDomain = domainWorkarounds.get(domain);
@@ -698,6 +721,19 @@ public class DeepbridCom extends PluginForHost {
             if (downSinceDate != null) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 mhost.setStatusText("Down since " + downSinceDate);
+            }
+            if (AccountType.FREE.equals(account.getType())) {
+                if (global_free_links_left != null && global_free_links_max != null) {
+                    mhost.setLinksLeft(global_free_links_left.longValue());
+                    mhost.setLinksMax(global_free_links_max.longValue());
+                }
+            }
+        }
+        if (AccountType.FREE.equals(account.getType())) {
+            if (global_free_max_filesize != null) {
+                ai.setTrafficLeft(global_free_max_filesize);
+            } else {
+                logger.warning("Failed to find global free account traffic limit");
             }
         }
         account.setConcurrentUsePossible(true);

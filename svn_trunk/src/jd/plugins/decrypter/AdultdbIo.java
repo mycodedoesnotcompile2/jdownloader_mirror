@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50415 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
 public class AdultdbIo extends PluginForDecrypt {
     public AdultdbIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,6 +82,10 @@ public class AdultdbIo extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String urlSlug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        /* Check for some invalid URLs */
+        if (new Regex(urlSlug, "(wp-admin|wp-includes|wp-json|wp-content|about-us|feed)").patternFind()) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -108,8 +113,13 @@ public class AdultdbIo extends PluginForDecrypt {
         String rcKey = null;
         final String[] jsurls = br.getRegex("(/wp-content/litespeed/js/[^\"]+)\"").getColumn(0);
         if (jsurls != null && jsurls.length > 0) {
+            final HashSet<String> dupes = new HashSet<String>();
             final Browser brx = br.cloneBrowser();
             for (final String jsurl : jsurls) {
+                if (!dupes.add(jsurl)) {
+                    /* Skip duplicates */
+                    continue;
+                }
                 brx.getPage(jsurl);
                 rcKey = brx.getRegex("\"recaptcha_key\":\\s*\"([^\"]+)\"").getMatch(0);
                 if (rcKey != null) {

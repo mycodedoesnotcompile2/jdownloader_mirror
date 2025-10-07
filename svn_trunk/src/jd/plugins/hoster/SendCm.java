@@ -36,22 +36,6 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
@@ -71,7 +55,23 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51617 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -214,8 +214,8 @@ public class SendCm extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (allowAPIDownloadIfApikeyIsAvailable(link, account)) {
             /**
-             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br>
-             * Looks like this is supposed to help with Cloudflare problems.
+             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br> Looks like this is supposed to help with
+             * Cloudflare problems.
              */
             final String directurl = this.getDllinkAPI(link, account);
             handleDownload(link, account, null, directurl);
@@ -966,9 +966,6 @@ public class SendCm extends XFileSharingProBasic {
                 pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
             }
             freeAccountPanel.add(pass);
-            // Add panels to main container
-            add(premiumAccountPanel, "span 2, grow");
-            add(freeAccountPanel, "span 2, grow");
             // Handle clipboard auto-fill
             handleClipboardAutoFill(apikey_help_url_without_protocol);
             // Set initial visibility
@@ -1002,15 +999,15 @@ public class SendCm extends XFileSharingProBasic {
         }
 
         private void updateVisibleComponents() {
-            boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
+            final boolean isPremium = accountTypeComboBox.getSelectedIndex() == 0;
             premiumAccountPanel.setVisible(isPremium);
             freeAccountPanel.setVisible(!isPremium);
             if (isPremium) {
                 this.remove(freeAccountPanel);
-                this.add(premiumAccountPanel);
+                add(premiumAccountPanel, "span 2, grow");
             } else {
                 this.remove(premiumAccountPanel);
-                this.add(freeAccountPanel);
+                add(freeAccountPanel, "span 2, grow");
             }
             // Trigger layout update
             revalidate();

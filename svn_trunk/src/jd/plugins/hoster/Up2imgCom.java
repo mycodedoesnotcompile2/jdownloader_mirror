@@ -15,13 +15,13 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Image;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import javax.imageio.ImageIO;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -38,7 +38,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.Up2imgComAlbum;
 
-@HostPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51617 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { Up2imgComAlbum.class })
 public class Up2imgCom extends PluginForHost {
     public Up2imgCom(PluginWrapper wrapper) {
@@ -157,31 +160,6 @@ public class Up2imgCom extends PluginForHost {
     }
 
     @Override
-    protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
-        if (!super.looksLikeDownloadableContent(urlConnection)) {
-            return false;
-        }
-        try {
-            /* try to detect special "File not found" image */
-            final int knownImageSize = 106684;
-            final byte[] probe = urlConnection.peek(knownImageSize + 1);// +1 more to only check hash on exactly 106684 content length
-            if (probe.length != knownImageSize) {
-                return true;
-            }
-            final String hash = Hash.getSHA256(probe);
-            // TODO: Change to this value? 4a963b95bf081c3ea02923dceaeb3f8085e1a654fc54840aac61a57a60903fef
-            if ("9d452fef9e7a588aeff42ea2f1e145a4f3fac5596898d99994b39db126fd7497".equals(hash)) {
-                logger.info("Detected dummy \"File not found\" image");
-                return false;
-            }
-            return true;
-        } catch (IOException e) {
-            logger.log(e);
-        }
-        return true;
-    }
-
-    @Override
     protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
@@ -196,9 +174,9 @@ public class Up2imgCom extends PluginForHost {
             if (probe.length != knownImageSize) {
                 return;
             }
-            final String hash = Hash.getSHA256(probe);
-            if ("9d452fef9e7a588aeff42ea2f1e145a4f3fac5596898d99994b39db126fd7497".equals(hash)) {
-                /* e.g. /album/MTg2NDA/hardcore-Jasmine-Rouge-George-Titus-Steel/viewimage/Mg/666wMjkxOTA1MjAyMTEzMg/MTQw/MDAwMDE.html */
+            final Image image = ImageIO.read(new ByteArrayInputStream(probe));
+            if (image != null && image.getWidth(null) == 584 && image.getHeight(null) == 387) {
+                /* e.g. /album/MTg2NDA/54842993/showimage/Mg/666wMjkxOTA1MjAyMTEzMg/MDAwMDE.up2img.com.jpg" */
                 logger.info("Detected dummy \"File not found\" image");
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -219,10 +197,6 @@ public class Up2imgCom extends PluginForHost {
     }
 
     private String getDllink(final Browser br) {
-        /* @Dev: Commented out code down below returns direct-URL that leads to empty dummy image. */
-        // if (true) {
-        // return "https://cdn1.up2img.com/album/MTg2NDA/54842993/showimage/Mg/666wMjkxOTA1MjAyMTEzMg/MDAwMDE.up2img.com.jpg";
-        // }
         return br.getRegex("<img src=\"([^\"]+)\"[^>]*style=\"max-width:100%; height:auto;\"[^>]*>").getMatch(0);
     }
 

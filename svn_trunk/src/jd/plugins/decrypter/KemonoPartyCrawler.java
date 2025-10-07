@@ -25,20 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -57,7 +43,21 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 51615 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51619 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -195,10 +195,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             if (posts == null || posts.isEmpty()) {
                 if (ret.isEmpty() && retryWithSinglePostAPI.isEmpty()) {
                     if (!StringUtils.isEmpty(qString)) {
-                        // TODO: Use exception down below once RetryReason.EMPTY_SEARCH_QUERY is live.
-                        // throw new DecrypterRetryException(RetryReason.EMPTY_SEARCH_QUERY);
-                        logger.info("Stopping because: Search query revealed zero results");
-                        break pagination;
+                        throw new DecrypterRetryException(RetryReason.EMPTY_SEARCH_QUERY);
                     }
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
@@ -490,15 +487,13 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-            return size() > 100;
-        };
-    };
+                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                                                              return size() > 100;
+                                                          };
+                                                      };
 
     /**
-     * Returns userID for given username. </br>
-     * Uses API to find userID. </br>
-     * Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {

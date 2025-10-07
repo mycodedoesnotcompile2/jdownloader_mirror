@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FromsmashCom;
 
-@DecrypterPlugin(revision = "$Revision: 49060 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
 public class FromsmashComFolder extends PluginForDecrypt {
     public FromsmashComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,11 +105,10 @@ public class FromsmashComFolder extends PluginForDecrypt {
                 final long tokenTimestamp = TimeFormatter.getMilliSeconds(tokenExpireDate, "yyyy-MM-dd'T'HH:mm:ss'.000Z'", Locale.ENGLISH);
                 if (StringUtils.isEmpty(token)) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    TOKEN.set(token);
-                    TOKEN_TIMESTAMP_VALID_UNTIL.set(tokenTimestamp);
-                    return token;
                 }
+                TOKEN.set(token);
+                TOKEN_TIMESTAMP_VALID_UNTIL.set(tokenTimestamp);
+                return token;
             }
         }
     }

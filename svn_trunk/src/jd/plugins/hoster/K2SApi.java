@@ -70,7 +70,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51572 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51620 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -282,7 +282,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 51572 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 51620 $"));
     }
 
     /**
@@ -320,6 +320,7 @@ public abstract class K2SApi extends PluginForHost {
      *
      * @return
      */
+    @Deprecated
     protected boolean useAPI() {
         /* 2020-05-09: Website mode not supported anymore so this is hardcoded to true now. */
         return true;

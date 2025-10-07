@@ -52,7 +52,7 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -60,8 +60,9 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPlugin
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51617 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -88,8 +89,19 @@ public class FileFactory extends PluginForHost {
         return "https://www." + this.getHost() + "/legal/terms";
     }
 
+    public static final String PROPERTY_CLASSIC = "classic_file";
+
+    private boolean isClassicFile(final DownloadLink link) throws PluginException {
+        return link.hasProperty("classic_file") || link.getPluginPatternMatcher().contains("classic.filefactory.com");
+
+    }
+
     private String getContentURL(final DownloadLink link) throws PluginException {
-        return "https://www." + getHost() + "/file/" + this.getFUID(link);
+        if (isClassicFile(link)) {
+            return "https://classic." + getHost() + "/file/" + this.getFUID(link);
+        } else {
+            return "https://www." + getHost() + "/file/" + this.getFUID(link);
+        }
     }
 
     private String getWebapiBase() {
@@ -150,7 +162,7 @@ public class FileFactory extends PluginForHost {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
+            ret.add("https?://(?:www\\.|classic\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -201,18 +213,35 @@ public class FileFactory extends PluginForHost {
                 return AvailableStatus.TRUE;
             }
             br.followConnection();
+            final String NEXT_REDIRECT = br.getRegex("NEXT_REDIRECT;replace;(https://classic\\.filefactory\\.com/file/" + Pattern.quote(getFUID(link)) + ")").getMatch(0);
+            if (NEXT_REDIRECT != null) {
+                br.getPage(NEXT_REDIRECT);
+            }
+            if ("classic.filefactory.com".equals(br.getHost(true))) {
+                link.setProperty(PROPERTY_CLASSIC, Boolean.TRUE);
+            }
             if (isPasswordProtectedFile(br)) {
                 link.setPasswordProtected(true);
             } else {
                 link.setPasswordProtected(false);
             }
-            final String filename = getString(br, "disp_filename");
-            final String filesizeBytesStr = getString(br, "size");
+            String filename = getString(br, "disp_filename");
+            if (filename == null) {
+                // classic
+                filename = br.getRegex("class\\s*=\\s*\"file-name\"[^>]*>\\s*(.+?)\\s*</").getMatch(0);
+            }
             if (filename != null) {
                 link.setName(filename);
             }
+            final String filesizeBytesStr = getString(br, "size");
             if (filesizeBytesStr != null) {
                 link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+            } else {
+                // classic
+                final String filesizeString = br.getRegex("class\\s*=\\s*\"file-meta\"[^>]*id\\s*=\\s*\"file_info\"[^>]*>\\s*([0-9\\. GMKB]+)").getMatch(0);
+                if (filesizeString != null) {
+                    link.setDownloadSize(SizeFormatter.getSize(filesizeString));
+                }
             }
             checkErrorsWebsite(link, account, br);
         } finally {
@@ -266,7 +295,10 @@ public class FileFactory extends PluginForHost {
         if (Boolean.FALSE.equals(userIsPremium) && Boolean.TRUE.equals(requiresPremium)) {
             throw new AccountRequiredException();
         } else if (error_code != null) {
-            if ("266".equals(error_code)) {
+            if ("274".equals(error_code)) {
+                // unknown error happened
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
+            } else if ("266".equals(error_code)) {
                 // Please wait a moment before downloading. Free users must wait between downloads. This typically takes 5 minutes after
                 // your
                 // last download completed
@@ -527,9 +559,41 @@ public class FileFactory extends PluginForHost {
         handleDownloadWebsite(link, null);
     }
 
+    private void handleClassicDownloadWebsite(final DownloadLink link, final Account account) throws Exception {
+        if (this.dl == null) {
+            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "classic links are not yet working/supported");
+            }
+            final String slowDownload = br.getRegex("data-href\\s*=\\s*\"([^\"]*)\"\\s*>\\Slow Download").getMatch(0);
+            if (slowDownload == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.getPage(slowDownload);
+            final String NEXT_REDIRECT = br.getRegex("NEXT_REDIRECT;replace;(https://classic\\.filefactory\\.com/file/" + Pattern.quote(getFUID(link)) + ")").getMatch(0);
+            if (NEXT_REDIRECT != null) {
+                br.getPage(NEXT_REDIRECT);
+            }
+            String finallink = null;
+            if (StringUtils.isEmpty(finallink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+            }
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finallink, this.isResumeable(link, account), this.getMaxChunks(link, account));
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                handleConnectionErrors(br, dl.getConnection());
+                checkErrorsWebsite(link, account, br);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
+        dl.startDownload();
+    }
+
     public void handleDownloadWebsite(final DownloadLink link, final Account account) throws Exception {
         requestFileInformationWebsite(account, link);
         /* If dl != null this means that we had a direct downloadable link. */
+        if (isClassicFile(link)) {
+            handleClassicDownloadWebsite(link, account);
+            return;
+        }
         if (this.dl == null) {
             if (link.isPasswordProtected()) {
                 /*
@@ -576,21 +640,24 @@ public class FileFactory extends PluginForHost {
             if (StringUtils.isEmpty(finallink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
             }
-            if (Application.getJavaVersion() < Application.JAVA17) {
-                // TODO. Check if this is still working (if http redirects to https we do not need this)
-                finallink = finallink.replaceFirst("(?i)https", "http");
-            }
-            Number fileSize = (Number) entries.get("fileSize");
-            if (fileSize == null) {
+            Object fileSizeEntry = entries.get("fileSize");
+            if (fileSizeEntry == null) {
                 /* 2025-10-01: atm fields "fileSize" and "filesize" both exist at the same time. */
-                fileSize = (Number) entries.get("filesize");
+                fileSizeEntry = entries.get("filesize");
             }
-            if (fileSize != null) {
-                link.setVerifiedFileSize(fileSize.longValue());
+            final long fileSize = JavaScriptEngineFactory.toLong(fileSizeEntry, -1l);
+            if (fileSize != -1) {
+                link.setVerifiedFileSize(fileSize);
             }
             final String filename = (String) entries.get("filename");
             if (filename != null) {
                 link.setFinalFileName(filename);
+            }
+            if (!Boolean.TRUE.equals(entries.get("directDownload"))) {
+                // TODO
+                if (AccountType.PREMIUM.is(account)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finallink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
