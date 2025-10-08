@@ -19,8 +19,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -35,17 +44,17 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51233 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51624 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -74,6 +83,7 @@ public class JpgChurch extends PluginForHost {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "jpg6.su", "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
+        ret.add(new String[] { "imagepond.net" });
         return ret;
     }
 
@@ -101,7 +111,7 @@ public class JpgChurch extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/img/([A-Za-z0-9\\-\\.]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:img|image|video)/([A-Za-z0-9\\-\\.]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -148,7 +158,14 @@ public class JpgChurch extends PluginForHost {
     }
 
     private String getContentURL(final DownloadLink link) {
-        return "https://" + this.getHost() + "/img/" + this.getFID(link);
+        String contenturl = link.getPluginPatternMatcher();
+        final String addedLinkDomain = Browser.getHost(contenturl, true);
+        String domainToUse = addedLinkDomain;
+        if (getDeadDomains().contains(addedLinkDomain)) {
+            domainToUse = this.getHost();
+            contenturl = contenturl.replaceFirst(Pattern.quote(addedLinkDomain), domainToUse);
+        }
+        return contenturl;
     }
 
     @Override
@@ -157,12 +174,18 @@ public class JpgChurch extends PluginForHost {
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
+        final boolean isVideo = StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "/video/");
         if (!link.isNameSet()) {
             final String weakTitle = this.getFID(link).replaceAll("-+", " ").trim();
-            link.setName(this.applyFilenameExtension(weakTitle, ".jpg"));
+            final String extFallback;
+            if (isVideo) {
+                extFallback = ".mp4";
+            } else {
+                extFallback = ".jpg";
+            }
+            link.setName(this.applyFilenameExtension(weakTitle, extFallback));
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         String title = null;
         String filesizeStr = null;
         /*
@@ -176,6 +199,9 @@ public class JpgChurch extends PluginForHost {
         final String contentURL = getContentURL(link);
         boolean useWebsite = false;
         if (link.isPasswordProtected()) {
+            useWebsite = true;
+        } else if (isVideo) {
+            /* 2025-10-07: oembed is not supported for video links (tested with imagepond.net) */
             useWebsite = true;
         } else {
             final UrlQuery query = new UrlQuery();
@@ -347,14 +373,6 @@ public class JpgChurch extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

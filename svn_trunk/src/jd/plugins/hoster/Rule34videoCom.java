@@ -28,10 +28,11 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginBrowser;
 
+import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigRule34videoCom;
 
-@HostPlugin(revision = "$Revision: 51211 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51622 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -83,11 +84,27 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
         String uploader = br.getRegex("class=\"avatar\"[^>]*title=\"([^\"]+)").getMatch(0);
         if (uploader == null) {
             /* 2024-10-07 */
-            uploader = br.getRegex("src=\"[^\"]+/avatars/[^\"]+\" alt=\"[^\"]+\"/>\\s*</div>([^<]+)</a>").getMatch(0);
+            uploader = br.getRegex("src=\"[^\"]+/avatars/[^\"]+\" alt=\"[^\"]+\"/>\\s*</div>\\s*(.*?)\\s*<").getMatch(0);
+            if (uploader == null) {
+                uploader = br.getRegex(">\\s*Uploaded by\\s*</div>\\s*<a[^>]*>\\s*(?:<div.*?</div>|<span.*?</span>)\\s*(.*?)\\s*<").getMatch(0);
+            }
         }
         if (uploader != null) {
             uploader = Encoding.htmlDecode(uploader).trim();
+            // 'Uploaded by'
             link.setProperty(PROPERTY_USERNAME, uploader);
+        }
+        final String artistHTML = br.getRegex("<div[^>]*>Artist</div>(.*?)class\\s*=\\s*\"label\"\\s*>\\s*Uploaded by").getMatch(0);
+        final String artists[] = new Regex(artistHTML, "class\\s*=\\s*\"name\"\\s*>\\s*(.*?)\\s*<").getColumn(0);
+        if (artists != null) {
+            final StringBuilder sb = new StringBuilder();
+            for (String artist : artists) {
+                if (sb.length() > 0) {
+                    sb.append(",");
+                }
+                sb.append(artist);
+            }
+            link.setProperty("artist", sb.toString());
         }
         final String uploaddate = br.getRegex("\"uploadDate\"\\s*:\\s*\"([^\"]+)").getMatch(0);
         if (uploaddate != null) {

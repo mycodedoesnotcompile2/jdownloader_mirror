@@ -36,6 +36,35 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -66,36 +95,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 51617 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51624 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -380,8 +380,9 @@ public class OneFichierCom extends PluginForHost {
                 // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is server side deprecated but we're still using it because: </br> 1. It is still working. </br> 2. It is the
-                 * only method that can be used to check multiple items with one request.
+                 * This method is server side deprecated but we're still using it because: </br>
+                 * 1. It is still working. </br>
+                 * 2. It is the only method that can be used to check multiple items with one request.
                  */
                 br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
@@ -771,26 +772,25 @@ public class OneFichierCom extends PluginForHost {
                 throw new AccountUnavailableException("Wait between downloads", waitMilliseconds);
             } else {
                 final boolean preferReconnect = PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferReconnectEnabled();
-                if (waittimeMinutesStr != null && preferReconnect) {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Integer.parseInt(waittimeMinutesStr) * 60 * 1001l);
-                } else if (waittimeMinutesStr != null && Integer.parseInt(waittimeMinutesStr) >= 10) {
+                long waitMillis = defaultWaitMinutes * 60 * 1000l;
+                if (waittimeMinutesStr != null) {
+                    waitMillis = Long.parseLong(waittimeMinutesStr) * 60 * 1000l;
+                }
+                if (preferReconnect) {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitMillis);
+                } else if (waitMillis >= 10 * 60 * 1000) {
                     /* High waittime --> Reconnect */
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Integer.parseInt(waittimeMinutesStr) * 60 * 1001l);
-                } else if (preferReconnect) {
-                    /* User prefers reconnect --> Throw Exception with LinkStatus to trigger reconnect */
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, defaultWaitMinutes * 60 * 1000l);
-                } else if (waittimeMinutesStr != null) {
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait between download, Reconnect is disabled in plugin settings", Integer.parseInt(waittimeMinutesStr) * 60 * 1001l);
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitMillis);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait between download, Reconnect is disabled in plugin settings", defaultWaitMinutes * 60 * 1001);
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait between downloads. Reconnect is disabled in plugin settings!", waitMillis);
                 }
             }
         }
     }
 
     /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br> See here for all possible reasons (login
-     * required): https://1fichier.com/console/acl.pl
+     * Access restricted by IP / only registered users / only premium users / only owner. </br>
+     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
      *
      * @throws PluginException
      */
@@ -1119,15 +1119,12 @@ public class OneFichierCom extends PluginForHost {
         } else {
             available_credits_human_readable = SIZEUNIT.formatValue(maxSizeUnit, creditsInBytes);
         }
-        String cdnCreditsStatusText = "CDN credits: " + available_credits_human_readable + " | Used: ";
-        if ((AccountType.FREE.equals(account.getType()) && this.isUsingCDNCredits(account)) || Boolean.TRUE.equals(cdnCreditsUsageEnforced)) {
+        String cdnCreditsStatusText = "CDN credits: " + available_credits_human_readable + " | CDN Used: ";
+        final boolean isFreeAccount = AccountType.FREE.equals(account.getType());
+        if ((isFreeAccount && this.isUsingCDNCredits(account)) || Boolean.TRUE.equals(cdnCreditsUsageEnforced)) {
             cdnCreditsStatusText += "Yes";
             if (Boolean.TRUE.equals(cdnCreditsUsageEnforced)) {
                 cdnCreditsStatusText += " (forced)";
-            }
-            if (account.getType() == AccountType.FREE) {
-                /* Treat Free accounts like a premium account if credits are used. */
-                account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             }
             ai.setTrafficLeft(creditsInBytes);
             ai.setTrafficRefill(false);
@@ -1138,6 +1135,10 @@ public class OneFichierCom extends PluginForHost {
             ai.setSpecialTraffic(true);
         } else {
             cdnCreditsStatusText += "No";
+        }
+        if (isFreeAccount) {
+            /* Treat Free accounts like a premium account if credits are used. */
+            account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
         }
         final String accountTypeText;
         if (this.isGoldAccount(account)) {
@@ -1476,8 +1477,8 @@ public class OneFichierCom extends PluginForHost {
 
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
-         * 2019-04-05: At the moment there are no benefits for us when using this. </br> 2021-01-29: Removed this because if login/API is
-         * blocked because of "flood control" this won't work either!
+         * 2019-04-05: At the moment there are no benefits for us when using this. </br>
+         * 2021-01-29: Removed this because if login/API is blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
         if (checkFileInfoBeforeDownloadAttempt) {
@@ -1826,7 +1827,113 @@ public class OneFichierCom extends PluginForHost {
         /**
          *
          */
-        private static final long serialVersionUID = 1L;
+        private static final long   serialVersionUID = 1L;
+        // Translation keys
+        private static final String ACCOUNT_TYPE     = "account_type";
+        private static final String PREMIUM_API      = "premium_api";
+        private static final String PREMIUM_GOLD_API = "premium_gold_api";
+        private static final String PREMIUM_WEB      = "premium_web";
+        private static final String PREMIUM_GOLD_WEB = "premium_gold_web";
+        private static final String FREE_CDN         = "free_cdn";
+        private static final String FREE             = "free";
+        private static final String PREMIUM_USERS    = "premium_users";
+        private static final String ENTER_API_KEY    = "enter_api_key";
+        private static final String API_KEY_LABEL    = "api_key_label";
+        private static final String OBTAIN_API_KEY   = "obtain_api_key";
+
+        /**
+         * Returns translations for the specified language code with English fallback.
+         *
+         * @param langCode
+         *            Language code: "en", "de", "es", or "fr"
+         * @return HashMap containing translations
+         */
+        private static Map<String, String> getTranslations(final String langCode) {
+            Map<String, String> english = getEnglishTranslations();
+            if ("en".equals(langCode)) {
+                return english;
+            }
+            Map<String, String> targetLang;
+            if ("de".equals(langCode)) {
+                targetLang = getGermanTranslations();
+            } else if ("es".equals(langCode)) {
+                targetLang = getSpanishTranslations();
+            } else if ("fr".equals(langCode)) {
+                targetLang = getFrenchTranslations();
+            } else {
+                // Unknown language, return English
+                return english;
+            }
+            // Merge: start with English, then overlay target language
+            Map<String, String> merged = new HashMap<String, String>();
+            merged.putAll(english);
+            merged.putAll(targetLang);
+            return merged;
+        }
+
+        private static Map<String, String> getEnglishTranslations() {
+            Map<String, String> translations = new HashMap<String, String>();
+            translations.put(ACCOUNT_TYPE, "Account Type:");
+            translations.put(PREMIUM_API, "Premium Account | API Login");
+            translations.put(PREMIUM_GOLD_API, "Premium GOLD Account | API Login");
+            translations.put(PREMIUM_WEB, "Premium Account | Website Login");
+            translations.put(PREMIUM_GOLD_WEB, "Premium GOLD Account | Website Login");
+            translations.put(FREE_CDN, "Free Account with paid CDN credits");
+            translations.put(FREE, "Free Account");
+            translations.put(PREMIUM_USERS, "Premium account users:");
+            translations.put(ENTER_API_KEY, "Enter API key (click here to find it)");
+            translations.put(API_KEY_LABEL, "Premium API Key: ");
+            translations.put(OBTAIN_API_KEY, "Obtain API key here: ");
+            return translations;
+        }
+
+        private static Map<String, String> getGermanTranslations() {
+            Map<String, String> translations = new HashMap<String, String>();
+            translations.put(ACCOUNT_TYPE, "Kontotyp:");
+            translations.put(PREMIUM_API, "Premium-Konto | API-Anmeldung");
+            translations.put(PREMIUM_GOLD_API, "Premium GOLD-Konto | API-Anmeldung");
+            translations.put(PREMIUM_WEB, "Premium-Konto | Website-Anmeldung");
+            translations.put(PREMIUM_GOLD_WEB, "Premium GOLD-Konto | Website-Anmeldung");
+            translations.put(FREE_CDN, "Kostenloses Konto mit bezahlten CDN-Credits");
+            translations.put(FREE, "Kostenloses Konto");
+            translations.put(PREMIUM_USERS, "Premium-Kontonutzer:");
+            translations.put(ENTER_API_KEY, "API-Schlüssel eingeben (hier klicken)");
+            translations.put(API_KEY_LABEL, "Premium-API-Schlüssel: ");
+            translations.put(OBTAIN_API_KEY, "API-Schlüssel hier erhalten: ");
+            return translations;
+        }
+
+        private static Map<String, String> getSpanishTranslations() {
+            Map<String, String> translations = new HashMap<String, String>();
+            translations.put(ACCOUNT_TYPE, "Tipo de cuenta:");
+            translations.put(PREMIUM_API, "Cuenta Premium | Inicio de sesión API");
+            translations.put(PREMIUM_GOLD_API, "Cuenta Premium GOLD | Inicio de sesión API");
+            translations.put(PREMIUM_WEB, "Cuenta Premium | Inicio de sesión web");
+            translations.put(PREMIUM_GOLD_WEB, "Cuenta Premium GOLD | Inicio de sesión web");
+            translations.put(FREE_CDN, "Cuenta gratuita con créditos CDN pagados");
+            translations.put(FREE, "Cuenta gratuita");
+            translations.put(PREMIUM_USERS, "Usuarios de cuenta Premium:");
+            translations.put(ENTER_API_KEY, "Introducir clave API (haga clic aquí)");
+            translations.put(API_KEY_LABEL, "Clave API Premium: ");
+            translations.put(OBTAIN_API_KEY, "Obtener clave API aquí: ");
+            return translations;
+        }
+
+        private static Map<String, String> getFrenchTranslations() {
+            Map<String, String> translations = new HashMap<String, String>();
+            translations.put(ACCOUNT_TYPE, "Type de compte :");
+            translations.put(PREMIUM_API, "Compte Premium | Connexion API");
+            translations.put(PREMIUM_GOLD_API, "Compte Premium GOLD | Connexion API");
+            translations.put(PREMIUM_WEB, "Compte Premium | Connexion site web");
+            translations.put(PREMIUM_GOLD_WEB, "Compte Premium GOLD | Connexion site web");
+            translations.put(FREE_CDN, "Compte gratuit avec crédits CDN payants");
+            translations.put(FREE, "Compte gratuit");
+            translations.put(PREMIUM_USERS, "Utilisateurs de compte Premium :");
+            translations.put(ENTER_API_KEY, "Entrer la clé API (cliquez ici)");
+            translations.put(API_KEY_LABEL, "Clé API Premium : ");
+            translations.put(OBTAIN_API_KEY, "Obtenir la clé API ici : ");
+            return translations;
+        }
 
         protected String getPassword() {
             if (this.pass == null) {
@@ -1870,6 +1977,8 @@ public class OneFichierCom extends PluginForHost {
         private final JPanel                        freeAccountPanel;
         private final JLabel                        premiumInstructionsLabel;
         private final JLabel                        premiumInstructionsLink;
+        // Translations
+        private final Map<String, String>           translations;
 
         public boolean updateAccount(Account input, Account output) {
             boolean changed = false;
@@ -1889,11 +1998,13 @@ public class OneFichierCom extends PluginForHost {
             this.plg = plg;
             this.callback = callback;
             this.usernameIsEmail = this.plg.hasFeature(FEATURE.USERNAME_IS_EMAIL);
+            // Initialize internal translations with English fallback
+            this.translations = getTranslations(System.getProperty("user.language"));
             final String apikey_help_url_without_protocol = plg.getAPILoginHelpURL().replaceFirst("^https?://", "");
             final String apikey_help_url = plg.getAPILoginHelpURL();
             // Add account type dropdown
-            add(new JLabel("Account Type:"));
-            accountTypeComboBox = new JComboBox<String>(new String[] { "Premium Account", "Premium GOLD Account", "Free Account with paid CDN credits", "Free Account" });
+            add(new JLabel(translations.get(ACCOUNT_TYPE)));
+            accountTypeComboBox = new JComboBox(new String[] { translations.get(PREMIUM_API), translations.get(PREMIUM_GOLD_API), translations.get(PREMIUM_WEB), translations.get(PREMIUM_GOLD_WEB), translations.get(FREE_CDN), translations.get(FREE) });
             /* Select premium account as default value */
             accountTypeComboBox.setSelectedIndex(0);
             accountTypeComboBox.addActionListener(new ActionListener() {
@@ -1906,12 +2017,11 @@ public class OneFichierCom extends PluginForHost {
             add(accountTypeComboBox);
             // Create premium account panel
             premiumAccountPanel = new JPanel(new MigLayout("ins 0, wrap 2", "[][grow,fill]", ""));
-
-            premiumInstructionsLabel = new JLabel("Premium account users:");
-            premiumInstructionsLink = new JLink("Enter API key (click here to find it)", apikey_help_url);
+            premiumInstructionsLabel = new JLabel(translations.get(PREMIUM_USERS));
+            premiumInstructionsLink = new JLink(translations.get(ENTER_API_KEY), apikey_help_url);
             premiumAccountPanel.add(premiumInstructionsLabel);
             premiumAccountPanel.add(premiumInstructionsLink);
-            apikeyLabel = new JLink("Premium API Key: ", apikey_help_url);
+            apikeyLabel = new JLink(translations.get(API_KEY_LABEL), apikey_help_url);
             premiumAccountPanel.add(apikeyLabel);
             this.apikey = new ExtPasswordField() {
                 @Override
@@ -1919,7 +2029,7 @@ public class OneFichierCom extends PluginForHost {
                     callback.onChangedInput(apikey);
                 }
             };
-            this.apikey.setHelpText("Obtain API key here: " + apikey_help_url_without_protocol);
+            this.apikey.setHelpText(translations.get(OBTAIN_API_KEY) + apikey_help_url_without_protocol);
             premiumAccountPanel.add(this.apikey);
             // Create free account panel
             freeAccountPanel = new JPanel(new MigLayout("ins 0, wrap 2", "[][grow,fill]", ""));
@@ -2006,15 +2116,15 @@ public class OneFichierCom extends PluginForHost {
             updateVisibleComponents();
         }
 
-        private boolean isPremiumAccountTypeSelected() {
+        private boolean isAPILoginTypeSelected() {
             return accountTypeComboBox.getSelectedIndex() == 0 || accountTypeComboBox.getSelectedIndex() == 1;
         }
 
         private void updateVisibleComponents() {
-            final boolean isPremium = isPremiumAccountTypeSelected();
-            premiumAccountPanel.setVisible(isPremium);
-            freeAccountPanel.setVisible(!isPremium);
-            if (isPremium) {
+            final boolean isAPILogin = isAPILoginTypeSelected();
+            premiumAccountPanel.setVisible(isAPILogin);
+            freeAccountPanel.setVisible(!isAPILogin);
+            if (isAPILogin) {
                 this.remove(freeAccountPanel);
                 add(premiumAccountPanel, "span 2, grow");
             } else {
@@ -2071,8 +2181,7 @@ public class OneFichierCom extends PluginForHost {
 
         @Override
         public boolean validateInputs() {
-            final boolean isPremium = isPremiumAccountTypeSelected();
-            if (isPremium) {
+            if (isAPILoginTypeSelected()) {
                 // Premium account validation - only API key needed
                 final String apikey = this.getApikey();
                 if (plg.looksLikeValidAPIKey(apikey)) {
@@ -2116,9 +2225,8 @@ public class OneFichierCom extends PluginForHost {
 
         @Override
         public Account getAccount() {
-            final boolean isPremium = isPremiumAccountTypeSelected();
             final String apikey = this.getApikey();
-            if (isPremium && plg.looksLikeValidAPIKey(apikey)) {
+            if (isAPILoginTypeSelected() && plg.looksLikeValidAPIKey(apikey)) {
                 /* Use API key as password */
                 final Account account = new Account(getUsername(), apikey);
                 account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);

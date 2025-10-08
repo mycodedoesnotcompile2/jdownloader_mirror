@@ -176,7 +176,7 @@ public class CrossSystem {
         KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
-         *
+         * 
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -193,7 +193,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         *
+         * 
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -206,9 +206,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         *
+         * 
          * https://wiki.ubuntu.com/Releases
-         *
+         * 
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -239,7 +239,8 @@ public class CrossSystem {
         UBUNTU_NOBLE(OSFamily.LINUX, "24\\.04"), // 24.04
         UBUNTU_ORACULAR(OSFamily.LINUX, "24\\.10"), // 24.10
         UBUNTU_PLUCKY(OSFamily.LINUX, "25\\.04"), // 25.04
-        UBUNTU_QUOKKA(OSFamily.LINUX, "25\\.10"), // 25.10
+        UBUNTU_QUESTING(OSFamily.LINUX, "25\\.10"), // 25.10
+        UBUNTU_RESOLUTE(OSFamily.LINUX, "26\\.04"), // 26.04
         /*
          * MAC: List must be sorted by release Date!!
          */
@@ -303,7 +304,6 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H2(OSFamily.WINDOWS);
-
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -370,7 +370,6 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -407,7 +406,7 @@ public class CrossSystem {
     }
 
     private static volatile String[]                     BROWSER_COMMANDLINE = null;
-    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>();;
+    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>(); ;
     private static String[]                              FILE_COMMANDLINE    = null;
     private static String                                JAVAINT             = null;
     /**
@@ -564,7 +563,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         *
+         * 
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -825,7 +824,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);
@@ -1803,7 +1802,6 @@ public class CrossSystem {
     public static void openFile(final File file, final boolean trySingleInstance) {
         // I noticed a bug: desktop.open freezes under win7 java 1.7u25 in some
         // cases... we should at least avoid a gui freeze in such cases..
-
         final Runnable runnable = new Runnable() {
             @Override
             public void run() {
@@ -1865,7 +1863,6 @@ public class CrossSystem {
         if (saveTo.exists()) {
             if (CrossSystem.isWindows()) {
                 if (useExitingWindow) {
-
                     File openFolder = saveTo.getParentFile();
                     if (WindowsUtils.explorerToFront(openFolder)) {
                         return;

@@ -24,13 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.WebshareCzConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -48,7 +41,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51042 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.WebshareCzConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51622 $", interfaceVersion = 2, names = {}, urls = {})
 public class WebShareCz extends PluginForHost {
     public WebShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -234,10 +234,8 @@ public class WebShareCz extends PluginForHost {
             query1.add("maybe_removed", "1");
             query1.add("wst", Encoding.urlEncode(wst));
             br.postPage("https://" + getHost() + "/api/file_password_salt/", query1);
-            final String salt = this.getXMLtagValue("salt");
-            if (StringUtils.isEmpty(salt)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            // var passwordDigest = ws.Password.authHash(this.$password.val(), response.salt || '');
+            final String salt = StringUtils.valueOrEmpty(this.getXMLtagValue("salt"));
             String passCode = link.getDownloadPassword();
             if (passCode == null) {
                 passCode = getUserInput("Password?", link);
@@ -361,11 +359,9 @@ public class WebShareCz extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
+            // password: ws.Password.authHash(password, response.salt || ''),
             br.postPage("https://" + this.getHost() + "/api/salt/", "username_or_email=" + Encoding.urlEncode(account.getUser()) + "&wst=");
-            final String salt = this.getXMLtagValue("salt");
-            if (StringUtils.isEmpty(salt)) {
-                throw new AccountInvalidException("\r\nInvalid E-Mail or username!");
-            }
+            final String salt = StringUtils.valueOrEmpty(this.getXMLtagValue("salt"));
             final String password = JDHash.getSHA1(crypt_md5(account.getPass().getBytes("UTF-8"), salt));
             final String digest = Hash.getMD5(account.getUser() + ":Webshare:" + account.getPass());
             /* wst is random 16 char cookie, app().setCookie('wst', ws.strings.randomString(16)) || app().cookie('wst') */
@@ -452,25 +448,25 @@ public class WebShareCz extends PluginForHost {
 
     /*
      * Copyright (c) 1999 University of California. All rights reserved.
-     *
+     * 
      * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions
      * are met: 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
      * disclaimer. 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
      * disclaimer in the documentation and/or other materials provided with the distribution. 3. Neither the name of the author nor the
      * names of any co-contributors may be used to endorse or promote products derived from this software without specific prior written
      * permission.
-     *
+     * 
      * THIS SOFTWARE IS PROVIDED BY CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
      * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL CONTRIBUTORS BE LIABLE FOR ANY
      * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
      * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
      * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
      * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-     *
+     * 
      * $FreeBSD: src/lib/libcrypt/misc.c,v 1.1 1999/09/20 12:45:49 markm Exp $
      */
     static char[] itoa64 = /* 0 ... 63 => ascii - 64 */
-            "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
+                         "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
 
     private static String cryptTo64(long v, int n) {
         StringBuilder result = new StringBuilder();
@@ -486,7 +482,7 @@ public class WebShareCz extends PluginForHost {
      * <phk@login.dknet.dk> wrote this file. As long as you retain this notice you can do whatever you want with this stuff. If we meet some
      * day, and you think this stuff is worth it, you can buy me a beer in return. Poul-Henning Kamp
      * ----------------------------------------------------------------------------
-     *
+     * 
      * $FreeBSD: src/lib/libcrypt/crypt-md5.c,v 1.5 1999/12/17 20:21:45 peter Exp $
      */
     private final String magic    = "$1$"; /*

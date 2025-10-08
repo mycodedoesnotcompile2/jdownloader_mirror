@@ -36,11 +36,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51621 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51623 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaupCc extends PluginForHost {
     public MegaupCc(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("https://" + getHost() + "/register");
     }
 
     private String download_token = null;
@@ -123,7 +122,7 @@ public class MegaupCc extends PluginForHost {
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             /* Special offline check for dummy file e.g. megaup.cc/download/bla_bla_bla_bla_bla_bla_bla */
-            if (br.containsHTML("Duration:\\s*<span>00:02:50") && Hash.getMD5(filename).equals("28c16e2944c2b8e616cf3f8d047730ce")) {
+            if (br.containsHTML("Duration:\\s*<span>\\s*00:02:50") && Hash.getMD5(filename).equals("28c16e2944c2b8e616cf3f8d047730ce")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         }

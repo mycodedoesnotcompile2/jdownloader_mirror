@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 51260 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51623 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -78,7 +78,7 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             /* 2025-07-28: Negative-lookahead regex which excludes image-directlinks */
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!(img|images)/).+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!(img|images?|video)/).+");
         }
         return ret.toArray(new String[0]);
     }
@@ -111,7 +111,7 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getURL().matches("(?i)^https?://[^/]+/?$")) {
-            /* Redirect to mainpage */
+            /* Redirect to main page */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String passCode = null;
@@ -151,9 +151,14 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         }
         br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        final String token = br.getRegex("PF\\.obj.config.auth_token\\s*=\\s*\"([a-f0-9]+)\"").getMatch(0);
-        final String apiurl = br.getRegex("PF\\.obj.config.json_api\\s*=\\s*\"(https?://[^\"]+)\"").getMatch(0);
+        final String token = br.getRegex("PF\\.obj\\.config\\.auth_token\\s*=\\s*\"([a-f0-9]+)\"").getMatch(0);
+        final String apiurl = br.getRegex("PF\\.obj\\.config\\.json_api\\s*=\\s*\"((https?://|/)[^\"]+)\"").getMatch(0);
         final String dataparamshidden = br.getRegex("data-params-hidden=\"([^\"]+)").getMatch(0);
+        final String numberofImagesStr = br.getRegex("data-text=\"image-count\">\\s*(\\d+)").getMatch(0);
+        int numberofImages = -1;
+        if (numberofImagesStr != null) {
+            numberofImages = Integer.parseInt(numberofImagesStr);
+        }
         int page = 1;
         final UrlQuery query = dataparamshidden != null ? UrlQuery.parse(dataparamshidden) : new UrlQuery();
         query.appendEncoded("action", "list");
@@ -183,11 +188,12 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         if (token != null) {
             query.appendEncoded("auth_token", token);
         }
-        final String siteTitle = HTMLSearch.searchMetaTag(br, "og:title", "twitter:title");
+        String siteTitle = HTMLSearch.searchMetaTag(br, "og:title", "twitter:title");
         FilePackage fp = null;
         if (siteTitle != null) {
+            siteTitle = Encoding.htmlDecode(siteTitle).trim();
             fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(siteTitle).trim());
+            fp.setName(siteTitle);
         }
         final Set<String> seekEnds = new HashSet<String>();
         if (seek != null) {
@@ -214,9 +220,9 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                     distribute(link);
                     ret.add(link);
                 } else {
-                    final String url = new Regex(html, "<a href=\"(https?://[^\"]+)\" class=\"image-container --media\">").getMatch(0);
+                    String url = new Regex(html, "<a href=\"((https?://|/)[^\"]+)\" class=\"image-container --media\">").getMatch(0);
                     final String urlThumbnail = new Regex(html, "<img src=\"(https:?//[^\"]+)\"\\s*alt=\"").getMatch(0);
-                    final String title = new Regex(html, "data-title=\"([^\"]+)\"").getMatch(0);
+                    String title = new Regex(html, "data-title=\"([^\"]+)\"").getMatch(0);
                     final String filesizeBytesStr = new Regex(html, "data-size=\"(\\d+)\"").getMatch(0);
                     if (url == null || title == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -225,6 +231,14 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                         logger.info("Skipping dupe: " + url);
                         continue;
                     }
+                    title = Encoding.htmlDecode(title).trim();
+                    final String extFallback;
+                    if (StringUtils.containsIgnoreCase(url, "/video/")) {
+                        extFallback = ".mp4";
+                    } else {
+                        extFallback = ".jpg";
+                    }
+                    url = br.getURL(url).toExternalForm();
                     imagePosition++;
                     numberofNewItems++;
                     final DownloadLink link = this.createDownloadlink(url);
@@ -233,10 +247,10 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                         ext = Plugin.getFileNameExtensionFromURL(urlThumbnail);
                     }
                     if (ext != null) {
-                        link.setFinalFileName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ext));
+                        link.setFinalFileName(this.applyFilenameExtension(title, ext));
                     } else {
                         /* Fallback */
-                        link.setName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ".jpg"));
+                        link.setName(this.applyFilenameExtension(title, extFallback));
                     }
                     if (filesizeBytesStr != null) {
                         link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
@@ -250,13 +264,16 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                         link.setProperty(JpgChurch.PROPERTY_PHPSESSID, br.getCookie(br.getHost(), "PHPSESSID", Cookies.NOTDELETEDPATTERN));
                     }
                     link.setProperty(JpgChurch.PROPERTY_POSITION, imagePosition);
-                    distribute(link);
                     ret.add(link);
+                    distribute(link);
                 }
             }
-            logger.info("Crawled page " + page + " | Number of new items on current page: " + numberofNewItems + " | Found items so far: " + ret.size());
+            logger.info("Crawled page " + page + " | Number of new items on current page: " + numberofNewItems + " | Found items so far: " + ret.size() + "/" + numberofImagesStr);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
+                break;
+            } else if (ret.size() == numberofImages) {
+                logger.info("Stopping because: Found all items");
                 break;
             } else if (numberofNewItems == 0 && numberofNewAlbums == 0) {
                 logger.info("Stopping because: Current page contains no new items");
@@ -294,7 +311,6 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             }
         } while (true);
         if (ret.isEmpty()) {
-            final String numberofImagesStr = br.getRegex("data-text=\"image-count\">\\s*(\\d+)\\s*</span>").getMatch(0);
             if (StringUtils.equals(numberofImagesStr, "0")) {
                 logger.info("This profile contains zero images");
                 throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);

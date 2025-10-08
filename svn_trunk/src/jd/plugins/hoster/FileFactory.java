@@ -52,7 +52,6 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -62,7 +61,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51617 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51622 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -561,21 +560,18 @@ public class FileFactory extends PluginForHost {
 
     private void handleClassicDownloadWebsite(final DownloadLink link, final Account account) throws Exception {
         if (this.dl == null) {
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "classic links are not yet working/supported");
-            }
-            final String slowDownload = br.getRegex("data-href\\s*=\\s*\"([^\"]*)\"\\s*>\\Slow Download").getMatch(0);
-            if (slowDownload == null) {
+            final String finallink = br.getRegex("data-href\\s*=\\s*\"([^\"]*)\"\\s*>\\Slow Download").getMatch(0);
+            if (finallink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            br.getPage(slowDownload);
-            final String NEXT_REDIRECT = br.getRegex("NEXT_REDIRECT;replace;(https://classic\\.filefactory\\.com/file/" + Pattern.quote(getFUID(link)) + ")").getMatch(0);
-            if (NEXT_REDIRECT != null) {
-                br.getPage(NEXT_REDIRECT);
-            }
-            String finallink = null;
-            if (StringUtils.isEmpty(finallink)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+            final String delay = br.getRegex("countdown_clock\"\\s*data-delay\\s*=\\s*\"(\\d+)\"").getMatch(0);
+            sleep(delay != null ? TimeUnit.SECONDS.toMillis(Integer.parseInt(delay)) : TimeUnit.SECONDS.toMillis(60), link);
+            if (false) {
+                br.getPage(finallink);
+                final String NEXT_REDIRECT = br.getRegex("NEXT_REDIRECT;replace;(https://classic\\.filefactory\\.com/file/" + Pattern.quote(getFUID(link)) + ")").getMatch(0);
+                if (NEXT_REDIRECT != null) {
+                    br.getPage(NEXT_REDIRECT);
+                }
             }
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finallink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -760,12 +756,6 @@ public class FileFactory extends PluginForHost {
     }
 
     private boolean isPremiumAccount(final Account account) {
-        if (account == null) {
-            return false;
-        } else if (account.getType() == AccountType.PREMIUM || account.getType() == AccountType.LIFETIME) {
-            return true;
-        } else {
-            return false;
-        }
+        return AccountType.PREMIUM.is(account);
     }
 }
