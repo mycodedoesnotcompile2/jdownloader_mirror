@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51054 $", interfaceVersion = 3, names = { "onedrive.live.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51625 $", interfaceVersion = 3, names = { "onedrive.live.com" }, urls = { "" })
 public class OneDriveLiveCom extends PluginForHost {
     public OneDriveLiveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,7 @@ public class OneDriveLiveCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://windows.microsoft.com/de-de/windows-live/microsoft-services-agreement";
+        return "https://windows.microsoft.com/de-de/windows-live/microsoft-services-agreement";
     }
 
     public static final String PROPERTY_FILE_ID             = "plain_item_id";

@@ -18,9 +18,11 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -42,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
+@HostPlugin(revision = "$Revision: 51626 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
 public class KrakenfilesCom extends PluginForHost {
     public KrakenfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,7 +120,7 @@ public class KrakenfilesCom extends PluginForHost {
         }
         /* This json is part of their embed functions :) */
         br.getPage("https://" + getHost() + "/json/" + fid);
-        final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        final Object jsonO = this.checkErrors(br, null, link);
         if (!(jsonO instanceof Map)) {
             /* 2023-11-21: Returns empty array when given fileID is invalid. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -160,24 +162,15 @@ public class KrakenfilesCom extends PluginForHost {
             }
             dlform.setMethod(MethodType.POST);
             /* 2024-11-05: lol Even premium users need to enter that captcha, lol */
-            boolean captchaNeeded = false;
-            if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(dlform)) {
-                captchaNeeded = true;
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            /* 2025-10-08: Captcha needed, tested for free downloads */
+            // boolean captchaNeeded = false;
+            boolean captchaNeeded = account == null || AccountType.FREE.equals(account.getType());
+            if (captchaNeeded) {
+                final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
+                dlform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
             }
             br.submitForm(dlform);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String status = (String) entries.get("status");
-            if ("error".equalsIgnoreCase(status)) {
-                final String msg = entries.get("msg").toString();
-                if (captchaNeeded && msg.equalsIgnoreCase("captcha not valid")) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                } else {
-                    /* Unknown error */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, entries.get("msg").toString());
-                }
-            }
+            final Map<String, Object> entries = (Map<String, Object>) this.checkErrors(br, account, link);
             dllink = entries.get("url").toString();
             if (StringUtils.isEmpty(dllink) && dllink.startsWith("http")) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -306,41 +299,32 @@ public class KrakenfilesCom extends PluginForHost {
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
     }
-    // private Object checkErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException,
-    // InterruptedException {
-    // try {
-    // final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-    // if (jsonO == null || !(jsonO instanceof Map)) {
-    // return jsonO;
-    // }
-    // final Map<String, Object> entries = (Map<String, Object>) jsonO;
-    // final String status = (String) entries.get("status");
-    // if (!"error".equalsIgnoreCase(status)) {
-    // return entries;
-    // }
-    // // TODO: Add functionality
-    // final String msg = entries.get("msg").toString();
-    // if (link == null) {
-    // throw new AccountInvalidException(msg);
-    // }
-    // if (msg.equalsIgnoreCase("captcha not valid")) {
-    // throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-    // } else {
-    // /* Unknown error */
-    // throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, entries.get("msg").toString());
-    // }
-    // } catch (final JSonMapperException jme) {
-    // final String errortext = "Bad API response";
-    // // TODO
-    // }
-    // return null;
-    // }
 
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+    private Object checkErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException {
+        try {
+            final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (jsonO == null || !(jsonO instanceof Map)) {
+                return jsonO;
+            }
+            final Map<String, Object> entries = (Map<String, Object>) jsonO;
+            final String status = (String) entries.get("status");
+            if (!"error".equalsIgnoreCase(status)) {
+                return entries;
+            }
+            // TODO: Add handling for more errors
+            final String msg = entries.get("msg").toString();
+            if (link == null) {
+                throw new AccountInvalidException(msg);
+            }
+            if (msg.equalsIgnoreCase("captcha not valid")) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            } else {
+                /* Unknown error */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, entries.get("msg").toString());
+            }
+        } catch (final JSonMapperException jme) {
+            final String errortext = "Bad API response";
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext);
+        }
     }
 }

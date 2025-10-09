@@ -28,21 +28,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.SimpleMapper;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.TiktokConfig;
-import org.jdownloader.plugins.components.config.TiktokConfig.MediaCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -66,7 +51,22 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.TiktokComCrawler;
 
-@HostPlugin(revision = "$Revision: 50491 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.SimpleMapper;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.TiktokConfig;
+import org.jdownloader.plugins.components.config.TiktokConfig.MediaCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51630 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
 public class TiktokCom extends PluginForHost {
     public TiktokCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -175,16 +175,7 @@ public class TiktokCom extends PluginForHost {
     public static final String TYPE_VIDEO                                     = "video";
     public static final String TYPE_PICTURE                                   = "picture";
     public static final String PATTERN_VIDEO                                  = "(?i)https?://[^/]+/@([^/]+)/video/(\\d+).*";
-    /* API related stuff */
-    public static final String API_CLIENT                                     = "trill";
-    public static final String API_AID                                        = "1180";
-    /**
-     * Values used in the past: </br>
-     * Until 2024-03-14: api16-normal-c-useast1a.tiktokv.com
-     */
-    public static final String API_BASE                                       = "https://api22-normal-c-useast2a.tiktokv.com/aweme/v1";
-    public static final String API_VERSION_NAME                               = "25.6.2";
-    public static final String API_VERSION_CODE                               = "250602";
+
     private final String       PROPERTY_ACCOUNT_HAS_SHOWN_DOWNLOAD_MODE_HINT  = "has_shown_download_mode_hint";
 
     @Override
@@ -220,12 +211,9 @@ public class TiktokCom extends PluginForHost {
             link.setName(contentID + ".mp4");
         }
         String dllink = getStoredDirecturl(link);
-        final String storedCookiesString = link.getStringProperty(TiktokCom.PROPERTY_COOKIES);
-        if (storedCookiesString != null) {
-            final Cookies cookies = loadCookies(this, storedCookiesString);
-            if (cookies != null) {
-                br.setCookies(getHost(), cookies);
-            }
+        final Cookies cookies = loadCookies(this, link.getStringProperty(TiktokCom.PROPERTY_COOKIES));
+        if (cookies != null) {
+            br.setCookies(getHost(), cookies);
         }
         if (dllink == null || forceFetchNewDirecturl) {
             logger.info("Obtaining fresh directurl");
@@ -515,8 +503,9 @@ public class TiktokCom extends PluginForHost {
         }
     }
 
+    // github.com/is-L7N/SignerPy
     public static void accessAPI(final Browser br, final String path, final UrlQuery query) throws IOException {
-        br.getPage(API_BASE + path + "/" + "?" + query.toString());
+        br.getPage(getAPIBase() + path + "/" + "?" + query.toString());
     }
 
     public static Browser prepBRWebsite(final Browser br) {
@@ -529,21 +518,70 @@ public class TiktokCom extends PluginForHost {
         return br;
     }
 
+    private static final boolean TRY_NEXT_API_DETAILS = false;
+
+    // TikTok (KR/PH/TW/TH/VN) = trill, TikTok (rest of world) = musical_ly, Douyin = aweme
+    public static String getAPIClient() {
+        if (TRY_NEXT_API_DETAILS) {
+            return "musical_ly";
+        } else {
+            return "trill";
+        }
+    }
+
+    public static String getAPIVersion() {
+        if (TRY_NEXT_API_DETAILS) {
+            return "35.1.3";
+        } else {
+            return "25.6.2";
+        }
+    }
+
+    // "app id": aweme = 1128, trill = 1180, musical_ly = 1233, universal = 0
+    public static String getAid() {
+        if (TRY_NEXT_API_DETAILS) {
+            return "0";
+        } else {
+            return "1180";
+        }
+    }
+
+    public static String getAPIVersionCode() {
+        if (TRY_NEXT_API_DETAILS) {
+            return "2023501030";
+        } else {
+            return "250602";
+        }
+    }
+
+    public static String getAPIBase() {
+        if (TRY_NEXT_API_DETAILS) {
+            return "https://api16-normal-c-useast1a.tiktokv.com/aweme/v1";
+        } else {
+            return "https://api22-normal-c-useast2a.tiktokv.com/aweme/v1";
+        }
+    }
+
     public static Browser prepBRAPI(final Browser br) {
-        br.getHeaders().put("User-Agent", String.format("com.ss.android.ugc.%s/%s (Linux; U; Android 10; en_US; Pixel 4; Build/QQ3A.200805.001; Cronet/58.0.2991.0)", API_CLIENT, API_VERSION_CODE));
+        final String apiClient = getAPIClient();
+        if ("musical_ly".equals(apiClient)) {
+            br.getHeaders().put("User-Agent", String.format("com.zhiliaoapp.musically/%s (Linux; U; Android 13; en_US; Pixel 7; Build/TD1A.220804.031; Cronet/58.0.2991.0)'", getAPIVersionCode()));
+        } else {
+            br.getHeaders().put("User-Agent", String.format("com.ss.android.ugc.%s/%s (Linux; U; Android 10; en_US; Pixel 4; Build/QQ3A.200805.001; Cronet/58.0.2991.0)", apiClient, getAPIVersionCode()));
+        }
         // br.getHeaders().put("User-Agent", "okhttp");
         br.getHeaders().put("Accept", "application/json");
-        br.setCookie(API_BASE, "odin_tt", generateRandomString("0123456789abcdef", 160));
+        br.setCookie(getAPIBase(), "odin_tt", generateRandomString("0123456789abcdef", 160));
         return br;
     }
 
     public static UrlQuery getAPIQuery() {
         final UrlQuery query = new UrlQuery();
-        query.add("version_name", API_VERSION_NAME);
-        query.add("version_code", API_VERSION_CODE);
-        query.add("build_number", API_VERSION_NAME);
-        query.add("manifest_version_code", API_VERSION_CODE);
-        query.add("update_version_code", API_VERSION_CODE);
+        query.add("version_name", getAPIVersion());
+        query.add("version_code", getAPIVersionCode());
+        query.add("build_number", getAPIVersion());
+        query.add("manifest_version_code", getAPIVersionCode());
+        query.add("update_version_code", getAPIVersionCode());
         query.add("openudid", generateRandomString("0123456789abcdef", 16));
         query.add("uuid", generateRandomString("0123456789", 16));
         query.add("_rticket", Long.toString(System.currentTimeMillis()));
@@ -558,7 +596,7 @@ public class TiktokCom extends PluginForHost {
         query.add("carrier_region", "US");
         query.add("sys_region", "US");
         query.add("region", "US");
-        query.add("app_name", API_CLIENT);
+        query.add("app_name", getAPIClient());
         query.add("app_language", "en");
         query.add("language", "en");
         query.add("timezone_name", Encoding.urlEncode("America/New_York"));
@@ -567,7 +605,7 @@ public class TiktokCom extends PluginForHost {
         query.add("ac", "wifi");
         query.add("mcc_mnc", "310260");
         query.add("is_my_cn", "0");
-        query.add("aid", API_AID);
+        query.add("aid", getAid());
         query.add("ssmix", "a");
         query.add("as", "a1qwert123");
         query.add("cp", "cbfhckdckkde1");
@@ -756,6 +794,11 @@ public class TiktokCom extends PluginForHost {
         /* Remember last used download mode */
         link.setProperty(PROPERTY_LAST_USED_DOWNLOAD_MODE, mode.name());
         this.missingDateFilenamePreDownloadHandling(link, account);
+        final Cookies cookies = loadCookies(this, link.getStringProperty(TiktokCom.PROPERTY_COOKIES));
+        if (cookies != null) {
+            br.setCookies(getHost(), cookies);
+        }
+        prepareDownloadHeaders(link, br);
         if (this.attemptStoredDownloadurlDownload(link)) {
             logger.info("Using stored directurl for downloading");
         } else {

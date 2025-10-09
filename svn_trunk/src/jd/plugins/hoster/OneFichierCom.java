@@ -95,7 +95,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51624 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51633 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -146,7 +146,7 @@ public class OneFichierCom extends PluginForHost {
 
     public OneFichierCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www." + getHost() + "/en/register.pl");
+        this.enablePremium("https://" + getHost() + "/register.pl");
     }
 
     @Override
@@ -620,6 +620,9 @@ public class OneFichierCom extends PluginForHost {
         }
         errorHandlingWebsite(link, account, br);
         final Form form = br.getForm(0);
+        if (form == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         String passCode = link.getDownloadPassword();
         if (isPasswordProtectedFileWebsite(br)) {
             logger.info("Handling password protected link...");
@@ -664,10 +667,10 @@ public class OneFichierCom extends PluginForHost {
         }
         String dllink = br.getRegex("align:middle\">\\s+<a href=(\"|')(https?://[a-zA-Z0-9_\\-]+\\.(1fichier|desfichiers)\\.com/[a-zA-Z0-9]+.*?)\\1").getMatch(1);
         if (dllink == null) {
-            dllink = br.getRegex("<a href=\"([^\"]*?)\"[^<]*>\\s*Click here to download").getMatch(0);
-        }
-        if (StringUtils.isEmpty(dllink)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            dllink = br.getRegex("<a href=\"([^\"]+)\"[^>]*>\\s*Click here to download").getMatch(0);
+            if (StringUtils.isEmpty(dllink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
         dllink = this.getURLWithPreferredProtocol(dllink);
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -943,11 +946,6 @@ public class OneFichierCom extends PluginForHost {
             AccountType type = null;
             if (account.lastUpdateTime() > 0) {
                 final AccountType oldAccountType = account.getType();
-                if (AccountType.FREE.equals(oldAccountType) && !allowFreeAccountDownloadsViaAPI) {
-                    errorPremiumNeededForAPIDownloading(account);
-                    /* This code should never be reached */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
                 if (!AccountType.UNKNOWN.equals(oldAccountType)) {
                     final AccountInfo existing = account.getAccountInfo();
                     if (existing != null) {
@@ -958,6 +956,7 @@ public class OneFichierCom extends PluginForHost {
                             existing.setValidUntil(lastValidUntil);
                         }
                         setCdnCreditsStatus(account, existing, cachedCdnCreditsBytes);
+                        checkForAccountTypeRelatedProblems(account);
                         return existing;
                     }
                 }
@@ -991,6 +990,7 @@ public class OneFichierCom extends PluginForHost {
                 ai.setTrafficLeft(0);
             }
             setCdnCreditsStatus(account, ai, cachedCdnCreditsBytes);
+            checkForAccountTypeRelatedProblems(account);
             return ai;
         }
         this.handleErrorsAPI(entries, account);
@@ -1022,11 +1022,6 @@ public class OneFichierCom extends PluginForHost {
             /* Free --> 2019-07-18: API Keys are only available for premium users so this should never happen! */
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(getMaxSimultanFreeDownloadNum());
-            if (!allowFreeAccountDownloadsViaAPI) {
-                errorPremiumNeededForAPIDownloading(account);
-                /* This code should never be reached */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
         } else {
             /* Premium or "Access" account */
             long validuntil = 0;
@@ -1039,7 +1034,7 @@ public class OneFichierCom extends PluginForHost {
             setValidUntil(ai, validuntil);
             ai.setUnlimitedTraffic();
         }
-        /* Set/remove gold status */
+        /* Set gold status */
         if (accountType == 3) {
             account.setProperty(PROPERTY_ACCOUNT_IS_GOLD_ACCOUNT, true);
         } else {
@@ -1057,11 +1052,21 @@ public class OneFichierCom extends PluginForHost {
             ai.setUsedSpace(space_used_bytes);
         }
         setCdnCreditsStatus(account, ai, creditsAsBytes);
+        checkForAccountTypeRelatedProblems(account);
+        return ai;
+    }
+
+    /** Call this on every account check before returning AccountInfo. */
+    private void checkForAccountTypeRelatedProblems(final Account account) throws PluginException {
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && this.isGoldAccount(account) && account.hasProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED)) {
             /* TODO: Check if this handling is correct, then add a nicer error message dialog + translations. */
             throw new AccountUnavailableException("Premium GOLD account + VPN can only be used in website mode", 5 * 60 * 1000l);
         }
-        return ai;
+        if (AccountType.FREE.equals(account.getType()) && !allowFreeAccountDownloadsViaAPI) {
+            errorPremiumNeededForAPIDownloading(account);
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
     }
 
     private boolean isUsingCDNCredits(final Account account) {
@@ -1946,12 +1951,11 @@ public class OneFichierCom extends PluginForHost {
         protected String getUsername() {
             if (name == null) {
                 return "";
-            } else {
-                if (_GUI.T.jd_gui_swing_components_AccountDialog_help_username().equals(this.name.getText())) {
-                    return null;
-                }
-                return this.name.getText();
             }
+            if (_GUI.T.jd_gui_swing_components_AccountDialog_help_username().equals(this.name.getText())) {
+                return null;
+            }
+            return this.name.getText();
         }
 
         protected String getApikey() {
@@ -1971,7 +1975,7 @@ public class OneFichierCom extends PluginForHost {
         private final JLabel                        passwordLabel;
         private final OneFichierCom                 plg;
         private final boolean                       usernameIsEmail;
-        // New components for account type selection
+        // Components for account type selection
         private final JComboBox                     accountTypeComboBox;
         private final JPanel                        premiumAccountPanel;
         private final JPanel                        freeAccountPanel;
@@ -2116,6 +2120,7 @@ public class OneFichierCom extends PluginForHost {
             updateVisibleComponents();
         }
 
+        /** Returns true if API login will be used baeed on the selected account type. */
         private boolean isAPILoginTypeSelected() {
             return accountTypeComboBox.getSelectedIndex() == 0 || accountTypeComboBox.getSelectedIndex() == 1;
         }
@@ -2225,8 +2230,8 @@ public class OneFichierCom extends PluginForHost {
 
         @Override
         public Account getAccount() {
-            final String apikey = this.getApikey();
-            if (isAPILoginTypeSelected() && plg.looksLikeValidAPIKey(apikey)) {
+            final String apikey;
+            if (isAPILoginTypeSelected() && plg.looksLikeValidAPIKey(apikey = this.getApikey())) {
                 /* Use API key as password */
                 final Account account = new Account(getUsername(), apikey);
                 account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);

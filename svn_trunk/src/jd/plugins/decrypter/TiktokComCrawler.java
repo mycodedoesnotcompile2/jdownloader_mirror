@@ -20,28 +20,15 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.TiktokConfig;
-import org.jdownloader.plugins.components.config.TiktokConfig.ImageFormat;
-import org.jdownloader.plugins.components.config.TiktokConfig.MediaCrawlMode;
-import org.jdownloader.plugins.components.config.TiktokConfig.ProfileCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -60,7 +47,20 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 50972 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.TiktokConfig;
+import org.jdownloader.plugins.components.config.TiktokConfig.ImageFormat;
+import org.jdownloader.plugins.components.config.TiktokConfig.MediaCrawlMode;
+import org.jdownloader.plugins.components.config.TiktokConfig.ProfileCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51630 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -200,8 +200,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
             /* MediaCrawlMode.AUTO */
             /* Website with API as fallback. */
             /**
-             * Deprecated: Website with API fallback </br>
-             * 2024-06-19: This doesn't make sense anymore since API mode doesn't work anymore atm.
+             * Deprecated: Website with API fallback </br> 2024-06-19: This doesn't make sense anymore since API mode doesn't work anymore
+             * atm.
              */
             try {
                 return crawlSingleMediaWebsiteWebsite(hostPlg, contenturl, account, forceGrabAll);
@@ -220,7 +220,11 @@ public class TiktokComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> crawlSingleMediaAPIWithWebsiteFallback(final TiktokCom hostPlg, final String url, final Account account, final boolean forceGrabAll) throws Exception {
         try {
             return this.crawlSingleMediaAPI(url, null, forceGrabAll);
-        } catch (final JSonMapperException jme) {
+        } catch (final PluginException e) {
+            throw e;
+        } catch (final IOException e) {
+            throw e;
+        } catch (final Exception jme) {
             /* Most likely API has answered with blank page. */
             logger.info("Attempting website fallback in API mode");
             return crawlSingleMediaWebsiteWebsite(hostPlg, url, account, forceGrabAll);
@@ -230,8 +234,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
     private boolean websiteHandlingAsFallbackAndOfflineIfWebsiteHandlingFails = false;
 
     /**
-     * This can crawl single videos from website. </br>
-     * If this tiktok item also contains images or contains only images, this handling will fail!
+     * This can crawl single videos from website. </br> If this tiktok item also contains images or contains only images, this handling will
+     * fail!
      */
     public ArrayList<DownloadLink> crawlSingleMediaWebsiteEmbedWithWebsiteFallback(final TiktokCom hostPlg, final String url, final Account account, final boolean forceGrabAll) throws Exception {
         websiteHandlingAsFallbackAndOfflineIfWebsiteHandlingFails = false;
@@ -518,8 +522,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             return new ArrayList<DownloadLink>();
         }
         /**
-         * See: https://board.jdownloader.org/showthread.php?t=91365 </br>
-         * and: https://svn.jdownloader.org/issues/90292
+         * See: https://board.jdownloader.org/showthread.php?t=91365 </br> and: https://svn.jdownloader.org/issues/90292
          */
         final boolean profileCrawlerPermanentlyBroken = true;
         if (profileCrawlerPermanentlyBroken) {
@@ -542,9 +545,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Use website to crawl all videos of a user. </br>
-     * Pagination hasn't been implemented so this will only find the first batch of items - usually around 30 items! </br>
-     * 2024-06-19: This is broken, see: https://svn.jdownloader.org/issues/90216
+     * Use website to crawl all videos of a user. </br> Pagination hasn't been implemented so this will only find the first batch of items -
+     * usually around 30 items! </br> 2024-06-19: This is broken, see: https://svn.jdownloader.org/issues/90216
      */
     public ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param, final String contenturl) throws Exception {
         prepBRWebsite(br);
@@ -731,72 +733,45 @@ public class TiktokComCrawler extends PluginForDecrypt {
             crawlAudio = true;
         } else {
             /* Video post */
-            String videoDirecturl = (String) videomap.get("playAddr");
-            if (StringUtils.isEmpty(videoDirecturl)) {
-                videoDirecturl = (String) videomap.get("downloadAddr");
-            }
-            if (StringUtils.isEmpty(videoDirecturl) && preloadInfo != null) {
-                /* Old code */
-                videoDirecturl = preloadInfo.get("url").toString();
-            }
-            if (StringUtils.isEmpty(videoDirecturl)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final DownloadLink video = new DownloadLink(hostPlg, this.getHost(), contentURL);
-            video.setProperty(TiktokCom.PROPERTY_TYPE, TiktokCom.TYPE_VIDEO);
-            video.setProperty(TiktokCom.PROPERTY_ALLOW_HEAD_REQUEST, true);
-            video.setProperty(TiktokCom.PROPERTY_DIRECTURL_WEBSITE, videoDirecturl);
-            final boolean debugTest202406 = false;
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && debugTest202406) {
-                URLConnectionAdapter con = null;
-                try {
-                    final Browser tempbr = br.cloneBrowser();
-                    // tempbr.setCurrentURL(""); // Removes referer
-                    tempbr.getHeaders().put("Referer", "https://www." + getHost() + "/");
-                    tempbr.getHeaders().put("Origin", "https://www." + getHost());
-                    tempbr.getHeaders().put("Sec-Fetch-Mode", "navigate");
-                    con = tempbr.openHeadConnection(videoDirecturl);
-                    if (this.looksLikeDownloadableContent(con)) {
-                        logger.info("VIDEO OK");
-                    } else {
-                        logger.warning("VIDEO FAILED");
+            final DownloadLink video0 = new DownloadLink(hostPlg, this.getHost(), contentURL);
+            video0.setProperty(TiktokCom.PROPERTY_TYPE, TiktokCom.TYPE_VIDEO);
+            video0.setProperty(TiktokCom.PROPERTY_ALLOW_HEAD_REQUEST, true);
+            findVideoURL: {
+                Map<String, Object> best_play_addr = null;
+                final List<Map<String, Object>> bit_rate = (List<Map<String, Object>>) videomap.get("bitrateInfo");
+                if (bit_rate != null && bit_rate.size() > 0) {
+                    for (Map<String, Object> entry : bit_rate) {
+                        final Map<String, Object> play_addr = new HashMap<String, Object>((Map<String, Object>) entry.get("PlayAddr"));
+                        if ("h265_hvc1".equals(StringUtils.valueOfOrNull(entry.get("CodecType")))) {
+                            play_addr.put("codec", "h265");
+                        } else if ("h264".equals(StringUtils.valueOfOrNull(entry.get("CodecType")))) {
+                            play_addr.put("codec", "h264");
+                        } else {
+                            // unsupported
+                            continue;
+                        }
+                        if (best_play_addr == null) {
+                            best_play_addr = play_addr;
+                        } else if (Integer.parseInt(play_addr.get("Height").toString()) > Integer.parseInt(best_play_addr.get("Height").toString())) {
+                            best_play_addr = play_addr;
+                        }
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    logger.warning("VIDEO FAILED");
-                } finally {
-                    try {
-                        con.disconnect();
-                    } catch (final Throwable ignore) {
+                }
+                if (best_play_addr != null) {
+                    final String url = (String) JavaScriptEngineFactory.walkJson(best_play_addr, "UrlList/{0}");
+                    video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_WEBSITE, url);
+                    final Object data_size = best_play_addr.get("DataSize");
+                    if (data_size != null) {
+                        /**
+                         * Set filesize of download-version because streaming- and download-version are nearly identical. </br> If a video
+                         * is watermarked and downloads are prohibited both versions should be identical.
+                         */
+                        video0.setDownloadSize(Long.parseLong(data_size.toString()));
                     }
                 }
             }
-            /* Try to find additional video information */
-            boolean foundMatch = false;
-            final List<Map<String, Object>> bitrateInfoList = (List<Map<String, Object>>) videomap.get("bitrateInfo");
-            bitrateLoop: for (final Map<String, Object> bitrateInfo : bitrateInfoList) {
-                final Map<String, Object> playAddr = (Map<String, Object>) bitrateInfo.get("PlayAddr");
-                if (playAddr == null) {
-                    continue;
-                }
-                final List<String> urlList = (List<String>) playAddr.get("UrlList");
-                if (urlList == null || urlList.size() == 0) {
-                    continue;
-                }
-                for (final String url : urlList) {
-                    if (url.equalsIgnoreCase(videoDirecturl)) {
-                        foundMatch = true;
-                        video.setDownloadSize(Long.parseLong(playAddr.get("DataSize").toString()));
-                        // video.setVerifiedFileSize(Long.parseLong(playAddr.get("DataSize").toString()));
-                        video.setMD5Hash(playAddr.get("FileHash").toString());
-                        break bitrateLoop;
-                    }
-                }
-            }
-            if (!foundMatch) {
-                logger.warning("Failed to find additional video information");
-            }
-            ret.add(video);
+
+            ret.add(video0);
             /* Crawl separate audio only if wished by user. */
             crawlAudio = cfg.isVideoCrawlerCrawlAudioSeparately();
         }
@@ -1174,6 +1149,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
         } else {
             /* Video post */
             final DownloadLink video0 = new DownloadLink(hostPlg, this.getHost(), contenturl);
+            video0.setProperty(TiktokCom.PROPERTY_TYPE, TiktokCom.TYPE_VIDEO);
+            video0.setProperty(TiktokCom.PROPERTY_ALLOW_HEAD_REQUEST, true);
             final Boolean has_watermark = Boolean.TRUE.equals(video.get("has_watermark"));
             Map<String, Object> downloadInfo = (Map<String, Object>) video.get("download_addr");
             if (downloadInfo == null) {
@@ -1184,38 +1161,77 @@ public class TiktokComCrawler extends PluginForDecrypt {
                     downloadInfo = (Map<String, Object>) misc_download_addrs.get("suffix_scene");
                 }
             }
-            final Map<String, Object> play_addr = (Map<String, Object>) video.get("play_addr");
-            /* Get non-HD directurl */
-            String directurl = null;
-            final Number data_size = downloadInfo != null ? (Number) downloadInfo.get("data_size") : null;
-            if (has_watermark || (Boolean.TRUE.equals(aweme_detail.get("prevent_download")) && downloadInfo == null)) {
-                /* Get stream downloadurl because it comes WITHOUT watermark anyways */
-                if (has_watermark) {
-                    video0.setProperty(TiktokCom.PROPERTY_HAS_WATERMARK, true);
-                } else {
-                    video0.setProperty(TiktokCom.PROPERTY_HAS_WATERMARK, null);
-                }
-                directurl = (String) JavaScriptEngineFactory.walkJson(play_addr, "url_list/{0}");
-                video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_API, directurl);
-                if (data_size != null) {
-                    /**
-                     * Set filesize of download-version because streaming- and download-version are nearly identical. </br>
-                     * If a video is watermarked and downloads are prohibited both versions should be identical.
-                     */
-                    video0.setDownloadSize(data_size.longValue());
-                }
-            } else {
-                /* Get official downloadurl. */
-                final Object directURL = JavaScriptEngineFactory.walkJson(downloadInfo, "url_list/{0}");
-                if (directURL != null) {
-                    video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_API, StringUtils.valueOfOrNull(directURL));
-                    if (data_size != null) {
-                        video0.setVerifiedFileSize(data_size.longValue());
+            findVideoURL: {
+                Map<String, Object> best_play_addr = null;
+                final List<Map<String, Object>> bit_rate = (List<Map<String, Object>>) video.get("bit_rate");
+                if (bit_rate != null && bit_rate.size() > 0) {
+                    for (Map<String, Object> entry : bit_rate) {
+                        final Map<String, Object> play_addr = new HashMap<String, Object>((Map<String, Object>) entry.get("play_addr"));
+                        if ("1".equals(StringUtils.valueOfOrNull(entry.get("is_bytevc2")))) {
+                            // unsupported h266
+                            continue;
+                        } else if ("1".equals(StringUtils.valueOfOrNull(entry.get("is_bytevc1"))) || "1".equals(StringUtils.valueOfOrNull(entry.get("is_h265")))) {
+                            play_addr.put("codec", "h265");
+                        } else {
+                            play_addr.put("codec", "h264");
+                        }
+                        if (best_play_addr == null) {
+                            best_play_addr = play_addr;
+                        } else if (Integer.parseInt(play_addr.get("height").toString()) > Integer.parseInt(best_play_addr.get("height").toString())) {
+                            best_play_addr = play_addr;
+                        }
                     }
-                    video0.removeProperty(TiktokCom.PROPERTY_HAS_WATERMARK);
+                }
+                final Map<String, Object> play_addr_bytevc1 = (Map<String, Object>) video.get("play_addr_bytevc1");
+                if (play_addr_bytevc1 != null) {
+                    final Map<String, Object> play_addr = new HashMap<String, Object>(play_addr_bytevc1);
+                    play_addr.put("codec", "h265");
+                    if (best_play_addr == null) {
+                        best_play_addr = play_addr;
+                    } else if (Integer.parseInt(play_addr.get("height").toString()) > Integer.parseInt(best_play_addr.get("height").toString())) {
+                        best_play_addr = play_addr;
+                    }
+                }
+                final Map<String, Object> play_addr_h264 = (Map<String, Object>) video.get("play_addr_h264");
+                if (play_addr_h264 != null) {
+                    final Map<String, Object> play_addr = new HashMap<String, Object>(play_addr_h264);
+                    play_addr.put("codec", "h264");
+                    if (best_play_addr == null) {
+                        best_play_addr = play_addr;
+                    } else if (Integer.parseInt(play_addr.get("height").toString()) > Integer.parseInt(best_play_addr.get("height").toString())) {
+                        best_play_addr = play_addr;
+                    }
+                }
+                if (best_play_addr != null) {
+                    final String url = (String) JavaScriptEngineFactory.walkJson(best_play_addr, "url_list/{0}");
+                    video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_API, url);
+                    final Number data_size = (Number) best_play_addr.get("data_size");
+                    if (data_size != null) {
+                        /**
+                         * Set filesize of download-version because streaming- and download-version are nearly identical. </br> If a video
+                         * is watermarked and downloads are prohibited both versions should be identical.
+                         */
+                        video0.setDownloadSize(data_size.longValue());
+                    }
+                    if (has_watermark) {
+                        video0.setProperty(TiktokCom.PROPERTY_HAS_WATERMARK, true);
+                    } else {
+                        video0.setProperty(TiktokCom.PROPERTY_HAS_WATERMARK, null);
+                    }
+                }
+                if (downloadInfo != null) {
+                    final String url = (String) JavaScriptEngineFactory.walkJson(downloadInfo, "url_list/{0}");
+                    if (url != null) {
+                        video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_API, StringUtils.valueOfOrNull(url));
+                        final Number data_size = (Number) downloadInfo.get("data_size");
+                        if (data_size != null) {
+                            video0.setVerifiedFileSize(data_size.longValue());
+                        }
+                        video0.removeProperty(TiktokCom.PROPERTY_HAS_WATERMARK);
+                    }
                 }
             }
-            video0.setProperty(TiktokCom.PROPERTY_TYPE, TiktokCom.TYPE_VIDEO);
+
             ret.add(video0);
             /* User decides whether or not he wants to download the audio of this video separately. */
             crawlAudio = cfg.isVideoCrawlerCrawlAudioSeparately();

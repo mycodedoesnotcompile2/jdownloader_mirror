@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51252 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51628 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -116,11 +116,13 @@ public class TwitterComCrawler extends PluginForDecrypt {
         Browser.setRequestIntervalLimitGlobal("api.x.com", true, cfg.getGlobalRequestIntervalLimitApiTwitterComMilliseconds());
     }
 
-    private static final Pattern           PATTERN_CARD                                                     = Pattern.compile("/i/cards/tfw/v1/(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           TYPE_USER_ALL                                                    = Pattern.compile("(?i)https?://[^/]+/([\\w\\-]+)(?:/(?:media|likes))?(\\?.*)?");
-    private static final Pattern           TYPE_USER_LIKES                                                  = Pattern.compile("(?i)https?://[^/]+/([\\w\\-]+)/likes.*");
-    private static final Pattern           TYPE_USER_MEDIA                                                  = Pattern.compile("(?i)https?://[^/]+/([\\w\\-]+)/media.*");
-    private static final Pattern           PATTERN_SINGLE_TWEET                                             = Pattern.compile("(?i)https?://[^/]+/([^/]+)/status/(\\d+).*?");
+    private static final Pattern           PATTERN_I_CARD                                                   = Pattern.compile("/i/cards/tfw/v1/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_I_USER_VIA_USER_ID                                       = Pattern.compile("/i/user/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_I_VIDEOS_BY_SINGLE_TWEET                                 = Pattern.compile("/i/videos/tweet/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_SINGLE_TWEET                                             = Pattern.compile("/([A-Za-z0-9_-]+)/status/(\\d+).*?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_USER_ALL                                                    = Pattern.compile("/([A-Za-z0-9_-]+)(?:/(?:media|likes))?(\\?.*)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_USER_LIKES                                                  = Pattern.compile("/([A-Za-z0-9_-]+)/likes.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_USER_MEDIA                                                  = Pattern.compile("/([A-Za-z0-9_-]+)/media.*", Pattern.CASE_INSENSITIVE);
     // private ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
     private static AtomicReference<String> GUEST_TOKEN                                                      = new AtomicReference<String>();
     private static AtomicLong              GUEST_TOKEN_TS                                                   = new AtomicLong(-1);
@@ -178,11 +180,16 @@ public class TwitterComCrawler extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:(?:www|mobile)\\.)?" + buildHostsPatternPart(domains);
-            regex += "/(?:";
-            regex += "[A-Za-z0-9_\\-]+/status/\\d+";
-            regex += "|i/videos/tweet/\\d+";
-            regex += "|[A-Za-z0-9_\\-]{2,}(?:/(?:media|likes))?(\\?.*)?";
-            regex += "|i/cards/tfw/v1/(\\d+)";
+            regex += "(";
+            regex += PATTERN_I_CARD.pattern();
+            regex += "|";
+            regex += PATTERN_I_USER_VIA_USER_ID.pattern();
+            regex += "|";
+            regex += PATTERN_I_VIDEOS_BY_SINGLE_TWEET.pattern();
+            regex += "|";
+            regex += PATTERN_SINGLE_TWEET.pattern();
+            regex += "|";
+            regex += TYPE_USER_ALL.pattern();
             regex += ")";
             ret.add(regex);
         }
@@ -250,6 +257,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         final Regex single_tweetVideoEmbed;
         final Regex single_tweetCard;
         final Regex single_tweet = new Regex(contenturl, PATTERN_SINGLE_TWEET);
+        final String user_id;
         if (single_tweet.patternFind()) {
             final String username = single_tweet.getMatch(0);
             final String tweetID = single_tweet.getMatch(1);
@@ -257,9 +265,11 @@ public class TwitterComCrawler extends PluginForDecrypt {
         } else if ((single_tweetVideoEmbed = new Regex(contenturl, TwitterCom.TYPE_VIDEO_EMBED)).patternFind()) {
             final String tweetID = single_tweetVideoEmbed.getMatch(0);
             return this.crawlSingleTweet(account, null, tweetID);
-        } else if ((single_tweetCard = new Regex(contenturl, PATTERN_CARD)).patternFind()) {
+        } else if ((single_tweetCard = new Regex(contenturl, PATTERN_I_CARD)).patternFind()) {
             final String tweetID = single_tweetCard.getMatch(0);
             return this.crawlSingleTweet(account, null, tweetID);
+        } else if ((user_id = new Regex(contenturl, PATTERN_I_USER_VIA_USER_ID).getMatch(0)) != null) {
+            return this.crawlUserByUserID(param, account, user_id);
         } else {
             return this.crawlUser(param, account, contenturl);
         }
@@ -586,8 +596,14 @@ public class TwitterComCrawler extends PluginForDecrypt {
         return formatTwitterDateFromDate(new Date(timestamp));
     }
 
+    private ArrayList<DownloadLink> crawlUserByUserID(final CryptedLink param, final Account account, final String user_id) throws Exception {
+        final Map<String, Object> user_info = this.getUserInfoByUserID(br, account, user_id);
+        return this.crawlUserViaGraphqlAPI(param, account, ProfileCrawlMode.ALL_ITEMS, user_info);
+    }
+
     private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account, final String contenturl) throws Exception {
-        final String username = new Regex(contenturl, TYPE_USER_ALL).getMatch(0);
+        final String path = new URL(contenturl).getPath();
+        final String username = new Regex(path, TYPE_USER_ALL).getMatch(0);
         if (StringUtils.isEmpty(username)) {
             throw new IllegalArgumentException();
         }
@@ -606,15 +622,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
             logger.info("Account required to crawl all media items of a user");
             throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "ACCOUNT_REQUIRED_TO_CRAWL_MEDIA_ITEMS_OF_PROFILE_" + username, "Account is required to crawl media items of profiles.");
         }
-        final String warningtextNoAccount = "You did not add a Twitter account to JDownloader or you've disabled it.\r\nAdd your x.com account under: Settings -> Account Manager -> Add";
-        if (account == null) {
-            displayBubbleNotification("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nTwitter is hiding some posts (e.g. NSFW content) or profiles when a user is not logged in\r\n" + warningtextNoAccount);
-        }
-        final boolean crawlRetweets = PluginJsonConfig.get(TwitterConfigInterface.class).isCrawlRetweetsV2();
-        if (account == null && crawlRetweets) {
-            displayBubbleNotification("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nYou've enabled re-tweet crawling in twitter plugin settings.\r\nTwitter is sometimes hiding Re-Tweets when users are not logged in.\r\n" + warningtextNoAccount);
-        }
-        return this.crawlUserViaGraphqlAPI(param, username, account, mode);
+        final Map<String, Object> user = getUserInfoByUsername(br, account, username);
+        return this.crawlUserViaGraphqlAPI(param, account, mode, user);
     }
 
     private void resetUglyGlobalVariables() {
@@ -629,13 +638,21 @@ public class TwitterComCrawler extends PluginForDecrypt {
     }
 
     /** Crawls all Tweets of a profile via GraphQL Web-API. */
-    private ArrayList<DownloadLink> crawlUserViaGraphqlAPI(final CryptedLink param, final String username, final Account account, final ProfileCrawlMode crawlmode) throws Exception {
-        if (username == null) {
+    private ArrayList<DownloadLink> crawlUserViaGraphqlAPI(final CryptedLink param, final Account account, final ProfileCrawlMode crawlmode, final Map<String, Object> user) throws Exception {
+        if (user == null) {
             /* Developer mistake */
             throw new IllegalArgumentException();
         }
         resetUglyGlobalVariables();
-        final Map<String, Object> user = getUserInfo(br, account, username);
+        final String username = user.get("screen_name").toString();
+        final String warningtextNoAccount = "You did not add a Twitter account to JDownloader or you've disabled it.\r\nAdd your x.com account under: Settings -> Account Manager -> Add";
+        if (account == null) {
+            displayBubbleNotification("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nTwitter is hiding some posts (e.g. NSFW content) or profiles when a user is not logged in\r\n" + warningtextNoAccount);
+        }
+        final boolean crawlRetweets = PluginJsonConfig.get(TwitterConfigInterface.class).isCrawlRetweetsV2();
+        if (account == null && crawlRetweets) {
+            displayBubbleNotification("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nYou've enabled re-tweet crawling in twitter plugin settings.\r\nTwitter is sometimes hiding Re-Tweets when users are not logged in.\r\n" + warningtextNoAccount);
+        }
         final int statuses_count = ((Number) user.get("statuses_count")).intValue();
         final int media_count = ((Number) user.get("media_count")).intValue();
         final int favorite_count = ((Number) user.get("favourites_count")).intValue();
@@ -1404,10 +1421,10 @@ public class TwitterComCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Obtains information about given username via old API. </br>
+     * Obtains information about given username. </br>
      * The response of this will also expose the users' userID which is often needed to perform further API requests.
      */
-    private Map<String, Object> getUserInfo(final Browser br, final Account account, final String username) throws Exception {
+    private Map<String, Object> getUserInfoByUsername(final Browser br, final Account account, final String username) throws Exception {
         this.prepareAPI(br, account);
         /* 2023-08-11: Old API can only be used when we're logged in. */
         /* 2024-11-22: Looks like the old endpoint has been shut down. TODO: Remove that old code. */
@@ -1451,14 +1468,42 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 br.getPage("https://" + getAPIDomain() + "/graphql/" + queryID + "/UserByScreenName?variables=%7B%22screen_name%22%3A%22" + PluginJSonUtils.escape(username)
                         + "%22%7D&features=%7B%22hidden_profile_subscriptions_enabled%22%3Atrue%2C%22profile_label_improvements_pcf_label_in_post_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22subscriptions_verification_info_is_identity_verified_enabled%22%3Atrue%2C%22subscriptions_verification_info_verified_since_enabled%22%3Atrue%2C%22highlights_tweets_tab_ui_enabled%22%3Atrue%2C%22responsive_web_twitter_article_notes_tab_enabled%22%3Atrue%2C%22subscriptions_feature_can_gift_premium%22%3Atrue%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%7D&fieldToggles=%7B%22withAuxiliaryUserLabels%22%3Afalse%7D");
             }
-            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> userNew = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/user/result");
             final String userID = userNew.get("rest_id").toString();
             user = (Map<String, Object>) userNew.get("legacy");
-            /* 2023-08-11: Small ugly hack to keep compatibility ob subsequent methods */
+            /* 2023-08-11: Small ugly hack to keep compatibility of subsequent methods */
             if (!user.containsKey("id_str")) {
                 user.put("id_str", userID);
             }
+            if (!user.containsKey("screen_name")) {
+                user.put("screen_name", username);
+            }
+        }
+        return user;
+    }
+
+    /**
+     * Obtains information about given user_id.
+     */
+    private Map<String, Object> getUserInfoByUserID(final Browser br, final Account account, final String user_id) throws Exception {
+        this.prepareAPI(br, account);
+        if (account == null) {
+            throw new AccountRequiredException();
+        }
+        this.prepareAPI(br, account);
+        br.getPage("https://x.com/i/api/graphql/FEomBoY_XkBgfqBPWktRMw/UserByRestId?variables=%7B%22userId%22%3A%22" + user_id + "%22%7D&features=%7B%22hidden_profile_subscriptions_enabled%22%3Atrue%2C%22payments_enabled%22%3Afalse%2C%22profile_label_improvements_pcf_label_in_post_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22highlights_tweets_tab_ui_enabled%22%3Atrue%2C%22responsive_web_twitter_article_notes_tab_enabled%22%3Atrue%2C%22subscriptions_feature_can_gift_premium%22%3Atrue%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%7D");
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> userNew = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/user/result");
+        final String userID = userNew.get("rest_id").toString();
+        final Map<String, Object> user = (Map<String, Object>) userNew.get("legacy");
+        /* 2023-08-11: Small ugly hack to keep compatibility of subsequent methods */
+        if (!user.containsKey("id_str")) {
+            user.put("id_str", userID);
+        }
+        if (!user.containsKey("screen_name")) {
+            final Map<String, Object> core = (Map<String, Object>) userNew.get("core");
+            user.put("screen_name", core.get("screen_name").toString());
         }
         return user;
     }

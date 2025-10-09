@@ -57,7 +57,7 @@ import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51619 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51630 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -217,6 +217,13 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                         // we have to skip and reprocess later, else duplicate check will prevent reprocessed files to be added
                         continue;
                     }
+                }
+                if (cfg.isCrawlHttpLinksFromPostContent() && post.get("embed") == null) {
+                    // posts api no longer returns embed entry, so we have to retry with post api
+                    retryWithSinglePostAPI.add(post.get("id").toString());
+                    logger.info("Need to process item:" + post.get("id") + " again due to missing embed");
+                    // we have to skip and reprocess later, else duplicate check will prevent reprocessed files to be added
+                    continue;
                 }
                 for (final DownloadLink thisresult : thisresults) {
                     if (!perPostPackageEnabled) {
@@ -487,10 +494,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                                                              return size() > 100;
-                                                          };
-                                                      };
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > 100;
+        };
+    };
 
     /**
      * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.

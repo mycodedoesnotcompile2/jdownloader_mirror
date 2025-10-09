@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51623 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51626 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaupCc extends PluginForHost {
     public MegaupCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -168,6 +168,7 @@ public class MegaupCc extends PluginForHost {
             if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Plugin is still under development");
             }
+            // TODO: Add decryption of download_token value
             br.getPage("https://m3g.megaup.cc/dl/" + download_token + "/check");
             String dllink = "https://m3g.megaup.cc/dl/" + download_token + "/download";
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
@@ -209,5 +210,10 @@ public class MegaupCc extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public void resetPluginGlobals() {
+        this.download_token = null;
     }
 }

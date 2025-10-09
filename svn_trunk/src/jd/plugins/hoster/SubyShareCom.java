@@ -17,16 +17,13 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -43,7 +40,12 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50908 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51630 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -183,6 +185,28 @@ public class SubyShareCom extends XFileSharingProBasic {
                 throw new AccountUnavailableException("Traffic limit reached", 5 * 60 * 1000);
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Traffic limit reached", 5 * 60 * 1000);
+            }
+        } else if (new Regex(correctedBR, ">\\s*You have reached downloads limit today for free type").patternFind()) {
+            /* 2025-10-08 */
+            final long serverTime = br.getCurrentServerTime(-1);
+            final long timeout;
+            if (serverTime == -1) {
+                timeout = TimeUnit.DAYS.toMillis(1);
+            } else {
+                // calculate remaining time until midnight
+                final Calendar midnight = Calendar.getInstance();
+                midnight.setTimeInMillis(serverTime);
+                midnight.set(Calendar.HOUR_OF_DAY, 0);
+                midnight.set(Calendar.MINUTE, 0);
+                midnight.set(Calendar.SECOND, 0);
+                midnight.set(Calendar.MILLISECOND, 0);
+                midnight.add(Calendar.DAY_OF_MONTH, 1);
+                timeout = midnight.getTimeInMillis() - serverTime;
+            }
+            if (account != null) {
+                throw new AccountUnavailableException(timeout);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, timeout);
             }
         } else if (StringUtils.containsIgnoreCase(br.getURL(), "/?op=payments")) {
             /**
