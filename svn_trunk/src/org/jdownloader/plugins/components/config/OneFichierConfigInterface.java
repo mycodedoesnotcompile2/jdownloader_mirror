@@ -26,12 +26,8 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
             return "SSL mode: Control http(s) handling for downloads";
         }
 
-        public String getSmallFilesWaitInterval_label() {
+        public String getSmallFilesWaitIntervalSeconds_label() {
             return "Wait x seconds for small files (smaller than 50 MB) to prevent IP block";
-        }
-
-        public String getUsePremiumAPIEnabled_label() {
-            return "Use premium API[recommended]? If you want to use a 1fichier free account, disable this.";
         }
 
         public String getLinkcheckMode_label() {
@@ -88,22 +84,11 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
 
     void setSSLMode(final SSLMode mode);
 
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @Order(30)
-    /**
-     * Disabled by default because the API has very tight "account check" rate limits which will result in it failing to obtain account
-     * information and/or even temporary account bans.
-     */
-    boolean isUsePremiumAPIEnabled();
-
-    void setUsePremiumAPIEnabled(boolean b);
-
     public static enum LinkcheckMode implements LabelInterface {
         AUTO {
             @Override
             public String getLabel() {
-                return "Auto";
+                return "Auto | Website Mass linkcheck";
             }
         },
         PREFER_SINGLE_LINKCHECK {
@@ -115,7 +100,7 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
         MASS_LINKCHECK {
             @Override
             public String getLabel() {
-                return "Mass linkcheck";
+                return "Website Mass linkcheck";
             }
         };
     }
@@ -132,9 +117,9 @@ public interface OneFichierConfigInterface extends PluginConfigInterface {
     @DefaultIntValue(10)
     @SpinnerValidator(min = 0, max = 60)
     @Order(40)
-    int getSmallFilesWaitInterval();
+    int getSmallFilesWaitIntervalSeconds();
 
-    void setSmallFilesWaitInterval(int i);
+    void setSmallFilesWaitIntervalSeconds(int i);
 
     @AboutConfig
     @DefaultIntValue(3)

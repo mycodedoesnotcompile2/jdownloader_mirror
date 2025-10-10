@@ -36,35 +36,6 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -95,7 +66,35 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51633 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 51643 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -201,24 +200,9 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        /*
-         * Do not return feature USERNAME_IS_EMAIL since this will enforce/validate username field but if user enters API key, no username
-         * (email) is given.
-         */
-        // if (true) {
-        // return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
-        // }
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            return super.getFeatures();
-        }
-        if (PluginJsonConfig.get(OneFichierConfigInterface.class).isUsePremiumAPIEnabled()) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.API_KEY_LOGIN };
-        } else {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
-        }
-    }
+    // @Override
+    // public LazyPlugin.FEATURE[] getFeatures() {
+    // }
 
     @Override
     public void init() {
@@ -321,11 +305,14 @@ public class OneFichierCom extends PluginForHost {
     private boolean preferSingleLinkcheckViaAPI() {
         final OneFichierConfigInterface cfg = PluginJsonConfig.get(OneFichierConfigInterface.class);
         final LinkcheckMode mode = cfg.getLinkcheckMode();
-        if (mode == LinkcheckMode.AUTO) {
-            return true;
-        } else if (mode == LinkcheckMode.PREFER_SINGLE_LINKCHECK) {
+        /**
+         * 2025-10-09: Changed default meaning of LinkcheckMode.AUTO to return alse here due to the strict API rate limits of 1fichier. API
+         * linkcheck can cause errors like the following one pretty quickly: {"status":"KO","message":"Owner locked #649"}
+         */
+        if (mode == LinkcheckMode.PREFER_SINGLE_LINKCHECK) {
             return true;
         } else {
+            /* LinkcheckMode.AUTO and LinkcheckMode.MASS_LINKCHECK */
             return false;
         }
     }
@@ -380,9 +367,8 @@ public class OneFichierCom extends PluginForHost {
                 // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is server side deprecated but we're still using it because: </br>
-                 * 1. It is still working. </br>
-                 * 2. It is the only method that can be used to check multiple items with one request.
+                 * This method is server side deprecated but we're still using it because: </br> 1. It is still working. </br> 2. It is the
+                 * only method that can be used to check multiple items with one request.
                  */
                 br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
@@ -564,7 +550,7 @@ public class OneFichierCom extends PluginForHost {
             return true;
         }
         if (StringUtils.containsIgnoreCase(getDownloadLink().getName(), ".htm") && urlConnection.isContentDisposition() && (urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206)) {
-            // special handling to allow download of inline html files
+            /* special handling to allow download of inline .html files */
             final String contentDispositionHeader = urlConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_DISPOSITION);
             final String contentDispositionFileName = HTTPConnectionUtils.getFileNameFromDispositionHeader(contentDispositionHeader);
             final boolean inlineFlag = contentDispositionHeader.matches("(?i)^\\s*inline\\s*;?.*");
@@ -688,7 +674,7 @@ public class OneFichierCom extends PluginForHost {
         final int responsecode = br.getHttpConnection().getResponseCode();
         if (br.containsHTML(">\\s*File not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">\\s*Software error:<")) {
+        } else if (br.containsHTML(">\\s*Software error:?\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Software error'", 10 * 60 * 1000l);
         } else if (br.containsHTML(">\\s*Connexion à la base de données impossible<|>Can\\'t connect DB")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Internal database error", 5 * 60 * 1000l);
@@ -703,7 +689,7 @@ public class OneFichierCom extends PluginForHost {
         } else if (br.containsHTML(">\\s*Access to this file is protected|>\\s*This file is protected")) {
             /* Access restricted by IP / only registered users / only premium users / only owner */
             if (br.containsHTML(">\\s*The owner of this file has reserved access to the subscribers of our services")) {
-                throw new AccountRequiredException();
+                throw new AccountRequiredException("The owner of this file has reserved access to the subscribers of our services");
             } else {
                 errorAccessControlLimit(link);
                 /* This code should never be reached */
@@ -733,7 +719,7 @@ public class OneFichierCom extends PluginForHost {
             throw new AccountUnavailableException("You are trying to use this account on multiple IP addresses at once", 10 * 60 * 1000l);
         } else if (br.containsHTML("\">Warning \\! Without premium status, you can download only")) {
             logger.info("Seems like this is no premium account or it's vot valid anymore -> Disabling it");
-            throw new AccountInvalidException("Account is no premium anymore");
+            throw new AccountInvalidException("Account is not premium anymore");
         } else if (account != null && br.containsHTML(">\\s*Usage of professional services is restricted and requires usage of CDN credits") && !this.isUsingCDNCredits(account)) {
             errorVPNUsed(account);
             /* This code should never be reached */
@@ -792,8 +778,8 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br>
-     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
+     * Access restricted by IP / only registered users / only premium users / only owner. </br> See here for all possible reasons (login
+     * required): https://1fichier.com/console/acl.pl
      *
      * @throws PluginException
      */
@@ -808,52 +794,43 @@ public class OneFichierCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         /* Clear this property on every account check so it will get refreshed. */
         account.removeProperty(PROPERTY_ACCOUNT_TIMESTAMP_VPN_DETECTED);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* 2025-10-03: Testing */
-            final Number loginType = (Number) account.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
-            if (loginType != null) {
-                if (loginType.intValue() == ACCOUNT_LOGIN_TYPE_API) {
-                    return fetchAccountInfoAPI(account);
-                } else {
-                    return fetchAccountInfoWebsite(account);
-                }
-            }
-            if (this.looksLikeValidAPIKey(account.getPass())) {
-                /* Auto mode e.g. headless login or older accounts */
-                try {
-                    logger.info("Attempting API login");
-                    /* Important for getAPIKeyFromAccount !! */
-                    final AccountInfo ai_api = fetchAccountInfoAPI(account);
-                    /* API login successful -> Always login via API with this account in the future */
-                    account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);
-                    return ai_api;
-                } catch (final InterruptedException ie1) {
-                    throw ie1;
-                } catch (final Exception pe1) {
-                    logger.info("API login failed -> Trying website login");
-                    /* Remove property again as API login failed. */
-                    try {
-                        final AccountInfo ai_website = this.fetchAccountInfoWebsite(account);
-                        /* Website login successful -> Always login via website with this account in the future */
-                        account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_WEBSITE);
-                        return ai_website;
-                    } catch (final InterruptedException ie2) {
-                        throw ie2;
-                    } catch (final PluginException pe2) {
-                        logger.log(pe2);
-                        logger.info("API login and website login failed -> Throwing API login exception");
-                        throw pe1;
-                    }
-                }
-            } else {
-                return this.fetchAccountInfoWebsite(account);
+        /* 2025-10-03: Testing */
+        final Number loginType = (Number) account.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
+        if (loginType != null) {
+            switch (loginType.intValue()) {
+            case ACCOUNT_LOGIN_TYPE_API:
+                return fetchAccountInfoAPI(account);
+            case ACCOUNT_LOGIN_TYPE_WEBSITE:
+                return fetchAccountInfoWebsite(account);
+            default:
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        if (canUseAPI(account)) {
-            return fetchAccountInfoAPI(account);
-        } else {
-            return fetchAccountInfoWebsite(account);
+        Exception apiException = null;
+        if (this.looksLikeValidAPIKey(account.getPass())) {
+            /**
+             * Auto mode e.g. headless login or older accounts -> Try API login first, then website login. <br>
+             * This should work pretty good except for users who are using a password that matches the typical format of an 1fichier API
+             * key.
+             */
+            try {
+                logger.info("Attempting API login");
+                return fetchAccountInfoAPI(account);
+            } catch (final Exception api_login_fail) {
+                logger.log(api_login_fail);
+                /* Remove property again as API login failed. */
+                apiException = api_login_fail;
+            }
         }
+        try {
+            return this.fetchAccountInfoWebsite(account);
+        } catch (final PluginException website_login_fail) {
+            if (apiException == null) {
+                throw website_login_fail;
+            }
+            throw Exceptions.addSuppressed(website_login_fail, apiException);
+        }
+
     }
 
     public AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
@@ -940,8 +917,10 @@ public class OneFichierCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> entries = this.parseAPIResponse(account);
         final String api_error = (String) entries.get("message");
-        if (api_error != null && api_error.matches("(?i)Flood detected: (User|User APK|IP) Locked.*?")) {
+        if (api_error != null && isAPIErrorFloodDetected(api_error)) {
             logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
+            /* Set this property so API login will always be used in the future for this account. */
+            account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);
             final long cachedCdnCreditsBytes = account.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, -1);
             AccountType type = null;
             if (account.lastUpdateTime() > 0) {
@@ -994,6 +973,8 @@ public class OneFichierCom extends PluginForHost {
             return ai;
         }
         this.handleErrorsAPI(entries, account);
+        /* Set this property so API login will always be used in the future for this account. */
+        account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);
         final String email = (String) entries.get("email");
         if (!StringUtils.isEmpty(email) && !StringUtils.equals(account.getUser(), email)) {
             account.setUser(email);
@@ -1186,71 +1167,79 @@ public class OneFichierCom extends PluginForHost {
             /* No error */
             return entries;
         }
-        final String message = (String) entries.get("message");
-        if (StringUtils.isEmpty(message)) {
+        final String msg = (String) entries.get("message");
+        if (StringUtils.isEmpty(msg)) {
             /* This should never happen! */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown API error", 5 * 60 * 1000l);
-        } else if (message.matches("(?i)Flood detected: IP Locked #\\d+")) {
+        } else if (isAPIErrorFloodDetected(msg)) {
             /*
              * 2019-07-18: This may even happen on the first login attempt. When this happens we cannot know whether the account is valid or
              * not!
              */
             throw new AccountUnavailableException("API flood detection has been triggered", 5 * 60 * 1000l);
-        } else if (message.matches("(?i)Flood detected: User Locked #\\d+")) {
-            throw new AccountUnavailableException("API flood detection has been triggered", 5 * 60 * 1000l);
-        } else if (message.matches("(?i)Not authenticated #\\d+")) {
+        } else if (msg.matches("(?i)Not authenticated #\\d+")) {
             /* Login required but not logged in (this should never happen) */
             errorInvalidAPIKey(account);
-        } else if (message.matches("(?i)No such user\\s*#\\d+")) {
+        } else if (msg.matches("(?i)No such user\\s*#\\d+")) {
             errorInvalidAPIKey(account);
-        } else if (message.matches("(?i)Owner locked\\s*#\\d+")) {
+        } else if (msg.matches("(?i)Owner locked\\s*#\\d+")) {
             /* 2021-01-29 */
-            throw new AccountInvalidException("Account banned: " + message);
-        } else if (message.matches("(?i)IP Locked\\s*#\\d+")) {
-            throw new AccountUnavailableException(message, 60 * 60 * 1000l);
-        } else if (message.matches("(?i).*Must be a customer.*")) {
+            throw new AccountInvalidException("Account banned: " + msg);
+        } else if (msg.matches("(?i)IP Locked\\s*#\\d+")) {
+            throw new AccountUnavailableException(msg, 60 * 60 * 1000l);
+        } else if (msg.matches("(?i).*Must be a customer.*")) {
             /* 2020-06-09: E.g. {"message":"Must be a customer (Premium, Access) #200","status":"KO"} */
             /* Free account API key entered by user --> API can only be used by premium users */
             errorPremiumNeededForAPIDownloading(account);
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (isAPIErrorPassword(message)) {
+        } else if (isAPIErrorPassword(msg)) {
             this.errorWrongPassword(this.getDownloadLink());
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (message.matches("(?i).*Resource not allowed #\\d+")) {
+        } else if (msg.matches("(?i).*Resource not allowed #\\d+")) {
             errorAccessControlLimit(this.getDownloadLink());
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (message.matches("(?i).*Resource not found #\\d+")) {
+        } else if (msg.matches("(?i).*Resource not found #\\d+")) {
             /* Usually goes along with http response 404 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (message.matches("(?i).*Only \\d+ locations? allowed at a time\\s*#\\d+")) {
+        } else if (msg.matches("(?i).*Only \\d+ locations? allowed at a time\\s*#\\d+")) {
             /* 2021-03-17: Tmp. account ban e.g. because of account sharing or user is just using it with too many IPs. */
-            throw new AccountUnavailableException(message, 5 * 60 * 1000l);
-        } else if (message.matches("(?i).*professional equipment, must have CDN.*")) {
+            throw new AccountUnavailableException(msg, 5 * 60 * 1000l);
+        } else if (msg.matches("(?i).*professional equipment, must have CDN.*")) {
             errorVPNUsed(account);
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else {
             /* Unknown/unhandled error */
-            logger.warning("Handling unknown API error: " + message);
+            logger.warning("Handling unknown API error: " + msg);
             if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
                 /* Account error */
-                throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+                throw new AccountUnavailableException(msg, 5 * 60 * 1000l);
             } else {
                 /* Error during download/linkcheck */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message, 5 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, 5 * 60 * 1000l);
             }
         }
         /* This code should never be reached! */
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
-    private boolean isAPIErrorPassword(final String errorMsg) {
-        if (errorMsg == null) {
+    private boolean isAPIErrorFloodDetected(final String msg) {
+        if (msg == null) {
             return false;
-        } else if (errorMsg.matches("(?i).*(Invalid password\\.|Password not provided\\.).*Resource not allowed.*")) {
+        } else if (msg.matches("(?i)Flood detected: (User|User APK|IP) Locked.*?")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean isAPIErrorPassword(final String msg) {
+        if (msg == null) {
+            return false;
+        } else if (msg.matches("(?i).*(Invalid password\\.|Password not provided\\.).*Resource not allowed.*")) {
             return true;
         } else {
             return false;
@@ -1278,50 +1267,44 @@ public class OneFichierCom extends PluginForHost {
         }
         /* Assume APIKey is invalid or simply not valid anymore (e.g. user disabled or changed APIKey) */
         final StringBuilder sb = new StringBuilder();
-        String language = System.getProperty("user.language").toLowerCase();
+        final String language = System.getProperty("user.language").toLowerCase();
         if ("de".equals(language)) {
             sb.append("Ungültiger API-Schlüssel!");
-            sb.append("\r\nDu findest Deinen API-Schlüssel hier: 1fichier.com/console/params.pl");
-            sb.append("\r\nWenn Du einen 'Premium-Schlüssel'/'Gutschein'/'Aktivierungsschlüssel' von einem Reseller gekauft hast, musst Du ein 1fichier-Konto erstellen, Dich anmelden und diesen Code hier einlösen: 1fichier.com/console/vu.pl");
-            sb.append("\r\nBitte beachte, dass API-Schlüssel nur von Premium-Kunden zum Herunterladen verwendet werden können.");
-            sb.append("\r\nInformationen für 1fichier FREE-Kontonutzer:");
-            sb.append("\r\nUm kostenlose Konten in JD zu verwenden, gehe zu Einstellungen -> Plugins -> 1fichier.com -> 'Premium-API verwenden' -> Deaktiviere dies -> Versuche jetzt, Dich erneut anzumelden, diesmal mit Deiner E-Mail & Passwort.");
+            sb.append("\r\nDu findest deinen API-Schlüssel hier: 1fichier.com/console/params.pl");
+            sb.append("\r\nWenn du einen 'Premium-Schlüssel' / 'Gutschein' / 'Aktivierungsschlüssel' von einem Reseller gekauft hast, musst du ein 1fichier-Konto erstellen, dich anmelden und diesen Code hier einlösen: 1fichier.com/console/vu.pl");
+            sb.append("\r\nBitte beachte, dass API-Schlüssel nur von Premium-Nutzern zum Herunterladen verwendet werden können.");
+            sb.append("\r\nInformationen für Nutzer von 1fichier-FREE-Konten oder kostenlosen Konten mit bezahlten CDN-Guthaben:");
+            sb.append("\r\nUm solche Konten in JDownloader zu verwenden, wähle im Konto-Hinzufügen-Dialog den korrekten Kontotyp aus (z. B. Webseiten-Login oder API-Login).");
         } else if ("es".equals(language)) {
             sb.append("¡Clave API inválida!");
             sb.append("\r\nPuedes encontrar tu clave API aquí: 1fichier.com/console/params.pl");
-            sb.append("\r\nSi compraste una 'clave premium'/'Cupón'/'Clave de activación' de un Reseller, necesitas crear una cuenta de 1fichier, iniciar sesión y canjear ese código aquí: 1fichier.com/console/vu.pl");
-            sb.append("\r\nPor favor ten en cuenta que las claves API solo pueden ser utilizadas para descargar por clientes premium.");
-            sb.append("\r\nInformación para usuarios de cuentas GRATUITAS de 1fichier:");
-            sb.append("\r\nPara usar cuentas gratuitas en JD, ve a Configuración -> Plugins -> 1fichier.com -> 'Usar API premium' -> Desactiva esto -> Ahora intenta iniciar sesión de nuevo, esta vez con tu correo electrónico y contraseña.");
+            sb.append("\r\nSi compraste una 'clave premium' / 'cupón' / 'clave de activación' de un revendedor, necesitas crear una cuenta de 1fichier, iniciar sesión y canjear ese código aquí: 1fichier.com/console/vu.pl");
+            sb.append("\r\nTen en cuenta que las claves API solo pueden ser utilizadas para descargar por usuarios premium.");
+            sb.append("\r\nInformación para usuarios de cuentas GRATUITAS de 1fichier o cuentas gratuitas con créditos CDN pagados:");
+            sb.append("\r\nPara usar dichas cuentas en JDownloader, asegúrate de seleccionar el tipo de cuenta correcto en el diálogo para añadir cuentas (por ejemplo, inicio de sesión web o API).");
         } else if ("fr".equals(language)) {
             sb.append("Clé API invalide !");
             sb.append("\r\nTu peux trouver ta clé API ici : 1fichier.com/console/params.pl");
-            sb.append("\r\nSi tu as acheté une 'clé premium'/'Coupon'/'Clé d'activation' auprès d'un Reseller, tu dois créer un compte 1fichier, te connecter et échanger ce code ici : 1fichier.com/console/vu.pl");
-            sb.append("\r\nGarde à l'esprit que les clés API ne peuvent être utilisées pour télécharger que par les clients premium.");
-            sb.append("\r\nInformations pour les utilisateurs de comptes GRATUITS 1fichier :");
-            sb.append("\r\nPour utiliser des comptes gratuits dans JD, va dans Paramètres -> Plugins -> 1fichier.com -> 'Utiliser l'API premium' -> Désactive cette option -> Maintenant essaie de te connecter à nouveau, cette fois avec ton e-mail et mot de passe.");
+            sb.append("\r\nSi tu as acheté une 'clé premium' / 'coupon' / 'clé d'activation' auprès d'un revendeur, tu dois créer un compte 1fichier, te connecter et échanger ce code ici : 1fichier.com/console/vu.pl");
+            sb.append("\r\nNote que les clés API ne peuvent être utilisées pour télécharger que par les utilisateurs premium.");
+            sb.append("\r\nInformations pour les utilisateurs de comptes GRATUITS 1fichier ou de comptes gratuits avec crédits CDN payants :");
+            sb.append("\r\nPour utiliser ces comptes dans JDownloader, veille à sélectionner le type de compte correct dans la boîte de dialogue d’ajout de compte (par exemple, connexion web ou API).");
         } else {
             sb.append("Invalid API Key!");
-            sb.append("\r\nYou can find your API Key here: 1fichier.com/console/params.pl");
-            sb.append("\r\nIf you bought a 'premium key'/'Voucher'/'Activation key' from a Reseller, you need to create a 1fichier account, login and redeem that code here: 1fichier.com/console/vu.pl");
-            sb.append("\r\nPlease keep in mind that API Keys can only be used for downloading by premium customers.");
-            sb.append("\r\nInformation for 1fichier FREE account users:");
-            sb.append("\r\nTo use free accounts in JD, Go to Settings -> Plugins -> 1fichier.com -> 'Use premium API' -> Disable this -> Now try to login again, this time with your e-mail & password.");
+            sb.append("\r\nYou can find your API key here: 1fichier.com/console/params.pl");
+            sb.append("\r\nIf you bought a 'Premium Key', 'Voucher', or 'Activation Key' from a reseller, you need to create a 1fichier account, log in, and redeem that code here: 1fichier.com/console/vu.pl");
+            sb.append("\r\nPlease note that API keys can only be used for downloading by Premium users.");
+            sb.append("\r\nInformation for users of 1fichier FREE accounts or free accounts with paid CDN credits:");
+            sb.append("\r\nTo use such accounts in JDownloader, be sure to select the correct account type in the add account dialog (e.g. website login or API login).");
+            sb.append("\r\nFor headless setups: Enter your email and password, or your email and API key, into the username and password fields.");
         }
         throw new AccountInvalidException(sb.toString());
     }
 
     /** Checks whether we're logged in via website. */
     private boolean isLoggedinWebsite(final Browser br) {
-        if (isLoginCookieExists(br) && br.containsHTML("/logout\\.pl")) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean isLoginCookieExists(final Browser br) {
-        if (br.getCookie(this.getHost(), "SID", Cookies.NOTDELETEDPATTERN) != null) {
+        final boolean loginCookieExists = br.getCookie(this.getHost(), "SID", Cookies.NOTDELETEDPATTERN) != null;
+        if (loginCookieExists && br.containsHTML("/logout\\.pl")) {
             return true;
         } else {
             return false;
@@ -1364,7 +1347,7 @@ public class OneFichierCom extends PluginForHost {
             query.appendEncoded("mail", username);
             query.appendEncoded("pass", password);
             /* Now add the "Advanced options" parameters */
-            /* do not purge older sessions by no adding the param down below */
+            /* Do not purge older sessions by no adding the param down below */
             // query.appendEncoded("purge", "on");
             query.appendEncoded("lt", "on"); // long term session
             query.appendEncoded("other", "on"); // set cookies also on other 1fichier domains
@@ -1406,6 +1389,7 @@ public class OneFichierCom extends PluginForHost {
             }
             setBasicAuthHeader(br, account);
             account.saveCookies(br.getCookies(br.getHost()), "");
+            account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_WEBSITE);
         }
     }
 
@@ -1431,7 +1415,7 @@ public class OneFichierCom extends PluginForHost {
         } else {
             final long knownDownloadSize = link.getKnownDownloadSize();
             if (knownDownloadSize <= 50 * 1024 * 1024) {
-                final int wait = PluginJsonConfig.get(OneFichierConfigInterface.class).getSmallFilesWaitInterval();
+                final int wait = PluginJsonConfig.get(OneFichierConfigInterface.class).getSmallFilesWaitIntervalSeconds();
                 /* Small file or big file but only some bytes remaining -> Avoid IP block because of too many downloads in short time */
                 return Math.max(0, wait * 1000);
             } else {
@@ -1442,7 +1426,7 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        if (canUseAPIForPremiumDownloads(account)) {
+        if (canUseAPI(account)) {
             final String directurlproperty = getDirectlinkproperty(account);
             String storedDirecturl = link.getStringProperty(directurlproperty);
             if (storedDirecturl != null) {
@@ -1482,8 +1466,8 @@ public class OneFichierCom extends PluginForHost {
 
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
-         * 2019-04-05: At the moment there are no benefits for us when using this. </br>
-         * 2021-01-29: Removed this because if login/API is blocked because of "flood control" this won't work either!
+         * 2019-04-05: At the moment there are no benefits for us when using this. </br> 2021-01-29: Removed this because if login/API is
+         * blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
         if (checkFileInfoBeforeDownloadAttempt) {
@@ -1535,26 +1519,22 @@ public class OneFichierCom extends PluginForHost {
          * true = use premium API, false = use combination of website + OLD basic auth API - ONLY RELEVANT FOR PREMIUM USERS; IF ENABLED,
          * USER HAS TO ENTER API_KEY INSTEAD OF USERNAME:PASSWORD (or APIKEY:APIKEY)!!
          */
-        if (account != null && looksLikeValidAPIKeySTATIC(account.getPass())) {
-            return PluginJsonConfig.get(OneFichierConfigInterface.class).isUsePremiumAPIEnabled();
-        } else {
+        if (account == null) {
             return false;
         }
-    }
-
-    public static boolean canUseAPIForPremiumDownloads(final Account account) {
-        /**
-         * true = use premium API, false = use combination of website + OLD basic auth API - ONLY RELEVANT FOR PREMIUM USERS; IF ENABLED,
-         * USER HAS TO ENTER API_KEY INSTEAD OF USERNAME:PASSWORD (or APIKEY:APIKEY)!!
-         */
         final Number loginType = (Number) account.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
         if (loginType != null) {
-            if (loginType.intValue() == ACCOUNT_LOGIN_TYPE_API) {
+            switch (loginType.intValue()) {
+            case ACCOUNT_LOGIN_TYPE_API:
                 return true;
+            case ACCOUNT_LOGIN_TYPE_WEBSITE:
+            default:
+                return false;
             }
         }
-        if (canUseAPI(account) && (account.getType() == null || account.getType() == AccountType.PREMIUM || account.getType() == AccountType.UNKNOWN)) {
-            return PluginJsonConfig.get(OneFichierConfigInterface.class).isUsePremiumAPIEnabled();
+        /* For accounts that do not have the login type property yet. */
+        if (looksLikeValidAPIKeySTATIC(account.getPass())) {
+            return true;
         } else {
             return false;
         }
@@ -1746,10 +1726,11 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br>Wenn dein Konto ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits ist, wirst du nicht über die API herunterladen können.";
                         message += "<br>In diesem Fall gehe so vor:";
                         message += "<br>1. Gehe zu Einstellungen -> Account Manager und entferne dieses Konto";
-                        message += "<br>2. Gehe zu Einstellungen -> Plugins -> 1fichier.com -> Premium-API verwenden -> Deaktiviere dies";
-                        message += "<br>3. Gehe zu Einstellungen -> Account Manager -> Füge dein 1fichier-Konto mit E-Mail & Passwort hinzu.";
+                        message += "<br>2. Gehe zu Einstellungen -> Account Manager -> 1fichier.com -> Wähle im Hinzufügen-Dialog einen Kontotyp mit Webseiten-Login";
+                        message += "<br>3. Gib deine E-Mail und dein Passwort ein und klicke auf 'Speichern'";
+                        message += "<br>4. Starte den Download.";
                         message += "<br>";
-                        message += "<br><b>Warnung:</b> Wenn du ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits besitzt und versuchst, den API-Key-Login zu verwenden, werden Downloads fehlschlagen und dein Konto wird in einen roten Fehlerzustand wechseln!";
+                        message += "<br><b>Warnung:</b> Wenn du ein Free-Konto oder ein Free-Konto mit <b>bezahlten</b> CDN-Credits besitzt und den API-Key-Login verwendest, werden Downloads fehlschlagen und dein Konto wird in einen roten Fehlerzustand wechseln!";
                     } else if ("es".equals(language)) {
                         title = "Información sobre tipo de cuenta desconocido";
                         message += "<br>JDownloader no pudo detectar el tipo de tu cuenta en este momento.";
@@ -1758,8 +1739,9 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br>Si tu cuenta es una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b>, no podrás descargar mediante la API.";
                         message += "<br>En este caso, haz lo siguiente:";
                         message += "<br>1. Ve a Configuración -> Administrador de cuentas y elimina esta cuenta";
-                        message += "<br>2. Ve a Configuración -> Plugins -> 1fichier.com -> Usar API premium -> Desactiva esto";
-                        message += "<br>3. Ve a Configuración -> Administrador de cuentas -> Añade tu cuenta de 1fichier con E-Mail y contraseña.";
+                        message += "<br>2. Ve a Configuración -> Administrador de cuentas -> 1fichier.com -> Selecciona en el cuadro de diálogo un tipo de cuenta con inicio de sesión web";
+                        message += "<br>3. Introduce tu correo electrónico y contraseña y pulsa 'Guardar'";
+                        message += "<br>4. Inicia la descarga.";
                         message += "<br>";
                         message += "<br><b>Advertencia:</b> Si tienes una cuenta gratuita o una cuenta gratuita con créditos CDN <b>pagados</b> e intentas usar el inicio de sesión con clave API, las descargas fallarán y tu cuenta entrará en estado de error rojo!";
                     } else if ("fr".equals(language)) {
@@ -1770,8 +1752,9 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br>Si votre compte est un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b>, vous ne pourrez pas télécharger via l’API.";
                         message += "<br>Dans ce cas, procédez ainsi :";
                         message += "<br>1. Allez dans Paramètres -> Gestionnaire de comptes et supprimez ce compte";
-                        message += "<br>2. Allez dans Paramètres -> Plugins -> 1fichier.com -> Utiliser l’API premium -> Désactivez ceci";
-                        message += "<br>3. Allez dans Paramètres -> Gestionnaire de comptes -> Ajoutez votre compte 1fichier avec E-Mail et mot de passe.";
+                        message += "<br>2. Allez dans Paramètres -> Gestionnaire de comptes -> 1fichier.com -> Sélectionnez dans la boîte de dialogue un type de compte avec connexion via site web";
+                        message += "<br>3. Entrez votre e-mail et votre mot de passe, puis cliquez sur 'Enregistrer'";
+                        message += "<br>4. Lancez le téléchargement.";
                         message += "<br>";
                         message += "<br><b>Avertissement :</b> Si vous possédez un compte gratuit ou un compte gratuit avec crédits CDN <b>payés</b> et essayez d’utiliser la connexion par clé API, les téléchargements échoueront et votre compte passera en état d’erreur rouge !";
                     } else {
@@ -1782,8 +1765,9 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br>If your account is a free account or a free account with <b>paid</b> CDN credits, you will not be able to download via API.";
                         message += "<br>In the latter case, do this:";
                         message += "<br>1. Go to Settings -> Account Manager and remove this account";
-                        message += "<br>2. Go to Settings -> Plugins -> 1fichier.com -> Use premium API -> Disable this";
-                        message += "<br>3. Go to Settings -> Account Manager -> Add your 1fichier account via E-Mail & password.";
+                        message += "<br>2. Go to Settings -> Account Manager -> 1fichier.com -> Select any account type with website login";
+                        message += "<br>3. Enter your E-Mail and password and hit the 'Save' button.";
+                        message += "<br>4. Start downloading.";
                         message += "<br>";
                         message += "<br><b>Warning:</b> If you own a free account or a free account with <b>paid</b> CDN credits and try to use the API key login, downloads will fail and your account will go into a red error state!";
                     }
@@ -1821,11 +1805,7 @@ public class OneFichierCom extends PluginForHost {
 
     @Override
     public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            return new OneFichierAccountFactory(callback, this);
-        } else {
-            return super.getAccountFactory(callback);
-        }
+        return new OneFichierAccountFactory(callback, this);
     }
 
     public static class OneFichierAccountFactory extends MigPanel implements AccountBuilderInterface {
@@ -1971,10 +1951,10 @@ public class OneFichierCom extends PluginForHost {
         private final ExtPasswordField              apikey;
         private final JLabel                        apikeyLabel;
         private final InputChangedCallbackInterface callback;
-        private JLabel                              usernameLabel = null;
+        private JLabel                              usernameLabel   = null;
         private final JLabel                        passwordLabel;
         private final OneFichierCom                 plg;
-        private final boolean                       usernameIsEmail;
+        private final boolean                       usernameIsEmail = true;
         // Components for account type selection
         private final JComboBox                     accountTypeComboBox;
         private final JPanel                        premiumAccountPanel;
@@ -2001,7 +1981,7 @@ public class OneFichierCom extends PluginForHost {
             super("ins 0, wrap 2", "[][grow,fill]", "");
             this.plg = plg;
             this.callback = callback;
-            this.usernameIsEmail = this.plg.hasFeature(FEATURE.USERNAME_IS_EMAIL);
+            // this.usernameIsEmail = this.plg.hasFeature(FEATURE.USERNAME_IS_EMAIL);
             // Initialize internal translations with English fallback
             this.translations = getTranslations(System.getProperty("user.language"));
             final String apikey_help_url_without_protocol = plg.getAPILoginHelpURL().replaceFirst("^https?://", "");

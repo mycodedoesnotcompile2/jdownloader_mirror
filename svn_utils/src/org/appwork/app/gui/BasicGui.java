@@ -188,9 +188,11 @@ public abstract class BasicGui {
                 // we get in problems. avoid this!
                 if (!b) {
                     for (final Window w : getOwnedWindows()) {
-                        if (w instanceof JDialog && ((JDialog) w).isModal() && w.isActive()) {
+                        if (w instanceof JDialog && ((JDialog) w).isModal() && w.isActive() && w.isVisible()) {
+
                             UIManager.getLookAndFeel().provideErrorFeedback(this);
                             throw new ActiveDialogException((JDialog) w);
+
                         }
                     }
                     locator.onClose(frame, null);

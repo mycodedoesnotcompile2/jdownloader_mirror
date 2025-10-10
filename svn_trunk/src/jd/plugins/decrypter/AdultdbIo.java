@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
@@ -38,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51635 $", interfaceVersion = 3, names = {}, urls = {})
 public class AdultdbIo extends PluginForDecrypt {
     public AdultdbIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +84,7 @@ public class AdultdbIo extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String urlSlug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         /* Check for some invalid URLs */
-        if (new Regex(urlSlug, "(wp-admin|wp-includes|wp-json|wp-content|about-us|feed)").patternFind()) {
+        if (new Regex(urlSlug, "(?i)(wp-admin|wp-includes|wp-json|wp-content|about-us|feed)").patternFind()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         br.getPage(param.getCryptedUrl());
@@ -91,9 +92,15 @@ public class AdultdbIo extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         Form captchaform = null;
+        boolean hCaptcha = false;
         for (final Form form : br.getForms()) {
             if (form.containsHTML("recaptcha-form")) {
                 captchaform = form;
+                break;
+            } else if (form.containsHTML("hcaptcha-form")) {
+                // 2025-10-09
+                captchaform = form;
+                hCaptcha = true;
                 break;
             }
         }
@@ -111,28 +118,37 @@ public class AdultdbIo extends PluginForDecrypt {
         }
         /* Find reCaptchaKey */
         String rcKey = null;
-        final String[] jsurls = br.getRegex("(/wp-content/litespeed/js/[^\"]+)\"").getColumn(0);
-        if (jsurls != null && jsurls.length > 0) {
-            final HashSet<String> dupes = new HashSet<String>();
-            final Browser brx = br.cloneBrowser();
-            for (final String jsurl : jsurls) {
-                if (!dupes.add(jsurl)) {
-                    /* Skip duplicates */
-                    continue;
-                }
-                brx.getPage(jsurl);
-                rcKey = brx.getRegex("\"recaptcha_key\":\\s*\"([^\"]+)\"").getMatch(0);
-                if (rcKey != null) {
-                    break;
-                }
-                if (this.isAbort()) {
-                    throw new InterruptedException();
+        String hcaptchaKey = null;
+        if (hCaptcha) {
+            hcaptchaKey = br.getRegex("data-sitekey=\"([^\"]+)").getMatch(0);
+            if (hcaptchaKey == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        } else {
+            logger.info("Searching for reCaptchaKey");
+            final String[] jsurls = br.getRegex("(/wp-content/litespeed/js/[^\"]+)\"").getColumn(0);
+            if (jsurls != null && jsurls.length > 0) {
+                final HashSet<String> dupes = new HashSet<String>();
+                final Browser brx = br.cloneBrowser();
+                for (final String jsurl : jsurls) {
+                    if (!dupes.add(jsurl)) {
+                        /* Skip duplicates */
+                        continue;
+                    }
+                    brx.getPage(jsurl);
+                    rcKey = brx.getRegex("\"recaptcha_key\":\\s*\"([^\"]+)\"").getMatch(0);
+                    if (rcKey != null) {
+                        break;
+                    }
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
                 }
             }
-        }
-        if (rcKey == null) {
-            logger.warning("Failed to find reCaptchaKey -> Using static fallback");
-            rcKey = "6Lc12LYZAAAAAHrmiB-FozY-KoqQYLFxEj6xoiAm";
+            if (rcKey == null) {
+                logger.warning("Failed to find reCaptchaKey -> Using static fallback");
+                rcKey = "6Lc12LYZAAAAAHrmiB-FozY-KoqQYLFxEj6xoiAm";
+            }
         }
         /* Fill form */
         final Map<String, String> mappings = new HashMap<String, String>();
@@ -140,11 +156,16 @@ public class AdultdbIo extends PluginForDecrypt {
         mappings.put("show_duration", "duration");
         for (final String[] kvlist : keyValuePairs) {
             /* Use different key according to mapping if needed. */
+            final String key_raw = kvlist[0];
+            if (key_raw.equals("sitekey")) {
+                /* Ignore invalid/unneeded items */
+                continue;
+            }
             final String key;
-            if (mappings.containsKey(kvlist[0])) {
-                key = mappings.get(kvlist[0]);
+            if (mappings.containsKey(key_raw)) {
+                key = mappings.get(key_raw);
             } else {
-                key = kvlist[0];
+                key = key_raw;
             }
             captchaform.put(key, kvlist[1]);
         }
@@ -153,8 +174,13 @@ public class AdultdbIo extends PluginForDecrypt {
         brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
         brc.getHeaders().put("Origin", "https://www." + getHost());
         brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
-        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, rcKey).getToken();
-        captchaform.put("token", Encoding.urlEncode(recaptchaV2Response));
+        if (hCaptcha) {
+            final String hcaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br, hcaptchaKey).getToken();
+            captchaform.put("token", Encoding.urlEncode(hcaptchaResponse));
+        } else {
+            final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, rcKey).getToken();
+            captchaform.put("token", Encoding.urlEncode(recaptchaV2Response));
+        }
         captchaform.setAction("/wp-admin/admin-ajax.php");
         brc.submitForm(captchaform);
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);

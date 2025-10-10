@@ -69,7 +69,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51285 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51645 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -423,57 +423,66 @@ public class InstaGramCom extends PluginForHost {
             /* No json -> Nothing we can check for */
             return;
         }
-        /* E.g. {"message": "Invalid media_id 1234561234567862322X", "status": "fail"} */
-        /* E.g. {"message": "Media not found or unavailable", "status": "fail"} */
         final Map<String, Object> map = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final String message = (String) map.get("message");
         final String status = (String) map.get("status");
         if (!"fail".equalsIgnoreCase(status)) {
             /* No fail status -> No error */
             return;
         }
-        if (message.equalsIgnoreCase("Media not found or unavailable")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        /* First evaluate error message only, then response-code only */
-        final Map<String, Object> loginChallenge = (Map<String, Object>) map.get("challenge");
-        if (loginChallenge != null) {
-            /* Either the request we made was plain wrong or we were (partly) logged out */
-            /*
-             * {"message":"challenge_required","challenge":{"url":"https://i.instagram.com/challenge/?next=/api/v1/feed/user/...","api_path"
-             * :"/challenge/","hide_webview_header":true,"lock":true,"logout":false,"native_flow":true,"flow_render_type":0},"status":
-             * "fail"}
-             */
-            errorSessionExpired(account);
-        } else if (br.getHttpConnection().getResponseCode() == 400) {
-            /* Either the request we made was plain wrong or we were (partly) logged out */
-            /*
-             * {"message":"challenge_required","challenge":{"url":"https://i.instagram.com/challenge/?next=/api/v1/feed/user/...","api_path"
-             * :"/challenge/","hide_webview_header":true,"lock":true,"logout":false,"native_flow":true,"flow_render_type":0},"status":
-             * "fail"}
-             */
-            if (StringUtils.equalsIgnoreCase(message, "Not authorized to view user")) {
+        handle_message: {
+            final String message = (String) map.get("message");
+            if ("Media not found or unavailable".equalsIgnoreCase(message)) {
+                /* E.g. {"message": "Media not found or unavailable", "status": "fail"} */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (StringUtils.containsIgnoreCase(message, "invalid media_id")) {
+                /* E.g. {"message": "Invalid media_id 1234561234567862322X", "status": "fail"} */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if ("login_required".equals(message)) {
+                /*
+                 * {"message":"login_required","error_title":"Du wurdest abgemeldet","error_body":"Bitte melde dich wieder an."
+                 * ,"logout_reason":8,"status":"fail"}
+                 */
+                errorSessionExpired(account);
+            } else if ("feedback_required".equals(message) || Boolean.TRUE.equals(map.get("is_spam"))) {
+                /*
+                 * {"message":"feedback_required","is_spam":true,"feedback_title":"Versuche es später noch einmal","feedback_message":
+                 * "Wir schränken die Häufigkeit mancher Handlungen auf Instagram ein, um unsere Community zu schützen. Sag uns, wenn wir deiner Meinung nach einen Fehler gemacht haben."
+                 * ,
+                 * "feedback_url":"/","feedback_appeal_label":"Feedback geben","feedback_ignore_label":"OK","feedback_action":"report_problem"
+                 * ,"feedback_required":true,"category"...."dialogue_type":"0","sentry_block_restriction_dialogue_unification_enabled":true,
+                 * "status":"fail"}
+                 */
+                if (account != null) {
+                    /* Account should always be given */
+                    throw new AccountUnavailableException("Bot protection triggered", 15 * 60 * 1000);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Bot protection triggered");
+                }
+            } else if ("challenge_required".equals(message) || map.get("challenge") != null) {
+                /* Either the request we made was plain wrong or we were (partly) logged out */
+                /*
+                 * {"message":"challenge_required","challenge":{"url":"https://i.instagram.com/challenge/?next=/api/v1/feed/user/...","api_path"
+                 * :"/challenge/","hide_webview_header":true,"lock":true,"logout":false,"native_flow":true,"flow_render_type":0},"status":
+                 * "fail"}
+                 */
+                errorSessionExpired(account);
+            } else if (StringUtils.equalsIgnoreCase(message, "Not authorized to view user")) {
                 /* E.g. private Instagram account/content and current user is not allowed to view it. */
                 throw new AccountRequiredException();
-            } else {
-                errorSessionExpired(account);
             }
-        } else if (br.getHttpConnection().getResponseCode() == 403) {
-            /*
-             * {"message":"login_required","error_title":"Du wurdest abgemeldet","error_body":"Bitte melde dich wieder an."
-             * ,"logout_reason":8,"status":"fail"}
-             */
-            errorSessionExpired(account);
-        } else if (br.getHttpConnection().getResponseCode() == 429) {
-            if (account != null) {
-                /* Account should always be given */
-                throw new AccountUnavailableException("Rate-Limit reached", 5 * 60 * 1000);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Rate-Limit reached");
-            }
-        } else {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+
+        handle_responseCode: {
+            if (br.getHttpConnection().getResponseCode() == 429) {
+                if (account != null) {
+                    /* Account should always be given */
+                    throw new AccountUnavailableException("Rate-Limit reached", 5 * 60 * 1000);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Rate-Limit reached");
+                }
+            }
+        }
+        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "ResponseCode:" + br.getHttpConnection().getResponseCode());
     }
 
     public static String getBestQualityURLAltAPI(final Map<String, Object> entries) {

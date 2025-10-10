@@ -172,7 +172,7 @@ public class JsonModification<TargetType, MatcherType> implements Storable {
         this.comment = comment;
     }
 
-    @StorableDoc("A int from -2147483648 to 2147483647. Modifications with higher priority are applied first.")
+    @StorableDoc("A int from -2147483648 to 2147483647. Modifications with higher priority override others.")
     private int priority = 0;
 
     public int getPriority() {

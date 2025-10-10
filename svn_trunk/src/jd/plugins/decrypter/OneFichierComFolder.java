@@ -44,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.OneFichierCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50875 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51634 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierComFolder extends PluginForDecrypt {
     public OneFichierComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,7 +96,7 @@ public class OneFichierComFolder extends PluginForDecrypt {
                 account = filteredAccounts.get(0);
             }
         }
-        if (OneFichierCom.canUseAPIForPremiumDownloads(account) && internal_allow_api_usage_in_crawler) {
+        if (account != null && OneFichierCom.canUseAPI(account) && internal_allow_api_usage_in_crawler) {
             /* Use premium API */
             return crawlAPI(param, account);
         } else {

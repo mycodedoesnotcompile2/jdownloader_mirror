@@ -57,15 +57,23 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.jna.windows.Kernel32Ext;
 import org.appwork.jna.windows.Rm;
 import org.appwork.jna.windows.RmProcessInfo;
 import org.appwork.jna.windows.User32Ext;
+import org.appwork.jna.windows.WinTrust;
 import org.appwork.jna.windows.Wtsapi32Ext;
 import org.appwork.jna.windows.interfaces.Advapi32Ext;
 import org.appwork.jna.windows.interfaces.ByHandleFileInformation;
@@ -88,6 +96,7 @@ import org.appwork.utils.processes.ProcessBuilderFactory;
 import org.appwork.utils.processes.ProcessOutput;
 
 import com.sun.jna.Memory;
+import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.StringArray;
 import com.sun.jna.Structure;
@@ -97,12 +106,18 @@ import com.sun.jna.platform.win32.AccCtrl;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.Advapi32Util.Account;
+import com.sun.jna.platform.win32.Crypt32;
+import com.sun.jna.platform.win32.Guid;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.Shell32;
 import com.sun.jna.platform.win32.W32Errors;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinBase;
+import com.sun.jna.platform.win32.WinCrypt;
+import com.sun.jna.platform.win32.WinCrypt.CERT_CONTEXT;
+import com.sun.jna.platform.win32.WinCrypt.DATA_BLOB;
+import com.sun.jna.platform.win32.WinCrypt.HCERTSTORE;
 import com.sun.jna.platform.win32.WinDef.BOOLByReference;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.DWORDByReference;
@@ -187,6 +202,7 @@ public class WindowsUtils {
         SYNCHRONIZE(WinNT.SYNCHRONIZE),
         @StorableDoc("Access system security.")
         ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY);
+
         public final int mask;
 
         private AccessPermission(int mask) {
@@ -277,6 +293,7 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
+
         public final String sid;
 
         private SID(String sid) {
@@ -419,7 +436,8 @@ public class WindowsUtils {
             access |= p.mask;
         }
         HashSet<AccessPermission> ret = new HashSet<AccessPermission>();
-        HANDLE h = Kernel32.INSTANCE.CreateFile(dirPath.getAbsolutePath(), access, WinNT.FILE_SHARE_READ | WinNT.FILE_SHARE_WRITE | WinNT.FILE_SHARE_DELETE, null, WinNT.OPEN_EXISTING, WinNT.FILE_FLAG_BACKUP_SEMANTICS, null);
+        HANDLE h = Kernel32.INSTANCE.CreateFile(dirPath.getAbsolutePath(), access, WinNT.FILE_SHARE_READ | WinNT.FILE_SHARE_WRITE | WinNT.FILE_SHARE_DELETE, null, WinNT.OPEN_EXISTING,
+                WinNT.FILE_FLAG_BACKUP_SEMANTICS, null);
         boolean hasAccess = !WinBase.INVALID_HANDLE_VALUE.equals(h);
         if (hasAccess) {
             Kernel32.INSTANCE.CloseHandle(h);
@@ -483,7 +501,8 @@ public class WindowsUtils {
             access |= p.mask;
         }
         ;
-        HANDLE h = Kernel32.INSTANCE.CreateFile(dirPath.getAbsolutePath(), access, WinNT.FILE_SHARE_READ | WinNT.FILE_SHARE_WRITE | WinNT.FILE_SHARE_DELETE, null, WinNT.OPEN_EXISTING, WinNT.FILE_FLAG_BACKUP_SEMANTICS, null);
+        HANDLE h = Kernel32.INSTANCE.CreateFile(dirPath.getAbsolutePath(), access, WinNT.FILE_SHARE_READ | WinNT.FILE_SHARE_WRITE | WinNT.FILE_SHARE_DELETE, null, WinNT.OPEN_EXISTING,
+                WinNT.FILE_FLAG_BACKUP_SEMANTICS, null);
         boolean hasAccess = !WinBase.INVALID_HANDLE_VALUE.equals(h);
         if (hasAccess) {
             try {
@@ -518,7 +537,8 @@ public class WindowsUtils {
 
     public static Account getFileOwnerSid(File path) {
         PointerByReference pOwnerSid = new PointerByReference();
-        int result = Advapi32.INSTANCE.GetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.OWNER_SECURITY_INFORMATION, pOwnerSid, null, null, null, new PointerByReference());
+        int result = Advapi32.INSTANCE.GetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.OWNER_SECURITY_INFORMATION, pOwnerSid, null, null, null,
+                new PointerByReference());
         if (result != WinError.ERROR_SUCCESS) {
             throw new Win32Exception(result);
         }
@@ -983,7 +1003,8 @@ public class WindowsUtils {
                     permissionGroups.add("READ");
                 }
                 // Check for basic write permissions
-                if (permissions.contains(AccessPermission.FILE_WRITE_DATA) || permissions.contains(AccessPermission.FILE_APPEND_DATA) || permissions.contains(AccessPermission.FILE_ADD_FILE) || permissions.contains(AccessPermission.FILE_ADD_SUBDIRECTORY) || permissions.contains(AccessPermission.FILE_WRITE_ATTRIBUTES)) {
+                if (permissions.contains(AccessPermission.FILE_WRITE_DATA) || permissions.contains(AccessPermission.FILE_APPEND_DATA) || permissions.contains(AccessPermission.FILE_ADD_FILE)
+                        || permissions.contains(AccessPermission.FILE_ADD_SUBDIRECTORY) || permissions.contains(AccessPermission.FILE_WRITE_ATTRIBUTES)) {
                     permissionGroups.add("WRITE");
                 }
                 // Check for basic execute permissions
@@ -1008,7 +1029,8 @@ public class WindowsUtils {
             // Create the overview line
             String overview = String.format("%s%s '%s' to '%s'", itseMe ? "*" : " ", allow ? "ALLOW" : "DENY ", new Joiner(",").join(permissionGroups), accountName);
             // Add detailed information
-            return String.format("%s | Details: {" + "sid='%s', " + "allow=%b, " + "permissions=%s, " + "inherited=%b, " + "inherit=%b, " + "inheritOnly=%b, " + "noPropagateInherit=%b, " + "objectInherit=%b, " + "containerInherit=%b" + "}", overview, sid, allow, permissions, inherited, inherit, inheritOnly, noPropagateInherit, objectInherit, containerInherit);
+            return String.format("%s | Details: {" + "sid='%s', " + "allow=%b, " + "permissions=%s, " + "inherited=%b, " + "inherit=%b, " + "inheritOnly=%b, " + "noPropagateInherit=%b, "
+                    + "objectInherit=%b, " + "containerInherit=%b" + "}", overview, sid, allow, permissions, inherited, inherit, inheritOnly, noPropagateInherit, objectInherit, containerInherit);
         }
 
         /**
@@ -1279,7 +1301,11 @@ public class WindowsUtils {
                         permissions.add(perm);
                     }
                 }
-                entries.add(aceHeader.AceType == WinNT.ACCESS_ALLOWED_ACE_TYPE ? AccessPermissionEntry.allow(sidString, permissions).inherited(inherited).inherit(inherit).inheritOnly(inheritOnly).noPropagateInherit(noPropagateInherit).objectInherit(objectInherit).containerInherit(containerInherit) : AccessPermissionEntry.deny(sidString, permissions).inherited(inherited).inherit(inherit).inheritOnly(inheritOnly).noPropagateInherit(noPropagateInherit).objectInherit(objectInherit).containerInherit(containerInherit));
+                entries.add(aceHeader.AceType == WinNT.ACCESS_ALLOWED_ACE_TYPE
+                        ? AccessPermissionEntry.allow(sidString, permissions).inherited(inherited).inherit(inherit).inheritOnly(inheritOnly).noPropagateInherit(noPropagateInherit)
+                                .objectInherit(objectInherit).containerInherit(containerInherit)
+                        : AccessPermissionEntry.deny(sidString, permissions).inherited(inherited).inherit(inherit).inheritOnly(inheritOnly).noPropagateInherit(noPropagateInherit)
+                                .objectInherit(objectInherit).containerInherit(containerInherit));
             }
         }
         return entries.toArray(new AccessPermissionEntry[0]);
@@ -1372,7 +1398,8 @@ public class WindowsUtils {
             PointerByReference pNewDacl = new PointerByReference();
             if (append) {
                 // get existing dacl
-                successOrException(Advapi32.INSTANCE.GetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.DACL_SECURITY_INFORMATION, null, null, pOldDacl, null, new PointerByReference()));
+                successOrException(Advapi32.INSTANCE.GetNamedSecurityInfo(path.getAbsolutePath(), AccCtrl.SE_OBJECT_TYPE.SE_FILE_OBJECT, WinNT.DACL_SECURITY_INFORMATION, null, null, pOldDacl, null,
+                        new PointerByReference()));
             }
             try {
                 // merge
@@ -1434,6 +1461,7 @@ public class WindowsUtils {
              * Application is critical to system operation
              */
             RmCritical(6);
+
             private final int value;
 
             ApplicationType(int value) {
@@ -1553,9 +1581,12 @@ public class WindowsUtils {
     /** All possible permissions */
     public static final Set<AccessPermission> PERMISSIONSET_FULL    = EnumSet.allOf(AccessPermission.class);
     /** Read-related permissions */
-    public static final Set<AccessPermission> PERMISSIONSET_READ    = EnumSet.of(AccessPermission.FILE_READ_DATA, AccessPermission.FILE_LIST_DIRECTORY, AccessPermission.FILE_READ_EA, AccessPermission.FILE_READ_ATTRIBUTES, AccessPermission.FILE_GENERIC_READ, AccessPermission.READ_CONTROL);
+    public static final Set<AccessPermission> PERMISSIONSET_READ    = EnumSet.of(AccessPermission.FILE_READ_DATA, AccessPermission.FILE_LIST_DIRECTORY, AccessPermission.FILE_READ_EA,
+            AccessPermission.FILE_READ_ATTRIBUTES, AccessPermission.FILE_GENERIC_READ, AccessPermission.READ_CONTROL);
     /** Write-related permissions */
-    public static final Set<AccessPermission> PERMISSIONSET_WRITE   = EnumSet.of(AccessPermission.FILE_WRITE_DATA, AccessPermission.FILE_APPEND_DATA, AccessPermission.FILE_ADD_FILE, AccessPermission.FILE_ADD_SUBDIRECTORY, AccessPermission.FILE_WRITE_EA, AccessPermission.FILE_WRITE_ATTRIBUTES, AccessPermission.FILE_GENERIC_WRITE, AccessPermission.WRITE_DAC, AccessPermission.WRITE_OWNER);
+    public static final Set<AccessPermission> PERMISSIONSET_WRITE   = EnumSet.of(AccessPermission.FILE_WRITE_DATA, AccessPermission.FILE_APPEND_DATA, AccessPermission.FILE_ADD_FILE,
+            AccessPermission.FILE_ADD_SUBDIRECTORY, AccessPermission.FILE_WRITE_EA, AccessPermission.FILE_WRITE_ATTRIBUTES, AccessPermission.FILE_GENERIC_WRITE, AccessPermission.WRITE_DAC,
+            AccessPermission.WRITE_OWNER);
     /** Execute-related permissions */
     public static final Set<AccessPermission> PERMISSIONSET_EXECUTE = EnumSet.of(AccessPermission.FILE_EXECUTE, AccessPermission.FILE_TRAVERSE, AccessPermission.FILE_GENERIC_EXECUTE);
     /** Delete-related permissions */
@@ -1796,10 +1827,6 @@ public class WindowsUtils {
         }
     }
 
-    public static void main(String[] args) {
-        System.out.println(getActiveConsoleAccount());
-    }
-
     public static void runViaWindowsScheduler(String binary, String workingDir, String sid, String... args) throws IOException, InterruptedException {
         String taskName = "TempAppWorkJavaTask_" + UniqueAlltimeID.next();
         LogV3.info("Launch via Scheduler: " + binary + "  " + Arrays.toString(args) + " in " + workingDir);
@@ -1943,4 +1970,114 @@ public class WindowsUtils {
         }
         return false;
     }
+
+    /**
+     * Verifies whether the given file has a valid and trusted Authenticode signature.
+     *
+     * @param filePath
+     *            the full path to the file
+     * @return true if the file has a valid digital signature; false otherwise
+     */
+    public static boolean verifySignature(File filePath) {
+        if (filePath == null) {
+            System.err.println("filePath is null");
+            return false;
+        }
+
+        File file = new File(filePath.getAbsolutePath());
+        if (!file.isFile()) {
+            System.err.println("❌ File not found: " + filePath);
+            return false;
+        }
+
+        WinTrust.WINTRUST_FILE_INFO fileInfo = new WinTrust.WINTRUST_FILE_INFO(file.getAbsolutePath());
+        WinTrust.WINTRUST_DATA trustData = new WinTrust.WINTRUST_DATA(fileInfo);
+        Guid.GUID action = WinTrust.WINTRUST_ACTION_GENERIC_VERIFY_V2;
+
+        int result = WinTrust.INSTANCE.WinVerifyTrust(null, action, trustData);
+
+        if (result == WinError.ERROR_SUCCESS) {
+            return true;
+        } else if (result == WinError.TRUST_E_NOSIGNATURE) {
+            System.err.println("⚠ No digital signature found.");
+        } else if (result == WinError.TRUST_E_BAD_DIGEST) {
+            System.err.println("⚠ Signature present but invalid.");
+        } else if (result == WinError.CERT_E_REVOKED) {
+            System.err.println("⚠ Certificate revoked.");
+        } else {
+            System.err.println("⚠ WinVerifyTrust failed, code: 0x" + Integer.toHexString(result));
+        }
+
+        return false;
+    }
+
+    /**
+     * Reads the certificate subject fields of the embedded Authenticode signature.
+     *
+     * @param file
+     *            signed executable file
+     * @return map of subject attributes (CN, O, C, etc.) or null if not found
+     */
+    public static Map<String, String> readCodeSignSignature(File file) throws InvalidNameException {
+        if (file == null || !file.isFile()) {
+            System.err.println("❌ Invalid file.");
+            return null;
+        }
+
+        // Create LPWSTR pointer for CryptQueryObject
+        char[] fileChars = Native.toCharArray(file.getAbsolutePath());
+        Pointer filePtr = new Memory((fileChars.length + 1L) * Native.WCHAR_SIZE);
+        filePtr.write(0, fileChars, 0, fileChars.length);
+
+        PointerByReference phCertStore = new PointerByReference();
+        PointerByReference phMsg = new PointerByReference();
+        PointerByReference ppvContext = new PointerByReference();
+
+        boolean ok = Crypt32.INSTANCE.CryptQueryObject(WinCrypt.CERT_QUERY_OBJECT_FILE, filePtr, WinCrypt.CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, WinCrypt.CERT_QUERY_FORMAT_FLAG_BINARY, 0,
+                new IntByReference(), new IntByReference(), new IntByReference(), phCertStore, phMsg, ppvContext);
+
+        if (!ok) {
+            int lastError = Kernel32.INSTANCE.GetLastError();
+            System.err.println("❌ CryptQueryObject failed, error: " + lastError);
+            return null;
+        }
+
+        HCERTSTORE hStore = new HCERTSTORE(phCertStore.getValue());
+        CERT_CONTEXT ctx = Crypt32.INSTANCE.CertEnumCertificatesInStore(hStore, null);
+        if (ctx == null) {
+            Crypt32.INSTANCE.CertCloseStore(hStore, 0);
+            return null;
+        }
+
+        try {
+            DATA_BLOB subjectBlob = ctx.pCertInfo.Subject;
+
+            int requiredChars = Crypt32.INSTANCE.CertNameToStr(WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, subjectBlob, WinCrypt.CERT_X500_NAME_STR, Pointer.NULL, 0);
+
+            if (requiredChars <= 1) {
+                return null;
+            }
+
+            Memory buffer = new Memory((long) requiredChars * Native.WCHAR_SIZE);
+            Crypt32.INSTANCE.CertNameToStr(WinCrypt.X509_ASN_ENCODING | WinCrypt.PKCS_7_ASN_ENCODING, subjectBlob, WinCrypt.CERT_X500_NAME_STR, buffer, requiredChars);
+
+            String subject = buffer.getWideString(0);
+            if (subject == null || subject.trim().length() == 0) {
+                return null;
+            }
+
+            Map<String, String> map = new LinkedHashMap<String, String>();
+            LdapName ldap = new LdapName(subject);
+            for (Iterator<?> it = ldap.getRdns().iterator(); it.hasNext();) {
+                Rdn rdn = (Rdn) it.next();
+                map.put(rdn.getType(), String.valueOf(rdn.getValue()));
+            }
+
+            return map;
+        } finally {
+            Crypt32.INSTANCE.CertFreeCertificateContext(ctx);
+            Crypt32.INSTANCE.CertCloseStore(hStore, 0);
+        }
+    }
+
 }
