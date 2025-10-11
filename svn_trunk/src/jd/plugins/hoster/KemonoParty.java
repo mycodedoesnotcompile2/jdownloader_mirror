@@ -21,12 +21,14 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.downloader.text.TextDownloader;
 
@@ -43,8 +45,10 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 51461 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51649 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -287,6 +291,32 @@ public class KemonoParty extends PluginForHost {
                 logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
             }
         }
+    }
+
+    @Override
+    public Downloadable newDownloadable(DownloadLink downloadLink, Browser br) {
+        return new DownloadLinkDownloadable(downloadLink, br) {
+            @Override
+            public long getLastModifiedTimestamp() {
+                /**
+                 * The last modified date they provide via last-modified header is the import date which is nothing that the user can really
+                 * make use of. <br>
+                 * The date in the last-modified header is the same date, you get via API in "post.added". <br>
+                 * We instead return the date when the content was published. <br>
+                 *
+                 */
+                final String publishedDateStr = getDownloadLink().getStringProperty(PROPERTY_DATE);
+                if (publishedDateStr == null) {
+                    /* Missing property */
+                    return super.getLastModifiedTimestamp();
+                } else if (!publishedDateStr.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}")) {
+                    /* Invalid format */
+                    return super.getLastModifiedTimestamp();
+                }
+                final long timestamp = TimeFormatter.getMilliSeconds(publishedDateStr, "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
+                return timestamp;
+            }
+        };
     }
 
     @Override

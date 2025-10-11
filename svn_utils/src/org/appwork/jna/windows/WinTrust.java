@@ -34,6 +34,9 @@
  * ==================================================================================================================================================== */
 package org.appwork.jna.windows;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
@@ -48,9 +51,8 @@ import com.sun.jna.win32.W32APIOptions;
  * Minimal WinTrust API mapping for WinVerifyTrust.
  */
 public interface WinTrust extends StdCallLibrary {
-    WinTrust  INSTANCE                          = Native.load("wintrust", WinTrust.class, W32APIOptions.UNICODE_OPTIONS);
-
-    Guid.GUID WINTRUST_ACTION_GENERIC_VERIFY_V2 = new Guid.GUID("{00AAC56B-CD44-11d0-8CC2-00C04FC295EE}");
+    final static WinTrust  INSTANCE                          = Native.load("wintrust", WinTrust.class, W32APIOptions.UNICODE_OPTIONS);
+    final static Guid.GUID WINTRUST_ACTION_GENERIC_VERIFY_V2 = new Guid.GUID("{00AAC56B-CD44-11d0-8CC2-00C04FC295EE}");
 
     int WinVerifyTrust(HWND hwnd, Guid.GUID pgActionID, WINTRUST_DATA pWinTrustData);
 
@@ -69,8 +71,8 @@ public interface WinTrust extends StdCallLibrary {
         }
 
         @Override
-        protected java.util.List getFieldOrder() {
-            java.util.List l = new java.util.ArrayList();
+        protected List<String> getFieldOrder() {
+            List<String> l = new ArrayList<String>();
             l.add("cbStruct");
             l.add("pcwszFilePath");
             l.add("hFile");
@@ -100,8 +102,8 @@ public interface WinTrust extends StdCallLibrary {
         }
 
         @Override
-        protected java.util.List getFieldOrder() {
-            java.util.List l = new java.util.ArrayList();
+        protected List<String> getFieldOrder() {
+            List<String> l = new ArrayList<String>();
             l.add("cbStruct");
             l.add("pPolicyCallbackData");
             l.add("pSIPClientData");
@@ -117,5 +119,4 @@ public interface WinTrust extends StdCallLibrary {
             return l;
         }
     }
-
 }

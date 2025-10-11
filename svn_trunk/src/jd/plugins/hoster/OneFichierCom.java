@@ -36,6 +36,34 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
+import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -66,35 +94,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.LinkcheckMode;
-import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 51643 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51647 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -198,7 +198,6 @@ public class OneFichierCom extends PluginForHost {
         }
         setPremiumAPIHeaders(br, apiKey);
     }
-
     /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
     // @Override
     // public LazyPlugin.FEATURE[] getFeatures() {
@@ -367,8 +366,9 @@ public class OneFichierCom extends PluginForHost {
                 // remove last "&"
                 sb.deleteCharAt(sb.length() - 1);
                 /**
-                 * This method is server side deprecated but we're still using it because: </br> 1. It is still working. </br> 2. It is the
-                 * only method that can be used to check multiple items with one request.
+                 * This method is server side deprecated but we're still using it because: </br>
+                 * 1. It is still working. </br>
+                 * 2. It is the only method that can be used to check multiple items with one request.
                  */
                 br.postPageRaw("https://" + this.getHost() + "/check_links.pl", sb.toString());
                 for (final DownloadLink link : links) {
@@ -778,8 +778,8 @@ public class OneFichierCom extends PluginForHost {
     }
 
     /**
-     * Access restricted by IP / only registered users / only premium users / only owner. </br> See here for all possible reasons (login
-     * required): https://1fichier.com/console/acl.pl
+     * Access restricted by IP / only registered users / only premium users / only owner. </br>
+     * See here for all possible reasons (login required): https://1fichier.com/console/acl.pl
      *
      * @throws PluginException
      */
@@ -830,7 +830,6 @@ public class OneFichierCom extends PluginForHost {
             }
             throw Exceptions.addSuppressed(website_login_fail, apiException);
         }
-
     }
 
     public AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
@@ -1466,8 +1465,8 @@ public class OneFichierCom extends PluginForHost {
 
     private String getDllinkPremiumAPI(final DownloadLink link, final Account account) throws Exception {
         /**
-         * 2019-04-05: At the moment there are no benefits for us when using this. </br> 2021-01-29: Removed this because if login/API is
-         * blocked because of "flood control" this won't work either!
+         * 2019-04-05: At the moment there are no benefits for us when using this. </br>
+         * 2021-01-29: Removed this because if login/API is blocked because of "flood control" this won't work either!
          */
         boolean checkFileInfoBeforeDownloadAttempt = false;
         if (checkFileInfoBeforeDownloadAttempt) {
@@ -1717,7 +1716,7 @@ public class OneFichierCom extends PluginForHost {
                 try {
                     String message = "<html>";
                     final String title;
-                    String language = System.getProperty("user.language").toLowerCase();
+                    final String language = System.getProperty("user.language").toLowerCase();
                     if ("de".equals(language)) {
                         title = "Information über unbekannten Kontotyp";
                         message += "<br>JDownloader konnte den Typ deines Kontos momentan nicht erkennen.";
@@ -1988,6 +1987,10 @@ public class OneFichierCom extends PluginForHost {
             final String apikey_help_url = plg.getAPILoginHelpURL();
             // Add account type dropdown
             add(new JLabel(translations.get(ACCOUNT_TYPE)));
+            /**
+             * Important developer information: If you edit the list down below, also check/update methods setAccount, getAccount and
+             * validateInputs
+             */
             accountTypeComboBox = new JComboBox(new String[] { translations.get(PREMIUM_API), translations.get(PREMIUM_GOLD_API), translations.get(PREMIUM_WEB), translations.get(PREMIUM_GOLD_WEB), translations.get(FREE_CDN), translations.get(FREE) });
             /* Select premium account as default value */
             accountTypeComboBox.setSelectedIndex(0);
@@ -2150,12 +2153,17 @@ public class OneFichierCom extends PluginForHost {
                     }
                 } else {
                     /* Website login */
-                    if (defaultAccount.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, 0) > 0) {
-                        /* Set account type selection on "Free Account with paid CDN credits" */
+                    /* Set account type selection depending on users' account type */
+                    if (plg.isGoldAccount(defaultAccount)) {
+                        accountTypeComboBox.setSelectedIndex(3);
+                    } else if (AccountType.PREMIUM == defaultAccount.getType()) {
                         accountTypeComboBox.setSelectedIndex(2);
+                    } else if (defaultAccount.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, 0) > 0) {
+                        /* Set account type selection on "Free Account with paid CDN credits" */
+                        accountTypeComboBox.setSelectedIndex(4);
                     } else {
                         /* Set account type selection on "Free Account" */
-                        accountTypeComboBox.setSelectedIndex(3);
+                        accountTypeComboBox.setSelectedIndex(5);
                     }
                 }
             } else {

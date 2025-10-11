@@ -26,6 +26,21 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -50,22 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51643 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51654 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -83,6 +83,8 @@ public class FileFactory extends PluginForHost {
         // blocking default UA
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("142.0"));
         br.setCookie(getHost(), "filefactory_relaunch", "seen");
+        br.setCookie(getHost(), "cookieConsent", "accepted");
+        br.setCookie(getHost(), "locale", "en_US.utf8");
         br.setFollowRedirects(true);
         return br;
     }
@@ -96,7 +98,7 @@ public class FileFactory extends PluginForHost {
 
     /** Returns true if this link shall be used with the older filefactory.com website accessible via classic.filefactory.com. */
     private boolean isClassicFile(final DownloadLink link) throws PluginException {
-        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */&& link.getPluginPatternMatcher().contains("classic.filefactory.com"));
+        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */ && link.getPluginPatternMatcher().contains("classic.filefactory.com"));
     }
 
     private String getContentURL(final DownloadLink link) throws PluginException {
@@ -187,7 +189,17 @@ public class FileFactory extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformationWebsite(null, link);
+        try {
+            return requestFileInformationWebsite(null, link);
+        } catch (PluginException e) {
+            switch (e.getLinkStatus()) {
+            case LinkStatus.ERROR_FILE_NOT_FOUND:
+                throw e;
+            default:
+                logger.log(e);
+                return AvailableStatus.TRUE;
+            }
+        }
     }
 
     private AvailableStatus requestFileInformationWebsite(final Account account, final DownloadLink link) throws Exception {
@@ -323,6 +335,9 @@ public class FileFactory extends PluginForHost {
             /* "Invalid Download Link" */
             if ("251".equals(error_code)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if ("258".equals(error_code)) {
+                /* https://www.filefactory.com/error.php?code=258 */
+                throw new AccountRequiredException();
             } else if ("257".equals(error_code)) {
                 /* https://www.filefactory.com/error.php?code=257 */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server Load Too High");
@@ -332,7 +347,11 @@ public class FileFactory extends PluginForHost {
                 // last download completed
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, errorDataMap != null ? StringUtils.valueOfOrNull(errorDataMap.get("message")) : null);
             } else if ("274".equals(error_code)) {
-                // unknown error happened
+                // File unavailable
+                /**
+                 * https://www.filefactory.com/error.php?code=274 <br>
+                 * This file cannot be downloaded at this time. Please let us know about this issue by using the contact link below.
+                 */
                 throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
             } else if ("300".equals(error_code)) {
                 /* Invalid folder link */
@@ -625,7 +644,8 @@ public class FileFactory extends PluginForHost {
                     accountType = AccountType.PREMIUM;
                 }
                 /**
-                 * Other possible values: </br> "expired" -> Free Account
+                 * Other possible values: </br>
+                 * "expired" -> Free Account
                  */
             }
             if (accountType == null) {
@@ -673,10 +693,9 @@ public class FileFactory extends PluginForHost {
             if (expireTimestamp > System.currentTimeMillis()) {
                 ai.setValidUntil(expireTimestamp);
             }
-
             // TODO: is this download quota?
             // <li class="tooltipster"
-            // title="TrafficShare: 0.00 KB / 1.00 TB<br>Data Packs: 0.00 KB / 0.00 KB<br><strong>Total:  0.00 KB / 1.00 TB</strong>">
+            // title="TrafficShare: 0.00 KB / 1.00 TB<br>Data Packs: 0.00 KB / 0.00 KB<br><strong>Total: 0.00 KB / 1.00 TB</strong>">
             final String traffic = br.getRegex("donoyet(.*?)xyz").getMatch(0);
             if (traffic != null) {
                 // OLD SHIT
@@ -969,20 +988,20 @@ public class FileFactory extends PluginForHost {
         final class NewWebsite {
             private Map<String, Object> checkLoginStatus(final Browser br, final Account account) throws IOException, PluginException, InterruptedException {
                 br.getPage(FileFactory.this.getWebapiBase() + "/auth/session");
-                if (br.getHttpConnection().getResponseCode() != 404) {
-                    try {
-                        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                        account.removeProperty(PROPERTY_CLASSIC);
-                        checkErrorsWebapi(br, account, null, entries);
-                        return entries;
-                    } catch (final JSonMapperException ignore) {
-                        logger.log(ignore);
-                    }
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    return null;
+                }
+                try {
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    account.removeProperty(PROPERTY_CLASSIC);
+                    checkErrorsWebapi(br, account, null, entries);
+                    return entries;
+                } catch (final JSonMapperException ignore) {
+                    logger.log(ignore);
                 }
                 return null;
             }
         }
-
         if (account.hasProperty(PROPERTY_CLASSIC)) {
             return new OldWebsite().checkLoginStatus(br, account);
         }

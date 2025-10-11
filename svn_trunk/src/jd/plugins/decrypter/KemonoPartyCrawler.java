@@ -57,7 +57,7 @@ import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51630 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51650 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -207,31 +207,37 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             final int numberofUniqueItemsOld = dupes.size();
             final int numberOfRetryPostsOld = retryWithSinglePostAPI.size();
             for (final Map<String, Object> post : posts) {
-                final ArrayList<DownloadLink> thisresults = this.crawlProcessPostAPI(post, dupes, useAdvancedDupecheck);
-                if (post.get("content") == null && StringUtils.isNotEmpty(StringUtils.valueOfOrNull(post.get("substring")))) {
-                    // posts api no longer returns full post content but only a substring, so we have to retry with post api
-                    final TextCrawlMode mode = cfg.getTextCrawlMode();
-                    if (cfg.isCrawlHttpLinksFromPostContent() || mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && thisresults.isEmpty())) {
+                if (true) {
+                    /* fetch all posts via single post api */
+                    retryWithSinglePostAPI.add(post.get("id").toString());
+                    continue;
+                } else {
+                    final ArrayList<DownloadLink> thisresults = this.crawlProcessPostAPI(post, dupes, useAdvancedDupecheck);
+                    if (post.get("content") == null && StringUtils.isNotEmpty(StringUtils.valueOfOrNull(post.get("substring")))) {
+                        // posts api no longer returns full post content but only a substring, so we have to retry with post api
+                        final TextCrawlMode mode = cfg.getTextCrawlMode();
+                        if (cfg.isCrawlHttpLinksFromPostContent() || mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && thisresults.isEmpty())) {
+                            retryWithSinglePostAPI.add(post.get("id").toString());
+                            logger.info("Need to process item:" + post.get("id") + " again due to maybe incomplete post content");
+                            // we have to skip and reprocess later, else duplicate check will prevent reprocessed files to be added
+                            continue;
+                        }
+                    }
+                    if (cfg.isCrawlHttpLinksFromPostContent() && post.get("embed") == null) {
+                        // posts api no longer returns embed entry, so we have to retry with post api
                         retryWithSinglePostAPI.add(post.get("id").toString());
-                        logger.info("Need to process item:" + post.get("id") + " again due to maybe incomplete post content");
+                        logger.info("Need to process item:" + post.get("id") + " again due to missing embed");
                         // we have to skip and reprocess later, else duplicate check will prevent reprocessed files to be added
                         continue;
                     }
-                }
-                if (cfg.isCrawlHttpLinksFromPostContent() && post.get("embed") == null) {
-                    // posts api no longer returns embed entry, so we have to retry with post api
-                    retryWithSinglePostAPI.add(post.get("id").toString());
-                    logger.info("Need to process item:" + post.get("id") + " again due to missing embed");
-                    // we have to skip and reprocess later, else duplicate check will prevent reprocessed files to be added
-                    continue;
-                }
-                for (final DownloadLink thisresult : thisresults) {
-                    if (!perPostPackageEnabled) {
-                        thisresult._setFilePackage(profileFilePackage);
+                    for (final DownloadLink thisresult : thisresults) {
+                        if (!perPostPackageEnabled) {
+                            thisresult._setFilePackage(profileFilePackage);
+                        }
                     }
+                    distribute(thisresults);
+                    ret.addAll(thisresults);
                 }
-                distribute(thisresults);
-                ret.addAll(thisresults);
             }
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + " |Retry posts so far: " + retryWithSinglePostAPI.size() + " |Offset: " + offset);
             final int numberofUniqueItemsNew = dupes.size();

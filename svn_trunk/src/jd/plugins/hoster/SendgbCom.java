@@ -16,10 +16,12 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.Map;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.Form;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -27,9 +29,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 47486 $", interfaceVersion = 3, names = { "sendgb.com" }, urls = { "https?://(?:www\\.)?sendgb\\.com/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51653 $", interfaceVersion = 3, names = { "sendgb.com" }, urls = { "https?://(?:www\\.)?sendgb\\.com/(?:upload/\\?utm_source=)?([A-Za-z0-9]+)" })
 public class SendgbCom extends PluginForHost {
     public SendgbCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -37,13 +40,19 @@ public class SendgbCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.sendgb.com/de/nutzungsbedingungen.html";
+        return "https://www." + getHost() + "/en/terms-of-use.html";
     }
 
     /* Connection stuff */
-    private final boolean FREE_RESUME       = false;
-    private final int     FREE_MAXCHUNKS    = 1;
-    private final int     FREE_MAXDOWNLOADS = -1;
+    private final boolean FREE_RESUME    = false;
+    private final int     FREE_MAXCHUNKS = 1;
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        ret.setCookie(getHost(), "l_code_3", "en");
+        return ret;
+    }
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -64,18 +73,21 @@ public class SendgbCom extends PluginForHost {
         link.setName(this.getFID(link) + ".zip");
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.getPage(link.getDownloadURL());
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("class=\"boo\\-wrapper\"")) {
+        br.getPage(link.getPluginPatternMatcher());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("class=\"boo\\-wrapper\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!this.canHandle(br.getURL())) {
             /* 2020-12-08: E.g. redirect to mainpage */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        // String filename = br.getRegex("<title>Download ([^<>\"]+)</title>").getMatch(0);
-        // if (filename == null) {
-        // filename = br.getRegex("").getMatch(0);
-        // }
-        final String filesize = br.getRegex("class=\"fa fa\\-cloud\\-download\"></i>([^<>\"]+)</div>").getMatch(0);
+        final String downloadData[] = br.getRegex("\"submitdownload\"\\s*data-id\\s*=\\s*\"(.*?)\"\\s*\\s*data-sc\\s*=\\s*\"(.*?)\"\\s*data-file\\s*=\\s*\"(.*?)\"\\s*data-private_id\\s*=\\s*\"(.*?)\"").getRow(0);
+        if (downloadData == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        link.setFinalFileName(Encoding.htmlDecode(downloadData[2]));
+        final String filesize = br.getRegex("Total files / Total size</div>\\s*\\d+\\s*/\\s*(.*?)\\s*<").getMatch(0);
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         }
@@ -89,31 +101,26 @@ public class SendgbCom extends PluginForHost {
     }
 
     private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks) throws Exception, PluginException {
-        final Form dlForm = br.getFormbyProperty("id", "downloadItems");
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlForm, resumable, maxchunks);
+        final String downloadData[] = br.getRegex("\"submitdownload\"\\s*data-id\\s*=\\s*\"(.*?)\"\\s*\\s*data-sc\\s*=\\s*\"(.*?)\"\\s*data-file\\s*=\\s*\"(.*?)\"\\s*data-private_id\\s*=\\s*\"(.*?)\"").getRow(0);
+        if (downloadData == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.getPage("/src/download_one.php?uploadId=" + downloadData[0] + "&sc=" + downloadData[1] + "&file=" + downloadData[2] + "&private_id=" + downloadData[3]);
+        final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (!Boolean.TRUE.equals(response.get("success"))) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String url = response.get("url").toString();
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, url, resumable, maxchunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            handleConnectionErrors(br, dl.getConnection());
         }
         dl.startDownload();
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51463 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51651 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
 public class ProLeechLink extends PluginForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -1069,6 +1069,12 @@ public class ProLeechLink extends PluginForHost {
                 apiAccountInvalid(account);
             case -5:
                 throw new AccountInvalidException("Free accounts are not supported");
+            case -4:
+                /* Website under maintenance */
+                /*
+                 * 2025-10-10: {"error":-4,"message":"Site is temporarily disabled for maintenance or JD2 disabled. We will be back soon."}
+                 */
+                throw new AccountUnavailableException(message, 30 * 60 * 1000);
             case -1:
                 /* {"error":-1,"message":"API key is invalid. Please update new API key https:\/\/proleech.link\/jdownloader."} */
                 apiAccountInvalid(account);
