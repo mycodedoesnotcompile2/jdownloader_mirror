@@ -47,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.JulesjordanCom;
 import jd.plugins.hoster.JulesjordanCom.JulesjordanComConfigInterface;
 
-@DecrypterPlugin(revision = "$Revision: 50564 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51661 $", interfaceVersion = 3, names = {}, urls = {})
 public class JulesjordanComDecrypter extends PluginForDecrypt {
     public JulesjordanComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,6 +61,7 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
         ret.add(new String[] { "theassfactory.com" });
         ret.add(new String[] { "spermswallowers.com" });
         ret.add(new String[] { "girlgirl.com" });
+        ret.add(new String[] { "auntjudysxxx.com" });
         return ret;
     }
 
@@ -150,7 +151,7 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
                     account.saveCookies(br.getCookies(br.getHost()), "");
                 }
             } else {
-                // refresh stored cookies
+                // login successful -> refresh stored cookies
                 account.saveCookies(br.getCookies(br.getHost()), "");
             }
         }
@@ -199,7 +200,7 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
     }
 
     public static boolean isNewDeviceProtectionActive(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*New Device or Location Detected")) {
+        if (br.containsHTML(">\\s*New Device or Location Detected")) {
             return true;
         } else {
             return false;
@@ -222,7 +223,9 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
         final String[] jsons = br.getRegex("(\\{ path:.*?\\});").getColumn(0);
         for (final String json : jsons) {
             final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
-            final String url = (String) entries.get("path");
+            String url = entries.get("path").toString();
+            /* Ensure we got an absolute URL, not a relative URL. */
+            url = br.getURL(url).toString();
             final String name = (String) entries.get("name");
             allQualities.put(name, url);
         }

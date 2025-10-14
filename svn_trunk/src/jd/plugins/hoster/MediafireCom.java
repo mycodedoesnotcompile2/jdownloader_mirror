@@ -23,6 +23,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -50,17 +60,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51212 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 51659 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -220,7 +220,8 @@ public class MediafireCom extends PluginForHost {
         final Map<String, Object> response = login(this.br, account, true);
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user_info = (Map<String, Object>) response.get("user_info");
-        final String isPremium = user_info.get("premium").toString();
+        final String isPremiumStr = user_info.get("premium").toString();
+        final boolean isPremium = StringUtils.equalsIgnoreCase(isPremiumStr, "yes");
         final Object used_storage_sizeO = user_info.get("used_storage_size");
         final Object bandwidthO = user_info.get("bandwidth");
         final String createDate = (String) user_info.get("created");
@@ -230,18 +231,22 @@ public class MediafireCom extends PluginForHost {
         if (used_storage_sizeO != null && used_storage_sizeO.toString().matches("\\d+")) {
             ai.setUsedSpace(Long.parseLong(used_storage_sizeO.toString()));
         }
-        if (StringUtils.equalsIgnoreCase(isPremium, "yes")) {
+        if (isPremium) {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(-1);
             account.setConcurrentUsePossible(true);
+            if (bandwidthO != null && bandwidthO.toString().matches("\\d+")) {
+                ai.setTrafficLeft(Long.parseLong(bandwidthO.toString()));
+            }
         } else {
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(10);
             account.setConcurrentUsePossible(true);
-        }
-        if (bandwidthO != null && bandwidthO.toString().matches("\\d+")) {
-            ai.setTrafficLeft(Long.parseLong(bandwidthO.toString()));
-        } else {
+            /**
+             * API may return a "bandwidth" value of 0 for free accounts but theoretically, free accounts do not have any traffic limit and
+             * we should still accept them so that users can download private files. <br>
+             * Free accounts do not have any specific traffic limits and if they do, the API does not seem to return them.
+             */
             ai.setUnlimitedTraffic();
         }
         return ai;
@@ -802,8 +807,9 @@ public class MediafireCom extends PluginForHost {
         /* 2020-06-29: Some files will have all information given bur are deleted if delete_date exists! */
         if (delete_date != null && delete_date.matches("\\d{4}-\\d{2}-\\d{2}.*")) {
             /**
-             * For files parsed in context of a folder: </br> We can't really be sure if the file is online until we actually try to
-             * download it but also in browser all files as part of folders look to be online when viewing folders.
+             * For files parsed in context of a folder: </br>
+             * We can't really be sure if the file is online until we actually try to download it but also in browser all files as part of
+             * folders look to be online when viewing folders.
              */
             link.setAvailableStatus(AvailableStatus.FALSE);
         } else {
@@ -864,7 +870,8 @@ public class MediafireCom extends PluginForHost {
         final String ipLimitReachedWaitSecondsStr = getIPLimitReachedSecondsStr(br);
         if (ipLimitReachedWaitSecondsStr != null) {
             /**
-             * E.g. <h2 class="MFUltraDialog-heading">Download Threshold Exceeded<span id="count_down"></span></h2>
+             * E.g.
+             * <h2 class="MFUltraDialog-heading">Download Threshold Exceeded<span id="count_down"></span></h2>
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Downloadlimit reached", Long.parseLong(ipLimitReachedWaitSecondsStr) * 1000);
         }

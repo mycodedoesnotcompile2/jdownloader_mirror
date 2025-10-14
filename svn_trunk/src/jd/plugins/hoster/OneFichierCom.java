@@ -94,7 +94,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51647 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51660 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -2082,12 +2082,12 @@ public class OneFichierCom extends PluginForHost {
             /* Normal username & password login */
             pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
             // Handle clipboard auto-fill
-            handleClipboardAutoFill(apikey_help_url_without_protocol);
+            handleClipboardAutoFill();
             // Set initial visibility
             updateVisibleComponents();
         }
 
-        private void handleClipboardAutoFill(String apikey_help_url_without_protocol) {
+        private void handleClipboardAutoFill() {
             final ExtTextField dummy = new ExtTextField();
             dummy.paste();
             final String clipboard = dummy.getText();

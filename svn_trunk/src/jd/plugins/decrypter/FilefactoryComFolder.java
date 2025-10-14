@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51653 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51663 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
@@ -121,17 +122,72 @@ public class FilefactoryComFolder extends PluginForDecrypt {
                     /* Empty folder */
                     throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
                 }
-                String folder_url_without_params = URLHelper.getUrlWithoutParams(br.getURL());
-                if (!folder_url_without_params.endsWith("/")) {
-                    folder_url_without_params += "/";
-                }
-                final String folderTitle = br.getRegex("<h1>Files in\\s*<span>([^<]+)</span>").getMatch(0);
+                /* Folder title is not available in CSV file thus to get it, we need to look into the html code of the older URL. */
+                String folderTitle = br.getRegex("<h1>Files in\\s*<span>([^<]+)</span>").getMatch(0);
                 final FilePackage fp = FilePackage.getInstance();
                 if (!StringUtils.isEmpty(folderTitle)) {
-                    fp.setName(Encoding.htmlDecode(folderTitle).trim());
+                    folderTitle = Encoding.htmlDecode(folderTitle).trim();
+                    fp.setName(folderTitle);
                 } else {
                     logger.warning("Failed to find folder title");
                     fp.setName(folder_id);
+                }
+                fp.setPackageKey(this.getHost() + "://folder/" + folder_id);
+                parse_folder_csv_export: {
+                    /* Try to extract folder information from CSV since this is the better source of data. */
+                    final String folderExportLink = br.getRegex("(/folder/" + folder_id + "/\\?export=1)").getMatch(0);
+                    if (folderExportLink == null) {
+                        logger.warning("CSV crawler: Cannot parse folder CSV export because: Failed to find folder export link");
+                        break parse_folder_csv_export;
+                    }
+                    try {
+                        final Browser brc = br.cloneBrowser();
+                        /* Allow unlimited size of CSV files. */
+                        brc.setLoadLimit(Integer.MAX_VALUE);
+                        brc.getPage(folderExportLink);
+                        final String exportName = getFileNameFromConnection(brc.getHttpConnection());
+                        if (!StringUtils.endsWithCaseInsensitive(exportName, ".csv") || brc.getHttpConnection().getResponseCode() != 200) {
+                            logger.warning("CSV crawler: csv export failed");
+                            break parse_folder_csv_export;
+                        }
+                        final String csvContent = brc.getRequest().getHtmlCode();
+                        // Split by line breaks
+                        final String[] lines = csvContent.split("\\r?\\n");
+                        /* Validate CSV integrity by checking for the expected CSV headers. */
+                        final List<String> header = Arrays.asList(parseCsvLine(lines[0]));
+                        final int filenameIndex = header.indexOf("filename");
+                        final int sizeIndex = header.indexOf("size");
+                        final int urlIndex = header.indexOf("url");
+                        if (filenameIndex == -1 || sizeIndex == -1 || urlIndex == -1) {
+                            logger.warning("CSV crawler: cannot find all required columns in csv");
+                            break parse_folder_csv_export;
+                        }
+                        for (int i = 1; i < lines.length; i++) { // Start at 1 to skip CSV header
+                            final String line = lines[i];
+                            final String[] data = parseCsvLine(line);
+                            final String filename = data[filenameIndex];
+                            final String sizeBytesStr = data[sizeIndex];
+                            // final String createdDate = data[2];
+                            final String url = data[urlIndex];
+                            final DownloadLink link = this.createDownloadlink(url);
+                            link.setFinalFileName(filename);
+                            link.setVerifiedFileSize(Long.parseLong(sizeBytesStr));
+                            link._setFilePackage(fp);
+                            link.setAvailable(true);
+                            ret.add(link);
+                        }
+                        logger.info("CSV crawler: Success!");
+                        return ret;
+                    } catch (Exception e) {
+                        logger.log(e);
+                        logger.info("CSV crawler: Failed!");
+                        break parse_folder_csv_export;
+                    }
+                }
+                /* Base URL needed for pagination. */
+                String folder_url_without_params = URLHelper.getUrlWithoutParams(br.getURL());
+                if (!folder_url_without_params.endsWith("/")) {
+                    folder_url_without_params += "/";
                 }
                 int pageMax = 1;
                 final HashSet<String> dupes = new HashSet<String>();
@@ -296,6 +352,44 @@ public class FilefactoryComFolder extends PluginForDecrypt {
             }
         }
         return ret;
+    }
+
+    /**
+     * Parses a CSV line correctly - handles quotes, commas, and escaped quotes within quoted values Java 1.6 compatible version
+     *
+     * CSV escape rules: - Fields with commas or quotes are wrapped in quotes: "value" - Quotes inside quoted fields are escaped by doubling
+     * them: ""
+     *
+     * Example: "File with ""quotes"" in name.zip" represents: File with "quotes" in name.zip
+     */
+    private static String[] parseCsvLine(String line) {
+        List<String> result = new ArrayList<String>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                // Check if this is an escaped quote ("")
+                if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    // Escaped quote: add one quote to output and skip the next one
+                    current.append('"');
+                    i++; // Skip next quote
+                } else {
+                    // Toggle quote mode (start or end of quoted field)
+                    inQuotes = !inQuotes;
+                }
+            } else if (c == ',' && !inQuotes) {
+                // Comma outside quotes = new field
+                result.add(current.toString());
+                current = new StringBuilder();
+            } else {
+                // Regular character
+                current.append(c);
+            }
+        }
+        // Add last field
+        result.add(current.toString());
+        return result.toArray(new String[result.size()]);
     }
 
     private String generateSingleFileLink(final String file_id, final String filename) {

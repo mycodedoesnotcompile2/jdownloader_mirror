@@ -54,7 +54,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SpankBangCom;
 
-@DecrypterPlugin(revision = "$Revision: 48480 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51658 $", interfaceVersion = 2, names = {}, urls = {})
 public class SpankBangComCrawler extends PluginForDecrypt {
     public SpankBangComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,6 +128,9 @@ public class SpankBangComCrawler extends PluginForDecrypt {
             /* Login whenever account is available so we can e.g. handle private videos too. */
             plugin.login(account, false);
         }
+        if (false) {
+            br.getPage("https://" + getHost() + "/lang/www");// change to language, stored in session, cookies alone are not enough
+        }
         if (param.getCryptedUrl().matches(PATTERN_PLAYLIST)) {
             return this.crawlPlaylist(param);
         } else {
@@ -140,6 +143,11 @@ public class SpankBangComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.getPage(param.getCryptedUrl());
         this.checkErrors(br);
+        final String canonical = br.getRegex("rel\\s*=\\s*\"canonical\"\\s*href\\s*=\\s*\"(https?://(\\w+\\.)?spankbang.com/[a-z0-9\\-]+/(video|embed/playlist)/.*?)\"").getMatch(0);
+        if (canonical != null && canHandle(canonical) && !canonical.matches(PATTERN_PLAYLIST)) {
+            br.getPage(canonical);
+            return this.parseCrawlSingleVideo(br);
+        }
         /* We can't know what we get solely based on URL structure. */
         if (this.isSingleVideo(br)) {
             return this.parseCrawlSingleVideo(br);
@@ -153,9 +161,12 @@ public class SpankBangComCrawler extends PluginForDecrypt {
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(playlistSlug);
-            final String totalNumberofItemsStr = br.getRegex("(?i)records in total\\s*<b>(\\d+)").getMatch(0);
+            String totalNumberofItemsStr = br.getRegex("(?i)records in total\\s*<b>(\\d+)").getMatch(0);
             if (totalNumberofItemsStr == null) {
-                logger.warning("Failed to find totalNumberofItems");
+                totalNumberofItemsStr = br.getRegex("(?i)>\\s*(\\d+)\\s*videos\\s*<").getMatch(0);
+                if (totalNumberofItemsStr == null) {
+                    logger.warning("Failed to find totalNumberofItems");
+                }
             }
             final HashSet<String> dupes = new HashSet<String>();
             int page = 1;
@@ -225,7 +236,7 @@ public class SpankBangComCrawler extends PluginForDecrypt {
                 }
             }
         }
-        String username = br.getRegex("<a href=\"/profile/([^/\"]+)\" class=\"ul\"><svg class=\"i_svg i_user\"").getMatch(0);
+        String username = br.getRegex("<a href=\"/profile/([^/\"]+)\" class=\"ul\">\\s*<svg class=\"i_svg i_(new-ui-)?user\"").getMatch(0);
         if (title == null) {
             title = br._getURL().getPath();
         }

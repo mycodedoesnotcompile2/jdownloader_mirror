@@ -65,7 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51654 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51662 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -191,11 +191,18 @@ public class FileFactory extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         try {
             return requestFileInformationWebsite(null, link);
-        } catch (PluginException e) {
+        } catch (final PluginException e) {
             switch (e.getLinkStatus()) {
             case LinkStatus.ERROR_FILE_NOT_FOUND:
                 throw e;
+            case LinkStatus.ERROR_PLUGIN_DEFECT:
+                throw e;
             default:
+                /**
+                 * Ignore exception since we know that the file is online. <br>
+                 * This is especially for file items with errors 257 and 258 so that they get correctly displayed as online during available
+                 * check.
+                 */
                 logger.log(e);
                 return AvailableStatus.TRUE;
             }
@@ -331,13 +338,14 @@ public class FileFactory extends PluginForHost {
         }
         if (Boolean.FALSE.equals(userIsPremium) && Boolean.TRUE.equals(requiresPremium)) {
             throw new AccountRequiredException();
-        } else if (error_code != null) {
+        }
+        if (error_code != null) {
             /* "Invalid Download Link" */
             if ("251".equals(error_code)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if ("258".equals(error_code)) {
                 /* https://www.filefactory.com/error.php?code=258 */
-                throw new AccountRequiredException();
+                throw new AccountRequiredException("The owner of this file has restricted it to members with a Premium Account. Please purchase a Premium account in order to download this file.");
             } else if ("257".equals(error_code)) {
                 /* https://www.filefactory.com/error.php?code=257 */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server Load Too High");
@@ -355,6 +363,9 @@ public class FileFactory extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, error_code);
             } else if ("300".equals(error_code)) {
                 /* Invalid folder link */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if ("325".equals(error_code)) {
+                /* Invalid Share Link e.g. https://www.filefactory.com/share/fi:xxxyyy */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if ("FILE_NOT_FOUND".equals(error_code)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -387,8 +398,7 @@ public class FileFactory extends PluginForHost {
         }
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account == null) {
-            // logger.info("Login impossible -> Cannot use mass-linkchecking");
-            return false;
+            return checkLinks_old_public(urls);
         }
         if (account.hasProperty(PROPERTY_CLASSIC)) {
             return this.checkLinks_old(urls, account);
@@ -414,20 +424,12 @@ public class FileFactory extends PluginForHost {
                     }
                     final DownloadLink link = urls[index];
                     final String fid = getFUID(link);
+                    this.setFallbackFilename(link, fid);
                     links.put(fid, link);
                     index++;
                 }
                 sb.delete(0, sb.capacity());
                 for (final DownloadLink link : links.values()) {
-                    if (!link.isNameSet()) {
-                        /* Set fallback name */
-                        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
-                        if (filenameFromURL != null) {
-                            link.setName(filenameFromURL);
-                        } else {
-                            link.setName(this.getFUID(link));
-                        }
-                    }
                     if (sb.length() > 0) {
                         sb.append("\n");
                     }
@@ -478,10 +480,6 @@ public class FileFactory extends PluginForHost {
         if (urls == null || urls.length == 0) {
             return false;
         }
-        if (account == null) {
-            // logger.info("Login impossible -> Cannot use mass-linkchecking");
-            return false;
-        }
         final Browser br = this.createNewBrowserInstance();
         try {
             loginWebsite(br, account, false);
@@ -506,6 +504,7 @@ public class FileFactory extends PluginForHost {
                 }
                 sb.delete(0, sb.capacity());
                 for (final DownloadLink link : links) {
+                    this.setFallbackFilename(link, null);
                     if (sb.length() > 0) {
                         sb.append("\r\n");
                     }
@@ -525,19 +524,10 @@ public class FileFactory extends PluginForHost {
                 }
                 for (final DownloadLink link : links) {
                     final String fileID = getFUID(link);
-                    if (!link.isNameSet()) {
-                        /* Set fallback name */
-                        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
-                        if (filenameFromURL != null) {
-                            link.setName(URLEncode.decodeURIComponent(filenameFromURL));
-                        } else {
-                            link.setName(fileID);
-                        }
-                    }
                     /* Search html snippet belonging to the link we are working on to determine online status. */
                     String filehtml = null;
                     for (final String trElement : trElements) {
-                        if (new Regex(trElement, ">\\s*(" + Pattern.quote(fileID) + ".*?</small>\\s*</span>)").getMatch(0) != null) {
+                        if (new Regex(trElement, ">\\s*(" + fileID + ".*?</small>\\s*</span>)").getMatch(0) != null) {
                             filehtml = trElement;
                             break;
                         }
@@ -580,6 +570,112 @@ public class FileFactory extends PluginForHost {
             return false;
         }
         return true;
+    }
+
+    /* Checks links in batches without the need to be logged in. */
+    private boolean checkLinks_old_public(final DownloadLink[] urls) {
+        if (urls == null || urls.length == 0) {
+            return false;
+        }
+        final Browser br = this.createNewBrowserInstance();
+        try {
+            final StringBuilder sb = new StringBuilder();
+            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            int index = 0;
+            while (true) {
+                links.clear();
+                while (true) {
+                    if (index == urls.length || links.size() == 100) {
+                        break;
+                    } else {
+                        links.add(urls[index]);
+                        index++;
+                    }
+                }
+                sb.delete(0, sb.capacity());
+                for (final DownloadLink link : links) {
+                    final String fid = this.getFUID(link);
+                    setFallbackFilename(link, fid);
+                    if (sb.length() > 0) {
+                        sb.append(",");
+                    }
+                    sb.append("fi:" + fid);
+                }
+                br.getPage("https://www." + getHost() + "/share/" + sb.toString());
+                try {
+                    this.checkErrorsWebsite(null, null, br);
+                } catch (final Exception e) {
+                    /* e.g. https://www.filefactory.com/error.php?code=325 -> "Invalid Share Link" */
+                    logger.log(e);
+                    return false;
+                }
+                final String trElements[] = br.getRegex("<tr id=\"row_[a-z0-9]*\">(.*?)</tr>").getColumn(0);
+                if (trElements == null || trElements.length == 0) {
+                    logger.warning("Mass linkcheck failed");
+                    return false;
+                }
+                int numberof_offline_items = 0;
+                for (final DownloadLink link : links) {
+                    final String fid = getFUID(link);
+                    /* Search html snippet belonging to the link we are working on to determine online status. */
+                    String filehtml = null;
+                    for (final String trElement : trElements) {
+                        if (trElement.contains("/file/" + fid)) {
+                            filehtml = trElement;
+                            break;
+                        }
+                    }
+                    if (filehtml == null) {
+                        /* Assume that this item is offline */
+                        link.setAvailable(false);
+                        numberof_offline_items++;
+                    } else {
+                        /* Find file information */
+                        /* 2025-10-09: File size unit starts from "KB", there is no "bytes". */
+                        final String filesizeStr = new Regex(filehtml, ">\\s*Size:\\s*([\\d\\.]+\\s*(KB|MB|GB|TB))").getMatch(0);
+                        if (filesizeStr != null) {
+                            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                        }
+                        String filenameFromHTML = new Regex(filehtml, "/file/" + fid + "/([^/\"]+)").getMatch(0);
+                        if (filenameFromHTML != null) {
+                            filenameFromHTML = Encoding.htmlDecode(filenameFromHTML).trim();
+                            link.setName(filenameFromHTML);
+                        }
+                        /* Assume that item is online */
+                        link.setAvailable(true);
+                    }
+                }
+                if (numberof_offline_items == links.size()) {
+                    /* html contains id="row_" exactly the number of times we have links -> All items are offline / invalid file_id. */
+                    logger.info("All items of the current batch of links are offline -> Possible website shows a table with dummy items, all with a file size of '0.00 KB'");
+                }
+                if (index == urls.length) {
+                    break;
+                }
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            return false;
+        }
+        return true;
+    }
+
+    private void setFallbackFilename(final DownloadLink link, String fileID) {
+        if (link.isNameSet()) {
+            /* Do nothing */
+            return;
+        }
+        /* Set fallback name */
+        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
+        if (filenameFromURL != null) {
+            link.setName(URLEncode.decodeURIComponent(filenameFromURL));
+            return;
+        }
+        /* Final fallback */
+        if (fileID == null) {
+            fileID = this.getFUID(link);
+        }
+        link.setName(fileID);
     }
 
     @Override

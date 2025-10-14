@@ -15,7 +15,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -35,8 +38,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51542 $", interfaceVersion = 2, names = { "winporn.com", "proporn.com", "vivatube.com", "tubeon.com", "viptube.com", "hd21.com", "iceporn.com", "nuvid.com", "yeptube.com" }, urls = { "https?://(?:(?:www|m)\\.)?winporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?proporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?vivatube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?tubeon\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?viptube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?hd21\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?iceporn\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?", "https?://(?:(?:www|m)\\.)?nuvid\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?",
-        "https?://(?:(?:www|m)\\.)?yeptube\\.com/(?:[a-z]{2}/)?video/\\d+(?:/[a-z0-9\\-]+)?" })
+@HostPlugin(revision = "$Revision: 51660 $", interfaceVersion = 2, names = {}, urls = {})
 public class UnknownPornScript9 extends PluginForHost {
     public UnknownPornScript9(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,6 +54,45 @@ public class UnknownPornScript9 extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+    }
+
+    private static final Pattern TYPE_NORMAL = Pattern.compile("/(?:[a-z]{2}/)?video/(\\d+)(/([a-z0-9-]+))?", Pattern.CASE_INSENSITIVE);
+    /* 2025-10-13: e.g. available for: viptube.com, iceporn.com, nuvid.com */
+    private static final Pattern TYPE_EMBED  = Pattern.compile("/embed/(\\d+)", Pattern.CASE_INSENSITIVE);
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "winporn.com" });
+        ret.add(new String[] { "proporn.com" });
+        ret.add(new String[] { "vivatube.com" });
+        ret.add(new String[] { "tubeon.com" });
+        ret.add(new String[] { "viptube.com" });
+        ret.add(new String[] { "hd21.com" });
+        ret.add(new String[] { "iceporn.com" });
+        ret.add(new String[] { "nuvid.com" });
+        ret.add(new String[] { "yeptube.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_NORMAL.pattern() + "|" + TYPE_EMBED.pattern() + ")");
+        }
+        return ret.toArray(new String[0]);
     }
 
     /* Similar sites but they use a different 'player_config' URL: drtuber.com, viptube.com */
@@ -76,7 +117,12 @@ public class UnknownPornScript9 extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "/video/(\\d+)").getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), TYPE_NORMAL).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(link.getPluginPatternMatcher(), TYPE_EMBED).getMatch(0);
+        return fid;
     }
 
     /** Items with different FUIDs but same filenames should not get treated as mirrors! */
@@ -107,7 +153,15 @@ public class UnknownPornScript9 extends PluginForHost {
         } else if (br.containsHTML("class=\"notifications__item notifications__item-error\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String url_title = new Regex(br.getURL(), "/([a-z0-9_-]+)$").getMatch(0);
+        String url_title = new Regex(br.getURL(), TYPE_NORMAL).getMatch(2);
+        if (new Regex(br.getURL(), TYPE_EMBED).patternFind()) {
+            /* Find better fallback filename for embed URLs e.g. iceporn.com */
+            String original_url = br.getRegex("target_url=(http[^&]+)").getMatch(0);
+            if (original_url != null) {
+                original_url = Encoding.htmlDecode(original_url);
+                url_title = new Regex(original_url, TYPE_NORMAL).getMatch(2);
+            }
+        }
         final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
         final boolean fetchDirecturlOnlyOnDownload = true;
         String title = null;
@@ -143,10 +197,7 @@ public class UnknownPornScript9 extends PluginForHost {
                 final Map<String, Object> map = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 // final long has_hq = JavaScriptEngineFactory.toLong(map.get("has_hq"), 1);
                 /* Most reliable way to find filename */
-                String filename = (String) map.get("title");
-                if (filename == null) {
-                    filename = url_title;
-                }
+                title = (String) map.get("title");
                 /* Prefer hq */
                 dllink = (String) JavaScriptEngineFactory.walkJson(map, "files/hq");
                 if (dllink == null) {
@@ -155,11 +206,22 @@ public class UnknownPornScript9 extends PluginForHost {
             }
         }
         if (title == null) {
-            title = url_title.replace("-", " ").trim();
+            if (url_title != null) {
+                /* Prefer title from url */
+                title = url_title.replace("-", " ").trim();
+            } else {
+                title = br.getRegex("<title>([^<]+)").getMatch(0);
+            }
         }
         final String ext = getFileNameExtensionFromString(dllink, extDefault);
-        final String filename = Encoding.htmlDecode(title).trim() + ext;
-        link.setFinalFileName(Encoding.htmlDecode(title).trim() + ext);
+        String filename = null;
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            /* Apply some small corrections e.g. for embed links from: iceporn.com, viptube.com, nuvid.com */
+            title = title.replaceFirst("(?i) - Free Porn Videos, Sex Movies\\. " + Pattern.quote(br.getHost(false)), "");
+            filename = title + ext;
+        }
+        link.setFinalFileName(filename);
         if (!isDownload && dllink != null && !link.isSizeSet()) {
             this.basicLinkCheck(br, br.createGetRequest(this.dllink), link, filename, ext);
         }
@@ -172,7 +234,7 @@ public class UnknownPornScript9 extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (link.getDownloadURL().contains("iceporn") || link.getDownloadURL().contains("viptube")) {
+        if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "iceporn") || StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "viptube")) {
             free_maxchunks = 1; // https://svn.jdownloader.org/issues/84428, /84735
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);

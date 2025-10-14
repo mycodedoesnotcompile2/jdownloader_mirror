@@ -25,6 +25,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -49,18 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 51610 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51658 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,7 +104,6 @@ public class SankakucomplexCom extends PluginForHost {
     public static final String   PROPERTY_EXT_HINT                     = "ext_hint";
     private final String         TIMESTAMP_LAST_TIME_FILE_MAYBE_BROKEN = "timestamp_last_time_file_maybe_broken";
     private static final String  PROPERTY_ACCOUNT_ACCESS_TOKEN         = "access_token";
-
     private static final String  PROPERTY_API_ACCESS_TOKEN             = "api_token";
     private static final String  PROPERTY_API_REFRESH_TOKEN            = "api_refresh";
     /* 2024-04-26: Refresh-token is currently not used. */
@@ -347,7 +346,7 @@ public class SankakucomplexCom extends PluginForHost {
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
         if (account != null) {
-            final String accessToken = getAPIToken(account);
+            final String accessToken = getAPIAccessToken(account);
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + accessToken);
         }
         return request;
@@ -517,8 +516,8 @@ public class SankakucomplexCom extends PluginForHost {
 
     private static void prepareDownloadHeaders(final Browser br) {
         /**
-         * 2024-11-12: Do not send a referer header! </br> This is really important else we may get redirected to a dummy image. Looks to be
-         * some kind of pseudo protection.
+         * 2024-11-12: Do not send a referer header! </br>
+         * This is really important else we may get redirected to a dummy image. Looks to be some kind of pseudo protection.
          */
         br.getHeaders().put("Referer", "");
         // br.setCurrentURL(null);
@@ -548,8 +547,8 @@ public class SankakucomplexCom extends PluginForHost {
         final String errortext = "Broken or temporarily unavailable file";
         if (System.currentTimeMillis() - timestampLastTimeFileMaybeBroken <= 5 * 60 * 1000l) {
             /**
-             * Failed again in a short time even with fresh direct URL: </br> Wait longer time before retry as we've just recently tried and
-             * it failed again.
+             * Failed again in a short time even with fresh direct URL: </br>
+             * Wait longer time before retry as we've just recently tried and it failed again.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext, 5 * 60 * 1000l);
         } else {
@@ -603,13 +602,13 @@ public class SankakucomplexCom extends PluginForHost {
                     return false;
                 }
                 br.getPage(logincheckurl);
-                if (isLoggedin(br)) {
-                    logger.info("Cookie login successful");
+                if (isLoggedin(br) && getStoredValidAccountAccessToken(account) != null && getStoredValidAPIAccessToken(account) != null) {
+                    logger.info("Cookie and Token login successful");
                     /* Refresh cookie timestamp */
                     account.saveCookies(br.getCookies(br.getHost()), "");
                     return true;
                 } else {
-                    logger.info("Cookie login failed");
+                    logger.info("Cookie or Token login failed");
                     br.clearCookies(null);
                     account.clearCookies("");
                 }
@@ -699,10 +698,41 @@ public class SankakucomplexCom extends PluginForHost {
         }
     }
 
-    public String getAPIToken(Account account) throws Exception {
+    public String getStoredValidAPIAccessToken(Account account) {
         synchronized (account) {
             final String ret = account.getStringProperty(PROPERTY_API_ACCESS_TOKEN);
             if (isTokenValid(ret)) {
+                return ret;
+            }
+            return null;
+        }
+    }
+
+    public String getStoredValidAccountAccessToken(Account account) {
+        synchronized (account) {
+            final String ret = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
+            if (isTokenValid(ret)) {
+                return ret;
+            }
+            return null;
+        }
+    }
+
+    public String getAccountAccessToken(Account account) throws Exception {
+        synchronized (account) {
+            final String ret = getStoredValidAccountAccessToken(account);
+            if (ret != null) {
+                return ret;
+            }
+            login(account, true);
+            return account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
+        }
+    }
+
+    public String getAPIAccessToken(Account account) throws Exception {
+        synchronized (account) {
+            final String ret = getStoredValidAPIAccessToken(account);
+            if (ret != null) {
                 return ret;
             }
             return refreshAPIToken(account);
@@ -711,7 +741,7 @@ public class SankakucomplexCom extends PluginForHost {
 
     protected Map<String, Object> getAPIAccountDetails(Account account) throws Exception {
         synchronized (account) {
-            final String apiToken = getAPIToken(account);
+            final String apiToken = getAPIAccessToken(account);
             final Browser brc = createNewBrowserInstance();
             final GetRequest request = brc.createGetRequest("https://sankakuapi.com/users/me?lang=en");
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
@@ -730,7 +760,7 @@ public class SankakucomplexCom extends PluginForHost {
         synchronized (account) {
             final Browser brc = createNewBrowserInstance();
             final Map<String, Object> json = new HashMap<String, Object>();
-            json.put("access_token", getAccountToken(account));
+            json.put("access_token", getAccountAccessToken(account));
             json.put("client_id", "sankaku-web-app");
             json.put("url", "https://www.sankakucomplex.com");
             final PostRequest request = brc.createJSonPostRequest("https://sankakuapi.com/sso/token-exchange?lang=en", json);
@@ -749,17 +779,6 @@ public class SankakucomplexCom extends PluginForHost {
             account.setProperty(PROPERTY_API_ACCESS_TOKEN, api_access_token);
             account.setProperty(PROPERTY_API_REFRESH_TOKEN, api_refresh_token);
             return api_access_token;
-        }
-    }
-
-    public String getAccountToken(Account account) throws Exception {
-        synchronized (account) {
-            final String ret = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
-            if (isTokenValid(ret)) {
-                return ret;
-            }
-            login(account, true);
-            return account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
         }
     }
 

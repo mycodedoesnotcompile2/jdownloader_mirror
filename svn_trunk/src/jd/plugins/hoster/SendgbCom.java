@@ -18,10 +18,14 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -29,10 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 51653 $", interfaceVersion = 3, names = { "sendgb.com" }, urls = { "https?://(?:www\\.)?sendgb\\.com/(?:upload/\\?utm_source=)?([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51662 $", interfaceVersion = 3, names = { "sendgb.com" }, urls = { "https?://(?:www\\.)?sendgb\\.com/(?:upload/\\?utm_source=)?([A-Za-z0-9]+)" })
 public class SendgbCom extends PluginForHost {
     public SendgbCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +71,11 @@ public class SendgbCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        link.setName(this.getFID(link) + ".zip");
+        final String fid = this.getFID(link);
+        if (!link.isSizeSet()) {
+            /* Set default filename. Mimic names that user would get when downloading .zip files via browser. */
+            link.setName("sendgb-" + fid + ".zip");
+        }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
@@ -78,18 +83,20 @@ public class SendgbCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("class=\"boo\\-wrapper\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!this.canHandle(br.getURL())) {
+        } else if (!br.getURL().contains(fid)) {
             /* 2020-12-08: E.g. redirect to mainpage */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String downloadData[] = br.getRegex("\"submitdownload\"\\s*data-id\\s*=\\s*\"(.*?)\"\\s*\\s*data-sc\\s*=\\s*\"(.*?)\"\\s*data-file\\s*=\\s*\"(.*?)\"\\s*data-private_id\\s*=\\s*\"(.*?)\"").getRow(0);
-        if (downloadData == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (downloadData != null) {
+            // single file downloads
+            link.setFinalFileName(Encoding.htmlDecode(downloadData[2].trim()));
         }
-        link.setFinalFileName(Encoding.htmlDecode(downloadData[2]));
-        final String filesize = br.getRegex("Total files / Total size</div>\\s*\\d+\\s*/\\s*(.*?)\\s*<").getMatch(0);
+        final String filesize = br.getRegex("Total files / Total size[^<]*</div>\\s*\\d+\\s*/\\s*(.*?)\\s*<").getMatch(0);
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -101,18 +108,31 @@ public class SendgbCom extends PluginForHost {
     }
 
     private void doFree(final DownloadLink link, final boolean resumable, final int maxchunks) throws Exception, PluginException {
-        final String downloadData[] = br.getRegex("\"submitdownload\"\\s*data-id\\s*=\\s*\"(.*?)\"\\s*\\s*data-sc\\s*=\\s*\"(.*?)\"\\s*data-file\\s*=\\s*\"(.*?)\"\\s*data-private_id\\s*=\\s*\"(.*?)\"").getRow(0);
-        if (downloadData == null) {
+        startDownload: {
+            final String downloadData[] = br.getRegex("\"submitdownload\"\\s*data-id\\s*=\\s*\"(.*?)\"\\s*\\s*data-sc\\s*=\\s*\"(.*?)\"\\s*data-file\\s*=\\s*\"(.*?)\"\\s*data-private_id\\s*=\\s*\"(.*?)\"").getRow(0);
+            if (downloadData != null) {
+                // single file downloads
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("/src/download_one.php?uploadId=" + downloadData[0] + "&sc=" + downloadData[1] + "&file=" + downloadData[2] + "&private_id=" + downloadData[3]);
+                final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (!Boolean.TRUE.equals(response.get("success"))) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final String url = response.get("url").toString();
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, url, resumable, maxchunks);
+                break startDownload;
+            }
+            final Form downloadForm = br.getFormbyActionRegex(".*/download/.*");
+            if (downloadForm != null) {
+                // multiple files download as a zip
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, downloadForm, false, 1);
+                break startDownload;
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Browser brc = br.cloneBrowser();
-        brc.getPage("/src/download_one.php?uploadId=" + downloadData[0] + "&sc=" + downloadData[1] + "&file=" + downloadData[2] + "&private_id=" + downloadData[3]);
-        final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (!Boolean.TRUE.equals(response.get("success"))) {
+        if (dl == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String url = response.get("url").toString();
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, url, resumable, maxchunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             handleConnectionErrors(br, dl.getConnection());
         }

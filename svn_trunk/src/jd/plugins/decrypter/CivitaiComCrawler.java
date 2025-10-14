@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51657 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -103,6 +103,13 @@ public class CivitaiComCrawler extends PluginForDecrypt {
          */
         final String apiBase = "https://civitai.com/api/v1";
         final List<Map<String, Object>> modelVersions = new ArrayList<Map<String, Object>>();
+        /**
+         * 2024-07-18: About the "nsfw" parameter: According to their docs, without nsfw parameter, all items will be returned but that is
+         * wrong --> Wrong API docs or bug in API. </br>
+         * Only with the nsfw parameter set to "X", all items will be returned. <br>
+         * 2024-07-18: Issue has been reported to civitai: https://github.com/civitai/civitai/issues/1277
+         */
+        final String special_api_params = "&nsfw=X";
         String modelName = null;
         if (itemType.equals("models")) {
             /* Crawl all versions of a model */
@@ -125,9 +132,11 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 }
             }
         } else if (itemType.equals("posts")) {
-            /* Handles such links: https://civitai.com/posts/1234567 */
-            /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1images */
-            br.getPage(apiBase + "/images?postId=" + itemID);
+            /**
+             * Handles such links: https://civitai.com/posts/1234567 <br>
+             * https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1images
+             */
+            br.getPage(apiBase + "/images?postId=" + itemID + special_api_params);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -162,14 +171,9 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             /* Handles such links: https://civitai.com/user/test */
             /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1images */
             /* 2024-07-17: use small limit/pagination size to avoid timeout issues */
-            /**
-             * 2024-07-18: About the "nsfw" parameter: According to their docs, without nsfw parameter, all items will be rerturned but that
-             * is wrong --> Wrong API docs or bug in API. </br>
-             * Only with the nsfw parameter set to "X", all items will be returned.
-             */
             final int maxItemsPerPage = cfg.getProfileCrawlerMaxPaginationItems();
             final int paginationSleepMillis = cfg.getProfileCrawlerPaginationSleepMillis();
-            String nextpage = apiBase + "/images?username=" + itemID + "&limit=" + maxItemsPerPage + "&nsfw=X";
+            String nextpage = apiBase + "/images?username=" + itemID + "&limit=" + maxItemsPerPage + special_api_params;
             if (modelVersionId != null) {
                 nextpage += "&modelVersionId=" + modelVersionId;
             }

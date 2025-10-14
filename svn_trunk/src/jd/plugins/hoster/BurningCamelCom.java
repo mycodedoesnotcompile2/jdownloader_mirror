@@ -18,6 +18,8 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.List;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,10 +33,8 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 47474 $", interfaceVersion = 2, names = {}, urls = {})
-@PluginDependencies(dependencies = { jd.plugins.decrypter.BurningCamelCom.class })
+@HostPlugin(revision = "$Revision: 51660 $", interfaceVersion = 2, names = {}, urls = {})
+@PluginDependencies(dependencies = { jd.plugins.decrypter.BurningCamelComCrawler.class })
 public class BurningCamelCom extends PluginForHost {
     private String dllink = null;
 
@@ -43,7 +43,7 @@ public class BurningCamelCom extends PluginForHost {
     }
 
     public static List<String[]> getPluginDomains() {
-        return jd.plugins.decrypter.BurningCamelCom.getPluginDomains();
+        return jd.plugins.decrypter.BurningCamelComCrawler.getPluginDomains();
     }
 
     public static String[] getAnnotationNames() {
@@ -60,7 +60,7 @@ public class BurningCamelCom extends PluginForHost {
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
-        return jd.plugins.decrypter.BurningCamelCom.buildAnnotationUrls(pluginDomains);
+        return jd.plugins.decrypter.BurningCamelComCrawler.buildAnnotationUrls(pluginDomains);
     }
 
     @Override
@@ -70,12 +70,12 @@ public class BurningCamelCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.burningcamel.com/dmca";
+        return "https://www." + getHost() + "/dmca";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -98,7 +98,7 @@ public class BurningCamelCom extends PluginForHost {
         link.setFinalFileName(filenameByURL + ".mp4");
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.getPage(jd.plugins.decrypter.BurningCamelCom.getContentURL(this.getFID(link)));
+        br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!this.canHandle(br.getURL())) {
@@ -157,14 +157,6 @@ public class BurningCamelCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

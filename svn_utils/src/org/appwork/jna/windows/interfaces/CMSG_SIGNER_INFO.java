@@ -4,13 +4,14 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
  *
  * === 3rd Party Licences ===
@@ -19,11 +20,11 @@
  *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
  * === Dual Licensing ===
  * === Commercial Usage ===
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
- *     Contact AppWork for further details: <e-mail@appwork.org>
+ *     Contact AppWork for further details: e-mail@appwork.org
  * === Non-Commercial Usage ===
  *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
@@ -31,23 +32,41 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage;
+package org.appwork.jna.windows.interfaces;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
+import com.sun.jna.platform.win32.WinCrypt;
 
-/**
- * @author thomas
- *
- */
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.METHOD, ElementType.FIELD, ElementType.TYPE, ElementType.PARAMETER })
+public class CMSG_SIGNER_INFO extends Structure {
+    public int                                 dwVersion;
+    public WinCrypt.DATA_BLOB                  Issuer;
+    public WinCrypt.DATA_BLOB                  SerialNumber;
+    public WinCrypt.CRYPT_ALGORITHM_IDENTIFIER HashAlgorithm;
+    public WinCrypt.CRYPT_ALGORITHM_IDENTIFIER HashEncryptionAlgorithm;
+    public WinCrypt.DATA_BLOB                  EncryptedHash;
+    public CRYPT_ATTRIBUTES                    AuthAttrs;
+    public CRYPT_ATTRIBUTES                    UnauthAttrs;
 
-public @interface StorableExample {
-    String value();
+    public CMSG_SIGNER_INFO() {
+    }
 
-    String comment() default "";
+    public CMSG_SIGNER_INFO(Pointer p) {
+        super(p);
+        read();
+    }
 
+    @Override
+    protected java.util.List getFieldOrder() {
+        java.util.List fields = new java.util.ArrayList();
+        fields.add("dwVersion");
+        fields.add("Issuer");
+        fields.add("SerialNumber");
+        fields.add("HashAlgorithm");
+        fields.add("HashEncryptionAlgorithm");
+        fields.add("EncryptedHash");
+        fields.add("AuthAttrs");
+        fields.add("UnauthAttrs");
+        return fields;
+    }
 }

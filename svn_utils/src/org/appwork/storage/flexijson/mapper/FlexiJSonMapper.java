@@ -1156,7 +1156,9 @@ public class FlexiJSonMapper {
             comments = this.pushComment(comments, ((StorableDoc) anno).value(), FlexiMapperTags.DOCS);
         }
         if (anno instanceof StorableExample) {
-            if (StringUtils.isNotEmpty(((StorableExample) anno).value())) {
+            if (StringUtils.isNotEmpty(((StorableExample) anno).value()) && StringUtils.isNotEmpty(((StorableExample) anno).comment())) {
+                comments = this.pushComment(comments, "Example: " + ((StorableExample) anno).value() + " - " + ((StorableExample) anno).comment(), FlexiMapperTags.EXAMPLE);
+            } else if (StringUtils.isNotEmpty(((StorableExample) anno).value())) {
                 comments = this.pushComment(comments, "Example: " + ((StorableExample) anno).value(), FlexiMapperTags.EXAMPLE);
             }
         }

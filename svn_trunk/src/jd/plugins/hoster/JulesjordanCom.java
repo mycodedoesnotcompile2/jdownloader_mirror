@@ -23,6 +23,8 @@ import java.util.Map;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
@@ -32,6 +34,7 @@ import org.jdownloader.translate._JDT;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
@@ -53,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50563 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51662 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
@@ -110,6 +113,10 @@ public class JulesjordanCom extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final String extDefault = ".mp4";
+        if (account != null) {
+            /* Login if account is available. */
+            this.login(account, false);
+        }
         // final String decrypter_filename = link.getStringProperty("decrypter_filename", null);
         if (isTrailerURL(link.getPluginPatternMatcher())) {
             /* Trailer download */
@@ -144,15 +151,19 @@ public class JulesjordanCom extends PluginForHost {
             /* Full video (premium) download */
             dllink = link.getPluginPatternMatcher();
             URLConnectionAdapter con = null;
+            final boolean isHLS = isHLS(link.getPluginPatternMatcher());
             try {
-                con = br.openHeadConnection(dllink);
+                if (isHLS) {
+                    con = br.openGetConnection(dllink);
+                } else {
+                    con = br.openHeadConnection(dllink);
+                }
                 if (con.getResponseCode() == 410) {
                     logger.info("Directurl expired --> Trying to refresh it");
                     if (account == null) {
                         logger.info("Cannot refresh directurl because: Account missing");
                         throw new AccountRequiredException();
                     }
-                    this.login(account, false);
                     /* Refresh directurl */
                     final String mainlink = link.getStringProperty("mainlink");
                     final String quality = link.getStringProperty("quality");
@@ -171,15 +182,24 @@ public class JulesjordanCom extends PluginForHost {
                         logger.warning("Failed to refresh directurl");
                         throw new PluginException(LinkStatus.ERROR_FATAL, "Failed to refresh directurl");
                     }
-                    con = br.openHeadConnection(dllink);
+                    if (isHLS) {
+                        con = br.openGetConnection(dllink);
+                    } else {
+                        con = br.openHeadConnection(dllink);
+                    }
+                }
+                if (isHLS) {
+                    br.followConnection();
                 }
                 this.handleConnectionErrors(br, con);
-                link.setFinalFileName(getFileNameFromConnection(con));
-                if (con.getCompleteContentLength() > 0) {
-                    if (con.isContentDecoded()) {
-                        link.setDownloadSize(con.getCompleteContentLength());
-                    } else {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (!isHLS) {
+                    link.setFinalFileName(getFileNameFromConnection(con));
+                    if (con.getCompleteContentLength() > 0) {
+                        if (con.isContentDecoded()) {
+                            link.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
                     }
                 }
             } finally {
@@ -190,6 +210,19 @@ public class JulesjordanCom extends PluginForHost {
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    @Override
+    protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
+        if (LinkCrawlerDeepInspector.looksLikeMpegURL(urlConnection)) {
+            return true;
+        } else {
+            return super.looksLikeDownloadableContent(urlConnection);
+        }
+    }
+
+    private boolean isHLS(final String url) {
+        return StringUtils.containsIgnoreCase(url, ".m3u8");
     }
 
     @Override
@@ -204,20 +237,32 @@ public class JulesjordanCom extends PluginForHost {
              * If trailer download is possible but dllink == null in theory this would be a PLUGIN_DEFECT but I think that premiumonly
              * message is more suitable here as a trailer is usually not what you'd want to download.
              */
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+            throw new AccountRequiredException();
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, this.getMaxChunks(account));
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        final boolean isHLS = isHLS(link.getPluginPatternMatcher());
+        if (isHLS) {
+            /* HLS video stream */
+            br.followConnection();
+            /* Either multiple qualities as HLS playlist or a single HLS stream. */
+            final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+            final String url_hls = hlsbest != null ? hlsbest.getStreamURL() : br.getURL();
+            checkFFmpeg(link, "Download a HLS Stream");
+            dl = new HLSDownloader(link, br, url_hls);
+            dl.startDownload();
+        } else {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, this.getMaxChunks(account));
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                if (dl.getConnection().getResponseCode() == 403) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+                } else if (dl.getConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
+            dl.startDownload();
         }
-        dl.startDownload();
     }
 
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
@@ -299,6 +344,9 @@ public class JulesjordanCom extends PluginForHost {
             /* Login is valid but account is not premium anymore. */
             throw new AccountInvalidException("Account is expired");
         } else if (br.getURL().matches("(?i).*/trial_pg/?$")) {
+            throw new AccountUnavailableException("Age verification required", 2 * 60 * 60 * 1000);
+        } else if (br.containsHTML(">Please note that you are accessing [^<]* from a location that requires us to to verify your age")) {
+            /* 2025-10-13: auntjudysxxx.com + USA Ashburn VA VPN, example not blocked: USA Washington */
             throw new AccountUnavailableException("Age verification required", 2 * 60 * 60 * 1000);
         }
     }

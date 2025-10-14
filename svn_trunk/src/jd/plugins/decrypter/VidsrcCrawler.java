@@ -22,17 +22,18 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51660 $", interfaceVersion = 2, names = {}, urls = {})
-public class SolarMovieCr extends PluginForDecrypt {
-    public SolarMovieCr(PluginWrapper wrapper) {
+@DecrypterPlugin(revision = "$Revision: 51662 $", interfaceVersion = 3, names = {}, urls = {})
+public class VidsrcCrawler extends PluginForDecrypt {
+    public VidsrcCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -46,7 +47,7 @@ public class SolarMovieCr extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "solarmovie.cx", "solarmovie.cr", "solarmovie.one" });
+        ret.add(new String[] { "vidsrc.net", "vidsrcme.ru", "vidsrcme.su", "vsrc.su", "vidsrc-embed.ru", "vidsrc-embed.su", "vsdash.net" });
         return ret;
     }
 
@@ -66,41 +67,46 @@ public class SolarMovieCr extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/movie/[\\w-]+-\\d+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/embed/movie/(tt\\d+)");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String contenturl = param.getCryptedUrl() + "/watching";
-        br.getPage(contenturl);
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String title = br.getRegex("<meta name=\"description\" content=[\"']Watch ([^\"]*) Online\\s*(For)?\\s*Free").getMatch(0);
-        final String[] links = br.getRegex("<a[^>]+data-file=\"([^\"]+)\"[^>]+>").getColumn(0);
-        if (links != null) {
-            for (String link : links) {
-                ret.add(createDownloadlink(Encoding.htmlDecode(link)));
-            }
-        }
-        final String embed = br.getRegex("id\\s*=\\s*\"iframe-embed\"\\s*src\\s*=\\s*\"(.*?)\"").getMatch(0);
-        if (embed != null) {
-            ret.add(createDownloadlink(Encoding.htmlDecode(embed)));
-        }
-        if (ret.isEmpty()) {
+        final String next_url = br.getRegex("id=\"player_iframe\" src=\"([^\"]+)").getMatch(0);
+        if (next_url == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final FilePackage fp = FilePackage.getInstance();
-        if (title != null) {
-            title = Encoding.htmlDecode(title).trim();
-            fp.setName(title);
-        } else {
-            /* Fallback */
-            fp.setName(br._getURL().getPath());
+        br.getPage(next_url);
+        final String next_url_2 = br.getRegex("src:\\s*'(/prorcp/[^']+)").getMatch(0);
+        if (next_url_2 == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        fp.addLinks(ret);
+        br.getPage(next_url_2);
+        String title = br.getRegex("removeExtension\\(atob\\('([^']+)").getMatch(0);
+        if (title != null) {
+            title = Encoding.Base64Decode(title).trim();
+        }
+        /* TODO: Add subtitle crawler? */
+        final String hls_master = br.getRegex("file\\s*:\\s*'(https?://[^']+)").getMatch(0);
+        if (hls_master == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final DownloadLink video = this.createDownloadlink(hls_master);
+        if (title != null) {
+            video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
+        }
+        ret.add(video);
         return ret;
+    }
+
+    @Override
+    public boolean hasCaptcha(CryptedLink link, Account acc) {
+        return false;
     }
 }
