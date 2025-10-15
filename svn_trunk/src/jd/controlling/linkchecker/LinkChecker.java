@@ -14,6 +14,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.FinalLinkState;
+import org.jdownloader.plugins.controller.PluginClassLoader;
+import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
+
 import jd.controlling.linkcrawler.CheckableLink;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
@@ -26,14 +34,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.controlling.UniqueAlltimeID;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.plugins.FinalLinkState;
-import org.jdownloader.plugins.controller.PluginClassLoader;
-import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 
 public class LinkChecker<E extends CheckableLink> {
     protected static class InternCheckableLink {
@@ -102,7 +102,8 @@ public class LinkChecker<E extends CheckableLink> {
     private final AtomicLong                                                                           linksRequested         = new AtomicLong(0);
     private final boolean                                                                              forceRecheck;
     private LinkCheckerHandler<E>                                                                      handler                = null;
-    private final static int                                                                           ROUNDSIZE              = 80;
+    /* Defines max batch size of links to check. */
+    private final static int                                                                           ROUNDSIZE              = 100;
     private final static LinkCheckerEventSender                                                        EVENTSENDER            = new LinkCheckerEventSender();
     protected final AtomicLong                                                                         checkerGeneration      = new AtomicLong(0);
     protected final AtomicBoolean                                                                      runningState           = new AtomicBoolean(false);
@@ -158,27 +159,30 @@ public class LinkChecker<E extends CheckableLink> {
 
     @SuppressWarnings("unchecked")
     protected void linkChecked(InternCheckableLink link) {
-        if (link != null && !link.isChecked()) {
-            final boolean stopEvent;
-            if (link.check() && linksRequested.decrementAndGet() == 0) {
-                synchronized (CHECKER) {
-                    if (linksRequested.get() == 0 && runningState.compareAndSet(true, false)) {
-                        stopEvent = true;
-                        if (CHECKER.get() > 0) {
-                            CHECKER.decrementAndGet();
-                        }
-                    } else {
-                        stopEvent = false;
+        if (link == null) {
+            return;
+        } else if (link.isChecked()) {
+            return;
+        }
+        final boolean stopEvent;
+        if (link.check() && linksRequested.decrementAndGet() == 0) {
+            synchronized (CHECKER) {
+                if (linksRequested.get() == 0 && runningState.compareAndSet(true, false)) {
+                    stopEvent = true;
+                    if (CHECKER.get() > 0) {
+                        CHECKER.decrementAndGet();
                     }
-                }
-                if (stopEvent) {
-                    EVENTSENDER.fireEvent(new LinkCheckerEvent(this, LinkCheckerEvent.Type.STOPPED));
+                } else {
+                    stopEvent = false;
                 }
             }
-            final LinkCheckerHandler<E> h = handler;
-            if (h != null && link.linkCheckAllowed()) {
-                h.linkCheckDone((E) link.getCheckableLink());
+            if (stopEvent) {
+                EVENTSENDER.fireEvent(new LinkCheckerEvent(this, LinkCheckerEvent.Type.STOPPED));
             }
+        }
+        final LinkCheckerHandler<E> h = handler;
+        if (h != null && link.linkCheckAllowed()) {
+            h.linkCheckDone((E) link.getCheckableLink());
         }
     }
 
@@ -311,7 +315,7 @@ public class LinkChecker<E extends CheckableLink> {
                                             while (it.hasNext()) {
                                                 checkableLinks.add(it.next());
                                                 it.remove();
-                                                if (checkableLinks.size() > ROUNDSIZE) {
+                                                if (checkableLinks.size() == ROUNDSIZE) {
                                                     break;
                                                 }
                                             }
@@ -325,7 +329,7 @@ public class LinkChecker<E extends CheckableLink> {
                                                 if (it.hasNext()) {
                                                     again = size;
                                                     checkableLinks.add(it.next());
-                                                    if (checkableLinks.size() > ROUNDSIZE) {
+                                                    if (checkableLinks.size() == ROUNDSIZE) {
                                                         break;
                                                     }
                                                     it.remove();

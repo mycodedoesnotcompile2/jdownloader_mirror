@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51669 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "sheshaft.com" });
         ret.add(new String[] { "yeswegays.com" });
         ret.add(new String[] { "analdin.com", "analdin.xxx" });
-        ret.add(new String[] { "tryboobs.com" });
         ret.add(new String[] { "vikiporn.com" });
         ret.add(new String[] { "katestube.com" });
         ret.add(new String[] { "bravoteens.com" });

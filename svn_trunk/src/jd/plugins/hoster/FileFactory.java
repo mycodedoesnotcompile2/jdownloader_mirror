@@ -65,7 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51662 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51666 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -312,7 +312,6 @@ public class FileFactory extends PluginForHost {
     }
 
     public void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException, MalformedURLException {
-        // TODO: Add more error handling
         final Boolean requiresPremium = getBoolean(br, "requiresPremium");
         // final Boolean isFree = getBoolean(br, "isFree");
         final Boolean userIsPremium = getBoolean(br, "userIsPremium");
@@ -340,8 +339,8 @@ public class FileFactory extends PluginForHost {
             throw new AccountRequiredException();
         }
         if (error_code != null) {
-            /* "Invalid Download Link" */
             if ("251".equals(error_code)) {
+                /* "Invalid Download Link" */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if ("258".equals(error_code)) {
                 /* https://www.filefactory.com/error.php?code=258 */
@@ -398,6 +397,7 @@ public class FileFactory extends PluginForHost {
         }
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account == null) {
+            /* No account given -> Check links via special method. */
             return checkLinks_old_public(urls);
         }
         if (account.hasProperty(PROPERTY_CLASSIC)) {
@@ -601,53 +601,63 @@ public class FileFactory extends PluginForHost {
                     }
                     sb.append("fi:" + fid);
                 }
-                br.getPage("https://www." + getHost() + "/share/" + sb.toString());
-                try {
-                    this.checkErrorsWebsite(null, null, br);
-                } catch (final Exception e) {
-                    /* e.g. https://www.filefactory.com/error.php?code=325 -> "Invalid Share Link" */
-                    logger.log(e);
-                    return false;
-                }
-                final String trElements[] = br.getRegex("<tr id=\"row_[a-z0-9]*\">(.*?)</tr>").getColumn(0);
-                if (trElements == null || trElements.length == 0) {
-                    logger.warning("Mass linkcheck failed");
-                    return false;
-                }
-                int numberof_offline_items = 0;
-                for (final DownloadLink link : links) {
-                    final String fid = getFUID(link);
-                    /* Search html snippet belonging to the link we are working on to determine online status. */
-                    String filehtml = null;
-                    for (final String trElement : trElements) {
-                        if (trElement.contains("/file/" + fid)) {
-                            filehtml = trElement;
-                            break;
+                check_this_batch_of_links: {
+                    br.getPage("https://www." + getHost() + "/share/" + sb.toString());
+                    try {
+                        this.checkErrorsWebsite(null, null, br);
+                    } catch (final Exception e) {
+                        /* Typically https://www.filefactory.com/error.php?code=325 -> "Invalid Share Link" */
+                        logger.log(e);
+                        logger.info("All items are invalid/offline");
+                        for (final DownloadLink link : links) {
+                            link.setAvailable(false);
+                        }
+                        /* Break out of this label to allow to continue in this loop down below. */
+                        break check_this_batch_of_links;
+                    }
+                    final String trElements[] = br.getRegex("<tr id=\"row_[a-z0-9]*\">(.*?)</tr>").getColumn(0);
+                    if (trElements == null || trElements.length == 0) {
+                        /* This should never happen */
+                        logger.warning("Mass linkcheck failed");
+                        return false;
+                    }
+                    int numberof_offline_items = 0;
+                    for (final DownloadLink link : links) {
+                        final String fid = getFUID(link);
+                        /* Search html snippet belonging to the link we are working on to determine online status. */
+                        String filehtml = null;
+                        for (final String trElement : trElements) {
+                            if (trElement.contains("/file/" + fid)) {
+                                filehtml = trElement;
+                                break;
+                            }
+                        }
+                        if (filehtml == null) {
+                            /* Assume that this item is offline */
+                            link.setAvailable(false);
+                            numberof_offline_items++;
+                        } else {
+                            /* Find/parse file information */
+                            /* 2025-10-09: File size unit starts from "KB", there is no "bytes". */
+                            final String filesizeStr = new Regex(filehtml, ">\\s*Size:\\s*([\\d\\.]+\\s*(KB|MB|GB|TB))").getMatch(0);
+                            if (filesizeStr != null) {
+                                link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                            }
+                            String filenameFromHTML = new Regex(filehtml, "/file/" + fid + "/([^/\"]+)").getMatch(0);
+                            if (filenameFromHTML != null) {
+                                filenameFromHTML = Encoding.htmlDecode(filenameFromHTML).trim();
+                                link.setName(filenameFromHTML);
+                            }
+                            /* Assume that item is online */
+                            link.setAvailable(true);
                         }
                     }
-                    if (filehtml == null) {
-                        /* Assume that this item is offline */
-                        link.setAvailable(false);
-                        numberof_offline_items++;
-                    } else {
-                        /* Find file information */
-                        /* 2025-10-09: File size unit starts from "KB", there is no "bytes". */
-                        final String filesizeStr = new Regex(filehtml, ">\\s*Size:\\s*([\\d\\.]+\\s*(KB|MB|GB|TB))").getMatch(0);
-                        if (filesizeStr != null) {
-                            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
-                        }
-                        String filenameFromHTML = new Regex(filehtml, "/file/" + fid + "/([^/\"]+)").getMatch(0);
-                        if (filenameFromHTML != null) {
-                            filenameFromHTML = Encoding.htmlDecode(filenameFromHTML).trim();
-                            link.setName(filenameFromHTML);
-                        }
-                        /* Assume that item is online */
-                        link.setAvailable(true);
+                    if (numberof_offline_items == links.size()) {
+                        /*
+                         * html contains id="row_" exactly the number of times we have links -> All items are offline / invalid file_id.
+                         */
+                        logger.info("All items of the current batch of links are offline -> Possible website shows a table with dummy items, all with a file size of '0.00 KB'");
                     }
-                }
-                if (numberof_offline_items == links.size()) {
-                    /* html contains id="row_" exactly the number of times we have links -> All items are offline / invalid file_id. */
-                    logger.info("All items of the current batch of links are offline -> Possible website shows a table with dummy items, all with a file size of '0.00 KB'");
                 }
                 if (index == urls.length) {
                     break;
@@ -1038,25 +1048,19 @@ public class FileFactory extends PluginForHost {
                 if (filename != null) {
                     link.setFinalFileName(filename);
                 }
-                if (!Boolean.TRUE.equals(entries.get("directDownload"))) {
-                    // TODO
-                    if (AccountType.PREMIUM.is(account)) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
+                if (!Boolean.TRUE.equals(entries.get("directDownload")) && AccountType.PREMIUM.is(account)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finallink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                handleConnectionErrors(br, dl.getConnection());
+                br.followConnection(true);
                 checkErrorsWebsite(link, account, br);
+                throwConnectionExceptions(br, dl.getConnection());
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
         dl.startDownload();
-    }
-
-    @Override
-    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
     }
 
     @Override

@@ -30,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49151 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51669 $", interfaceVersion = 3, names = {}, urls = {})
 public class TheyarehugeCom extends KernelVideoSharingComV2 {
     public TheyarehugeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -40,8 +40,8 @@ public class TheyarehugeCom extends KernelVideoSharingComV2 {
     /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "theyarehuge.com" });
+        /* 2025-10-14: Moved tryboobs.com from KernelVideoSharingComV2HostsDefault into this plugin since it redirects to theyarehuge.com */
+        ret.add(new String[] { "theyarehuge.com", "tryboobs.com" });
         return ret;
     }
 

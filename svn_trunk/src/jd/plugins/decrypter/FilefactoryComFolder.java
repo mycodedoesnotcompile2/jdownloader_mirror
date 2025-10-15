@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FileFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51663 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51668 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FileFactory.class })
 public class FilefactoryComFolder extends PluginForDecrypt {
     public FilefactoryComFolder(PluginWrapper wrapper) {
@@ -320,6 +320,7 @@ public class FilefactoryComFolder extends PluginForDecrypt {
                 for (final Map<String, Object> file : files) {
                     final String file_id = file.get("viewhash").toString();
                     if (!dupes.add(file_id)) {
+                        /* Skip duplicates */
                         continue;
                     }
                     numberofNewItemsThisPage++;

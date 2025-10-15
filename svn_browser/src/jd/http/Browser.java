@@ -2851,6 +2851,44 @@ public class Browser {
                 return null;
             }
         },
+        INCAPSULA_IMPERVA_COM {
+            @Override
+            public String getLabel() {
+                return "Incapsula/imperva.com";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                } else {
+                    if (con.getResponseCode() == 200 && request.getResponseHeader("X-Iinfo") != null && browser.containsHTML("src=\"/_Incapsula_Resource")) {
+                        for(final Cookie cookie:browser.getCookies(browser.getHost()).getCookies()) {
+                            if(StringUtils.startsWithCaseInsensitive(cookie.getKey(), "visid_incap_")) {
+                                return this;
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
         DNSPROXY_ORG {
             @Override
             public String getLabel() {

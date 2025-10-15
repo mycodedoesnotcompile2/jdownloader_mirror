@@ -32,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50867 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51668 $", interfaceVersion = 3, names = {}, urls = {})
 public class CadoozVoucherCrawler extends PluginForDecrypt {
     public CadoozVoucherCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,51 +79,71 @@ public class CadoozVoucherCrawler extends PluginForDecrypt {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getRequest().getHtmlCode().length() < 200) {
-            /*
-             * E.g. plain text error
-             * "Die übergebene Ecard ist im System nicht bekannt. Bitte prüfen Sie die übergebene URL auf Vollständigkeit. Eventuell ist der Link durch einen Zeilenumbruch unbrauchbar geworden."
+        } else if (br.getRequest().getHtmlCode().length() < 300) {
+            /**
+             * E.g. plain text error "Die übergebene Ecard ist im System nicht bekannt. Bitte prüfen Sie die übergebene URL auf
+             * Vollständigkeit. Eventuell ist der Link durch einen Zeilenumbruch unbrauchbar geworden." <br>
+             * e.g. >Leider kam es zu einem Problem beim Versuch ihren PDF Gutschein anzuzeigen. Bitte versuchen sie es später erneut. Falls
+             * das Problem weiter besteht, wenden sie sich bitte an den cadooz Kundendienst.
              */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String[] htmls = br.getRegex("<div class=\"ecard[^\"]+\">(.*?)--></div>").getColumn(0);
-        if (htmls == null || htmls.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String lastShopName = null;
-        int index = 0;
-        for (final String html : htmls) {
-            final String shopName = new Regex(html, "class=\"ecard-header-title\"[^>]*>([^<]+)</h3>").getMatch(0);
-            final String downloadlink = new Regex(html, "\"(https?://[^\"]+)\"[^<]+title=\"Hier PDF anzeigen").getMatch(0);
-            final String value = new Regex(html, ">\\s*Wert:\\s*</span>\\s*(\\d+,\\d{2})").getMatch(0);
-            String valueMinimal = null;
-            if (value != null) {
-                valueMinimal = value.replace(",00", "");
+        if (htmls != null && htmls.length > 0) {
+            int index = 0;
+            int skipped_un_downloadable_items = 0;
+            for (final String html : htmls) {
+                final String shopName = new Regex(html, "class=\"ecard-header-title\"[^>]*>([^<]+)</h3>").getMatch(0);
+                final String download_url = new Regex(html, "\"(https?://[^\"]+)\"[^<]+title=\"Hier PDF anzeigen").getMatch(0);
+                final String value = new Regex(html, ">\\s*Wert:\\s*</span>\\s*(\\d+,\\d{2})").getMatch(0);
+                String valueMinimal = null;
+                if (value != null) {
+                    valueMinimal = value.replace(",00", "");
+                }
+                final String validUntilDate = new Regex(html, " Gültig bis:\\s*</span>\\s*(\\d{4}\\.\\d{2}\\.\\d{2})").getMatch(0);
+                if (download_url == null) {
+                    skipped_un_downloadable_items++;
+                    continue;
+                }
+                final DownloadLink link = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(download_url));
+                String filename = shopName + "_" + valueMinimal;
+                if (htmls.length > 1) {
+                    /* Add position to filename to ensure unique filenames if we got more than 1 item. */
+                    filename += "_" + (index + 1);
+                }
+                filename += ".pdf";
+                link.setFinalFileName(filename);
+                /* Ensure that name does not change when item is reset by user. */
+                link.setProperty(DirectHTTP.FIXNAME, filename);
+                /* HEAD request is not possible -> Allow only GET */
+                link.setProperty(DirectHTTP.PROPERTY_REQUEST_TYPE, "GET");
+                if (validUntilDate != null) {
+                    link.setComment("Gültig bis: " + validUntilDate);
+                }
+                link.setAvailable(true);
+                ret.add(link);
+                lastShopName = shopName;
+                index++;
             }
-            final String validUntilDate = new Regex(html, " Gültig bis:\\s*</span>\\s*(\\d{4}\\.\\d{2}\\.\\d{2})").getMatch(0);
-            final DownloadLink link = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(downloadlink));
-            String filename = shopName + "_" + valueMinimal;
-            if (htmls.length > 1) {
-                /* Add position to filename to ensure unique filenames if we got more than 1 item. */
-                filename += "_" + (index + 1);
+        }
+        if (ret.isEmpty()) {
+            if (!br.containsHTML("class=\"ecard-data-code lazy\"")) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            filename += ".pdf";
-            link.setFinalFileName(filename);
-            /* Ensure that name does not change when item is reset by user. */
-            link.setProperty(DirectHTTP.FIXNAME, filename);
-            /* HEAD request is not possible -> Allow only GET */
-            link.setProperty(DirectHTTP.PROPERTY_REQUEST_TYPE, "GET");
-            if (validUntilDate != null) {
-                link.setComment("Gültig bis: " + validUntilDate);
-            }
-            link.setAvailable(true);
-            ret.add(link);
-            lastShopName = shopName;
-            index++;
+            /* Text based vouchers -> Download html page */
+            final DownloadLink text = this.createDownloadlink(br.getURL() + ".jdeatme");
+            text.setDownloadSize(br.getRequest().getHtmlCode().getBytes("UTF-8").length);
+            text.setAvailable(true);
+            ret.add(text);
         }
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(lastShopName);
+        if (lastShopName != null) {
+            fp.setName(lastShopName);
+        } else {
+            /* Fallback */
+        }
         fp.setPackageKey("cadooz://ecard/" + content_id);
         fp.addLinks(ret);
         return ret;

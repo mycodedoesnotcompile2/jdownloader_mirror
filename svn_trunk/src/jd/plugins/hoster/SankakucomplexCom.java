@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 51658 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51668 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -446,7 +446,10 @@ public class SankakucomplexCom extends PluginForHost {
              */
             // link.setHashInfo(HashInfo.parse(md5hash, false,false));
         }
-        storeDirecturl(link, item.get("file_url").toString());
+        final String directurl = (String) item.get("file_url");
+        if (!StringUtils.isEmpty(directurl)) {
+            storeDirecturl(link, directurl);
+        }
         link.setProperty(PROPERTY_SOURCE, item.get("source"));
         final String bookTitle = link.getStringProperty(PROPERTY_BOOK_TITLE);
         final int pageNumber = link.getIntegerProperty(PROPERTY_PAGE_NUMBER, 0) + 1;
