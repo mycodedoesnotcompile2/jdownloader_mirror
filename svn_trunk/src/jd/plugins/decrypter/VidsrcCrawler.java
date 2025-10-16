@@ -17,21 +17,28 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Browser.REFERRER_POLICY;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51662 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51676 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidsrcCrawler extends PluginForDecrypt {
     public VidsrcCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,49 +71,95 @@ public class VidsrcCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    /** Possible types of links: See examples in API docs: https://vidsrc-embed.ru/api/ */
+    private static final Pattern TYPE_MOVIE   = Pattern.compile("/embed/movie/((tt)?\\d+).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_MOVIE_2 = Pattern.compile("/embed/movie\\?(imdb|tmdb)=.+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TV      = Pattern.compile("/embed/tv/((tt)?\\d+)(/(\\d+)-(\\d+))?.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TV_2    = Pattern.compile("/embed/tv\\?(imdb|tmdb)=.+", Pattern.CASE_INSENSITIVE);
+    // private static final Pattern TYPE_MOVIE = Pattern.compile("/embed/movie/(tt\\d+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/embed/movie/(tt\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_MOVIE.pattern() + "|" + TYPE_MOVIE_2.pattern() + "|" + TYPE_TV.pattern() + "|" + TYPE_TV_2.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String next_url = br.getRegex("id=\"player_iframe\" src=\"([^\"]+)").getMatch(0);
-        if (next_url == null) {
+        final UrlQuery query = UrlQuery.parse(br.getURL());
+        String episode = query.get("episode");
+        if (episode == null) {
+            /* Try to obtain episode-number from url-path */
+            episode = new Regex(contenturl, TYPE_TV).getMatch(4);
+        }
+        if (episode != null || new Regex(contenturl, TYPE_MOVIE).patternFind() || new Regex(contenturl, TYPE_MOVIE_2).patternFind()) {
+            /* We expect a single video stream -> Crawl it */
+            final String next_url = br.getRegex("id=\"player_iframe\" src=\"([^\"]+)").getMatch(0);
+            if (next_url == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.getPage(next_url);
+            final String next_url_2 = br.getRegex("src:\\s*'(/prorcp/[^']+)").getMatch(0);
+            if (next_url_2 == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.getPage(next_url_2);
+            String title = br.getRegex("removeExtension\\(atob\\('([^']+)").getMatch(0);
+            if (title != null) {
+                title = Encoding.Base64Decode(title).trim();
+            }
+            /* TODO: Add subtitle crawler? */
+            final String hls_master = br.getRegex("file\\s*:\\s*'(https?://[^']+)").getMatch(0);
+            if (hls_master != null) {
+                final DownloadLink video = this.createDownloadlink(hls_master);
+                video.setReferrerUrl(REFERRER_POLICY.getOrigin(br._getURL()));
+                if (title != null) {
+                    video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
+                }
+                ret.add(video);
+            } else {
+                logger.warning("Failed to find video stream link");
+            }
+            String url_poster = br.getRegex("poster:\"([^\"]+)").getMatch(0);
+            if (url_poster != null) {
+                url_poster = br.getURL(url_poster).toExternalForm();
+                final DownloadLink image = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url_poster));
+                image.setAvailable(true);
+                ret.add(image);
+            }
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(title);
+            fp.addLinks(ret);
+        } else {
+            /* Collect links to other episodes which will be crawled separately */
+            final String[] urls_episodes = br.getRegex("/embed/tv\\?imdb=tt\\d+&season=\\d+&episode=\\d+").getColumn(-1);
+            for (String url_episode : urls_episodes) {
+                url_episode = br.getURL(url_episode).toExternalForm();
+                final DownloadLink link = this.createDownloadlink(url_episode);
+                ret.add(link);
+            }
+        }
+        if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.getPage(next_url);
-        final String next_url_2 = br.getRegex("src:\\s*'(/prorcp/[^']+)").getMatch(0);
-        if (next_url_2 == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        br.getPage(next_url_2);
-        String title = br.getRegex("removeExtension\\(atob\\('([^']+)").getMatch(0);
-        if (title != null) {
-            title = Encoding.Base64Decode(title).trim();
-        }
-        /* TODO: Add subtitle crawler? */
-        final String hls_master = br.getRegex("file\\s*:\\s*'(https?://[^']+)").getMatch(0);
-        if (hls_master == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final DownloadLink video = this.createDownloadlink(hls_master);
-        if (title != null) {
-            video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
-        }
-        ret.add(video);
         return ret;
     }
 
     @Override
     public boolean hasCaptcha(CryptedLink link, Account acc) {
         return false;
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* 2025-10-15: Try to avoid Cloudflare blocks */
+        return 1;
     }
 }

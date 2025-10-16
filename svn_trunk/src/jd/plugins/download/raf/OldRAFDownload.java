@@ -1009,7 +1009,12 @@ public class OldRAFDownload extends DownloadInterface {
         int id = 0;
         for (int i = 0; i < getChunkNum(); i++) {
             if (i == getChunkNum() - 1) {
-                chunk = new RAFChunk(downloadable.getChunksProgress()[i] == 0 ? 0 : downloadable.getChunksProgress()[i] + 1, -1, connection, this, downloadable, id++);
+                final long size = getVerifiedFileSize();
+                if (size == -1 || true) {
+                    chunk = new RAFChunk(downloadable.getChunksProgress()[i] == 0 ? 0 : downloadable.getChunksProgress()[i] + 1, -1, connection, this, downloadable, id++);
+                } else {
+                    chunk = new RAFChunk(downloadable.getChunksProgress()[i] == 0 ? 0 : downloadable.getChunksProgress()[i] + 1, size - 1, connection, this, downloadable, id++);
+                }
                 chunk.setLoaded((downloadable.getChunksProgress()[i] - i * parts + 1));
             } else {
                 chunk = new RAFChunk(downloadable.getChunksProgress()[i] == 0 ? 0 : downloadable.getChunksProgress()[i] + 1, (i + 1) * parts - 1, connection, this, downloadable, id++);

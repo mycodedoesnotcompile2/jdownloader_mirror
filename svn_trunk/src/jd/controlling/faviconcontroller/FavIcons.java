@@ -40,14 +40,6 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.PluginForHost;
-import net.sf.image4j.codec.ico.ICODecoder;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.shutdown.ShutdownController;
@@ -76,6 +68,14 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.PluginForHost;
+import net.sf.image4j.codec.ico.ICODecoder;
 
 public class FavIcons {
     private static final int                                                     BASE_SIZE       = 16;
@@ -699,6 +699,7 @@ public class FavIcons {
             }
         }
         for (final String website : websites) {
+            favBr.setRequest(null);
             boolean retryFlag = true;
             int retryCount = 0;
             while (retryFlag) {

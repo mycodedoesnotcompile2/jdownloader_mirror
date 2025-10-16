@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51657 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51677 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -151,10 +151,18 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             for (final Map<String, Object> image : images) {
                 final String imageurl = image.get("url").toString();
                 final DownloadLink link = this.createDownloadlink(br.getURL("/images/" + image.get("id")).toExternalForm());
+                link.setProperty(CivitaiCom.PROPERTY_DATE, image.get("createdAt"));
+                link.setProperty(CivitaiCom.PROPERTY_USERNAME, image.get("username"));
+                link.setProperty(CivitaiCom.PROPERTY_DIRECTURL, imageurl);
+                link.setProperty(CivitaiCom.PROPERTY_TYPE, image.get("type"));
                 link._setFilePackage(fp);
                 final String tempName;
                 if (cfg.isUseIndexIDForImageFilename()) {
-                    tempName = image.get("id").toString() + ".jpg";
+                    if ("video".equals(image.get("type"))) {
+                        tempName = image.get("id").toString() + getFileNameExtensionFromURL(imageurl, ".mp4");
+                    } else {
+                        tempName = image.get("id").toString() + ".jpg";
+                    }
                 } else {
                     tempName = getFileNameFromURL(new URL(imageurl));
                 }
@@ -204,10 +212,18 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                     }
                     numberofNewItems++;
                     final DownloadLink link = this.createDownloadlink(br.getURL("/images/" + imageid).toExternalForm());
+                    link.setProperty(CivitaiCom.PROPERTY_DATE, image.get("createdAt"));
+                    link.setProperty(CivitaiCom.PROPERTY_USERNAME, image.get("username"));
+                    link.setProperty(CivitaiCom.PROPERTY_DIRECTURL, imageurl);
+                    link.setProperty(CivitaiCom.PROPERTY_TYPE, image.get("type"));
                     link._setFilePackage(fp);
                     final String tempName;
                     if (cfg.isUseIndexIDForImageFilename()) {
-                        tempName = imageid + ".jpg";
+                        if ("video".equals(image.get("type"))) {
+                            tempName = imageid + getFileNameExtensionFromURL(imageurl, ".mp4");
+                        } else {
+                            tempName = imageid + ".jpg";
+                        }
                     } else {
                         tempName = getFileNameFromURL(new URL(imageurl));
                     }
@@ -300,6 +316,10 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                     /* Link will be handled via DirectHTTP hoster plugin. */
                     link = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
                 }
+                link.setProperty(CivitaiCom.PROPERTY_DATE, image.get("createdAt"));
+                link.setProperty(CivitaiCom.PROPERTY_USERNAME, image.get("username"));
+                link.setProperty(CivitaiCom.PROPERTY_DIRECTURL, directurl);
+                link.setProperty(CivitaiCom.PROPERTY_TYPE, image.get("type"));
                 final String filenameFromURL = Plugin.getFileNameFromURL(new URL(directurl));
                 if (filenameFromURL != null) {
                     link.setName(filenameFromURL);

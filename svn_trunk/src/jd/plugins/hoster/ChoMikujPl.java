@@ -32,6 +32,7 @@ import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
@@ -49,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 51130 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51670 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "" })
 public class ChoMikujPl extends PluginForHost {
     /* Plugin settings */
     public static final String   CRAWL_SUBFOLDERS                                             = "CRAWL_SUBFOLDERS";
@@ -606,6 +607,16 @@ public class ChoMikujPl extends PluginForHost {
         return dllink;
     }
 
+    private boolean isStreamDirecturl(final String url) {
+        if (url == null) {
+            return false;
+        } else if (new Regex(url, "https?://[^/]+/(Audio|Video)\\.ashx.+").patternFind()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private String getFID(final DownloadLink dl) {
         return dl.getStringProperty(PROPERTY_DOWNLOADLINK_FILEID);
     }
@@ -688,6 +699,10 @@ public class ChoMikujPl extends PluginForHost {
     private String getStoredDirectlink(final DownloadLink link, final Account account) {
         final String directlinkproperty = getDirectlinkProperty(account);
         final String dllink = link.getStringProperty(directlinkproperty);
+        if (dllink != null && !setting_allowStreamDownloadFallback() && this.isStreamDirecturl(dllink)) {
+            logger.info("User has disabled stream download while it was enabled in beforehand");
+            return null;
+        }
         return dllink;
     }
 
@@ -708,9 +723,8 @@ public class ChoMikujPl extends PluginForHost {
                     /* Save new cookie timestamp */
                     account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
-                } else {
-                    logger.info("Failed to login via cookies");
                 }
+                logger.info("Failed to login via cookies");
             }
             logger.info("Performing full login");
             br.clearCookies(null);
@@ -807,12 +821,12 @@ public class ChoMikujPl extends PluginForHost {
     }
 
     @Override
-    public void update(final DownloadLink downloadLink, final Account account, final long bytesTransfered) {
-        if (this.isOwnedBy(downloadLink, account)) {
+    public void update(final DownloadLink link, final Account account, final long bytesTransfered) {
+        if (this.isOwnedBy(link, account)) {
             /* Do not deduct traffic for downloads of self-owned items. */
             return;
         } else {
-            super.update(downloadLink, account, bytesTransfered);
+            super.update(link, account, bytesTransfered);
         }
     }
 

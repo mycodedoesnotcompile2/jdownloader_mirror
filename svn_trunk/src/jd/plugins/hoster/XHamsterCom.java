@@ -30,6 +30,23 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -57,24 +74,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51594 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51674 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -105,9 +105,11 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
-         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br>
+         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
+         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br>
+         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -967,7 +969,11 @@ public class XHamsterCom extends PluginForHost {
         private int nk(int x, int y) {
             long lx = x & 0xFFFFFFFFL;
             long ly = y & 0xFFFFFFFFL;
-            return (int) ((lx * ly) & 0xFFFFFFFFL);
+            return toSigned32(lx * ly);
+        }
+
+        private int toSigned32(long value) {
+            return (int) (value & 0xFFFFFFFFL);
         }
 
         private interface ByteGenerator {
@@ -1007,13 +1013,40 @@ public class XHamsterCom extends PluginForHost {
                     @Override
                     public int next() {
                         // add 2654435769 modulo 2^32: hex 0x9E3779B9 (fits as int literal)
-                        i = i + 0x9E3779B9;
-                        int e = i;
+                        int e = i = i + 0x9E3779B9;
                         e ^= (e >>> 16);
                         e = nk(e, 0x85EBCA77); // 2246822519 -> 0x85EBCA77
                         e ^= (e >>> 13);
                         e = nk(e, 0xC2B2AE3D); // 3266489917 -> 0xC2B2AE3D
                         e ^= (e >>> 16);
+                        return e & 0xFF;
+                    }
+                };
+            case 4:
+                return new ByteGenerator() {
+                    int i = seed;
+
+                    @Override
+                    public int next() {
+                        int e = i = toSigned32(i + 0x6d2b79f5l);
+                        e = toSigned32((e << 7) | ((e & 0xFFFFFFFFl) >> 25));
+                        e = toSigned32(e + 0x9e3779b9l);
+                        e = toSigned32(e ^ ((e & 0xFFFFFFFFl) >> 11));
+                        e = toSigned32(e * 0x27d4eb2dl);
+                        return e & 0xFF;
+                    }
+                };
+            case 5:
+                return new ByteGenerator() {
+                    int i = seed;
+
+                    @Override
+                    public int next() {
+                        int e = i;
+                        e = toSigned32(e ^ (e << 7));
+                        e = toSigned32(e ^ ((e & 0xFFFFFFFFl) >> 9));
+                        e = toSigned32(e ^ (e << 8));
+                        e = i = toSigned32(e + 0xa5a5a5a5l);
                         return e & 0xFF;
                     }
                 };
@@ -1321,7 +1354,14 @@ public class XHamsterCom extends PluginForHost {
 
     @SuppressWarnings("deprecation")
     public void handleDownload(final DownloadLink link, final Account account) throws Exception {
+        final String fidBefore = getFID(link);
         requestFileInformation(link, account);
+        final String fidAfter = getFID(br.getURL());
+        if (fidAfter != null && !StringUtils.equals(fidBefore, fidAfter)) {
+            // video link redirects to another video, eg shorter video, maybe uploaded longer version
+            // retry to make sure all checks (eg mirror, file exists) are done prior to starting the download
+            throw new PluginException(LinkStatus.ERROR_RETRY, "VideoID has changed, retry!");
+        }
         final String contentURL = getCorrectedURL(link.getPluginPatternMatcher());
         final boolean isPremiumURL = this.isPremiumURL(contentURL);
         if (StringUtils.isEmpty(dllink) && !isPremiumURL) {
@@ -1815,9 +1855,10 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
-             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
-             * user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br>
+             * Redirects to mainpage if cookies are invalid. </br>
+             * Return json if cookies are valid. </br>
+             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */

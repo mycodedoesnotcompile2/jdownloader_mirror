@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.CivitaiComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -45,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51657 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51677 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,7 +98,9 @@ public class CivitaiCom extends PluginForHost {
     private static final Pattern PATTERN_IMAGE           = Pattern.compile("/images/(\\d+).*", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_DOWNLOAD_MODELS = Pattern.compile("/api/download/models/(\\d+).*", Pattern.CASE_INSENSITIVE);
     public static final String   PROPERTY_DIRECTURL      = "directurl";
-    private static final String  PROPERTY_DATE           = "date";
+    public static final String   PROPERTY_DATE           = "date";
+    public static final String   PROPERTY_TYPE           = "type";
+    public static final String   PROPERTY_USERNAME       = "username";
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -182,6 +185,7 @@ public class CivitaiCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 final Map<String, Object> metadata = (Map<String, Object>) imagemap.get("metadata");
+                final Map<String, Object> user = (Map<String, Object>) imagemap.get("user");
                 String filename = (String) imagemap.get("name");
                 final Number filesize = (Number) metadata.get("size");
                 if (cfg.isUseIndexIDForImageFilename()) {
@@ -196,6 +200,7 @@ public class CivitaiCom extends PluginForHost {
                     filename = contentID;
                 }
                 final String type = imagemap.get("type").toString();
+                link.setProperty(PROPERTY_TYPE, type);
                 final boolean isVideo = type.equalsIgnoreCase("video");
                 final String mimeType = (String) imagemap.get("mimeType");
                 final String ext = getExtensionFromMimeType(mimeType);
@@ -230,10 +235,8 @@ public class CivitaiCom extends PluginForHost {
                     link.setProperty(PROPERTY_DIRECTURL, directurl);
                 }
                 /* Set Packagizer properties */
-                final String createdAtStr = (String) imagemap.get("createdAt");
-                if (!StringUtils.isEmpty(createdAtStr)) {
-                    link.setProperty(PROPERTY_DATE, createdAtStr);
-                }
+                link.setProperty(PROPERTY_DATE, imagemap.get("createdAt"));
+                link.setProperty(PROPERTY_USERNAME, user.get("username"));
             } else {
                 if (isDownload) {
                     /* Do nothing - download handling will take care. */
@@ -248,6 +251,23 @@ public class CivitaiCom extends PluginForHost {
                 /* File is online but account is required to download it. */
                 return AvailableStatus.TRUE;
             }
+        } catch (final PluginException e) {
+            if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
+                String directURL = link.getStringProperty(PROPERTY_DIRECTURL);
+                if (directURL != null) {
+                    if ("video".equals(link.getStringProperty(PROPERTY_TYPE))) {
+                        directURL = directURL.replace("/original=true/", "/optimized=true/");
+                    }
+                    try {
+                        basicLinkCheck(br, br.createGetRequest(directURL), link, null, ".mp4", FILENAME_SOURCE.CUSTOM, FILENAME_SOURCE.HEADER);
+                        link.setProperty(PROPERTY_DIRECTURL, directURL);
+                        return AvailableStatus.TRUE;
+                    } catch (Exception ignore) {
+                        throw Exceptions.addSuppressed(e, ignore);
+                    }
+                }
+            }
+            throw e;
         }
         return AvailableStatus.TRUE;
     }

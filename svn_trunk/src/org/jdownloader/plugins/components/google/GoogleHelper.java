@@ -19,20 +19,6 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-import jd.nutils.JDHash;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.components.GoogleService;
-
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.TextComponentInterface;
 import org.appwork.uio.ConfirmDialogInterface;
@@ -54,6 +40,20 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.translate._JDT;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
+
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
+import jd.nutils.JDHash;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.components.GoogleService;
 
 public class GoogleHelper {
     // private static final String COOKIES2 = "googleComCookies";
@@ -315,25 +315,29 @@ public class GoogleHelper {
         final StringBuilder sb = new StringBuilder();
         String language = System.getProperty("user.language").toLowerCase();
         if ("de".equals(language)) {
-            sb.append("Login unvollständig - 'SAPISID' Cookie fehlt! Versuch folgendes:");
-            sb.append("\r\n1. Öffne oben rechts das Kontomenü. Wähle \"Google-Konto\". Es wird hoffentlich in einem neuen Tab geladen.");
-            sb.append("\r\n2. Wenn dies geladen ist, geh zurück zum vorherigen GDrive/YouTube-Tab und aktualisiere ihn, dann ist der Cookie da. Hinweis: Das ist der Tab, den du zum Öffnen des Kontomenüs verwendet hast. Geh nicht über das App-Menü (neun Punkte) oben rechts zurück zu YouTube/GDrive, da dies den Cookie wieder verlieren könnte.");
-            sb.append("\r\n3. Exportiere jetzt deine Cookies erneut und versuche den Login-Prozess in JDownloader erneut.");
+            sb.append("Login unvollständig – 'SAPISID'-Cookie fehlt! Versuch Folgendes:");
+            sb.append("\r\n1. Öffne oben rechts das Kontomenü und wähle „Google-Konto“. Es sollte sich in einem neuen Tab öffnen.");
+            sb.append("\r\n2. Sobald die Seite geladen ist, geh zurück zum vorherigen GDrive-/YouTube-Tab und aktualisiere ihn – der Cookie sollte nun vorhanden sein. Hinweis: Das ist der Tab, den du zum Öffnen des Kontomenüs verwendet hast. Geh nicht über das App-Menü (neun Punkte) oben rechts zurück zu YouTube oder GDrive, da sonst der Cookie erneut verloren gehen kann.");
+            sb.append("\r\n3. Exportiere jetzt deine Cookies erneut und versuche den Login-Vorgang in JDownloader erneut.");
+            sb.append("\r\nZusätzlicher Hinweis: Wenn du deine Cookies mit dem Chrome-Browser exportiert hast, probiere es erneut mit Firefox.");
         } else if ("es".equals(language)) {
-            sb.append("Inicio de sesión incompleto - ¡Falta la cookie 'SAPISID'! Intenta esto:");
-            sb.append("\r\n1. En la esquina superior derecha, abre el menú de cuenta. Selecciona \"Cuenta de Google\". Esperemos que se cargue en una nueva pestaña.");
-            sb.append("\r\n2. Cuando esto se cargue, regresa a la pestaña anterior de GDrive/YouTube y actualiza, y la cookie estará ahí. Nota: esa es la pestaña que usaste para abrir el menú de cuenta. No regreses a YouTube/GDrive usando el menú de aplicaciones (nueve puntos) en la parte superior derecha, ya que esto puede hacer que se pierda la cookie nuevamente.");
-            sb.append("\r\n3. Ahora exporta tus cookies nuevamente e intenta el proceso de inicio de sesión en JDownloader otra vez.");
+            sb.append("Inicio de sesión incompleto: ¡falta la cookie 'SAPISID'! Prueba esto:");
+            sb.append("\r\n1. En la esquina superior derecha, abre el menú de cuenta y selecciona \"Cuenta de Google\". Debería cargarse en una nueva pestaña.");
+            sb.append("\r\n2. Cuando se cargue, vuelve a la pestaña anterior de GDrive/YouTube y actualízala; la cookie debería estar allí. Nota: esa es la pestaña que usaste para abrir el menú de cuenta. No vuelvas a YouTube/GDrive usando el menú de aplicaciones (nueve puntos) en la parte superior derecha, ya que esto podría hacer que se pierda la cookie nuevamente.");
+            sb.append("\r\n3. Ahora exporta tus cookies otra vez e intenta el proceso de inicio de sesión en JDownloader de nuevo.");
+            sb.append("\r\nSugerencia adicional: si exportaste tus cookies usando el navegador Chrome, inténtalo nuevamente con Firefox.");
         } else if ("fr".equals(language)) {
-            sb.append("Connexion incomplète - cookie 'SAPISID' manquant ! Essaie ceci :");
-            sb.append("\r\n1. Dans le coin supérieur droit, ouvre le menu de compte. Sélectionne \"Compte Google\". Il devrait se charger dans un nouvel onglet.");
-            sb.append("\r\n2. Quand cela se charge, retourne à l'onglet GDrive/YouTube précédent et actualise, et le cookie sera là. Note : c'est l'onglet que tu as utilisé pour ouvrir le menu de compte. Ne retourne pas à YouTube/GDrive en utilisant le menu des applications (neuf points) en haut à droite, car cela pourrait faire perdre le cookie à nouveau.");
-            sb.append("\r\n3. Maintenant, exporte à nouveau tes cookies et réessaie le processus de connexion dans JDownloader.");
+            sb.append("Connexion incomplète – le cookie 'SAPISID' est manquant ! Essaie ceci :");
+            sb.append("\r\n1. En haut à droite, ouvre le menu de compte et sélectionne « Compte Google ». Cela devrait s’ouvrir dans un nouvel onglet.");
+            sb.append("\r\n2. Une fois la page chargée, retourne à l’onglet GDrive/YouTube précédent et actualise-le ; le cookie devrait maintenant être présent. Remarque : c’est l’onglet que tu as utilisé pour ouvrir le menu de compte. N’utilise pas le menu des applications (neuf points) en haut à droite pour revenir à YouTube/GDrive, car cela pourrait faire perdre à nouveau le cookie.");
+            sb.append("\r\n3. Exporte maintenant à nouveau tes cookies et réessaie la connexion dans JDownloader.");
+            sb.append("\r\nAstuce supplémentaire : si tu as exporté tes cookies avec le navigateur Chrome, essaie à nouveau avec Firefox.");
         } else {
-            sb.append("Login incomplete - 'SAPISID' cookie missing! Try this:");
-            sb.append("\r\n1. In the top-right corner, open the account menu. Select \"Google account\". It should load in a new tab.");
-            sb.append("\r\n2. When this loads, go back to the previous GDrive/YouTube tab and refresh, and the cookie is there. Note: that's the tab you used to open the account menu. Do not go back to YouTube/GDrive by using the app menu (nine dots) at the top right, as this may lose the cookie again.");
+            sb.append("Login incomplete – 'SAPISID' cookie missing! Try this:");
+            sb.append("\r\n1. In the top-right corner, open the account menu and select \"Google account\". It should load in a new tab.");
+            sb.append("\r\n2. When it loads, go back to the previous GDrive/YouTube tab and refresh it – the cookie should now be there. Note: that's the tab you used to open the account menu. Do not go back to YouTube/GDrive using the app menu (nine dots) at the top right, as this may cause the cookie to be lost again.");
             sb.append("\r\n3. Now export your cookies again and retry the login process in JDownloader.");
+            sb.append("\r\nExtra hint: If you exported your cookies using the Chrome browser, try again using Firefox.");
         }
         throw new AccountInvalidException(sb.toString());
     }
@@ -760,7 +764,6 @@ public class GoogleHelper {
     private boolean isCacheEnabled() {
         return cacheEnabled;
     }
-
     // public void followRedirect() throws IOException, InterruptedException {
     // int wait = 0;
     // String url = null;

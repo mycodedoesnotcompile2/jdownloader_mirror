@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51674 $", interfaceVersion = 3, names = {}, urls = {})
 public class XubsterCom extends XFileSharingProBasic {
     public XubsterCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -98,7 +98,7 @@ public class XubsterCom extends XFileSharingProBasic {
             return -2;
         } else {
             /* Free(anonymous) and unknown account type */
-            return -2;
+            return 1;
         }
     }
 

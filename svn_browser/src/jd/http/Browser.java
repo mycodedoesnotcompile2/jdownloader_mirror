@@ -132,6 +132,90 @@ public class Browser {
         }
     }
 
+    /**
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy
+     */
+    public static enum REFERRER_POLICY {
+        NO_REFERRER,
+        NO_REFERRER_WHEN_DOWNGRADE,
+        ORIGIN,
+        ORIGIN_WHEN_CROSS_ORIGIN,
+        SAME_ORIGIN,
+        STRICT_ORIGIN,
+        STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+        UNSAFE_URL;
+
+        public static boolean isSameProtocol(final Request current, final Request next) {
+            return StringUtils.equalsIgnoreCase(current.getURL().getProtocol(), next.getURL().getProtocol());
+        }
+
+        public static boolean isSecureProtocol(final Request current, final Request next) {
+            return StringUtils.equalsIgnoreCase("https", current.getURL().getProtocol()) && isSameProtocol(current, next);
+        }
+
+        public static boolean isDowngrade(final Request current, final Request next) {
+            return StringUtils.equalsIgnoreCase("https", current.getURL().getProtocol()) && StringUtils.equalsIgnoreCase("http", next.getURL().getProtocol());
+        }
+
+        public static boolean isUpgrade(final Request current, final Request next) {
+            return StringUtils.equalsIgnoreCase("http", current.getURL().getProtocol()) && StringUtils.equalsIgnoreCase("https", next.getURL().getProtocol());
+        }
+
+        public static String getOrigin(URL url) throws IOException {
+            final String origin = URLHelper.createURL(url.getProtocol(), null, url.getHost(), url.getPort(), null, null, null);
+            return origin;
+        }
+
+        public static boolean isSameOrigin(final Request current, final Request next) {
+            return StringUtils.equalsIgnoreCase(Browser.getHost(current.getURL()), Browser.getHost(next.getURL()));
+        }
+
+        public static REFERRER_POLICY get(final Request request) {
+            if (request == null) {
+                return null;
+            }
+            final URLConnectionAdapter httpConnection = request.getHttpConnection();
+            if (httpConnection == null) {
+                return null;
+            }
+            metaElement: {
+                final String meta = request.getRegex("<meta[^>]*name\\s*=\\s*\"referrer\"[^>]*content\\s*=\\s*\"(.*?)\"").getMatch(0);
+                final REFERRER_POLICY ret = get(meta);
+                if (ret != null) {
+                    return ret;
+                }
+            }
+            policyHeader: {
+                final String policyHeader = httpConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_REFERRER_POLICY);
+                if (policyHeader != null) {
+                    REFERRER_POLICY ret = null;
+                    final String policyValues[] = policyHeader.split(",");
+                    for (String policyValue : policyValues) {
+                        final REFERRER_POLICY policy = get(policyValue);
+                        if (policy != null) {
+                            ret = policy;
+                        }
+                    }
+                    if (ret != null) {
+                        return ret;
+                    }
+                }
+            }
+            return null;
+        }
+
+        public static REFERRER_POLICY get(final String referrer_policy) {
+            if (StringUtils.isEmpty(referrer_policy)) {
+                return null;
+            }
+            try {
+                return REFERRER_POLICY.valueOf(referrer_policy.toUpperCase(Locale.ROOT).replace("-", "_"));
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+    }
+
     private static final HashMap<String, Cookies> COOKIES                   = new HashMap<String, Cookies>();
     private static ProxySelectorInterface         GLOBAL_PROXY              = null;
     private static LogInterface                   LOGGER                    = new ConsoleLogImpl();
@@ -141,6 +225,19 @@ public class Browser {
     protected static IPVERSION                    GLOBAL_IPVERSION          = null;
     protected IPVERSION                           ipVersion                 = null;
     private boolean                               throwExceptionOnBlockedBy = true;
+    private REFERRER_POLICY                       browserReferrerPolicy     = null;
+
+    public REFERRER_POLICY getBrowserReferrerPolicy() {
+        final REFERRER_POLICY referrerPolicy = this.browserReferrerPolicy;
+        if (referrerPolicy != null) {
+            return referrerPolicy;
+        }
+        return null;
+    }
+
+    public void setBrowserReferrerPolicy(REFERRER_POLICY referrerPolicy) {
+        this.browserReferrerPolicy = referrerPolicy;
+    }
 
     public static IPVERSION getGlobalIPVersion() {
         return Browser.GLOBAL_IPVERSION;
@@ -771,6 +868,7 @@ public class Browser {
     }
 
     public Browser cloneBrowser(final Browser br) {
+        br.browserReferrerPolicy = this.browserReferrerPolicy;
         br.acceptLanguage = this.acceptLanguage;
         br.connectTimeout = this.connectTimeout;
         br.currentURL = this.currentURL;
@@ -964,10 +1062,11 @@ public class Browser {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
      *
+     * 
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1780,8 +1879,8 @@ public class Browser {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
-     * facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
+     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request != null) {
@@ -1868,7 +1967,7 @@ public class Browser {
         return this.openRequestConnection(this.createPostRequest(url, query));
     }
 
-    protected void setRequestProperties(final Request sourceRequest, final Request nextRequest, final String refererURL) {
+    protected void setRequestProperties(final Request nextRequest) throws IOException {
         if (nextRequest != null) {
             nextRequest.setSSLSocketStreamOptions(this.getSSLSocketStreamOptions());
             if (nextRequest.isSSLTrustALLSet() == null) {
@@ -1883,19 +1982,139 @@ public class Browser {
             }
             nextRequest.setConnectTimeout(this.getConnectTimeout());
             nextRequest.setReadTimeout(this.getReadTimeout());
-            final boolean allowRefererURL;
-            if (sourceRequest != null && StringUtils.startsWithCaseInsensitive(sourceRequest.getURL().getProtocol(), "https")) {
-                // http://allben.net/post/2009/02/25/Null-Url-Referrer-going-from-HTTPS-to-HTTP
-                allowRefererURL = StringUtils.startsWithCaseInsensitive(nextRequest.getURL().getProtocol(), "https");
-            } else {
-                allowRefererURL = true;
-            }
-            if (allowRefererURL && refererURL != null && !nextRequest.getHeaders().contains(HTTPConstants.HEADER_REQUEST_REFERER)) {
-                nextRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, refererURL);
-            }
+            setReferrer(getNextRequestReferrerPolicy(), nextRequest);
             this.mergeHeaders(nextRequest);
             this.autoCompleteHeaders(nextRequest);
         }
+    }
+
+    /**
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy
+     * 
+     * @param referrerPolicy
+     * @param nextRequest
+     */
+    protected String setReferrer(REFERRER_POLICY referrerPolicy, Request nextRequest) throws IOException {
+        if (referrerPolicy == null) {
+            return setReferrer(REFERRER_POLICY.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, nextRequest);
+        }
+        final String requestReferrer = getRefererURL();
+        if (StringUtils.isEmpty(requestReferrer)) {
+            referrerPolicy = REFERRER_POLICY.NO_REFERRER;
+        }
+        switch (referrerPolicy) {
+        case NO_REFERRER: {
+            // The Referer header will be omitted: sent requests do not include any referrer information.
+            nextRequest.getHeaders().remove(HTTPConstants.HEADER_REQUEST_REFERER);
+            return null;
+        }
+        case NO_REFERRER_WHEN_DOWNGRADE: {
+            // Send the origin, path, and query string in Referer when the protocol security level stays the same or improves (HTTP→HTTP,
+            // HTTP→HTTPS, HTTPS→HTTPS). Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
+            Request currentRequest = getRequest();
+            if (currentRequest == null) {
+                currentRequest = new GetRequest(requestReferrer);
+            }
+            if (REFERRER_POLICY.isSameProtocol(currentRequest, nextRequest) || REFERRER_POLICY.isUpgrade(currentRequest, nextRequest)) {
+                // Send the origin, path, and query string in Referer when the protocol security level stays the same or improves
+                // (HTTP→HTTP,HTTP→HTTPS, HTTPS→HTTPS)
+                return setReferrer(REFERRER_POLICY.UNSAFE_URL, nextRequest);
+            } else {
+                // Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
+                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
+            }
+        }
+        case ORIGIN: {
+            // Send only the origin in the Referer header. For example, a document at https://example.com/page.html will send the referrer
+            // https://example.com/.
+            final URL url = new URL(requestReferrer);
+            final String origin = REFERRER_POLICY.getOrigin(url);
+            nextRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, origin);
+            return origin;
+        }
+        case ORIGIN_WHEN_CROSS_ORIGIN: {
+            // When performing a same-origin request, send the origin, path, and query string. Send only the origin for cross origin
+            // requests and requests to less secure destinations (HTTPS→HTTP).
+            Request currentRequest = getRequest();
+            if (currentRequest == null) {
+                currentRequest = new GetRequest(requestReferrer);
+            }
+            if (!REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest) || REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
+                // Send only the origin for cross origin requests and requests to less secure destinations (HTTPS→HTTP).
+                return setReferrer(REFERRER_POLICY.ORIGIN, nextRequest);
+            } else {
+                // When performing a same-origin request, send the origin, path, and query string
+                return setReferrer(REFERRER_POLICY.SAME_ORIGIN, nextRequest);
+            }
+        }
+        case SAME_ORIGIN: {
+            // Send the origin, path, and query string for same-origin requests. Don't send the Referer header for cross-origin requests.
+            Request currentRequest = getRequest();
+            if (currentRequest == null) {
+                currentRequest = new GetRequest(requestReferrer);
+            }
+            if (!REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
+                // Don't send the Referer header for cross-origin requests.
+                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
+            } else {
+                // Send the origin, path, and query string for same-origin requests.
+                return setReferrer(REFERRER_POLICY.UNSAFE_URL, nextRequest);
+            }
+        }
+        case STRICT_ORIGIN: {
+            // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS). Don't send the Referer header to less
+            // secure destinations (HTTPS→HTTP).
+            Request currentRequest = getRequest();
+            if (currentRequest == null) {
+                currentRequest = new GetRequest(requestReferrer);
+            }
+            if (REFERRER_POLICY.isSecureProtocol(currentRequest, nextRequest)) {
+                // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS)
+                return setReferrer(REFERRER_POLICY.ORIGIN, nextRequest);
+            } else {
+                // Don't send the Referer header to less secure destinations (HTTPS→HTTP).
+                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
+            }
+        }
+        case STRICT_ORIGIN_WHEN_CROSS_ORIGIN: {
+            // Send the origin, path, and query string when performing a same-origin request. For cross-origin requests send the origin
+            // (only) when the protocol security level stays same (HTTPS→HTTPS). Don't send the Referer header to less secure destinations
+            // (HTTPS→HTTP).
+            Request currentRequest = getRequest();
+            if (currentRequest == null) {
+                currentRequest = new GetRequest(requestReferrer);
+            }
+            if (REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
+                // Send the origin, path, and query string when performing a same-origin request.
+                return setReferrer(REFERRER_POLICY.UNSAFE_URL, nextRequest);
+            } else if (REFERRER_POLICY.isSecureProtocol(currentRequest, nextRequest)) {
+                // For cross-origin requests send the origin (only) when the protocol security level stays same (HTTPS→HTTPS).
+                return setReferrer(REFERRER_POLICY.STRICT_ORIGIN, nextRequest);
+            } else {
+                // Don't send the Referer header to less secure destinations(HTTPS→HTTP).
+                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
+            }
+        }
+        case UNSAFE_URL: {
+            // Send the origin, path, and query string when performing any request, regardless of security.
+            nextRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, requestReferrer);
+            return requestReferrer;
+        }
+        default:
+            throw new WTFException("FIXME:" + referrerPolicy);
+        }
+    }
+
+    protected REFERRER_POLICY getNextRequestReferrerPolicy() {
+        REFERRER_POLICY ret = getBrowserReferrerPolicy();
+        if (ret != null) {
+            return ret;
+        }
+        ret = REFERRER_POLICY.get(getRequest());
+        if (ret != null) {
+            return ret;
+        }
+        return REFERRER_POLICY.STRICT_ORIGIN_WHEN_CROSS_ORIGIN;
     }
 
     public URLConnectionAdapter openRequestConnection(final Request request) throws IOException {
@@ -2022,9 +2241,8 @@ public class Browser {
         }
         int redirectLoopPrevention = 0;
         final Request originalRequest = request;
-        final String refererURL = this.getRefererURL(originalRequest);
         while (true) {
-            this.setRequestProperties(originalRequest, request, refererURL);
+            this.setRequestProperties(request);
             int connectRetryCounter = 0;
             connectLoop: while (true) {
                 try {
@@ -2392,7 +2610,7 @@ public class Browser {
      *
      * @return
      */
-    private String getRefererURL(Request request) {
+    private String getRefererURL() {
         final HTTPHeader referer = this.getHeaders().remove(HTTPConstants.HEADER_REQUEST_REFERER);
         final String refererURLHeader = referer != null ? referer.getValue() : null;
         if (refererURLHeader == null) {
@@ -2439,7 +2657,8 @@ public class Browser {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br>
+     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2584,7 +2803,8 @@ public class Browser {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br> To be called after a sent request.
+     * Checks for block by firewalls and similar. </br>
+     * To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (this.getThrowExceptionOnBlockedBy(request)) {
@@ -2615,7 +2835,8 @@ public class Browser {
         /* 526: Invalid SSL certificate */
         /**
          * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-         * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
+         * Cloudflare block happens. </br>
+         * I've just added code 502 to the list of "Cloudflare response-codes".
          */
         /*
          * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login -> Cloudflare
@@ -2864,8 +3085,8 @@ public class Browser {
                     return null;
                 } else {
                     if (con.getResponseCode() == 200 && request.getResponseHeader("X-Iinfo") != null && browser.containsHTML("src=\"/_Incapsula_Resource")) {
-                        for(final Cookie cookie:browser.getCookies(browser.getHost()).getCookies()) {
-                            if(StringUtils.startsWithCaseInsensitive(cookie.getKey(), "visid_incap_")) {
+                        for (final Cookie cookie : browser.getCookies(browser.getHost()).getCookies()) {
+                            if (StringUtils.startsWithCaseInsensitive(cookie.getKey(), "visid_incap_")) {
                                 return this;
                             }
                         }
@@ -3247,8 +3468,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {
@@ -3388,13 +3609,13 @@ public class Browser {
                 if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
                     return null;
                 }
-                if (con.getResponseCode() == 202 && request.getResponseHeader("x-amzn-waf-action") != null && StringUtils.containsIgnoreCase(request.getResponseHeader("server"), "awselb")) {
-                    /**
-                     * Typical reaponse-headers: <br>
-                     * Server: awselb/2.0 <br>
-                     * x-amzn-waf-action: challenge <br>
-                     * Access-Control-Allow-Headers: x-amzn-waf-action
-                     */
+                if (con.getResponseCode() == 202 && request.getResponseHeader("x-amzn-waf-action") != null && StringUtils.containsIgnoreCase(request.getResponseHeader("server"),
+                        "awselb")) {/**
+                                     * Typical reaponse-headers: <br>
+                                     * Server: awselb/2.0 <br>
+                                     * x-amzn-waf-action: challenge <br>
+                                     * Access-Control-Allow-Headers: x-amzn-waf-action
+                                     */
                     return this;
                 }
                 return null;
@@ -3431,8 +3652,8 @@ public class Browser {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
-     * https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
+     * See also: https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

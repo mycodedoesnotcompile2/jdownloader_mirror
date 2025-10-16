@@ -43,6 +43,7 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionImpl.KEEPALIVE;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.KeepAliveSocketStreamException;
@@ -606,6 +607,8 @@ public abstract class Request {
                 useCS = this.httpConnection.getCharset();
             }
             if (StringUtils.isEmpty(useCS) && contentType != null) {
+                final String contentDispositionHeader = httpConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_DISPOSITION);
+                final String contentDispositionFileName = HTTPConnectionUtils.getFileNameFromDispositionHeader(contentDispositionHeader);
                 if (contentType.matches("(?i)application/json")) {
                     // application/json default is UTF-8 //
                     useCS = "UTF-8";
@@ -613,6 +616,9 @@ public abstract class Request {
                     useCS = "UTF-8";
                 } else if (contentType.matches("(?i)application/(x-mpegURL|vnd\\.apple\\.mpegurl)")) {
                     // https://datatracker.ietf.org/doc/html/rfc8216
+                    useCS = "UTF-8";
+                } else if (StringUtils.endsWithCaseInsensitive(contentDispositionFileName, ".csv") || contentType.matches("(?i)text/(x-)?csv")) {
+                    // https://blogs.windows.com/windows-insider/2018/12/10/announcing-windows-10-insider-preview-build-18298
                     useCS = "UTF-8";
                 }
             }

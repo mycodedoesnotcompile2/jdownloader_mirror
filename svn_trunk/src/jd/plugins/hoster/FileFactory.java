@@ -65,7 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51666 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51670 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -718,7 +718,7 @@ public class FileFactory extends PluginForHost {
         if (usedSpaceGB_Str != null && usedSpaceGB_Str.matches("\\d+")) {
             ai.setUsedSpace(Long.parseLong(usedSpaceGB_Str) * 1024 * 1024 * 1024);
         }
-        if (account.loadUserCookies() != null) {
+        find_and_set_real_user_email: if (account.loadUserCookies() != null) {
             /* Ensure to have unique usernames when user is using cookie login */
             final String email = (String) settings.get("email");
             if (email != null) {
@@ -735,6 +735,15 @@ public class FileFactory extends PluginForHost {
     private AccountInfo fetchAccountInfo_old(final Account account) throws Exception {
         if (br.getURL() == null || !StringUtils.endsWithCaseInsensitive(br.getURL(), "/account/")) {
             br.getPage("https://www." + this.getHost() + "/account/");
+        }
+        find_and_set_real_user_email: if (account.loadUserCookies() != null) {
+            /* Users using cookie login could enter whatever they want into the username field -> Correct that. */
+            final String email = br.getRegex("\"email\":\"([^\"]+)").getMatch(0);
+            if (email != null && email.contains("@")) {
+                account.setUser(email);
+            } else {
+                logger.warning("Failed to find users' email in html code");
+            }
         }
         final AccountInfo ai = new AccountInfo();
         AccountType accountType = null;

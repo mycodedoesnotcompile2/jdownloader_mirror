@@ -16,8 +16,23 @@
 package jd.plugins.decrypter;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
+import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig.CrawlSpeedMode;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -25,6 +40,7 @@ import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.LinkCrawler.BrowserCrawledLink;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
+import jd.http.Browser.REFERRER_POLICY;
 import jd.http.Cookies;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
@@ -38,19 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
-import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig.CrawlSpeedMode;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
-@DecrypterPlugin(revision = "$Revision: 51571 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
+@DecrypterPlugin(revision = "$Revision: 51674 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
 public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -69,7 +73,7 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         CrawledLink source = getCurrentLink();
-        String refererURL = null;
+        String enforceReferrerURL = null;
         String cookiesString = null;
         String preSetTitle = null;
         while (source != null) {
@@ -81,22 +85,18 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                     br.setCookies(host, Cookies.parseCookies(cookiesString, host, null));
                 }
                 preSetTitle = downloadLink.getStringProperty(GenericM3u8.PRESET_NAME_PROPERTY);
-                refererURL = downloadLink.getReferrerUrl();
+                enforceReferrerURL = downloadLink.getReferrerUrl();
             }
             if (!StringUtils.equals(source.getURL(), param.getCryptedUrl())) {
                 if (source instanceof BrowserCrawledLink) {
                     final BrowserCrawledLink bcl = (BrowserCrawledLink) source;
-                    refererURL = source.getURL();
-                    br = bcl.cloneBrowser();
+                    enforceReferrerURL = null;// we have automatic referrer handling via browser from BrowserCrawledLink(eg DeepDecrypt)
+                    final Browser brc = bcl.cloneBrowser();
+                    brc.setLogger(br.getLogger());
+                    brc.setVerbose(br.isVerbose());
+                    brc.setDebug(br.isDebug());
+                    setBrowser(brc);
                     logger.info("Reuse BrowserCrawledLink browser: " + br.getURL());
-                } else if (source.getCryptedLink() != null && refererURL == null) {
-                    /* TODO: Maybe don't access URL here and just set referer header down below */
-                    try {
-                        refererURL = source.getURL();
-                        br.getPage(source.getURL());
-                    } catch (final IOException ignore) {
-                        logger.log(ignore);
-                    }
                 }
                 // stop here as param(CryptedLink) is result of this source(CrawledLink)
                 break;
@@ -120,20 +120,22 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                 ref = URLEncode.decodeURIComponent(forcedRefererText);
             }
             if (ref != null) {
-                try {
-                    refererURL = ref;
-                    br.getPage(ref);
-                    logger.info("Actually used referer: " + ref);
-                } catch (final IOException ignore) {
-                    logger.log(ignore);
-                }
+                enforceReferrerURL = ref;
             }
         }
         br.setFollowRedirects(true);
         final String m3u8 = param.getCryptedUrl().replaceFirst("(?i)^m3u8://", "");
         final GetRequest get = br.createGetRequest(m3u8);
-        if (refererURL != null) {
-            get.getHeaders().put("Referer", refererURL);
+        if (enforceReferrerURL != null) {
+            try {
+                URLHelper.verifyURL(new URL(enforceReferrerURL));
+                br.setCurrentURL(enforceReferrerURL);
+                br.setBrowserReferrerPolicy(REFERRER_POLICY.UNSAFE_URL);// we enforce the custom referrer
+                br.getPage(enforceReferrerURL);
+                logger.info("Actually used referer: " + enforceReferrerURL);
+            } catch (final IOException ignore) {
+                logger.log(ignore);
+            }
         }
         br.getPage(get);
         if (br.getHttpConnection() == null || br.getHttpConnection().getResponseCode() == 403 || br.getHttpConnection().getResponseCode() == 404) {
@@ -142,7 +144,7 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
             logger.info("!Response is not a valid HLS construct according to headers!");
             /* This is only an indicator. Continue anyways. */
         }
-        return parseM3U8(this, m3u8, br, refererURL, cookiesString, preSetTitle);
+        return parseM3U8(this, m3u8, br, br.getRequest().getHeaders().getValue(HTTPConstants.HEADER_REQUEST_REFERER), cookiesString, preSetTitle);
     }
 
     public static ArrayList<DownloadLink> parseM3U8(final PluginForDecrypt plugin, final String m3u8URL, final Browser br, final String referer, final String cookiesString, final String preSetTitle) throws Exception {
