@@ -17,12 +17,14 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -31,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50311 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51681 $", interfaceVersion = 3, names = {}, urls = {})
 public class CutyIo extends PluginForDecrypt {
     public CutyIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +42,7 @@ public class CutyIo extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "cuty.io", "cutty.app", "cety.app" });
+        ret.add(new String[] { "cuty.io", "cutty.app", "cety.app", "cuttlinks.com" });
         return ret;
     }
 
@@ -60,12 +62,16 @@ public class CutyIo extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[A-Za-z0-9]+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final String content_id = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        if (content_id.toLowerCase(Locale.ENGLISH).equals(content_id) && !content_id.matches(".*\\d+.*")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());

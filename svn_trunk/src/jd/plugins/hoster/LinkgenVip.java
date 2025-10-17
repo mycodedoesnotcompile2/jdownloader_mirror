@@ -23,7 +23,8 @@ import java.util.Locale;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -49,10 +50,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51679 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
 public class LinkgenVip extends PluginForHost {
     /* Connection limits */
     private static MultiHosterManagement mhm = new MultiHosterManagement("linkgen.vip");
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+    }
 
     public LinkgenVip(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,11 +91,6 @@ public class LinkgenVip extends PluginForHost {
     public void handlePremium(DownloadLink link, Account account) throws Exception {
         /* handle premium should never be called */
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-    }
-
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
     }
 
     @Override
@@ -268,10 +269,19 @@ public class LinkgenVip extends PluginForHost {
 
     private void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
+            /*
+             * 2025-10-16: Added cookie login support for users who are stuck on normal login due to website using Cloudflare Turnstile
+             * captcha.
+             */
             final Cookies cookies = account.loadCookies("");
+            final Cookies userCookies = account.loadUserCookies();
             final String targetPath = "/downloader.php";
-            if (cookies != null) {
-                this.br.setCookies(this.getHost(), cookies);
+            if (cookies != null || userCookies != null) {
+                if (userCookies != null) {
+                    br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
+                }
                 if (!force) {
                     /* Do not check cookies */
                     return;
@@ -280,13 +290,22 @@ public class LinkgenVip extends PluginForHost {
                 handleLoginStep2(account);
                 if (isLoggedin(br)) {
                     logger.info("Cookie login successful");
-                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    if (userCookies == null) {
+                        account.saveCookies(br.getCookies(br.getHost()), "");
+                    }
                     return;
-                } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(null);
-                    account.clearCookies("");
                 }
+                logger.info("Cookie login failed");
+                if (userCookies != null) {
+                    /* Dead end */
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                    }
+                }
+                br.clearCookies(null);
+                account.clearCookies("");
             }
             logger.info("Performing full login");
             br.getPage("https://" + this.getHost() + "/login.php");
@@ -296,8 +315,8 @@ public class LinkgenVip extends PluginForHost {
             }
             loginform.put("username", Encoding.urlEncode(account.getUser()));
             loginform.put("password", Encoding.urlEncode(account.getPass()));
-            final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-            loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            final String captchaResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
+            loginform.put("cf-turnstile-response", Encoding.urlEncode(captchaResponse));
             /* Setting this cookie here may prevent login step number two thus speeding up login process. */
             br.setCookie(br.getHost(), "username", JDHash.getMD5(account.getUser()));
             br.submitForm(loginform);
@@ -305,6 +324,7 @@ public class LinkgenVip extends PluginForHost {
             if (!isLoggedin(br)) {
                 final String loginErrormessage = br.getRegex("class=\"error\"[^>]*>\\s*<p><b>([^<]+)</b></p>").getMatch(0);
                 if (loginErrormessage != null) {
+                    /* e.g. Account Not Active. Please Buy Premium To Gain Access */
                     throw new AccountInvalidException(Encoding.htmlDecode(loginErrormessage).trim());
                 } else {
                     throw new AccountInvalidException();

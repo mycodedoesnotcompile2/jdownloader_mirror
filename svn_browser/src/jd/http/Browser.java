@@ -154,7 +154,7 @@ public class Browser {
         }
 
         public static boolean isDowngrade(final Request current, final Request next) {
-            return StringUtils.equalsIgnoreCase("https", current.getURL().getProtocol()) && StringUtils.equalsIgnoreCase("http", next.getURL().getProtocol());
+            return StringUtils.equalsIgnoreCase("https", current.getURL().getProtocol()) && !StringUtils.equalsIgnoreCase("https", next.getURL().getProtocol());
         }
 
         public static boolean isUpgrade(final Request current, final Request next) {
@@ -2015,13 +2015,13 @@ public class Browser {
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
-            if (REFERRER_POLICY.isSameProtocol(currentRequest, nextRequest) || REFERRER_POLICY.isUpgrade(currentRequest, nextRequest)) {
+            if (REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
+                // Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
+                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
+            } else {
                 // Send the origin, path, and query string in Referer when the protocol security level stays the same or improves
                 // (HTTP→HTTP,HTTP→HTTPS, HTTPS→HTTPS)
                 return setReferrer(REFERRER_POLICY.UNSAFE_URL, nextRequest);
-            } else {
-                // Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
-                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
             }
         }
         case ORIGIN: {
@@ -2053,12 +2053,12 @@ public class Browser {
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
-            if (!REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
-                // Don't send the Referer header for cross-origin requests.
-                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
-            } else {
+            if (REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
                 // Send the origin, path, and query string for same-origin requests.
                 return setReferrer(REFERRER_POLICY.UNSAFE_URL, nextRequest);
+            } else {
+                // Don't send the Referer header for cross-origin requests.
+                return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
             }
         }
         case STRICT_ORIGIN: {
@@ -2068,12 +2068,12 @@ public class Browser {
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
-            if (REFERRER_POLICY.isSecureProtocol(currentRequest, nextRequest)) {
-                // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS)
-                return setReferrer(REFERRER_POLICY.ORIGIN, nextRequest);
-            } else {
+            if (REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
                 // Don't send the Referer header to less secure destinations (HTTPS→HTTP).
                 return setReferrer(REFERRER_POLICY.NO_REFERRER, nextRequest);
+            } else {
+                // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS)
+                return setReferrer(REFERRER_POLICY.ORIGIN, nextRequest);
             }
         }
         case STRICT_ORIGIN_WHEN_CROSS_ORIGIN: {

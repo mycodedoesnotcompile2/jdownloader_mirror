@@ -94,7 +94,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51660 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51690 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -902,6 +902,12 @@ public class OneFichierCom extends PluginForHost {
         ai.setValidUntil(calendar.getTimeInMillis());
     }
 
+    protected AccountInfo finalizeAccountInfo(final Account account, final AccountInfo accountInfo, final long creditsAsBytes) throws Exception {
+        setCdnCreditsStatus(account, accountInfo, creditsAsBytes);
+        checkForAccountTypeRelatedProblems(account);
+        return accountInfo;
+    }
+
     /**
      * 2019-04-04: This API can only be used by premium users! It might still work when a premium account expires and the key stays valid
      * but we don't know this yet!
@@ -913,64 +919,34 @@ public class OneFichierCom extends PluginForHost {
          * {"status":"KO","message":"Flood detected: IP Locked #38"} [DOWNLOADS VIA API WILL STILL WORK!!]
          */
         performAPIRequest(API_BASE + "/user/info.cgi", "");
-        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> entries = this.parseAPIResponse(account);
         final String api_error = (String) entries.get("message");
-        if (api_error != null && isAPIErrorFloodDetected(api_error)) {
+        if (isAPIErrorFloodDetected(api_error)) {
             logger.info("Cannot get account details because of API limits but account has been checked before and is ok");
             /* Set this property so API login will always be used in the future for this account. */
             account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);
             final long cachedCdnCreditsBytes = account.getLongProperty(PROPERTY_ACCOUNT_CDN_CREDITS_BYTES, -1);
-            AccountType type = null;
-            if (account.lastUpdateTime() > 0) {
-                final AccountType oldAccountType = account.getType();
-                if (!AccountType.UNKNOWN.equals(oldAccountType)) {
-                    final AccountInfo existing = account.getAccountInfo();
-                    if (existing != null) {
-                        /* return previously set AccountInfo */
-                        final long lastValidUntil = existing.getLastValidUntil();
-                        if (lastValidUntil > 0) {
-                            /* keep previously set valid until date */
-                            existing.setValidUntil(lastValidUntil);
-                        }
-                        setCdnCreditsStatus(account, existing, cachedCdnCreditsBytes);
-                        checkForAccountTypeRelatedProblems(account);
-                        return existing;
-                    }
-                }
-                type = oldAccountType;
-            } else {
-                /*
-                 * Account got added for the first time but API is blocked at the moment. We know the account must be premium because only
-                 * premium users can generate APIKeys but we cannot get any information at the moment ...
-                 */
-                logger.info("Cannot get account details because of API limits and account has never been checked before --> Adding account without info");
-                type = AccountType.UNKNOWN;
+            final AccountInfo oldAccountInfo = account.getAccountInfo();
+            if (oldAccountInfo != null && account.getLastValidTimestamp() != -1) {
+                /* Set old/previous AccountInfo */
+                logger.info("Re-using previous AccountInfo");
+                return finalizeAccountInfo(account, oldAccountInfo, cachedCdnCreditsBytes);
             }
-            if (type == null) {
-                /* If in doubt, treat account as unknown. */
-                type = AccountType.UNKNOWN;
-            }
-            if (type == AccountType.UNKNOWN) {
-                displayAPIMode_UnknownAccountTypeWarning(account);
-            }
-            account.setType(type);
-            ai.setStatus(type.getLabel() + " | Cannot obtain account info atm. | Try account-check again later. | Downloads are not affected by this message!");
+            final AccountType type_unknown = AccountType.UNKNOWN;
+            displayAPIMode_UnknownAccountTypeWarning(account);
+            account.setType(type_unknown);
+            /**
+             * Set max simultaneous downloads as if this account was a premium account. <br>
+             * If on download attempt we notice that this is not a premium account, it will get an error status either way. <br>
+             * If it is a premium account, users will be happy to be able to start more than 1 simultaneous downloads with it :)
+             */
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
-            if (type == AccountType.PREMIUM || type == AccountType.UNKNOWN) {
-                ai.setUnlimitedTraffic();
-            } else {
-                /*
-                 * Free accounts cannot be used for downloading in API mode [unless they got CDN credits and they are in use, see down
-                 * below].
-                 */
-                ai.setTrafficLeft(0);
-            }
-            setCdnCreditsStatus(account, ai, cachedCdnCreditsBytes);
-            checkForAccountTypeRelatedProblems(account);
+            final AccountInfo ai = new AccountInfo();
+            finalizeAccountInfo(account, ai, cachedCdnCreditsBytes).setStatus(type_unknown.getLabel() + " | Cannot obtain account info atm. | Try account-check again later. | Downloads are not affected by this message!");
             return ai;
         }
+        final AccountInfo ai = new AccountInfo();
         this.handleErrorsAPI(entries, account);
         /* Set this property so API login will always be used in the future for this account. */
         account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_API);
@@ -1031,9 +1007,7 @@ public class OneFichierCom extends PluginForHost {
             }
             ai.setUsedSpace(space_used_bytes);
         }
-        setCdnCreditsStatus(account, ai, creditsAsBytes);
-        checkForAccountTypeRelatedProblems(account);
-        return ai;
+        return finalizeAccountInfo(account, ai, creditsAsBytes);
     }
 
     /** Call this on every account check before returning AccountInfo. */

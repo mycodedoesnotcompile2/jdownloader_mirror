@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.StreamrecorderIo;
 
-@DecrypterPlugin(revision = "$Revision: 51365 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51679 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { StreamrecorderIo.class })
 public class StreamrecorderIoCrawler extends PluginForDecrypt {
     public StreamrecorderIoCrawler(PluginWrapper wrapper) {
@@ -143,9 +143,12 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final String recordingIDs[] = br.getRegex("loadModalPlayer\\((\\d+)").getColumn(0);
-            final String displayName = br.getRegex("<span class\\s*=\\s*\"user-name[^\"]*\"\\s*>\\s*<span>\\s*(.*?)\\s*</span>").getMatch(0);
+            String displayName = br.getRegex("<span class\\s*=\\s*\"user-name[^\"]*\"\\s*>\\s*<span>\\s*(.*?)\\s*</span>").getMatch(0);
+            if (displayName == null) {
+                displayName = br.getRegex(">\\s*This section shows the entire stream of Streamer\\s*(.*?)\\.?\\s*<").getMatch(0);
+            }
+            String title = br.getRegex(">\\s*([^>]*?\\s*Stream\\s*from\\s*<span sr-date-time.*?</span>\\s*to\\s*<span sr-date-time[^<]*</span>)\\s*</?").getMatch(0);
             if (displayName != null) {
-                String title = br.getRegex("</span>\\s*([^>]*?\\s*Stream\\s*from\\s*<span sr-date-time.*?</span>\\s*to\\s*<span sr-date-time[^<]*</span>)\\s*</?span").getMatch(0);
                 final List<DownloadLink> results = findUserRecordings(account, br.cloneBrowser(), displayName, new HashSet<String>(Arrays.asList(recordingIDs)));
                 if (results.size() > 0) {
                     ret.addAll(results);
@@ -198,7 +201,7 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String error_msg_no_recordings = "User has zero recordings";
-        final String[] user_ids = br.getRegex("content-(\\d+)").getColumn(0);
+        String[] user_ids = br.getRegex("content-(\\d+)").getColumn(0);
         if (user_ids == null || user_ids.length == 0) {
             final String totalNumberofRecordingsStr = br.getRegex("class=\"count\">(\\d+)</div>\\s*<div class=\"title\"[^^>]*>\\s*Total recordings\\s*</div>").getMatch(0);
             if (totalNumberofRecordingsStr != null && totalNumberofRecordingsStr.equals("0")) {
@@ -207,13 +210,9 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        final HashSet<String> dupes_user_ids = new HashSet<String>();
+        user_ids = new HashSet<String>(Arrays.asList(user_ids)).toArray(new String[0]);
         int numberOfUsersWithZeroRecordings = 0;
         userloop: for (final String user_id : user_ids) {
-            if (!dupes_user_ids.add(user_id)) {
-                /* Prevent crawling the same user_id multiple times. */
-                continue userloop;
-            }
             String username = null;
             int offset = 0;
             final int maxItemsPerPage = 20;
@@ -298,17 +297,24 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
             // https://streamrecorder.io/recordings/stream/
             title = (String) recording.get("title");
             if (title == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                title = "No title for recording " + recordingID;
             }
         }
         if (userID == null) {
             // https://streamrecorder.io/recordings/stream/
             userID = new Regex(StringUtils.valueOfOrNull(recording.get("profile_image_url")), "/img/profile_image/(\\d+)").getMatch(0);
+            if (userID == null) {
+                // https://streamrecorder.io/userrecordings
+                userID = (String) recording.get("targetid");
+            }
         }
         final String status = recording.get("status").toString();
         if (username == null) {
             // https://streamrecorder.io/recordings/stream/
             username = (String) recording.get("displayname");
+            if (username == null) { // https://streamrecorder.io/userrecordings
+                username = (String) recording.get("target_name");
+            }
         }
         if (Boolean.TRUE.equals(recording.get("premium_required"))) {
             logger.info("Skipping recordingID " + recordingID + " | Reason: Premium-only");

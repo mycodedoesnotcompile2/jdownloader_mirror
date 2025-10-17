@@ -444,15 +444,13 @@ public class AccountController implements AccountControllerListener, AccountProp
         } else if (account.getPlugin() == null) {
             return;
         }
-        final String lastKnownAccountType;
         final AccountType currentAccountType = account.getType();
-        if (currentAccountType != null) {
-            lastKnownAccountType = account.getStringProperty(lastKnownAccountTypeProperty, currentAccountType.name());
-            account.setProperty(lastKnownAccountTypeProperty, currentAccountType.name());
-        } else {
-            lastKnownAccountType = account.getStringProperty(lastKnownAccountTypeProperty, AccountType.UNKNOWN.name());
-            account.setProperty(lastKnownAccountTypeProperty, AccountType.UNKNOWN.name());
+        if (AccountType.UNKNOWN.equals(currentAccountType)) {
+            // unknown account type should not trigger and upOrDowngrade events
+            return;
         }
+        final String lastKnownAccountType = account.getStringProperty(lastKnownAccountTypeProperty, currentAccountType.name());
+        account.setProperty(lastKnownAccountTypeProperty, currentAccountType.name());
         final long currentValidUntilTimeStamp = account.getValidPremiumUntil();
         final boolean hasLastKnownPremiumValidUntilTimeStamp = account.hasProperty(lastKnownValidUntilTimeStampProperty);
         final long lastKnownPremiumValidUntilTimeStamp = account.getLongProperty(lastKnownValidUntilTimeStampProperty, currentValidUntilTimeStamp);

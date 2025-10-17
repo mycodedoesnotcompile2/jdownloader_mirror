@@ -25,7 +25,7 @@ import jd.PluginWrapper;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 50313 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51681 $", interfaceVersion = 3, names = {}, urls = {})
 public class MightyScriptAdLinkFlyDefault extends MightyScriptAdLinkFly {
     public MightyScriptAdLinkFlyDefault(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,7 @@ public class MightyScriptAdLinkFlyDefault extends MightyScriptAdLinkFly {
 
     private static final String[]     domains                    = { "shorts-link.com", "easy4earn.com", "linkat4all.com", "shrtz.me", "ctkings.com", "linksad.net", "paylink.pro", "123link.pro", "donia2link.com", "cutpaid.com", "shortadz.org", "itiurl.co", "shortli.net", "cutearn.ca", "icutit.ca", "cut-one.com", "cll.press", "link-zero.com", "linktor.io", "cash4url.com", "cashat.net", "123short.com", "skip-url.me", "msms4.com", "empireshort.com", "loadurl.com", "cutt.us.com", "arabdollar.com", "shortenow.com", "best3link.com", "solo-link.com", "best5link.com", "lkky.co", "win4cut.com", "adlink.guru", "ibly.co", "urle.co", "mitly.us", "zlshorte.net", "igram.im", "gram.im", "adbilty.me", "linclik.com", "oke.io", "pnd.tl", "met.bz", "urlcloud.us", "clik.pw", "z2i.com", "fant1asy.com",
             /** oei.la domains */
-            "oei.la",
+            "oei.la", "oii.la", "oko.sh", "iir.ai", "iir.la",
             /** pwrpa.cc domains */
             "pwrpa.cc",
             /** 2023-09-11: tmearn.com domains */
@@ -104,7 +104,7 @@ public class MightyScriptAdLinkFlyDefault extends MightyScriptAdLinkFly {
             /** shrinkearn.com domains */
             "shrinkearn.com", "shortearn.eu",
             /** clk.sh domains */
-            "clk.sh", "oko.sh", "iir.ai", "iir.la",
+            "clk.sh",
             /** shorted4us.com domains */
             "shorted4us.com", "thefreech.com", "sewrn.com",
             /** asrar-alrb7.com domains */
