@@ -21,6 +21,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,12 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KoofrNetFolder;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49306 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51692 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KoofrNetFolder.class })
 public class KoofrNet extends PluginForHost {
     public KoofrNet(PluginWrapper wrapper) {
@@ -98,7 +100,14 @@ public class KoofrNet extends PluginForHost {
 
     private String getInternalPath(final DownloadLink link) {
         try {
-            return UrlQuery.parse(link.getPluginPatternMatcher()).get("path");
+            final String ret = UrlQuery.parse(link.getPluginPatternMatcher()).get("path");
+            if (ret == null) {
+                return null;
+            } else if (ret.startsWith("%2F%2F")) {
+                return ret.substring(3);
+            } else {
+                return ret;
+            }
         } catch (MalformedURLException e) {
             e.printStackTrace();
             return null;
@@ -124,13 +133,23 @@ public class KoofrNet extends PluginForHost {
     }
 
     public static void parseFileInfo(final DownloadLink file, final Map<String, Object> resource) {
-        file.setFinalFileName(resource.get("name").toString());
+        final String filenName = resource.get("name").toString();
+        file.setFinalFileName(filenName);
+        file.setProperty(PROPERTY_FILENAME_FROM_CRAWLER, filenName);
         file.setVerifiedFileSize(((Number) resource.get("size")).longValue());
         file.setMD5Hash(resource.get("hash").toString());
     }
 
-    private String getDirecturl(final DownloadLink link) {
-        final String filename = link.getStringProperty(PROPERTY_FILENAME_FROM_CRAWLER);
+    private String getDirecturl(final DownloadLink link) throws PluginException {
+        String filename = link.getStringProperty(PROPERTY_FILENAME_FROM_CRAWLER);
+        final String path = getInternalPath(link);
+        if (filename == null && path != null) {
+            String tmp = URLEncode.decodeURIComponent(path);
+            filename = new Regex(tmp, "(?:.+/)?([^/]+)").getMatch(0);
+        }
+        if (filename == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final String password = link.getDownloadPassword();
         String url = "https://app.koofr.net/content/links/" + this.getFolderID(link) + "/files/get/" + Encoding.urlEncode(filename) + "?path=" + this.getInternalPath(link);
         if (password != null) {

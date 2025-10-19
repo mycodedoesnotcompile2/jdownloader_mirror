@@ -21,6 +21,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.MotherlessComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -35,12 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MotherLessCom;
 
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.MotherlessComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 50277 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51692 $", interfaceVersion = 3, names = {}, urls = {})
 public class MotherLessComCrawler extends PluginForDecrypt {
     public MotherLessComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,6 +77,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
             regex += "|G[A-Fa-f0-9]+";
             regex += "|GI[A-Fa-f0-9]+";
             regex += "|GV[A-Fa-f0-9]+";
+            regex += "|GG[A-Fa-f0-9]+";
             regex += "|u/[^/]+(\\?t=[aiv])?";
             regex += "|f/[^/]+/(?:images|galleries|videos)";
             regex += ")";
@@ -100,6 +101,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     private final String TYPE_GALLERY_IMAGE_AND_VIDEO            = "(?i)https?://[^/]+/(G([A-Fa-f0-9]+))";
     private final String TYPE_GALLERY_IMAGE                      = "https?://[^/]+/GI[A-Fa-f0-9]+$";
     private final String TYPE_GALLERY_VIDEO                      = "https?://[^/]+/GV[A-Fa-f0-9]+$";
+    private final String TYPE_GALLERY_GALLERIES                  = "https?://[^/]+/GG[A-Fa-f0-9]+$";
     private final String TYPE_GROUP_CATEGORIES_OVERVIEW          = "https?://[^/]+/g/([\\w\\-%]+)$";
     private final String TYPE_GROUP_CATEGORY_IMAGE               = "https?://[^/]+/gi/([\\w\\-%]+)$";
     private final String TYPE_GROUP_CATEGORY_VIDEO               = "https?://[^/]+/gv/([\\w\\-%]+)$";
@@ -126,13 +128,17 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(new int[] { 503 });
         if (param.getCryptedUrl().matches(TYPE_FAVOURITES_ALL)) {
-            return crawlGallery(param);
+            return crawlGallery(param, null);
         } else if (param.getCryptedUrl().matches(TYPE_USER)) {
             return crawlUser(param);
+        } else if (param.getCryptedUrl().matches(TYPE_GALLERY_IMAGE)) {
+            return crawlGallery(param, CRAWL_MODE.IMAGES);
+        } else if (param.getCryptedUrl().matches(TYPE_GALLERY_VIDEO)) {
+            return crawlGallery(param, CRAWL_MODE.VIDEOS);
+        } else if (param.getCryptedUrl().matches(TYPE_GALLERY_GALLERIES)) {
+            return crawlGallery(param, CRAWL_MODE.GALLERIES);
         } else if (param.getCryptedUrl().matches(TYPE_GALLERY_IMAGE_AND_VIDEO)) {
             return crawlSubGalleries(param);
-        } else if (param.getCryptedUrl().matches(TYPE_GALLERY_IMAGE) || param.getCryptedUrl().matches(TYPE_GALLERY_VIDEO)) {
-            return crawlGallery(param);
         } else if (param.getCryptedUrl().matches(TYPE_GROUP_CATEGORIES_OVERVIEW) || param.getCryptedUrl().matches(TYPE_GROUP_CATEGORY_IMAGE) || param.getCryptedUrl().matches(TYPE_GROUP_CATEGORY_VIDEO)) {
             return this.crawlGroups(param);
         } else {
@@ -143,7 +149,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlUser(final CryptedLink param) throws IOException, PluginException {
         br.getPage(param.getCryptedUrl());
-        return this.crawlPage(param, -1);
+        return this.crawlPage(param, null, -1);
     }
 
     private ArrayList<DownloadLink> crawlSubGalleries(final CryptedLink param) throws IOException, PluginException {
@@ -157,7 +163,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         if (MotherLessCom.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String[] subGalURLs = br.getRegex("(/G(I|V)" + subgalID + ")").getColumn(0);
+        final String[] subGalURLs = br.getRegex("(/G(I|V|G)" + subgalID + ")").getColumn(0);
         /* Remove duplicates */
         final ArrayList<String> subGalsDeduped = new ArrayList<String>();
         for (final String subGalURL : subGalURLs) {
@@ -169,7 +175,16 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         for (final String subGalURL : subGalsDeduped) {
             logger.info("Crawling subGallery " + counter + "/" + subGalURLs.length + " | URL: " + subGalURL);
             br.getPage(subGalURL);
-            ret.addAll(crawlPage(param, -1));
+            if (subGalURL.startsWith("/GV")) {
+                ret.addAll(crawlPage(param, CRAWL_MODE.VIDEOS, -1));
+            } else if (subGalURL.startsWith("/GI")) {
+                ret.addAll(crawlPage(param, CRAWL_MODE.IMAGES, -1));
+            } else if (subGalURL.startsWith("/GG")) {
+                // TODO: maybe add a setting for this?
+                // ret.addAll(crawlPage(param, CRAWL_MODE.GALLERIES, -1));
+            } else {
+                ret.addAll(crawlPage(param, null, -1));
+            }
             if (this.isAbort()) {
                 break;
             }
@@ -190,9 +205,15 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         return singlelink;
     }
 
-    private ArrayList<DownloadLink> crawlGallery(final CryptedLink param) throws IOException, PluginException {
+    private ArrayList<DownloadLink> crawlGallery(final CryptedLink param, CRAWL_MODE crawlMode) throws IOException, PluginException {
         br.getPage(param.getCryptedUrl());
-        return crawlPage(param, -1);
+        return crawlPage(param, crawlMode, -1);
+    }
+
+    private enum CRAWL_MODE {
+        VIDEOS,
+        IMAGES,
+        GALLERIES
     }
 
     /**
@@ -200,7 +221,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
      *
      * @throws PluginException
      */
-    private ArrayList<DownloadLink> crawlPage(final CryptedLink param, final int maxItemsLimit) throws IOException, PluginException {
+    private ArrayList<DownloadLink> crawlPage(final CryptedLink param, CRAWL_MODE crawlMode, final int maxItemsLimit) throws IOException, PluginException {
         if (MotherLessCom.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -230,7 +251,8 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         // }
         /**
          * Find number of pages to walk through. Website displays max 6 pages so for galleries containing more than 6 pages this value will
-         * be updated after each loop! </br> Example with a lot of pages: https://motherless.com/GIAEE5076
+         * be updated after each loop! </br>
+         * Example with a lot of pages: https://motherless.com/GIAEE5076
          */
         int maxPage = getMaxPage(br);
         final HashSet<String> pages = new HashSet<String>();
@@ -240,14 +262,16 @@ public class MotherLessComCrawler extends PluginForDecrypt {
             int numberofResultsThisPage = 0;
             /* Find all galleries of [user | user favorites, and so on] */
             /* E.g. /f/username/galleries */
-            final String[] galleries = br.getRegex("data-gallery-codename=\"([A-Z0-9]+)").getColumn(0);
-            if (galleries != null && galleries.length > 0) {
-                for (final String galleryID : galleries) {
-                    ret.add(this.createDownloadlink("https://" + this.getHost() + "/G" + galleryID));
-                    numberofResultsThisPage += 1;
+            if (CRAWL_MODE.GALLERIES.equals(crawlMode) || crawlMode == null) {
+                final String[] galleries = br.getRegex("data-gallery-codename=\"([A-Z0-9]+)").getColumn(0);
+                if (galleries != null && galleries.length > 0) {
+                    for (final String galleryID : galleries) {
+                        ret.add(this.createDownloadlink("https://" + this.getHost() + "/G" + galleryID));
+                        numberofResultsThisPage += 1;
+                    }
                 }
             }
-            final String[] videolinks = br.getRegex("<a href=\"(?:https?://[^/]+)?(/[^\"]+)\" class=\"img-container\" target=\"_self\">\\s*<span class=\"currently-playing-icon\"").getColumn(0);
+            final String[] videolinks = (CRAWL_MODE.VIDEOS.equals(crawlMode) || crawlMode == null) ? br.getRegex("<a href=\"(?:https?://[^/]+)?(/[^\"]+)\" class=\"img-container\" target=\"_self\">\\s*<span class=\"currently-playing-icon\"").getColumn(0) : null;
             if (videolinks != null && videolinks.length != 0) {
                 for (String singlelink : videolinks) {
                     final String contentID = new Regex(singlelink, "/([A-Z0-9]+$)").getMatch(0);
@@ -277,7 +301,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
                     numberofResultsThisPage += 1;
                 }
             }
-            final String[] picturelinks = br.getRegex("<a href=\"(?:https?://[^/]+)?(?:/g/[^/]+)?(/[a-zA-Z0-9]+){1,2}\"[^>]*class=\"img-container\"").getColumn(0);
+            final String[] picturelinks = (CRAWL_MODE.IMAGES.equals(crawlMode) || crawlMode == null) ? br.getRegex("<a href=\"(?:https?://[^/]+)?(?:/g/[^/]+)?(/[a-zA-Z0-9]+){1,2}\"[^>]*class=\"img-container\"").getColumn(0) : null;
             if (picturelinks != null && picturelinks.length > 0) {
                 for (String singlelink : picturelinks) {
                     final String contentID = new Regex(singlelink, "/([A-Z0-9]+$)").getMatch(0);
@@ -391,12 +415,16 @@ public class MotherLessComCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlGroupImagesAndVideos(final CryptedLink param) throws IOException, PluginException {
         br.getPage(param.getCryptedUrl());
-        return this.crawlPage(param, PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit());
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        ret.addAll(this.crawlPage(param, CRAWL_MODE.IMAGES, PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit()));
+        ret.addAll(this.crawlPage(param, CRAWL_MODE.VIDEOS, PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit()));
+        return ret;
     }
 
     /**
-     * Returns max page number for pagination according to current html code. </br> This can vary e.g. on first page it looks like last page
-     * is number 6 but once we are on page 4 the highest page number visible changes to 8.
+     * Returns max page number for pagination according to current html code. </br>
+     * This can vary e.g. on first page it looks like last page is number 6 but once we are on page 4 the highest page number visible
+     * changes to 8.
      */
     private int getMaxPage(final Browser br) throws MalformedURLException {
         final String[] pageURLs = br.getRegex("<a href=\"([^\"]+page=\\d+[^\"]*)\"").getColumn(0);

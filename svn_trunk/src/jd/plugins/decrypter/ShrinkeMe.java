@@ -19,23 +19,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.Regex;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 49534 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51692 $", interfaceVersion = 3, names = {}, urls = {})
 public class ShrinkeMe extends MightyScriptAdLinkFly {
     public ShrinkeMe(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private final String internalMainDomain = "shrinke.me";
+    private final String internalMainDomain = "shrinkme.click";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "shrinke.me", "shrinkme.io", "shrinkme.info", "shrinkme.site", "shrinkme.us", "shrinkme.dev", "shrinke.us" });
+        ret.add(new String[] { "shrinkme.click", "shrinke.me", "shrinkme.io", "shrinkme.info", "shrinkme.site", "shrinkme.us", "shrinkme.dev", "shrinke.us" });
         return ret;
     }
 
@@ -68,10 +71,30 @@ public class ShrinkeMe extends MightyScriptAdLinkFly {
     }
 
     @Override
+    protected void handleLandingRedirect(final CryptedLink param, Browser br) throws Exception {
+        super.handleLandingRedirect(param, br);
+        if (br.containsHTML("getRandomLink\\(\\)\\+\\\"\\?link")) {
+            final String id = new Regex(param.getCryptedUrl(), ".+/([A-Za-z0-9]+)").getMatch(0);
+            final Browser brc = br;
+            brc.setCookie("themezon.net", "tp", id);
+            brc.getPage("https://themezon.net/link.php?link=" + id);
+            final String location_href = brc.getRegex("window.location.href\\s*=\\s*\".*?url=(.*?)&.*?\";").getMatch(0);
+            if (location_href != null) {
+                brc.getPage(location_href);
+                Form form = brc.getFormByInputFieldKeyValue("newwpsafelink", id);
+                brc.submitForm(form);
+                brc.followRedirect(true);
+                final String goToUrl = brc.getRegex("<a href\\s*=\\s*\"([^\"]*/" + id + ")\"").getMatch(0);
+                brc.getPage(goToUrl);
+            }
+        }
+    }
+
+    @Override
     protected String getContentURL(final CryptedLink param) {
         final String contenturlOld = super.getContentURL(param);
         final String domainWithSubdomain = Browser.getHost(contenturlOld, true);
-        final String contenturlNew = contenturlOld.replaceFirst(Pattern.quote(domainWithSubdomain) + "/", "en." + internalMainDomain + "/");
+        final String contenturlNew = contenturlOld.replaceFirst(Pattern.quote(domainWithSubdomain) + "/", internalMainDomain + "/");
         if (!contenturlNew.equals(contenturlOld)) {
             logger.info("Changed URL: Old: " + contenturlOld + " | New: " + contenturlNew);
             return contenturlNew;

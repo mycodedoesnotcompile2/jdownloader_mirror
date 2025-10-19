@@ -39,7 +39,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.KoofrNet;
 
-@DecrypterPlugin(revision = "$Revision: 48185 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51692 $", interfaceVersion = 3, names = {}, urls = {})
 public class KoofrNetFolder extends PluginForDecrypt {
     public KoofrNetFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -144,7 +144,13 @@ public class KoofrNetFolder extends PluginForDecrypt {
         final List<Map<String, Object>> files = (List<Map<String, Object>>) entries2.get("files");
         for (final Map<String, Object> resource : files) {
             final String resourceName = resource.get("name").toString();
-            final String resourceurl = "https://app.koofr.net/links/" + contentID + "?path=" + Encoding.urlEncode(pathInternal + "/" + resourceName);
+            final String path;
+            if ("/".equals(pathInternal)) {
+                path = Encoding.urlEncode("/" + resourceName);
+            } else {
+                path = Encoding.urlEncode(pathInternal + "/" + resourceName);
+            }
+            final String resourceurl = "https://app.koofr.net/links/" + contentID + "?path=" + path;
             final String type = resource.get("type").toString();
             if (type.equalsIgnoreCase("dir")) {
                 /* Folder */
