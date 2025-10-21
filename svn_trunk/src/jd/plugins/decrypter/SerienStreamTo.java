@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51558 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -58,7 +58,7 @@ public class SerienStreamTo extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "s.to", "serienstream.sx", "serienstream.to", "serienstream.ch", "serien.sx", "serien.domains", "serien.cam", "190.115.18.20" });
+        ret.add(new String[] { "s.to", "serienstream.sx", "serienstream.to", "serienstream.ch", "serien.sx", "serien.domains", "serien.cam", "190.115.18.20", "186.2.175.5" });
         ret.add(new String[] { "aniworld.to" });
         return ret;
     }

@@ -1002,6 +1002,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Link is already in Downloadlist" })
     String DOWNLOAD_LIST_DUPE();
 
+    @Default(lngs = { "en" }, values = { "Link is enabled" })
+    String LinkFilterSettings_condition_link_enabled();
+
     @Default(lngs = { "en" }, values = { "Already in Downloadlist" })
     String LinkFilterSettings_DefaultFilterList_dupes();
 

@@ -15,9 +15,8 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,8 +42,6 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.JDHash;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -62,9 +59,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
-import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51559 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -286,7 +282,8 @@ public class FileCryptCc extends PluginForDecrypt {
                     break dlcContainerHandling;
                 }
                 logger.info("DLC found - trying to add it");
-                final ArrayList<DownloadLink> dlcResults = loadcontainer(br.getURL("/DLC/" + dlc_id + ".dlc").toExternalForm());
+                final Browser brc = br.cloneBrowser();
+                final List<DownloadLink> dlcResults = loadContainerFile(brc, brc.createGetRequest("/DLC/" + dlc_id + ".dlc"), Collections.singletonMap("extension", ".dlc"));
                 if (dlcResults == null || dlcResults.isEmpty()) {
                     logger.warning("DLC for current mirror is empty or something is broken!");
                     break dlcContainerHandling;
@@ -859,40 +856,6 @@ public class FileCryptCc extends PluginForDecrypt {
             }
         }
         cleanHTML = toClean;
-    }
-
-    @SuppressWarnings("deprecation")
-    private ArrayList<DownloadLink> loadcontainer(final String theLink) throws IOException, PluginException {
-        ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
-        final Browser brc = br.cloneBrowser();
-        File file = null;
-        URLConnectionAdapter con = null;
-        try {
-            con = brc.openGetConnection(theLink);
-            if (con.getResponseCode() == 200) {
-                file = JDUtilities.getResourceFile("tmp/filecryptcc/" + JDHash.getSHA1(theLink) + theLink.substring(theLink.lastIndexOf(".")));
-                if (file == null) {
-                    return links;
-                }
-                file.getParentFile().mkdirs();
-                file.deleteOnExit();
-                brc.downloadConnection(file, con);
-                if (file != null && file.exists() && file.length() > 100) {
-                    links.addAll(loadContainerFile(file));
-                }
-            }
-        } catch (Throwable e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                con.disconnect();
-            } catch (final Throwable e) {
-            }
-            if (file.exists()) {
-                file.delete();
-            }
-        }
-        return links;
     }
 
     private final void getPage(final String page) throws Exception {

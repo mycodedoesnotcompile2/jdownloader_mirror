@@ -41,6 +41,7 @@ import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
@@ -63,13 +64,44 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
     @Override
     public void browseURL(final URL url) throws IOException, URISyntaxException {
         try {
-            // it seems that unicode filenames cannot be opened with
-            // "rundll32.exe", "url.dll,FileProtocolHandler". let's try
-            // Desktop.open first
-            Desktop.getDesktop().browse(url.toURI());
+            final AtomicReference<Object> resultReference = new AtomicReference<Object>(null);
+            final Thread openThread = new Thread("browseURL:" + url) {
+                {
+                    setDaemon(true);
+                }
+
+                // desktop.open might freeze in WDesktopPeer.open....bla on win7 java 1.7u25
+                @Override
+                public void run() {
+                    try {
+                        Desktop.getDesktop().browse(url.toURI());
+                        synchronized (resultReference) {
+                            resultReference.set(Boolean.TRUE);
+                            resultReference.notifyAll();
+                        }
+                    } catch (Exception e) {
+                        synchronized (resultReference) {
+                            resultReference.set(e);
+                            resultReference.notifyAll();
+                        }
+                    }
+                }
+            };
+            openThread.start();
+            Object result = null;
+            synchronized (resultReference) {
+                result = resultReference.get();
+                if (result == null) {
+                    resultReference.wait(1000);
+                    result = resultReference.get();
+                }
+            }
+            if (Boolean.TRUE.equals(result)) {
+                return;
+            }
         } catch (final Throwable e) {
-            ProcessBuilderFactory.create("rundll32.exe", "url.dll,FileProtocolHandler", url.toExternalForm()).start();
         }
+        ProcessBuilderFactory.create("rundll32.exe", "url.dll,FileProtocolHandler", url.toExternalForm()).start();
     }
 
     @Override
@@ -90,15 +122,45 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
             throw new IOException("File does not exist " + file.getAbsolutePath());
         }
         try {
-            // it seems that unicode filenames cannot be opened with
-            // "rundll32.exe", "url.dll,FileProtocolHandler". let's try
-            // this call works for unicode paths as well.
-            // the " " parameter is a dummy parameter to represent the window
-            // name. without it, paths with space will fail
-            ProcessBuilderFactory.create("cmd", "/c", "start", "/B", " ", file.getCanonicalPath()).start();
-            // desktop.open might freeze in WDesktopPeer.open....bla on win7
-            // java 1.7u25
-            // Desktop.getDesktop().open(file);
+            final AtomicReference<Object> resultReference = new AtomicReference<Object>(null);
+            final Thread openThread = new Thread("openFile:" + file) {
+                {
+                    setDaemon(true);
+                }
+
+                // desktop.open might freeze in WDesktopPeer.open....bla on win7 java 1.7u25
+                @Override
+                public void run() {
+                    try {
+                        Desktop.getDesktop().open(file);
+                        synchronized (resultReference) {
+                            resultReference.set(Boolean.TRUE);
+                            resultReference.notifyAll();
+                        }
+                    } catch (IOException e) {
+                        synchronized (resultReference) {
+                            resultReference.set(e);
+                            resultReference.notifyAll();
+                        }
+                    }
+                }
+            };
+            openThread.start();
+            Object result = null;
+            synchronized (resultReference) {
+                result = resultReference.get();
+                if (result == null) {
+                    resultReference.wait(1000);
+                    result = resultReference.get();
+                }
+            }
+            if (result instanceof Exception) {
+                throw (Exception) result;
+            } else if (Boolean.TRUE.equals(result)) {
+                return;
+            } else {
+                ProcessBuilderFactory.create("cmd", "/c", "start", "/B", " ", file.getCanonicalPath()).start();
+            }
         } catch (final Exception e) {
             ProcessBuilderFactory.create("rundll32.exe", "url.dll,FileProtocolHandler", file.getCanonicalPath()).start();
         }

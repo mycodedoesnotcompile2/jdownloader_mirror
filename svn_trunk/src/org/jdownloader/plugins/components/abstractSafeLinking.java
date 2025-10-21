@@ -1,7 +1,5 @@
 package org.jdownloader.plugins.components;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
@@ -18,8 +16,6 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.JDHash;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -32,7 +28,6 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
-import jd.utils.JDUtilities;
 
 /**
  * abstract class to handle sites similar to safelinking type sites. <br />
@@ -43,7 +38,7 @@ import jd.utils.JDUtilities;
  * @author bismarck - parts of the original
  * @author psp - parts of the original
  */
-@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     public abstractSafeLinking(PluginWrapper wrapper) {
         super(wrapper);
@@ -176,7 +171,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                         // refresh/toggle
                         switch (0) { // Integer.parseInt(captchaType)) {
                         case 0: {
-                            /*captcha handling used to be here butdoes not exist anymore. */
+                            /* captcha handling used to be here butdoes not exist anymore. */
                             break;
                         }
                         case 1: {
@@ -607,7 +602,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                             protectedForm.put("adcopy_response", "");
                             break;
                         } else {
-                            /*captcha handling used to be here butdoes not exist anymore. */
+                            /* captcha handling used to be here butdoes not exist anymore. */
                             break;
                         }
                     }
@@ -818,42 +813,13 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         br.getRequest().setHtmlCode(res);
     }
 
-    private ArrayList<DownloadLink> loadcontainer(final String format, final CryptedLink param) throws IOException, PluginException {
-        ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
-        String containerLink = br.getRegex(regexContainer(format)).getMatch(0);
-        if (containerLink == null) {
-            return links;
+    protected ArrayList<DownloadLink> loadcontainer(final String format, final CryptedLink param) throws Exception {
+        final String containerURL = Encoding.htmlDecode(br.getRegex(regexContainer(format)).getMatch(0));
+        if (containerURL == null) {
+            return null;
         }
-        Browser brc = br.cloneBrowser();
-        final String test = Encoding.htmlDecode(containerLink);
-        File file = null;
-        URLConnectionAdapter con = null;
-        try {
-            con = openAntiDDoSRequestConnection(brc, brc.createGetRequest(test));
-            if (con.getResponseCode() == 200) {
-                file = JDUtilities.getResourceFile("tmp/generalsafelinking/" + JDHash.getSHA1(test) + format);
-                if (file == null) {
-                    return links;
-                }
-                file.getParentFile().mkdirs();
-                file.deleteOnExit();
-                brc.downloadConnection(file, con);
-                if (file != null && file.exists() && file.length() > 100) {
-                    links.addAll(loadContainerFile(file));
-                }
-            }
-        } catch (final Throwable t) {
-            t.printStackTrace();
-        } finally {
-            try {
-                con.disconnect();
-            } catch (Throwable e) {
-            }
-            if (file.exists()) {
-                file.delete();
-            }
-        }
-        return links;
+        final Browser brc = br.cloneBrowser();
+        return loadContainerFile(brc, brc.createGetRequest(containerURL), null);
     }
 
     protected String regexContainer(final String format) {
@@ -861,23 +827,23 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     }
 
     protected ArrayList<DownloadLink> decryptMultipleLinks(final CryptedLink param) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         // TODO: Add handling for offline links/containers
         if (supportsContainers()) {
             /* Container handling (if no containers found, use webprotection) */
-            decryptedLinks.addAll(loadcontainer(regexContainerDlc(), param));
-            if (!decryptedLinks.isEmpty()) {
-                return decryptedLinks;
+            ArrayList<DownloadLink> results = loadcontainer(regexContainerDlc(), param);
+            if (results != null && !results.isEmpty()) {
+                return results;
             }
-            decryptedLinks.addAll(loadcontainer(regexContainerRsdf(), param));
-            if (!decryptedLinks.isEmpty()) {
-                return decryptedLinks;
+            results = loadcontainer(regexContainerRsdf(), param);
+            if (results != null && !results.isEmpty()) {
+                return results;
             }
-            decryptedLinks.addAll(loadcontainer(regexContainerCcf(), param));
-            if (!decryptedLinks.isEmpty()) {
-                return decryptedLinks;
+            results = loadcontainer(regexContainerCcf(), param);
+            if (results != null && !results.isEmpty()) {
+                return results;
             }
         }
+        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         // TODO: don't think this is needed! confirm -raztoki, not required by keeplinks or safemylink
         /* Webprotection decryption */
         if (br.getRedirectLocation() != null && br.getRedirectLocation().equals(parameter)) {

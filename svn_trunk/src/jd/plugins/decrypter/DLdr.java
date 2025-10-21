@@ -15,9 +15,8 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -31,9 +30,8 @@ import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.PluginForDecrypt;
-import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 48442 $", interfaceVersion = 2, names = { "jdloader" }, urls = { "(jdlist://.+)|((dlc|rsdf|ccf)://.*/.+)" })
+@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 2, names = { "jdloader" }, urls = { "(jdlist://.+)|((dlc|rsdf|ccf)://.*/.+)" })
 public class DLdr extends PluginForDecrypt {
     public DLdr(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,9 +39,7 @@ public class DLdr extends PluginForDecrypt {
 
     // @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink parameter, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        String format = null;
-        String url = null;
+        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         String jdlist = new Regex(parameter.getCryptedUrl(), Pattern.compile("jdlist://(.+)", Pattern.CASE_INSENSITIVE)).getMatch(0);
         if (jdlist != null) {
             /* Links einlesen */
@@ -55,6 +51,8 @@ public class DLdr extends PluginForDecrypt {
             }
         } else {
             /* Container einlesen */
+            final String url;
+            final String format;
             if (new Regex(parameter.getCryptedUrl(), Pattern.compile("dlc://", Pattern.CASE_INSENSITIVE)).matches()) {
                 format = ".dlc";
                 url = new Regex(parameter.getCryptedUrl(), Pattern.compile("dlc://(.+)", Pattern.CASE_INSENSITIVE)).getMatch(0);
@@ -64,17 +62,14 @@ public class DLdr extends PluginForDecrypt {
             } else if (new Regex(parameter.getCryptedUrl(), Pattern.compile("rsdf://", Pattern.CASE_INSENSITIVE)).matches()) {
                 format = ".rsdf";
                 url = new Regex(parameter.getCryptedUrl(), Pattern.compile("rsdf://(.+)", Pattern.CASE_INSENSITIVE)).getMatch(0);
-            }
-            if (format == null) {
+            } else {
                 throw new DecrypterException("Unknown Container prefix");
             }
-            File container = JDUtilities.getResourceFile("container/" + System.currentTimeMillis() + format);
-            Browser.download(container, br.cloneBrowser().openGetConnection("http://" + url));
-            final List<DownloadLink> links = loadContainerFile(container);
-            for (DownloadLink dLink : links) {
-                decryptedLinks.add(dLink);
+            final Browser brc = br.cloneBrowser();
+            final ArrayList<DownloadLink> containerResults = loadContainerFile(brc, brc.createGetRequest("http://" + url), Collections.singletonMap("extension", format));
+            if (containerResults != null) {
+                return containerResults;
             }
-            container.delete();
         }
         return decryptedLinks;
     }

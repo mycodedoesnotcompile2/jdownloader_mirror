@@ -28,6 +28,17 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.GfycatConfig;
+import org.jdownloader.plugins.components.config.GfycatConfig.PreferredFormat;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -43,18 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.GfycatConfig;
-import org.jdownloader.plugins.components.config.GfycatConfig.PreferredFormat;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 50705 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51696 $", interfaceVersion = 2, names = {}, urls = {})
 public class GfyCatCom extends PluginForHost {
     public GfyCatCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,7 +127,13 @@ public class GfyCatCom extends PluginForHost {
         }
     }
 
+    public static final String PROPERTY_API_ITEM_ID = "api_item_id";
+
     protected String getFID(final DownloadLink link) {
+        final String apiItemID = link.getStringProperty(PROPERTY_API_ITEM_ID);
+        if (apiItemID != null) {
+            return apiItemID;
+        }
         final String idFromLegacyURL = new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/watch/([A-Za-z0-9]+)").getMatch(0);
         if (idFromLegacyURL != null) {
             /*

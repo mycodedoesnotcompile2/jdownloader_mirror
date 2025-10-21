@@ -1,8 +1,8 @@
 package jd.plugins.decrypter;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.appwork.storage.config.JsonConfig;
@@ -19,10 +19,12 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49601 $", interfaceVersion = 2, names = { "genericautocontainer" }, urls = { "https?://[\\w\\.:\\-@]*/.*\\.(dlc|ccf|rsdf|nzb|sfdl)$" })
+@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 2, names = { "genericautocontainer" }, urls = { "https?://[\\w\\.:\\-@]*/.*\\.(dlc|ccf|rsdf|nzb|sfdl)$" })
 public class GenericAutoContainer extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -60,32 +62,26 @@ public class GenericAutoContainer extends PluginForDecrypt {
             return ret;
         }
         final String type = new Regex(url, this.getSupportedLinks()).getMatch(0);
-        final URLConnectionAdapter con = br.openGetConnection(url);
-        File containerTemp = null;
         try {
-            if (con.isOK()) {
-                boolean seemsValidContainer = StringUtils.containsIgnoreCase(con.getContentType(), type);
-                seemsValidContainer = seemsValidContainer | (con.isContentDisposition() && StringUtils.containsIgnoreCase(Plugin.getFileNameFromConnection(con), type)) || (con.getContentLength() > 100 && (con.getContentType() == null || !StringUtils.containsIgnoreCase(con.getContentType(), "text")));
-                if (seemsValidContainer) {
-                    containerTemp = org.appwork.utils.Application.getResource("tmp/autocontainer/" + System.nanoTime() + "." + type);
-                    br.downloadConnection(containerTemp, con);
-                    if (containerTemp.exists() && containerTemp.length() > 100) {
-                        ret.addAll(loadContainerFile(containerTemp));
+            final URLConnectionAdapter con = br.openGetConnection(url);
+            try {
+                if (!con.isOK()) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final boolean maybeDLC = "dlc".equalsIgnoreCase(type) && StringUtils.containsIgnoreCase(con.getContentType(), "text");
+                if ((con.isContentDisposition() && StringUtils.containsIgnoreCase(Plugin.getFileNameFromConnection(con), type)) || (con.getContentLength() > 100 && (con.getContentType() == null || maybeDLC || !StringUtils.containsIgnoreCase(con.getContentType(), "text")))) {
+                    final ArrayList<DownloadLink> results = loadContainerFile(br, con.getRequest(), Collections.singletonMap("extension", "." + type));
+                    if (results != null) {
+                        return results;
                     }
                 }
+            } finally {
+                con.disconnect();
             }
         } catch (final IOException e) {
             logger.log(e);
-            if (ret.size() == 0) {
-                ret.add(createDownloadlink(url));
-            }
-        } finally {
-            if (containerTemp != null && containerTemp.exists()) {
-                containerTemp.delete();
-            }
-            con.disconnect();
         }
-        if (containerTemp != null && ret.size() == 0) {
+        if (ret.size() == 0) {
             ret.add(createDownloadlink(url));
         }
         return ret;

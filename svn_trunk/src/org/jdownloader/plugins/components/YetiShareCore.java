@@ -68,7 +68,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 51354 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51693 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1574,7 +1574,11 @@ public abstract class YetiShareCore extends antiDDoSForHost {
         }
         final long responsecode = con.getResponseCode();
         if (responsecode == 403) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
+            if (StringUtils.equalsIgnoreCase(con.getHeaderField(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare")) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403 (Cloudflare?)", 5 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
+            }
         } else if (responsecode == 404) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
         } else if (responsecode == 416) {

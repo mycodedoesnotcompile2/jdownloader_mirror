@@ -15,6 +15,8 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import static jd.plugins.hoster.GfyCatCom.PROPERTY_API_ITEM_ID;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -43,7 +45,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51591 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51696 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
     public RedGifsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +84,7 @@ public class RedGifsCom extends GfyCatCom {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/watch/([A-Za-z0-9]+)");
+            ret.add("https?://(?:www\\.|v3\\.)?" + buildHostsPatternPart(domains) + "/watch/([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -224,6 +226,7 @@ public class RedGifsCom extends GfyCatCom {
         }
         final String ext = getFileNameExtensionFromURL(url, ".mp4");
         final String fid = gif.get("id").toString();
+        link.setProperty(PROPERTY_API_ITEM_ID, fid);
         final String username = (String) gif.get("userName"); // can be null!
         String filename = username;
         if (!StringUtils.isEmpty(username) && !StringUtils.equals(username, fid)) {

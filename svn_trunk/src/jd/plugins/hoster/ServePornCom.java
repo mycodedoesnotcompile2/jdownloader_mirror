@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51240 $", interfaceVersion = 2, names = { "drpornofilme.com", "filmikiporno.tv", "heureporno.com", "muchoporno.xxx", "pornodoido.com", "serviporno.com" }, urls = { "https?://(?:www\\.)?drpornofilme\\.com/filme/[^/]+/", "https?://(?:www\\.)?filmikiporno\\.tv/filmy/[a-z0-9-_]+/", "https?://(?:www\\.)?heureporno\\.com/videos?/[a-z0-9-_]+/", "https?://(?:www\\.)?muchoporno\\.xxx/(?:videos|ver)/[a-z0-9-_]+/", "https?://(?:www\\.)?pornodoido\\.com/video/[a-z0-9\\-_]+/", "https?://(?:www\\.)?serviporno\\.com/videos?/[a-z0-9\\-_]+/" })
+@HostPlugin(revision = "$Revision: 51693 $", interfaceVersion = 2, names = { "drpornofilme.com", "filmikiporno.tv", "heureporno.com", "muchoporno.xxx", "pornodoido.com", "serviporno.com", "koloporno.com" }, urls = { "https?://(?:www\\.)?drpornofilme\\.com/filme/[^/]+/", "https?://(?:www\\.)?filmikiporno\\.tv/filmy/[a-z0-9-_]+/", "https?://(?:www\\.)?heureporno\\.com/videos?/[a-z0-9-_]+/", "https?://(?:www\\.)?muchoporno\\.xxx/(?:videos|ver)/[a-z0-9-_]+/", "https?://(?:www\\.)?pornodoido\\.com/video/[a-z0-9-_]+/", "https?://(?:www\\.)?serviporno\\.com/videos?/[a-z0-9-_]+/", "https?://(?:www\\.)?koloporno\\.com/filmy/[a-z0-9-_]+/" })
 public class ServePornCom extends antiDDoSForHost {
     public ServePornCom(PluginWrapper wrapper) {
         super(wrapper);

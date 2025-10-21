@@ -16,12 +16,14 @@
 package jd.plugins;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -83,8 +85,11 @@ import jd.controlling.linkcrawler.LinkCrawlerThread;
 import jd.http.Browser;
 import jd.http.Browser.BlockedByException;
 import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.utils.JDUtilities;
 
 /**
  * Dies ist die Oberklasse für alle Plugins, die Links entschlüsseln können
@@ -857,6 +862,56 @@ public abstract class PluginForDecrypt extends Plugin {
     }
 
     public LinkCrawler getCustomNextCrawler() {
+        return null;
+    }
+
+    protected ArrayList<DownloadLink> loadContainerFile(Browser br, final Request request, final Map<String, Object> optionsMap) throws Exception {
+        File file = null;
+        try {
+            final URLConnectionAdapter con;
+            if (request.isRequested() && request.getHttpConnection() != null) {
+                // continue to use already opened connection from request
+                con = request.getHttpConnection();
+            } else {
+                // open new connection
+                con = br.openRequestConnection(request);
+            }
+            try {
+                if (con.getResponseCode() == 200) {
+                    String containerExtension = optionsMap == null ? null : StringUtils.valueOfOrNull(optionsMap.get("extension"));
+                    if (containerExtension == null) {
+                        final String fileName = getFileNameFromConnection(con);
+                        containerExtension = getFileNameExtensionFromString(fileName, null);
+                    }
+                    final String tmpFile = "tmp/" + getHost() + "/" + Hash.getMD5(getCurrentLink().getURL()) + "-" + Hash.getMD5(request.getUrl()) + containerExtension;
+                    file = JDUtilities.getResourceFile(tmpFile, true);
+                    if (file == null) {
+                        throw new IOException("could not generate tmpFile:" + tmpFile);
+                    }
+                    file.delete();
+                    br.downloadConnection(file, con);
+                    if (file.exists() && file.length() > 100) {
+                        final List<DownloadLink> results = loadContainerFile(file);
+                        if (results == null || results.size() == 0) {
+                            return null;
+                        }
+                        return new ArrayList<DownloadLink>(results);
+                    }
+                } else {
+                    br.followConnection(true);
+                }
+            } finally {
+                con.disconnect();
+            }
+        } catch (Throwable e) {
+            getLogger().log(e);
+        } finally {
+            if (file != null && file.exists()) {
+                if (!file.delete()) {
+                    file.deleteOnExit();
+                }
+            }
+        }
         return null;
     }
 

@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -38,10 +39,12 @@ import jd.plugins.DecrypterRetryException;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51591 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51696 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +81,7 @@ public class RedgifsComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_USERS.pattern() + "|" + PATTERN_GALLERY_OR_SINGLE_GIF.pattern() + ")");
+            ret.add("https?://(?:www\\.|v3\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_USERS.pattern() + "|" + PATTERN_GALLERY_OR_SINGLE_GIF.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -89,7 +92,7 @@ public class RedgifsComCrawler extends PluginForDecrypt {
         this.br = plg.createNewBrowserInstance();
         final String token = plg.getTemporaryToken(br, null);
         final String username = new Regex(param.getCryptedUrl(), PATTERN_USERS).getMatch(0);
-        final String contentID = new Regex(param.getCryptedUrl(), PATTERN_GALLERY_OR_SINGLE_GIF).getMatch(0);
+        String contentID = new Regex(param.getCryptedUrl(), PATTERN_GALLERY_OR_SINGLE_GIF).getMatch(0);
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www." + this.getHost());
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www." + this.getHost() + "/");
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
@@ -191,7 +194,17 @@ public class RedgifsComCrawler extends PluginForDecrypt {
             }
         } else {
             /* Crawl single image or all images of a gallery */
-            final Map<String, Object> response = plg.getView(br, token, contentID);
+            Map<String, Object> response = null;
+            try {
+                response = plg.getView(br, token, contentID);
+            } catch (PluginException e) {
+                if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND && !contentID.equals(contentID.toLowerCase(Locale.ROOT))) {
+                    contentID = contentID.toLowerCase(Locale.ROOT);
+                    response = plg.getView(br, token, contentID);
+                } else {
+                    throw e;
+                }
+            }
             final Map<String, Object> gif_main = (Map<String, Object>) response.get("gif");
             final String galleryID = (String) gif_main.get("gallery");
             if (StringUtils.isEmpty(galleryID)) {
