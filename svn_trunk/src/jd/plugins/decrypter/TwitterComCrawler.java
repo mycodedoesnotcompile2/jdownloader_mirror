@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51628 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51697 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -1100,7 +1100,12 @@ public class TwitterComCrawler extends PluginForDecrypt {
          */
         final List<Map<String, Object>> mediasExtended = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(tweet, "extended_entities/media");
         final List<Map<String, Object>> medias = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(tweet, "entities/media");
+        final Map<String, Object> card = (Map<String, Object>) thisRoot.get("card");
         final String vmapURL = (String) JavaScriptEngineFactory.walkJson(tweet, "card/binding_values/amplify_url_vmap/string_value");
+        String legacyVideoJson = null;
+        if (card != null) {
+            legacyVideoJson = (String) JavaScriptEngineFactory.walkJson(card, "legacy/binding_values/{0}/value/string_value");
+        }
         final List<List<Map<String, Object>>> mediaLists = new ArrayList<List<Map<String, Object>>>();
         if (mediasExtended != null && mediasExtended.size() > 0) {
             mediaLists.add(mediasExtended);
@@ -1108,9 +1113,20 @@ public class TwitterComCrawler extends PluginForDecrypt {
         if (medias != null && medias.size() > 0) {
             mediaLists.add(medias);
         }
-        int mediaIndex = 0;
-        int videoIndex = 0;
+        if (mediaLists.isEmpty() && legacyVideoJson != null) {
+            /* 2025-10-21: Alternative/new source for media items */
+            final Map<String, Object> map = restoreFromString(legacyVideoJson, TypeRef.MAP);
+            final Map<String, Object> media_entities = (Map) map.get("media_entities");
+            final ArrayList<Map<String, Object>> thisMedias = new ArrayList<Map<String, Object>>();
+            for (Object value : media_entities.values()) {
+                thisMedias.add((Map<String, Object>) value);
+            }
+            mediaLists.add(thisMedias);
+        }
+        boolean foundVideo = false;
         if (mediaLists.size() > 0) {
+            int mediaIndex = 0;
+            int videoIndex = 0;
             final List<String> mediaTypesVideo = Arrays.asList(new String[] { "animated_gif", "video" });
             final String mediaTypePhoto = "photo";
             final Map<String, DownloadLink> mediaResultMap = new LinkedHashMap<String, DownloadLink>();
@@ -1159,6 +1175,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
                         }
                         dl.setProperty(PROPERTY_VIDEO_DIRECT_URLS_ARE_AVAILABLE_VIA_API_EXTENDED_ENTITY, true);
                         videoIndex++;
+                        foundVideo = true;
                         /* Add video thumbnail if possible */
                         final String photoURL = (String) media.get("media_url_https");
                         if (photoURL != null) {
@@ -1189,7 +1206,6 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     }
                     dl.setAvailable(true);
                     dl.setProperty(PROPERTY_MEDIA_INDEX, mediaIndex);
-                    dl.setProperty(PROPERTY_MEDIA_COUNT, mediasExtended.size());
                     dl.setProperty(PROPERTY_MEDIA_ID, media.get("id_str"));
                     mediaResultMap.put(keyForMap, dl);
                     mediaIndex += 1;
@@ -1208,11 +1224,14 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     logger.info("Skipped thumbnails: " + numberofSkippedVideoThumbnails);
                 }
             }
-            /* Add results to list to be returned later. */
-            retMedia.addAll(mediaResultMap.values());
+            /* Set additional properties and add results to list to be returned later. */
+            for (final DownloadLink result : mediaResultMap.values()) {
+                result.setProperty(PROPERTY_MEDIA_COUNT, mediaResultMap.size());
+                retMedia.add(result);
+            }
         }
         /* Check for fallback video source if no video item has been found until now. */
-        if (videoIndex == 0 && !StringUtils.isEmpty(vmapURL)) {
+        if (!foundVideo && !StringUtils.isEmpty(vmapURL)) {
             // TODO: 2024-03-27: Check if this is still needed
             /* Fallback handling for very old (???) content */
             /* Expect such URLs which our host plugin can handle: https://video.twimg.com/amplify_video/vmap/<numbers>.vmap */
@@ -1222,6 +1241,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
             singleVideo.setProperty(PROPERTY_TYPE, TYPE_VIDEO);
             singleVideo.setAvailable(true);
             retMedia.add(singleVideo);
+            foundVideo = true;
         }
         final ArrayList<DownloadLink> retInternal = new ArrayList<DownloadLink>();
         int itemsSkippedDueToPluginSettings = 0;

@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 51660 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51699 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -284,6 +284,12 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "ztreamhub.com" });
         ret.add(new String[] { "filenext.com" });
         ret.add(new String[] { "anon.services" });
+        /**
+         * 2025-10-21 <br>
+         * at this moment, easyupload.io looks to be broken or at least when uploading a file there, it redirects to "limewire.com" <br>
+         * The limewire.com website then also says "Your files are ready! Easyupload.io is now part of LimeWire."
+         */
+        ret.add(new String[] { "easyupload.io" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

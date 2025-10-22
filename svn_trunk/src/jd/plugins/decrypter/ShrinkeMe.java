@@ -27,7 +27,7 @@ import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51697 $", interfaceVersion = 3, names = {}, urls = {})
 public class ShrinkeMe extends MightyScriptAdLinkFly {
     public ShrinkeMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,10 +79,10 @@ public class ShrinkeMe extends MightyScriptAdLinkFly {
             brc.setCookie("themezon.net", "tp", id);
             brc.getPage("https://themezon.net/link.php?link=" + id);
             // google search redirect
-            String location_href = brc.getRegex("window.location.href\\s*=\\s*\".*?url=(.*?)&.*?\";").getMatch(0);
+            String location_href = brc.getRegex("window\\.location\\.href\\s*=\\s*\".*?url=(.*?)&.*?\";").getMatch(0);
             if (location_href == null) {
                 // normal redirect
-                location_href = brc.getRegex("window.location.href\\s*=\\s*\"(.*?)\";").getMatch(0);
+                location_href = brc.getRegex("window\\.location\\.href\\s*=\\s*\"(.*?)\";").getMatch(0);
             }
             if (location_href != null) {
                 brc.getPage(location_href);

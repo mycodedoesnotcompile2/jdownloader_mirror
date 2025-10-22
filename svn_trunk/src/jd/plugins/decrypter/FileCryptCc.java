@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51697 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -791,24 +791,25 @@ public class FileCryptCc extends PluginForDecrypt {
                 }
             }
         }
-        if (cnl != null) {
-            final Map<String, String> infos = new HashMap<String, String>();
-            infos.put("crypted", Encoding.urlDecode(cnl.getInputField("crypted").getValue(), false));
-            infos.put("jk", Encoding.urlDecode(cnl.getInputField("jk").getValue(), false));
-            String source = cnl.getInputField("source").getValue();
-            if (StringUtils.isEmpty(source)) {
-                source = url;
-            } else {
-                infos.put("source", source);
-            }
-            infos.put("source", source);
-            if (password != null) {
-                infos.put("passwords", password);
-            }
-            final String json = JSonStorage.toString(infos);
-            final DownloadLink dl = createDownloadlink("http://dummycnl.jdownloader.org/" + HexFormatter.byteArrayToHex(json.getBytes("UTF-8")));
-            ret.add(dl);
+        if (cnl == null) {
+            return ret;
         }
+        final Map<String, String> infos = new HashMap<String, String>();
+        infos.put("crypted", Encoding.urlDecode(cnl.getInputField("crypted").getValue(), false));
+        infos.put("jk", Encoding.urlDecode(cnl.getInputField("jk").getValue(), false));
+        String source = cnl.getInputField("source").getValue();
+        if (StringUtils.isEmpty(source)) {
+            source = url;
+        } else {
+            infos.put("source", source);
+        }
+        infos.put("source", source);
+        if (password != null) {
+            infos.put("passwords", password);
+        }
+        final String json = JSonStorage.serializeToJson(infos);
+        final DownloadLink dl = createDownloadlink("http://dummycnl.jdownloader.org/" + HexFormatter.byteArrayToHex(json.getBytes("UTF-8")));
+        ret.add(dl);
         return ret;
     }
 

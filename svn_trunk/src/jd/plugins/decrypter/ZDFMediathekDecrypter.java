@@ -35,9 +35,9 @@ import java.util.regex.Pattern;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
-import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -51,9 +51,12 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.M3U8Playlist;
@@ -63,7 +66,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 51702 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -1520,22 +1523,46 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
      * hosted on their other website on zdfmediathek instead as zdfmediathek is providing a fairly stable search function while other
      * websites hosting the same content such as kika.de can be complicated to parse. </br> This does not (yet) support pagination!
      */
-    public ArrayList<DownloadLink> crawlZDFMediathekSearchResultsVOD(final String tvChannel, final String searchTerm, final int maxResults) throws Exception {
-        if (StringUtils.isEmpty(tvChannel) || StringUtils.isEmpty(searchTerm)) {
+    public ArrayList<DownloadLink> crawlZDFMediathekSearchResultsVOD(final String tvChannel, final String searchTerm, final int maxResults, final String externalID) throws Exception {
+        if (StringUtils.isEmpty(tvChannel) || StringUtils.isEmpty(searchTerm) || StringUtils.isEmpty(externalID)) {
             /* Developer mistake */
             return null;
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage("https://www.zdf.de/suche?q=" + Encoding.urlEncode(searchTerm) + "&synth=true&sender=" + Encoding.urlEncode(tvChannel) + "&from=&to=&attrs=&abName=&abGroup=gruppe-a");
-        final String[] urls = br.getRegex("\"(/[^\"]+)\"[^>]*class=\"teaser-title-link m-clickarea-action js-track-click\"").getColumn(0);
-        logger.info("Found " + urls.length + " search results on page 1");
-        for (String url : urls) {
-            url = br.getURL(url).toString();
-            ret.add(super.createDownloadlink(url));
-            if (ret.size() == maxResults) {
-                break;
+        if (!externalID.startsWith("zdf-")) {
+            return null;
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.getPage("https://www.zdf.de/suche");
+        final String apiToken = brc.getRegex("appToken\\\\\"\\s*:\\s*\\{\\\\\"apiToken\\\\\"\\s*:\\s*\\\\\"([^\\\\\"]+)").getMatch(0);
+        final String appID = brc.getRegex("graphql\\\\\"\\s*,\\s*\\\\\"appId\\\\\"\\s*:\\s*\\\\\"([^\\\\\"]+)").getMatch(0);
+        if (apiToken == null) {
+            logger.info("appToken/apiToken not found");
+            return null;
+        } else if (appID == null) {
+            logger.info("app-id not found");
+            return null;
+        }
+        final String queryText = JSonStorage.serializeToJson(searchTerm);
+        final Request request = brc.createGetRequest("https://api.zdf.de/graphql?operationName=getSearchResults&variables=" + URLEncode.encodeURIComponent("{\"query\":" + queryText + ",\"mode\":\"TOP_RESULTS\",\"group\":\"gruppe-a\",\"filters\":{\"contentOwner\":[],\"fsk\":[],\"language\":[]},\"first\":6,\"after\":null}") + "&extensions=" + URLEncode.encodeURIComponent("{\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"12fb4b8055562757fb20426cb0ec4611ace91aff12d2456a12eeb740f9fcaee8\"}}"));
+        request.getHeaders().put("api-auth", "Bearer " + apiToken);
+        request.getHeaders().put("Accept", "*/*");
+        request.getHeaders().put("content-type", "application/json");
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.zdf.de");
+        request.getHeaders().put("zdf-app-id", appID);
+        brc.getPage(request);
+        final Map<String, Object> response = restoreFromString(request.getHtmlCode(), TypeRef.MAP);
+        final List<Map<String, Object>> results = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(response, "data/searchDocuments/results");
+        for (Map<String, Object> result : results) {
+            result = (Map<String, Object>) result.get("item");
+            final Map<String, Object> video = (Map<String, Object>) result.get("video");
+            if (StringUtils.contains(externalID, (String) video.get("id"))) {
+                final String sharingURL = result.get("sharingUrl").toString();
+                final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+                final DownloadLink found = createDownloadlink(sharingURL);
+                ret.add(found);
+                return ret;
             }
         }
-        return ret;
+        return null;
     }
 }
