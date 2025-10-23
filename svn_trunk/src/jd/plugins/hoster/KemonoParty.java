@@ -48,7 +48,7 @@ import jd.plugins.decrypter.KemonoPartyCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 51649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51705 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -64,7 +64,8 @@ public class KemonoParty extends PluginForHost {
     public static String                      PROPERTY_PORTAL             = "portal";
     public static String                      PROPERTY_USERID             = "userid";
     public static String                      PROPERTY_USERNAME           = "username";
-    public static String                      PROPERTY_POSTID             = "postid";
+    public static String                      PROPERTY_POST_ID             = "postid";
+    public static String                      PROPERTY_REVISION_ID        = "revisionid";
     public static String                      PROPERTY_DATE               = "date";
     public static String                      PROPERTY_DATE_EDIT          = "date_edit";
     public static String                      PROPERTY_POST_CONTENT_INDEX = "postContentIndex";
@@ -125,7 +126,7 @@ public class KemonoParty extends PluginForHost {
             }
             final String portal = link.getStringProperty(PROPERTY_PORTAL);
             final String userid = link.getStringProperty(PROPERTY_USERID);
-            final String postid = link.getStringProperty(PROPERTY_POSTID);
+            final String postid = link.getStringProperty(PROPERTY_POST_ID);
             if (this.isTextFile(link)) {
                 fid = UNIQUE_ID_PREFIX + "textfile/portal/" + portal + "/user/" + userid + "/post/" + postid;
             } else {
@@ -152,7 +153,7 @@ public class KemonoParty extends PluginForHost {
     private String getFID(final DownloadLink link) {
         final String portal = link.getStringProperty(PROPERTY_PORTAL);
         final String userid = link.getStringProperty(PROPERTY_USERID);
-        final String postid = link.getStringProperty(PROPERTY_POSTID);
+        final String postid = link.getStringProperty(PROPERTY_POST_ID);
         final int index = link.getIntegerProperty(PROPERTY_POST_CONTENT_INDEX, -1);
         if (portal != null && userid != null && postid != null && index != -1) {
             /* Media/Files */

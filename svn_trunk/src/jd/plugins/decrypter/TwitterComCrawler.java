@@ -77,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 51697 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51704 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -852,7 +852,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
     private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByMaxitems             = new HashSet<DownloadLink>();
     private final HashSet<DownloadLink> globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet = new HashSet<DownloadLink>();
     private long                        globalSumberofSkippedDeadTweets                          = 0;                          // Counts
-                                                                                                                               // TweetTombstone
+    // TweetTombstone
     // items
 
     private ArrayList<DownloadLink> crawlUserProfileGraphqlTimelineInstructions(final List<Map<String, Object>> timelineInstructions, final Map<String, Object> user, final String singleTweetID, final FilePackage fp, final boolean crawlUserLikes) throws Exception {
@@ -880,7 +880,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
     }
 
     /** Crawls all Tweets inside _any_ given Map. */
-    private ArrayList<DownloadLink> crawlTweets(final Map<String, Object> sourcemap, final Map<String, Object> user, final String singleTweetID, final FilePackage fp, final boolean allowSkipRetweets) throws PluginException, MalformedURLException {
+    private ArrayList<DownloadLink> crawlTweets(final Map<String, Object> sourcemap, final Map<String, Object> user, final String singleTweetID, final FilePackage fp, final boolean allowSkipRetweets) throws Exception {
         // final String username = user != null ? user.get("screen_name").toString() : null;
         final List<Map<String, Object>> tweetResults = new ArrayList<Map<String, Object>>();
         final ArrayList<DownloadLink> allowedResults = new ArrayList<DownloadLink>();
@@ -1050,7 +1050,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
      * @param username
      *            : Pre given username (only needed if we know in beforehand that all Tweet items we will process belong to one user).
      */
-    private ArrayList<DownloadLink> crawlTweetMap(String username, final Map<String, Object> thisRoot, FilePackage fp) throws MalformedURLException, PluginException {
+    private ArrayList<DownloadLink> crawlTweetMap(String username, final Map<String, Object> thisRoot, FilePackage fp) throws Exception {
         final TwitterConfigInterface cfg = PluginJsonConfig.get(TwitterConfigInterface.class);
         final Map<String, Object> tweet = (Map<String, Object>) thisRoot.get("legacy");
         final Map<String, Object> user = (Map<String, Object>) JavaScriptEngineFactory.walkJson(thisRoot, "core/user_results/result/legacy");
@@ -1102,10 +1102,6 @@ public class TwitterComCrawler extends PluginForDecrypt {
         final List<Map<String, Object>> medias = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(tweet, "entities/media");
         final Map<String, Object> card = (Map<String, Object>) thisRoot.get("card");
         final String vmapURL = (String) JavaScriptEngineFactory.walkJson(tweet, "card/binding_values/amplify_url_vmap/string_value");
-        String legacyVideoJson = null;
-        if (card != null) {
-            legacyVideoJson = (String) JavaScriptEngineFactory.walkJson(card, "legacy/binding_values/{0}/value/string_value");
-        }
         final List<List<Map<String, Object>>> mediaLists = new ArrayList<List<Map<String, Object>>>();
         if (mediasExtended != null && mediasExtended.size() > 0) {
             mediaLists.add(mediasExtended);
@@ -1113,15 +1109,43 @@ public class TwitterComCrawler extends PluginForDecrypt {
         if (medias != null && medias.size() > 0) {
             mediaLists.add(medias);
         }
-        if (mediaLists.isEmpty() && legacyVideoJson != null) {
+        legacyVideoJson: if (mediaLists.isEmpty() && card != null) {
             /* 2025-10-21: Alternative/new source for media items */
-            final Map<String, Object> map = restoreFromString(legacyVideoJson, TypeRef.MAP);
-            final Map<String, Object> media_entities = (Map) map.get("media_entities");
-            final ArrayList<Map<String, Object>> thisMedias = new ArrayList<Map<String, Object>>();
-            for (Object value : media_entities.values()) {
-                thisMedias.add((Map<String, Object>) value);
+            try {
+                final List<Map<String, Object>> binding_values = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(card, "legacy/binding_values");
+                String legacyVideoJson = null;
+                for (final Map<String, Object> binding_value : binding_values) {
+                    final String key = binding_value.get("key").toString();
+                    if (!key.equalsIgnoreCase("unified_card")) {
+                        continue;
+                    }
+                    final Object valueO = binding_value.get("value");
+                    if (!(valueO instanceof Map)) {
+                        continue;
+                    }
+                    final Map<String, Object> value = (Map<String, Object>) valueO;
+                    legacyVideoJson = value.get("string_value").toString();
+                    break;
+                }
+                if (legacyVideoJson == null) {
+                    /* No legacyVideoJson available */
+                    break legacyVideoJson;
+                }
+                final Map<String, Object> map = restoreFromString(legacyVideoJson, TypeRef.MAP);
+                final Map<String, Object> media_entities = (Map) map.get("media_entities");
+                final ArrayList<Map<String, Object>> thisMedias = new ArrayList<Map<String, Object>>();
+                for (Object value : media_entities.values()) {
+                    thisMedias.add((Map<String, Object>) value);
+                }
+                mediaLists.add(thisMedias);
+            } catch (final Exception e) {
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    /* Throw exception to notify developers that something is off. */
+                    throw e;
+                }
+                logger.log(e);
+                logger.warning("Video legacy handling failed due to exception");
             }
-            mediaLists.add(thisMedias);
         }
         boolean foundVideo = false;
         if (mediaLists.size() > 0) {

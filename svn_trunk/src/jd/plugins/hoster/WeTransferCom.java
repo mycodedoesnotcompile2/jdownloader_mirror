@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,9 +33,14 @@ import java.util.zip.ZipFile;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -56,6 +62,7 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
@@ -64,10 +71,13 @@ import org.jdownloader.controlling.FileStateManager.FILESTATE;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-@HostPlugin(revision = "$Revision: 51444 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 51711 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.enablePremium("https://auth." + getHost() + "/signup");
+        }
     }
 
     @Override
@@ -79,12 +89,12 @@ public class WeTransferCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://wetransfer.com/de-DE/explore/legal/terms";
+        return "https://" + getHost() + "/en-US/explore/legal/terms";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     public static Browser prepBRWebsite(final Browser br) {
@@ -102,14 +112,16 @@ public class WeTransferCom extends PluginForHost {
     }
 
     /* 2019-09-30: https://play.google.com/store/apps/details?id=com.wetransfer.app.live */
-    public static final String   API_BASE_AUTH                   = "https://api.wetransfermobile.com/v1";
-    public static final String   API_BASE_NORMAL                 = "https://api.wetransfermobile.com/v2";
-    private static final Pattern TYPE_DOWNLOAD                   = Pattern.compile("https?://wetransferdecrypted/([a-f0-9]{46})/([a-f0-9]{4,12})/([a-f0-9]{46})");
-    public static final String   PROPERTY_DIRECT_LINK            = "direct_link";
-    public static final String   PROPERTY_DIRECT_LINK_EXPIRES_AT = "direct_link_expires_at";
-    public static final String   PROPERTY_SINGLE_ZIP             = "single_zip";
-    public static final String   PROPERTY_COLLECTION_ID          = "collection_id";
-    public static final String   PROPERTY_COLLECTION_FILE_ID     = "collection_file_id";
+    public static final String   API_BASE_AUTH                          = "https://api.wetransfermobile.com/v1";
+    public static final String   API_BASE_NORMAL                        = "https://api.wetransfermobile.com/v2";
+    public static final String   API_BASE_LOGIN                         = "https://wetransfer.com/adroit/api";
+    private static final Pattern TYPE_DOWNLOAD                          = Pattern.compile("https?://wetransferdecrypted/([a-f0-9]{46})/([a-f0-9]{4,12})/([a-f0-9]{46})");
+    public static final String   PROPERTY_DIRECT_LINK                   = "direct_link";
+    public static final String   PROPERTY_DIRECT_LINK_EXPIRES_AT        = "direct_link_expires_at";
+    public static final String   PROPERTY_SINGLE_ZIP                    = "single_zip";
+    public static final String   PROPERTY_COLLECTION_ID                 = "collection_id";
+    public static final String   PROPERTY_COLLECTION_FILE_ID            = "collection_file_id";
+    public static final String   PROPERTY_DOWNLOADER_EMAIL_VERIFICATION = "downloader_email_verification";
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -122,6 +134,10 @@ public class WeTransferCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformation(link, null);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         setBrowserExclusive();
         prepBRWebsite(br);
         final String directurl = link.getStringProperty(PROPERTY_DIRECT_LINK);
@@ -129,6 +145,13 @@ public class WeTransferCom extends PluginForHost {
         if (directurl != null && directurlExpiresTimestamp > System.currentTimeMillis()) {
             /* Trust direct-URL to still be usable so item is online. */
             return AvailableStatus.TRUE;
+        }
+        final String error_text_account_required = "Free account required to download this file";
+        if (account == null && this.isAccountRequired(link)) {
+            throw new AccountRequiredException(error_text_account_required);
+        }
+        if (account != null) {
+            this.login(account, false);
         }
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), TYPE_DOWNLOAD);
         if (urlinfo.patternFind()) {
@@ -150,6 +173,7 @@ public class WeTransferCom extends PluginForHost {
             }
             final String domain_user_id = br.getRegex("user\\s*:\\s*\\{\\s*\"key\"\\s*:\\s*\"(.*?)\"").getMatch(0);
             final String csrfToken = br.getRegex("name\\s*=\\s*\"csrf-token\"\\s*content\\s*=\\s*\"(.*?)\"").getMatch(0);
+            String passCode = link.getDownloadPassword();
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("security_hash", security_hash);
             if (this.isSingleZip(link)) {
@@ -164,6 +188,12 @@ public class WeTransferCom extends PluginForHost {
             if (domain_user_id != null) {
                 postdata.put("domain_user_id", domain_user_id);
             }
+            if (link.isPasswordProtected()) {
+                if (passCode == null) {
+                    passCode = getUserInput("Password?", link);
+                }
+                postdata.put("password", passCode);
+            }
             final PostRequest post = new PostRequest(br.getURL(("/api/v4/transfers/" + folder_id + "/download")));
             post.getHeaders().put("Accept", "application/json");
             post.getHeaders().put("Content-Type", "application/json");
@@ -174,10 +204,28 @@ public class WeTransferCom extends PluginForHost {
             }
             post.setPostDataString(JSonStorage.serializeToJson(postdata));
             br.getPage(post);
-            if (br.getHttpConnection().getResponseCode() == 404) {
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (br.getHttpConnection().getResponseCode() == 403) {
+                final String message = (String) entries.get("message");
+                if ("invalid_transfer_password".equalsIgnoreCase(message)) {
+                    link.setPasswordProtected(true);
+                    link.setDownloadPassword(null);
+                    throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered or password required");
+                } else if ("No download access to this Transfer".equalsIgnoreCase(message)) {
+                    /* Set property so such items will be instantly skipped when no account is available */
+                    if (!link.hasProperty(PROPERTY_DOWNLOADER_EMAIL_VERIFICATION)) {
+                        link.setProperty(PROPERTY_DOWNLOADER_EMAIL_VERIFICATION, "tracking");
+                    }
+                    throw new AccountRequiredException(error_text_account_required);
+                } else if (message != null) {
+                    /* Unknown error */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, message);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Error 403");
+                }
+            } else if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String error = (String) entries.get("error");
             if (error != null) {
                 if (error.equalsIgnoreCase("invalid_transfer")) {
@@ -189,6 +237,10 @@ public class WeTransferCom extends PluginForHost {
             final String direct_link = (String) entries.get("direct_link");
             if (!StringUtils.isEmpty(direct_link)) {
                 link.setProperty(PROPERTY_DIRECT_LINK, direct_link);
+            }
+            /* Save valid download password if we know it. */
+            if (link.isPasswordProtected()) {
+                link.setDownloadPassword(passCode);
             }
         } else {
             final String collectionID = link.getStringProperty(PROPERTY_COLLECTION_ID);
@@ -268,6 +320,10 @@ public class WeTransferCom extends PluginForHost {
         }
     }
 
+    private boolean isAccountRequired(final DownloadLink link) {
+        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_DOWNLOADER_EMAIL_VERIFICATION), "tracking");
+    }
+
     private long getStoredDirecturlValidityTimestamp(final DownloadLink link) {
         return link.getLongProperty(PROPERTY_DIRECT_LINK_EXPIRES_AT, 0) * 1000;
     }
@@ -314,6 +370,16 @@ public class WeTransferCom extends PluginForHost {
         final File srcDst = new File(link.getFileOutput());
         ZipFile zipFile = null;
         try {
+            final FileInputStream fis = new FileInputStream(srcDst);
+            try {
+                if (fis.read() != 0x50 || fis.read() != 0x4B) {
+                    // no zip magic found
+                    return;
+                }
+            } finally {
+                fis.close();
+            }
+
             zipFile = new ZipFile(srcDst);
         } catch (IOException e) {
             logger.log(e);
@@ -442,6 +508,122 @@ public class WeTransferCom extends PluginForHost {
         return link.getBooleanProperty(PROPERTY_SINGLE_ZIP, false);
     }
 
+    private Map<String, Object> login(final Account account, final boolean force) throws Exception {
+        synchronized (account) {
+            br.setCookiesExclusive(true);
+            final Cookies userCookies = account.loadCookies("");
+            logger.info("Attempting cookie login");
+            br.setCookies(userCookies);
+            String access_token = account.getStringProperty("access_token");
+            if (!force) {
+                /* Don't validate cookies */
+                return null;
+            }
+            // TODO: Fix this -> Obtain auth_token via cookies and the request down below
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("client_id", "TODO");
+            postdata.put("code", "TODO");
+            postdata.put("code_verifier", "TODO");
+            postdata.put("grant_type", "authorization_code");
+            postdata.put("redirect_uri", "https://wetransfer.com/account/callback?finalizeSSOAuth=1&login=1");
+            br.postPageRaw("https://auth.wetransfer.com/oauth/token", JSonStorage.serializeToJson(postdata));
+            final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            access_token = resp.get("access_token").toString();
+            account.setProperty("access_token", access_token);
+            // TODO: Fix this: Either set authorization header or add handling that creates fresh auth header via cookies
+            br.getHeaders().put("Authorization", "Bearer " + access_token);
+            br.getPage(API_BASE_LOGIN + "/v1/users/me");
+            final Map<String, Object> entries = (Map<String, Object>) this.checkErrorsAPI(br);
+            return entries;
+        }
+    }
+
+    private Object checkErrorsAPI(final Browser br) throws PluginException {
+        final Object object = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        if (!(object instanceof Map)) {
+            return object;
+        }
+        final Map<String, Object> map = (Map<String, Object>) object;
+        final String error = (String) map.get("error");
+        if (error == null) {
+            /* No error */
+            return map;
+        }
+        // TODO: Add better errorhandling
+        final int statusCode = ((Number) map.get("statusCode")).intValue();
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "ErrorCode " + statusCode);
+    }
+
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        final AccountInfo ai = new AccountInfo();
+        final Map<String, Object> user = login(account, true);
+        if (Boolean.TRUE.equals(user.get("blocked"))) {
+            /* This should be a super rare case! */
+            throw new AccountInvalidException("Your account is banned/blocked");
+        }
+        /*
+         * Plugin supports cookie login only -> User cound enter anything into username field -> Set username here so we can be sure to have
+         * an unique username.
+         */
+        final String email = (String) user.get("email");
+        if (!StringUtils.isEmpty(email)) {
+            account.setUser(email);
+        }
+        ai.setUnlimitedTraffic();
+        int activePremiumPackages = 0;
+        int activeFreePackages = 0;
+        int activeMiscPackages = 0;
+        final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) user.get("subscriptions");
+        for (Map<String, Object> subscription : subscriptions) {
+            subscription = (Map<String, Object>) subscription.get("subscription");
+            final String status = subscription.get("status").toString();
+            if (!"active".equalsIgnoreCase(status)) {
+                continue;
+            }
+            // TODO: Add check for premium packages
+            final String tier = subscription.get("tier").toString();
+            if (tier.equalsIgnoreCase("free")) {
+                activeFreePackages += 1;
+            } else {
+                activeMiscPackages += 1;
+            }
+        }
+        if (activePremiumPackages > 0) {
+            // TODO: Set expire date
+            account.setType(AccountType.PREMIUM);
+        } else if (activeFreePackages > 0) {
+            account.setType(AccountType.FREE);
+        } else {
+            account.setType(AccountType.UNKNOWN);
+        }
+        return ai;
+    }
+
+    // @Override
+    // public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+    // this.handleDownload(link, account);
+    // }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        return false;
+    }
+
+    @Override
+    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
+        if (account == null && this.isAccountRequired(link)) {
+            /* Without account it's not possible to download this link. */
+            return false;
+        }
+        return super.canHandle(link, account);
+    }
+
     @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return WetransferConfig.class;
@@ -491,10 +673,6 @@ public class WeTransferCom extends PluginForHost {
         CrawlMode getCrawlMode2();
 
         void setCrawlMode2(final CrawlMode mode);
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

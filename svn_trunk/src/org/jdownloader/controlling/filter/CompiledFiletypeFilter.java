@@ -700,6 +700,7 @@ public class CompiledFiletypeFilter {
         MP2,
         MPA,
         MIDI("midi?"),
+        MMP("mmpz?"), // https://docs.lmms.io/user-manual/getting-started/settings#misc
         OMG,
         OMF,
         SND,

@@ -19,6 +19,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,12 +53,14 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
 import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
 import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51650 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51709 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,13 +110,13 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?.+)?)(/post/[a-z0-9]+)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[^/]+/user/([\\w\\-\\.]+(\\?.+)?)(/post/[a-z0-9]+(/revision/(\\d+))?)?");
         }
         return ret.toArray(new String[0]);
     }
 
     private final String TYPE_PROFILE = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)(\\?.+)?$";
-    private final String TYPE_POST    = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)/post/([a-z0-9]+)$";
+    private final String TYPE_POST    = "(?i)(?:https?://[^/]+)?/([^/]+)/user/([\\w\\-\\.]+)/post/([a-z0-9]+)(/revision/(\\d+))?$";
     private KemonoParty  hostPlugin   = null;
     private CryptedLink  cl           = null;
 
@@ -266,18 +269,24 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 page++;
             }
         } while (!this.isAbort());
-        logger.info("Need to process " + retryWithSinglePostAPI.size() + " items again due to maybe incomplete post content");
-        while (!this.isAbort() && retryWithSinglePostAPI.size() > 0) {
-            final String nextRetryPostID = retryWithSinglePostAPI.iterator().next();
-            retryWithSinglePostAPI.remove(nextRetryPostID);
-            final ArrayList<DownloadLink> thisresults = crawlPostAPI(br, service, usernameOrUserID, nextRetryPostID);
-            for (final DownloadLink thisresult : thisresults) {
+        final int retryWithSinglePostAPISize = retryWithSinglePostAPI.size();
+        logger.info("Need to process " + retryWithSinglePostAPISize + " items again due to maybe incomplete post content");
+        crawl_single_posts: {
+            int singlePostAPIIndex = 0;
+            while (!this.isAbort() && retryWithSinglePostAPI.size() > 0) {
+                singlePostAPIIndex++;
+                final String nextRetryPostID = retryWithSinglePostAPI.iterator().next();
+                retryWithSinglePostAPI.remove(nextRetryPostID);
+                final ArrayList<DownloadLink> thisresults = crawlPostAPI(br, service, usernameOrUserID, nextRetryPostID, null);
                 if (!perPostPackageEnabled) {
-                    thisresult._setFilePackage(profileFilePackage);
+                    for (final DownloadLink thisresult : thisresults) {
+                        thisresult._setFilePackage(profileFilePackage);
+                    }
                 }
+                distribute(thisresults);
+                ret.addAll(thisresults);
+                logger.info("Crawled single post " + singlePostAPIIndex + "/" + retryWithSinglePostAPISize + " | Found items for postID " + nextRetryPostID + ": " + thisresults.size() + " | Total so far: " + ret.size());
             }
-            distribute(thisresults);
-            ret.addAll(thisresults);
         }
         return ret;
     }
@@ -313,23 +322,72 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final String service = urlinfo.getMatch(0);
         final String usernameOrUserID = urlinfo.getMatch(1);
         final String postID = urlinfo.getMatch(2);
-        return crawlPostAPI(br, service, usernameOrUserID, postID);
+        final String revisionID = urlinfo.getMatch(4);
+        return crawlPostAPI(br, service, usernameOrUserID, postID, revisionID);
     }
 
     /** API docs: https://kemono.su/api/schema */
-    private ArrayList<DownloadLink> crawlPostAPI(final Browser br, final String service, final String userID, final String postID) throws Exception {
+    private ArrayList<DownloadLink> crawlPostAPI(final Browser br, final String service, final String userID, final String postID, final String revisionID) throws Exception {
         if (service == null || userID == null || postID == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(br, this.getApiBase() + "/" + service + "/user/" + userID + "/post/" + postID);
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        /* 2024-11-06: Looks like they are playing around with API changes. */
-        Map<String, Object> post = (Map<String, Object>) entries.get("post");
-        if (post == null) {
-            post = entries;
+        if (revisionID != null && !revisionID.matches("\\d+")) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        return crawlProcessPostAPI(post, new HashSet<String>(), false);
+        String url = this.getApiBase() + "/" + service + "/user/" + userID + "/post/" + postID;
+        final PostRevisionMode revisionMode = cfg.getPostRevisionMode().getMode();
+        final boolean request_specific_revision = true;
+        if (PostRevisionMode.SELECTED.equals(revisionMode) && revisionID != null && request_specific_revision) {
+            url += "/revision/" + revisionID;
+        }
+        getPage(br, url);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Map<String, Object>> postRevisions = new HashMap<String, Map<String, Object>>();
+        mainPostResponse: {
+            final Map<String, Object> post = (Map<String, Object>) entries.get("post");
+            postRevisions.put(StringUtils.valueOfOrNull(post.get("revision_id")), post);// null -> head revision
+        }
+        otherPostRevisions: {
+            final List<List<Object>> revisions = (List<List<Object>>) JavaScriptEngineFactory.walkJson(entries, "props/revisions");
+            if (revisions == null || revisions.size() == 0) {
+                break otherPostRevisions;
+            }
+            for (final List<Object> revision : revisions) {
+                final Map<String, Object> post = (Map<String, Object>) revision.get(1);
+                final String post_revision = StringUtils.valueOfOrNull(post.get("revision_id"));// null -> head revision
+                if (!postRevisions.containsKey(post_revision)) {
+                    postRevisions.put(post_revision, post);
+                }
+            }
+        }
+        switch (revisionMode) {
+        case ALL:
+            break;
+        case LATEST:
+            final Map<String, Object> head = postRevisions.get(null);
+            if (head != null) {
+                postRevisions.clear();
+                postRevisions.put(null, head);
+            }
+            break;
+        case SELECTED:
+            final Map<String, Object> selected = postRevisions.get(revisionID);
+            if (selected != null) {
+                postRevisions.clear();
+                postRevisions.put(revisionID, selected);
+            }
+            break;
+        }
+        processPosts: {
+            final HashSet<String> dupe = new HashSet<String>();
+            final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+            for (Map<String, Object> postRevision : postRevisions.values()) {
+                ret.addAll(crawlProcessPostAPI(postRevision, dupe, false));
+            }
+            return ret;
+        }
     }
 
     /**
@@ -341,6 +399,14 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final String service = postmap.get("service").toString();
         final String usernameOrUserID = postmap.get("user").toString();
         final String postID = postmap.get("id").toString();
+        /**
+         * revision_id is not always given in post object. If it is not given, we are on the latest revision. <br>
+         * API sometimes refers to current revision_id as "current" but we will only store it if the field is available, then it's usually a
+         * number. <br>
+         * If it is given, we did explicitly specify a desired revision_id in the API call before. <br>
+         * If given, this field is a Number field.
+         */
+        final String revisionID = StringUtils.valueOfOrNull(postmap.get("revision_id"));
         final String posturl = "https://" + this.getHost() + "/" + service + "/user/" + usernameOrUserID + "/post/" + postID;
         final String postTitle = postmap.get("title").toString();
         /* Every item has a "published" date */
@@ -437,7 +503,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             kemonoResult.setProperty(KemonoParty.PROPERTY_PORTAL, service);
             kemonoResult.setProperty(KemonoParty.PROPERTY_USERID, usernameOrUserID);
             kemonoResult.setProperty(KemonoParty.PROPERTY_USERNAME, username);
-            kemonoResult.setProperty(KemonoParty.PROPERTY_POSTID, postID);
+            kemonoResult.setProperty(KemonoParty.PROPERTY_POST_ID, postID);
+            kemonoResult.setProperty(KemonoParty.PROPERTY_REVISION_ID, revisionID);
             kemonoResult.setAvailable(true);
             /* Add kemono item to our list of total results. */
             ret.add(kemonoResult);

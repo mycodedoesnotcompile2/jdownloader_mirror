@@ -35,6 +35,7 @@ import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
 import jd.plugins.DecrypterRetryException.RetryReason;
@@ -47,7 +48,7 @@ import jd.plugins.hoster.WeTransferCom;
 import jd.plugins.hoster.WeTransferCom.WetransferConfig;
 import jd.plugins.hoster.WeTransferCom.WetransferConfig.CrawlMode;
 
-@DecrypterPlugin(revision = "$Revision: 49912 $", interfaceVersion = 3, names = { "wetransfer.com" }, urls = { WeTransferComFolder.patternShort + "|" + WeTransferComFolder.patternNormal + "|" + WeTransferComFolder.patternCollection })
+@DecrypterPlugin(revision = "$Revision: 51708 $", interfaceVersion = 3, names = { "wetransfer.com" }, urls = { WeTransferComFolder.patternShort + "|" + WeTransferComFolder.patternNormal + "|" + WeTransferComFolder.patternCollection })
 public class WeTransferComFolder extends PluginForDecrypt {
     public WeTransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -220,22 +221,66 @@ public class WeTransferComFolder extends PluginForDecrypt {
                 jsonMap.put("recipient_id", recipient_id);
             }
             final String refererValue = br.getURL();
-            final PostRequest post = new PostRequest(br.getURL(("/api/v4/transfers/" + folder_id + "/prepare-download")));
-            post.getHeaders().put("Accept", "application/json");
-            post.getHeaders().put("Content-Type", "application/json");
-            post.getHeaders().put("Origin", "https://wetransfer.com");
-            post.getHeaders().put("X-Requested-With", " XMLHttpRequest");
-            if (csrfToken != null) {
-                post.getHeaders().put("X-CSRF-Token", csrfToken);
+            Map<String, Object> entries = null;
+            String passCode = param.getDecrypterPassword();
+            boolean passwordSuccess = false;
+            boolean isPasswordProtected = false;
+            handle_download_password: {
+                int i = 0;
+                while (!this.isAbort() && i <= 3) {
+                    if (i > 0) {
+                        passCode = getUserInput("Password?", param);
+                    }
+                    final PostRequest post = new PostRequest(br.getURL(("/api/v4/transfers/" + folder_id + "/prepare-download")));
+                    post.getHeaders().put("Accept", "application/json");
+                    post.getHeaders().put("Content-Type", "application/json");
+                    post.getHeaders().put("Origin", "https://wetransfer.com");
+                    post.getHeaders().put("X-Requested-With", " XMLHttpRequest");
+                    if (csrfToken != null) {
+                        post.getHeaders().put("X-CSRF-Token", csrfToken);
+                    }
+                    if (passCode != null) {
+                        jsonMap.put("password", passCode);
+                    }
+                    post.setPostDataString(JSonStorage.serializeToJson(jsonMap));
+                    br.getPage(post);
+                    entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    if (i == 0) {
+                        isPasswordProtected = Boolean.TRUE.equals(entries.get("password_protected"));
+                        if (!isPasswordProtected) {
+                            passwordSuccess = true;
+                            break handle_download_password;
+                        }
+                        logger.info("Password required");
+                    } else {
+                        /**
+                         * Check if correct password has been entered <br>
+                         * Response on invalid password: {"message":"invalid_transfer_password"}
+                         */
+                        if (br.getHttpConnection().getResponseCode() == 200) {
+                            passwordSuccess = true;
+                            break handle_download_password;
+                        }
+                        logger.info("User has entered wrong password: " + passCode);
+                    }
+                    /* Try [again] */
+                    i++;
+                }
+                ;
+                if (isPasswordProtected && !passwordSuccess) {
+                    throw new DecrypterException(DecrypterException.PASSWORD);
+                }
             }
-            post.setPostDataString(JSonStorage.serializeToJson(jsonMap));
-            br.getPage(post);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String internal_folder_id = entries.get("id").toString();
             final String state = (String) entries.get("state");
+            /* Possible values: anonymous, tracking, more to be found */
+            final String downloader_email_verification = (String) entries.get("downloader_email_verification");
             if (!"downloadable".equals(state)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+            /* This is often the name of the first file in that folder. */
             final String thisFolderName = (String) entries.get("display_name");
+            /* description field contains the "message" that the uploader of the file(s) can customize. */
             final String description = (String) entries.get("description");
             if (shortID == null) {
                 /* Fallback */
@@ -258,16 +303,23 @@ public class WeTransferComFolder extends PluginForDecrypt {
             zip.setDownloadSize(((Number) entries.get("size")).longValue());
             zip.setAvailable(true);
             zip.setProperty(WeTransferCom.PROPERTY_SINGLE_ZIP, true);
-            final FilePackage fpZIP = FilePackage.getInstance();
+            final FilePackage rootPackage = FilePackage.getInstance();
             if (thisFolderName != null) {
-                fpZIP.setName(thisFolderName);
+                rootPackage.setName(thisFolderName);
             } else if (zipFilename != null) {
-                fpZIP.setName(zipFilename);
+                rootPackage.setName(zipFilename);
+            } else if (shortID != null) {
+                /* Fallback 1 */
+                rootPackage.setName(shortID);
+            } else {
+                /* Fallback 2 */
+                rootPackage.setName(internal_folder_id);
             }
             if (description != null) {
-                fpZIP.setComment(description);
+                rootPackage.setComment(description);
             }
-            zip._setFilePackage(fpZIP);
+            rootPackage.setPackageKey(this.getHost() + "://folder/" + internal_folder_id);
+            zip._setFilePackage(rootPackage);
             if (mode == CrawlMode.ZIP) {
                 /* Return zip only */
                 ret.add(zip);
@@ -276,9 +328,6 @@ public class WeTransferComFolder extends PluginForDecrypt {
                 /* TODO: Handle this case */
                 // final boolean per_file_download_available = map.containsKey("per_file_download_available") &&
                 // Boolean.TRUE.equals(map.get("per_file_download_available"));
-                /* TODO: Handle this case */
-                // final boolean password_protected = map.containsKey("password_protected") &&
-                // Boolean.TRUE.equals(map.get("password_protected"));
                 /* E.g. okay would be "downloadable" */
                 // final String state = (String) map.get("state");
                 final Map<String, FilePackage> packagemap = new HashMap<String, FilePackage>();
@@ -330,6 +379,9 @@ public class WeTransferComFolder extends PluginForDecrypt {
                             packagemap.put(pathForPlugin, fp);
                         }
                         link._setFilePackage(fp);
+                    } else {
+                        /* Assume that there is no subfolder and this file simply belongs to the root of this item. */
+                        link._setFilePackage(rootPackage);
                     }
                 }
                 if (mode == CrawlMode.ALL) {
@@ -340,6 +392,11 @@ public class WeTransferComFolder extends PluginForDecrypt {
             /* Add some properties */
             for (final DownloadLink result : ret) {
                 result.setReferrerUrl(refererValue);
+                if (isPasswordProtected) {
+                    result.setPasswordProtected(true);
+                    result.setDownloadPassword(passCode);
+                }
+                result.setProperty(WeTransferCom.PROPERTY_DOWNLOADER_EMAIL_VERIFICATION, downloader_email_verification);
             }
         }
         return ret;

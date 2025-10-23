@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -34,14 +37,13 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.EmuParadiseMe;
-
-import org.appwork.utils.formatter.SizeFormatter;
 
 /**
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 51066 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51708 $", interfaceVersion = 2, names = {}, urls = {})
 public class EmuParadiseMeCrawler extends PluginForDecrypt {
     public EmuParadiseMeCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,7 +98,6 @@ public class EmuParadiseMeCrawler extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String[] urls_single_files = br.getRegex(jd.plugins.hoster.EmuParadiseMe.TYPE_DOWNLOAD).getColumn(-1);
-        final String[] urls_roms = br.getRegex("Info and Download\" href=\"(/[^/]+/[^/]+/\\d+)\"").getColumn(0);
         if (urls_single_files != null && urls_single_files.length > 0) {
             String title = br.getRegex("\"name\":\\s*\"([^\"]+)").getMatch(0);
             final FilePackage fp = FilePackage.getInstance();
@@ -136,25 +137,66 @@ public class EmuParadiseMeCrawler extends PluginForDecrypt {
                 link._setFilePackage(fp);
                 ret.add(link);
             }
-        } else if (urls_roms != null && urls_roms.length > 0) {
+            return ret;
+        }
+        final String[] urls_roms = br.getRegex("Info and Download\" href=\"(/[^/]+/[^/]+/\\d+)\"").getColumn(0);
+        if (urls_roms != null && urls_roms.length > 0) {
+            /**
+             * "Category" link e.g. /Atari_2600_ROMs/Games-Starting-With-C/49 <br>
+             * e.g. <br>
+             * -> Find all "ROMs" -> Links will go back into this crawler and it will look for single file URLs
+             */
             if (param.getDownloadLink() != null) {
                 logger.warning("Current link already came from another crawler -> Deeper level crawling is not allowed for this kind of links to prevent accidentally crawling the whole website");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            /**
-             * "Category" link e.g. /Atari_2600_ROMs/Games-Starting-With-C/49 <br>
-             * -> Find all "ROMs" -> Links will go back into this crawler and it will look for single file URLs
-             */
             for (String url : urls_roms) {
                 final String absolute_url = Request.getLocation(url, br.getRequest());
                 ret.add(this.createDownloadlink(absolute_url));
             }
-        } else {
+            return ret;
+        }
+        final String[] directurls = br.getRegex("Download:\\s*<a href=\"([^\"]+)\"").getColumn(0);
+        if (directurls != null && directurls.length > 0) {
+            /**
+             * Category type 2 <br>
+             * Examples single file: <br>
+             * /Amiga_Emulators/Windows/4 <br>
+             * /Atari_7800_Emulators/Mac_OS_X/47 <br>
+             * /Acorn_BBC_Micro_Emulators/Windows/59 <br>
+             * Examples multiple files: <br>
+             * /Atari_2600_Emulators/Windows/49
+             */
+            final String[] filesizes = br.getRegex("Size:([^<]+)<br>").getColumn(0);
+            for (int i = 0; i < directurls.length; i++) {
+                final String url = directurls[i];
+                final String absolute_url = Request.getLocation(url, br.getRequest());
+                final DownloadLink file = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(absolute_url));
+                if (filesizes != null && filesizes.length == directurls.length) {
+                    String filesizeStr = filesizes[i];
+                    if (!StringUtils.endsWithCaseInsensitive(filesizeStr, "b")) {
+                        filesizeStr += "b";
+                    }
+                    file.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                }
+                file.setAvailable(true);
+                ret.add(file);
+            }
+            if (ret.size() > 1) {
+                final FilePackage fp = FilePackage.getInstance();
+                fp.setName(br._getURL().getPath());
+                fp.addLinks(ret);
+            }
+            return ret;
+        }
+        /* Zero results -> Perform deeper check on why */
+        if (br.containsHTML(">\\s*No games found")) {
             /* Example: /Atari_2600_ROMs/Genre/Soccer/49 */
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+        } else {
             logger.info("Found zero results -> Assume we got an empty category");
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
-            // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        return ret;
+        // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 }
