@@ -48,7 +48,7 @@ import jd.plugins.hoster.WeTransferCom;
 import jd.plugins.hoster.WeTransferCom.WetransferConfig;
 import jd.plugins.hoster.WeTransferCom.WetransferConfig.CrawlMode;
 
-@DecrypterPlugin(revision = "$Revision: 51708 $", interfaceVersion = 3, names = { "wetransfer.com" }, urls = { WeTransferComFolder.patternShort + "|" + WeTransferComFolder.patternNormal + "|" + WeTransferComFolder.patternCollection })
+@DecrypterPlugin(revision = "$Revision: 51712 $", interfaceVersion = 3, names = { "wetransfer.com" }, urls = { WeTransferComFolder.patternShort + "|" + WeTransferComFolder.patternNormal + "|" + WeTransferComFolder.patternCollection })
 public class WeTransferComFolder extends PluginForDecrypt {
     public WeTransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,7 @@ public class WeTransferComFolder extends PluginForDecrypt {
         final Map<String, Object> tokenResp = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String token = tokenResp.get("token").toString();
         if (StringUtils.isEmpty(token)) {
-            /* Thi should never happen. */
+            /* This should never happen. */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return tokenResp.get("token").toString();
@@ -244,10 +244,15 @@ public class WeTransferComFolder extends PluginForDecrypt {
                     }
                     post.setPostDataString(JSonStorage.serializeToJson(jsonMap));
                     br.getPage(post);
+                    if (br.getHttpConnection().getResponseCode() == 404) {
+                        /* {"message":"Transfer not found"} */
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    }
                     entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     if (i == 0) {
                         isPasswordProtected = Boolean.TRUE.equals(entries.get("password_protected"));
                         if (!isPasswordProtected) {
+                            /* No password required -> Exit loop */
                             passwordSuccess = true;
                             break handle_download_password;
                         }
@@ -271,6 +276,7 @@ public class WeTransferComFolder extends PluginForDecrypt {
                     throw new DecrypterException(DecrypterException.PASSWORD);
                 }
             }
+            /* Download password has been entered successfully if needed -> Process item */
             final String internal_folder_id = entries.get("id").toString();
             final String state = (String) entries.get("state");
             /* Possible values: anonymous, tracking, more to be found */

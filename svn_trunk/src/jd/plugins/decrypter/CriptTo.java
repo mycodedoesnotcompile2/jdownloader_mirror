@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 3, names = { "cript.to" }, urls = { "https?://(?:www\\.)?cript\\.to/folder/([A-Za-z0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 51712 $", interfaceVersion = 3, names = { "cript.to" }, urls = { "https?://(?:www\\.)?cript\\.to/folder/([A-Za-z0-9]+)" })
 public class CriptTo extends PluginForDecrypt {
     public CriptTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,11 +47,11 @@ public class CriptTo extends PluginForDecrypt {
         ArrayList<String> dupelist = new ArrayList<String>();
         final String contenturl = param.getCryptedUrl();
         final String folder_id = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
-        this.br.setFollowRedirects(true);
+        br.setFollowRedirects(true);
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (this.br.containsHTML("Inhalt im Usenet gefunden - Weiterleitung erfolgt sofort ...")) {
+        } else if (br.containsHTML("Inhalt im Usenet gefunden - Weiterleitung erfolgt sofort ...")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         handle_captcha: {
@@ -65,7 +65,7 @@ public class CriptTo extends PluginForDecrypt {
                 if (i > 0) {
                     br.getPage(contenturl);
                 }
-                if (this.br.containsHTML("circlecaptcha")) {
+                if (br.containsHTML("circlecaptcha")) {
                     final String captchaurl = br.getRegex("<input type=\"image\" style=\"cursor:crosshair;\" src=\"([^\"]*)\" alt=\"Circle Captcha\"").getMatch(0);
                     if (captchaurl == null || !captchaurl.contains("circlecaptcha")) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -80,7 +80,7 @@ public class CriptTo extends PluginForDecrypt {
                     }
                     captchaform.put("button.x", Integer.toString(cp.getX()));
                     captchaform.put("button.y", Integer.toString(cp.getY()));
-                } else if (this.br.containsHTML("Simple Captcha")) {
+                } else if (br.containsHTML("Simple Captcha")) {
                     final String captchaurl = br.getRegex("<img src=\"([^\"]*)\" alt=\"Simple Captcha\"").getMatch(0);
                     if (captchaurl == null || !captchaurl.contains("simplecaptcha")) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -109,7 +109,7 @@ public class CriptTo extends PluginForDecrypt {
                 if (br.containsHTML("Wrong captcha solution") || captchaform != null) {
                     /* Invalid captcha */
                     invalidateLastChallengeResponse();
-                    this.br.getPage(contenturl);
+                    br.getPage(contenturl);
                     continue;
                 }
                 /* Valid captcha has been entered */
@@ -154,9 +154,10 @@ public class CriptTo extends PluginForDecrypt {
             fp.setName(title);
         } else {
             /* Fallback */
+            logger.warning("Failed to find folder title");
             fp.setName(folder_id);
         }
-        fp.setPackageKey("cryptto://folder/" + folder_id);
+        fp.setPackageKey("criptto://folder/" + folder_id);
         /* Try to add links via DLC since this is much faster than crawling the links one by one. */
         crawl_dlc: {
             final String dlc_url = br.getRegex("'(https?://cript\\.to/dlc/[^\"']+)").getMatch(0);
@@ -173,6 +174,11 @@ public class CriptTo extends PluginForDecrypt {
             fp.addLinks(dlcResults);
             return dlcResults;
         }
+        /**
+         * TODO: Check if a crawler for their CNL implementation makes sense <br>
+         * 2025-10-23: Their website is broken after the captcha so we cannot check this now.
+         */
+        /* Crawl single links one by one */
         final String[] linkkeys = br.getRegex("href=\"javascript:void\\(0\\);\" onclick=\"popup\\('([^\"]*)'").getColumn(0);
         if (linkkeys == null || linkkeys.length == 0) {
             logger.warning("Decrypter broken for link: " + contenturl);
@@ -188,15 +194,15 @@ public class CriptTo extends PluginForDecrypt {
                 continue;
             }
             dupelist.add(linkkey);
-            this.br.getPage(linkkey);
-            final String finallink = this.br.getRedirectLocation();
-            if (finallink.matches(".+cript\\.to/bot")) {// only one click captcha? No captcha rotation?
+            br.getPage(linkkey);
+            final String redirect = br.getRedirectLocation();
+            if (redirect.matches(".+cript\\.to/bot")) {// only one click captcha? No captcha rotation?
                 for (int i = 0; i <= 3; i++) {
                     String postData = "";
-                    this.br.setFollowRedirects(true);
+                    br.setFollowRedirects(true);
                     br.getPage(linkkey);
-                    this.br.setFollowRedirects(false);
-                    if (this.br.containsHTML("circlecaptcha")) {
+                    br.setFollowRedirects(false);
+                    if (br.containsHTML("circlecaptcha")) {
                         final String captcha = br.getRegex("<input type=\"image\" style=\"cursor:crosshair;\" src=\"([^\"]*)\" alt=\"Circle Captcha\"").getMatch(0);
                         if (captcha != null && captcha.contains("circlecaptcha")) {
                             final ClickedPoint cp = getCaptchaClickedPoint(captcha, param, "Click on the open circle or single color circle");
@@ -214,29 +220,29 @@ public class CriptTo extends PluginForDecrypt {
                         }
                         final String linksafe_csrf_token = br.getRegex("<input type=\"hidden\" name=\"linksafe_csrf_token\" value=\"([^\"]*)\"").getMatch(0);
                         postData += "&linksafe_csrf_token=" + linksafe_csrf_token;
-                        this.br.postPage(finallink, postData);
-                        final String finallink2 = this.br.getRedirectLocation();
+                        br.postPage(redirect, postData);
+                        final String finallink2 = br.getRedirectLocation();
                         if (finallink2 == null || finallink2.matches(".+cript\\.to/.+")) {
                             continue;
                         }
                         validateLastChallengeResponse();
-                        final DownloadLink dl2 = createDownloadlink(finallink2);
-                        dl2._setFilePackage(fp);
-                        ret.add(dl2);
-                        distribute(dl2);
+                        final DownloadLink link = createDownloadlink(finallink2);
+                        link._setFilePackage(fp);
+                        ret.add(link);
+                        distribute(link);
                         break;
                     } else {
                         logger.warning("Unknown captcha: " + contenturl);
                     }
                 }
             } else {
-                if (finallink == null || finallink.matches(".+cript\\.to/.+")) {
+                if (redirect == null || redirect.matches(".+cript\\.to/.+")) {
                     continue;
                 }
-                final DownloadLink dl1 = createDownloadlink(finallink);
-                dl1._setFilePackage(fp);
-                ret.add(dl1);
-                distribute(dl1);
+                final DownloadLink link = createDownloadlink(redirect);
+                link._setFilePackage(fp);
+                ret.add(link);
+                distribute(link);
             }
         }
         return ret;

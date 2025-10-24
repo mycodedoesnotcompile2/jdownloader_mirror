@@ -65,7 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51670 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51714 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -983,16 +983,22 @@ public class FileFactory extends PluginForHost {
             old_website: {
                 /* Download via old/legacy/classic website */
                 final boolean isSpecialImageDownload = br.getURL().matches("https?://[^/]+/preview/.+");
-                finallink = br.getRegex("data-href\\s*=\\s*\"([^\"]*)\"\\s*>\\Slow Download").getMatch(0);
-                if (finallink == null && isSpecialImageDownload) {
-                    finallink = br.getRegex("id=\"image_info_dl\"[^>]*href=\"(https?://[^\"]+)\"").getMatch(0);
-                }
-                if (finallink == null) {
-                    /* Premium download */
-                    finallink = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*Start Download").getMatch(0);
+                final boolean isSpecialTrafficShareDownload = br.getURL().matches("https?://[^/]+/trafficshare/.+");
+                if (isSpecialTrafficShareDownload) {
+                    /* Trafficshare link = Can be downloaded like a premium user, even by free users */
+                    finallink = regexTrafficShareDirecturl_old_website(br);
+                } else {
+                    finallink = br.getRegex("data-href\\s*=\\s*\"([^\"]*)\"\\s*>\\Slow Download").getMatch(0);
+                    if (finallink == null && isSpecialImageDownload) {
+                        finallink = br.getRegex("id=\"image_info_dl\"[^>]*href=\"(https?://[^\"]+)\"").getMatch(0);
+                    }
                     if (finallink == null) {
-                        /* Premium traffic share download */
-                        finallink = br.getRegex("<a href=\"(https?://\\w+\\.filefactory\\.com/get/t/[^\"]+)\"[^\r\n]*Download with FileFactory TrafficShare").getMatch(0);
+                        /* Premium download */
+                        finallink = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*Start Download").getMatch(0);
+                        if (finallink == null) {
+                            /* Premium traffic share download */
+                            finallink = regexTrafficShareDirecturl_old_website(br);
+                        }
                     }
                 }
                 if (finallink == null) {
@@ -1003,7 +1009,7 @@ public class FileFactory extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 /* No pre download wait time needed for special image links and premium users */
-                if (!isSpecialImageDownload && !isPremium) {
+                if (!isSpecialImageDownload && !isPremium && !isSpecialTrafficShareDownload) {
                     final String delaySecondsStr = br.getRegex("countdown_clock\"\\s*data-delay\\s*=\\s*\"(\\d+)\"").getMatch(0);
                     long delayMillis = TimeUnit.SECONDS.toMillis(60);
                     if (delaySecondsStr != null) {
@@ -1070,6 +1076,10 @@ public class FileFactory extends PluginForHost {
             }
         }
         dl.startDownload();
+    }
+
+    private String regexTrafficShareDirecturl_old_website(final Browser br) {
+        return br.getRegex("id=\"download-premium\"[^>]*>\\s*<a href=\"(https?://[^\"]+)\"").getMatch(0);
     }
 
     @Override
