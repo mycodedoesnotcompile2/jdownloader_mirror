@@ -70,7 +70,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51620 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51736 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -282,7 +282,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 51620 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 51736 $"));
     }
 
     /**
@@ -593,8 +593,8 @@ public abstract class K2SApi extends PluginForHost {
         }
         /* Set additional properties for Packagizer usage */
         final Map<String, Object> video_info;
+        // can be null, for example shortly after file being uploaded but not processed yet
         final Map<String, Object> extended_info = (Map<String, Object>) fileInfo.get("extended_info");
-        String content_type = null;
         if (extended_info != null) {
             video_info = (Map<String, Object>) extended_info.get("video_info");
         } else {
@@ -606,7 +606,7 @@ public abstract class K2SApi extends PluginForHost {
             link.setProperty("video_height", video_info.get("height"));
             link.setProperty("video_format", video_info.get("format"));
             /* Small workaround for video files with missing file extension. */
-            content_type = (String) extended_info.get("content_type");
+            final String content_type = extended_info == null ? null : (String) extended_info.get("content_type");
             if (content_type != null && name != null) {
                 final String ext = this.getExtensionFromMimeType(content_type);
                 if (ext != null) {

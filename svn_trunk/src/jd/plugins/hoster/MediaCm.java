@@ -20,6 +20,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigMediaCm;
+import org.jdownloader.plugins.components.config.XFSConfigVideo;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -29,12 +34,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigMediaCm;
-import org.jdownloader.plugins.components.config.XFSConfigVideo;
-
-@HostPlugin(revision = "$Revision: 51267 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class MediaCm extends XFileSharingProBasic {
     public MediaCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -236,7 +236,7 @@ public class MediaCm extends XFileSharingProBasic {
         if (download1 != null) {
             this.handleCaptcha(link, br, download1);
             this.submitForm(br, download1);
-            this.checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
+            this.checkErrors(br, br.getRequest().getHtmlCode(), link, account);
         }
         dllink = this.getDllink(link, account, br, br.toString());
         if (StringUtils.isEmpty(dllink)) {

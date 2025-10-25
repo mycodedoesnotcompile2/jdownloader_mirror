@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@HostPlugin(revision = "$Revision: 50584 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class PreFilesCom extends XFileSharingProBasic {
     public PreFilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -131,9 +131,9 @@ public class PreFilesCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         /* 2019-07-03: Special */
-        super.checkErrors(br, correctedBR, link, account, checkAll);
+        super.checkErrors(br, correctedBR, link, account);
         final String wait = new Regex(correctedBR, ">\\s*Your subsequent download will be started in([^<>]+)").getMatch(0);
         if (wait != null) {
             /* adjust this regex to catch the wait time string for COOKIE_HOST */

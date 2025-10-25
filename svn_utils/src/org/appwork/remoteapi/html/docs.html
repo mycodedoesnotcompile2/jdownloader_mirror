@@ -14,7 +14,7 @@
 </style>
 
 
-
+<link rel="icon" href="data:,">
 
 <script type="text/javascript"> 
 
@@ -23,6 +23,43 @@
 </script>
 
 
+
+  
+<script>
+    window.addEventListener('load', function() {
+      // Nur wenn kein Hash (#...) in der URL vorhanden ist
+      if (!window.location.hash) {
+        // Pfad aufsplitten, leere Einträge entfernen
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        
+        // Wenn Pfad nur aus einem Teil besteht (z. B. /news)
+        // → diesen Teil nehmen, sonst den vorletzten
+        let targetPart = '';
+        if (pathParts.length === 1) {
+          targetPart = pathParts[0];
+        } else if (pathParts.length >= 2) {
+          targetPart = pathParts[pathParts.length - 2];
+        }
+
+        // Datei-Endungen entfernen (.html, .php, etc.)
+        const cleanPart = targetPart.replace(/\.[^/.]+$/, '');
+
+        // Ziel-ID zusammensetzen
+        const targetId = 'tag_namespace_' + cleanPart;
+
+        // Element suchen
+        const targetElement = document.getElementById(targetId);
+
+        // Falls vorhanden → scrollen
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          console.warn('Kein Element mit ID "' + targetId + '" gefunden.');
+        }
+      }
+    });
+  </script>
+  
 <script>hljs.initHighlightingOnLoad();</script>
 	<!--[if lt IE 7]>
 		#page-wrap {

@@ -24,6 +24,7 @@ import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -34,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51713 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51722 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNu extends PluginForHost {
     public GigafileNu(PluginWrapper wrapper) {
         super(wrapper);
@@ -123,7 +124,7 @@ public class GigafileNu extends PluginForHost {
         final String filenameFromCrawler = link.getStringProperty(PROPERTY_FILE_NAME_FROM_CRAWLER);
         if (filenameFromCrawler != null) {
             link.setName(filenameFromCrawler);
-        } else {
+        } else if (link.getFinalFileName() == null) {
             final String[] nonZipFiles = br.getRegex("alt=\"スキャン中\" style=\"height: 18px;\">\\s*</span>\\s*<span class=\"\">([^<]+)</span>").getColumn(0);
             String filename = br.getRegex("<span>([^<>\"]+\\.zip)</span>").getMatch(0);
             if (filename == null) {
@@ -137,6 +138,26 @@ public class GigafileNu extends PluginForHost {
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
                 link.setName(filename);
+            }
+            if (!PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
+                final String fileIDForDownload = link.getStringProperty(PROPERTY_FILE_ID);
+                if (fileIDForDownload == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final String dllink;
+                if (isSingleZipDownload(br, fileIDForDownload)) {
+                    dllink = "/dl_zip.php?file=" + fileIDForDownload;
+                } else {
+                    dllink = "/download.php?file=" + fileIDForDownload;
+                }
+                try {
+                    final Browser brc = br.cloneBrowser();
+                    brc.setFollowRedirects(true);
+                    final URLConnectionAdapter con = basicLinkCheck(brc, brc.createHeadRequest(dllink), link, null, null);
+                    link.setProperty("free_directlink", con.getURL().toExternalForm());
+                } catch (final IOException e) {
+                    logger.log(e);
+                }
             }
         }
         return AvailableStatus.TRUE;
@@ -162,8 +183,6 @@ public class GigafileNu extends PluginForHost {
             } else {
                 dllink = "/download.php?file=" + fileIDForDownload;
             }
-            // final String fileiidFromURL = new Regex(br.getURL(), "https?://[^/]+/(.+)").getMatch(0);
-            // final String dllink = "/dl_zip.php?file=" + fileiidFromURL;
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
@@ -223,13 +242,5 @@ public class GigafileNu extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

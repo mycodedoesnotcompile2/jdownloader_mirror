@@ -21,6 +21,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -33,13 +39,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class TakefileLink extends XFileSharingProBasic {
     public TakefileLink(final PluginWrapper wrapper) {
         super(wrapper);
@@ -203,8 +203,8 @@ public class TakefileLink extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, correctedBR, link, account, checkAll);
+    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, correctedBR, link, account);
         /* 2021-01-11: Some files are "paid files": The user has to pay a fee for that single file to be able to download it. */
         if (new Regex(correctedBR, "class=\"price\"").patternFind()) {
             throw new AccountRequiredException();

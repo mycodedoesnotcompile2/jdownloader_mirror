@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51420 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -388,12 +388,12 @@ public class StreamwishCom extends XFileSharingProBasic {
             return filesizeStrChosen;
         }
         getPage(br, continueURL);
-        checkErrors(br, continueURL, link, account, false);
+        checkErrors(br, continueURL, link, account);
         final Form download1 = br.getFormByInputFieldKeyValue("op", "download_orig");
         if (download1 != null) {
             handleCaptcha(link, br, download1);
             submitForm(br, download1);
-            checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
+            checkErrors(br, br.getRequest().getHtmlCode(), link, account);
         }
         String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink)) {
@@ -419,11 +419,11 @@ public class StreamwishCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         if (br.containsHTML(">\\s*Video temporarily not available")) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Video temporarily not available");
         }
-        super.checkErrors(br, html, link, account, checkAll);
+        super.checkErrors(br, html, link, account);
         final String errorsMisc = br.getRegex("class=\"icon icon-info icon-size-16 me-3\"[^>]*></i>\\s*<div>([^<]+)</div>").getMatch(0);
         if (errorsMisc != null) {
             throw new PluginException(LinkStatus.ERROR_FATAL, Encoding.htmlDecode(errorsMisc).trim());

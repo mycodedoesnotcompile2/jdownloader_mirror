@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 44946 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadTn extends XFileSharingProBasic {
     public UploadTn(final PluginWrapper wrapper) {
         super(wrapper);
@@ -117,8 +117,8 @@ public class UploadTn extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account);
         /* 2021-09-06 */
         final String preciseWaittime = new Regex(html, "(?i)<br>\\s*Wait\\s*<h2>([^<]*)</h2>\\s*before the next download").getMatch(0);
         if (preciseWaittime != null) {

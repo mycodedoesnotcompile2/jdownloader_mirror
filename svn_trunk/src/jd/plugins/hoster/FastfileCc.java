@@ -18,6 +18,8 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -29,9 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 49831 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class FastfileCc extends XFileSharingProBasic {
     public FastfileCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -162,10 +162,10 @@ public class FastfileCc extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account);
         /* 2021-04-08 */
-        if (new Regex(html, ">\\s*Your IP was banned by administrator").matches()) {
+        if (new Regex(html, ">\\s*Your IP was banned by administrator").patternFind()) {
             if (account != null) {
                 throw new AccountUnavailableException("Your IP was banned by administrator", 6 * 60 * 60 * 1000l);
             } else {

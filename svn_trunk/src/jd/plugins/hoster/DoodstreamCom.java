@@ -56,7 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51536 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -622,7 +622,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
         final Form download1 = brc.getFormByInputFieldKeyValue("op", "download1");
         if (download1 != null) {
             this.submitForm(brc, download1);
-            this.checkErrors(brc, brc.toString(), link, account, false);
+            this.checkErrors(brc, brc.toString(), link, account);
         }
         String dllink = brc.getRegex("(https?://[^/]+/[A-Za-z0-9]+/[^/]+\\?token=[^<>\"\\']+)").getMatch(0);
         if (dllink == null) {

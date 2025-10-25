@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -32,10 +35,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 51267 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class MyqloudOrg extends XFileSharingProBasic {
     public MyqloudOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -284,7 +284,7 @@ public class MyqloudOrg extends XFileSharingProBasic {
                 requiresAccountToDownload = true;
                 throw new AccountRequiredException();
             }
-            checkErrors(brc, getCorrectBR(brc), link, account, false);
+            checkErrors(brc, getCorrectBR(brc), link, account);
             /* 2019-08-29: This Form may sometimes be given e.g. deltabit.co */
             Form download1 = brc.getFormByInputFieldKeyValue("op", "download1");
             if (download1 == null) {

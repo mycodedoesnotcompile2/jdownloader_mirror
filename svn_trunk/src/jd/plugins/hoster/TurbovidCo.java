@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50608 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class TurbovidCo extends XFileSharingProBasic {
     public TurbovidCo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -115,10 +115,10 @@ public class TurbovidCo extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         if (br.containsHTML("Video no available at the moment\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video not available at the moment");
         }
-        super.checkErrors(br, html, link, account, checkAll);
+        super.checkErrors(br, html, link, account);
     }
 }

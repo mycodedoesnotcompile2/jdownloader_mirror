@@ -31,6 +31,25 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import org.appwork.shutdown.ShutdownController;
+import org.appwork.shutdown.ShutdownRequest;
+import org.appwork.shutdown.ShutdownVetoException;
+import org.appwork.shutdown.ShutdownVetoListener;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
+import org.jdownloader.controlling.FileStateManager;
+import org.jdownloader.controlling.FileStateManager.FILESTATE;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -52,26 +71,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-import org.appwork.shutdown.ShutdownController;
-import org.appwork.shutdown.ShutdownRequest;
-import org.appwork.shutdown.ShutdownVetoException;
-import org.appwork.shutdown.ShutdownVetoListener;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultEnumValue;
-import org.appwork.storage.config.annotations.DefaultOnNull;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
-import org.jdownloader.controlling.FileStateManager;
-import org.jdownloader.controlling.FileStateManager.FILESTATE;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-
-@HostPlugin(revision = "$Revision: 51711 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 51715 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -313,7 +313,8 @@ public class WeTransferCom extends PluginForHost {
         dl.startDownload();
         /**
          * 2024-02-27: This website delivers single files as .zip files without .zip file-extension while all of them contain exactly one
-         * file. </br> The special handling down below corrects this by extracting such files.
+         * file. </br>
+         * The special handling down below corrects this by extracting such files.
          */
         if (!isSingleZip && link.getLinkStatus().hasStatus(LinkStatus.FINISHED) && link.getDownloadCurrent() > 0) {
             extract(link);
@@ -379,7 +380,6 @@ public class WeTransferCom extends PluginForHost {
             } finally {
                 fis.close();
             }
-
             zipFile = new ZipFile(srcDst);
         } catch (IOException e) {
             logger.log(e);
@@ -563,7 +563,7 @@ public class WeTransferCom extends PluginForHost {
             throw new AccountInvalidException("Your account is banned/blocked");
         }
         /*
-         * Plugin supports cookie login only -> User cound enter anything into username field -> Set username here so we can be sure to have
+         * Plugin supports cookie login only -> User could enter anything into username field -> Set username here so we can be sure to have
          * an unique username.
          */
         final String email = (String) user.get("email");
@@ -599,7 +599,6 @@ public class WeTransferCom extends PluginForHost {
         }
         return ai;
     }
-
     // @Override
     // public void handlePremium(final DownloadLink link, final Account account) throws Exception {
     // this.handleDownload(link, account);

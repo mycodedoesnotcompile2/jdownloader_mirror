@@ -18,6 +18,17 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -34,23 +45,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigDdownloadCom;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 51361 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51738 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(getPurchasePremiumURL());
     }
+
+    private static final String PROPERTY_ACCOUNT_HAS_EMAIL_SET = "account_has_email_set";
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
@@ -215,18 +217,15 @@ public class DdownloadCom extends XFileSharingProBasic {
     protected String regExTrafficLeft(final Browser br) {
         /* 2019-11-03: Special */
         final String src = this.getCorrectBR(br);
-        final Regex trafficleft = new Regex(src, "<span>Traffic available</span>\\s*<div class=\"price\"><sup>([^<>]+)</sup>(-?\\d+)</div>");
-        String availabletraffic = null;
+        final Regex trafficleft = new Regex(src, "<[^>]*>\\s*Traffic available\\s*</[^>]*>\\s*<div[^>]*>*>\\s*<sup>\\s*([^<>]+)\\s*</sup>\\s*(-?\\d+)\\s*</div>");
         final String trafficleftUnit = trafficleft.getMatch(0);
         final String trafficleftTmp = trafficleft.getMatch(1);
         if (trafficleftUnit != null && trafficleftTmp != null) {
-            availabletraffic = trafficleftTmp + trafficleftUnit;
+            final String ret = trafficleftTmp + trafficleftUnit;
+            return ret;
         }
-        if (availabletraffic == null) {
-            /* Fallback to template handling */
-            availabletraffic = super.regExTrafficLeft(br);
-        }
-        return availabletraffic;
+        /* Fallback to template handling */
+        return super.regExTrafficLeft(br);
     }
 
     @Override
@@ -348,6 +347,21 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
+    protected void fetchAccountInfoWebsiteTraffic(Browser br, Account account, AccountInfo ai) throws Exception {
+        super.fetchAccountInfoWebsiteTraffic(br, account, ai);
+        if (ai.getTrafficLeft() > 0) {
+            /**
+             * var trafficLeftMB = parseFloat(trafficBar.attr('data-traffic')) || 0; <br>
+             * var totalTrafficMB = 200000; // 200000 MB daily limit
+             */
+            final String totalTrafficMB = br.getRegex("var\\s*totalTrafficMB\\s*=\\s*(\\d+)").getMatch(0);
+            if (totalTrafficMB != null) {
+                ai.setTrafficMax(SizeFormatter.getSize(totalTrafficMB + " MB"));
+            }
+        }
+    }
+
+    @Override
     protected AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
         final AccountInfo ai = super.fetchAccountInfoWebsite(account);
         /*
@@ -359,8 +373,15 @@ public class DdownloadCom extends XFileSharingProBasic {
          * 2020-05-06: Template also has handling for this but will not detect it until download-start which is why we will keep it in here
          * too.
          */
+        /* Ensure that an email is set on this account if we do not know this information already. */
+        if (account.hasProperty(PROPERTY_ACCOUNT_HAS_EMAIL_SET)) {
+            /* We already know this information so we don't need to check again. */
+            return ai;
+        }
+        logger.info("Checking if email is set on account | Accounts without E-Mail cannot be used for up- and downloading");
         this.getPage("/?op=my_reports");
         if (new Regex(getCorrectBR(br), "(?i)>\\s*?Please enter your e-mail").patternFind()) {
+            logger.info("Account does NOT email set");
             final String accountErrorMsg;
             if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
                 accountErrorMsg = String.format("Ergänze deine E-Mail Adresse unter %s/?op=my_account um diesen Account verwenden zu können!", this.getHost());
@@ -369,6 +390,9 @@ public class DdownloadCom extends XFileSharingProBasic {
             }
             throw new AccountUnavailableException(accountErrorMsg, 10 * 60 * 1000l);
         }
+        logger.info("Account has email set");
+        /* Once set, the user cannot remove the e-mail address so we can store this information. */
+        account.setProperty(PROPERTY_ACCOUNT_HAS_EMAIL_SET, true);
         return ai;
     }
 
@@ -398,7 +422,7 @@ public class DdownloadCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         /* 2020-01-20: Special */
         if (new Regex(html, "(?i)>\\s*This server is in maintenance mode").patternFind()) {
             /* <strong>Oops!</strong> This server is in maintenance mode. Refresh this page in some minutes. */
@@ -407,7 +431,7 @@ public class DdownloadCom extends XFileSharingProBasic {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500", 1 * 60 * 1000l);
         }
         /* Now execute template handling */
-        super.checkErrors(br, html, link, account, checkAll);
+        super.checkErrors(br, html, link, account);
     }
 
     @Override

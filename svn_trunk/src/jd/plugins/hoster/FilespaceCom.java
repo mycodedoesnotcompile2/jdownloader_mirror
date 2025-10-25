@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51052 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilespaceCom extends XFileSharingProBasic {
     public FilespaceCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -112,7 +112,7 @@ public class FilespaceCom extends XFileSharingProBasic {
     }
 
     @Override
-    public void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    public void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         /* 2019-05-21: Special */
         if (link != null && link.getMD5Hash() == null) {
             /* 2023-04-19: Special: Small hack: Look for md5 hash on every page. */
@@ -121,7 +121,7 @@ public class FilespaceCom extends XFileSharingProBasic {
                 link.setMD5Hash(md5hash);
             }
         }
-        super.checkErrors(br, correctedBR, link, account, checkAll);
+        super.checkErrors(br, correctedBR, link, account);
         if (new Regex(correctedBR, "(?i)>\\s*You, or someone with the same IP address, are downloading the").patternFind()) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You're using all download slots for current IP", 10 * 60 * 1001l);
         } else if (br.containsHTML(">\\s*Bandwidth overload detected")) {
@@ -133,14 +133,12 @@ public class FilespaceCom extends XFileSharingProBasic {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Bandwidth overload detected");
             }
         }
-        if (checkAll) {
-            if (new Regex(correctedBR, "(?i)>[^<]*Wrong captcha[^<]*<").patternFind()) {
-                logger.warning("Wrong captcha (or wrong password as well)!");
-                if (this.getChallengeRound() >= 1) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server says 'wrong captcha' but never prompted for one");
-                }
+        if (new Regex(correctedBR, "(?i)>[^<]*Wrong captcha[^<]*<").patternFind()) {
+            logger.warning("Wrong captcha (or wrong password as well)!");
+            if (this.getChallengeRound() >= 1) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server says 'wrong captcha' but never prompted for one");
             }
         }
     }

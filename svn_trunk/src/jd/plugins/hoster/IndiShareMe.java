@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class IndiShareMe extends XFileSharingProBasic {
     public IndiShareMe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -178,12 +178,12 @@ public class IndiShareMe extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         if (containsFakeError(br)) {
             /* Workaround */
             return;
         } else {
-            super.checkErrors(br, html, link, account, checkAll);
+            super.checkErrors(br, html, link, account);
         }
     }
 

@@ -71,7 +71,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51661 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -292,8 +292,8 @@ public class SendCm extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account);
         if (br.containsHTML(">\\s*Not allowed")) {
             /*
              * 2024-06-24: Not sure what this means. Possibly this happens for premium-only files. In this case, website does not provide

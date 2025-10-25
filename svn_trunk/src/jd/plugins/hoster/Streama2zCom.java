@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51291 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class Streama2zCom extends XFileSharingProBasic {
     public Streama2zCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -118,7 +118,7 @@ public class Streama2zCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         if (br.containsHTML(">\\s*Download disabled!")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Uploader has disabled downloads for this file");
         }
@@ -126,7 +126,7 @@ public class Streama2zCom extends XFileSharingProBasic {
             /* 2025-07-30: Special offline -> Example: /d/itlt3myw3ykp */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        super.checkErrors(br, html, link, account, checkAll);
+        super.checkErrors(br, html, link, account);
     }
 
     @Override

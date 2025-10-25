@@ -65,7 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51714 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51715 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -166,25 +166,25 @@ public class FileFactory extends PluginForHost {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_FILE = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_FILE          = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_TRAFFIC_SHARE = Pattern.compile("/trafficshare/[a-f0-9]{32}/([a-z0-9]+)/?", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.|classic\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
+            ret.add("https?://(?:www\\.|classic\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_FILE.pattern() + "|" + PATTERN_TRAFFIC_SHARE.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
-    protected String getDefaultFileName(DownloadLink link) {
+    protected String getDefaultFileName(final DownloadLink link) {
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE);
         final String filenameFromURL = urlinfo.getMatch(2);
         if (filenameFromURL != null) {
             return URLEncode.decodeURIComponent(filenameFromURL);
         }
-        final String file_id = urlinfo.getMatch(0);
-        return file_id;
+        return this.getFUID(link);
     }
 
     @Override
@@ -1072,6 +1072,16 @@ public class FileFactory extends PluginForHost {
                 br.followConnection(true);
                 checkErrorsWebsite(link, account, br);
                 throwConnectionExceptions(br, dl.getConnection());
+                if (br.getRequest().getHtmlCode().length() == 0) {
+                    final String errormessage = "Got blank page";
+                    throw new PluginException(LinkStatus.ERROR_FATAL, errormessage);
+                } else if (br.getRequest().getHtmlCode().length() <= 100 && !br.containsHTML("<html")) {
+                    /* Assume that we got a small plaintext error response */
+                    /* e.g. 2025-10-24: Couldn't get valid connection to DB */
+                    final String plaintextError = br.getRequest().getHtmlCode().trim();
+                    throw new PluginException(LinkStatus.ERROR_FATAL, plaintextError);
+                }
+                logger.warning("Unknown error happened");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
@@ -1205,7 +1215,12 @@ public class FileFactory extends PluginForHost {
     }
 
     private String getFUID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
+        String fuid = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
+        if (fuid != null) {
+            return fuid;
+        }
+        fuid = new Regex(link.getPluginPatternMatcher(), PATTERN_TRAFFIC_SHARE).getMatch(0);
+        return fuid;
     }
 
     private boolean isPremiumAccount(final Account account) {

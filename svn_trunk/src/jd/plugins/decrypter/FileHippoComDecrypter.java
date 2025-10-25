@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50453 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(?:www\\.)?update\\.filehippo\\.com(/[a-z]{2})?/update/check/[a-z0-9\\-]+/detailed" })
+@DecrypterPlugin(revision = "$Revision: 51721 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(?:www\\.)?update\\.filehippo\\.com(/[a-z]{2})?/update/check/[a-z0-9\\-]+/detailed" })
 public class FileHippoComDecrypter extends PluginForDecrypt {
     public FileHippoComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -39,10 +39,12 @@ public class FileHippoComDecrypter extends PluginForDecrypt {
         final String parameter = param.getCryptedUrl().replaceAll("/(es|en|pl|jp|de(?!tailed))", "");
         br.setCookie(this.getHost(), "FH_PreferredCulture", "en-US");
         br.getPage(parameter);
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">404 Error<|>Sorry the page you requested could not be found")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*404 Error\\s*<|>\\s*Sorry the page you requested could not be found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fpName = br.getRegex("<h3>([^<>\"]*?)</h3>").getMatch(0);
+        final String fpName = br.getRegex("<h3>([^<]*?)</h3>").getMatch(0);
         final String[] links = br.getRegex("\"(https?://(www\\.)?filehippo\\.com(/[a-z]{2})?/download[^<>\"]*?)\" class=\"update\\-download\\-link\"").getColumn(0);
         if (links == null || links.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

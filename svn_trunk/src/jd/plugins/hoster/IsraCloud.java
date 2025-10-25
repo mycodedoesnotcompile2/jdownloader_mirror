@@ -31,7 +31,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class IsraCloud extends XFileSharingProBasic {
     public IsraCloud(final PluginWrapper wrapper) {
         super(wrapper);
@@ -135,9 +135,9 @@ public class IsraCloud extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
-        if (br.containsHTML("(?i)This file is available.{1,8}for Premium Users only")) {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account);
+        if (br.containsHTML("This file is available.{1,8}for Premium Users only")) {
             throw new AccountRequiredException();
         }
     }

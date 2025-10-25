@@ -74,7 +74,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 51674 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51736 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -1047,6 +1047,31 @@ public class XHamsterCom extends PluginForHost {
                         e = toSigned32(e ^ ((e & 0xFFFFFFFFl) >> 9));
                         e = toSigned32(e ^ (e << 8));
                         e = i = toSigned32(e + 0xa5a5a5a5l);
+                        return e & 0xFF;
+                    }
+                };
+            case 6:
+                return new ByteGenerator() {
+                    int i = seed;
+
+                    @Override
+                    public int next() {
+                        i = toSigned32(nk(i, 747796405) + 2891336453l);
+                        int t = (i ^ (i >>> 18)) >>> ((i >>> 27) & 31);
+                        return t & 0xFF;
+                    }
+                };
+            case 7:
+                return new ByteGenerator() {
+                    int i = seed;
+
+                    @Override
+                    public int next() {
+                        i = (int) (i + 0x9E3779B9L); // 2654435769 modulo 2^32
+                        int e = i ^ (i << 5);
+                        e = nk(e, 2146121005);
+                        e ^= (e >>> 15);
+                        e = nk(e, (int) 2221713035l);
                         return e & 0xFF;
                     }
                 };

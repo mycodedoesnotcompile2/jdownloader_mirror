@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 51517 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -328,8 +328,8 @@ public class VoeSx extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account);
         // if (br.containsHTML(">\\s*This video can be watched as embed only")) {
         // throw new PluginException(LinkStatus.ERROR_FATAL, "This video can be watched as embed only");
         // }

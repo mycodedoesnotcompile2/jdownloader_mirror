@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.exceptions.WTFException;
@@ -68,6 +69,7 @@ import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -77,12 +79,12 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
     /**
      *
      */
-    public static final String       AUTHENTICATION = "Authentication";
-    final protected RemoteAPI        api;
-    private Method                   help;
-    private SoftReference<byte[]>    cachedBytes;
-    private HashMap<Object, Integer> reservedAnchorIds;
-    private HashSet<Object>          dupeCheck;
+    public static final String    AUTHENTICATION = "Authentication";
+    final protected RemoteAPI     api;
+    private Method                help;
+    private SoftReference<byte[]> cachedBytes;
+    private Map<Object, String>   reservedAnchorIds;
+    private HashSet<Object>       dupeCheck;
 
     public DefaultDocsPageFactory(RemoteAPI api) throws SecurityException, NoSuchMethodException {
         super();
@@ -127,12 +129,12 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
         try {
             byte[] bytes = null;
             bytes = cachedBytes != null ? this.cachedBytes.get() : null;
-            if (bytes == null || true) {
-                String txt = build();
+            if (bytes == null || DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                String txt = build(request);
                 bytes = txt.getBytes("UTF-8");
                 this.cachedBytes = new SoftReference<byte[]>(bytes);
             }
-            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/html"));
+            response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/html; charset=utf-8"));
             ContentSecurityHeader ret = new ContentSecurityHeader();
             ret.addDefaultSrc("'self'");
             ret.addScriptSrc("'unsafe-inline'");
@@ -194,7 +196,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
                 }
             }
             if (requiredTypes != null && requiredTypes.contains(currentType)) {
-                Integer aid = getReservedID(currentType);
+                final String aid = getReservedID(currentType);
                 if (html) {
                     if (aid == null) {
                         if (((Class) currentType).isEnum()) {
@@ -203,7 +205,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
                             return htmlEncode("Object:" + ret);
                         }
                     } else {
-                        return "<a href='#tag_" + aid + "'>" + htmlEncode(ret) + "</a>";
+                        return "<a href='#tag_object_" + aid + "'>" + htmlEncode(ret) + "</a>";
                     }
                 } else {
                     if (((Class) currentType).isEnum()) {
@@ -270,11 +272,11 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.lang.Object#toString()
          */
         @Override
-        public String toString() {            
+        public String toString() {
             return sb.toString();
         }
 
@@ -329,7 +331,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
         return out.toString();
     }
 
-    public String build() {
+    public String build(RemoteAPIRequest request) {
         final HTMLStringBuilder content = new HTMLStringBuilder();
         HTMLStringBuilder nav = new HTMLStringBuilder();
         Template template = readHTMLTemplate();
@@ -345,8 +347,9 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
         nav.append("<a style='padding: 0;' href='#methods'>Methods</a>");
         nav.append("</h1>");
         nav.append("<ul>");
-        reservedAnchorIds = new HashMap<Object, Integer>();
+        reservedAnchorIds = new HashMap<Object, String>();
         dupeCheck = new HashSet<Object>();
+        count.set(0);
         HashSet<Type> requiredTypes = new HashSet<Type>();
         for (InterfaceHandler<RemoteAPIInterface> handler : handlerList) {
             HashSet<Method> methodSet = new HashSet<Method>(handler.getMethodsMap().values());
@@ -373,7 +376,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
                 }
             });
             nav.append("<li class='namespace'>");
-            addMenuEntry(content, nav, 1, "Namespace /" + handler.getNamespace(), null, htmlEncode(methods.get(0).getDeclaringClass().getName()));
+            addMenuEntry(content, nav, 1, "Namespace /" + handler.getNamespace(), "namespace_" + handler.getNamespace(), htmlEncode(methods.get(0).getDeclaringClass().getName()));
             nav.append("<ul  class='typelist'>");
             // nav.append("<li>");
             // addMenuEntry(content, nav, 2, "Methods");
@@ -436,10 +439,13 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
                 for (Type rt : requiredTypes) {
                     putReservedID(rt);
                 }
-                int id = this.count.incrementAndGet();
+                String methodTag = m.getDeclaringClass().getName() + "." + m.getName();
+                if (count > 0) {
+                    methodTag = methodTag + "." + count;
+                }
                 int i = 3;
-                content.append("<a class='anchor' id='tag_" + id + "'></a>" + "<h3 class='main-type-method'>" + "<span  style=''>" + htmlEncode(name) + "</span><span  style='position: absolute;right: 20px;'>Parameter: " + count + "</span>" + "</h" + i + ">");
-                nav.append("<div class='menu-h" + i + "'><a href=\"#tag_" + id + "\"><span class='menu-content-h" + i + " tooltip' >" + "<span  style=''>" + htmlEncode(name) + "</span><span class='tooltiptext'>" + htmlEncode("Parameter: " + count + " " + htmlEncode(header)) + "</span>" + "</span></a></div>");
+                content.append("<a class='anchor' id='tag_method_" + methodTag + "'></a>" + "<h3 class='main-type-method'>" + "<span  style=''>" + htmlEncode(name) + "</span><span  style='position: absolute;right: 20px;'>Parameter: " + count + "</span>" + "</h" + i + ">");
+                nav.append("<div class='menu-h" + i + "'><a href=\"#tag_method_" + methodTag + "\"><span class='menu-content-h" + i + " tooltip' >" + "<span  style=''>" + htmlEncode(name) + "</span><span class='tooltiptext'>" + htmlEncode("Parameter: " + count + " " + htmlEncode(header)) + "</span>" + "</span></a></div>");
                 nav.append("</li>");
                 content.append("<ul class='keyvalue'>");
                 if (m.getAnnotation(Deprecated.class) != null) {
@@ -628,11 +634,11 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
                         header = true;
                     }
                     nav.append("<li class='type-object'>");
-                    Integer aid = getReservedID(enumClass);
+                    final String aid = getReservedID(enumClass);
                     int i = 3;
-                    int id = aid != null ? aid : count.incrementAndGet();
-                    content.append("<div class='header" + i + "'><a class='anchor' id='tag_" + id + "'>" + "</a>" + "<h" + i + " class='tooltip'>" + htmlEncode(typeToString(null, enumClass, false, true)) + "<span class='tooltiptext'>" + htmlEncode(enumClass.toString()) + "</span>" + "</h" + i + "></div>");
-                    nav.append("<div class='menu-h" + i + "'><a href=\"#tag_" + id + "\">" + htmlEncode(typeToString(null, enumClass, false, false)) + "</a></div>");
+                    final String id = aid != null ? aid : String.valueOf(count.incrementAndGet());
+                    content.append("<div class='header" + i + "'><a class='anchor' id='tag_object_" + id + "'>" + "</a>" + "<h" + i + " class='tooltip'>" + htmlEncode(typeToString(null, enumClass, false, true)) + "<span class='tooltiptext'>" + htmlEncode(enumClass.toString()) + "</span>" + "</h" + i + "></div>");
+                    nav.append("<div class='menu-h" + i + "'><a href=\"#tag_object_" + id + "\">" + htmlEncode(typeToString(null, enumClass, false, false)) + "</a></div>");
                     nav.append("</li>");
                     ClassCache cc;
                     try {
@@ -644,14 +650,13 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
                             String ex = (String) exampleMethod.invoke(null, new Object[] {});
                             appendCodeComments(content, ex);
                         } catch (NoSuchMethodException e) {
-                        } catch (Throwable e1) {                            
+                        } catch (Throwable e1) {
                             e1.printStackTrace();
                         }
                         content.appendRaw("          my" + typeToString(null, enumClass, false, false) + " = ");
                         content.appendRaw("\r\n                  {");
                         HashSet<String> keySet = new HashSet<String>();
                         int widestKey = 0;
-
                         for (String sg : cc.getKeys()) {
                             keySet.add(sg);
                             widestKey = Math.max(sg.length(), widestKey);
@@ -695,7 +700,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
                         content.appendRaw("\r\n                  }");
                         content.append("</code></pre>");
                         continue;
-                    } catch (Throwable e1) {                        
+                    } catch (Throwable e1) {
                         e1.printStackTrace();
                     }
                 }
@@ -759,7 +764,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
      * @param declaringClass
      * @return
      */
-    protected boolean isInterfaceVisible(Class<?> iClass) {        
+    protected boolean isInterfaceVisible(Class<?> iClass) {
         return true;
     }
 
@@ -776,7 +781,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
     /**
      * @param requiredTypes
      */
-    protected void collectRequiredTypes(HashSet<Type> requiredTypes) {        
+    protected void collectRequiredTypes(HashSet<Type> requiredTypes) {
     }
 
     protected void appendPossibleErrors(HashSet<Type> requiredTypes, final HTMLStringBuilder content, final Method m) {
@@ -816,12 +821,12 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
 
     protected void putReservedID(Type rt) {
         if (reservedAnchorIds.get(rt) == null) {
-            reservedAnchorIds.put(rt, this.count.incrementAndGet());
-            System.out.println("PUT reserved: " + rt + " - " + reservedAnchorIds.get(rt));
+            reservedAnchorIds.put(rt, rt.getTypeName());
+            System.out.println("PUT reserved: " + rt + " - " + rt.getTypeName());
         }
     }
 
-    protected Integer getReservedID(Type enumClass) {
+    protected String getReservedID(Type enumClass) {
         System.out.println("Get reserved: " + enumClass + " - " + reservedAnchorIds.get(enumClass));
         return reservedAnchorIds.get(enumClass);
     }
@@ -834,8 +839,8 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
      */
     private AtomicInteger count = new AtomicInteger(0);
 
-    private void addMenuEntry(HTMLStringBuilder content, HTMLStringBuilder nav, int i, String string, Integer aid, String tooltipHTML) {
-        int id = aid != null ? aid : count.incrementAndGet();
+    private void addMenuEntry(HTMLStringBuilder content, HTMLStringBuilder nav, int i, String string, String aid, String tooltipHTML) {
+        final String id = aid != null ? aid : String.valueOf(count.incrementAndGet());
         if (StringUtils.isNotEmpty(tooltipHTML)) {
             content.append("<div class='header" + i + "'><a class='anchor' id='tag_" + id + "'>" + "</a>" + "<h" + i + " class='tooltip'>" + htmlEncode(string) + "<span class='tooltiptext'>" + tooltipHTML + "</span>" + "</h" + i + "></div>");
         } else {

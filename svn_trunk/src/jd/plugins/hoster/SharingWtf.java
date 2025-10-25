@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51263 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51721 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -310,10 +310,10 @@ public class SharingWtf extends YetiShareCore {
                  * many connections) --> Should work fine after the next try.
                  */
                 link.setProperty(directlinkproperty, con.getURL().toExternalForm());
-                checkResponseCodeErrors(con);
                 if (!looksLikeDownloadableContent(con)) {
                     br.followConnection(true);
                     checkErrors(br, link, account);
+                    checkResponseCodeErrors(con);
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to downloadable content");
                 }
                 dl.startDownload();
@@ -347,10 +347,10 @@ public class SharingWtf extends YetiShareCore {
              * connections) --> Should work fine after the next try.
              */
             link.setProperty(directlinkproperty, con.getURL().toExternalForm());
-            checkResponseCodeErrors(con);
             if (!looksLikeDownloadableContent(con)) {
                 br.followConnection(true);
                 checkErrors(br, link, account);
+                checkResponseCodeErrors(con);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to downloadable content");
             }
             dl.startDownload();

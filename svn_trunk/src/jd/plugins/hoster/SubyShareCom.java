@@ -25,6 +25,11 @@ import java.util.concurrent.TimeUnit;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -40,12 +45,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51630 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -161,7 +161,7 @@ public class SubyShareCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         /* 2019-07-08: Special */
         final String msg_vpn_blocked = "Dedicated servers/VPS/RDP/VPN/Tor/Proxies/Socks blocked by subyshare";
         final long time_vpn_blocked = 5 * 60 * 1000l;
@@ -222,7 +222,7 @@ public class SubyShareCom extends XFileSharingProBasic {
         if (link != null && link.hasProperty(PROPERTY_FAKE_OFFLINE_STATUS)) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "URL is referer protected or offline");
         }
-        super.checkErrors(br, correctedBR, link, account, checkAll);
+        super.checkErrors(br, correctedBR, link, account);
     }
 
     @Override

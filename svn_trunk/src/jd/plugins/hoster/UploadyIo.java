@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50407 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -149,7 +149,7 @@ public class UploadyIo extends XFileSharingProBasic {
             return;
         }
         requestFileInformationWebsite(link, account);
-        checkErrors(br, getCorrectBR(br), link, account, false);
+        checkErrors(br, getCorrectBR(br), link, account);
         final Form download1 = findFormDownload1Free(br);
         if (download1 == null) {
             this.checkErrorsLastResort(br, link, account);
@@ -185,7 +185,7 @@ public class UploadyIo extends XFileSharingProBasic {
         /* Wait remaining time if needed */
         this.waitTime(link, timeBefore);
         submitForm(download1);
-        checkErrors(br, getCorrectBR(br), link, account, false);
+        checkErrors(br, getCorrectBR(br), link, account);
         final Form download2 = this.findFormDownload2Free(br);
         if (download2 == null) {
             this.checkErrorsLastResort(br, link, account);
@@ -201,7 +201,7 @@ public class UploadyIo extends XFileSharingProBasic {
         String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find final downloadurl");
-            checkErrors(br, getCorrectBR(br), link, account, true);
+            checkErrors(br, getCorrectBR(br), link, account);
             checkErrorsLastResort(br, link, account);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -228,11 +228,11 @@ public class UploadyIo extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         final String ipWaitMinutes = br.getRegex("Delay between downloads must not be less than (\\d+) minutes?").getMatch(0);
         if (ipWaitMinutes != null) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(ipWaitMinutes) * 60 * 1000);
         }
-        super.checkErrors(br, html, link, account, checkAll);
+        super.checkErrors(br, html, link, account);
     }
 }

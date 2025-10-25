@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51102 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class SavefilesCom extends XFileSharingProBasic {
     public SavefilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -97,8 +97,8 @@ public class SavefilesCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account);
         final long waitMillis = 5 * 60 * 1000l;
         String website_error = br.getRegex("class=\"alert alert-danger\">([^<]+)<").getMatch(0);
         if (!StringUtils.isEmpty(website_error)) {

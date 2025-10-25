@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51492 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -162,12 +162,12 @@ public class DatanodesTo extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         if (br.containsHTML(">\\s*Not allowed from domain you")) {
             /* 2023-02-21 */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Not allowed from domain you're coming from");
         }
-        super.checkErrors(br, html, link, account, checkAll);
+        super.checkErrors(br, html, link, account);
     }
 
     @Override

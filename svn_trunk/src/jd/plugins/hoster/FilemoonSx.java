@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.decrypter.FilemoonSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50618 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSx extends XFileSharingProBasic {
     public FilemoonSx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -194,7 +194,7 @@ public class FilemoonSx extends XFileSharingProBasic {
                 /* User prefers to download stream -> We can skip the captcha required to find official video downloadurl. */
                 break grabOfficialVideoDownloadDirecturl;
             }
-            this.checkErrors(br, this.getCorrectBR(br), link, account, false);
+            this.checkErrors(br, this.getCorrectBR(br), link, account);
             if (!br.getURL().matches(".*/download/.*")) {
                 this.getPage("/download/" + this.getFUIDFromURL(link));
             }
@@ -260,8 +260,8 @@ public class FilemoonSx extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account);
         /* 2022-11-04: Website failure after captcha on "/download/..." page */
         if (isOffline(link, br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

@@ -35,7 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
 public class MexashareCom extends XFileSharingProBasic {
     public MexashareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -130,7 +130,7 @@ public class MexashareCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+    protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         /* 2019-08-28: Special */
         final String preciseWaittime = new Regex(correctedBR, "(you can download this file after\\s*:\\s*</a><br>\\s*<br><br>\\s*<a.*?)</a>").getMatch(0);
         if (preciseWaittime != null) {
@@ -177,7 +177,7 @@ public class MexashareCom extends XFileSharingProBasic {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You have consumed your daily download volume", 30 * 60 * 1000l);
             }
         }
-        super.checkErrors(br, correctedBR, link, account, checkAll);
+        super.checkErrors(br, correctedBR, link, account);
     }
 
     @Override
