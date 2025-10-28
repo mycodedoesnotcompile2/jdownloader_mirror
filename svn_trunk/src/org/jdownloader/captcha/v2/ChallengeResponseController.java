@@ -10,12 +10,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Account;
-
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
@@ -35,8 +29,6 @@ import org.jdownloader.captcha.event.ChallengeResponseEvent;
 import org.jdownloader.captcha.event.ChallengeResponseEventSender;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaDialogSolver;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.jac.KeyCaptchaJACSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
@@ -54,7 +46,6 @@ import org.jdownloader.captcha.v2.solver.jac.JACSolver;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSolver;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSolverClick;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSolverMultiClick;
-import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSolverPuzzle;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaSolver;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
@@ -64,6 +55,12 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.updatev2.UpdateController;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountFilter;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.Account;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
@@ -143,7 +140,6 @@ public class ChallengeResponseController {
         addSolver(Captcha9kwSolver.getInstance());
         addSolver(Captcha9kwSolverClick.getInstance());
         addSolver(Captcha9kwSolverMultiClick.getInstance());
-        addSolver(Captcha9kwSolverPuzzle.getInstance());
         if (!Application.isHeadless()) {
             addSolver(DialogBasicCaptchaSolver.getInstance());
             addSolver(DialogClickCaptchaSolver.getInstance());
@@ -152,10 +148,6 @@ public class ChallengeResponseController {
             addSolver(OAuthDialogSolver.getInstance());
         }
         addSolver(AccountOAuthSolver.getInstance());
-        addSolver(KeyCaptchaJACSolver.getInstance());
-        if (!Application.isHeadless()) {
-            addSolver(KeyCaptchaDialogSolver.getInstance());
-        }
         addSolver(CaptchaAPISolver.getInstance());
     }
 

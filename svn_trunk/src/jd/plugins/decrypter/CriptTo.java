@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51712 $", interfaceVersion = 3, names = { "cript.to" }, urls = { "https?://(?:www\\.)?cript\\.to/folder/([A-Za-z0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = { "cript.to" }, urls = { "https?://(?:www\\.)?cript\\.to/folder/([A-Za-z0-9]+)" })
 public class CriptTo extends PluginForDecrypt {
     public CriptTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,7 @@ public class CriptTo extends PluginForDecrypt {
             }
         }
         handle_folder_password: {
-            Form pwform = getCaptchaForm(br);
+            Form pwform = getFolderpwForm(br);
             if (pwform == null) {
                 logger.info("No folder password required");
                 break handle_folder_password;

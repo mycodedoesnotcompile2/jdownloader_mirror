@@ -17,8 +17,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.captcha.v2.challenge.areyouahuman.CaptchaHelperCrawlerPluginAreYouHuman;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
@@ -34,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 3, names = { "ivpaste.com" }, urls = { "https?://(www\\.)?ivpaste\\.com/(v/|view\\.php\\?id=)[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = { "ivpaste.com" }, urls = { "https?://(www\\.)?ivpaste\\.com/(v/|view\\.php\\?id=)[A-Za-z0-9]+" })
 public class IvPasteCom extends PluginForDecrypt {
     public IvPasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,11 +76,6 @@ public class IvPasteCom extends PluginForDecrypt {
                 logger.info(i + "/5:Unsupported captchatype: " + parameter);
                 sleep(1000l, param);
                 br.getPage("https://ivpaste.com/p/" + ID);
-            } else if (form.containsHTML("areyouahuman\\.com/")) {
-                final String areweahuman = new CaptchaHelperCrawlerPluginAreYouHuman(this, br).getToken();
-                form.put("session_secret", Encoding.urlEncode(areweahuman));
-                form.put("soy_humano_btn", "Submit");
-                br.submitForm(form);
             } else if (form.containsHTML("class=(\"|')g-recaptcha\\1") && form.containsHTML("google\\.com/recaptcha")) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
@@ -91,18 +84,6 @@ public class IvPasteCom extends PluginForDecrypt {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(form);
-            } else if (form.containsHTML("KeyCAPTCHA code")) {
-                String result = null;
-                if (auto < 3) {
-                    auto++;
-                    result = handleCaptchaChallenge(new KeyCaptcha(this, br, createDownloadlink(parameter)).createChallenge(this));
-                } else {
-                    result = handleCaptchaChallenge(new KeyCaptcha(this, br, createDownloadlink(parameter)).createChallenge(true, this));
-                }
-                if (result == null || "CANCEL".equals(result)) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                }
-                br.postPage(br.getURL(), "capcode=" + Encoding.urlEncode(result) + "&save=&save=");
             } else {
                 // this logic is bad, unsupported captcha will result in premature breaking and plugin defect.
                 break;

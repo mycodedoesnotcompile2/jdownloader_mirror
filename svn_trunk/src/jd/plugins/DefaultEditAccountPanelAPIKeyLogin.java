@@ -23,19 +23,19 @@ public class DefaultEditAccountPanelAPIKeyLogin extends MigPanel implements Acco
     /**
      *
      */
-    private static final long serialVersionUID = 1L;
+    private static final long      serialVersionUID = 1L;
+    private final ExtPasswordField pass;
+    private final JLabel           idLabel;
+    private final PluginForHost    plg;
 
     protected String getPassword() {
         if (this.pass == null) {
             return null;
         } else {
-            return new String(this.pass.getPassword());
+            /* Return trimmed value since API keys typically never begin/end with whitespaces. */
+            return StringUtils.trim(new String(this.pass.getPassword()));
         }
     }
-
-    private final ExtPasswordField pass;
-    private final JLabel           idLabel;
-    private final PluginForHost    plg;
 
     public boolean updateAccount(Account input, Account output) {
         boolean changed = false;

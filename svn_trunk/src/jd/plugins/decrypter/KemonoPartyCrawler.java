@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import jd.PluginWrapper;
@@ -60,7 +61,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51709 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51753 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -379,6 +380,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 postRevisions.put(revisionID, selected);
             }
             break;
+        default:
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported PostRevisionMode:" + revisionMode);
         }
         processPosts: {
             final HashSet<String> dupe = new HashSet<String>();
@@ -567,10 +570,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-            return size() > 100;
-        };
-    };
+                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                                                              return size() > 100;
+                                                          };
+                                                      };
 
     /**
      * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
@@ -625,10 +628,11 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     protected void getPage(final Browser br, final String url) throws Exception {
-        boolean errorRateLimit = true;
-        final int maxtries = 15;
-        for (int i = 0; i <= maxtries; i++) {
-            GetRequest getRequest = br.createGetRequest(url);
+        final int maxTries = 15;
+        final Random rnd = new Random();
+        for (int i = 0; i <= maxTries; i++) {
+            final boolean lastTry = i == maxTries;
+            final GetRequest getRequest = br.createGetRequest(url);
             // If you want to scrape, use "Accept: text/css" header in your requests for now. For whatever reason DDG does not like SPA and
             // JSON, so we have to be funny. And you are no exception to caching.
             getRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "text/css");
@@ -644,24 +648,32 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 } else if (con.getResponseCode() == 429) {
                     br.followConnection(true);
                     logger.info("Error 429 too many requests");
-                    final int retrySeconds = 10;
+                    if (lastTry) {
+                        throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
+                    }
+                    final int retrySeconds = 10 + rnd.nextInt(10);
                     final String title = "Rate-Limit reached";
-                    String text = "Time until rate-limit reset: Unknown | Attempt " + (i + 1) + "/" + maxtries;
+                    String text = "Time until rate-limit reset: Unknown | Attempt " + (i + 1) + "/" + maxTries;
                     text += "\nTry again later or change your IP | Auto retry in " + retrySeconds + " seconds";
                     this.displayBubbleNotification(title, text);
                     this.sleep(retrySeconds * 1000, this.cl);
                     continue;
+                } else if (con.getResponseCode() == 503) {
+                    br.followConnection(true);
+                    logger.info("Error 503 " + con.getResponseMessage());
+                    if (lastTry) {
+                        throw new DecrypterRetryException(RetryReason.HOST);
+                    }
+                    final int retrySeconds = 3 + rnd.nextInt(10);
+                    this.sleep(retrySeconds * 1000, this.cl);
+                    continue;
                 } else {
                     br.followConnection();
-                    errorRateLimit = false;
-                    break;
+                    return;
                 }
             } finally {
                 con.disconnect();
             }
-        }
-        if (errorRateLimit) {
-            throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
         }
     }
 

@@ -27,7 +27,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 48528 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51739 $", interfaceVersion = 3, names = {}, urls = {})
 public class UiiIo extends MightyScriptAdLinkFly {
     public UiiIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -36,8 +36,16 @@ public class UiiIo extends MightyScriptAdLinkFly {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uii.io", "szs.pw", "passgen.icu", "wordcounter.icu", "pwrpa.cc" });
+        ret.add(new String[] { "uii.io", "szs.pw", "passgen.icu", "wordcounter.icu", "wordcount.im", "pwrpa.cc" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("szs.pw");
+        deadDomains.add("wordcounter.icu");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

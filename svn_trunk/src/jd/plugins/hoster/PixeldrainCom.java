@@ -58,7 +58,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51543 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51739 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -717,7 +717,7 @@ public class PixeldrainCom extends PluginForHost {
     @Override
     protected String getAPILoginHelpURL() {
         try {
-            return "https://" + getAPIBase(this) + "/user/connect_app?app=jdownloader";
+            return getAPIBase(this) + "/user/connect_app?app=jdownloader";
         } catch (Exception e) {
             return "https://" + getHost() + "/user/connect_app?app=jdownloader";
         }
@@ -732,13 +732,5 @@ public class PixeldrainCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

@@ -18,7 +18,9 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
 
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
     private final String siteKey;
@@ -36,13 +38,13 @@ public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
         return this.getPluginBrowser().getURL();
     }
 
-    public CutCaptchaChallenge(final Plugin plugin, final String siteKey, final String apiKey) {
+    public CutCaptchaChallenge(final Plugin plugin, final String siteKey, final String apiKey) throws PluginException {
         super("cutcaptcha", plugin);
         if (!looksLikeValidSiteKey(siteKey)) {
             // default: SAs61IAI
-            throw new WTFException("Bad SiteKey:" + siteKey);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Bad SiteKey:" + siteKey);
         } else if (!looksLikeValidApiKey(apiKey)) {
-            throw new WTFException("Bad APIKey:" + apiKey);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Bad APIKey:" + apiKey);
         }
         this.siteKey = siteKey;
         this.apiKey = apiKey;

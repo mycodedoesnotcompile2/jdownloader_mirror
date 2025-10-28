@@ -14,7 +14,9 @@ import java.util.regex.Pattern;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.nutils.encoding.HTMLEntities;
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -232,13 +234,13 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         }
     }
 
-    public RecaptchaV2Challenge(final String siteKey, final String secureToken, Plugin pluginForHost, Browser br, String siteDomain) {
+    public RecaptchaV2Challenge(final String siteKey, final String secureToken, Plugin pluginForHost, Browser br, String siteDomain) throws PluginException {
         super(RECAPTCHAV2, pluginForHost, br);
         this.secureToken = secureToken;
         this.siteKey = siteKey;
         this.siteDomain = siteDomain;
         if (!AbstractRecaptchaV2.isValidSiteKey(siteKey)) {
-            throw new WTFException("Bad SiteKey:" + siteKey);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Bad SiteKey:" + siteKey);
         }
     }
 

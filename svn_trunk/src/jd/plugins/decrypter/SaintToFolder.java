@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SaintTo;
 
-@DecrypterPlugin(revision = "$Revision: 51302 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51740 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SaintTo.class })
 public class SaintToFolder extends PluginForDecrypt {
     public SaintToFolder(PluginWrapper wrapper) {
@@ -68,7 +68,7 @@ public class SaintToFolder extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/a/([a-zA-Z0-9]{5,})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/a/([a-zA-Z0-9\\-_]{5,})");
         }
         return ret.toArray(new String[0]);
     }

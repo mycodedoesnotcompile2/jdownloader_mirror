@@ -7,14 +7,6 @@ import java.util.Map;
 
 import javax.swing.Icon;
 
-import jd.SecondLevelLaunch;
-import jd.gui.swing.jdgui.components.premiumbar.ServiceCollection;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanelExtender;
-import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -31,6 +23,14 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
 import org.jdownloader.settings.staticreferences.CFG_9KWCAPTCHA;
+
+import jd.SecondLevelLaunch;
+import jd.gui.swing.jdgui.components.premiumbar.ServiceCollection;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanelExtender;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 
 public class NineKwSolverService extends AbstractSolverService implements ServicePanelExtender {
     private static final NineKwSolverService INSTANCE = new NineKwSolverService();
@@ -170,7 +170,6 @@ public class NineKwSolverService extends AbstractSolverService implements Servic
     private Captcha9kwSolver           textSolver;
     private Captcha9kwSolverClick      clickSolver;
     private Captcha9kwSolverMultiClick multiclickSolver;
-    private Captcha9kwSolverPuzzle     puzzleSolver;
 
     private void updateServicePanel(boolean b) {
         if (!Application.isHeadless()) {
@@ -296,9 +295,5 @@ public class NineKwSolverService extends AbstractSolverService implements Servic
 
     public void setMultiClickSolver(Captcha9kwSolverMultiClick captcha9kwSolverMultiClick) {
         this.multiclickSolver = captcha9kwSolverMultiClick;
-    }
-
-    public void setPuzzleSolver(Captcha9kwSolverPuzzle captcha9kwSolverPuzzle) {
-        this.puzzleSolver = captcha9kwSolverPuzzle;
     }
 }

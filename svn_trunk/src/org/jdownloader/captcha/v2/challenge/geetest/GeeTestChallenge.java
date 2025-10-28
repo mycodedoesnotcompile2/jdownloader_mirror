@@ -3,7 +3,9 @@ package org.jdownloader.captcha.v2.challenge.geetest;
 import java.io.IOException;
 import java.net.URL;
 
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -27,11 +29,11 @@ public abstract class GeeTestChallenge extends AbstractBrowserChallenge {
         return siteKey;
     }
 
-    public GeeTestChallenge(String siteKey, Plugin pluginForHost) {
+    public GeeTestChallenge(String siteKey, Plugin pluginForHost) throws PluginException {
         super("geetest", pluginForHost);
         this.siteKey = siteKey;
         if (siteKey == null || !siteKey.matches("^[a-f0-9]{32}$")) {
-            throw new WTFException("Bad SiteKey");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Bad SiteKey:" + siteKey);
         }
     }
 

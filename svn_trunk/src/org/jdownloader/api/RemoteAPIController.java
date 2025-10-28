@@ -104,7 +104,6 @@ import org.jdownloader.api.system.SystemAPIImpl;
 import org.jdownloader.api.toolbar.JDownloaderToolBarAPIImpl;
 import org.jdownloader.api.ui.UIAPIImpl;
 import org.jdownloader.api.useragent.UserAgentController;
-import org.jdownloader.captcha.api.CaptchaForwarder;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.myjdownloader.client.AbstractMyJDClient;
 import org.jdownloader.myjdownloader.client.bindings.ClientApiNameSpace;
@@ -467,7 +466,6 @@ public class RemoteAPIController {
         });
         validateInterfaces(EventsAPIInterface.class, EventsInterface.class);
         register(CaptchaAPISolver.getInstance());
-        register(CaptchaForwarder.getInstance());
         register(CaptchaAPISolver.getInstance().getEventPublisher());
         register(new JDAPIImpl());
         DownloadWatchDogEventPublisher downloadWatchDogEventPublisher = new DownloadWatchDogEventPublisher();

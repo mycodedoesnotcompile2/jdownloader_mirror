@@ -22,13 +22,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.zip.Inflater;
 
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaShowDialogTwo;
 
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
@@ -43,10 +40,9 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
-import jd.utils.JDHexUtils;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 47660 $", interfaceVersion = 2, names = { "shahid.mbc.net" }, urls = { "https?://(?:www\\.)?(?:shahid\\.mbc\\.net/(?:media/video|ar/episode)/\\d+(/\\w+)?|bluefishtv\\.com/Store/[_a-zA-Z]+/\\d+/.*)" })
+@DecrypterPlugin(revision = "$Revision: 51747 $", interfaceVersion = 2, names = { "shahid.mbc.net" }, urls = { "https?://(?:www\\.)?(?:shahid\\.mbc\\.net/(?:media/video|ar/episode)/\\d+(/\\w+)?|bluefishtv\\.com/Store/[_a-zA-Z]+/\\d+/.*)" })
 public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
     public static enum Quality {
         ALLOW_HD("3f3f", "720p HD"),
@@ -222,67 +218,6 @@ public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
             }
             if (!next) {
                 break;
-            }
-            try {
-                // Decrypt -> http stream
-                /* TODO: change me after 0.9xx public --> jd.crypt.RC4 */
-                KeyCaptchaShowDialogTwo arkfour = new KeyCaptchaShowDialogTwo();
-                /* CHECK: we should always use getBytes("UTF-8") or with wanted charset, never system charset! */
-                byte[] compressedPlainData = arkfour.D(Encoding.Base64Decode(KEY).getBytes(), enc);
-                // Decompress -> decrypted http stream
-                Inflater decompressor = new Inflater();
-                decompressor.setInput(compressedPlainData);
-                ByteArrayOutputStream bos = new ByteArrayOutputStream(compressedPlainData.length);
-                try {
-                    while (true) {
-                        int count = decompressor.inflate(buffer);
-                        if (count == 0 && decompressor.finished()) {
-                            break;
-                        } else if (count == 0) {
-                            logger.severe("bad zip data, size:" + compressedPlainData.length);
-                            return null;
-                        } else {
-                            bos.write(buffer, 0, count);
-                        }
-                    }
-                } catch (Throwable t) {
-                } finally {
-                    decompressor.end();
-                }
-                // Parsing -> video urls
-                String decompressedPlainData = new String(bos.toByteArray(), "UTF-8");
-                String[] finalContent = new Regex(decompressedPlainData, "(.{23}rtmp[^\r\n]+)").getColumn(0);
-                if (finalContent == null || finalContent.length == 0) {
-                    if (decompressedPlainData.contains("com.delvenetworks.media.data.caching.service.PlaylistCachingServiceImplementation")) {
-                        logger.info("Link offline: " + parameter);
-                        return decryptedLinks;
-                    }
-                    return null;
-                }
-                for (String fC : finalContent) {
-                    if (fC.length() < 40) {
-                        continue;
-                    }
-                    // Einzellink oder Alles
-                    if (fC.contains("rtmp")) {
-                        if (new Regex(fC, "/" + mediaId + "(\\-|/)").matches() || completeSeason) {
-                            quality = fixedHexValue(JDHexUtils.getHexString(fC.substring(0, 2)));
-                            if (quality != null && qStr.containsKey(quality)) {
-                                /*
-                                 * Auf Anbieterseite wurden teilweise falsche Qualitätswerte eingepflegt. Funktioniert schon bei
-                                 * Einzellinks. Bei kompletten Staffeln und Qualitätsstufe HD wird auch die Mediumqualität als HD angegeben.
-                                 * Scheint ein Tippfehler zu sein ;-). Wird demnächst fixed
-                                 */
-                                if (!completeSeason && links != null && links.containsValue(Quality.valueOf(qStr.get(quality)).getName()) && ("3f3f".equals(quality) || "3f20".equals(quality))) {
-                                    quality = "7d3f";
-                                }
-                                links.put(new Regex(fC, "(rtmp[\\w:\\/\\.\\-]+)").getMatch(0), Quality.valueOf(qStr.get(quality)).getName());
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable e) {
-                continue;
             }
         }
         for (Entry<String, String> link : links.entrySet()) {

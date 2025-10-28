@@ -22,6 +22,16 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.config.Type;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -31,13 +41,15 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.decrypter.GigafileNuFolderCrawler.GigafileNuConfig.CrawlMode;
 import jd.plugins.hoster.GigafileNu;
 
-@DecrypterPlugin(revision = "$Revision: 51713 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51745 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public GigafileNuFolderCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,9 +99,11 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
         final String content_id_from_url = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String filesJson = br.getRegex("var files = (\\[.*?\\]);").getMatch(0);
-        String fileIDForDownload = null;
         final GigafileNu hosterplugin = (GigafileNu) this.getNewPluginForHostInstance(this.getHost());
         final HashSet<String> fileIDs = new HashSet<String>();
+        final CrawlMode crawlMode = PluginJsonConfig.get(getConfigInterface()).getCrawlMode().getMode();
+        final boolean addZip = CrawlMode.ALL.equals(crawlMode) || CrawlMode.ZIP.equals(crawlMode);
+        final boolean addFiles = CrawlMode.ALL.equals(crawlMode) || CrawlMode.FILES_FOLDERS.equals(crawlMode);
         final String[] extensionsOfCensoredFilenames = br.getRegex("<span class=\"unchecked_filename_filter\"[^>]*>\\*+</span>(\\.[a-zA-Z0-9]+)").getColumn(0);
         String extensionForSingleFile = null;
         long totalFilesize = 0;
@@ -134,38 +148,33 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
                     filename = Encoding.htmlDecode(filename).trim();
                     link.setName(filename);
                     link.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
+                    link.setAvailableStatus(AvailableStatus.TRUE);
                 } else if (foundFileExtensionsForCensoredFilenames) {
                     link.setName(fileID + extensionsOfCensoredFilenamesCleaned.get(i));
+                    link.setAvailableStatus(AvailableStatus.UNCHECKED);
                 } else {
                     /* Fallback: Set dummy filename to avoid all results having the same file name. */
                     link.setName(fileID);
+                    link.setAvailableStatus(AvailableStatus.UNCHECKED);
                 }
-                link.setDownloadSize(filesize);
+                link.setVerifiedFileSize(filesize);
                 link.setProperty(GigafileNu.PROPERTY_FILE_ID, fileID);
-                link.setAvailable(true);
-                ret.add(link);
                 totalFilesize += filesize;
-            }
-            if (ressourcelist.size() == 1) {
-                /* Single file -> Download that, else .zip of all files. */
-                final Map<String, Object> filemap = ressourcelist.get(0);
-                fileIDForDownload = filemap.get("file").toString();
-                logger.info("Downloading single file: " + fileIDForDownload);
-            } else {
-                logger.info("This is a folder containing " + ressourcelist.size() + " files --> Download .zip file containing all files");
+                if (addFiles) {
+                    ret.add(link);
+                }
             }
         }
         final String singleFileID = br.getRegex("var file = \"([^\"]+)").getMatch(0);
-        final boolean isSingleZipDownloadAvailable = GigafileNu.isSingleZipDownload(br, content_id_from_url);
-        if (singleFileID != null && fileIDs.add(singleFileID)) {
+        if (addZip && singleFileID != null && fileIDs.add(singleFileID)) {
             final String fileSizeBytesStr = br.getRegex("var size = (\\d+);").getMatch(0);
             final DownloadLink link = this.createDownloadlink(contenturl);
             link.setDefaultPlugin(hosterplugin);
             link.setHost(this.getHost());
             /* There is no specific single file URL -> set "folder" URL as contenturl. */
             link.setContentUrl(contenturl);
-            String filename = br.getRegex("onclick=\"download\\([^\\)]+\\);\">([^<]+)</p>").getMatch(0);
-            if (filename != null) {
+            String filename = br.getRegex("matomete_zip_filename\"[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+            if (!StringUtils.isEmpty(filename)) {
                 filename = Encoding.htmlDecode(filename).trim();
                 link.setName(filename);
                 link.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
@@ -180,7 +189,7 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             if (fileSizeBytesStr != null) {
                 link.setDownloadSize(Long.parseLong(fileSizeBytesStr));
             } else {
-                logger.warning("Failed to find size of single file");
+                logger.warning("Failed to find size of single file in html code");
                 if (totalFilesize > 0) {
                     /*
                      * Use total size of all other files as fallback value -> Assume that this is the .zip file containing all other files.
@@ -193,7 +202,7 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             ret.add(link);
         }
         if (ret.isEmpty()) {
-            if (!br.containsHTML("download\\('" + content_id_from_url) && !isSingleZipDownloadAvailable) {
+            if (!br.containsHTML("download\\('" + content_id_from_url) && !GigafileNu.isSingleZipDownload(br, content_id_from_url)) {
                 /* Assume that item is offline */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
@@ -206,5 +215,66 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
         fp.setPackageKey(this.getHost() + "/folder/" + content_id_from_url);
         fp.addLinks(ret);
         return ret;
+    }
+
+    @Override
+    public Class<GigafileNuConfig> getConfigInterface() {
+        return GigafileNuConfig.class;
+    }
+
+    @PluginHost(host = "gigafile.nu", type = Type.CRAWLER)
+    public static interface GigafileNuConfig extends PluginConfigInterface {
+        public static final TRANSLATION TRANSLATION  = new TRANSLATION();
+        public static final CrawlMode   DEFAULT_MODE = CrawlMode.FILES_FOLDERS;
+
+        public static class TRANSLATION {
+            public String getCrawlMode2_label() {
+                return "Crawl mode";
+            }
+        }
+
+        public static enum CrawlMode implements LabelInterface {
+            ZIP {
+                @Override
+                public String getLabel() {
+                    return "Add .zip container only";
+                }
+            },
+            FILES_FOLDERS {
+                @Override
+                public String getLabel() {
+                    return "Add individual files";
+                }
+            },
+            ALL {
+                @Override
+                public String getLabel() {
+                    return "Add individual files and .zip container";
+                }
+            },
+            DEFAULT {
+                @Override
+                public String getLabel() {
+                    return "Default: " + DEFAULT_MODE.getLabel();
+                }
+
+                @Override
+                public CrawlMode getMode() {
+                    return DEFAULT_MODE.getMode();
+                }
+            };
+
+            public CrawlMode getMode() {
+                return this;
+            }
+        }
+
+        @AboutConfig
+        @DefaultEnumValue("DEFAULT")
+        @DefaultOnNull
+        @Order(10)
+        CrawlMode getCrawlMode();
+
+        void setCrawlMode(final CrawlMode mode);
     }
 }

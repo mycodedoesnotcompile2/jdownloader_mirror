@@ -18,15 +18,17 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50899 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 51740 $", interfaceVersion = 3, names = {}, urls = {})
 public class FasttGg extends XFileSharingProBasic {
     public FasttGg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -44,6 +46,14 @@ public class FasttGg extends XFileSharingProBasic {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "fastt.gg" });
+        return ret;
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        // download servers do not support IPV6
+        ret.setIPVersion(IPVERSION.IPV4_IPV6);
         return ret;
     }
 

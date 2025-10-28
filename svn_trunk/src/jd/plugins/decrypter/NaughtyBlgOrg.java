@@ -40,10 +40,11 @@ import jd.plugins.PluginException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51439 $", interfaceVersion = 5, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51740 $", interfaceVersion = 5, names = {}, urls = {})
 public class NaughtyBlgOrg extends antiDDoSForDecrypt {
     private enum Category {
         UNDEF,
@@ -107,12 +108,12 @@ public class NaughtyBlgOrg extends antiDDoSForDecrypt {
         getPage(parameter);
         final String nonce = br.getRegex("\"nonce\"\\s*:\\s*\"(.*?)\"").getMatch(0);
         final String post_id = br.getRegex("\"post_id\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-        final String recaptcha_key = br.getRegex("\"recaptcha_key\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+        final String captcha_key = br.getRegex("\"recaptcha_key\"\\s*:\\s*\"(.*?)\"").getMatch(0);
         final String data_protection = br.getRegex("data-protection\\s*=\\s*\"(.*?)\"").getMatch(0);
         final String data_area = br.getRegex("data-area\\s*=\\s*\"(.*?)\"").getMatch(0);
         final String data_psid = br.getRegex("data-psid\\s*=\\s*\"(.*?)\"").getMatch(0);
         String downloadhidden = null;
-        if (StringUtils.isAllNotEmpty(nonce, post_id, recaptcha_key, data_area, data_protection, data_psid)) {
+        if (StringUtils.isAllNotEmpty(nonce, post_id, captcha_key, data_area, data_protection, data_psid)) {
             final Form form = new Form();
             form.setAction("/wp-admin/admin-ajax.php");
             form.setMethod(MethodType.POST);
@@ -124,8 +125,15 @@ public class NaughtyBlgOrg extends antiDDoSForDecrypt {
             form.put("captcha_id", data_psid);
             form.put("type", "recaptcha");
             try {
-                final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, recaptcha_key).getToken();
-                form.put("token", recaptchaV2Response);
+                if (CaptchaHelperCrawlerPluginRecaptchaV2.isValidSiteKey(captcha_key)) {
+                    final String response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, captcha_key).getToken();
+                    form.put("token", response);
+                } else if (CaptchaHelperCrawlerPluginHCaptcha.isValidSiteKey(captcha_key)) {
+                    final String response = new CaptchaHelperCrawlerPluginHCaptcha(this, br, captcha_key).getToken();
+                    form.put("token", response);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported captchaKey:" + captcha_key);
+                }
                 final Browser brc = br.cloneBrowser();
                 brc.submitForm(form);
                 final Map<String, Object> response = restoreFromString(brc.toString(), TypeRef.MAP);

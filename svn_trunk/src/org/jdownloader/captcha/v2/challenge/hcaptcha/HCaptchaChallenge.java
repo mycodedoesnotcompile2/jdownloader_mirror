@@ -7,7 +7,9 @@ import java.util.Locale;
 import java.util.Map;
 
 import jd.http.Browser;
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -163,12 +165,12 @@ public class HCaptchaChallenge extends AbstractBrowserChallenge {
         }
     }
 
-    public HCaptchaChallenge(final String siteKey, Plugin pluginForHost, Browser br, String siteDomain) {
+    public HCaptchaChallenge(final String siteKey, Plugin pluginForHost, Browser br, String siteDomain) throws PluginException {
         super(getChallengeType(), pluginForHost, br);
         this.siteKey = siteKey;
         this.siteDomain = siteDomain;
         if (!AbstractHCaptcha.isValidSiteKey(siteKey)) {
-            throw new WTFException("Bad SiteKey:" + siteKey);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Bad SiteKey:" + siteKey);
         }
     }
 

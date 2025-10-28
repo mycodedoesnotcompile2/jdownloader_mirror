@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 51582 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -63,7 +63,6 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         types.add(CAPTCHA_TYPE.MULTI_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
-        types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
         return types;
     }
 

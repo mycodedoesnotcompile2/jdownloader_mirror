@@ -29,10 +29,8 @@ import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.config.FileCryptConfig;
@@ -47,7 +45,6 @@ import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
 import jd.parser.html.InputField;
-import jd.plugins.CaptchaException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
@@ -60,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 51697 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -614,27 +611,6 @@ public class FileCryptCc extends PluginForDecrypt {
                     } else if (captchaForm != null && captchaForm.containsHTML("=\"g-recaptcha\"")) {
                         final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                         captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    } else if (captchaForm != null && captchaForm.containsHTML("capcode")) {
-                        Challenge<String> challenge = new KeyCaptcha(this, br, createDownloadlink(url)).createChallenge(this);
-                        try {
-                            final String result = handleCaptchaChallenge(challenge);
-                            if (challenge.isRefreshTrigger(result)) {
-                                continue;
-                            }
-                            if (StringUtils.isEmpty(result)) {
-                                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                            }
-                            if ("CANCEL".equals(result)) {
-                                throw new PluginException(LinkStatus.ERROR_FATAL);
-                            }
-                            captchaForm.put("capcode", Encoding.urlEncode(result));
-                        } catch (CaptchaException e) {
-                            e.throwMeIfNoRefresh();
-                            continue;
-                        } catch (Throwable e) {
-                            e.printStackTrace();
-                            continue;
-                        }
                     } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
                         lastCaptchaIsCutCaptcha = true;
                         if (cutCaptchaRetryIndex == 0 || tryToSolveCutCaptcha) {

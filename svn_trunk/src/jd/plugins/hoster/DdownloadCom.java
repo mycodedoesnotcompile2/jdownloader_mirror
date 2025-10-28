@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51738 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -240,11 +240,7 @@ public class DdownloadCom extends XFileSharingProBasic {
     public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2020-05-17 */
         super.scanInfo(html, fileInfo);
-        String filename = new Regex(html, "<div class=\"name position-relative\">\\s*<h4>([^<>\"]+)</h4>").getMatch(0);
-        if (StringUtils.isEmpty(filename)) {
-            /* 2021-03-25 */
-            filename = new Regex(html, ">File\\s*:\\s*<font[^>]*>([^<>\"]+)<").getMatch(0);
-        }
+        String filename = new Regex(html, "<h1[^>]*class=\"file-info-name\"[^>]*>([^<]+)</h1>").getMatch(0);
         String filesize = new Regex(html, "class=\"file-size\">([^<>\"]+)<").getMatch(0);
         if (StringUtils.isEmpty(filesize)) {
             /* 2021-03-25 */

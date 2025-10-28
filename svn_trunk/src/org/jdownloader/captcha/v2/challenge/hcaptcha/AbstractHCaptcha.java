@@ -4,20 +4,21 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.logging.LogController;
-
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.parser.html.Form;
 import jd.plugins.DownloadLink;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.logging.LogController;
 
 public class AbstractHCaptcha<T extends Plugin> {
     // https://docs.hcaptcha.com/invisible/
@@ -309,7 +310,7 @@ public class AbstractHCaptcha<T extends Plugin> {
         return null;
     }
 
-    protected HCaptchaChallenge createChallenge() {
+    protected HCaptchaChallenge createChallenge() throws PluginException {
         return new HCaptchaChallenge(getSiteKey(), getPlugin(), br, getSiteDomain()) {
             @Override
             public String getSiteUrl() {
