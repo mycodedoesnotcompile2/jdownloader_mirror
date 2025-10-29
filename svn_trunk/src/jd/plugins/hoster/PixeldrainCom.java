@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51739 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51754 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -153,6 +154,18 @@ public class PixeldrainCom extends PluginForHost {
                 }
             }
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Blocked by ISP? See: pixeldrain.com/about#toc_8", 30 * 60 * 1000l);
+        }
+    }
+
+    /* Returns domain currently used for API requests. */
+    public static String getAPIDomain(final Plugin plugin) {
+        try {
+            final String apiBase = getAPIBase(plugin);
+            final String host = new URL(apiBase).getHost();
+            return host;
+        } catch (final Exception ignore) {
+            /* Fallback */
+            return plugin.getHost();
         }
     }
 
@@ -716,11 +729,7 @@ public class PixeldrainCom extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        try {
-            return getAPIBase(this) + "/user/connect_app?app=jdownloader";
-        } catch (Exception e) {
-            return "https://" + getHost() + "/user/connect_app?app=jdownloader";
-        }
+        return "https://" + getAPIDomain(this) + "/user/connect_app?app=jdownloader";
     }
 
     @Override

@@ -16,22 +16,10 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultEnumValue;
-import org.appwork.storage.config.annotations.DefaultOnNull;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginHost;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.config.Type;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -46,10 +34,15 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.decrypter.GigafileNuFolderCrawler.GigafileNuConfig.CrawlMode;
 import jd.plugins.hoster.GigafileNu;
 
-@DecrypterPlugin(revision = "$Revision: 51745 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.GigafileNuConfig;
+import org.jdownloader.plugins.components.config.GigafileNuConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 51767 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public GigafileNuFolderCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,109 +90,137 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String content_id_from_url = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String filesJson = br.getRegex("var files = (\\[.*?\\]);").getMatch(0);
         final GigafileNu hosterplugin = (GigafileNu) this.getNewPluginForHostInstance(this.getHost());
-        final HashSet<String> fileIDs = new HashSet<String>();
-        final CrawlMode crawlMode = PluginJsonConfig.get(getConfigInterface()).getCrawlMode().getMode();
-        final boolean addZip = CrawlMode.ALL.equals(crawlMode) || CrawlMode.ZIP.equals(crawlMode);
-        final boolean addFiles = CrawlMode.ALL.equals(crawlMode) || CrawlMode.FILES_FOLDERS.equals(crawlMode);
-        final String[] extensionsOfCensoredFilenames = br.getRegex("<span class=\"unchecked_filename_filter\"[^>]*>\\*+</span>(\\.[a-zA-Z0-9]+)").getColumn(0);
-        String extensionForSingleFile = null;
         long totalFilesize = 0;
+        final Map<String, DownloadLink> filesFolders = new HashMap<String, DownloadLink>();
         if (filesJson != null) {
-            final String[] filenames = br.getRegex("alt=\"スキャン中\" style=\"height: 18px;\">\\s*</span>\\s*<span class=\"\">([^<]+)</span>").getColumn(0);
             final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) restoreFromString(filesJson, TypeRef.OBJECT);
-            final List<String> extensionsOfCensoredFilenamesCleaned = new ArrayList<String>();
-            final boolean foundRealFilenames;
-            if (filenames != null && filenames.length == ressourcelist.size()) {
-                foundRealFilenames = true;
-            } else {
-                foundRealFilenames = false;
-                logger.warning("Failed to find names of individual files");
-            }
-            final boolean foundFileExtensionsForCensoredFilenames;
-            if (extensionsOfCensoredFilenames != null && extensionsOfCensoredFilenames.length == ressourcelist.size()) {
-                extensionsOfCensoredFilenamesCleaned.addAll(Arrays.asList(extensionsOfCensoredFilenames));
-                foundFileExtensionsForCensoredFilenames = true;
-            } else if (extensionsOfCensoredFilenames != null && extensionsOfCensoredFilenames.length == ressourcelist.size() + 1) {
-                extensionsOfCensoredFilenamesCleaned.addAll(Arrays.asList(extensionsOfCensoredFilenames));
-                /* Remove first item as this belongs to the single file or to the .zip that contains all files. */
-                extensionForSingleFile = extensionsOfCensoredFilenamesCleaned.remove(0);
-                foundFileExtensionsForCensoredFilenames = true;
-            } else {
-                foundFileExtensionsForCensoredFilenames = false;
-            }
+            final String[] matomete_file_names = br.getRegex("class=\"matomete_file_name[^\"]*\"[^>]*>(?:\\s*<span[^>]*\"unchecked_filename_filter\"[^<]*</span>)?\\s*([^<]*?)\\s*</span>").getColumn(0);
             for (int i = 0; i < ressourcelist.size(); i++) {
                 final Map<String, Object> file = ressourcelist.get(i);
                 final String fileID = file.get("file").toString();
                 final long filesize = ((Number) file.get("size")).longValue();
-                if (!fileIDs.add(fileID)) {
-                    /* Skip duplicates */
-                    continue;
-                }
                 final DownloadLink link = this.createDownloadlink(contenturl);
                 link.setDefaultPlugin(hosterplugin);
                 link.setHost(this.getHost());
                 /* There is no specific single file URL -> set "folder" URL as contenturl. */
                 link.setContentUrl(contenturl);
-                if (foundRealFilenames) {
-                    String filename = filenames[i];
+                String filename = matomete_file_names != null && matomete_file_names.length == ressourcelist.size() ? matomete_file_names[i] : null;
+                String censoredExtension = null;
+                if (filename != null && filename.matches("^\\.[a-z0-9]{2,4}$")) {
+                    censoredExtension = filename;
+                    filename = null;
+                }
+                boolean prefer_report_api = false;
+                if (!GigafileNu.isFilename(filename)) {
+                    prefer_report_api = StringUtils.isNotEmpty(filename);
+                    filename = br.getRegex("download\\('" + Pattern.quote(fileID) + "[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+                }
+                if (!GigafileNu.isFilename(filename)) {
+                    prefer_report_api = prefer_report_api || StringUtils.isNotEmpty(filename);
+                    filename = null;
+                }
+                if (StringUtils.isNotEmpty(filename)) {
+                    prefer_report_api = false;
                     filename = Encoding.htmlDecode(filename).trim();
                     link.setName(filename);
                     link.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
                     link.setAvailableStatus(AvailableStatus.TRUE);
-                } else if (foundFileExtensionsForCensoredFilenames) {
-                    link.setName(fileID + extensionsOfCensoredFilenamesCleaned.get(i));
-                    link.setAvailableStatus(AvailableStatus.UNCHECKED);
                 } else {
                     /* Fallback: Set dummy filename to avoid all results having the same file name. */
-                    link.setName(fileID);
+                    link.setName(fileID + StringUtils.valueOrEmpty(censoredExtension));
+                    /* Do not set online status here so that hoster plugin can find the real filenames. */
                     link.setAvailableStatus(AvailableStatus.UNCHECKED);
                 }
                 link.setVerifiedFileSize(filesize);
+                if (prefer_report_api) {
+                    link.setProperty(GigafileNu.REPORT_WORKAROUND_PROPERTY, Boolean.TRUE);
+                }
                 link.setProperty(GigafileNu.PROPERTY_FILE_ID, fileID);
                 totalFilesize += filesize;
-                if (addFiles) {
-                    ret.add(link);
+                if (!filesFolders.containsKey(fileID)) {
+                    filesFolders.put(fileID, link);
                 }
             }
         }
+        DownloadLink singleZipOrFile = null;
         final String singleFileID = br.getRegex("var file = \"([^\"]+)").getMatch(0);
-        if (addZip && singleFileID != null && fileIDs.add(singleFileID)) {
-            final String fileSizeBytesStr = br.getRegex("var size = (\\d+);").getMatch(0);
-            final DownloadLink link = this.createDownloadlink(contenturl);
-            link.setDefaultPlugin(hosterplugin);
-            link.setHost(this.getHost());
+        if (singleFileID != null && !filesFolders.containsKey(singleFileID)) {
+            singleZipOrFile = this.createDownloadlink(contenturl);
+            singleZipOrFile.setDefaultPlugin(hosterplugin);
+            singleZipOrFile.setHost(this.getHost());
             /* There is no specific single file URL -> set "folder" URL as contenturl. */
-            link.setContentUrl(contenturl);
+            singleZipOrFile.setContentUrl(contenturl);
             String filename = br.getRegex("matomete_zip_filename\"[^>]*>\\s*(.*?)\\s*<").getMatch(0);
-            if (!StringUtils.isEmpty(filename)) {
+            boolean prefer_report_api = false;
+            if (!GigafileNu.isFilename(filename)) {
+                prefer_report_api = StringUtils.isNotEmpty(filename);
+                filename = br.getRegex("download\\('" + Pattern.quote(singleFileID) + "[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+            }
+            if (!GigafileNu.isFilename(filename)) {
+                prefer_report_api = prefer_report_api || StringUtils.isNotEmpty(filename);
+                filename = null;
+            }
+            String extensionForSingleFile = null;// TODO
+            if (StringUtils.isNotEmpty(filename)) {
+                prefer_report_api = false;
                 filename = Encoding.htmlDecode(filename).trim();
-                link.setName(filename);
-                link.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
+                singleZipOrFile.setName(filename);
+                singleZipOrFile.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
+                singleZipOrFile.setAvailableStatus(AvailableStatus.TRUE);
             } else if (extensionForSingleFile != null) {
                 /* We do not know a filename but we know the file extension */
-                link.setName(singleFileID + extensionForSingleFile);
+                singleZipOrFile.setName(singleFileID + extensionForSingleFile);
+                /* Do not set online status here so that hoster plugin can find the real filenames. */
+                singleZipOrFile.setAvailableStatus(AvailableStatus.UNCHECKED);
             } else {
                 /* Fallback */
                 /* Set .zip extension as we just assume that this is the .zip file containing all other files. */
-                link.setName(singleFileID + ".zip");
+                singleZipOrFile.setName(singleFileID + ".zip");
+                /* Do not set online status here so that hoster plugin can find the real filenames. */
+                singleZipOrFile.setAvailableStatus(AvailableStatus.UNCHECKED);
             }
+            final String fileSizeBytesStr = br.getRegex("var size = (\\d+);").getMatch(0);
             if (fileSizeBytesStr != null) {
-                link.setDownloadSize(Long.parseLong(fileSizeBytesStr));
+                singleZipOrFile.setVerifiedFileSize(Long.parseLong(fileSizeBytesStr));
             } else {
                 logger.warning("Failed to find size of single file in html code");
                 if (totalFilesize > 0) {
                     /*
                      * Use total size of all other files as fallback value -> Assume that this is the .zip file containing all other files.
                      */
-                    link.setDownloadSize(totalFilesize);
+                    singleZipOrFile.setDownloadSize(totalFilesize);
                 }
             }
-            link.setProperty(GigafileNu.PROPERTY_FILE_ID, singleFileID);
-            link.setAvailable(true);
-            ret.add(link);
+            if (prefer_report_api) {
+                singleZipOrFile.setProperty(GigafileNu.REPORT_WORKAROUND_PROPERTY, Boolean.TRUE);
+            }
+            singleZipOrFile.setProperty(GigafileNu.PROPERTY_FILE_ID, singleFileID);
+        }
+        final CrawlMode crawlMode = PluginJsonConfig.get(getConfigInterface()).getCrawlMode().getMode();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        switch (crawlMode) {
+        case ALL:
+            ret.addAll(filesFolders.values());
+            if (singleZipOrFile != null) {
+                ret.add(singleZipOrFile);
+            }
+            break;
+        case FILES_FOLDERS:
+            ret.addAll(filesFolders.values());
+            if (ret.size() == 0 && singleZipOrFile != null) {
+                // add zip because it's the only file
+                ret.add(singleZipOrFile);
+            }
+            break;
+        case ZIP:
+            if (singleZipOrFile != null) {
+                ret.add(singleZipOrFile);
+            }
+            break;
+        default:
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported CrawlMode:" + crawlMode);
         }
         if (ret.isEmpty()) {
             if (!br.containsHTML("download\\('" + content_id_from_url) && !GigafileNu.isSingleZipDownload(br, content_id_from_url)) {
@@ -222,59 +243,4 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
         return GigafileNuConfig.class;
     }
 
-    @PluginHost(host = "gigafile.nu", type = Type.CRAWLER)
-    public static interface GigafileNuConfig extends PluginConfigInterface {
-        public static final TRANSLATION TRANSLATION  = new TRANSLATION();
-        public static final CrawlMode   DEFAULT_MODE = CrawlMode.FILES_FOLDERS;
-
-        public static class TRANSLATION {
-            public String getCrawlMode2_label() {
-                return "Crawl mode";
-            }
-        }
-
-        public static enum CrawlMode implements LabelInterface {
-            ZIP {
-                @Override
-                public String getLabel() {
-                    return "Add .zip container only";
-                }
-            },
-            FILES_FOLDERS {
-                @Override
-                public String getLabel() {
-                    return "Add individual files";
-                }
-            },
-            ALL {
-                @Override
-                public String getLabel() {
-                    return "Add individual files and .zip container";
-                }
-            },
-            DEFAULT {
-                @Override
-                public String getLabel() {
-                    return "Default: " + DEFAULT_MODE.getLabel();
-                }
-
-                @Override
-                public CrawlMode getMode() {
-                    return DEFAULT_MODE.getMode();
-                }
-            };
-
-            public CrawlMode getMode() {
-                return this;
-            }
-        }
-
-        @AboutConfig
-        @DefaultEnumValue("DEFAULT")
-        @DefaultOnNull
-        @Order(10)
-        CrawlMode getCrawlMode();
-
-        void setCrawlMode(final CrawlMode mode);
-    }
 }

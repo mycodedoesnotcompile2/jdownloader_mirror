@@ -52,9 +52,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
-import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51759 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -512,57 +511,25 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     }
 
     public static void setInfoOnDownloadLink(final DownloadLink dl, final Map<String, Object> map) {
-        final String pin_id = PinterestCom.getPinID(dl.getPluginPatternMatcher());
-        String filename = null;
         final Map<String, Object> data = map.containsKey("data") ? (Map<String, Object>) map.get("data") : map;
         // final String directlink = getDirectlinkFromPINMap(data);
         final List<String> directurlsList = getDirectlinkFromPINMap(data);
-        final String directlink;
-        if (directurlsList != null && !directurlsList.isEmpty()) {
-            directlink = directurlsList.get(0);
-        } else {
-            directlink = null;
-        }
-        if (StringUtils.isEmpty(filename)) {
-            filename = (String) data.get("title");
-        }
-        if (StringUtils.isEmpty(filename)) {
-            /* Fallback */
-            filename = pin_id;
-        } else {
-            filename = Encoding.htmlDecode(filename).trim();
-            filename = pin_id + "_" + filename;
-        }
         final String description = (String) data.get("description");
-        final String ext;
-        if (!StringUtils.isEmpty(directlink)) {
-            if (directlink.contains(".m3u8")) {
-                /* HLS stream */
-                ext = ".mp4";
-            } else {
-                ext = getFileNameExtensionFromString(directlink, ".jpg");
+        if (!StringUtils.isEmpty(description)) {
+            if (StringUtils.isEmpty(dl.getComment())) {
+                dl.setComment(description);
             }
-        } else {
-            ext = ".jpg";
-        }
-        final PluginForHost hostPlugin = JDUtilities.getPluginForHost(dl.getHost());
-        if (hostPlugin.getPluginConfig().getBooleanProperty(PinterestCom.ENABLE_DESCRIPTION_IN_FILENAMES, PinterestCom.defaultENABLE_DESCRIPTION_IN_FILENAMES) && !StringUtils.isEmpty(description)) {
-            filename += "_" + description;
-        }
-        if (!StringUtils.isEmpty(description) && dl.getComment() == null) {
-            dl.setComment(description);
-        }
-        if (!filename.endsWith(ext)) {
-            filename += ext;
+            dl.setProperty(PinterestCom.PROPERTY_DESCRIPTION, description);
         }
         if (directurlsList != null && !directurlsList.isEmpty()) {
             dl.setProperty(PinterestCom.PROPERTY_DIRECTURL_LIST, directurlsList);
         }
-        dl.setFinalFileName(filename);
         dl.setAvailable(true);
+        dl.setProperty(PinterestCom.PROPERTY_TITLE, data.get("title"));
+        PinterestCom.setFilename(dl);
     }
 
-    /** Accesses pinterest API and retrn map of PIN. */
+    /** Accesses pinterest API and return map of PIN. */
     public static Map<String, Object> getPINMap(final Browser br, final String pinURL) throws Exception {
         final String pinID = PinterestCom.getPinID(pinURL);
         if (pinID == null) {

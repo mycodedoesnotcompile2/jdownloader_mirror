@@ -76,6 +76,7 @@ import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
 import org.appwork.utils.os.ContainerRuntime;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.Flatpak;
 import org.appwork.utils.os.Snap;
 import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.swing.EDTHelper;
@@ -348,6 +349,17 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     }
                     stats.add(new JLabel("Snap:"), "gapleft 10");
                     stats.add(createLink(Snap.getSnapInstanceName()));
+                }
+            } catch (Throwable ignore) {
+            }
+            try {
+                if (Flatpak.isInsideFlatpak()) {
+                    if (envLabel != null) {
+                        stats.add(envLabel, "spanx");
+                        envLabel = null;
+                    }
+                    stats.add(new JLabel("Flatpak:"), "gapleft 10");
+                    stats.add(createLink(Flatpak.getInstanceName()));
                 }
             } catch (Throwable ignore) {
             }

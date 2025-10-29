@@ -44,14 +44,23 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PinterestComDecrypter;
+import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51759 $", interfaceVersion = 3, names = {}, urls = {})
 public class PinterestCom extends PluginForHost {
     public PinterestCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www.pinterest.com/");
         setConfigElements();
     }
+
+    /* Site constants */
+    public static final String x_app_version             = "6cedd5c";
+    @Deprecated
+    public static final String PROPERTY_DIRECTURL_LEGACY = "free_directlink";
+    public static final String PROPERTY_DIRECTURL_LIST   = "directlink_list";
+    public static final String PROPERTY_TITLE            = "title";
+    public static final String PROPERTY_DESCRIPTION      = "description";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -120,12 +129,6 @@ public class PinterestCom extends PluginForHost {
         return new Regex(pin_url, "(?i)pin/([^/]+)/?$").getMatch(0);
     }
 
-    /* Site constants */
-    public static final String x_app_version             = "6cedd5c";
-    @Deprecated
-    public static final String PROPERTY_DIRECTURL_LEGACY = "free_directlink";
-    public static final String PROPERTY_DIRECTURL_LIST   = "directlink_list";
-
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final String pinID = getPinID(link.getPluginPatternMatcher());
@@ -147,6 +150,30 @@ public class PinterestCom extends PluginForHost {
             logger.info("Old pinID: " + pinID + " | New pinID: " + newPinID + " | New URL: " + redirect);
             // link.setPluginPatternMatcher(redirect);
         }
+        parse_single_pin_info_from_html: {
+            final String[] directurls = br.getRegex("fetchpriority=\"high\" href=\"(https://[^\"]+)").getColumn(0);
+            if (directurls != null && directurls.length > 0) {
+                final List<String> directurls_without_dupes = new ArrayList<String>();
+                for (final String directurl : directurls) {
+                    if (directurls_without_dupes.contains(directurl)) {
+                        continue;
+                    }
+                    directurls_without_dupes.add(directurl);
+                }
+                link.setProperty(PinterestCom.PROPERTY_DIRECTURL_LIST, directurls_without_dupes);
+            }
+            String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+            if (title != null) {
+                title = Encoding.htmlDecode(title).trim();
+                link.setProperty(PinterestCom.PROPERTY_TITLE, title);
+            }
+            // TODO: Find- and set description
+            if (directurls != null && directurls.length > 0) {
+                /* Early return to avoid the need to execute the possibly broken json handling down below */
+                setFilename(link);
+                return AvailableStatus.TRUE;
+            }
+        }
         Map<String, Object> pinMap;
         final Account account = AccountController.getInstance().getValidAccount(this);
         if (account != null) {
@@ -162,6 +189,45 @@ public class PinterestCom extends PluginForHost {
         }
         PinterestComDecrypter.setInfoOnDownloadLink(link, pinMap);
         return AvailableStatus.TRUE;
+    }
+
+    public static void setFilename(final DownloadLink link) {
+        final List<String> directurls = getStoredDirecturls(link);
+        final String pin_id = PinterestCom.getPinID(link.getPluginPatternMatcher());
+        String filename = link.getStringProperty(PROPERTY_TITLE);
+        final String directlink;
+        if (directurls != null && !directurls.isEmpty()) {
+            directlink = directurls.get(0);
+        } else {
+            directlink = null;
+        }
+        if (StringUtils.isEmpty(filename)) {
+            /* Fallback */
+            filename = pin_id;
+        } else {
+            filename = Encoding.htmlDecode(filename).trim();
+            filename = pin_id + "_" + filename;
+        }
+        final String ext;
+        if (!StringUtils.isEmpty(directlink)) {
+            if (directlink.contains(".m3u8")) {
+                /* HLS stream */
+                ext = ".mp4";
+            } else {
+                ext = getFileNameExtensionFromString(directlink, ".jpg");
+            }
+        } else {
+            ext = ".jpg";
+        }
+        final String description = link.getStringProperty(PROPERTY_DESCRIPTION);
+        final PluginForHost hostPlugin = JDUtilities.getPluginForHost(link.getHost());
+        if (hostPlugin.getPluginConfig().getBooleanProperty(PinterestCom.ENABLE_DESCRIPTION_IN_FILENAMES, PinterestCom.defaultENABLE_DESCRIPTION_IN_FILENAMES) && !StringUtils.isEmpty(description)) {
+            filename += "_" + description;
+        }
+        if (!filename.endsWith(ext)) {
+            filename += ext;
+        }
+        link.setFinalFileName(filename);
     }
 
     /**
@@ -244,7 +310,7 @@ public class PinterestCom extends PluginForHost {
         dl.startDownload();
     }
 
-    private List<String> getStoredDirecturls(final DownloadLink link) {
+    public static List<String> getStoredDirecturls(final DownloadLink link) {
         final String legacyItem = link.getStringProperty(PROPERTY_DIRECTURL_LEGACY);
         if (legacyItem != null) {
             final List<String> ret = new ArrayList<String>();

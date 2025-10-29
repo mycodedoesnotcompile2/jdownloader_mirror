@@ -19,14 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultEnumValue;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -42,9 +34,13 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.hoster.OpenSubtitlesOrg.OpenSubtitlesConfig.ActionOnCaptchaRequired;
 
-@HostPlugin(revision = "$Revision: 51232 $", interfaceVersion = 2, names = { "opensubtitles.org" }, urls = { "https?://(?:www\\.)?opensubtitles\\.org/([a-z]{2})/subtitles/(\\d+)(/([\\w-]+))?" })
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.OpenSubtitlesConfig;
+import org.jdownloader.plugins.components.config.OpenSubtitlesConfig.ActionOnCaptchaRequired;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51767 $", interfaceVersion = 2, names = { "opensubtitles.org" }, urls = { "https?://(?:www\\.)?opensubtitles\\.org/([a-z]{2})/subtitles/(\\d+)(/([\\w-]+))?" })
 public class OpenSubtitlesOrg extends PluginForHost {
     public OpenSubtitlesOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -130,14 +126,16 @@ public class OpenSubtitlesOrg extends PluginForHost {
             }
         }
         this.setBrowserExclusive();
+        br.getPage("https://www.opensubtitles.org");
         br.setCookie(this.getHost(), "weblang", "en");
-        br.getPage(this.getContentURL(link));
+        final String url = link.getPluginPatternMatcher().replaceFirst("/([a-z]{2})/subtitles", "/subtitles");
+        br.getPage(url);// redirect to language via cookie, url without name -> cloudflare
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!br.getURL().contains(fid)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("/en/download/sub/\\d+\"><span itemprop=\"name\">([^<>\"]*?)</span>").getMatch(0);
+        String filename = br.getRegex("/[a-z]{2}/download/sub/\\d+\"><span itemprop=\"name\">([^<>\"]*?)</span>").getMatch(0);
         if (filename != null) {
             filename = fid + "_" + Encoding.htmlDecode(filename.trim()).replace("\"", "'");
         } else if (filename == null) {
@@ -216,7 +214,7 @@ public class OpenSubtitlesOrg extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
-        final ActionOnCaptchaRequired captchaaction = PluginJsonConfig.get(OpenSubtitlesConfig.class).getActionOnCaptchaRequired();
+        final ActionOnCaptchaRequired captchaaction = PluginJsonConfig.get(getConfigInterface()).getActionOnCaptchaRequired();
         if (captchaaction == ActionOnCaptchaRequired.RETRY_LATER) {
             /*
              * User has disabled captchas -> Do not ask -> From the plugins' point of view it looks like there will never be a captcha
@@ -244,46 +242,10 @@ public class OpenSubtitlesOrg extends PluginForHost {
     @Override
     public void resetDownloadlink(DownloadLink link) {
     }
-    // @Override
-    // public String getDescription() {
-    // return "Download subtitles from ";
-    // }
 
     @Override
-    public Class<? extends PluginConfigInterface> getConfigInterface() {
+    public Class<OpenSubtitlesConfig> getConfigInterface() {
         return OpenSubtitlesConfig.class;
     }
 
-    public static interface OpenSubtitlesConfig extends PluginConfigInterface {
-        final String                                        text_ActionOnCaptchaRequired = "Action to perform when captcha is required for downloading";
-        public static final OpenSubtitlesConfig.TRANSLATION TRANSLATION                  = new TRANSLATION();
-
-        public static class TRANSLATION {
-            public String getActionOnCaptchaRequired_label() {
-                return "Action to perform when captcha is required for downloading";
-            }
-        }
-
-        public static enum ActionOnCaptchaRequired implements LabelInterface {
-            PROCESS_CAPTCHA {
-                @Override
-                public String getLabel() {
-                    return "Ask for captcha";
-                }
-            },
-            RETRY_LATER {
-                @Override
-                public String getLabel() {
-                    return "Try again later";
-                }
-            };
-        }
-
-        @AboutConfig
-        @DefaultEnumValue("PROCESS_CAPTCHA")
-        @Order(10)
-        ActionOnCaptchaRequired getActionOnCaptchaRequired();
-
-        void setActionOnCaptchaRequired(final ActionOnCaptchaRequired action);
-    }
 }

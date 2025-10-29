@@ -65,12 +65,16 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51715 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51754 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + this.getHost() + "/pricing");
     }
+
+    public static final String   PROPERTY_CLASSIC      = "classic_website";
+    private static final Pattern PATTERN_FILE          = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_TRAFFIC_SHARE = Pattern.compile("/trafficshare/[a-f0-9]{32}/([a-z0-9]+)/?", Pattern.CASE_INSENSITIVE);
 
     @Override
     public FEATURE[] getFeatures() {
@@ -93,8 +97,6 @@ public class FileFactory extends PluginForHost {
     public String getAGBLink() {
         return "https://www." + this.getHost() + "/legal/terms";
     }
-
-    public static final String PROPERTY_CLASSIC = "classic_website";
 
     /** Returns true if this link shall be used with the older filefactory.com website accessible via classic.filefactory.com. */
     private boolean isClassicFile(final DownloadLink link) throws PluginException {
@@ -165,9 +167,6 @@ public class FileFactory extends PluginForHost {
     public static String[] getAnnotationUrls() {
         return buildAnnotationUrls(getPluginDomains());
     }
-
-    private static final Pattern PATTERN_FILE          = Pattern.compile("/(?:file|image|preview|stream)/([a-z0-9]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_TRAFFIC_SHARE = Pattern.compile("/trafficshare/[a-f0-9]{32}/([a-z0-9]+)/?", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();

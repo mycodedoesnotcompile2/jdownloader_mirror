@@ -90,6 +90,7 @@ import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory.TLS;
 import org.appwork.utils.os.ContainerRuntime;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
+import org.appwork.utils.os.Flatpak;
 import org.appwork.utils.os.Snap;
 import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.os.hardware.HardwareTypeInterface;
@@ -443,6 +444,13 @@ public class SecondLevelLaunch {
         try {
             if (Snap.isInsideSnap()) {
                 LoggerFactory.getDefaultLogger().info("Snap detected:" + Snap.getSnapInstanceName());
+            }
+        } catch (final Throwable ignore) {
+            LoggerFactory.getDefaultLogger().log(ignore);
+        }
+        try {
+            if (Flatpak.isInsideFlatpak()) {
+                LoggerFactory.getDefaultLogger().info("Flatpak detected:" + Flatpak.getInstanceName());
             }
         } catch (final Throwable ignore) {
             LoggerFactory.getDefaultLogger().log(ignore);

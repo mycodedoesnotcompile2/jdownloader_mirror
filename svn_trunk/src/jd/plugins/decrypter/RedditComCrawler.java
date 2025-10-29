@@ -69,7 +69,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 51696 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51759 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -255,7 +255,11 @@ public class RedditComCrawler extends PluginForDecrypt {
             logger.info("Crawled page " + page + " | " + "Found unique items so far: " + crawledLinks.size() + "(dupes:" + dupeCounter + ")| Walked through items so far: " + numberofItemsWalkedThrough + " | next nextPageToken: " + nextPageToken);
             /* Multiple fail safes to prevent infinite loop. */
             if (StringUtils.isEmpty(nextPageToken)) {
-                logger.info("Stopping because: nextPageToken is not given -> Looks like we've reached the last page: " + page);
+                /**
+                 * This may happen after 100 pages even if there is more content, see: <br>
+                 * https://www.reddit.com/r/redditdev/comments/8zhcmr/how_to_crawl_more_than_1000_posts_through_reddit/
+                 */
+                logger.info("Stopping because: nextPageToken is not given -> Looks like we've reached the last page: " + page + " | URL: " + br.getURL());
                 break;
             } else if (!lastItemDupes.add(nextPageToken)) {
                 /* Additional fail-safe. This should not be needed. */

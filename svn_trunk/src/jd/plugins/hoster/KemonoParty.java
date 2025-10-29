@@ -48,7 +48,7 @@ import jd.plugins.decrypter.KemonoPartyCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 51705 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51757 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -64,13 +64,14 @@ public class KemonoParty extends PluginForHost {
     public static String                      PROPERTY_PORTAL             = "portal";
     public static String                      PROPERTY_USERID             = "userid";
     public static String                      PROPERTY_USERNAME           = "username";
-    public static String                      PROPERTY_POST_ID             = "postid";
+    public static String                      PROPERTY_POST_ID            = "postid";
     public static String                      PROPERTY_REVISION_ID        = "revisionid";
     public static String                      PROPERTY_DATE               = "date";
     public static String                      PROPERTY_DATE_EDIT          = "date_edit";
     public static String                      PROPERTY_POST_CONTENT_INDEX = "postContentIndex";
     private static Map<String, AtomicInteger> freeRunning                 = new HashMap<String, AtomicInteger>();
     public static final String                UNIQUE_ID_PREFIX            = "kemonocoomer://";
+    private static final Pattern              HASH_PATTERN                = Pattern.compile("/([a-fA-F0-9]{64})");
 
     protected AtomicInteger getFreeRunning() {
         synchronized (freeRunning) {
@@ -184,8 +185,6 @@ public class KemonoParty extends PluginForHost {
         }
     }
 
-    private static final Pattern HASH_PATTERN = Pattern.compile("/([a-fA-F0-9]{64})");
-
     public static String getSha256HashFromPath(final String path) {
         return new Regex(path, HASH_PATTERN).getMatch(0);
     }
@@ -295,8 +294,8 @@ public class KemonoParty extends PluginForHost {
     }
 
     @Override
-    public Downloadable newDownloadable(DownloadLink downloadLink, Browser br) {
-        return new DownloadLinkDownloadable(downloadLink, br) {
+    public Downloadable newDownloadable(final DownloadLink link, Browser br) {
+        return new DownloadLinkDownloadable(link, br) {
             @Override
             public long getLastModifiedTimestamp() {
                 /**

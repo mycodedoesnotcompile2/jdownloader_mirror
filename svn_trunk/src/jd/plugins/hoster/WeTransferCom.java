@@ -22,11 +22,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -47,12 +49,12 @@ import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
 import org.jdownloader.controlling.FileStateManager;
 import org.jdownloader.controlling.FileStateManager.FILESTATE;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.Cookies;
 import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -71,7 +73,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51715 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 51757 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +81,10 @@ public class WeTransferCom extends PluginForHost {
             this.enablePremium("https://auth." + getHost() + "/signup");
         }
     }
+    // @Override
+    // public LazyPlugin.FEATURE[] getFeatures() {
+    // return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
+    // }
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -112,16 +118,20 @@ public class WeTransferCom extends PluginForHost {
     }
 
     /* 2019-09-30: https://play.google.com/store/apps/details?id=com.wetransfer.app.live */
-    public static final String   API_BASE_AUTH                          = "https://api.wetransfermobile.com/v1";
-    public static final String   API_BASE_NORMAL                        = "https://api.wetransfermobile.com/v2";
-    public static final String   API_BASE_LOGIN                         = "https://wetransfer.com/adroit/api";
-    private static final Pattern TYPE_DOWNLOAD                          = Pattern.compile("https?://wetransferdecrypted/([a-f0-9]{46})/([a-f0-9]{4,12})/([a-f0-9]{46})");
-    public static final String   PROPERTY_DIRECT_LINK                   = "direct_link";
-    public static final String   PROPERTY_DIRECT_LINK_EXPIRES_AT        = "direct_link_expires_at";
-    public static final String   PROPERTY_SINGLE_ZIP                    = "single_zip";
-    public static final String   PROPERTY_COLLECTION_ID                 = "collection_id";
-    public static final String   PROPERTY_COLLECTION_FILE_ID            = "collection_file_id";
-    public static final String   PROPERTY_DOWNLOADER_EMAIL_VERIFICATION = "downloader_email_verification";
+    public static final String   API_BASE_AUTH                                  = "https://api.wetransfermobile.com/v1";
+    public static final String   API_BASE_NORMAL                                = "https://api.wetransfermobile.com/v2";
+    public static final String   API_BASE_LOGIN                                 = "https://wetransfer.com/adroit/api";
+    private static final Pattern TYPE_DOWNLOAD                                  = Pattern.compile("https?://wetransferdecrypted/([a-f0-9]{46})/([a-f0-9]{4,12})/([a-f0-9]{46})");
+    public static final String   PROPERTY_DIRECT_LINK                           = "direct_link";
+    public static final String   PROPERTY_DIRECT_LINK_EXPIRES_AT                = "direct_link_expires_at";
+    public static final String   PROPERTY_SINGLE_ZIP                            = "single_zip";
+    public static final String   PROPERTY_COLLECTION_ID                         = "collection_id";
+    public static final String   PROPERTY_COLLECTION_FILE_ID                    = "collection_file_id";
+    public static final String   PROPERTY_DOWNLOADER_EMAIL_VERIFICATION         = "downloader_email_verification";
+    /* Account properties */
+    public static final String   PROPERTY_ACCOUNT_ACCESS_TOKEN                  = "access_token";
+    public static final String   PROPERTY_ACCOUNT_ACCESS_TOKEN_EXPIRE_TIMESTAMP = "access_token_expire_timestamp";
+    public static final String   PROPERTY_ACCOUNT_REFRESH_TOKEN                 = "refresh_token";
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -274,12 +284,21 @@ public class WeTransferCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
+        handleDownload(link, null);
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        this.handleDownload(link, account);
+    }
+
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         String direct_link = link.getStringProperty(PROPERTY_DIRECT_LINK);
         final boolean stored_direct_link = direct_link != null;
         if (direct_link != null) {
             logger.info("Trying to re-use stored directurl: " + direct_link);
         } else {
-            requestFileInformation(link);
+            requestFileInformation(link, account);
             direct_link = link.getStringProperty(PROPERTY_DIRECT_LINK);
         }
         final boolean isSingleZip = this.isSingleZip(link);
@@ -511,13 +530,54 @@ public class WeTransferCom extends PluginForHost {
     private Map<String, Object> login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            final Cookies userCookies = account.loadCookies("");
+            // final Cookies userCookies = account.loadCookies("");
             logger.info("Attempting cookie login");
-            br.setCookies(userCookies);
+            // br.setCookies(userCookies);
             String access_token = account.getStringProperty("access_token");
-            if (!force) {
-                /* Don't validate cookies */
-                return null;
+            // TODO: Make use of this
+            final boolean allowOnlyLocalStorageStringAsPassword = true;
+            Number access_token_expire_timestamp = null;
+            final String error_invalid_password_input = "Invalid password syntax: Enter exported LocalStorage string";
+            final boolean looksLikePasswordIsJsonString = account.getPass().startsWith("{");
+            if (allowOnlyLocalStorageStringAsPassword && !looksLikePasswordIsJsonString) {
+                throw new AccountInvalidException(error_invalid_password_input);
+            }
+            if (looksLikePasswordIsJsonString) {
+                final Map<String, Object> entries = restoreFromString(account.getPass(), TypeRef.MAP);
+                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+                if (data == null) {
+                    throw new AccountInvalidException(error_invalid_password_input);
+                }
+                access_token = data.get("access_token").toString();
+                access_token_expire_timestamp = (Number) data.get("expiresAt");
+            }
+            // if (access_token == null) {
+            // access_token = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
+            // }
+            if (access_token != null) {
+                br.getHeaders().put("Authorization", "Bearer " + access_token);
+                br.getHeaders().put("x-app-origin", "decoupled"); // optional
+                // br.getHeaders().put("x-current-team", "TODO_not_needed_??");
+                // br.getHeaders().put("x-local-storage-id", "TODO_not_needed_??");
+                if (!force) {
+                    /* Don't validate cookies */
+                    return null;
+                }
+                br.getPage(API_BASE_LOGIN + "/v1/users/me");
+                if (br.getHttpConnection().getResponseCode() == 200) {
+                    logger.info("Token login successful");
+                    return (Map<String, Object>) this.checkErrorsAPI(br);
+                }
+                logger.info("Token login failed");
+                // br.getHeaders().put("Authorization", "");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                } else {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                }
+            }
+            if (allowOnlyLocalStorageStringAsPassword) {
+                throw new AccountInvalidException(error_invalid_password_input);
             }
             // TODO: Fix this -> Obtain auth_token via cookies and the request down below
             final Map<String, Object> postdata = new HashMap<String, Object>();
@@ -529,29 +589,12 @@ public class WeTransferCom extends PluginForHost {
             br.postPageRaw("https://auth.wetransfer.com/oauth/token", JSonStorage.serializeToJson(postdata));
             final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             access_token = resp.get("access_token").toString();
-            account.setProperty("access_token", access_token);
+            account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN, access_token);
             // TODO: Fix this: Either set authorization header or add handling that creates fresh auth header via cookies
             br.getHeaders().put("Authorization", "Bearer " + access_token);
             br.getPage(API_BASE_LOGIN + "/v1/users/me");
-            final Map<String, Object> entries = (Map<String, Object>) this.checkErrorsAPI(br);
-            return entries;
+            return (Map<String, Object>) this.checkErrorsAPI(br);
         }
-    }
-
-    private Object checkErrorsAPI(final Browser br) throws PluginException {
-        final Object object = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-        if (!(object instanceof Map)) {
-            return object;
-        }
-        final Map<String, Object> map = (Map<String, Object>) object;
-        final String error = (String) map.get("error");
-        if (error == null) {
-            /* No error */
-            return map;
-        }
-        // TODO: Add better errorhandling
-        final int statusCode = ((Number) map.get("statusCode")).intValue();
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "ErrorCode " + statusCode);
     }
 
     @Override
@@ -570,6 +613,11 @@ public class WeTransferCom extends PluginForHost {
         if (!StringUtils.isEmpty(email)) {
             account.setUser(email);
         }
+        final String date_created_at = user.get("created_at").toString();
+        final String normalizedDate = date_created_at.replace("Z", "+0000");
+        final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        ai.setCreateTime(sdf.parse(normalizedDate).getTime());
         ai.setUnlimitedTraffic();
         int activePremiumPackages = 0;
         int activeFreePackages = 0;
@@ -599,10 +647,22 @@ public class WeTransferCom extends PluginForHost {
         }
         return ai;
     }
-    // @Override
-    // public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-    // this.handleDownload(link, account);
-    // }
+
+    private Object checkErrorsAPI(final Browser br) throws PluginException {
+        final Object object = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        if (!(object instanceof Map)) {
+            return object;
+        }
+        final Map<String, Object> map = (Map<String, Object>) object;
+        final String error = (String) map.get("error");
+        if (error == null) {
+            /* No error */
+            return map;
+        }
+        // TODO: Add better errorhandling
+        final int statusCode = ((Number) map.get("statusCode")).intValue();
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "ErrorCode " + statusCode);
+    }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
@@ -678,4 +738,17 @@ public class WeTransferCom extends PluginForHost {
     public void resetDownloadlink(final DownloadLink link) {
         link.removeProperty(PROPERTY_DIRECT_LINK);
     }
+    // @Override
+    // protected boolean looksLikeValidAPIKey(final String str) {
+    // if (str == null) {
+    // return false;
+    // }
+    // /* Very basic validation of json string */
+    // if (!str.startsWith("{")) {
+    // return false;
+    // } else if (!str.contains("\"access_token\"")) {
+    // return false;
+    // }
+    // return true;
+    // }
 }
