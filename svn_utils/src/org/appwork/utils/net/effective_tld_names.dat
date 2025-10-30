@@ -14088,8 +14088,9 @@ myjino.ru
 // Submitted by Daniel Fariña <ingenieria@jotelulu.com>
 jote.cloud
 jotelulu.cloud
-jote-dr-lt1.com
-jote-rd-lt1.com
+eu1-plenit.com
+la1-plenit.com
+us1-plenit.com
 
 // JouwWeb B.V. : https://www.jouwweb.nl
 // Submitted by Camilo Sperberg <tech@webador.com>
@@ -14472,6 +14473,10 @@ cust.retrosnub.co.uk
 // Submitted by Paulus Schoutsen <infra@nabucasa.com>
 ui.nabu.casa
 
+// Needle Tools GmbH : https://needle.tools
+// Submitted by Felix Herbst <security@needle.tools>
+needle.run
+
 // Net at Work Gmbh : https://www.netatwork.de
 // Submitted by Jan Jaeschke <jan.jaeschke@netatwork.de>
 cloud.nospamproxy.com
@@ -14714,6 +14719,7 @@ simplesite.gr
 123website.nl
 123hjemmeside.no
 service.one
+website.one
 simplesite.pl
 123paginaweb.pt
 123minsida.se

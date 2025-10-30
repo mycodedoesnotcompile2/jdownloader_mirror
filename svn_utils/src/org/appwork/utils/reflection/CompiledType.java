@@ -359,12 +359,30 @@ public class CompiledType {
     }
 
     /**
-     * true if the type implements ALL of the given interfaces directly
+     * Returns true if the type implements ALL of the given interfaces directly or through inheritance
      *
-     * @param class1
-     * @return
+     * @param interfaces the interfaces to check for
+     * @return true if the type implements ALL of the given interfaces
      */
-    protected boolean isImplementing(Class<?>... interfaces) {
+    public boolean isImplementing(Class<?>... interfaces) {
+        if (interfaces == null || interfaces.length == 0) {
+            return false;
+        }
+        
+        // Validate that all parameters are interfaces
+        for (Class<?> c : interfaces) {
+            if (!c.isInterface()) {
+                throw new IllegalArgumentException("Class " + c.getName() + " is not an interface");
+            }
+        }
+        
+        // Check for duplicate interface requirements
+        Set<Class<?>> uniqueInterfaces = new HashSet<Class<?>>(Arrays.asList(interfaces));
+        if (uniqueInterfaces.size() != interfaces.length) {
+            // Duplicate interfaces in requirements - this would give wrong results
+            return false;
+        }
+        
         NEXT_REQUESTED: for (Class<?> requested : interfaces) {
             for (Class<?> i : raw.getInterfaces()) {
                 if (Clazz.isInstanceof(i, requested)) {
@@ -1149,13 +1167,12 @@ public class CompiledType {
                 }
             } else if (isInstanceOf(t)) {
                 CompiledType[] types = getComponentTypes(t);
+                if (types.length == 1) {
+                    return types[0];
+                }
                 if (CompiledType.create(t).isMap()) {
                     if (types.length == 2) {
                         return types[1];
-                    }
-                } else {
-                    if (types.length == 1) {
-                        return types[0];
                     }
                 }
                 return OBJECT;

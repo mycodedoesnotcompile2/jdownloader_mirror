@@ -1,12 +1,24 @@
 package jd.plugins.hoster;
 
-import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.controlling.proxy.AbstractProxySelectorImpl;
@@ -23,29 +35,16 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 51234 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51772 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.usenext.com/signup");
+        this.enablePremium("https://www." + getHost() + "/signup");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.usenext.com/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
     private final String FLATRATE_DOMAIN = "flat.usenext.de";
@@ -57,8 +56,8 @@ public class UsenextCom extends UseNet {
     public void update(final DownloadLink downloadLink, final Account account, long bytesTransfered) {
         final UsenetServer server = getLastUsedUsenetServer();
         /**
-         * If the "flatrate domain" is in use, do not substract traffic from users' account. </br> Only substract traffic if no domain is
-         * given or a non-flatrate domain is given.
+         * If the "flatrate domain" is in use, do not substract traffic from users' account. </br>
+         * Only substract traffic if no domain is given or a non-flatrate domain is given.
          */
         if (server == null || !StringUtils.equalsIgnoreCase(FLATRATE_DOMAIN, server.getHost())) {
             super.update(downloadLink, account, bytesTransfered);
@@ -70,11 +69,6 @@ public class UsenextCom extends UseNet {
         final Browser ret = super.createNewBrowserInstance();
         ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "jd");
         return ret;
-    }
-
-    @Override
-    public Object getFavIcon(String host) throws IOException {
-        return super.getFavIcon(host);
     }
 
     @Override
@@ -118,10 +112,8 @@ public class UsenextCom extends UseNet {
     private Map<String, Object> queryAPI(final Account account, final Browser br) throws Exception {
         /* At this point login was successful and all that's left to do is to obtain account information. */
         final String api_url = "https://janus.usenext.com";
-        final PostRequest postRequest = br
-                .createJSonPostRequest(
-                        URLHelper.parseLocation(new URL(api_url), "/graphql"),
-                        "{\"operationName\":\"DashboardInformation\",\"variables\":{},\"query\":\"query DashboardInformation {\\n  radiusData {\\n    volume {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n    extraBoost {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  cancellationInformation {\\n    isContractLocked\\n    hasWithdrawableCancellation\\n    isServiceDenied\\n    isInCancellationPeriod\\n    cancellationProcess {\\n      createDate\\n    }\\n  }\\n  currentServiceRoundUpgradeData {\\n    hasPendingUpgrade\\n    isLastUpgrade\\n    accountingPeriod {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  serviceInformation {\\n    currentServiceRound {\\n      currEndDate\\n      startDate\\n      article {\\n        id\\n        name\\n        articleTypeId\\n        priceNet\\n        priceGross\\n        volumeGb\\n        runtime\\n        runtimeUnit\\n      }\\n      invoice {\\n        id\\n        createDate\\n        uuid\\n        invoiceStatePaths {\\n          invoiceStateId\\n          isCurrent\\n        }\\n      }\\n    }\\n    nextServiceRoundBeginDate\\n    nextArticle {\\n      id\\n      name\\n      articleTypeId\\n      priceNet\\n      priceGross\\n      volumeGb\\n      runtime\\n      runtimeUnit\\n    }\\n  }\\n}\\n\"}");
+        final PostRequest postRequest = br.createJSonPostRequest(URLHelper.parseLocation(new URL(api_url), "/graphql"),
+                "{\"operationName\":\"DashboardInformation\",\"variables\":{},\"query\":\"query DashboardInformation {\\n  radiusData {\\n    volume {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n    extraBoost {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  cancellationInformation {\\n    isContractLocked\\n    hasWithdrawableCancellation\\n    isServiceDenied\\n    isInCancellationPeriod\\n    cancellationProcess {\\n      createDate\\n    }\\n  }\\n  currentServiceRoundUpgradeData {\\n    hasPendingUpgrade\\n    isLastUpgrade\\n    accountingPeriod {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  serviceInformation {\\n    currentServiceRound {\\n      currEndDate\\n      startDate\\n      article {\\n        id\\n        name\\n        articleTypeId\\n        priceNet\\n        priceGross\\n        volumeGb\\n        runtime\\n        runtimeUnit\\n      }\\n      invoice {\\n        id\\n        createDate\\n        uuid\\n        invoiceStatePaths {\\n          invoiceStateId\\n          isCurrent\\n        }\\n      }\\n    }\\n    nextServiceRoundBeginDate\\n    nextArticle {\\n      id\\n      name\\n      articleTypeId\\n      priceNet\\n      priceGross\\n      volumeGb\\n      runtime\\n      runtimeUnit\\n    }\\n  }\\n}\\n\"}");
         postRequest.getHeaders().put("x-ui-language", "en-US");
         postRequest.getHeaders().put("Origin", "https://www." + br.getHost());
         br.setCurrentURL("https://www." + br.getHost() + "/");

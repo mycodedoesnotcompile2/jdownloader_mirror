@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,10 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 51763 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51773 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNu extends PluginForHost {
     public GigafileNu(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,6 +52,7 @@ public class GigafileNu extends PluginForHost {
 
     public static final String PROPERTY_FILE_ID                = "file_id";
     public static final String PROPERTY_FILE_NAME_FROM_CRAWLER = "filename_from_crawler";
+    public static final String REPORT_WORKAROUND_PROPERTY      = "use_report_website";
 
     @Override
     public String getAGBLink() {
@@ -106,13 +107,11 @@ public class GigafileNu extends PluginForHost {
         return link.getStringProperty(PROPERTY_FILE_ID);
     }
 
-    public static final String REPORT_WORKAROUND_PROPERTY = "use_report_website";
-
     public static boolean isFilename(final String filename) {
         if (StringUtils.isEmpty(filename)) {
             return false;
         }
-        if (filename.contains("ファイル名が置換されました※DLしたファイルは、原題まま表示されます")) {
+        if (StringUtils.containsIgnoreCase(filename, "ファイル名が置換されました※DLしたファイルは、原題まま表示されます")) {
             return false;
         }
         return true;
@@ -126,6 +125,7 @@ public class GigafileNu extends PluginForHost {
             brc.setFollowRedirects(true);
             brc.getPage("https://" + host + "/report.php?host=" + host + "&uri=" + fid);
             if (!StringUtils.containsIgnoreCase(brc.getURL(), "/report.php")) {
+                /* e.g. redirect to main page */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             String filename = brc.getRegex(">\\s*対象ファイル名\\s*</td>\\s*(?:<td[^>]*>)?\\s*<p[^>]*>\\s*(.*?)\\s*</p>").getMatch(0);
@@ -139,29 +139,41 @@ public class GigafileNu extends PluginForHost {
         return null;
     }
 
-    private AvailableStatus requestAPIFileInformation(final DownloadLink link) throws IOException, PluginException {
+    private AvailableStatus requestAPIFileInformation(final DownloadLink link, final String preferred_host) throws IOException, PluginException {
         final String fid = this.getFID(link);
-        final String host = Browser.getHost(link.getPluginPatternMatcher(), true);
-        if (host != null && fid != null) {
-            final Browser brc = br.cloneBrowser();
-            brc.setFollowRedirects(true);
-            brc.getPage("https://" + host + "/get_uploaded_file_name_jx.php?file=" + fid + "&_=" + System.currentTimeMillis());
-            /* e.g. {"status":0,"file_status":2,"filename":"filename.ext"} */
-            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            if (!"0".equals(entries.get("status").toString())) {
-                if (false) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                return null;
+        final String host;
+        if (preferred_host != null) {
+            host = preferred_host;
+        } else {
+            host = Browser.getHost(link.getPluginPatternMatcher(), true);
+        }
+        if (host == null) {
+            logger.warning("host is null");
+            return null;
+        } else if (fid == null) {
+            logger.warning("fid is null");
+            return null;
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.setFollowRedirects(true);
+        brc.getPage("https://" + host + "/get_uploaded_file_name_jx.php?file=" + fid + "&_=" + System.currentTimeMillis());
+        /* e.g. {"status":0,"file_status":2,"filename":"filename.ext"} */
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (!"0".equals(entries.get("status").toString())) {
+            if (false) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final String filename = entries.get("filename").toString();
-            if (isFilename(filename)) {
-                link.setFinalFileName(filename);
-                link.setProperty(PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
-            }
-            if ("2".equals(StringUtils.valueOfOrNull(entries.get("file_status")))) {
-                return AvailableStatus.TRUE;
-            }
+            return null;
+        }
+        final String filename = entries.get("filename").toString();
+        if (isFilename(filename)) {
+            link.setFinalFileName(filename);
+            link.setProperty(PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
+        } else {
+            logger.info("Detected invalid filename: " + filename);
+        }
+        if ("2".equals(StringUtils.valueOfOrNull(entries.get("file_status")))) {
+            return AvailableStatus.TRUE;
         }
         return null;
     }
@@ -209,9 +221,11 @@ public class GigafileNu extends PluginForHost {
         }
         final String filenameFromCrawler = link.getStringProperty(PROPERTY_FILE_NAME_FROM_CRAWLER);
         if (filenameFromCrawler != null) {
+            /* Trust this filename */
             link.setFinalFileName(filenameFromCrawler);
         } else if (link.getFinalFileName() == null) {
-            final AvailableStatus ret = requestReportFileInformation(link);
+            final String ajax_server = br.getRegex("var dl_ajax_server = \"([^\"]+)\";").getMatch(0);
+            final AvailableStatus ret = requestAPIFileInformation(link, ajax_server);
             if (ret != null) {
                 if (AvailableStatus.FALSE.equals(ret)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

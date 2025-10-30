@@ -59,7 +59,7 @@ import org.appwork.storage.TypeRef;
 @StorableValidateCondition2(value = "{§keys:{§each:{§or:[{§regex:\"\\\\p{Lower}{2}\"},{§regex:\"\\\\p{Lower}{2}_\\\\p{Upper}{2}\"},{§regex:\"\\\\p{Lower}{2}_\\\\p{Upper}{2}_\\\\S+\"}]}}}", description = "All keys must match the format \r\n<2 char language code lower case>_<2 char country code upper case>_<Variant id>, \r\nwhile country code and variant id are optional.")
 // §node -> run on flexinode instead of actual types. §node->§type -> Flexi TYpe not java type
 @StorableValidateCondition3(value = "{§node.§type:STRING}", description = "You should use the format {\"en\":\"...\"} instead", level = FailLevel.WARNING, logic = StorableValidationLogic.FAIL_ON_MATCH)
-@StorableExample("{\"en\":\"My Text\",\"de\":\"Mein Text\"}")
+@StorableExample("{\"en\":\"My english Text\",\"de\":\"Mein deutscher Text\"}")
 public class LocaleMap extends LinkedHashMap<String, String> implements Storable {
     /**
      *

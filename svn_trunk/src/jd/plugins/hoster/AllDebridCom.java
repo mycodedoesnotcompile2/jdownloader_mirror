@@ -40,7 +40,6 @@ import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -87,12 +86,10 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50546 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 51773 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
-        /* 2020-03-27: As long as we're below 4 API requests per second we're fine according to admin. */
-        setStartIntervall(1000);
         this.enablePremium("https://" + getHost() + "/offer/");
     }
 
@@ -428,91 +425,6 @@ public class AllDebridCom extends PluginForHost {
         }
     }
 
-    /**
-     * This is executed whenever user is suddently logged out by alldebrid as a security measurement and needs to confirm his login via
-     * email.
-     */
-    // public void authBlockedLogin(final Account account, final DownloadLink link, final Map<String, Object> errormap) throws Exception {
-    // final String msg = errormap.get("message").toString();
-    // final String token = errormap.get("token").toString();
-    // if (StringUtils.isEmpty(msg)) {
-    // /* This should never happen */
-    // throw new IllegalArgumentException();
-    // } else if (StringUtils.isEmpty(token)) {
-    // /* No token given -> No way for us to refresh apikey */
-    // account.removeProperty(PROPERTY_apikey);
-    // throw new AccountInvalidException("Authorization has been denied by account owner.");
-    // }
-    // final AccountUnavailableException exceptionOnFailure = new AccountUnavailableException(msg, 10 * 60 * 1000);
-    // final PluginException exceptionOnDownloadAndSuccess = new PluginException(LinkStatus.ERROR_RETRY, "Retry after successful
-    // AUTH_BLOCKED handling");
-    // final String oldAuth = br.getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_AUTHORIZATION).getValue();
-    // final UrlQuery postdata = new UrlQuery();
-    // postdata.appendEncoded("token", token);
-    // synchronized (account) {
-    // final String newAuth = br.getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_AUTHORIZATION).getValue();
-    // if (!StringUtils.equals(oldAuth, newAuth)) {
-    // /* Previous download-attempt already successfully ran through this handling so we don't need to do this here again. */
-    // throw (PluginException) exceptionOnDownloadAndSuccess.fillInStackTrace();
-    // }
-    // logger.info("Performing auth blocked login");
-    // final int maxSecondsWait = 600;
-    // final Thread dialog = showNewLocationLoginInformation(null, msg, maxSecondsWait);
-    // int secondsWaited = 0;
-    // final int waitSecondsPerLoop = 3;
-    // String apikey = null;
-    // boolean throwThisException = false;
-    // try {
-    // try {
-    // for (int i = 0; i <= 23; i++) {
-    // logger.info("Waiting for user to authorize application. Seconds waited: " + secondsWaited + "/" + maxSecondsWait);
-    // Thread.sleep(waitSecondsPerLoop * 1000);
-    // secondsWaited += waitSecondsPerLoop;
-    // /** Example response: { "status": "success", "data": { "activated": false, "expires_in": 590 }}} */
-    // final Map<String, Object> data = this.callAPI("/user/verif", postdata, account, null);
-    // if (secondsWaited >= maxSecondsWait) {
-    // logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsWait + " seconds");
-    // break;
-    // }
-    // final String verifStatus = data.get("verif").toString();
-    // if (verifStatus.equals("denied")) {
-    // /* User opened link from email and denied this login-attempt. */
-    // throwThisException = true;
-    // throw new AccountInvalidException("Authorization has been denied by account owner");
-    // }
-    // apikey = (String) data.get("apikey");
-    // if (!StringUtils.isEmpty(apikey)) {
-    // logger.info("Stopping because: Found apikey!");
-    // break;
-    // } else if (!dialog.isAlive()) {
-    // logger.info("Stopping because: Dialog closed!");
-    // break;
-    // }
-    // }
-    // } finally {
-    // dialog.interrupt();
-    // }
-    // } catch (final Exception e) {
-    // if (throwThisException) {
-    // throw e;
-    // } else {
-    // throw (AccountUnavailableException) exceptionOnFailure.fillInStackTrace();
-    // }
-    // }
-    // if (StringUtils.isEmpty(apikey)) {
-    // logger.warning("Failed for unknown reasons");
-    // throw (AccountUnavailableException) exceptionOnFailure.fillInStackTrace();
-    // }
-    // logger.info("Using new apikey: " + apikey);
-    // account.setProperty(PROPERTY_apikey, apikey);
-    // setAuthHeader(br, apikey);
-    // if (link == null) {
-    // throw new AccountUnavailableException("Retry after blocked login has been cleared", 5 * 1000);
-    // } else {
-    // throw (PluginException) exceptionOnDownloadAndSuccess.fillInStackTrace();
-    // }
-    // }
-    // }
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
@@ -736,6 +648,9 @@ public class AllDebridCom extends PluginForHost {
             }
             try {
                 data = this.callAPI("/link/unlock", postdata, account, link);
+                logger.info("Breaking loop because: User entered correct password or none was needed");
+                passwordSuccess = true;
+                break;
             } catch (final PluginException e) {
                 if (br.containsHTML(ERROR_CODE_LINK_PASSWORD_PROTECTED)) {
                     /*
@@ -748,9 +663,6 @@ public class AllDebridCom extends PluginForHost {
                     throw e;
                 }
             }
-            logger.info("Breaking loop because: User entered correct password or none was needed");
-            passwordSuccess = true;
-            break;
         } while (counter <= 3);
         if (!passwordSuccess) {
             throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
@@ -761,7 +673,7 @@ public class AllDebridCom extends PluginForHost {
         }
         final Object delayID = data.get("delayed");
         if (delayID != null) {
-            /* Serverside download required, see https://docs.alldebrid.com/#delayed-links */
+            /* Server side download required, see https://docs.alldebrid.com/#delayed-links */
             cacheDLChecker(link, account, delayID.toString());
         }
         String dllink = (String) data.get("link");
@@ -821,7 +733,6 @@ public class AllDebridCom extends PluginForHost {
         return dllink;
     }
 
-    /* Stolen from LinkSnappyCom plugin */
     private void cacheDLChecker(final DownloadLink link, final Account account, final String delayID) throws Exception {
         final PluginProgress waitProgress = new PluginProgress(0, 100, null) {
             protected long lastCurrent    = -1;
@@ -869,7 +780,6 @@ public class AllDebridCom extends PluginForHost {
         };
         waitProgress.setIcon(new AbstractIcon(IconKey.ICON_WAIT, 16));
         waitProgress.setProgressSource(this);
-        int lastProgress = -1;
         final UrlQuery postdata = new UrlQuery();
         postdata.appendEncoded("id", delayID);
         try {
@@ -880,37 +790,39 @@ public class AllDebridCom extends PluginForHost {
             int waitSecondsLeft = maxWaitSeconds;
             /* 1 = still processing, 2 = Download link available, 3 = Error */
             int delayedStatus = 1;
-            Integer currentProgress = 0;
+            int currentProgress = 0;
             do {
-                logger.info(String.format("Waiting for file to get loaded onto server - seconds left %d / %d", waitSecondsLeft, maxWaitSeconds));
-                link.addPluginProgress(waitProgress);
-                waitProgress.updateValues(currentProgress.intValue(), 100);
-                for (int sleepRound = 0; sleepRound < waitSecondsPerLoop; sleepRound++) {
-                    if (isAbort()) {
-                        throw new InterruptedException();
-                    } else {
-                        Thread.sleep(1000);
-                    }
-                }
-                if (currentProgress.intValue() != lastProgress) {
-                    // lastProgressChange = System.currentTimeMillis();
-                    lastProgress = currentProgress.intValue();
-                }
                 final Map<String, Object> data = this.callAPI("/link/delayed", postdata, account, link);
                 delayedStatus = (int) JavaScriptEngineFactory.toLong(data.get("status"), 3);
-                final int tmpCurrentProgress = (int) ((Number) data.get("progress")).doubleValue() * 100;
-                if (tmpCurrentProgress > currentProgress) {
-                    /* Do not allow the progress to "go back". */
-                    currentProgress = tmpCurrentProgress;
-                }
+                currentProgress = (int) ((Number) data.get("progress")).doubleValue() * 100;
                 /* 2020-03-27: We cannot trust their 'time_left' :D */
                 // final int timeLeft = (int) JavaScriptEngineFactory.toLong(entries.get("time_left"), 30);
-                if (currentProgress >= 100) {
-                    /* 2020-03-27: Do not trust their 100% :D */
-                    currentProgress = 85;
+                /* 2020-03-27: Do not trust their 100% :D */
+                currentProgress = Math.min(currentProgress, 100);
+                /* Update progress values which user will see in GUI. */
+                link.addPluginProgress(waitProgress);
+                waitProgress.updateValues(currentProgress, 100);
+                /* Check abort conditions */
+                if (this.isAbort()) {
+                    logger.info("Exit delayed loop because: aborted by user");
+                    throw new InterruptedException();
+                } else if (delayedStatus != 1) {
+                    logger.info("Exit delayed loop because: delayedStatus != 1 | delayedStatus=" + delayedStatus);
+                    break;
+                } else if (waitSecondsLeft <= 0) {
+                    logger.info("Exit delayed loop because: waitSecondsLeft <=0 | waitSecondsLeft=" + waitSecondsLeft);
+                    break;
+                }
+                logger.info(String.format("Waiting for file to get loaded onto server - seconds left %d / %d", waitSecondsLeft, maxWaitSeconds));
+                for (int sleptSeconds = 0; sleptSeconds < waitSecondsPerLoop; sleptSeconds++) {
+                    if (isAbort()) {
+                        logger.info("Exit delayed loop because: aborted by user");
+                        throw new InterruptedException();
+                    }
+                    Thread.sleep(1000);
                 }
                 waitSecondsLeft -= waitSecondsPerLoop;
-            } while (waitSecondsLeft > 0 && delayedStatus == 1);
+            } while (true);
             if (delayedStatus == 2) {
                 return;
             } else {
@@ -1145,10 +1057,13 @@ public class AllDebridCom extends PluginForHost {
         try {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException jme) {
+            /* This should never happen. */
+            final String msg = "Invalid API response";
+            final long waitMillis = 60 * 1000l;
             if (link != null) {
-                mhm.handleErrorGeneric(account, link, "Bad API answer", 50, 5 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, waitMillis);
             } else {
-                throw Exceptions.addSuppressed(new AccountUnavailableException("Bad API answer", 1 * 60 * 1000l), jme);
+                throw new AccountUnavailableException(msg, 60 * 1000);
             }
         }
         final String status = (String) entries.get("status");

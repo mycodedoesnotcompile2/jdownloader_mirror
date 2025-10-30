@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,72 +32,57 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.flexijson.mapper;
+package org.appwork.moncompare;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
 
+import org.appwork.loggingv3.LogV3;
+import org.appwork.storage.DocsGenerator;
+import org.appwork.storage.simplejson.mapper.ClassCache;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.reflection.CompiledType;
 
 /**
  * @author thomas
- * @date 10.01.2024
+ * @date 13.10.2025
  *
  */
-public class DefaultObjectToJsonContext {
-    private LinkedList<CompiledType> types = new LinkedList<CompiledType>();
-
-    public List<CompiledType> getTypes() {
-        return Collections.unmodifiableList(types);
-    }
-
-    private CompiledType last;
-
-    /**
-     * @see java.lang.Object#toString()
-     */
-    @Override
-    public String toString() {
-        return new Joiner("->").join(types);
-    }
-
-    /**
-     * @param type
-     */
-    public DefaultObjectToJsonContext(CompiledType type) {
-        add(type, null);
-    }
-
-    /**
-     * @param compiledType
-     * @param object
-     */
-    public void add(CompiledType type, Object pathEntry) {
-        types.add(type);
-        this.last = type;
-    }
-
-    /**
-     * @return
-     */
-    public CompiledType getLast() {
-        return last;
-    }
-
+public class ConditionDocsGenerator extends DocsGenerator {
     /**
      *
      */
-    public void removeLast() {
-        types.removeLast();
-        last = types.getLast();
+    public ConditionDocsGenerator() {
     }
 
     /**
-     * @return
+     * @see org.appwork.storage.DocsGenerator#getDocs(org.appwork.utils.reflection.CompiledType, java.lang.Object)
      */
-    public CompiledType getCompiledType() {
-        return CompiledType.createFromCompiledHirarchy(types);
+    @Override
+    public String getDocs(CompiledType type, Object obj) {
+        if (type.isListContainer()) {
+            type = type.getComponentType();
+        }
+        CompiledType matcherType = type.getComponentType();
+        if (matcherType != null) {
+
+            ClassCache list;
+            try {
+                list = ClassCache.getClassCache(matcherType.type);
+
+                ArrayList<String> keys = new ArrayList<String>(list.getKeys());
+                Collections.sort(keys);
+
+                return "Matcher/Context: " + matcherType.toString() + " (" + new Joiner(", ").join(keys) + ") -[[" + matcherType.toString() + "]]";
+            } catch (SecurityException e) {
+                LogV3.log(e);
+            } catch (NoSuchMethodException e) {
+                LogV3.log(e);
+            }
+        }
+        DebugMode.debugger();
+        return null;
     }
+
 }

@@ -21,6 +21,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.GigafileNuConfig;
+import org.jdownloader.plugins.components.config.GigafileNuConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -36,13 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GigafileNu;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.GigafileNuConfig;
-import org.jdownloader.plugins.components.config.GigafileNuConfig.CrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 51767 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51770 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public GigafileNuFolderCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -112,6 +112,10 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
                     censoredExtension = filename;
                     filename = null;
                 }
+                /*
+                 * If this is set to true, this means that no usable filename was found here and it will need to be fetched by the hoster
+                 * plugin during linkcheck.
+                 */
                 boolean prefer_report_api = false;
                 if (!GigafileNu.isFilename(filename)) {
                     prefer_report_api = StringUtils.isNotEmpty(filename);
@@ -153,6 +157,10 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             /* There is no specific single file URL -> set "folder" URL as contenturl. */
             singleZipOrFile.setContentUrl(contenturl);
             String filename = br.getRegex("matomete_zip_filename\"[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+            /*
+             * If this is set to true, this means that no usable filename was found here and it will need to be fetched by the hoster plugin
+             * during linkcheck.
+             */
             boolean prefer_report_api = false;
             if (!GigafileNu.isFilename(filename)) {
                 prefer_report_api = StringUtils.isNotEmpty(filename);
@@ -184,14 +192,13 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             final String fileSizeBytesStr = br.getRegex("var size = (\\d+);").getMatch(0);
             if (fileSizeBytesStr != null) {
                 singleZipOrFile.setVerifiedFileSize(Long.parseLong(fileSizeBytesStr));
+            } else if (totalFilesize > 0) {
+                /*
+                 * Use total size of all other files as fallback value -> Assume that this is the .zip file containing all other files.
+                 */
+                singleZipOrFile.setDownloadSize(totalFilesize);
             } else {
                 logger.warning("Failed to find size of single file in html code");
-                if (totalFilesize > 0) {
-                    /*
-                     * Use total size of all other files as fallback value -> Assume that this is the .zip file containing all other files.
-                     */
-                    singleZipOrFile.setDownloadSize(totalFilesize);
-                }
             }
             if (prefer_report_api) {
                 singleZipOrFile.setProperty(GigafileNu.REPORT_WORKAROUND_PROPERTY, Boolean.TRUE);
@@ -220,6 +227,7 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             }
             break;
         default:
+            /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported CrawlMode:" + crawlMode);
         }
         if (ret.isEmpty()) {
@@ -242,5 +250,4 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public Class<GigafileNuConfig> getConfigInterface() {
         return GigafileNuConfig.class;
     }
-
 }

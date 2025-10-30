@@ -49,7 +49,7 @@ import jd.plugins.PluginForHost;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51373 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 51772 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
     @Override
     public String getAGBLink() {
@@ -68,8 +68,13 @@ public class JdLog extends PluginForHost {
     }
 
     @Override
+    public Object getFavIcon(final String host) throws IOException {
+        return "https://jdownloader.org/lib/tpl/arctic/images/favicon.ico";
+    }
+
+    @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.INTERNAL };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.INTERNAL, LazyPlugin.FEATURE.FAVICON };
     }
 
     @Override

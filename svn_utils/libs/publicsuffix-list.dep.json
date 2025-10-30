@@ -1406,11 +1406,29 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "version":"2025.272.2 07f088c3601c917bec4a070e439f03944ebb4227"
+    },
+    {
+      "changes":"2025.274.0 0673151c3d770cbe2bdd0116ca615f24e73d370e\t: util: gTLD data autopull updates for 2025-10-01T15:18:26 UTC (#2614)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.281.0 ee7dec4a99602baaf51879dd8469b6642881a494\t: consolidate my projects into one section (#2616)\r\n2025.286.0 c9eaff77a5670de21bd00afde95ee6a05002f572\t: chore: adds caffeine.xyz to public suffix list (#2615)\r\n2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993\t: Add Canva Code domains. (#2617)",
+      "date":"2025-10-13T12:51:24.159+02:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"55e5f38ba17263b76b44b64c6dfeef6a855d92a06e324ee94e7cd48d6c61ef97"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993"
     }
   ],
   "installed":{
-    "changes":"2025.274.0 0673151c3d770cbe2bdd0116ca615f24e73d370e\t: util: gTLD data autopull updates for 2025-10-01T15:18:26 UTC (#2614)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2025.281.0 ee7dec4a99602baaf51879dd8469b6642881a494\t: consolidate my projects into one section (#2616)\r\n2025.286.0 c9eaff77a5670de21bd00afde95ee6a05002f572\t: chore: adds caffeine.xyz to public suffix list (#2615)\r\n2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993\t: Add Canva Code domains. (#2617)",
-    "date":"2025-10-13T12:51:24.159+02:00",
+    "changes":"2025.286.2 c002d19a8ca969110dd8a3838d972ca293bdc48f\t: Added new Plenit domains by region and remove domains by service (#2621)\n\nCo-authored-by: Javi <javier.nunez@jotelulu.com>\r\n2025.289.0 399792921792cacc483219997697443b49b6976f\t: Add website.one to PSL for hosting independent customer websites as subdomains of website.one. (#2625)\n\nThis domain will in the future be used for hosting independent\nwebsites for customers, where each customer will have a name of the\nform <some-name>.website.one.\r\n2025.297.0 bf5fb1be05c946a31482c7c8b546cafe13688889\t: Add `needle.run` to Public Suffix List (#2627)",
+    "date":"2025-10-24T15:59:26.605+02:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -1515,7 +1533,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"55e5f38ba17263b76b44b64c6dfeef6a855d92a06e324ee94e7cd48d6c61ef97"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"aed25ede9897201432cc019fa40b4962fcf1bdab34dbb856d8dbd1ad20830292"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1525,7 +1543,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2025.286.1 797d160679466c6e07c15453fc0b547fcd9f5993"
+    "version":"2025.297.0 bf5fb1be05c946a31482c7c8b546cafe13688889"
   },
   "minJRE":null,
   "provider":"github-clone",

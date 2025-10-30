@@ -94,6 +94,7 @@ import org.appwork.utils.reflection.Clazz;
  * @date 06.05.2019
  *
  */
+
 // * "Query Filter Mode" vs "Strict Compare Mode"
 // *
 // * "Strict Compare Mode"
@@ -108,7 +109,8 @@ import org.appwork.utils.reflection.Clazz;
 // * {$or:[{a:true},{b:true}]} matches {a:true} and {b:true}
 // * HOWEVER:
 // * {$or:[{§§THIS:{a:true}},{b:true}]} matches only {b:true}, because for {§§THIS:{a:true}} a:true is not a direct children
-@ApiDoc("A Condition Object. See the WIKI for more details.")
+@StorableDoc(wiki = "connect:Condition", value = "A Condition Object. This may be a dynamic expression that resolves at runtime, a query on a database or a filter expression that resolves to true or false. See the WIKI for more details.", generator = ConditionDocsGenerator.class)
+
 @StorableExample("{\"$eq\":\"MyValue\"}")
 public class Condition<MatcherType> extends LinkedHashMap<String, Object> implements Storable {
     /**
@@ -1769,6 +1771,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             return new Iterator<KeyValue>() {
                 final boolean          validKeys = listWrapper instanceof ArrayAccessor || listWrapper instanceof ListAccessor;
                 final Iterator<Object> it        = listWrapper.iterator();
+
                 private int            index     = 0;
 
                 @Override

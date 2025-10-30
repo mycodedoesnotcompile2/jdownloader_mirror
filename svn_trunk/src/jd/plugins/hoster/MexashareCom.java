@@ -35,7 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51774 $", interfaceVersion = 3, names = {}, urls = {})
 public class MexashareCom extends XFileSharingProBasic {
     public MexashareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -169,13 +169,15 @@ public class MexashareCom extends XFileSharingProBasic {
             } else {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, null, waittime);
             }
-        } else if (new Regex(correctedBR, ">\\s*You have consumed your daily download volume").matches()) {
+        } else if (new Regex(correctedBR, ">\\s*You have consumed your daily download volume").patternFind()) {
             /* 2020-04-24 - almost certainly this is an account-only error */
             if (account != null) {
                 throw new AccountUnavailableException("You have consumed your daily download volume", 30 * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You have consumed your daily download volume", 30 * 60 * 1000l);
             }
+        } else if (br.containsHTML(">\\s*The site is currently under maintenance")) {
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Website is under maintenance");
         }
         super.checkErrors(br, correctedBR, link, account);
     }

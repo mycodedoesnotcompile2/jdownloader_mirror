@@ -47,5 +47,11 @@ import java.lang.annotation.Target;
 public @interface StorableDoc {
     String value();
 
+    String wiki() default "";
+
+    String wiki2() default "";
+
+    String wiki3() default "";
+
     Class<? extends DocsGenerator> generator() default DocsGenerator.class;
 }

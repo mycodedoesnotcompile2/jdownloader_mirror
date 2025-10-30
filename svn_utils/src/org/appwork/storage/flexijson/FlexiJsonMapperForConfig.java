@@ -65,8 +65,14 @@ public class FlexiJsonMapperForConfig extends FlexiJSonMapper {
         return true;
     }
 
+    /**
+     * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#methodOrFieldAnnotationsToComments(org.appwork.storage.simplejson.mapper.Getter,
+     *      org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext, org.appwork.storage.flexijson.KeyValueElement,
+     *      java.lang.Object, boolean)
+     */
     @Override
-    protected KeyValueElement methodOrFieldAnnotationsToComments(final Getter g, final DefaultObjectToJsonContext context, final KeyValueElement create, final Object defaultValue, final boolean addDefaultValueAnnotation) throws FlexiMapperException {
+    protected KeyValueElement methodOrFieldAnnotationsToComments(Getter g, DefaultObjectToJsonContext context, KeyValueElement create, Object defaultValue, boolean addDefaultValueAnnotation) throws FlexiMapperException {
+
         final KeyValueElement ret = super.methodOrFieldAnnotationsToComments(g, context, create, defaultValue, addDefaultValueAnnotation);
         if (ret.getCommentsBeforeKey() != null) {
             Collections.sort(ret.getCommentsBeforeKey(), new Comparator<FlexiCommentJsonNode>() {

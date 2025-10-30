@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage;
 
-import org.appwork.storage.flexijson.JSPath;
 import org.appwork.utils.reflection.CompiledType;
 
 /**
@@ -43,10 +42,9 @@ import org.appwork.utils.reflection.CompiledType;
  */
 public abstract class DocsGenerator {
     /**
+     * @param obj
      * @param type
-     * @param key
-     * @param jsPath
      * @return
      */
-    public abstract String getDocs(CompiledType type, String key, JSPath jsPath);
+    public abstract String getDocs(CompiledType type, Object obj);
 }
