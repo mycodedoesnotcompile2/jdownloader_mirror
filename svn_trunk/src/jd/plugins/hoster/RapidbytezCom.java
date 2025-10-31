@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51777 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidbytezCom extends XFileSharingProBasic {
     public RapidbytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -114,6 +114,9 @@ public class RapidbytezCom extends XFileSharingProBasic {
         if (br.containsHTML(">\\s*Downloads are temporarily disabled due to site maintenance")) {
             /* 2023-10-31 */
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Downloads are temporarily disabled due to site maintenance");
+        } else if (br.containsHTML(">\\s*We will be back shortly")) {
+            /* 2025-10-30 */
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Website is under maintenance: 'We will be back shortly'");
         }
     }
 }

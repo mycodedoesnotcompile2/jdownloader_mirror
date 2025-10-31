@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GigafileNu;
 
-@DecrypterPlugin(revision = "$Revision: 51770 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51775 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public GigafileNuFolderCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,40 +107,24 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
                 /* There is no specific single file URL -> set "folder" URL as contenturl. */
                 link.setContentUrl(contenturl);
                 String filename = matomete_file_names != null && matomete_file_names.length == ressourcelist.size() ? matomete_file_names[i] : null;
-                String censoredExtension = null;
-                if (filename != null && filename.matches("^\\.[a-z0-9]{2,4}$")) {
-                    censoredExtension = filename;
-                    filename = null;
-                }
-                /*
-                 * If this is set to true, this means that no usable filename was found here and it will need to be fetched by the hoster
-                 * plugin during linkcheck.
-                 */
-                boolean prefer_report_api = false;
                 if (!GigafileNu.isFilename(filename)) {
-                    prefer_report_api = StringUtils.isNotEmpty(filename);
                     filename = br.getRegex("download\\('" + Pattern.quote(fileID) + "[^>]*>\\s*(.*?)\\s*<").getMatch(0);
                 }
                 if (!GigafileNu.isFilename(filename)) {
-                    prefer_report_api = prefer_report_api || StringUtils.isNotEmpty(filename);
                     filename = null;
                 }
                 if (StringUtils.isNotEmpty(filename)) {
-                    prefer_report_api = false;
                     filename = Encoding.htmlDecode(filename).trim();
                     link.setName(filename);
                     link.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
                     link.setAvailableStatus(AvailableStatus.TRUE);
                 } else {
                     /* Fallback: Set dummy filename to avoid all results having the same file name. */
-                    link.setName(fileID + StringUtils.valueOrEmpty(censoredExtension));
+                    link.setName(fileID);
                     /* Do not set online status here so that hoster plugin can find the real filenames. */
                     link.setAvailableStatus(AvailableStatus.UNCHECKED);
                 }
                 link.setVerifiedFileSize(filesize);
-                if (prefer_report_api) {
-                    link.setProperty(GigafileNu.REPORT_WORKAROUND_PROPERTY, Boolean.TRUE);
-                }
                 link.setProperty(GigafileNu.PROPERTY_FILE_ID, fileID);
                 totalFilesize += filesize;
                 if (!filesFolders.containsKey(fileID)) {
@@ -148,95 +132,96 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
                 }
             }
         }
-        DownloadLink singleZipOrFile = null;
+        DownloadLink combinedZipOrFile = null;
+        boolean singleFileIsCombinedZip = false;
         final String singleFileID = br.getRegex("var file = \"([^\"]+)").getMatch(0);
         if (singleFileID != null && !filesFolders.containsKey(singleFileID)) {
-            singleZipOrFile = this.createDownloadlink(contenturl);
-            singleZipOrFile.setDefaultPlugin(hosterplugin);
-            singleZipOrFile.setHost(this.getHost());
+            combinedZipOrFile = this.createDownloadlink(contenturl);
+            combinedZipOrFile.setDefaultPlugin(hosterplugin);
+            combinedZipOrFile.setHost(this.getHost());
             /* There is no specific single file URL -> set "folder" URL as contenturl. */
-            singleZipOrFile.setContentUrl(contenturl);
+            combinedZipOrFile.setContentUrl(contenturl);
             String filename = br.getRegex("matomete_zip_filename\"[^>]*>\\s*(.*?)\\s*<").getMatch(0);
             /*
              * If this is set to true, this means that no usable filename was found here and it will need to be fetched by the hoster plugin
              * during linkcheck.
              */
-            boolean prefer_report_api = false;
             if (!GigafileNu.isFilename(filename)) {
-                prefer_report_api = StringUtils.isNotEmpty(filename);
                 filename = br.getRegex("download\\('" + Pattern.quote(singleFileID) + "[^>]*>\\s*(.*?)\\s*<").getMatch(0);
             }
             if (!GigafileNu.isFilename(filename)) {
-                prefer_report_api = prefer_report_api || StringUtils.isNotEmpty(filename);
                 filename = null;
             }
-            String extensionForSingleFile = null;// TODO
             if (StringUtils.isNotEmpty(filename)) {
-                prefer_report_api = false;
                 filename = Encoding.htmlDecode(filename).trim();
-                singleZipOrFile.setName(filename);
-                singleZipOrFile.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
-                singleZipOrFile.setAvailableStatus(AvailableStatus.TRUE);
-            } else if (extensionForSingleFile != null) {
-                /* We do not know a filename but we know the file extension */
-                singleZipOrFile.setName(singleFileID + extensionForSingleFile);
-                /* Do not set online status here so that hoster plugin can find the real filenames. */
-                singleZipOrFile.setAvailableStatus(AvailableStatus.UNCHECKED);
+                combinedZipOrFile.setName(filename);
+                combinedZipOrFile.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
+                combinedZipOrFile.setAvailableStatus(AvailableStatus.TRUE);
             } else {
                 /* Fallback */
                 /* Set .zip extension as we just assume that this is the .zip file containing all other files. */
-                singleZipOrFile.setName(singleFileID + ".zip");
+                combinedZipOrFile.setName(singleFileID + ".zip");
                 /* Do not set online status here so that hoster plugin can find the real filenames. */
-                singleZipOrFile.setAvailableStatus(AvailableStatus.UNCHECKED);
+                combinedZipOrFile.setAvailableStatus(AvailableStatus.UNCHECKED);
             }
             final String fileSizeBytesStr = br.getRegex("var size = (\\d+);").getMatch(0);
             if (fileSizeBytesStr != null) {
-                singleZipOrFile.setVerifiedFileSize(Long.parseLong(fileSizeBytesStr));
+                combinedZipOrFile.setVerifiedFileSize(Long.parseLong(fileSizeBytesStr));
             } else if (totalFilesize > 0) {
                 /*
                  * Use total size of all other files as fallback value -> Assume that this is the .zip file containing all other files.
                  */
-                singleZipOrFile.setDownloadSize(totalFilesize);
+                combinedZipOrFile.setDownloadSize(totalFilesize);
             } else {
                 logger.warning("Failed to find size of single file in html code");
             }
-            if (prefer_report_api) {
-                singleZipOrFile.setProperty(GigafileNu.REPORT_WORKAROUND_PROPERTY, Boolean.TRUE);
+            combinedZipOrFile.setProperty(GigafileNu.PROPERTY_FILE_ID, singleFileID);
+            if (GigafileNu.isCombinedZipDownload(br, singleFileID)) {
+                singleFileIsCombinedZip = true;
+                combinedZipOrFile.setProperty(GigafileNu.REPORT_IS_COMPLETE_ZIP, true);
             }
-            singleZipOrFile.setProperty(GigafileNu.PROPERTY_FILE_ID, singleFileID);
         }
-        final CrawlMode crawlMode = PluginJsonConfig.get(getConfigInterface()).getCrawlMode().getMode();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        switch (crawlMode) {
-        case ALL:
+        if (filesFolders.size() == 1 && singleFileIsCombinedZip) {
+            /*
+             * "smart" optimization: if there is only one single file and the .zip containing that same file, return only that single file
+             * regardless of the users' settings
+             */
+            logger.info("Single file and combined .zip");
             ret.addAll(filesFolders.values());
-            if (singleZipOrFile != null) {
-                ret.add(singleZipOrFile);
+        } else {
+            final CrawlMode crawlMode = PluginJsonConfig.get(getConfigInterface()).getCrawlMode().getMode();
+            switch (crawlMode) {
+            case ALL:
+                ret.addAll(filesFolders.values());
+                if (combinedZipOrFile != null) {
+                    ret.add(combinedZipOrFile);
+                }
+                break;
+            case FILES_FOLDERS:
+                ret.addAll(filesFolders.values());
+                if (ret.size() == 0 && combinedZipOrFile != null) {
+                    // add zip because it's the only file
+                    ret.add(combinedZipOrFile);
+                }
+                break;
+            case ZIP:
+                if (combinedZipOrFile != null) {
+                    ret.add(combinedZipOrFile);
+                }
+                break;
+            default:
+                /* Developer mistake */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported CrawlMode:" + crawlMode);
             }
-            break;
-        case FILES_FOLDERS:
-            ret.addAll(filesFolders.values());
-            if (ret.size() == 0 && singleZipOrFile != null) {
-                // add zip because it's the only file
-                ret.add(singleZipOrFile);
-            }
-            break;
-        case ZIP:
-            if (singleZipOrFile != null) {
-                ret.add(singleZipOrFile);
-            }
-            break;
-        default:
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported CrawlMode:" + crawlMode);
-        }
-        if (ret.isEmpty()) {
-            if (!br.containsHTML("download\\('" + content_id_from_url) && !GigafileNu.isSingleZipDownload(br, content_id_from_url)) {
-                /* Assume that item is offline */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                /* Unknown state */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (ret.isEmpty()) {
+                if (!br.containsHTML("download\\('" + content_id_from_url) && !GigafileNu.isCombinedZipDownload(br, content_id_from_url)) {
+                    /* Assume that item is offline */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    /* Unknown state */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
         }
         final FilePackage fp = FilePackage.getInstance();

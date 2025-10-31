@@ -53,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 
-@DecrypterPlugin(revision = "$Revision: 51759 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51780 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -535,7 +535,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         if (pinID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String[] jssnippets = br.getRegex("<script data-relay-response=\"true\" type=\"application/json\">(.*?)</script>").getColumn(0);
+        final String[] jssnippets = br.getRegex("<script[^>]*type=\"application/json\"[^>]*>(.*?)</script>").getColumn(0);
         if (jssnippets != null && jssnippets.length > 0) {
             /* Try to find json source in html code */
             for (final String jssnippet : jssnippets) {
@@ -544,7 +544,11 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                     continue;
                 }
                 final Map<String, Object> map = (Map<String, Object>) parsedjson;
-                final Map<String, Object> pin_root = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "response/data/v3GetPinQuery/data");
+                Map<String, Object> pin_root = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "response/data/v3GetPinQuery/data");
+                if (pin_root == null) {
+                    /* 2025-10-30: When logged in */
+                    pin_root = (Map<String, Object>) JavaScriptEngineFactory.walkJson(map, "initialReduxState/resources/PinResource/{0}/data");
+                }
                 if (pin_root != null) {
                     return pin_root;
                 }

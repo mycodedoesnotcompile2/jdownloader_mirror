@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51778 $", interfaceVersion = 3, names = {}, urls = {})
 public class SavefilesCom extends XFileSharingProBasic {
     public SavefilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -129,5 +129,18 @@ public class SavefilesCom extends XFileSharingProBasic {
         } else {
             return super.getDllinkVideohost(link, account, br, src);
         }
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filesize_html() {
+        return false;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        /* 2025-10-30: Remove filesize since it's most likely wrong RE forum 97468 */
+        fileInfo[1] = null;
+        return fileInfo;
     }
 }

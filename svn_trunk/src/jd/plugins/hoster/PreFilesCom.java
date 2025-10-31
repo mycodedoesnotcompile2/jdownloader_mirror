@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51775 $", interfaceVersion = 3, names = {}, urls = {})
 public class PreFilesCom extends XFileSharingProBasic {
     public PreFilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -222,8 +222,32 @@ public class PreFilesCom extends XFileSharingProBasic {
         if (dllink == null) {
             return null;
         }
+        if (dllink.matches("https?://ouo\\.io/[A-Za-z0-9]+")) {
+            logger.info("Processing special redirect URL");
+            try {
+                final Browser brc = br.cloneBrowser();
+                final PluginForDecrypt plg = this.getNewPluginForDecryptInstance("ouo.io");
+                plg.setBrowser(brc);
+                /* We expect exactly one result. */
+                final ArrayList<DownloadLink> results = plg.decryptIt(new CryptedLink(dllink), null);
+                if (results.size() != 1) {
+                    return null;
+                }
+                dllink = results.get(0).getPluginPatternMatcher();
+                return dllink;
+            } catch (final Throwable e) {
+                if (e instanceof BlockedByException) {
+                    /* 2024-06-20: Dirty hack to make this fail later in order to let upper handling run into BlockedByException. */
+                    logger.info("Special handling failed due to BlockedByException");
+                    return dllink;
+                } else {
+                    e.printStackTrace();
+                    return null;
+                }
+            }
+        }
         if (dllink.matches("https?://[^/]+/[A-Za-z0-9]+")) {
-            /* pro.sh/ouo.io --> Use dedicated crawler plugin. */
+            /* pro.sh --> Use dedicated crawler plugin. */
             logger.info("Processing special redirect URL");
             try {
                 final Browser brc = br.cloneBrowser();
@@ -231,11 +255,15 @@ public class PreFilesCom extends XFileSharingProBasic {
                 plg.setBrowser(brc);
                 /* We expect exactly one result. */
                 final ArrayList<DownloadLink> results = plg.decryptIt(new CryptedLink(dllink), null);
+                if (results.size() != 1) {
+                    return null;
+                }
                 dllink = results.get(0).getPluginPatternMatcher();
                 return dllink;
             } catch (final Throwable e) {
                 if (e instanceof BlockedByException) {
                     /* 2024-06-20: Dirty hack to make this fail later in order to let upper handling run into BlockedByException. */
+                    logger.info("Special handling failed due to BlockedByException");
                     return dllink;
                 } else {
                     e.printStackTrace();

@@ -582,7 +582,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
                 mhost.setStatusText("Permanently offline");
                 if (skipOfflineEntries) {
-                    /* Skip such items completely in stable */
+                    /* Skip such items in stable version of JDownloader. */
                     continue cleanListLoop;
                 }
             } else {

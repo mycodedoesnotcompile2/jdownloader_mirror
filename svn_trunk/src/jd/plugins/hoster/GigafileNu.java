@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51773 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51775 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNu extends PluginForHost {
     public GigafileNu(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,7 @@ public class GigafileNu extends PluginForHost {
 
     public static final String PROPERTY_FILE_ID                = "file_id";
     public static final String PROPERTY_FILE_NAME_FROM_CRAWLER = "filename_from_crawler";
-    public static final String REPORT_WORKAROUND_PROPERTY      = "use_report_website";
+    public static final String REPORT_IS_COMPLETE_ZIP          = "is_complete_zip";
 
     @Override
     public String getAGBLink() {
@@ -78,7 +78,7 @@ public class GigafileNu extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            /* Liks are added via crawler plugin */
+            /* Links are added via crawler plugin */
             ret.add("");
         }
         return ret.toArray(new String[0]);
@@ -107,38 +107,100 @@ public class GigafileNu extends PluginForHost {
         return link.getStringProperty(PROPERTY_FILE_ID);
     }
 
-    public static boolean isFilename(final String filename) {
-        if (StringUtils.isEmpty(filename)) {
-            return false;
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        final String fid = this.getFID(link);
+        if (!link.isNameSet()) {
+            /* Fallback */
+            link.setName(fid);
         }
-        if (StringUtils.containsIgnoreCase(filename, "ファイル名が置換されました※DLしたファイルは、原題まま表示されます")) {
-            return false;
+        this.setBrowserExclusive();
+        final String filenameFromCrawler = link.getStringProperty(PROPERTY_FILE_NAME_FROM_CRAWLER);
+        /* If we are about to download, we want to access URL from "getPluginPatternMatcher" down below. */
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment();
+        if (!isDownload && link.getFinalFileName() == null && !this.isCombinedZipDownload(link)) {
+            final AvailableStatus ret = requestReportFileInformation(link);
+            if (ret != null) {
+                if (AvailableStatus.FALSE.equals(ret)) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    return ret;
+                }
+            }
         }
-        return true;
+        br.getPage(link.getPluginPatternMatcher());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final PluginForDecrypt crawlerplugin = this.getNewPluginForDecryptInstance(this.getHost());
+        if (!crawlerplugin.canHandle(br.getURL())) {
+            /* E.g. redirect to main page */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (filenameFromCrawler != null) {
+            /* Trust this filename */
+            link.setFinalFileName(filenameFromCrawler);
+        } else if (link.getFinalFileName() == null) {
+            final String ajax_server = br.getRegex("var dl_ajax_server = \"([^\"]+)\";").getMatch(0);
+            final AvailableStatus ret = requestAPIFileInformation(link, ajax_server);
+            if (ret != null) {
+                if (AvailableStatus.FALSE.equals(ret)) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    return ret;
+                }
+            }
+            if (link.getFinalFileName() == null && !isDownload) {
+                final String dllink = findDirectURL(br, link);
+                try {
+                    final Browser brc = br.cloneBrowser();
+                    brc.setFollowRedirects(true);
+                    final URLConnectionAdapter con = basicLinkCheck(brc, brc.createHeadRequest(dllink), link, null, null);
+                    link.setProperty(PROPERTY_FILE_NAME_FROM_CRAWLER, link.getFinalFileName());
+                    link.setProperty("free_directlink", con.getURL().toExternalForm());
+                } catch (final IOException e) {
+                    logger.log(e);
+                }
+            }
+        }
+        return AvailableStatus.TRUE;
     }
 
+    /**
+     * Can be used for checking single file links. <br>
+     * Cannot be used to check combined .zip files!!
+     */
     private AvailableStatus requestReportFileInformation(final DownloadLink link) throws IOException, PluginException {
         final String fid = this.getFID(link);
         final String host = Browser.getHost(link.getPluginPatternMatcher(), true);
-        if (host != null && fid != null) {
-            final Browser brc = br.cloneBrowser();
-            brc.setFollowRedirects(true);
-            brc.getPage("https://" + host + "/report.php?host=" + host + "&uri=" + fid);
-            if (!StringUtils.containsIgnoreCase(brc.getURL(), "/report.php")) {
-                /* e.g. redirect to main page */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            String filename = brc.getRegex(">\\s*対象ファイル名\\s*</td>\\s*(?:<td[^>]*>)?\\s*<p[^>]*>\\s*(.*?)\\s*</p>").getMatch(0);
-            if (isFilename(filename)) {
-                filename = Encoding.htmlDecode(filename);
-                link.setFinalFileName(filename);
-                link.setProperty(PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
-                return AvailableStatus.TRUE;
-            }
+        if (host == null) {
+            logger.warning("host is null");
+            return null;
+        } else if (fid == null) {
+            logger.warning("fid is null");
+            return null;
         }
-        return null;
+        final Browser brc = br.cloneBrowser();
+        brc.setFollowRedirects(true);
+        brc.getPage("https://" + host + "/report.php?host=" + host + "&uri=" + fid);
+        if (!StringUtils.containsIgnoreCase(brc.getURL(), "/report.php")) {
+            /* e.g. redirect to main page */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String filename = brc.getRegex(">\\s*対象ファイル名\\s*</td>\\s*(?:<td[^>]*>)?\\s*<p[^>]*>\\s*(.*?)\\s*</p>").getMatch(0);
+        if (filename == null) {
+            logger.warning("Failed to find filename -> Regex outdated?");
+            return null;
+        } else if (!isFilename(filename)) {
+            return null;
+        }
+        filename = Encoding.htmlDecode(filename);
+        link.setFinalFileName(filename);
+        link.setProperty(PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
+        return AvailableStatus.TRUE;
     }
 
+    /** Can be used to check all types of links. */
     private AvailableStatus requestAPIFileInformation(final DownloadLink link, final String preferred_host) throws IOException, PluginException {
         final String fid = this.getFID(link);
         final String host;
@@ -175,6 +237,7 @@ public class GigafileNu extends PluginForHost {
         if ("2".equals(StringUtils.valueOfOrNull(entries.get("file_status")))) {
             return AvailableStatus.TRUE;
         }
+        logger.warning("API returned file_status != 2 while file looks to be online");
         return null;
     }
 
@@ -183,70 +246,12 @@ public class GigafileNu extends PluginForHost {
         if (fileIDForDownload == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (isSingleZipDownload(br, fileIDForDownload)) {
+        if (isCombinedZipDownload(br, fileIDForDownload)) {
+            link.setProperty(REPORT_IS_COMPLETE_ZIP, true);
             return "/dl_zip.php?file=" + fileIDForDownload;
         } else {
             return "/download.php?file=" + fileIDForDownload;
         }
-    }
-
-    @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(fid);
-        }
-        this.setBrowserExclusive();
-        if (link.getFinalFileName() == null && link.hasProperty(REPORT_WORKAROUND_PROPERTY)) {
-            final AvailableStatus ret = requestReportFileInformation(link);
-            if (ret != null) {
-                if (!PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
-                    if (AvailableStatus.FALSE.equals(ret)) {
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    } else {
-                        return ret;
-                    }
-                }
-            }
-        }
-        br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final PluginForDecrypt crawlerplugin = this.getNewPluginForDecryptInstance(this.getHost());
-        if (!crawlerplugin.canHandle(br.getURL())) {
-            /* E.g. redirect to main page */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final String filenameFromCrawler = link.getStringProperty(PROPERTY_FILE_NAME_FROM_CRAWLER);
-        if (filenameFromCrawler != null) {
-            /* Trust this filename */
-            link.setFinalFileName(filenameFromCrawler);
-        } else if (link.getFinalFileName() == null) {
-            final String ajax_server = br.getRegex("var dl_ajax_server = \"([^\"]+)\";").getMatch(0);
-            final AvailableStatus ret = requestAPIFileInformation(link, ajax_server);
-            if (ret != null) {
-                if (AvailableStatus.FALSE.equals(ret)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else {
-                    return ret;
-                }
-            }
-            if (link.getFinalFileName() == null && !PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
-                final String dllink = findDirectURL(br, link);
-                try {
-                    final Browser brc = br.cloneBrowser();
-                    brc.setFollowRedirects(true);
-                    final URLConnectionAdapter con = basicLinkCheck(brc, brc.createHeadRequest(dllink), link, null, null);
-                    link.setProperty(PROPERTY_FILE_NAME_FROM_CRAWLER, link.getFinalFileName());
-                    link.setProperty("free_directlink", con.getURL().toExternalForm());
-                } catch (final IOException e) {
-                    logger.log(e);
-                }
-            }
-        }
-        return AvailableStatus.TRUE;
     }
 
     @Override
@@ -270,7 +275,7 @@ public class GigafileNu extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
                 } else if (dl.getConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
-                } else if (br.containsHTML("(?i)alert\\(\"ダウンロードキーが異なります")) {
+                } else if (br.containsHTML("alert\\(\"ダウンロードキーが異なります")) {
                     throw new PluginException(LinkStatus.ERROR_FATAL, "Password protected files are not yet supported");
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -281,8 +286,22 @@ public class GigafileNu extends PluginForHost {
         dl.startDownload();
     }
 
-    public static boolean isSingleZipDownload(final Browser br, final String file_id) {
+    private boolean isCombinedZipDownload(final DownloadLink link) {
+        return link.getBooleanProperty(REPORT_IS_COMPLETE_ZIP, false);
+    }
+
+    public static boolean isCombinedZipDownload(final Browser br, final String file_id) {
         return br.containsHTML("download_zip\\('" + Pattern.quote(file_id));
+    }
+
+    public static boolean isFilename(final String filename) {
+        if (StringUtils.isEmpty(filename)) {
+            return false;
+        }
+        if (StringUtils.containsIgnoreCase(filename, "ファイル名が置換されました※DLしたファイルは、原題まま表示されます")) {
+            return false;
+        }
+        return true;
     }
 
     @Override

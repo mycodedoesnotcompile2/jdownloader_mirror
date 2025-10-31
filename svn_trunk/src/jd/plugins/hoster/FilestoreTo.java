@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 51141 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 51777 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
 public class FilestoreTo extends PluginForHost {
     public FilestoreTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -304,7 +304,7 @@ public class FilestoreTo extends PluginForHost {
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         login(account, true, "/konto");
         final AccountInfo ai = new AccountInfo();
-        final String validUntilString = br.getRegex("(?i)Premium-Status\\s*</small>\\s*<div class=\"value text-success\">\\s*(.*?)\\s*Uhr").getMatch(0);
+        final String validUntilString = br.getRegex("Premium-Status\\s*</small>\\s*<div class=\"value text-success\">\\s*(.*?)\\s*Uhr").getMatch(0);
         if (validUntilString != null) {
             final long until = TimeFormatter.getMilliSeconds(validUntilString, "dd'.'MM'.'yyyy' - 'HH':'mm", Locale.ENGLISH);
             ai.setValidUntil(until);

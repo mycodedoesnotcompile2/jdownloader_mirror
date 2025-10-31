@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.FilerNet;
 
-@DecrypterPlugin(revision = "$Revision: 51754 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51777 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilerNet.class })
 public class FilerNetFolder extends PluginForDecrypt {
     public FilerNetFolder(PluginWrapper wrapper) {
@@ -118,10 +118,10 @@ public class FilerNetFolder extends PluginForDecrypt {
         if (count == 0) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, folderID);
         }
-        String fpName = (String) data.get("name");
-        if (fpName == null) {
+        String title = (String) data.get("name");
+        if (title == null) {
             /* Fallback */
-            fpName = "filer.net folder: " + folderID;
+            title = "filer.net folder: " + folderID;
         }
         final List<Map<String, Object>> files = (List<Map<String, Object>>) data.get("files");
         for (final Map<String, Object> file : files) {
@@ -132,7 +132,7 @@ public class FilerNetFolder extends PluginForDecrypt {
             ret.add(link);
         }
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(fpName);
+        fp.setName(title);
         fp.setPackageKey("filer.net://folder/" + folderID);
         fp.addLinks(ret);
         return ret;

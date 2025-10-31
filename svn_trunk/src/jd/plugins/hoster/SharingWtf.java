@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51721 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51779 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +139,11 @@ public class SharingWtf extends YetiShareCore {
     public String[] scanInfo(final DownloadLink link, final String[] fileInfo) {
         /* 2020-01-17: Special */
         super.scanInfo(link, fileInfo);
-        final String betterFilesize = br.getRegex("class=\"fa fa-file-o\"></i>([^<>\"]+)<span").getMatch(0);
+        final String betterFilename = br.getRegex("class=\"text-muted small\"[^>]*>([^<]+)").getMatch(0);
+        if (!StringUtils.isEmpty(betterFilename)) {
+            fileInfo[0] = betterFilename;
+        }
+        final String betterFilesize = br.getRegex("class=\"fa fa-file-o\"[^>]*></i>([^<>\"]+)<span").getMatch(0);
         if (!StringUtils.isEmpty(betterFilesize)) {
             fileInfo[1] = betterFilesize.trim();
             if (!fileInfo[1].contains("b")) {
@@ -366,5 +370,11 @@ public class SharingWtf extends YetiShareCore {
          * filesharing.io.
          */
         return this.getHost();
+    }
+
+    @Override
+    public boolean supports_availablecheck_over_info_page(final DownloadLink link) {
+        /* 2025-10-30: info page is crippled and doesn't contain usable filename information anymore RE forum 93431 */
+        return false;
     }
 }
