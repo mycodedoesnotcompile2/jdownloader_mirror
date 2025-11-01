@@ -34,9 +34,9 @@
  * ==================================================================================================================================================== */
 package org.appwork.jna.windows.wmi.tests;
 
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -107,7 +107,7 @@ public class WMIJNATest extends AWTest {
                                 }
                                 final String query = "SELECT * from AntiVirusProduct";
                                 cc.addAndGet(1);
-                                final ArrayList<Map<String, Object>> list = JNAWMIUtils.query(namespace, query);
+                                final List<Map<String, Object>> list = JNAWMIUtils.query(namespace, query);
                                 final StringBuilder sb = new StringBuilder();
                                 if (list.size() > 0) {
                                     for (final Map<String, Object> map : list) {

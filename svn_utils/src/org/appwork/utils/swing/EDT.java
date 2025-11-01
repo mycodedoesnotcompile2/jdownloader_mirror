@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -142,7 +142,6 @@ public abstract class EDT<T, ExceptionType extends Throwable> implements Runnabl
     }
 
     public T waitFor() throws InterruptedException, ExceptionType {
-        InterruptedException interrupted = null;
         try {
             if (this.done) {
                 return returnValue;
@@ -160,24 +159,18 @@ public abstract class EDT<T, ExceptionType extends Throwable> implements Runnabl
                 return returnValue;
             }
             // c = System.currentTimeMillis();
-            try {
-                while (this.done == false) {
-                    /* ASK daniel why we use Sleep(1) here */
-                    /* Thread.yield can use too much cpu */
-                    /*
-                     * Thread.interrupt can cause side-effects! overwritten interrupt method in current Thread can do bad things
-                     */
-                    /* Object.wait releases all locks! */
-                    Thread.sleep(1);
-                }
-            } catch (InterruptedException e) {
-                interrupted = e;
+            while (this.done == false) {
+                /* ASK daniel why we use Sleep(1) here */
+                /* Thread.yield can use too much cpu */
+                /*
+                 * Thread.interrupt can cause side-effects! overwritten interrupt method in current Thread can do bad things
+                 */
+                /* Object.wait releases all locks! */
+                Thread.sleep(1);
             }
             return returnValue;
         } finally {
-            if (interrupted != null) {
-                throw interrupted;
-            } else if (this.exception != null) {
+            if (this.exception != null) {
                 Exceptions.addSuppressed(exception, new Exception("caused here").fillInStackTrace());
                 if (exception instanceof Error) {
                     throw (Error) this.exception;
@@ -218,5 +211,15 @@ public abstract class EDT<T, ExceptionType extends Throwable> implements Runnabl
                 return null;
             }
         }.invokeLater();
+    }
+
+    public static void runAndWait(final Runnable runnable) throws InterruptedException {
+        new EDT<Object, RuntimeException>() {
+            @Override
+            protected Object runInEDT() throws RuntimeException {
+                runnable.run();
+                return null;
+            }
+        }.waitFor();
     }
 }

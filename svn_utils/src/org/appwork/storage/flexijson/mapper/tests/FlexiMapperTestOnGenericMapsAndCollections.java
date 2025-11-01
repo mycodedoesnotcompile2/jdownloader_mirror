@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher StraÃŸe 117
- *         90763 FÃ¼rth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -58,7 +58,7 @@ public class FlexiMapperTestOnGenericMapsAndCollections extends AWTest {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
@@ -70,7 +70,6 @@ public class FlexiMapperTestOnGenericMapsAndCollections extends AWTest {
         HashMap<String, ArrayList<Boolean>> innerMap = new HashMap<String, ArrayList<Boolean>>();
         innerMap.put("InnerKey", list);
         obj.put("outerKey2", innerMap);
-        ;
         String serialized = FlexiUtils.serializeMinimized(obj);
         assertEquals(serialized, "{\"outerKey2\":{\"InnerKey\":[true,false]}}");
         HashMap<String, HashMap<String, ArrayList<Boolean>>> restored = FlexiUtils.jsonToObject(serialized, new TypeRef<HashMap<String, HashMap<String, ArrayList<Boolean>>>>() {

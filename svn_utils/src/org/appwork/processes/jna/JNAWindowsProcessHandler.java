@@ -107,7 +107,7 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
                 where = " where ExecutablePath = '" + JNAWMIUtils.escape(path) + "'";
             }
             ArrayList<ProcessInfo> ret = new ArrayList<ProcessInfo>();
-            final ArrayList<Map<String, Object>> wmiResult = JNAWMIUtils.query(null, "SELECT " + new Joiner(",").join(REQUIRED_PROPERTIES) + " from Win32_Process" + where);
+            final List<Map<String, Object>> wmiResult = JNAWMIUtils.query(null, "SELECT " + new Joiner(",").join(REQUIRED_PROPERTIES) + " from Win32_Process" + where);
             if (wmiResult != null && wmiResult.size() > 0) {
                 for (final Map<String, Object> p : wmiResult) {
                     ret.add(wmiResultToProcessInfo(p));
@@ -217,7 +217,7 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
             // TODO: rewrite to use
             // final WinNT.HANDLE processHandle = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_INFORMATION, false, pid);
             // Psapi.INSTANCE.GetModuleFileNameExW(processHandle, null, processName, processName.length);
-            final ArrayList<Map<String, Object>> wmiResult = JNAWMIUtils.query(null, "SELECT " + new Joiner(",").join(REQUIRED_PROPERTIES) + " from Win32_Process where " + where, REQUIRED_PROPERTIES);
+            final List<Map<String, Object>> wmiResult = JNAWMIUtils.query(null, "SELECT " + new Joiner(",").join(REQUIRED_PROPERTIES) + " from Win32_Process where " + where, REQUIRED_PROPERTIES);
             if (wmiResult != null && wmiResult.size() > 0) {
                 for (final Map<String, Object> p : wmiResult) {
                     ProcessInfo pi = wmiResultToProcessInfo(p);

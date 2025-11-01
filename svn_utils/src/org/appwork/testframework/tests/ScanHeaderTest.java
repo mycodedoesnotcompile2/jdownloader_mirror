@@ -83,7 +83,9 @@ public class ScanHeaderTest extends AWTest {
                         int year = new Date().getYear() + 1900;
                         String newJava = java.replaceAll("Copyright \\(c\\) 2009-20\\d\\d,", "Copyright (c) 2009-" + year + ",");
                         newJava = newJava.replace("Schwabacher Straße 117", "Spalter Strasse 58");
+                        newJava = newJava.replace("Schwabacher StraÃŸe 117", "Spalter Strasse 58");// files with broken encoding
                         newJava = newJava.replace("90763 Fürth", "91183 Abenberg");
+                        newJava = newJava.replace("90763 FÃ¼rth", "91183 Abenberg");// files with broken encoding
                         if (!newJava.contains("e-mail@appwork.org")) {
                             newJava = newJava.replace("91183 Abenberg", "91183 Abenberg\r\n *         e-mail@appwork.org");
                         }

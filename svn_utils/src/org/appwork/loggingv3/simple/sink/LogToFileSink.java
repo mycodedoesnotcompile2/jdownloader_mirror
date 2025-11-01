@@ -907,6 +907,10 @@ public class LogToFileSink extends AbstractSink {
      * @throws InterruptedException
      */
     public File exportFull(long startTimestamp) throws IOException, Error, InterruptedException {
+        return exportFull(startTimestamp, null);
+    }
+
+    public File exportFull(long startTimestamp, ExportExtender extender) throws IOException, Error, InterruptedException {
         synchronized (WORK_ON_FOLDERS_AND_FILES_LOCK) {
             ArrayList<LogFolder> logFolders = getLogFilesOrFolders(false);
             Collections.sort(logFolders, new Comparator<LogFolder>() {
@@ -935,6 +939,9 @@ public class LogToFileSink extends AbstractSink {
             try {
                 zipout.setLevel(4);
                 extendExport(zipout);
+                if (extender != null) {
+                    extender.extendExport(zipout);
+                }
                 for (LogFolder f : logFolders) {
                     if (Thread.interrupted()) {
                         throw new InterruptedException();

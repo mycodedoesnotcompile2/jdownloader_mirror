@@ -94,7 +94,6 @@ import org.appwork.utils.reflection.Clazz;
  * @date 06.05.2019
  *
  */
-
 // * "Query Filter Mode" vs "Strict Compare Mode"
 // *
 // * "Strict Compare Mode"
@@ -109,8 +108,7 @@ import org.appwork.utils.reflection.Clazz;
 // * {$or:[{a:true},{b:true}]} matches {a:true} and {b:true}
 // * HOWEVER:
 // * {$or:[{§§THIS:{a:true}},{b:true}]} matches only {b:true}, because for {§§THIS:{a:true}} a:true is not a direct children
-@StorableDoc(wiki = "connect:Condition", value = "A Condition Object. This may be a dynamic expression that resolves at runtime, a query on a database or a filter expression that resolves to true or false. See the WIKI for more details.", generator = ConditionDocsGenerator.class)
-
+@StorableDoc(wiki = "connect:Condition", value = "A Condition Object. This may be a dynamic expression that resolves at runtime, a query on a database or a filter expression that resolves to true or false. See the WIKI for more details.", generator = org.appwork.moncompare.ConditionDocsGenerator.class)
 @StorableExample("{\"$eq\":\"MyValue\"}")
 public class Condition<MatcherType> extends LinkedHashMap<String, Object> implements Storable {
     /**
@@ -306,7 +304,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         /**
          *
          */
-
         /**
          * See "Query Filter mode" vs. "Strict Compare mode"
          */
@@ -320,11 +317,9 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             try {
                 boolean allowReferences = false;
                 Object options = container.getOptions(Object.class);
-
                 if (options instanceof Map) {
                     allowReferences = Boolean.TRUE.equals(((Map) options).get(OPTIONS_ALLOW_REFERENCES));
                 }
-
                 final ListAccessorInterface access = container.getListWrapper(expression);
                 final CharSequence str = toCharSequence(container.resolveValue(container, access.get(0), scope, true));
                 final Pattern searchPattern = Pattern.compile(String.valueOf(container.resolveValue(container, access.get(1), scope, true)));
@@ -776,7 +771,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     return (compareResult > 0);
                 }
             };
-
             protected abstract boolean opEval(int compareResult);
         }
 
@@ -1287,7 +1281,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     } else {
                         return container.resolveValue(container, list.get(2), scope, true);
                     }
-
                 }
             } catch (final ConditionException e) {
                 throw new AggregationException(e);
@@ -1463,7 +1456,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.moncompare.Operator#isFilterRoot()
          */
         @Override
@@ -1715,9 +1708,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     @ApiDoc("Set this option to true to force all operators in the same layer to work in aggregation mode.")
     @ApiDocExample("{§eq:['§a',1],§options:{'aggregate':true}}")
     public static final String                              OPTIONS_AGGREGATE        = "aggregate";
-
     public static final String                              OPTIONS_ALLOW_REFERENCES = "allowReferences";
-
     protected List<TypeHandler>                             typeHandlers             = new ArrayList<TypeHandler>();
 
     protected List<TypeHandler> getTypeHandler() {
@@ -1771,7 +1762,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             return new Iterator<KeyValue>() {
                 final boolean          validKeys = listWrapper instanceof ArrayAccessor || listWrapper instanceof ListAccessor;
                 final Iterator<Object> it        = listWrapper.iterator();
-
                 private int            index     = 0;
 
                 @Override
@@ -1837,19 +1827,19 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return false;
     }
 
-    public static final ThreadLocal<List<TypeHandler>> TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
-    public static final List<TypeHandler>              GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
+    public static final ThreadLocal<List<TypeHandler>>         TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
+    public static final List<TypeHandler>                      GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
     static {
         GLOBAL_TYPE_HANDLERS.add(new TimeSpanHandler());
         GLOBAL_TYPE_HANDLERS.add(new DateHandler());
     }
-    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS    = new ThreadLocal<Map<String, PathHandler>>();
+    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS        = new ThreadLocal<Map<String, PathHandler>>();
     /**
      *
      */
-    private static final long                                  serialVersionUID = 1L;
-    public static final org.appwork.storage.TypeRef<Condition> TYPE             = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
-                                                                                };
+    private static final long                                  serialVersionUID     = 1L;
+    public static final org.appwork.storage.TypeRef<Condition> TYPE                 = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
+                                                                                    };
     static {
         IGNORE.add($OPTIONS);
     }
@@ -3019,19 +3009,16 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     public static final ThreadLocal<LogInterface> THREAD_LOGGER = new ThreadLocal<LogInterface>();
 
     public boolean _isDebug() {
-
         if (this.debug) {
             return true;
         }
         Object options = get($OPTIONS);
         if (options != null) {
             if (options instanceof Map) {
-
                 if (Boolean.TRUE.equals(((Map) options).get("debug"))) {
                     return true;
                 }
             }
-
         }
         final Condition root = ROOT_CONDITION.get();
         if (root != null && root != this && root._isDebug()) {
@@ -3076,7 +3063,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.util.HashMap#put(java.lang.Object, java.lang.Object)
      */
     @Override
@@ -3096,7 +3083,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.util.HashMap#putAll(java.util.Map)
      */
     @Override
@@ -3108,7 +3095,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.util.HashMap#remove(java.lang.Object)
      */
     @Override
@@ -3118,7 +3105,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.util.HashMap#replace(java.lang.Object, java.lang.Object, java.lang.Object)
      */
     @Override
@@ -3136,7 +3123,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.util.HashMap#replaceAll(java.util.function.BiFunction)
      */
     @Override
@@ -3188,7 +3175,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.util.AbstractMap#toString()
      */
     @Override

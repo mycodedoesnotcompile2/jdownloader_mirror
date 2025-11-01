@@ -177,12 +177,12 @@ public class CrossSystem {
         KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
-         *
+         * 
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
         DEBIAN_LENNY(OSFamily.LINUX, "lenny"),
-        DEBIAN_SQUEEZE(OSFamily.LINUX, "squeeze"),
+        DEBIAN_SQUEEZE(OSFamily.LINUX, "squeeze"), // 6
         DEBIAN_WHEEZY(OSFamily.LINUX, "wheezy"), // 7
         DEBIAN_JESSIE(OSFamily.LINUX, "jessie"), // 8
         DEBIAN_STRETCH(OSFamily.LINUX, "stretch"), // 9
@@ -194,7 +194,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         *
+         * 
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -207,9 +207,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         *
+         * 
          * https://wiki.ubuntu.com/Releases
-         *
+         * 
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -326,7 +326,7 @@ public class CrossSystem {
         }
 
         private boolean isRelease(final String line) {
-            return this.releasePattern != null && this.releasePattern.matcher(line).find();
+            return this.releasePattern != null && line != null && this.releasePattern.matcher(line).find();
         }
 
         public static boolean sameOSFamily(final OperatingSystem x, final OperatingSystem y) {
@@ -564,7 +564,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         *
+         * 
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -1151,6 +1151,160 @@ public class CrossSystem {
         return best;
     }
 
+    public static OperatingSystem getLinuxReleaseByProcVersion() {
+        final File procVersion = new File("/proc/version");
+        if (!procVersion.exists()) {
+            return null;
+        }
+        try {
+            final FileInputStream fis = new FileInputStream(procVersion);
+            try {
+                final BufferedReader is = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
+                try {
+                    String line = null;
+                    while ((line = is.readLine()) != null) {
+                        final OperatingSystem ret = parseReleaseByKernelString(line);
+                        if (ret != null) {
+                            return ret;
+                        }
+                    }
+                } finally {
+                    is.close();
+                }
+            } finally {
+                fis.close();
+            }
+        } catch (final Throwable e) {
+            org.appwork.loggingv3.LogV3.log(e);
+        }
+        return null;
+    }
+
+    public static OperatingSystem parseReleaseByKernelString(String line) {
+        if (line == null) {
+            return null;
+        }
+        final class debianReleaseName {
+            private String getReleaseName(int release) {
+                switch (release) {
+                case 6:
+                    return "squeeze";
+                case 7:
+                    return "wheezy";
+                case 8:
+                    return "jessie";
+                case 9:
+                    return "stretch";
+                case 10:
+                    return "buster";
+                case 11:
+                    return "bull";
+                case 12:
+                    return "bookworm";
+                case 13:
+                    return "trixie";
+                case 14:
+                    return "forky";
+                default:
+                    return null;
+                }
+            }
+        }
+        line = line.toLowerCase(Locale.ENGLISH);
+        OperatingSystem ret = null;
+        {
+            if (line.contains("freebsd")) {
+                return OperatingSystem.FREEBSD;
+            } else if (line.contains("bazzite")) {
+                return OperatingSystem.BAZZITE;
+            } else if (line.contains("alpine")) {
+                return OperatingSystem.ALPINE;
+            }
+        }
+        UBUNTU: {
+            if (line.contains("ubuntu")) {
+                ret = OperatingSystem.UBUNTU;
+                final String version = new Regex(line, "ubuntu[^~]*~([0-9\\.]+)").getMatch(0);
+                final OperatingSystem release = getLinuxRelease(ret, version);
+                if (release != null) {
+                    return release;
+                }
+            }
+        }
+        FEDORA: {
+            if (line.contains(".fc") && line.matches(".*\\.fc\\d+.*")) {
+                return OperatingSystem.FEDORA;
+            } else if (line.contains("fedoraproject.org")) {
+                return OperatingSystem.FEDORA;
+            } else if (line.contains("fedora")) {
+                return OperatingSystem.FEDORA;
+            }
+        }
+        REDHAT_CENTOS: {
+            if (line.contains("redhat.com")) {
+                return OperatingSystem.REDHAT;
+            } else if (line.contains("centos.org") || line.contains("centos")) {
+                return OperatingSystem.CENTOS;
+            } else if (line.contains(".el") && line.matches(".*\\.el\\d+.*")) {
+                // can also be OperatingSystem.CENTOS;
+                return OperatingSystem.REDHAT;
+            }
+        }
+        RASPBIAN: {
+            if (line.contains("rpt")) {
+                ret = OperatingSystem.RASPBIAN;
+                {
+                    final String version = new Regex(line, "rpt[^~]*~([a-z]+)").getMatch(0);
+                    final OperatingSystem release = getLinuxRelease(ret, version);
+                    if (release != null) {
+                        return release;
+                    }
+                }
+                final String debian = new Regex(line, "Debian\\s*(\\d+)").getMatch(0);
+                if (debian != null) {
+                    final String version = new debianReleaseName().getReleaseName(Integer.parseInt(debian));
+                    final OperatingSystem release = getLinuxRelease(ret, version);
+                    if (release != null) {
+                        return release;
+                    }
+                }
+                if (line.contains("rpt-rpi")) {
+                    final OperatingSystem release = getLinuxRelease(ret, line);
+                    if (release != null) {
+                        return release;
+                    }
+                    return ret;
+                }
+            }
+            if (line.contains("raspberrypi.com")) {
+                return OperatingSystem.RASPBIAN;
+            } else if (line.contains("raspberrypi")) {
+                return OperatingSystem.RASPBIAN;
+            }
+        }
+        ARCH: {
+            if (line.contains("arch1-")) {
+                return OperatingSystem.ARCH;
+            } else if (line.contains("archlinux")) {
+                return OperatingSystem.ARCH;
+            }
+        }
+        debian: {
+            if (ret == null && (line.contains("debian") || line.contains("debian.org"))) {
+                ret = OperatingSystem.DEBIAN;
+                final OperatingSystem release = getLinuxRelease(ret, line);
+                if (release != null) {
+                    return release;
+                }
+            }
+            final OperatingSystem release = getLinuxRelease(OperatingSystem.DEBIAN, line);
+            if (release != null) {
+                return release;
+            }
+        }
+        return ret;
+    }
+
     /*
      * https://gitlab.com/zygoon/os-release-zoo
      */
@@ -1276,6 +1430,20 @@ public class CrossSystem {
             }
             if (ret == null) {
                 ret = getLinuxRelease(os);
+            }
+            if (ret == null || ret == OperatingSystem.LINUX) {
+                final OperatingSystem byOsVersion = parseReleaseByKernelString(System.getProperty("os.version"));
+                final OperatingSystem byProcVersion = getLinuxReleaseByProcVersion();
+                if (byOsVersion != null && byProcVersion != null) {
+                    if (byOsVersion.name().length() > byProcVersion.name().length()) {
+                        return byOsVersion;
+                    }
+                    return byProcVersion;
+                } else if (byOsVersion != null) {
+                    return byOsVersion;
+                } else if (byProcVersion != null) {
+                    return byProcVersion;
+                }
             }
             if (ret != null) {
                 return ret;

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher StraÃŸe 117
- *         90763 FÃ¼rth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -126,7 +126,7 @@ public class FlexiMapperTestGenericArrays extends AWTest {
         inst1.setGenArray1(test);
         String json1 = FlexiUtils.serializeConfigStorable(inst1);
         assertTrue(json1.contains("Type: Array<Array<String>>"));
-        assertTrue(json1.contains("\"genArray1\":[[\"entry\"]]"));
+        assertTrue(json1.contains("\"genArray1\" : [[\"entry\"]]"));
         String jsonmini = FlexiUtils.serializeMinimized(inst1);
         assertEquals(jsonmini, "{\"genArray1\":[[\"entry\"]]}");
         TestClassWithGenericArrayType restored = FlexiUtils.jsonToObject(jsonmini, FlexiJSONParser.IGNORE_LIST_ENSURE_CORRECT_VALUES, new SimpleTypeRef<TestClassWithGenericArrayType>(TestClassWithGenericArrayType.class));

@@ -578,7 +578,12 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
      */
     @Override
     public void doLayout() {
-        final TableColumn resizeColumn = this.getTableHeader().getResizingColumn();
+        final JTableHeader th = this.getTableHeader();
+        if (th == null) {
+            super.doLayout();
+            return;
+        }
+        final TableColumn resizeColumn = th.getResizingColumn();
         if (resizeColumn == null) {
             super.doLayout();
             return;
@@ -599,11 +604,11 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
             this.saveWidthsRatio();
             if (getAutoResizeMode() != orgResizeMode) {
                 this.setAutoResizeMode(orgResizeMode);
-                if (getTableHeader().getResizingColumn() != resizeColumn) {
+                if (th.getResizingColumn() != resizeColumn) {
                     // restore resizing column
                     // JDK>=25 JTable.setAutoResizeMode sets TableHeader.setResizingColumn to last column JTable.AUTO_RESIZE_LAST_COLUMN
                     // we don't want this to happen during doLayout(eg changing column size via mouse)
-                    getTableHeader().setResizingColumn(resizeColumn);
+                    th.setResizingColumn(resizeColumn);
                 }
             }
         }

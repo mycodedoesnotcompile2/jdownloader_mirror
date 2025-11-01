@@ -596,7 +596,11 @@ public interface AWUTranslation extends TranslateInterface {
     String lit_no_upper();
 
     @Default(lngs = { "en", "de" }, values = { "Please wait...", "Bitte warten..." })
-
     String lit_please_wait_dot_dot_dot();
 
+    @Default(lngs = { "en", "de" }, values = { "Report Issue", "Fehler melden" })
+    String errorreport_action_name();
+
+    @Default(lngs = { "en", "de" }, values = { "Add", "Hinzufügen" })
+    String lit_add();
 }

@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,45 +32,53 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.flexijson.mapper.tests;
+package org.appwork.exceptions;
 
-import java.lang.reflect.Type;
-
-import org.appwork.storage.SimpleTypeRef;
-import org.appwork.storage.flexijson.FlexiJSONParser;
-import org.appwork.storage.flexijson.FlexiJSonNode;
-import org.appwork.storage.flexijson.FlexiParserException;
-import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
-import org.appwork.storage.flexijson.mapper.FlexiMapperException;
-import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
-import org.appwork.testframework.AWTest;
-import org.appwork.utils.reflection.CompiledType;
-import org.appwork.utils.reflection.TypeBuilder;
+import org.appwork.resources.IconRef;
+import org.appwork.utils.locale._AWU;
+import org.appwork.utils.swing.dialog.DialogIcon;
 
 /**
  * @author thomas
- * @date 25.06.2021
+ * @date 31.10.2025
  *
  */
-public class FlexiMultiDimensionalArrayTest extends AWTest {
-    public static void main(String[] args) throws FlexiMapperException, FlexiParserException {
-        run();
+public abstract class ErrorReporter {
+
+    private static ErrorReporter INSTANCE;
+
+    /**
+     * @return the iNSTANCE
+     */
+    public static ErrorReporter getInstance() {
+        return INSTANCE;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.appwork.testframework.TestInterface#runTest()
+    /**
+     * @param iNSTANCE
+     *            the iNSTANCE to set
      */
-    @Override
-    public void runTest() throws Exception {
-        final String input;
-        FlexiJSonNode node = new FlexiJSONParser(input = "[[1],[2],[3]]").parse();
-        int[][] result = (int[][]) new FlexiJSonMapper().jsonToObject(node, CompiledType.create(int[][].class));
-        Type type = new TypeBuilder().parse("int[][]");
-        int[][] result2 = (int[][]) new FlexiJSonMapper().jsonToObject(node, new SimpleTypeRef<Object>(type));
-        assertEqualsDeep(result, result2);
-        final String loopResult = new FlexiJSonStringBuilder().toJSONString(new FlexiJSonMapper().objectToJsonNode(result));
-        assertEquals(input, loopResult);
+    public static void setInstance(ErrorReporter iNSTANCE) {
+        INSTANCE = iNSTANCE;
     }
+
+    /**
+     * @param exceptionDialog
+     */
+    public abstract void report(Object context);
+
+    /**
+     * @return
+     */
+    public String getActionName() {
+        return _AWU.T.errorreport_action_name();
+    }
+
+    /**
+     * @return
+     */
+    public IconRef getActionIcon() {
+        return DialogIcon.DIALOG_WARNING;
+    }
+
 }

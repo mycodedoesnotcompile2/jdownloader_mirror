@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -418,12 +418,12 @@ public class ClassCache {
         try {
             if ("com.google.gson.annotations.SerializedName".equals(type.getName())) {
                 // Support for GSON Annotations
-                final Method valueMethod = ((Class) type).getMethod("value", new Class[] {});
+                final Method valueMethod = type.getMethod("value", new Class[] {});
                 final Object value = valueMethod.invoke(a, new Object[] {});
                 add(alternativeKeys, key, value);
             } else if ("com.fasterxml.jackson.annotation.JsonProperty".equals(type.getName())) {
                 // Support for Jackson Annotation
-                final Method valueMethod = ((Class) type).getMethod("value", new Class[] {});
+                final Method valueMethod = type.getMethod("value", new Class[] {});
                 final Object value = valueMethod.invoke(a, new Object[] {});
                 add(alternativeKeys, key, value);
             }

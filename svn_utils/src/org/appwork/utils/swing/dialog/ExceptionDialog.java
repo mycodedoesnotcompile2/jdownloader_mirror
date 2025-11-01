@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -52,7 +52,11 @@ import javax.swing.event.HyperlinkListener;
 
 import net.miginfocom.swing.MigLayout;
 
+import org.appwork.exceptions.ErrorReporter;
 import org.appwork.resources.AWUTheme;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.action.BasicAction;
+import org.appwork.swing.components.ExtButton;
 import org.appwork.uio.ExceptionDialogInterface;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.Exceptions;
@@ -95,6 +99,29 @@ public class ExceptionDialog extends AbstractDialog<Integer> implements Exceptio
         this.message = message;
         this.exception = exception;
         this.expanded = BinaryLogic.containsAll(flag, EXPANDED);
+    }
+
+    /**
+     * @see org.appwork.utils.swing.dialog.AbstractDialog#createBottomPanel()
+     */
+    @Override
+    protected MigPanel createBottomPanel() {
+        final ErrorReporter er = ErrorReporter.getInstance();
+        if (er == null) {
+            return super.createBottomPanel();
+        }
+        final MigPanel ret = new MigPanel("ins 0", "[]10[]20[grow,fill][]", "[]");
+        ret.add(new ExtButton(new BasicAction(er.getActionName()) {
+            {
+                setSmallIcon(er.getActionIcon() == null ? null : er.getActionIcon().icon(20));
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                er.report(ExceptionDialog.this);
+            }
+        }));
+        return ret;
     }
 
     public String getMessage() {
@@ -224,7 +251,7 @@ public class ExceptionDialog extends AbstractDialog<Integer> implements Exceptio
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.uio.ExceptionDialogInterface#getStacktrace()
      */
     @Override

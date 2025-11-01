@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -34,8 +34,10 @@
 package org.appwork.storage.flexijson.stringify;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.LinkedList;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.flexijson.FlexiComment;
 import org.appwork.storage.flexijson.FlexiJSonArray;
 import org.appwork.storage.flexijson.FlexiJSonComments;
@@ -43,6 +45,7 @@ import org.appwork.storage.flexijson.FlexiJSonObject;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.KeyValueElement;
 import org.appwork.storage.flexijson.NodeFilter;
+import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
 
 /**
  * @author thomas
@@ -60,6 +63,11 @@ public class FlexiJSonPrettyPrinterForConfig extends FlexiJSonPrettyStringify {
      */
     public FlexiJSonPrettyPrinterForConfig(NodeFilter filter) {
         this.filter = filter;
+        try {
+            collonString = " : ".getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            LogV3.log(e);
+        }
     }
 
     /*
@@ -132,6 +140,9 @@ public class FlexiJSonPrettyPrinterForConfig extends FlexiJSonPrettyStringify {
             if (filter.skipCommentNode(comment)) {
                 return;
             }
+        }
+        if (comment.getTags().contains(FlexiMapperTags.SEE)) {
+            System.out.println(132);
         }
         super.appendComment(comment, out, layer, path);
     }

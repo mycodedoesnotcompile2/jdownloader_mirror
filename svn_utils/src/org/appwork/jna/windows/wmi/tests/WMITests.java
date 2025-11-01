@@ -34,8 +34,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.jna.windows.wmi.tests;
 
-import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import org.appwork.jna.windows.wmi.JNAWMIUtils;
@@ -66,8 +66,8 @@ public class WMITests extends AWTest {
             System.out.println("Windows Only Test");
             return;
         }
-        ArrayList<Map<String, Object>> a = JNAWMIUtils.query("ROOT\\CIMV2", "SELECT Caption from Win32_UserAccount");
-        ArrayList<Map<String, Object>> b = JNAWMIUtils.wmiQueryViaPowerShell("ROOT\\CIMV2", "SELECT Caption from Win32_UserAccount");
+        List<Map<String, Object>> a = JNAWMIUtils.query("ROOT\\CIMV2", "SELECT Caption from Win32_UserAccount");
+        List<Map<String, Object>> b = JNAWMIUtils.wmiQueryViaPowerShell("ROOT\\CIMV2", "SELECT Caption from Win32_UserAccount");
         HashSet<String> contentsA = new HashSet<String>();
         HashSet<String> contentsB = new HashSet<String>();
         for (Map<String, Object> e : a) {

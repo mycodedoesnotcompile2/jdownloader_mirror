@@ -93,6 +93,6 @@ public class FlexiUtilsTest extends AWTest {
         String result = new FlexiJSonStringBuilder().toJSONString(node);
         assertEquals("{\"a\":true,\"a\":false}", result);
         assertEquals(FlexiUtils.serializeConfigStorable(TestEnum.A), "\"A\"/* A comment */");
-        assertEquals(FlexiUtils.serializeConfigStorable(new PropTest()), "{\r\n  /*\r\n   * Enum Class Anno\r\n   * Property Storable\r\n   * Type: TestEnum-Enum\r\n   * Options: \r\n   *    A: A comment\r\n   *    B: b comment\r\n   */\r\n  \"en\":\"A\"/* A comment */\r\n}");
+        assertEquals(FlexiUtils.serializeConfigStorable(new PropTest()), "{\r\n  /*\r\n   * Enum Class Anno\r\n   * Property Storable\r\n   * Type: TestEnum-Enum\r\n   * Options: \r\n   *    A: A comment\r\n   *    B: b comment\r\n   */\r\n  \"en\" : \"A\"/* A comment */\r\n}");
     }
 }
