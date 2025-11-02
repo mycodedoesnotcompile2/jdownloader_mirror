@@ -34,6 +34,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.loggingv3.simple.sink;
 
+import java.io.IOException;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -45,7 +46,8 @@ public interface ExportExtender {
 
     /**
      * @param zipout
+     * @throws IOException
      */
-    void extendExport(ZipOutputStream zipout);
+    void extendExport(ZipOutputStream zipout) throws IOException;
 
 }

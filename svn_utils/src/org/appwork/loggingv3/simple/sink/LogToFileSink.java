@@ -57,6 +57,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -937,7 +938,7 @@ public class LogToFileSink extends AbstractSink {
             };
             IOException ioException = null;
             try {
-                zipout.setLevel(4);
+                zipout.setLevel(Deflater.BEST_COMPRESSION);
                 extendExport(zipout);
                 if (extender != null) {
                     extender.extendExport(zipout);

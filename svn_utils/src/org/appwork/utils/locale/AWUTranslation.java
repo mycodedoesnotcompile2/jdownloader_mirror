@@ -598,7 +598,7 @@ public interface AWUTranslation extends TranslateInterface {
     @Default(lngs = { "en", "de" }, values = { "Please wait...", "Bitte warten..." })
     String lit_please_wait_dot_dot_dot();
 
-    @Default(lngs = { "en", "de" }, values = { "Report Issue", "Fehler melden" })
+    @Default(lngs = { "en", "de" }, values = { "Report Issue", "Problem melden" })
     String errorreport_action_name();
 
     @Default(lngs = { "en", "de" }, values = { "Add", "Hinzufügen" })
