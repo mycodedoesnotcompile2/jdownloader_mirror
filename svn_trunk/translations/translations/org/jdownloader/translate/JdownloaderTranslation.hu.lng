@@ -321,7 +321,7 @@ image_description=Kép fájlok: jpg, png, gif,...
 jd_controlling_SingleDownloadController_askexists3=A következő probléma történt egy fájl letöltésekor!\nA fájl már létezik a merevlemezen. Mit szeretne, mit tegyek?
 jd_controlling_SingleDownloadController_askexists_title=A fájl létezik
 jd_controlling_reconnect_Reconnector_progress_failed2=Az újracsatlakozás nagyon sokszor sikertelen! Az automatikus újracsatlakozás letiltva! Kérjük, ellenőrizze a beállításokat!
-jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Az újracsatlakoztatás nincs kiválasztva</u></b><br/><p>Az újracsatlakoztatás egy korszerű megközelítés, mellyel átugorható a hosszú várakozás, melyre néhány tárhelyszolgáltató rákényszeríti a szabad letöltést választó felhasználókat. <br>Ha ez nem segít, használjon prémium számlát. </p><p>Tudjon meg többet az újracsatlakoztatásról <a href='http://support.jdownloader.org/index.php?/Knowledgebase/Article/View/1/0/why-should-i-set-up-my-reconnect'>here</a></p>
+jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Az újracsatlakoztatás nincs kiválasztva</u></b><br/><p>Az újracsatlakoztatás egy korszerű megközelítés, mellyel átugorható a hosszú várakozás, melyre néhány tárhelyszolgáltató rákényszeríti a szabad letöltést választó felhasználókat. <br>Ha ez nem segít, használjon prémium számlát. </p><p>Tudjon meg többet az újracsatlakoztatásról <a href='https://support.jdownloader.org/knowledgebase/article/router-reconnect'>here</a></p>
 jd_controlling_reconnect_plugins_DummyRouterPlugin_getName=Nincs újracsatlakoztatás
 jd_plugins_PluginUtils_askPassword=Kérjük, adja meg a jelszót a következőhöz\n%s1
 lit_add_audio=Hang hozzáadása

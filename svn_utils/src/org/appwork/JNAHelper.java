@@ -65,9 +65,21 @@ public class JNAHelper {
     private static boolean     unsupportedClassVersionError          = false;
 
     /**
+     * System property to override JNA availability for testing purposes
+     * Set to "false" to force JNA unavailable even if JNA is actually available
+     */
+    private static final String SYSTEM_PROPERTY_JNA_AVAILABLE_OVERRIDE = "JNAHelper.isJNAAvailable.override";
+
+    /**
      * @return
      */
     public static boolean isJNAAvailable() {
+        // Check for test override first
+        final String override = System.getProperty(SYSTEM_PROPERTY_JNA_AVAILABLE_OVERRIDE);
+        if (override != null) {
+            return Boolean.parseBoolean(override);
+        }
+        
         try {
             if (unsupportedClassVersionError) {
                 return false;

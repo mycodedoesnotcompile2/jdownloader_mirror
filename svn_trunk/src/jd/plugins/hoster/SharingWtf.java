@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51779 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51785 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -283,15 +283,20 @@ public class SharingWtf extends YetiShareCore {
                 }
                 logger.log(pe);
                 /*
-                 * Ugly implementation: Let previous code do its job until it fails, then check if we landet on the captcha page to continue
+                 * Ugly implementation: Let previous code do its job until it fails, then check if we landed on the captcha page to continue
                  * lol
                  */
-                final String filename = br.getRegex("data-filename=\"([^\"]+)").getMatch(0);
+                /* 2025-11-03: filename is allowed to be an empty string. */
+                String filename = br.getRegex("data-filename=\"([^\"]+)").getMatch(0);
                 final String urlhash = br.getRegex("data-urlhash=\"([^\"]+)").getMatch(0);
                 final String sitekey = br.getRegex("data-sitekey=\"([^\"]+)").getMatch(0);
-                if (urlhash == null || sitekey == null || filename == null) {
-                    logger.warning("Special handling failed");
+                if (urlhash == null || sitekey == null) {
+                    logger.warning("Special handling failed: urlhash=" + urlhash + " | sitekey=" + sitekey);
                     throw pe;
+                }
+                if (filename == null) {
+                    /* Not important, can be empty */
+                    filename = "";
                 }
                 final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
                 final Form captcha = new Form();

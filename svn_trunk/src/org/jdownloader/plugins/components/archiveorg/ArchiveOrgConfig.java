@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.appwork.storage.StorableValidatorIgnoresMissingSetter;
-import org.appwork.storage.Storage;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultFactory;
@@ -70,30 +69,6 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
     class DefaultFileCrawlerTypesToCrawl extends AbstractDefaultFactory<Set<ArchiveOrgType>> {
         @Override
         public Set<ArchiveOrgType> getDefaultValue(KeyHandler<Set<ArchiveOrgType>> keyHandler) {
-            final Storage storage;
-            if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
-                /* This migrated a bunch of old boolean settings to one new ENUM setting. */
-                if (storage.hasProperty("filecrawlercrawlonlyoriginalversions") || storage.hasProperty("filecrawlercrawlthumbnails") || storage.hasProperty("filecrawlercrawlmetadatafiles")) {
-                    final Set<ArchiveOrgType> ret = new HashSet<ArchiveOrgType>();
-                    if (Boolean.TRUE.equals(storage.remove("filecrawlercrawlonlyoriginalversions"))) {
-                        ret.add(ArchiveOrgType.ORIGINAL);
-                    } else {
-                        ret.add(ArchiveOrgType.ORIGINAL);
-                        ret.add(ArchiveOrgType.DERIVATIVE);
-                        if (Boolean.TRUE.equals(storage.remove("filecrawlercrawlthumbnails"))) {
-                            ret.add(ArchiveOrgType.THUMBNAIL);
-                            ret.add(ArchiveOrgType.DERIVATIVE_COVER);
-                        }
-                        if (Boolean.TRUE.equals(storage.remove("filecrawlercrawlmetadatafiles"))) {
-                            ret.add(ArchiveOrgType.METADATA);
-                            ret.add(ArchiveOrgType.METADATA_TORRENT);
-                        }
-                    }
-                    if (ret.size() > 0) {
-                        return ret;
-                    }
-                }
-            }
             return new HashSet<ArchiveOrgType>(Arrays.asList(ArchiveOrgType.values()));// ALL
         }
     }
@@ -186,7 +161,7 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
         ADD_ALL {
             @Override
             public String getLabel() {
-                return "Add all other items";
+                return "Add all (selected) items";
             }
         },
         ADD_NOTHING_AND_DISPLAY_ADDED_URL_AS_OFFLINE {
@@ -298,24 +273,8 @@ public interface ArchiveOrgConfig extends PluginConfigInterface {
 
     void setBookCrawlMode(final BookCrawlMode bookCrawlerMode);
 
-    class DefaultNonDownloadableBookPagesMode extends AbstractDefaultFactory<NonDownloadableBookPagesMode> {
-        @Override
-        public NonDownloadableBookPagesMode getDefaultValue(KeyHandler<NonDownloadableBookPagesMode> keyHandler) {
-            final Storage storage;
-            if (keyHandler != null && (storage = keyHandler.getStorageHandler().getPrimitiveStorage(keyHandler)) != null) {
-                if (storage.hasProperty("marknonviewablebookpagesasofflineifnoaccountisavailable")) {
-                    if (Boolean.FALSE.equals(storage.remove("marknonviewablebookpagesasofflineifnoaccountisavailable"))) {
-                        return NonDownloadableBookPagesMode.SET_AVAILABLE_STATUS_ONLINE;
-                    }
-                }
-            }
-            return NonDownloadableBookPagesMode.SET_AVAILABLE_STATUS_OFFLINE;
-        }
-    }
-
     @AboutConfig
-    @DefaultFactory(DefaultNonDownloadableBookPagesMode.class)
-    // @DefaultEnumValue("SET_AVAILABLE_STATUS_OFFLINE")
+    @DefaultEnumValue("SET_AVAILABLE_STATUS_OFFLINE")
     @Order(41)
     NonDownloadableBookPagesMode getNonDownloadableBookPagesMode();
 

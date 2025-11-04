@@ -528,8 +528,10 @@ public class LogToFileSink extends AbstractSink {
                                 if (Thread.interrupted()) {
                                     throw new InterruptedException();
                                 }
+                                String folderPrefix = "";
                                 if (addSubfolder) {
-                                    zipout.putNextEntry(new ZipEntry(logFolder.getName() + "/" + entry.getName()));
+                                    folderPrefix = getFolderForLogs(logFolder.getName());
+                                    zipout.putNextEntry(new ZipEntry(folderPrefix + logFolder.getName() + "/" + entry.getName()));
                                 } else {
                                     zipout.putNextEntry(new ZipEntry(entry.getName()));
                                 }
@@ -547,12 +549,17 @@ public class LogToFileSink extends AbstractSink {
                             move(f, new File(f.getAbsolutePath() + ".deleteMe"));
                         }
                     } else if (f.getName().endsWith(".txt")) {
+                        String folderPrefix = "";
+                        String finalFileName = createFinalFileName(f);
                         if (addSubfolder) {
-                            zipout.putNextEntry(new ZipEntry(logFolder.getName() + "/" + createFinalFileName(f)));
+                            folderPrefix = getFolderForLogs(logFolder.getName());
+                            zipout.putNextEntry(new ZipEntry(folderPrefix + logFolder.getName() + "/" + finalFileName));
                         } else {
-                            zipout.putNextEntry(new ZipEntry(createFinalFileName(f)));
+                            zipout.putNextEntry(new ZipEntry(folderPrefix + finalFileName));
                         }
                         try {
+                            // Hook for log file processing
+                            onLogFile(f, zipout);
                             IO.readStreamToOutputStream(-1, new BufferedInputStream(new FileInputStream(f)), zipout, true);
                         } finally {
                             zipout.closeEntry();
@@ -958,7 +965,9 @@ public class LogToFileSink extends AbstractSink {
                                 if (Thread.interrupted()) {
                                     throw new InterruptedException();
                                 }
-                                zipout.putNextEntry(new ZipEntry(Files.getFileNameWithoutExtension(f.path.getName()) + "/" + entry.getName()));
+                                String logFolderName = Files.getFileNameWithoutExtension(f.path.getName());
+                                String folderPrefix = getFolderForLogs(logFolderName);
+                                zipout.putNextEntry(new ZipEntry(folderPrefix + logFolderName + "/" + entry.getName()));
                                 IO.readStreamToOutputStream(-1, zis, zipout, false);
                                 zipout.closeEntry();
                             }
@@ -990,6 +999,8 @@ public class LogToFileSink extends AbstractSink {
                         }
                     }
                 }
+
+                extendExportPost(zipout);
             } catch (IOException e) {
                 ioException = e;
             } finally {
@@ -1009,8 +1020,37 @@ public class LogToFileSink extends AbstractSink {
 
     /**
      * @param zipout
+     */
+    protected void extendExportPost(ZipOutputStream zipout) {
+    }
+
+    /**
+     * @param zipout
      * @throws IOException
      */
     protected void extendExport(ZipOutputStream zipout) throws IOException {
+    }
+
+    /**
+     * Returns the folder name for log folders (e.g. "Logs_2024-01-01")
+     *
+     * @param logFolderName
+     *            the original log folder name (e.g. "Logs_2024-01-01")
+     * @return folder name (with trailing slash) or empty string for no subfolder
+     */
+    protected String getFolderForLogs(String logFolderName) {
+        return "";
+    }
+
+    /**
+     * Hook method called for each log file during export. Override this method to analyze log files and extract relevant information.
+     *
+     * @param logFile
+     *            the log file being processed
+     * @param zipout
+     *            the ZIP output stream (may be null if not exporting)
+     */
+    protected void onLogFile(File logFile, ZipOutputStream zipout) {
+        // Default implementation does nothing
     }
 }

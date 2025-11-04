@@ -320,7 +320,7 @@ image_description=Bilddateien: jpg, png, gif,...
 jd_controlling_SingleDownloadController_askexists3=Beim Herunterladen einer Datei ist ein Problem aufgetreten!\nDie Datei existiert bereits auf Deiner Festplatte. Was möchtest Du tun?
 jd_controlling_SingleDownloadController_askexists_title=Datei ist vorhanden
 jd_controlling_reconnect_Reconnector_progress_failed2=Reconnect ist zu oft fehlgeschlagen! Auto-Reconnect ist nun deaktiviert. Bitte überprüfe deine Reconnect-Einstellungen!
-jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Kein Reconnect ausgewählt</u></b><br/><p>Reconnection ist eine fortgeschrittene Methode, lange Wartezeiten, die manche Hoster an Free-User verhängen, zu überspringen. <br>Beim Benutzen eines Premiumaccounts hilft diese Methode nicht.</p><p>Lies mehr über Reconnect <a href='http://support.jdownloader.org/index.php?/Knowledgebase/Article/View/1/0/why-should-i-set-up-my-reconnect'>hier</a></p>
+jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Kein Reconnect ausgewählt</u></b><br/><p>Reconnection ist eine fortgeschrittene Methode, lange Wartezeiten, die manche Hoster an Free-User verhängen, zu überspringen. <br>Beim Benutzen eines Premiumaccounts hilft diese Methode nicht.</p><p>Lies mehr über Reconnect <a href='https://support.jdownloader.org/knowledgebase/article/router-reconnect'>hier</a></p>
 jd_controlling_reconnect_plugins_DummyRouterPlugin_getName=Kein Reconnect
 jd_plugins_PluginUtils_askPassword=Bitte das Passwort für %s1 eingeben
 lit_add_audio=Audio hinzufügen

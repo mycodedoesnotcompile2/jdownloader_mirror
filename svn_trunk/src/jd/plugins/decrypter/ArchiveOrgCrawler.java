@@ -69,8 +69,9 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51392 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 51784 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -792,20 +793,23 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             playlistCrawlMode = PlaylistCrawlMode.AUTO;
         }
         final boolean isDownloadPage = sourceurl.matches("(?i)https?://[^/]+/download/.+");
-        final String desiredSubpath;
-        if (isDownloadPage) {
-            desiredSubpath = new Regex(sourceurlForThisHandling, ".*/(" + Pattern.quote(identifier) + "/.+)").getMatch(0);
-        } else {
-            /* No download page/link -> No desired subpath */
-            desiredSubpath = null;
-        }
+        String desiredSubpath = null;
         boolean allowCrawlArchiveContents = false;
         String desiredSubpathDecoded = null;
         String desiredSubpathDecoded2 = null;
-        if (desiredSubpath != null) {
+        find_desired_subpath: {
             /*
              * In this case we only want to get all files in a specific subfolder or even only a single file.
              */
+            if (!isDownloadPage) {
+                /* Sourceurl is not a "/download/..." URL -> Do not look for a subpath */
+                break find_desired_subpath;
+            }
+            desiredSubpath = new Regex(sourceurlForThisHandling, ".*/(" + Pattern.quote(identifier) + "/.+)").getMatch(0);
+            if (desiredSubpath == null) {
+                /* No subpath available */
+                break find_desired_subpath;
+            }
             desiredSubpathDecoded = Encoding.htmlDecode(desiredSubpath);
             /* Remove slash from end to allow for proper filename matching. */
             if (desiredSubpathDecoded.endsWith("/")) {
@@ -1075,13 +1079,21 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 /* User desired item(s) are available -> Return only them */
                 return desiredSubpathItems;
             }
-            logger.info("Failed to find single file/path: " + desiredSubpathDecoded);
             final SingleFilePathNotFoundMode mode = cfg.getSingleFilePathNotFoundMode();
             if (mode == SingleFilePathNotFoundMode.ADD_NOTHING_AND_DISPLAY_ADDED_URL_AS_OFFLINE) {
+                logger.info("Failed to find single file/path: " + desiredSubpathDecoded);
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                logger.info("Failed to find single file/path -> Adding all results instead");
             }
+            logger.info("Failed to find single file/path -> Adding all (selected) results instead");
+            /* Add single offline item to list of results */
+            // final DownloadLink offline = this.createDownloadlink(sourceurl);
+            /*
+             * Add as DirectHTTP link so that URL structure does not matter and link will definitely end up as entry in linkgrabber visible
+             * to the user.
+             */
+            final DownloadLink offline = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(sourceurl));
+            offline.setAvailable(false);
+            selectedItems.add(offline);
         }
         /* Log skipped results */
         if (skippedItemsFilepaths.size() > 0) {

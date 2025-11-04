@@ -142,7 +142,7 @@ image_description=Irudi fitxategiak: jpg,png,gif,...
 jd_controlling_SingleDownloadController_askexists3=Arazoren bat dago fitxategia deskargatzean!\nFitxategia dagoeneko existitzen da disko gogorrean. Zer egin nahi duzu?
 jd_controlling_SingleDownloadController_askexists_title=Fitxategia existitzen da
 jd_controlling_reconnect_Reconnector_progress_failed2=Birkonexioak gehiegitan huts egin du! Birkonexio automatikoa desgaituta! Mesedez egiaztatu zure birkonexio ezarpenak!
-jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Birkonexioa aukeratu gabe</u></b><br/><p> Birkonexioa  ostalari askok dohaineko moduan derrigortzen duten itxarote-denbora handia saihesteko modu aurreratua da. <br> Ez da lagungarria premium kontuak erabiltzean. </p><p>Irakurri gehiago birkonexioari buruz <a href='http://support.jdownloader.org/index.php?/Knowledgebase/Article/View/1/0/why-sould-i-set-up-my-reconnect'>hemen</a></p>
+jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Birkonexioa aukeratu gabe</u></b><br/><p> Birkonexioa  ostalari askok dohaineko moduan derrigortzen duten itxarote-denbora handia saihesteko modu aurreratua da. <br> Ez da lagungarria premium kontuak erabiltzean. </p><p>Irakurri gehiago birkonexioari buruz <a href='https://support.jdownloader.org/knowledgebase/article/router-reconnect'>hemen</a></p>
 jd_controlling_reconnect_plugins_DummyRouterPlugin_getName=Ez birkonektatu
 jd_plugins_PluginUtils_askPassword=Mesedez sartu pasahitza %s1 -entzako
 literally_offline=Linaz kanpo

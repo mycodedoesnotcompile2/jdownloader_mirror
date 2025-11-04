@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 51591 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51782 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -881,7 +881,7 @@ public class VKontakteRu extends PluginForDecrypt {
             contenturl = this.fixAddedURL(param.getCryptedUrl());
         }
         this.getPage(contenturl);
-        if (br.containsHTML("(id=\"msg_back_button\">Wr\\&#243;\\&#263;</button|B\\&#322;\\&#261;d dost\\&#281;pu)") || br.containsHTML("(?i)В альбоме нет фотографий|<title>\\s*DELETED\\s*</title>")) {
+        if (br.containsHTML("(id=\"msg_back_button\">Wr\\&#243;\\&#263;</button|B\\&#322;\\&#261;d dost\\&#281;pu)") || br.containsHTML("В альбоме нет фотографий|<title>\\s*DELETED\\s*</title>")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String numberOfItemsStr = br.getRegex("\\| (\\d+) zdj&#281").getMatch(0);
@@ -1683,7 +1683,7 @@ public class VKontakteRu extends PluginForDecrypt {
                 }
                 sleep(getPaginationSleepMillis(), param);
                 this.getPage(br, br.createPostRequest("/al_wall.php", String.format("act=get_wall&al=1&fixed=%s&offset=%s&onlyCache=false&owner_id=%s&type=own&wall_start_from=%s", postvalue_fixed, currentOffset, ownerID, counter_wall_start_from)));
-                this.br.getRequest().setHtmlCode(JSonUtils.unescape(br.toString()));
+                br.getRequest().setHtmlCode(JSonUtils.unescape(br.getRequest().getHtmlCode()));
             }
             final int numberof_items_old = ret.size();
             if (this.vkwall_comments_grab_comments) {
@@ -1695,7 +1695,7 @@ public class VKontakteRu extends PluginForDecrypt {
                 }
             } else {
                 logger.info("Crawling items inside single post as part of a wall");
-                ret.addAll(websiteCrawlContent(br.getURL(), br.toString(), fp, this.vkwall_grabaudio, this.vkwall_grabvideo, this.vkwall_grabphotos, this.vkwall_grabdocs, this.vkwall_graburlsinsideposts));
+                ret.addAll(websiteCrawlContent(br.getURL(), br.getRequest().getHtmlCode(), fp, this.vkwall_grabaudio, this.vkwall_grabvideo, this.vkwall_grabphotos, this.vkwall_grabdocs, this.vkwall_graburlsinsideposts));
             }
             final int numberof_items_current = ret.size();
             final int counter_items_found_in_current_offset = numberof_items_current - numberof_items_old;
@@ -2384,90 +2384,84 @@ public class VKontakteRu extends PluginForDecrypt {
         if (grabURLsInsideText && isContentFromWall) {
             ret.addAll(this.crawlUrlsInsidePosts(wall_post_text));
         }
-        ret.addAll(this.crawlDevPlayground(br));
+        ret.addAll(this.websiteCrawlContentV2(br));
         return ret;
     }
 
-    /** Function to test new crawl stuff */
-    private ArrayList<DownloadLink> crawlDevPlayground(final Browser br) throws IOException {
+    private ArrayList<DownloadLink> websiteCrawlContentV2(final Browser br) throws IOException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        try {
-            final String[] dataexecs = br.getRegex("data-exec=\"([^\"]+)").getColumn(0);
-            if (dataexecs == null || dataexecs.length == 0) {
-                logger.info("Failed to find any json source");
-                return ret;
+        final String[] dataexecs = br.getRegex("data-exec=\"([^\"]+)").getColumn(0);
+        if (dataexecs == null || dataexecs.length == 0) {
+            logger.info("Failed to find any json source");
+            return ret;
+        }
+        String groupID = null;
+        for (String dataexec : dataexecs) {
+            dataexec = Encoding.htmlOnlyDecode(dataexec);
+            final Map<String, Object> entries = restoreFromString(dataexec, TypeRef.MAP);
+            final Map<String, Object> videoShowcaseCommunityCatalogInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityCatalog/init");
+            if (videoShowcaseCommunityCatalogInit != null) {
+                groupID = videoShowcaseCommunityCatalogInit.get("groupId").toString();
             }
-            String groupID = null;
-            for (String dataexec : dataexecs) {
-                dataexec = Encoding.htmlOnlyDecode(dataexec);
-                final Map<String, Object> entries = restoreFromString(dataexec, TypeRef.MAP);
-                final Map<String, Object> videoShowcaseCommunityCatalogInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityCatalog/init");
-                if (videoShowcaseCommunityCatalogInit != null) {
-                    groupID = videoShowcaseCommunityCatalogInit.get("groupId").toString();
-                }
-                final Map<String, Object> videoShowcaseCommunityHeaderInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityHeader/init");
-                if (videoShowcaseCommunityHeaderInit != null) {
-                    // TODO
-                }
-                final Map<String, Object> postContentContainerInit = (Map<String, Object>) entries.get("PostContentContainer/init");
-                if (postContentContainerInit != null) {
-                    // TODO
-                    final Map<String, Object> item = (Map<String, Object>) postContentContainerInit.get("item");
-                    final List<Map<String, Object>> attachments = (List<Map<String, Object>>) item.get("attachments");
-                    for (final Map<String, Object> attachment : attachments) {
-                        /* Possible types: photo, audio, TODO find all possible types */
-                        final String type = attachment.get("type").toString();
-                        if (type.equalsIgnoreCase("photo")) {
-                            final Map<String, Object> photo = (Map<String, Object>) attachment.get("photo");
-                            final Map<String, Object> orig_photo = (Map<String, Object>) photo.get("orig_photo");
-                            String directurl = orig_photo.get("url").toString();
-                            directurl = Encoding.htmlOnlyDecode(directurl);
-                            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(directurl));
-                            final String owner_id = photo.get("owner_id").toString();
-                            final String content_id = photo.get("id").toString();
-                            final DownloadLink link = this.getPhotoDownloadLink(owner_id, content_id);
-                            link.setName(filenameFromURL);
-                            link.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_directlink, directurl);
-                            link.setAvailable(true);
-                            ret.add(link);
-                        } else if (type.equalsIgnoreCase("audio")) {
-                            final Map<String, Object> audio = (Map<String, Object>) attachment.get("audio");
-                            final String artist = Encoding.htmlDecode(audio.get("artist").toString()).trim();
-                            final String title = Encoding.htmlDecode(audio.get("title").toString()).trim();
-                            final String owner_id = audio.get("owner_id").toString();
-                            final String content_id = audio.get("id").toString();
-                            final String url = (String) audio.get("url");
-                            final DownloadLink link = this.getAudioDownloadLink(owner_id, content_id);
-                            link.setName(artist + " - " + title + ".mp3");
-                            if (!StringUtils.isEmpty(url)) {
-                                link.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_directlink, url);
-                            }
-                            final Number lengthSeconds = (Number) audio.get("duration");
-                            if (lengthSeconds != null) {
-                                /* Set estimated filesize based on a bitrate of 320KB/s */
-                                final long trackEstimatedFilesize = (lengthSeconds.intValue() * 320 * 1024) / 8;
-                                link.setDownloadSize(trackEstimatedFilesize);
-                            }
-                            ret.add(link);
-                        } else {
-                            logger.info("Skipping unsupported attachment type: " + type);
+            final Map<String, Object> videoShowcaseCommunityHeaderInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityHeader/init");
+            if (videoShowcaseCommunityHeaderInit != null) {
+                // TODO
+            }
+            final Map<String, Object> postContentContainerInit = (Map<String, Object>) entries.get("PostContentContainer/init");
+            if (postContentContainerInit != null) {
+                final Map<String, Object> item = (Map<String, Object>) postContentContainerInit.get("item");
+                final List<Map<String, Object>> attachments = (List<Map<String, Object>>) item.get("attachments");
+                for (final Map<String, Object> attachment : attachments) {
+                    final String type = attachment.get("type").toString();
+                    if (type.equalsIgnoreCase("audio")) {
+                        final Map<String, Object> audio = (Map<String, Object>) attachment.get("audio");
+                        final String artist = Encoding.htmlDecode(audio.get("artist").toString()).trim();
+                        final String title = Encoding.htmlDecode(audio.get("title").toString()).trim();
+                        final String owner_id = audio.get("owner_id").toString();
+                        final String content_id = audio.get("id").toString();
+                        final String url = (String) audio.get("url");
+                        final DownloadLink link = this.getAudioDownloadLink(owner_id, content_id);
+                        link.setName(artist + " - " + title + ".mp3");
+                        if (!StringUtils.isEmpty(url)) {
+                            link.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_directlink, url);
                         }
+                        final Number lengthSeconds = (Number) audio.get("duration");
+                        if (lengthSeconds != null) {
+                            /* Set estimated filesize based on a bitrate of 320KB/s */
+                            final long trackEstimatedFilesize = (lengthSeconds.intValue() * 320 * 1024) / 8;
+                            link.setDownloadSize(trackEstimatedFilesize);
+                        }
+                        ret.add(link);
+                    } else if (type.equalsIgnoreCase("photo")) {
+                        final Map<String, Object> photo = (Map<String, Object>) attachment.get("photo");
+                        final Map<String, Object> orig_photo = (Map<String, Object>) photo.get("orig_photo");
+                        String directurl = orig_photo.get("url").toString();
+                        directurl = Encoding.htmlOnlyDecode(directurl);
+                        final String owner_id = photo.get("owner_id").toString();
+                        final String content_id = photo.get("id").toString();
+                        final DownloadLink link = getPhotoDownloadLink(owner_id, content_id);
+                        final String tempFilename = VKontakteRuHoster.photoGetFinalFilename(owner_id + "_" + content_id, null, directurl);
+                        link.setName(tempFilename);
+                        link.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_directlink, directurl);
+                        link.setAvailable(true);
+                        ret.add(link);
+                    } else if (type.equalsIgnoreCase("video")) {
+                        final Map<String, Object> video = (Map<String, Object>) attachment.get("video");
+                        final String owner_id = video.get("owner_id").toString();
+                        final String content_id = video.get("id").toString();
+                        final DownloadLink link = this.createDownloadlink(generateContentURLVideo(owner_id, content_id));
+                        link.setProperty(VKontakteRuHoster.PROPERTY_VIDEO_LIST_ID, video.get("access_key"));
+                        ret.add(link);
+                    } else {
+                        logger.info("Skipping unsupported attachment type: " + type);
                     }
                 }
             }
-            if (groupID == null) {
-                logger.info("Found groupID:" + groupID);
-            } else {
-                logger.info("Failed to find groupID");
-            }
-        } catch (final IOException e) {
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                throw e;
-            } else {
-                /* Stable -> Do not throw exception inside experimental handling */
-                logger.log(e);
-                logger.warning("Experimental handling failed");
-            }
+        }
+        if (groupID == null) {
+            logger.info("Found groupID:" + groupID);
+        } else {
+            logger.info("Failed to find groupID");
         }
         return ret;
     }
@@ -2696,7 +2690,7 @@ public class VKontakteRu extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlDocs(final CryptedLink param) throws Exception {
         final ArrayList<DownloadLink> ret = this.getReturnArray();
         this.getPage(param.getCryptedUrl());
-        if (br.containsHTML("(?i)Unfortunately, you are not a member of this group and cannot view its documents") || br.getRedirectLocation() != null) {
+        if (br.containsHTML("Unfortunately, you are not a member of this group and cannot view its documents") || br.getRedirectLocation() != null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String owner_ID = new Regex(param.getCryptedUrl(), "((?:\\-)?\\d+)$").getMatch(0);
@@ -3055,7 +3049,7 @@ public class VKontakteRu extends PluginForDecrypt {
     }
 
     public static boolean containsErrorSamePageReloadTooFast(final Browser br) {
-        if (br.containsHTML("(?i)You tried to load the same page more than once in one second|Вы попытались загрузить более одной однотипной страницы в секунду|Pr\\&#243;bujesz za\\&#322;adowa\\&#263; wi\\&#281;cej ni\\&#380; jedn\\&#261; stron\\&#281; w ci\\&#261;gu sekundy|Sie haben versucht die Seite mehrfach innerhalb einer Sekunde zu laden")) {
+        if (br.containsHTML("You tried to load the same page more than once in one second|Вы попытались загрузить более одной однотипной страницы в секунду|Pr\\&#243;bujesz za\\&#322;adowa\\&#263; wi\\&#281;cej ni\\&#380; jedn\\&#261; stron\\&#281; w ci\\&#261;gu sekundy|Sie haben versucht die Seite mehrfach innerhalb einer Sekunde zu laden")) {
             return true;
         } else {
             return false;
@@ -3245,11 +3239,11 @@ public class VKontakteRu extends PluginForDecrypt {
         /* General errorhandling start */
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Unknown error")) {
+        } else if (br.containsHTML(">\\s*Unknown error")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Only logged in users can see this profile\\.<")) {
+        } else if (br.containsHTML(">\\s*Only logged in users can see this profile\\.<")) {
             throw new AccountRequiredException("Only logged in users can see this profile");
-        } else if (br.containsHTML("(?i)>\\s*Access denied|>\\s*You do not have permission to do this")) {
+        } else if (br.containsHTML(">\\s*Access denied|>\\s*You do not have permission to do this")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("vk.com/blank.php")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -3257,7 +3251,7 @@ public class VKontakteRu extends PluginForDecrypt {
             /* 2022-06-01 */
             // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "This content is blocked in your country");
             throw new DecrypterRetryException(RetryReason.GEO, "GEO_BLOCKED", "This content is blocked in your country");
-        } else if (br.containsHTML("(?i)You are not allowed to view this community")) {
+        } else if (br.containsHTML("You are not allowed to view this community")) {
             /* 2022-06-02 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("class=\"profile_deleted_text\"")) {
@@ -3305,9 +3299,7 @@ public class VKontakteRu extends PluginForDecrypt {
         }
         final String dllink_temp = VKontakteRuHoster.getHighestQualityPicFromSavedJson(picture_preview_json);
         final String tempFilename = VKontakteRuHoster.photoGetFinalFilename(ownerIDAndContentID, null, dllink_temp);
-        if (tempFilename != null) {
-            dl.setName(tempFilename);
-        }
+        dl.setName(tempFilename);
         dl.setContentUrl(generateContentURLPhoto(ownerID, contentID));
         return dl;
     }
@@ -3316,8 +3308,8 @@ public class VKontakteRu extends PluginForDecrypt {
         return getPhotoDownloadLink(ownerID, contentID, null);
     }
 
-    public static String generateContentURLVideo(final String oid, final String id) {
-        return "https://vk.com/video" + oid + "_" + id;
+    public static String generateContentURLVideo(final String ownerID, final String contentID) {
+        return "https://vk.com/video" + ownerID + "_" + contentID;
     }
 
     private static String generateContentURLPhoto(final String ownerID, final String contentID) {

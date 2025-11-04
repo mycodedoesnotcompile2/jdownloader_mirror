@@ -312,7 +312,7 @@ image_description=画像ファイル: jpg, png, gif,...
 jd_controlling_SingleDownloadController_askexists3=ファイルのダウンロードに問題があります!\nファイルがハードディスク上に既に存在します。それでも作業を続けますか?
 jd_controlling_SingleDownloadController_askexists_title=既にファイルが存在します
 jd_controlling_reconnect_Reconnector_progress_failed2=再接続の失敗が余りに多すぎます! 自動再接続は無効になりました! 再接続設定を確認して下さい!
-jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>再接続しないを選択しました</u></b><br/><p>再接続は大多数のホストが無料ユーザーに対して課す長い待ち時間を省略する為の先進的なアプローチです。<br>ですがこの機能はプレミアムアカウントを使用しているならば不必要です。</p><p>再接続についての詳細は <a href='http://support.jdownloader.org/index.php?/Knowledgebase/Article/View/1/0/why-should-i-set-up-my-reconnect'>ここ</a> を参照して下さい。</p>
+jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>再接続しないを選択しました</u></b><br/><p>再接続は大多数のホストが無料ユーザーに対して課す長い待ち時間を省略する為の先進的なアプローチです。<br>ですがこの機能はプレミアムアカウントを使用しているならば不必要です。</p><p>再接続についての詳細は <a href='https://support.jdownloader.org/knowledgebase/article/router-reconnect'>ここ</a> を参照して下さい。</p>
 jd_controlling_reconnect_plugins_DummyRouterPlugin_getName=再接続しない
 jd_plugins_PluginUtils_askPassword=次のパスワードを入力して下さい:\n%s1
 lit_add_only_the_best_video_quality=最高の動画品質だけを追加

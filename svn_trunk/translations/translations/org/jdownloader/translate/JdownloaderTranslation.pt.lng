@@ -246,7 +246,7 @@ image_description=Arquivo de imagem: jpg, png, gif,...
 jd_controlling_SingleDownloadController_askexists3=Ocorreu um problema ao tentar baixar o arquivo!\nAparententemente ele já existe no seu computador. O que você deseja fazer?
 jd_controlling_SingleDownloadController_askexists_title=O arquivo existe
 jd_controlling_reconnect_Reconnector_progress_failed2=Reconexão falhou muito frequentemente! Conexão automática está desactiva! Verifique as opções de Conexão!
-jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Sem Conexão escolhida</u></b><br/><p>Reconectar é um processo avançado que permite saltar as longas esperas que alguns servidores implementara para utilizadores sem contas. <br>Não ajuda se estiverem a utilizar contas PREMIUM.</p><p>Leia mais sobre o assunto <a href='http://support.jdownloader.org/index.php?/Knowledgebase/Article/View/1/0/why-should-i-set-up-my-reconnect'>aqui</a></p>
+jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2=<b><u>Sem Conexão escolhida</u></b><br/><p>Reconectar é um processo avançado que permite saltar as longas esperas que alguns servidores implementara para utilizadores sem contas. <br>Não ajuda se estiverem a utilizar contas PREMIUM.</p><p>Leia mais sobre o assunto <a href='https://support.jdownloader.org/knowledgebase/article/router-reconnect'>aqui</a></p>
 jd_controlling_reconnect_plugins_DummyRouterPlugin_getName=Sem Reconectar
 jd_plugins_PluginUtils_askPassword=Introduzir palavra-passe para %s1
 lit_add_only_the_best_video_quality=Adicionar apenas a melhor qualidade de vídeo

@@ -63,7 +63,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FlickrComCrawler;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 50191 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^<>\"/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 51787 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^<>\"/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
 public class FlickrCom extends PluginForHost {
     public FlickrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -798,8 +798,13 @@ public class FlickrCom extends PluginForHost {
         if (StringUtils.containsIgnoreCase(con.getURL().toExternalForm(), "/photo_unavailable.gif")) {
             con.disconnect();
             errorBrokenFile(link);
+            /* This code should never be reached */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (!this.looksLikeDownloadableContent(con)) {
+            if (con.getResponseCode() == 429) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Error 429 too many requests", 5 * 60 * 1000l);
+            }
             br.followConnection(true);
             if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Request forbidden by administrative rules")) {
                 final int minutesWait = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED, default_SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED);
