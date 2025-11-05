@@ -59,7 +59,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
  *            With reCaptchaV2 (like most): sh2rt.com <br />
  *
  */
-@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51790 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     public enum CaptchaType {
         hCaptcha,
@@ -328,7 +328,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
             }
             String waitSecondsStr = br.getRegex("\"counter_value\"\\s*:\\s*\"?(\\d+)").getMatch(0);
             if (waitSecondsStr == null) {
-                waitSecondsStr = br.getRegex("(?i)>\\s*Please Wait\\s*(\\d+)s\\s*<").getMatch(0);
+                waitSecondsStr = br.getRegex(">\\s*Please Wait\\s*(\\d+)s\\s*<").getMatch(0);
                 if (waitSecondsStr == null) {
                     /* 2018-12-12: E.g. rawabbet.com[RIP 2019-02-21] */
                     waitSecondsStr = br.getRegex("class=\"timer\">\\s*?(\\d+)\\s*?<").getMatch(0);

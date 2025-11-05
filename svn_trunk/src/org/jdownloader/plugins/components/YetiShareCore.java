@@ -67,7 +67,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51732 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51794 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1536,7 +1536,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Website uses reCaptchaV1 which has been shut down by Google. Contact website owner!");
         }
         final long waitMillis = 5 * 60 * 1000l;
-        if (br.getRequest().getHtmlCode().length() == 0) {
+        if (StringUtils.isEmpty(br.getRequest().getHtmlCode())) {
             final String errormessage = "Got blank page";
             if (link == null) {
                 /* No DownloadLink -> Assume that this error happened during login. */

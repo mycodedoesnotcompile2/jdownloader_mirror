@@ -1538,7 +1538,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
             }
             return this.convertedInputStream;
         } else {
-            throw new IOException(this.getResponseCode() + " " + this.getResponseMessage());
+            throw new HTTPResponseCodeException(this);
         }
     }
 

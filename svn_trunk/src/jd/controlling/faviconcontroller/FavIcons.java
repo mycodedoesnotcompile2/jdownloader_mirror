@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -39,6 +40,14 @@ import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.PluginForHost;
+import net.sf.image4j.codec.ico.ICODecoder;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.resources.MultiResolutionImageHelper;
@@ -68,14 +77,6 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.PluginForHost;
-import net.sf.image4j.codec.ico.ICODecoder;
 
 public class FavIcons {
     private static final int                                                     BASE_SIZE       = 16;
@@ -157,6 +158,9 @@ public class FavIcons {
     public static Icon getFavIcon(String host, FavIconRequestor requestor, boolean updatePermission) {
         if (host == null) {
             return null;
+        }
+        if ("linkcrawlerretry".equals(host)) {
+            updatePermission = true;
         }
         Icon image = null;
         synchronized (LOCK) {
@@ -281,20 +285,11 @@ public class FavIcons {
                     THREAD_POOL.execute(new Runnable() {
                         public void run() {
                             try {
-                                final List<String> tryHosts = new ArrayList<String>();
+                                final CopyOnWriteArrayList<String> tryHosts = new CopyOnWriteArrayList<String>();
                                 BufferedImage favicon = null;
                                 String[] siteSupportedNames = null;
                                 final LazyHostPlugin existingHostPlugin = getPlugin(host);
-                                if (existingHostPlugin != null) {
-                                    if (existingHostPlugin.hasFeature(LazyPlugin.FEATURE.INTERNAL)) {
-                                        synchronized (LOCK) {
-                                            QUEUE.remove(host);
-                                            if (!REFRESHED_ICONS.contains(host) && FAILED_ICONS.get(host) == null) {
-                                                FAILED_ICONS.put(host, getDefaultIcon(logger, host, true));
-                                            }
-                                        }
-                                        return;
-                                    }
+                                existingHostPlugin: if (existingHostPlugin != null) {
                                     if (existingHostPlugin.hasFeature(LazyPlugin.FEATURE.FAVICON)) {
                                         try {
                                             final PluginForHost pluginInstance = existingHostPlugin.newInstance(null, false);
@@ -304,30 +299,43 @@ public class FavIcons {
                                                 siteSupportedNames = new String[0];
                                             }
                                             final Object result = pluginInstance.getFavIcon(host);
-                                            if (result instanceof Image) {
+                                            if (result instanceof Icon) {
+                                                favicon = IconIO.toBufferedImage((Icon) result);
+                                                logger.clear();
+                                            } else if (result instanceof Image) {
                                                 favicon = IconIO.toBufferedImage((Image) result);
                                                 logger.clear();
                                             } else if (result instanceof String) {
-                                                tryHosts.add((String) result);
+                                                tryHosts.addIfAbsent((String) result);
                                             } else if (result instanceof Collection) {
                                                 for (final Object elem : (Collection) result) {
                                                     if (elem instanceof String) {
-                                                        tryHosts.add((String) elem);
+                                                        tryHosts.addIfAbsent((String) elem);
                                                     }
                                                 }
+                                            }
+                                            if (favicon != null || tryHosts.size() > 0) {
+                                                break existingHostPlugin;
                                             }
                                         } catch (Exception e) {
                                             logger.log(e);
                                         }
                                     }
+                                    if (existingHostPlugin.hasFeature(LazyPlugin.FEATURE.INTERNAL)) {
+                                        synchronized (LOCK) {
+                                            QUEUE.remove(host);
+                                            if (!REFRESHED_ICONS.contains(host) && FAILED_ICONS.get(host) == null) {
+                                                FAILED_ICONS.put(host, getDefaultIcon(logger, host, true));
+                                            }
+                                        }
+                                        return;
+                                    }
                                 }
                                 if (favicon == null) {
                                     if (existingHostPlugin != null) {
-                                        tryHosts.add(existingHostPlugin.getHost());
+                                        tryHosts.addIfAbsent(existingHostPlugin.getHost());
                                     }
-                                    if (!tryHosts.contains(host)) {
-                                        tryHosts.add(host);
-                                    }
+                                    tryHosts.addIfAbsent(host);
                                     if (!host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
                                         final String domain;
                                         if (PublicSuffixList.getInstance() != null) {
@@ -347,9 +355,7 @@ public class FavIcons {
                                                 if (domain != null && !tryHost.contains(domain) || tryHost.indexOf('.') == -1) {
                                                     break;
                                                 }
-                                                if (!tryHosts.contains(tryHost)) {
-                                                    tryHosts.add(tryHost);
-                                                }
+                                                tryHosts.add(tryHost);
                                             } else {
                                                 break;
                                             }

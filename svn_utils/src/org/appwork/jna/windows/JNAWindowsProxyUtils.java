@@ -31,7 +31,7 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpconnection.proxy;
+package org.appwork.jna.windows;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -40,26 +40,31 @@ import java.util.List;
 import java.util.Locale;
 
 import org.appwork.JNAHelper;
-import org.appwork.jna.windows.JNAWindowsProxyUtils;
+import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.loggingv3.LogV3;
-import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.NotSupportedException;
-import org.appwork.utils.processes.ProcessBuilderFactory;
+
+import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Win32Exception;
+import com.sun.jna.platform.win32.WinReg;
 
 /**
- * Checks windows registry for proxy settings. Uses JNA if available, otherwise falls back to reg.exe
+ * Windows Proxy Utils using JNA for registry access
  *
  * @author thomas
  * @date 04.04.2022
  *
  */
-public class WindowsProxyUtils {
+@BuildDecisionRequired(tags = { JNAHelper.JNA_HELPER_USE_JNA }, imports = { JNAHelper.CLASS_COM_SUN_JNA_NATIVE + ";" + JNAHelper.CLASS_COM_SUN_JNA_PLATFORM_FILE_UTILS, "" })
+public class JNAWindowsProxyUtils {
+    private static final String INTERNET_SETTINGS_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
+
     /**
-     * Gets the PAC script URL from Windows registry (AutoConfigURL). Uses JNA if available, otherwise falls back to reg.exe
+     * Gets the PAC script URL from Windows registry (AutoConfigURL) using JNA
      *
      * @return The PAC script URL if configured, null otherwise
      * @throws NotSupportedException
@@ -67,13 +72,25 @@ public class WindowsProxyUtils {
      */
     public static String getWindowsPACScriptURL() throws NotSupportedException {
         if (!CrossSystem.isWindows()) {
-            throw new NotSupportedException("WindowsProxyUtils is only supported on Windows");
+            throw new NotSupportedException("JNAWindowsProxyUtils is only supported on Windows");
         }
-        if (JNAHelper.isJNAAvailable()) {
-            return JNAWindowsProxyUtils.getWindowsPACScriptURL();
-        } else {
-            return getWindowsPACScriptURLViaRegExe();
+        if (!JNAHelper.isJNAAvailable()) {
+            return null;
         }
+        try {
+            final String autoProxy = Advapi32Util.registryGetStringValue(WinReg.HKEY_CURRENT_USER, INTERNET_SETTINGS_KEY, "AutoConfigURL");
+            if (!StringUtils.isEmpty(autoProxy)) {
+                LogV3.info("AutoProxy.pac Script found: " + autoProxy);
+                return autoProxy;
+            }
+        } catch (final Win32Exception e) {
+            if (e.getErrorCode() != com.sun.jna.platform.win32.WinError.ERROR_FILE_NOT_FOUND) {
+                LogV3.log(e);
+            }
+        } catch (final Throwable e) {
+            LogV3.log(e);
+        }
+        return null;
     }
 
     /**
@@ -88,76 +105,52 @@ public class WindowsProxyUtils {
     }
 
     /**
-     * Checks windows registry for proxy settings. Uses JNA if available, otherwise falls back to reg.exe
+     * Checks windows registry for proxy settings using JNA
      *
      * @throws NotSupportedException
      *             if not running on Windows
      */
     public static List<HTTPProxy> getWindowsRegistryProxies() throws NotSupportedException {
+        final java.util.List<HTTPProxy> ret = new ArrayList<HTTPProxy>();
         if (!CrossSystem.isWindows()) {
-            throw new NotSupportedException("WindowsProxyUtils is only supported on Windows");
+            throw new NotSupportedException("JNAWindowsProxyUtils is only supported on Windows");
         }
-        if (JNAHelper.isJNAAvailable()) {
-            return JNAWindowsProxyUtils.getWindowsRegistryProxies();
-        } else {
-            return getWindowsRegistryProxiesViaRegExe();
+        if (!JNAHelper.isJNAAvailable()) {
+            return ret;
         }
-    }
-
-    /**
-     * Gets the PAC script URL from Windows registry (AutoConfigURL) using reg.exe
-     *
-     * @return The PAC script URL if configured, null otherwise
-     */
-    private static String getWindowsPACScriptURLViaRegExe() {
         try {
-            final ProcessBuilder pb = ProcessBuilderFactory.create(new String[] { "reg", "query", "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" });
-            final Process process = pb.start();
-            final String result = IO.readInputStreamToString(process.getInputStream());
-            process.destroy();
+            // Check for PAC script
             try {
-                final String autoProxy = new Regex(result, "AutoConfigURL\\s+REG_SZ\\s+([^\r\n]+)").getMatch(0);
+                final String autoProxy = Advapi32Util.registryGetStringValue(WinReg.HKEY_CURRENT_USER, INTERNET_SETTINGS_KEY, "AutoConfigURL");
                 if (!StringUtils.isEmpty(autoProxy)) {
                     LogV3.info("AutoProxy.pac Script found: " + autoProxy);
-                    return autoProxy;
                 }
-            } catch (final Exception e) {
+            } catch (final Win32Exception e) {
+                // AutoConfigURL not found, that's okay
             }
-        } catch (final Throwable e) {
-            LogV3.log(e);
-        }
-        return null;
-    }
-
-    /**
-     * Checks windows registry for proxy settings using reg.exe
-     */
-    private static List<HTTPProxy> getWindowsRegistryProxiesViaRegExe() {
-        final java.util.List<HTTPProxy> ret = new ArrayList<HTTPProxy>();
-        try {
-            final ProcessBuilder pb = ProcessBuilderFactory.create(new String[] { "reg", "query", "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" });
-            final Process process = pb.start();
-            final String result = IO.readInputStreamToString(process.getInputStream());
-            process.destroy();
+            // Check if proxy is enabled
             try {
-                final String autoProxy = new Regex(result, "AutoConfigURL\\s+REG_SZ\\s+([^\r\n]+)").getMatch(0);
-                if (!StringUtils.isEmpty(autoProxy)) {
-                    org.appwork.loggingv3.LogV3.info("AutoProxy.pac Script found: " + autoProxy);
+                final int proxyEnable = Advapi32Util.registryGetIntValue(WinReg.HKEY_CURRENT_USER, INTERNET_SETTINGS_KEY, "ProxyEnable");
+                if (proxyEnable == 0) {
+                    // proxy disabled
+                    return ret;
                 }
-            } catch (final Exception e) {
-            }
-            final String enabledString = new Regex(result, "ProxyEnable\\s+REG_DWORD\\s+(\\d+x\\d+)").getMatch(0);
-            if ("0x0".equals(enabledString)) {
-                // proxy disabled
+            } catch (final Win32Exception e) {
+                // ProxyEnable not found, assume disabled
                 return ret;
             }
-            final String val = new Regex(result, " ProxyServer\\s+REG_SZ\\s+([^\r\n]+)").getMatch(0);
+            // Get proxy server string
+            String val = null;
+            try {
+                val = Advapi32Util.registryGetStringValue(WinReg.HKEY_CURRENT_USER, INTERNET_SETTINGS_KEY, "ProxyServer");
+            } catch (final Win32Exception e) {
+                // ProxyServer not found
+            }
             // val might be
             // 1. the proxy host only e.g. 127.0.0.1 or myproxy.de
             // 2. a full url http://127.0.0.1 2. a key=value list of ; sep. entries protocol=<1.> or <2.>
             // http=proxyxy:8000;https=proxyxysec:8000;ftp=proxyxyftp:8000
-            if (val != null) {
-                LogV3.info("Registry Result:\r\n" + result);
+            if (val != null && !val.isEmpty()) {
                 for (String vals : val.split(";")) {
                     final String lowerCaseVals = vals.toLowerCase(Locale.ENGLISH);
                     if (lowerCaseVals.startsWith("ftp=")) {
@@ -213,7 +206,7 @@ public class WindowsProxyUtils {
                 }
             }
         } catch (final Throwable e) {
-            org.appwork.loggingv3.LogV3.log(e);
+            LogV3.log(e);
         }
         return ret;
     }

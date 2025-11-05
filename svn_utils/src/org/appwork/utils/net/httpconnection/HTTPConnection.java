@@ -35,11 +35,63 @@ package org.appwork.utils.net.httpconnection;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
 public interface HTTPConnection {
+    public static class HTTPResponseException extends IOException {
+        /**
+         *
+         */
+        private static final long             serialVersionUID = 1L;
+        private WeakReference<HTTPConnection> connection;
+
+        public HTTPResponseException(HTTPConnection connection) {
+            this.connection = new WeakReference<HTTPConnection>(connection);
+        }
+
+        public HTTPConnection getConnection() {
+            WeakReference<HTTPConnection> connection = this.connection;
+            HTTPConnection ret = null;
+            if (connection == null || (ret = connection.get()) == null) {
+                this.connection = null;
+                return null;
+            }
+            return ret;
+        }
+    };
+
+    public static class HTTPResponseCodeException extends HTTPResponseException {
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+        private final int         responseCode;
+
+        public int getResponseCode() {
+            return responseCode;
+        }
+
+        public String getResponseMessage() {
+            return responseMessage;
+        }
+
+        private final String responseMessage;
+
+        protected HTTPResponseCodeException(HTTPConnection connection) {
+            super(connection);
+            this.responseCode = connection.getResponseCode();
+            this.responseMessage = connection.getResponseMessage();
+        }
+
+        @Override
+        public String toString() {
+            return getResponseCode() + " " + getResponseMessage();
+        }
+    }
+
     public static enum RequestMethod {
         NOTIFY(false), // UPNP
         MSEARCH(false), // UPNP
@@ -52,7 +104,6 @@ public interface HTTPConnection {
         POST(true), // HTTP 1.1
         HEAD(false), // HTTP 1.1
         PROPFIND(true);// WebDAV
-
         public final boolean requiresOutputStream;
 
         /**

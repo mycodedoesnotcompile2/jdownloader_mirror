@@ -8,6 +8,8 @@ import javax.swing.JLabel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import jd.gui.swing.components.linkbutton.JLink;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextHighlighter;
@@ -15,8 +17,6 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-
-import jd.gui.swing.components.linkbutton.JLink;
 
 /** Use this for plugins which need API key login instead of username/password. */
 public class DefaultEditAccountPanelAPIKeyLogin extends MigPanel implements AccountBuilderInterface {
@@ -64,8 +64,7 @@ public class DefaultEditAccountPanelAPIKeyLogin extends MigPanel implements Acco
 
             {
                 final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
-                addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")));
-                addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")));
+                addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)")));
                 applyTextHighlighter(null);
             }
         }, "");

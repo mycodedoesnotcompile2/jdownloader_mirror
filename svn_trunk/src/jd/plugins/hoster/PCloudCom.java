@@ -52,7 +52,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.PCloudComFolder;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 51494 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51789 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PCloudComFolder.class })
 public class PCloudCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -378,6 +378,7 @@ public class PCloudCom extends PluginForHost {
                 /* Save for later */
                 link.setDownloadPassword(passCode);
             }
+            this.handleAPIErrors(br);
             final List<String> hosts = (List<String>) resp.get("hosts");
             String dllink = resp.get("path").toString();
             if (dllink == null || hosts == null || hosts == null || hosts.isEmpty()) {
@@ -552,7 +553,7 @@ public class PCloudCom extends PluginForHost {
             }
             br.postPage("/login", query4);
             resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            this.handleAPIErrors(resp);
+            handleAPIErrors(resp);
             updateAccountInfo(account, resp);
             auth_token = resp.get("auth").toString();
             if (StringUtils.isEmpty(auth_token)) {
@@ -657,58 +658,53 @@ public class PCloudCom extends PluginForHost {
     private Map<String, Object> handleAPIErrors(final Map<String, Object> entries) throws PluginException {
         final int statusCode = ((Number) entries.get("result")).intValue();
         final String errormessage = (String) entries.get("error");
-        try {
-            switch (statusCode) {
-            case STATUS_CODE_OKAY:
-                /* Everything ok */
-                break;
-            case 1029:
-                throw new AccountRequiredException();
-            case STATUS_CODE_DOWNLOAD_PASSWORD_INVALID:
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Download password invalid");
-            case STATUS_CODE_INVALID_LOGIN:
-                throw new AccountInvalidException(errormessage);
-            case 2008:
-                /* Account is out of storage space */
-                throw new AccountInvalidException(errormessage);
-            case 2009:
-                /* { "result": 2009, "error": "File not found."} */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            case 2012:
-                /* Invalid email TOTP code */
-                throw new AccountInvalidException(errormessage);
-            case STATUS_CODE_DOWNLOAD_PASSWORD_REQUIRED:
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Download password required");
-            case STATUS_CODE_WRONG_LOCATION:
-                // wrong location
-                /*
-                 * {"result": 2321, "error": "This user is on another location.", "location": { "label": "US", "id": 1, "binapi":
-                 * "binapi.pcloud.com", "api": "api.pcloud.com" }}
-                 */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            case 5002:
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 'Internal error, no servers available. Try again later.'", 5 * 60 * 1000l);
-            case 7002:
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            case STATUS_CODE_PREMIUMONLY:
-                throw new AccountRequiredException();
-            case STATUS_CODE_MAYBE_OWNER_ONLY:
-                /* file might be set to preview only download */
-                /* "error": "Access denied. You do not have permissions to perform this operation." */
-                throw new AccountRequiredException(errormessage);
-            case 7014:
-                /*
-                 * 2016-08-31: Added support for this though I'm not sure about this - I guess some kind of account traffic limit has been
-                 * reached!
-                 */
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
-            default:
-                /* Unknown error */
-                throw new PluginException(LinkStatus.ERROR_FATAL, errormessage);
-            }
-        } catch (final PluginException e) {
-            logger.info(this.getHost() + ": Exception: statusCode: " + statusCode + " statusMessage: " + errormessage);
-            throw e;
+        switch (statusCode) {
+        case STATUS_CODE_OKAY:
+            /* Everything ok */
+            break;
+        case 1029:
+            throw new AccountRequiredException();
+        case STATUS_CODE_DOWNLOAD_PASSWORD_INVALID:
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Download password invalid");
+        case STATUS_CODE_INVALID_LOGIN:
+            throw new AccountInvalidException(errormessage);
+        case 2008:
+            /* Account is out of storage space */
+            throw new AccountInvalidException(errormessage);
+        case 2009:
+            /* { "result": 2009, "error": "File not found."} */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        case 2012:
+            /* Invalid email TOTP code */
+            throw new AccountInvalidException(errormessage);
+        case STATUS_CODE_DOWNLOAD_PASSWORD_REQUIRED:
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Download password required");
+        case STATUS_CODE_WRONG_LOCATION:
+            // wrong location
+            /*
+             * {"result": 2321, "error": "This user is on another location.", "location": { "label": "US", "id": 1, "binapi":
+             * "binapi.pcloud.com", "api": "api.pcloud.com" }}
+             */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        case 5002:
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 'Internal error, no servers available. Try again later.'", 5 * 60 * 1000l);
+        case 7002:
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        case STATUS_CODE_PREMIUMONLY:
+            throw new AccountRequiredException("This link has reached its traffic limit. Buy premium or try later.");
+        case STATUS_CODE_MAYBE_OWNER_ONLY:
+            /* file might be set to preview only download */
+            /* "error": "Access denied. You do not have permissions to perform this operation." */
+            throw new AccountRequiredException(errormessage);
+        case 7014:
+            /*
+             * 2016-08-31: Added support for this though I'm not sure about this - I guess some kind of account traffic limit has been
+             * reached!
+             */
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+        default:
+            /* Unknown error */
+            throw new PluginException(LinkStatus.ERROR_FATAL, errormessage);
         }
         return entries;
     }

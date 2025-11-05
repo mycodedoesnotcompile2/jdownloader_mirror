@@ -66,6 +66,7 @@ import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.PublicSuffixList;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.HTTPConnection.HTTPResponseCodeException;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.ProxyAuthException;
@@ -1853,11 +1854,31 @@ public class Browser {
             } else {
                 this.checkContentLengthLimit(requ);
                 this.prepareBlockDetectionBeforeLoadConnection(requ);
-                requ.read(this.isKeepResponseContentBytes());
-                if (this.isVerbose() && requ != null) {
-                    final LogInterface llogger = this.getLogger();
-                    if (llogger != null) {
-                        llogger.finest("\r\nBrowserID:" + requ.getBrowserID() + "|RequestID:" + requ.getRequestID() + "|URL:" + requ.getURL() + "\r\n----------------Request Content-------------\r\n" + requ.getHTMLSource() + "\r\n");
+                try {
+                    try {
+                        requ.read(this.isKeepResponseContentBytes());
+                    } catch (HTTPResponseCodeException e) {
+                        final URLConnectionAdapter con = requ.getHttpConnection();
+                        if (con != null) {
+                            try {
+                                con.setAllResponseCodesAllowed(true);
+                                try {
+                                    requ.read(this.isKeepResponseContentBytes());
+                                } finally {
+                                    con.setAllResponseCodesAllowed(false);
+                                }
+                            } catch (IOException e2) {
+                                Exceptions.addSuppressed(e, e2);
+                            }
+                        }
+                        throw e;
+                    }
+                } finally {
+                    if (this.isVerbose() && requ != null) {
+                        final LogInterface llogger = this.getLogger();
+                        if (llogger != null) {
+                            llogger.finest("\r\nBrowserID:" + requ.getBrowserID() + "|RequestID:" + requ.getRequestID() + "|URL:" + requ.getURL() + "\r\n----------------Request Content-------------\r\n" + requ.getHTMLSource() + "\r\n");
+                        }
                     }
                 }
                 this.checkForBlockedByAfterLoadConnection(requ);
@@ -2189,8 +2210,14 @@ public class Browser {
         }
     }
 
-    public boolean removeAuthentication(Authentication authentication) {
-        return authentication != null && this.authentications.remove(authentication);
+    public boolean removeAuthentication(Authentication remove) {
+        if (remove == null) {
+            return false;
+        }
+        if (this.authentications.remove(remove)) {
+            return true;
+        }
+        return false;
     }
 
     public List<Authentication> getAuthentications() {
@@ -3471,8 +3498,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                             */
+                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                 */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {

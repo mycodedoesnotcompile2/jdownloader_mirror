@@ -37,6 +37,7 @@ import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
 import org.appwork.shutdown.ShutdownVetoListener;
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
@@ -46,6 +47,7 @@ import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
 import org.jdownloader.controlling.FileStateManager;
 import org.jdownloader.controlling.FileStateManager.FILESTATE;
@@ -55,6 +57,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.requests.PostRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -73,7 +76,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51757 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 51791 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -530,37 +533,50 @@ public class WeTransferCom extends PluginForHost {
     private Map<String, Object> login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            // final Cookies userCookies = account.loadCookies("");
-            logger.info("Attempting cookie login");
-            // br.setCookies(userCookies);
-            String access_token = account.getStringProperty("access_token");
-            // TODO: Make use of this
+            logger.info("Attempting cookie/token login");
+            String access_token = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
             final boolean allowOnlyLocalStorageStringAsPassword = true;
-            Number access_token_expire_timestamp = null;
-            final String error_invalid_password_input = "Invalid password syntax: Enter exported LocalStorage string";
-            final boolean looksLikePasswordIsJsonString = account.getPass().startsWith("{");
-            if (allowOnlyLocalStorageStringAsPassword && !looksLikePasswordIsJsonString) {
-                throw new AccountInvalidException(error_invalid_password_input);
-            }
-            if (looksLikePasswordIsJsonString) {
-                final Map<String, Object> entries = restoreFromString(account.getPass(), TypeRef.MAP);
-                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-                if (data == null) {
-                    throw new AccountInvalidException(error_invalid_password_input);
+            Number access_token_expire_timestamp = this.getTokenExpireTimestamp(account);
+            final String error_invalid_local_storage_login_input = "Invalid password syntax: Enter exported LocalStorage token string in password field";
+            final String error_login_token_expired = "Login token expired";
+            Map<String, Object> parsedJson = null;
+            try {
+                parsedJson = restoreFromString(account.getPass(), TypeRef.MAP);
+            } catch (final JSonMapperException jme) {
+                if (allowOnlyLocalStorageStringAsPassword) {
+                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
                 }
-                access_token = data.get("access_token").toString();
-                access_token_expire_timestamp = (Number) data.get("expiresAt");
             }
-            // if (access_token == null) {
-            // access_token = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
-            // }
+            if (parsedJson != null) {
+                final Map<String, Object> data = (Map<String, Object>) parsedJson.get("data");
+                if (data == null) {
+                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
+                }
+                access_token = (String) data.get("access_token");
+                access_token_expire_timestamp = (Number) data.get("expiresAt");
+                if (StringUtils.isEmpty(access_token)) {
+                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
+                } else if (access_token_expire_timestamp == null) {
+                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
+                }
+                account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN, access_token);
+                account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN_EXPIRE_TIMESTAMP, access_token_expire_timestamp);
+            }
             if (access_token != null) {
+                if (access_token_expire_timestamp.longValue() <= System.currentTimeMillis()) {
+                    /*
+                     * 2025-11-04: Looks like the "expiresAt" timestamp from LocalStorage token string does not represent the expire date of
+                     * that login token.
+                     */
+                    logger.info("Login token expired according to expire timestamp");
+                    throw new AccountInvalidException(error_login_token_expired);
+                }
                 br.getHeaders().put("Authorization", "Bearer " + access_token);
                 br.getHeaders().put("x-app-origin", "decoupled"); // optional
                 // br.getHeaders().put("x-current-team", "TODO_not_needed_??");
                 // br.getHeaders().put("x-local-storage-id", "TODO_not_needed_??");
                 if (!force) {
-                    /* Don't validate cookies */
+                    /* Don't validate logins */
                     return null;
                 }
                 br.getPage(API_BASE_LOGIN + "/v1/users/me");
@@ -569,16 +585,23 @@ public class WeTransferCom extends PluginForHost {
                     return (Map<String, Object>) this.checkErrorsAPI(br);
                 }
                 logger.info("Token login failed");
+                /* Remove auth header */
                 // br.getHeaders().put("Authorization", "");
-                if (account.hasEverBeenValid()) {
-                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                } else {
-                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                }
+                // if (account.hasEverBeenValid()) {
+                // throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                // } else {
+                // throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                // }
+                throw new AccountInvalidException(error_login_token_expired);
             }
-            if (allowOnlyLocalStorageStringAsPassword) {
-                throw new AccountInvalidException(error_invalid_password_input);
+            if (allowOnlyLocalStorageStringAsPassword || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                throw new AccountInvalidException(error_invalid_local_storage_login_input);
             }
+            final Cookies userCookies = account.loadCookies("");
+            if (userCookies == null) {
+                throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorCookieLoginMandatoryButNoCookiesGiven());
+            }
+            br.setCookies(userCookies);
             // TODO: Fix this -> Obtain auth_token via cookies and the request down below
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("client_id", "TODO");
@@ -599,15 +622,15 @@ public class WeTransferCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user = login(account, true);
         if (Boolean.TRUE.equals(user.get("blocked"))) {
             /* This should be a super rare case! */
             throw new AccountInvalidException("Your account is banned/blocked");
         }
+        final AccountInfo ai = new AccountInfo();
         /*
-         * Plugin supports cookie login only -> User could enter anything into username field -> Set username here so we can be sure to have
-         * an unique username.
+         * Plugin supports special login types only -> User could enter anything into username field -> Set username here so we can be sure
+         * to have an unique username.
          */
         final String email = (String) user.get("email");
         if (!StringUtils.isEmpty(email)) {
@@ -638,14 +661,22 @@ public class WeTransferCom extends PluginForHost {
             }
         }
         if (activePremiumPackages > 0) {
-            // TODO: Set expire date
+            // TODO: Set expire date (premium account needed for testing)
             account.setType(AccountType.PREMIUM);
         } else if (activeFreePackages > 0) {
             account.setType(AccountType.FREE);
         } else {
             account.setType(AccountType.UNKNOWN);
         }
+        final long tokenExpireTimestamp = getTokenExpireTimestamp(account);
+        if (tokenExpireTimestamp != -1) {
+            ai.setStatus(account.getType().getLabel() + " | TokenValidity: " + TimeFormatter.formatMilliSeconds(tokenExpireTimestamp - System.currentTimeMillis(), 1));
+        }
         return ai;
+    }
+
+    private long getTokenExpireTimestamp(final Account account) {
+        return account.getLongProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN_EXPIRE_TIMESTAMP, -1);
     }
 
     private Object checkErrorsAPI(final Browser br) throws PluginException {

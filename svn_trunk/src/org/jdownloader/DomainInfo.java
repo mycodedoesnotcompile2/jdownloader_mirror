@@ -8,19 +8,19 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
-import org.appwork.swing.components.IDIcon;
-import org.appwork.swing.components.IconIdentifier;
-import org.appwork.utils.images.IconIO;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.images.NewTheme;
-
 import jd.config.Property;
 import jd.controlling.faviconcontroller.FavIconRequestor;
 import jd.controlling.faviconcontroller.FavIcons;
 import jd.http.Browser;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
+
+import org.appwork.swing.components.IDIcon;
+import org.appwork.swing.components.IconIdentifier;
+import org.appwork.utils.images.IconIO;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.images.NewTheme;
 
 public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Icon, IDIcon {
     // Inner interface
@@ -29,10 +29,10 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
     }
 
     // Static fields
-    private static final HashMap<String, String>                    HARDCODEDFAVICONS = new HashMap<String, String>();
-    private static final HashMap<String, WeakReference<DomainInfo>> CACHE             = new HashMap<String, WeakReference<DomainInfo>>();
-    private static final int                                        HEIGHT            = 16;
-    private static final int                                        WIDTH             = 16;
+    private static final HashMap<String, String>                    HARDCODEDFAVICONS          = new HashMap<String, String>();
+    private static final HashMap<String, WeakReference<DomainInfo>> CACHE                      = new HashMap<String, WeakReference<DomainInfo>>();
+    private static final int                                        HEIGHT                     = 16;
+    private static final int                                        WIDTH                      = 16;
     // Static initializer
     static {
         HARDCODEDFAVICONS.put("http", IconKey.ICON_URL);// 'http links' results in 'http'
@@ -42,19 +42,18 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
         HARDCODEDFAVICONS.put("f4m", IconKey.ICON_URL);
         HARDCODEDFAVICONS.put("m3u8", IconKey.ICON_URL);
         HARDCODEDFAVICONS.put("updaterequired", IconKey.ICON_URL);
-        HARDCODEDFAVICONS.put("jdlog", IconKey.ICON_URL);
         HARDCODEDFAVICONS.put("cloudcache", IconKey.ICON_URL);
         HARDCODEDFAVICONS.put("usenet", IconKey.ICON_LOGO_NZB);
         HARDCODEDFAVICONS.put("genericusenet", IconKey.ICON_LOGO_NZB);
         HARDCODEDFAVICONS.put("captcha_type_image", IconKey.ICON_IMAGE);
     }
     // Instance fields
-    private final String         domain;
-    private final IconIdentifier iconIdentifier;
-    private final String         tld;
-    private String               name                       = null;
-    protected Icon               hosterIcon                 = null;
-    protected boolean            hosterIconUpdatePermission = false;
+    private final String                                            domain;
+    private final IconIdentifier                                    iconIdentifier;
+    private final String                                            tld;
+    private String                                                  name                       = null;
+    protected Icon                                                  hosterIcon                 = null;
+    protected boolean                                               hosterIconUpdatePermission = false;
 
     // Constructor
     public DomainInfo(String tld, String domain) {

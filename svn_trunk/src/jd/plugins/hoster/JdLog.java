@@ -22,12 +22,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.auth.AuthenticationController;
-import org.jdownloader.jdserv.JDServUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -43,13 +37,21 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.auth.AuthenticationController;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.jdserv.JDServUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 /**
  * Alternative AppWork log downloader for internal use
  *
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51772 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 51793 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
     @Override
     public String getAGBLink() {
@@ -69,7 +71,7 @@ public class JdLog extends PluginForHost {
 
     @Override
     public Object getFavIcon(final String host) throws IOException {
-        return "https://jdownloader.org/lib/tpl/arctic/images/favicon.ico";
+        return new AbstractIcon(IconKey.ICON_LOGO_JD_LOGO_64_64, 16);
     }
 
     @Override
@@ -81,6 +83,7 @@ public class JdLog extends PluginForHost {
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
     }
+
     // @Override
     // public String getLinkID(final DownloadLink link) {
     // final String linkid = getFID(link);

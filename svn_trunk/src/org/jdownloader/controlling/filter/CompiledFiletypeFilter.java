@@ -608,6 +608,22 @@ public class CompiledFiletypeFilter {
     }
 
     public static enum AudioExtensions implements CompiledFiletypeExtension {
+        DTSHD {
+            private final Pattern pattern = Pattern.compile("(?i)audio/vnd\\.dts\\.hd");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+        },
+        DTS {
+            private final Pattern pattern = Pattern.compile("(?i)audio/vnd\\.dts");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+        },
         AC3,
         MP3 {
             private final Pattern pattern = Pattern.compile("(?i)audio/(mpeg|mp3)");

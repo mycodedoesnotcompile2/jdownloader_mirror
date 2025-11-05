@@ -134,7 +134,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#getIconHeight()
          */
         @Override
@@ -144,7 +144,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#getIconWidth()
          */
         @Override
@@ -154,7 +154,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.swing.components.IdentifierInterface#toIdentifier()
          */
         @Override
@@ -176,7 +176,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
@@ -963,9 +963,7 @@ public class IconIO {
     public static BufferedImage toBufferedImage(final Icon icon) {
         if (icon instanceof ImageIcon) {
             final Image img = ((ImageIcon) icon).getImage();
-            if (img instanceof BufferedImage) {
-                return (BufferedImage) img;
-            }
+            return toBufferedImage(img);
         }
         final int w = icon.getIconWidth();
         final int h = icon.getIconHeight();

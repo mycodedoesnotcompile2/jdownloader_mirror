@@ -334,7 +334,6 @@ public class ChallengeResponseController {
                 break;
             }
         }
-        // TODO: Get a nicer captcha type string here once possible
         String captcha_challenge_type = c.getTypeID();
         if (captcha_challenge_type != null && captcha_challenge_type.contains("turnstile")) {
             captcha_challenge_type = "Cloudflare Turnstile";
@@ -350,45 +349,44 @@ public class ChallengeResponseController {
                     if ("de".equals(lang)) {
                         title = "Externer Solver erforderlich für diese Captcha-Challenge";
                         message += "Die interaktive Art der Captcha-Herausforderung '" + captcha_challenge_type_final + "', die gelöst werden muss, kann derzeit nicht lokal in deinem Browser gelöst werden.<br><br>";
-                        message += "Daher bleibt dir nur die Möglichkeit, einen [kostenpflichtigen] Captcha-Lösungsdienst zu nutzen, der diesen Captcha-Typ verarbeiten kann.<br><br>";
-                        message += "Dies ist keine Werbung, sondern ein technischer Hinweisdialog.<br><br>";
-                        message += "Für detailliertere Informationen lies bitte den unten stehenden Hilfe-Artikel:<br>";
+                        message += "Daher bleibt dir in JD nur die Möglichkeit, einen möglicherweise kostenpflichtigen Captcha-Lösungsdienst zu nutzen, der diesen Captcha-Typ verarbeiten kann.<br><br>";
+                        message += "JD unterstützt verschiedene Captcha-Lösungsdienste, die im unten verlinkten Artikel aufgeführt werden.<br><br>";
+                        message += "Für detailliertere Informationen lies bitte den folgenden Hilfe-Artikel:<br>";
                         message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
                     } else if ("es".equals(lang)) {
-                        title = "Se requiere un solucionador externo para este desafío de captcha";
-                        message += "El tipo interactivo de desafío captcha '" + captcha_challenge_type_final + "' que debe resolverse actualmente no puede resolverse localmente en tu navegador.<br><br>";
-                        message += "Por lo tanto, tu única opción es obtener un servicio de resolución de captchas [de pago] que pueda manejar este tipo de captcha.<br><br>";
-                        message += "Esto no es un anuncio sino un cuadro de diálogo de información técnica.<br><br>";
-                        message += "Para obtener más información detallada, lee el artículo de ayuda a continuación:<br>";
+                        title = "Se requiere un solucionador externo para este desafío de CAPTCHA";
+                        message += "El tipo interactivo de desafío CAPTCHA '" + captcha_challenge_type_final + "' no puede resolverse actualmente de forma local en tu navegador.<br><br>";
+                        message += "Por lo tanto, en JD solo tienes la opción de utilizar un servicio de resolución de captchas posiblemente de pago que pueda manejar este tipo de CAPTCHA.<br><br>";
+                        message += "JD es compatible con varios servicios de resolución de CAPTCHA que se enumeran en el artículo enlazado a continuación.<br><br>";
+                        message += "Para obtener información más detallada, lee el siguiente artículo de ayuda:<br>";
                         message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
                     } else if ("fr".equals(lang)) {
-                        title = "Solveur externe requis pour ce défi captcha";
-                        message += "Le type interactif de défi captcha '" + captcha_challenge_type_final + "' qui doit être résolu ne peut actuellement pas être résolu localement dans votre navigateur.<br><br>";
-                        message += "Par conséquent, votre seule option est d'utiliser un service de résolution de captchas [payant] capable de traiter ce type de captcha.<br><br>";
-                        message += "Ceci n'est pas une publicité mais une boîte de dialogue d'information technique.<br><br>";
-                        message += "Pour plus d'informations détaillées, veuillez lire l'article d'aide ci-dessous :<br>";
+                        title = "Solveur externe requis pour ce défi CAPTCHA";
+                        message += "Le type interactif de défi CAPTCHA '" + captcha_challenge_type_final + "' ne peut actuellement pas être résolu localement dans votre navigateur.<br><br>";
+                        message += "Par conséquent, dans JD, votre seule option est d’utiliser un service de résolution de CAPTCHA potentiellement payant capable de traiter ce type de CAPTCHA.<br><br>";
+                        message += "JD prend en charge plusieurs services de résolution de CAPTCHA listés dans l’article ci-dessous.<br><br>";
+                        message += "Pour plus d’informations détaillées, veuillez consulter l’article d’aide ci-dessous :<br>";
                         message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
                     } else if ("hi".equals(lang)) {
-                        title = "इस कैप्चा चुनौती के लिए बाहरी सॉल्वर आवश्यक है";
-                        message += "इंटरएक्टिव प्रकार का कैप्चा चुनौती '" + captcha_challenge_type_final + "', जिसे हल करना है, वर्तमान में आपके ब्राउज़र में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>";
-                        message += "इसलिए आपका एकमात्र विकल्प एक [सशुल्क] कैप्चा समाधान सेवा प्राप्त करना है जो इस प्रकार के कैप्चा को संभाल सकती है।<br><br>";
-                        message += "यह कोई विज्ञापन नहीं है बल्कि एक तकनीकी सूचना संवाद है।<br><br>";
-                        message += "अधिक विस्तृत जानकारी के लिए, कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>";
+                        title = "इस CAPTCHA चुनौती के लिए बाहरी सॉल्वर आवश्यक है";
+                        message += "CAPTCHA चुनौती '" + captcha_challenge_type_final + "' की इंटरएक्टिव प्रकृति को आपके ब्राउज़र में वर्तमान में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>";
+                        message += "इसलिए JD में आपका एकमात्र विकल्प एक संभावित सशुल्क CAPTCHA समाधान सेवा का उपयोग करना है जो इस प्रकार के CAPTCHA को संभाल सके।<br><br>";
+                        message += "JD कई CAPTCHA समाधान सेवाओं का समर्थन करता है, जिन्हें नीचे दिए गए लेख में सूचीबद्ध किया गया है।<br><br>";
+                        message += "अधिक विस्तृत जानकारी के लिए कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>";
                         message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
                     } else if ("zh".equals(lang) || "zh-cn".equals(lang)) {
-                        title = "此验证码挑战需要外部解答器";
-                        message += "交互式验证码挑战 '" + captcha_challenge_type_final + "' 目前无法在您的浏览器中本地解决。<br><br>";
-                        message += "因此，您唯一的选择是使用可以处理此类验证码的 [付费] 验证码解答服务。<br><br>";
-                        message += "这不是广告，而是一个技术信息对话框。<br><br>";
-                        message += "有关更多详细信息，请阅读以下帮助文章：<br>";
+                        title = "此验证码挑战需要外部解答服务";
+                        message += "交互式验证码挑战 '" + captcha_challenge_type_final + "' 当前无法在您的浏览器中本地完成。<br><br>";
+                        message += "因此，在 JD 中，您只能使用能够处理此类验证码的可能需要付费的验证码解答服务。<br><br>";
+                        message += "JD 支持多个验证码解答服务，具体列表请参阅以下文章。<br><br>";
+                        message += "有关更详细的信息，请阅读以下帮助文章：<br>";
                         message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
                     } else {
-                        // Default English
                         title = "External solver required for this captcha challenge";
-                        message += "The interactive type of captcha challenge '" + captcha_challenge_type_final + "' that needs to be solved currently cannot be solved locally in your browser.<br><br>";
-                        message += "Therefore your only option is to get a [paid] captcha solver service which can handle this type of captcha.<br><br>";
-                        message += "This is not an advertisement but a technical information dialog.<br><br>";
-                        message += "For more detailed information, please read the help article down below:<br>";
+                        message += "The interactive type of captcha challenge '" + captcha_challenge_type_final + "' cannot currently be solved locally in your browser.<br><br>";
+                        message += "Therefore, in JD your only option is to use a captcha solving service that may require payment and is capable of handling this type of captcha.<br><br>";
+                        message += "JD supports various captcha solving services listed in the help article below.<br><br>";
+                        message += "For more detailed information, please read the help article below:<br>";
                         message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
                     }
                     message += "</html>";

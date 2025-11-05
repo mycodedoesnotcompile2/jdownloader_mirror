@@ -27,13 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -47,7 +40,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50946 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51793 $", interfaceVersion = 3, names = {}, urls = {})
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class MySpassDe extends PluginForHost {
     private static final AtomicLong              timestampTokenRefreshed = new AtomicLong(0);
     private static final AtomicLong              timestampCDNRefreshed   = new AtomicLong(0);
     private static final Pattern                 PATH_OLD                = Pattern.compile("/player\\?video=(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern                 PATH_NEW                = Pattern.compile("/player/([a-z0-9-]+)/(\\d+)", Pattern.CASE_INSENSITIVE); // 2025-04-10
+    private static final Pattern                 PATH_NEW                = Pattern.compile("/player/.*?([a-z0-9-]+)/(\\d+)(\\?|$)", Pattern.CASE_INSENSITIVE); // 2025-04-10
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {

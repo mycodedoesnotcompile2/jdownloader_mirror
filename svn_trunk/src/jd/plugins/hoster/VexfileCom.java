@@ -21,13 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -41,7 +34,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51786 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+
+@HostPlugin(revision = "$Revision: 51793 $", interfaceVersion = 3, names = {}, urls = {})
 public class VexfileCom extends PluginForHost {
     public VexfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,13 +121,13 @@ public class VexfileCom extends PluginForHost {
         if (StringUtils.isEmpty(filename)) {
             filename = br.getRegex("title:\\s*'([^'\"]+)").getMatch(0);
         }
-        String filesize = br.getRegex("class=\"file-size\"[^>]*>\\s*<[^>]*>\\s*</i>([^<]+)").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
         } else {
             logger.warning("Failed to find filename");
         }
+        final String filesize = br.getRegex("class=\"file-size\"[^>]*>\\s*<[^>]*>\\s*</i>([^<]+)").getMatch(0);
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         } else {
@@ -158,19 +157,17 @@ public class VexfileCom extends PluginForHost {
             if (csrftoken == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find file_id");
             }
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unfinished plugin!");
-            }
             final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
             final Map<String, Object> postdata = new HashMap<String, Object>();
-            postdata.put("file_id", csrftoken);
+            postdata.put("file_id", file_id);
             postdata.put("token", cfTurnstileResponse);
-            final Request req = br.createJSonPostRequest("/verify-cf-captcha", JSonStorage.serializeToJson(postdata));
+            final Browser brc = br.cloneBrowser();
+            final Request req = brc.createJSonPostRequest("/verify-cf-captcha", JSonStorage.serializeToJson(postdata));
             req.getHeaders().put("Content-Type", "application/json");
             req.getHeaders().put("X-CSRF-TOKEN", csrftoken);
             /* This should set at least two cookies: XSRF-TOKEN, vexfilecom_session */
-            br.getPage(req);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            brc.getPage(req);
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             if (Boolean.FALSE.equals(entries.get("success"))) {
                 /* This should be a rare case. */
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);

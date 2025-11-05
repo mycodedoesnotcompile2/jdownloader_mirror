@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51790 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebcamsbabeCom extends KernelVideoSharingComV2 {
     public WebcamsbabeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -33,7 +33,7 @@ public class WebcamsbabeCom extends KernelVideoSharingComV2 {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "sexcams-24.com", "webcamsbabe.com" });
         /* Russian version of webcamsbabe.com. Same URL-pattern but different content/file-servers/contentIDs! */
-        ret.add(new String[] { "private-records.com", "webcamvau.com", "privat-zapisi.biz" });
+        ret.add(new String[] { "privaterecords.life", "private-records.com", "webcamvau.com", "privat-zapisi.biz" });
         return ret;
     }
 

@@ -24,6 +24,36 @@ public class BasicAuthentication extends Authentication {
     }
 
     @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        } else if (obj == this) {
+            return true;
+        } else if (!(obj instanceof BasicAuthentication)) {
+            return false;
+        }
+        final BasicAuthentication other = (BasicAuthentication) obj;
+        if (!StringUtils.equals(this.getHost(), other.getHost())) {
+            return false;
+        }
+        if (!StringUtils.equals(this.getUsername(), other.getUsername())) {
+            return false;
+        }
+        if (!StringUtils.equals(this.getPassword(), other.getPassword())) {
+            return false;
+        }
+        if (!StringUtils.equals(this.getRealm(), other.getRealm())) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return BasicAuthentication.class.hashCode();
+    }
+
+    @Override
     public boolean retry(Browser browser, Request request) {
         return false;
     }

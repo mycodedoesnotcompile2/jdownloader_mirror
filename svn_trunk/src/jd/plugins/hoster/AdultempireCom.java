@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.TimeFormatter;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -42,16 +45,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.AdultempireComCrawler;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.TimeFormatter;
-
-@HostPlugin(revision = "$Revision: 49997 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51789 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { AdultempireComCrawler.class })
 public class AdultempireCom extends PluginForHost {
     public AdultempireCom(PluginWrapper wrapper) {
         super(wrapper);
         /** 2023-11-14: Added account support and then realized that this website is using a light DRM for their HLS streams. */
-        this.enablePremium("https://www.adultempire.com/unlimited/account/join");
+        this.enablePremium("https://www." + getHost() + "/unlimited/account/join");
     }
 
     @Override
@@ -64,7 +64,7 @@ public class AdultempireCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.adultempire.com/help/cs_termsofuse.html";
+        return "https://www." + getHost() + "/help/cs_termsofuse.html";
     }
 
     private static List<String[]> getPluginDomains() {

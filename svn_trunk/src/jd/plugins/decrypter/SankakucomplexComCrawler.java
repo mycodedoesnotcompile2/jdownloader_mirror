@@ -21,15 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,7 +39,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 51668 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51793 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,6 +69,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     private Browser createNewBrowserInstanceAPI() {
         final Browser br = createNewBrowserInstance();
         /* API can return very big json structures. */
+        br.setAllowedResponseCodes(429);
         br.setLoadLimit(Integer.MAX_VALUE);
         return br;
     }
@@ -157,12 +158,16 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final int tagsCount = tags.replaceAll("[^\\+]*", "").length();
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br>
-         * For this reason, some user may prefer website mode.
+         * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
+         * website mode.
          */
+        if (tagsCount > 3 && account == null) {
+            throw new AccountRequiredException("Account required: Your search query contains too many tags");
+        }
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && hosterplugin.allowUseAPI(account, SankakucomplexCom.API_METHOD.OTHER))) {
             return crawlTagsPostsAPI(account, param, tags, language);
         } else {
@@ -221,6 +226,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getURL().contains("/premium")) {
+            if (br.containsHTML("Ihre Suchanfrage enthält zu viele Tags")) {
+                throw new AccountRequiredException("Account required: Your search query contains too many tags");
+            }
             /* Account required (most times due to adult content so free account is enough). */
             throw new AccountRequiredException();
         }
@@ -359,9 +367,15 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             final Request request = hosterplugin.addAPIToken(brc.createGetRequest(API_BASE + "/posts/keyset?" + query.toString()), account);
             brc.getPage(request);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
-            final String nextPageHash = (String) meta.get("next");
+            if ("snackbar__anonymous_tags-limit".equals(entries.get("code"))) {
+                throw new AccountRequiredException("Account required: Your search query contains too many tags");
+            } else if (!Boolean.TRUE.equals(entries.get("success"))) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
+            if (data == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             for (final Map<String, Object> post : data) {
                 final String postID = post.get("id").toString();
                 final DownloadLink link = this.createDownloadlink(generateSinglePostURL(postID, language, tagsUrlEncoded));
@@ -375,6 +389,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 distribute(link);
                 position++;
             }
+            final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
+            final String nextPageHash = (String) meta.get("next");
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");

@@ -21,8 +21,8 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -37,11 +37,12 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
-public class FcLc extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 51791 $", interfaceVersion = 2, names = {}, urls = {})
+public class FcLc extends PluginForDecrypt {
     private static final String[]     domains                    = { "fc.lc", "fcc.lc", "short.fc-lc.com", "short.articlix.com", "fc-lc.com", "fc-lc.xyz" };
     /** List of services for which waittime is skippable. */
     private static final List<String> domains_waittime_skippable = Arrays.asList(new String[] { "fcc.lc" });
@@ -85,6 +86,7 @@ public class FcLc extends antiDDoSForDecrypt {
     public enum CaptchaType {
         reCaptchaV2,
         reCaptchaV2_invisible,
+        hCaptcha,
         WTF
     };
 
@@ -101,12 +103,11 @@ public class FcLc extends antiDDoSForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br = new Browser();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contentURL = param.getCryptedUrl();
         final String source_host = Browser.getHost(contentURL);
         br.setFollowRedirects(false);
-        getPage(contentURL);
+        br.getPage(contentURL);
         // 2019-11-13: http->https->different domain(https)
         // 2019-11-13: http->https->different domain(http)->different domain(https)
         while (true) {
@@ -134,7 +135,7 @@ public class FcLc extends antiDDoSForDecrypt {
                 ret.add(this.createDownloadlink(redirect));
                 return ret;
             } else {
-                getPage(redirect);
+                br.getPage(redirect);
                 continue;
             }
         }
@@ -150,7 +151,7 @@ public class FcLc extends antiDDoSForDecrypt {
         if (beforeCaptcha != null) {
             /* 2019-10-30: E.g. exe.io, redirecto.link */
             logger.info("Found pre-captcha Form");
-            this.submitForm(beforeCaptcha);
+            br.submitForm(beforeCaptcha);
         }
         /* 2020-07-06: E.g. fc.lc, fcc.lc */
         Form beforeCaptcha2 = br.getFormbyKey("ad_form_data");
@@ -165,11 +166,11 @@ public class FcLc extends antiDDoSForDecrypt {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 beforeCaptcha2.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
             }
-            this.submitForm(beforeCaptcha2);
+            br.submitForm(beforeCaptcha2);
             beforeCaptcha2 = br.getFormbyKey("ad_form_data");
             if (beforeCaptcha2 != null && beforeCaptcha2.getAction() != null) {
                 logger.info("Submitting second beforeCaptcha2");
-                this.submitForm(beforeCaptcha2);
+                br.submitForm(beforeCaptcha2);
             }
         }
         appVars = br.getRegex("var (app_vars.*?)</script>").getMatch(0);
@@ -179,14 +180,14 @@ public class FcLc extends antiDDoSForDecrypt {
         }
         if (!this.evalulateCaptcha(CaptchaType.reCaptchaV2, contentURL)) {
             /* 2020-10-26: short.fc-lc.com */
-            this.submitForm(form);
+            br.submitForm(form);
         }
         if (form.hasInputFieldByName("captcha")) {
             /* original captcha/ VERY OLD way! [2018-07-18: Very rare or non existent anymore!] */
             logger.info("OLD captcha required");
             final String code = getCaptchaCode("cp.php", param);
             form.put("captcha", Encoding.urlEncode(code));
-            submitForm(form);
+            br.submitForm(form);
             if (br.containsHTML("<script>alert\\('(?:Empty Captcha|Incorrect Captcha)\\s*!'\\);")) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
@@ -196,7 +197,7 @@ public class FcLc extends antiDDoSForDecrypt {
             }
             // we want redirect off here
             br.setFollowRedirects(false);
-            submitForm(form);
+            br.submitForm(form);
             final String finallink = br.getRedirectLocation();
             if (finallink == null) {
                 if (br.containsHTML("<script>alert\\('(?:Link not found)\\s*!'\\);")) {
@@ -209,86 +210,66 @@ public class FcLc extends antiDDoSForDecrypt {
             }
             ret.add(createDownloadlink(finallink));
         } else {
-            /* 2020-07-06: Static attempt */
-            final boolean forceRecaptchaV2 = false;
-            final CaptchaType captchaType;
-            if (forceRecaptchaV2) {
-                captchaType = CaptchaType.reCaptchaV2;
-            } else {
-                captchaType = getCaptchaType();
-            }
+            final CaptchaType captchaType = getCaptchaType();
             if (evalulateCaptcha(captchaType, contentURL)) {
                 logger.info("Captcha required");
-                boolean requiresCaptchaWhichCanFail = false;
-                boolean captchaFailed = false;
-                for (int i = 0; i <= 2; i++) {
-                    form = getCaptchaForm();
-                    if (form == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    if (captchaType == CaptchaType.reCaptchaV2 || captchaType == CaptchaType.reCaptchaV2_invisible) {
-                        requiresCaptchaWhichCanFail = false;
-                        final String key;
-                        if (captchaType == CaptchaType.reCaptchaV2) {
-                            key = getAppVarsResult("reCAPTCHA_site_key");
-                        } else {
-                            key = getAppVarsResult("invisible_reCAPTCHA_site_key");
-                        }
-                        if (StringUtils.isEmpty(key)) {
-                            logger.warning("Failed to find reCaptchaV2 key --> Fallback to default handling");
-                            final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
-                                @Override
-                                public TYPE getType() {
-                                    if (captchaType == CaptchaType.reCaptchaV2_invisible) {
-                                        return TYPE.INVISIBLE;
-                                    } else {
-                                        return TYPE.NORMAL;
-                                    }
-                                }
-                            }.getToken();
-                            form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                        } else {
-                            final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, key) {
-                                @Override
-                                public TYPE getType() {
-                                    if (captchaType == CaptchaType.reCaptchaV2_invisible) {
-                                        return TYPE.INVISIBLE;
-                                    } else {
-                                        return TYPE.NORMAL;
-                                    }
-                                }
-                            }.getToken();
-                            form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                        }
+                if (captchaType == CaptchaType.reCaptchaV2 || captchaType == CaptchaType.reCaptchaV2_invisible) {
+                    final String key;
+                    if (captchaType == CaptchaType.reCaptchaV2) {
+                        key = getAppVarsResult("reCAPTCHA_site_key");
                     } else {
-                        /* Unsupported captchaType */
-                        logger.warning("Unsupported captcha type!");
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        key = getAppVarsResult("invisible_reCAPTCHA_site_key");
                     }
-                    submitForm(form);
-                    if (requiresCaptchaWhichCanFail && this.br.containsHTML("The CAPTCHA was incorrect")) {
-                        captchaFailed = true;
+                    if (StringUtils.isEmpty(key)) {
+                        logger.warning("Failed to find reCaptchaV2 key --> Fallback to default handling");
+                        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
+                            @Override
+                            public TYPE getType() {
+                                if (captchaType == CaptchaType.reCaptchaV2_invisible) {
+                                    return TYPE.INVISIBLE;
+                                } else {
+                                    return TYPE.NORMAL;
+                                }
+                            }
+                        }.getToken();
+                        form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                     } else {
-                        captchaFailed = false;
+                        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, key) {
+                            @Override
+                            public TYPE getType() {
+                                if (captchaType == CaptchaType.reCaptchaV2_invisible) {
+                                    return TYPE.INVISIBLE;
+                                } else {
+                                    return TYPE.NORMAL;
+                                }
+                            }
+                        }.getToken();
+                        form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                     }
-                    if (!captchaFailed) {
-                        /* Captcha success or we did not have to enter any captcha! */
-                        break;
-                    }
+                } else if (captchaType == CaptchaType.hCaptcha) {
+                    final String hcaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
+                    /* Browser puts hCaptcha token token 3 times into form: 2x "h-captcha-response", 1x "g-recaptcha-response" */
+                    form.put("h-captcha-response", Encoding.urlEncode(hcaptchaResponse));
+                    form.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));
+                } else {
+                    /* Unsupported captchaType -> Developer mistake */
+                    logger.warning("Unsupported captcha type!");
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                if (requiresCaptchaWhichCanFail && captchaFailed) {
+                br.submitForm(form);
+                if (br.containsHTML("The CAPTCHA was incorrect")) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
             } else if (form != null) {
                 logger.info("No captcha required");
-                this.submitForm(form);
+                br.submitForm(form);
             }
             String anotherRedirect = br.getRequest().getHTMLRefresh();
             if (anotherRedirect == null) {
                 anotherRedirect = br.getRegex("var redirectUrl\\s*=\\s*'(https?://[^\\']+/)';").getMatch(0);
             }
             if (anotherRedirect != null) {
-                getPage(anotherRedirect);
+                br.getPage(anotherRedirect);
             }
             // 2024-08-12: Old stuff down below
             // final Form[] forms = br.getForms();
@@ -309,7 +290,7 @@ public class FcLc extends antiDDoSForDecrypt {
                     finalform = thisform;
                     break;
                 } else {
-                    this.submitForm(thisform);
+                    br.submitForm(thisform);
                 }
             } while (counter <= 3);
             final boolean skipWait = waittimeIsSkippable(source_host);
@@ -327,17 +308,10 @@ public class FcLc extends antiDDoSForDecrypt {
                 br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
                 br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
                 br.getHeaders().put("Origin", "https://" + br.getHost());
-                String waitStr = br.getRegex("\"counter_value\"\\s*:\\s*\"(\\d+)\"").getMatch(0);
-                if (waitStr == null) {
-                    waitStr = br.getRegex(">\\s*Please Wait\\s*(\\d+)s\\s*<").getMatch(0);
-                    if (waitStr == null) {
-                        /* 2018-12-12: E.g. rawabbet.com[RIP 2019-02-21] */
-                        waitStr = br.getRegex("class=\"timer\">\\s*(\\d+)\\s*<").getMatch(0);
-                    }
-                }
+                String waitStr = this.getAppVarsResult("counter_value");
                 if (!skipWait) {
                     int wait = 15;
-                    if (waitStr != null) {
+                    if (waitStr != null && waitStr.matches("\\d+")) {
                         logger.info("Found waittime in html, waiting (seconds): " + waitStr);
                         wait = Integer.parseInt(waitStr) * +1;
                         this.sleep(wait * 1000, param);
@@ -355,17 +329,15 @@ public class FcLc extends antiDDoSForDecrypt {
                     logger.info("Waiting extra seconds: " + extraSeconds);
                     this.sleep(extraSeconds * 1000l, param);
                 }
-                submitForm(finalform);
+                br.submitForm(finalform);
             } else {
                 logger.warning("Failed to find finalform -> This will most likely result in a plugin failure");
             }
             final String finallink = getFinallink();
             if (finallink == null) {
-                if (br.containsHTML("<h1>Whoops, looks like something went wrong\\.</h1>")) {
-                    logger.warning("Hoster has issue");
+                if (br.containsHTML("<h1>\\s*Whoops, looks like something went wrong\\.\\s*</h1>")) {
                     throw new DecrypterRetryException(RetryReason.HOST);
                 } else {
-                    logger.warning("Decrypter broken for link: " + contentURL);
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
@@ -375,17 +347,13 @@ public class FcLc extends antiDDoSForDecrypt {
     }
 
     private boolean waittimeIsSkippable(final String source_host) {
-        if (StringUtils.isEmpty(source_host)) {
-            /* WTF */
-            return false;
-        }
         if (domains_waittime_skippable.contains(source_host)) {
             /* Waittime is skippable for this host */
             return true;
-        } else if (domains_waittime_skippable.contains(this.br.getHost())) {
+        } else if (domains_waittime_skippable.contains(br.getHost())) {
             return true;
         }
-        /* Waittime is NOT skippable for all other hosts */
+        /* Waittime is not skippable */
         return false;
     }
 
@@ -428,7 +396,7 @@ public class FcLc extends antiDDoSForDecrypt {
         }
         if (hasCaptcha && domains_captcha_skippable.contains(source_host)) {
             logger.info("Captcha should be required but current host does not require captcha");
-            hasCaptcha = false;
+            return false;
         }
         return hasCaptcha;
     }
@@ -443,6 +411,10 @@ public class FcLc extends antiDDoSForDecrypt {
             }
             /* No captcha or plugin broken */
             return null;
+        }
+        /* 2025-11-04: "captcha_type" says "invisible-recaptcha" but what they actually use is hCaptcha. */
+        if (br.containsHTML("\"h-captcha-response\"")) {
+            return CaptchaType.hCaptcha;
         }
         if (captchaTypeStr.equalsIgnoreCase("recaptcha")) {
             /*
@@ -473,21 +445,22 @@ public class FcLc extends antiDDoSForDecrypt {
             /* For >90%, this json-attempt should work! */
             finallink = PluginJSonUtils.getJsonValue(br, "url");
         }
-        if (inValidate(finallink) || !finallink.startsWith("http")) {
+        if (StringUtils.isEmpty(finallink) || !finallink.startsWith("http")) {
             finallink = br.getRegex("<a href=(\"|')(.*?)\\1[^>]+>\\s*Get\\s+Link\\s*</a>").getMatch(1);
-            if (inValidate(finallink)) {
+            if (StringUtils.isEmpty(finallink)) {
                 finallink = br.getRegex("<a\\s+[^>]*href=(\"|')(.*?)\\1[^>]*>Continue[^<]*</a>").getMatch(1);
             }
         }
         /* 2020-02-03: clk.in: p.clk.in/?n=bla */
-        if (!this.inValidate(finallink) && finallink.matches("https?://p\\.[^/]+/\\?n=.+")) {
+        if (!StringUtils.isEmpty(finallink) && finallink.matches("https?://p\\.[^/]+/\\?n=.+")) {
             logger.info("Special case: Finallink seems to lead to another step");
-            this.getPage(finallink);
+            br.getPage(finallink);
             finallink = br.getRegex("<div class=\"button\">\\s*?<center>\\s*?<a name=\"a\"\\s*?href=\"(http[^\"]+)\">").getMatch(0);
         }
         return finallink;
     }
 
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         /* Most of all providers will require the user to solve a reCaptchaV2. */
         return true;

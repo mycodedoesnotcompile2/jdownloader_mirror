@@ -16,32 +16,21 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
+import jd.http.BasicAuthentication;
 import jd.http.Browser;
-import jd.http.Cookies;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -56,7 +45,17 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51786 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51793 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -75,7 +74,7 @@ public class FilerNet extends PluginForHost {
     private static final int     defaultSETTING_WAIT_MINUTES_ON_ERROR_CODE_415      = 5;
     /* API Docs: https://filer.net/api */
     public static final String   API_BASE                                           = "https://api.filer.net/api";
-    public static final String   BASE                                               = "https://filer.net";
+    public static final String   WEBSITE_BASE                                       = "https://filer.net";
 
     @SuppressWarnings("deprecation")
     public FilerNet(PluginWrapper wrapper) {
@@ -95,9 +94,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
-                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
-                 * this, http protocol would be used even if user preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
+                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
+                 * preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -112,15 +111,6 @@ public class FilerNet extends PluginForHost {
         };
         br.setFollowRedirects(true);
         br.getHeaders().put("User-Agent", "JDownloader");
-        return br;
-    }
-
-    /** Prepares browser for website (=non-API) requests. */
-    private Browser prepBrowserWebsite(final Browser br) {
-        br.setFollowRedirects(true);
-        br.getHeaders().put("Accept-Charset", null);
-        // TODO: 2025-10-28: Why are we using this User-Agent?
-        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.73.11 (KHTML, like Gecko) Version/7.0.1 Safari/537.73.11");
         return br;
     }
 
@@ -250,7 +240,7 @@ public class FilerNet extends PluginForHost {
                     }
                     sb.append(this.getFileID(link));
                 }
-                final Map<String, Object> entries = (Map<String, Object>) this.callAPI(API_BASE + "/multi_status/" + sb.toString() + ".json");
+                final Map<String, Object> entries = (Map<String, Object>) this.callAPI(getAPI_BASE() + "/multi_status/" + sb.toString() + ".json");
                 final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
                 for (final DownloadLink link : links) {
                     final String fid = this.getFileID(link);
@@ -306,113 +296,10 @@ public class FilerNet extends PluginForHost {
 
     /** Handles free- and free account downloads. */
     public void handleFreeDownloads(final DownloadLink link, final Account account) throws Exception {
-        doFreeWebsite(account, link);
-        // if (this.getPluginConfig().getBooleanProperty(SETTING_ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS,
-        // defaultSETTING_ENABLE_API_FOR_FREE_AND_FREE_ACCOUNT_DOWNLOADS)) {
-        // doFreeAPI(account, link);
-        // } else {
-        // doFreeWebsite(account, link);
-        // }
+        doWebsiteApi(account, link);
     }
 
-    private void doFreeAPI(final Account account, final DownloadLink link) throws Exception {
-        if (checkShowFreeDialog(getHost())) {
-            showFreeDialog(getHost());
-        }
-        final String storedDirecturl = link.getStringProperty(DIRECT_API);
-        final String dllink;
-        if (storedDirecturl != null) {
-            logger.info("Trying to re-use stored directurl: " + storedDirecturl);
-            dllink = storedDirecturl;
-        } else {
-            final String fid = getFileID(link);
-            String recaptchaV2Response = null;
-            Map<String, Object> resp = (Map<String, Object>) callAPI(null, BASE + "/get/" + fid + ".json");
-            Map<String, Object> data = (Map<String, Object>) resp.get("data");
-            int statusCode = ((Number) resp.get("code")).intValue();
-            final String reCaptchaKey = "6LdB1kcUAAAAAAVPepnD-6TEd4BXKzS7L4FZFkpO";
-            final boolean captchaAlwaysRequired = true; // 2025-10-27
-            if (statusCode == 203) {
-                /* Pre download wait time */
-                int i = 0;
-                final boolean allowSolveCaptchaDuringWaitTime = true;
-                do {
-                    if (recaptchaV2Response != null) {
-                        /**
-                         * Nullify previous captcha response, that should be a rare case or even never happen. <br>
-                         * If it happens, we need to ask the user to solve the captcha two times which we want to avoid.
-                         */
-                        recaptchaV2Response = null;
-                        logger.warning("Wait loop is executed multiple times -> Nullify captcha response");
-                    }
-                    final String token = data.get("token").toString();
-                    final int waitSeconds = ((Number) data.get("wait")).intValue();
-                    long waitMillis = waitSeconds * 1000l;
-                    if (i == 0 && allowSolveCaptchaDuringWaitTime) {
-                        /* 2025-10-27: Special: Solve captcha "during" wait time. */
-                        final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
-                        final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey);
-                        if (waitMillis > rc2.getSolutionTimeout()) {
-                            final long prePrePreDownloadWaitMillis = waitMillis - rc2.getSolutionTimeout();
-                            logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid captcha-token-timeout");
-                            logger.info("Pre-pre download waittime seconds: " + (prePrePreDownloadWaitMillis / 1000));
-                            this.sleep(prePrePreDownloadWaitMillis, link);
-                        }
-                        recaptchaV2Response = rc2.getToken();
-                        final long passedMillis = Time.systemIndependentCurrentJVMTimeMillis() - timeBefore;
-                        waitMillis = waitMillis - passedMillis;
-                    }
-                    /* Wait if any wait time is left */
-                    if (waitMillis > 0) {
-                        sleep(waitMillis, link);
-                    }
-                    resp = (Map<String, Object>) callAPI(null, BASE + "/get/" + fid + ".json?token=" + token);
-                    statusCode = ((Number) resp.get("code")).intValue();
-                } while (statusCode == 203 && ++i <= 2);
-            }
-            /* Check if captcha is required. Usually, captcha is required. */
-            if (captchaAlwaysRequired && statusCode != 202) {
-                logger.warning("Unexpected statusCode: " + statusCode + " and not 202");
-            }
-            if (statusCode == 202 || captchaAlwaysRequired) {
-                final Browser brc = br.cloneBrowser();
-                brc.setFollowRedirects(false);
-                /* Solve captcha if it hasn't been solved before. */
-                if (recaptchaV2Response == null) {
-                    final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey);
-                    recaptchaV2Response = rc2.getToken();
-                }
-                brc.postPage(BASE + "/get/" + fid + ".json", "g-recaptcha-response=" + Encoding.urlEncode(recaptchaV2Response) + "&hash=" + fid);
-                dllink = brc.getRedirectLocation();
-                if (dllink == null) {
-                    this.checkErrorsAPI(account);
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                }
-            }
-        }
-        try {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
-            if (!looksLikeDownloadableContent(dl.getConnection())) {
-                br.followConnection(true);
-                checkErrorsWebsite(account, true);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            dl.setAllowFilenameFromURL(true);
-            if (storedDirecturl == null) {
-                link.setProperty(DIRECT_API, dl.getConnection().getURL().toExternalForm());
-            }
-        } catch (final Exception e) {
-            if (storedDirecturl != null) {
-                link.removeProperty(DIRECT_API);
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
-            } else {
-                throw e;
-            }
-        }
-        dl.startDownload();
-    }
-
-    private void doFreeWebsite(final Account account, final DownloadLink link) throws Exception {
+    private void doWebsiteApi(final Account account, final DownloadLink link) throws Exception {
         if (checkShowFreeDialog(getHost())) {
             showFreeDialog(getHost());
         }
@@ -423,9 +310,6 @@ public class FilerNet extends PluginForHost {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            if (account != null) {
-                this.loginWebsite(account, false);
-            }
             final String fid = getFileID(link);
             Map<String, Object> data = (Map<String, Object>) callAPI(null, "https://" + getHost() + "/api/file/" + fid);
             if (Boolean.TRUE.equals(data.get("premiumOnly")) && (account == null || !AccountType.PREMIUM.equals(account.getType()))) {
@@ -516,66 +400,19 @@ public class FilerNet extends PluginForHost {
         throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "No free slots available, wait or buy premium!", waitMinutes * 60 * 1000l);
     }
 
+    private BasicAuthentication getAPIBasicAuthentication(final Account account) throws MalformedURLException {
+        synchronized (account) {
+            return new BasicAuthentication(new URL(getAPI_BASE()).getHost(), account.getUser(), account.getPass(), null);
+        }
+    }
+
     public Object loginAPI(final Account account, final boolean verifyLogins) throws Exception {
         synchronized (account) {
-            br.getHeaders().put("Authorization", "Basic " + Encoding.Base64Encode(account.getUser() + ":" + account.getPass()));
-            // br.addAuthentication(new BasicAuthentication(getHost(), account.getUser(), account.getPass(), null));
+            br.addAuthentication(getAPIBasicAuthentication(account));
             if (!verifyLogins) {
                 return null;
             }
             return callAPI(account, getAPI_BASE() + "/profile.json");
-        }
-    }
-
-    /**
-     * E.g. used for free account downloads <br>
-     * 2025-11-03: Disabled free account support since this login function is still broken andI was unable to find any benefits for free
-     * account downloads over anonymous downloads.
-     */
-    @Deprecated
-    private void loginWebsite(final Account account, final boolean force) throws Exception {
-        synchronized (account) {
-            /* Load cookies */
-            prepBrowserWebsite(br);
-            final Cookies cookies = account.loadCookies("");
-            login_via_stored_cookies: if (cookies != null) {
-                br.setCookies(cookies);
-                if (!force) {
-                    /* Do not validate cookies */
-                    return;
-                }
-                br.getPage("https://" + this.getHost());
-                if (this.isLoggedInWebsite(br)) {
-                    logger.info("Successfully logged in via cookies");
-                    account.saveCookies(this.br.getCookies(br.getHost()), "");
-                    return;
-                }
-                logger.info("Cookie login failed");
-                br.clearCookies(br.getHost());
-            }
-            logger.info("Performing full login");
-            br.getPage("https://" + this.getHost() + "/login");
-            final Form loginform = br.getFormbyKey("_username");
-            if (loginform == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
-            }
-            loginform.put("_username", Encoding.urlEncode(account.getUser()));
-            loginform.put("_password", Encoding.urlEncode(account.getPass()));
-            loginform.remove("_remember_me");
-            loginform.put("_remember_me", "on");
-            br.submitForm(loginform);
-            if (!isLoggedInWebsite(br)) {
-                throw new AccountInvalidException();
-            }
-            account.saveCookies(br.getCookies(br.getHost()), "");
-        }
-    }
-
-    private boolean isLoggedInWebsite(final Browser br) {
-        if (br.containsHTML("/logout\"")) {
-            return true;
-        } else {
-            return false;
         }
     }
 
@@ -630,9 +467,6 @@ public class FilerNet extends PluginForHost {
                 this.checkErrorsAPI(account);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            /* Important!! */
-            br.getHeaders().put("Authorization", "");
-            // br.removeAuthentication(new BasicAuthentication(getHost(), account.getUser(), account.getPass(), null));
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
