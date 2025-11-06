@@ -64,6 +64,12 @@ public class PostFormDataRequest extends Request {
         this.boundary = this.generateBoundary();
     }
 
+    @Override
+    public PostFormDataRequest setXHR(boolean b) {
+        super.setXHR(b);
+        return this;
+    }
+
     public void addFormData(final FormData fd) throws IOException {
         if (fd != null) {
             switch (fd.getType()) {
@@ -127,7 +133,7 @@ public class PostFormDataRequest extends Request {
     }
 
     @Override
-    public Request cloneRequest() {
+    public PostFormDataRequest cloneRequest() {
         final PostFormDataRequest ret = new PostFormDataRequest(this);
         ret.getFormData().addAll(this.getFormData());
         return ret;

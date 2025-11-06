@@ -25,19 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
+import jd.http.BearerAuthentication;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.Request;
@@ -60,7 +50,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 51668 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -519,8 +520,8 @@ public class SankakucomplexCom extends PluginForHost {
 
     private static void prepareDownloadHeaders(final Browser br) {
         /**
-         * 2024-11-12: Do not send a referer header! </br>
-         * This is really important else we may get redirected to a dummy image. Looks to be some kind of pseudo protection.
+         * 2024-11-12: Do not send a referer header! </br> This is really important else we may get redirected to a dummy image. Looks to be
+         * some kind of pseudo protection.
          */
         br.getHeaders().put("Referer", "");
         // br.setCurrentURL(null);
@@ -550,8 +551,8 @@ public class SankakucomplexCom extends PluginForHost {
         final String errortext = "Broken or temporarily unavailable file";
         if (System.currentTimeMillis() - timestampLastTimeFileMaybeBroken <= 5 * 60 * 1000l) {
             /**
-             * Failed again in a short time even with fresh direct URL: </br>
-             * Wait longer time before retry as we've just recently tried and it failed again.
+             * Failed again in a short time even with fresh direct URL: </br> Wait longer time before retry as we've just recently tried and
+             * it failed again.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext, 5 * 60 * 1000l);
         } else {
@@ -749,7 +750,7 @@ public class SankakucomplexCom extends PluginForHost {
             final GetRequest request = brc.createGetRequest("https://sankakuapi.com/users/me?lang=en");
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.sankakucomplex.com");
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.sankakucomplex.com/");
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + apiToken);
+            brc.addAuthentication(new BearerAuthentication("sankakuapi.com", apiToken, null));
             final String response = brc.getPage(request);
             final Map<String, Object> entries = restoreFromString(response, TypeRef.MAP);
             if (!Boolean.TRUE.equals(entries.get("success"))) {

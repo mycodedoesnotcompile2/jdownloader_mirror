@@ -60,6 +60,12 @@ public class GetRequest extends Request {
     }
 
     @Override
+    public GetRequest setXHR(boolean b) {
+        super.setXHR(b);
+        return this;
+    }
+
+    @Override
     protected boolean sendHTTPHeader(HTTPHeader header) {
         /**
          * GETRequest does not have any postContent

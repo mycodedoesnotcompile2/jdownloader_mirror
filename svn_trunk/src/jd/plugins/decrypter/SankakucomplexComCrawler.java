@@ -21,6 +21,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -39,16 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
-import org.jdownloader.plugins.components.config.SankakucomplexComConfig.AccessMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51793 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,8 +68,12 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
 
     private Browser createNewBrowserInstanceAPI() {
         final Browser br = createNewBrowserInstance();
-        /* API can return very big json structures. */
+        /*
+         * 2025-11-04: They may return response code 429 not for rate limiting but also when you try to access items via API that require
+         * the user to be logged in.
+         */
         br.setAllowedResponseCodes(429);
+        /* API can return very big json structures. */
         br.setLoadLimit(Integer.MAX_VALUE);
         return br;
     }
@@ -115,11 +119,12 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final Pattern TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/?)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_TAGS_BOOKS = Pattern.compile("/(([a-z]{2,3})/?)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_TAGS_POSTS = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
-    public static final String   API_BASE        = "https://sankakuapi.com";
-    private SankakucomplexCom    hosterplugin    = null;
+    private static final Pattern TYPE_BOOK                                       = Pattern.compile("/(([a-z]{2,3})/?)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TAGS_BOOKS                                 = Pattern.compile("/(([a-z]{2,3})/?)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TAGS_POSTS                                 = Pattern.compile("/(([a-z]{2,3})/?)?(?:posts)?\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
+    public static final String   API_BASE                                        = "https://sankakuapi.com";
+    private SankakucomplexCom    hosterplugin                                    = null;
+    private final String         ERROR_MSG_ACCOUNT_REQUIRED_TOO_MANY_SEARCH_TAGS = "Account required: Your search query contains too many tags";
 
     @Override
     public void clean() {
@@ -162,11 +167,12 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final AccessMode mode = cfg.getPostTagCrawlerAccessMode();
         /**
-         * Some items are only visible for logged in users and are never returned via API. </br> For this reason, some user may prefer
-         * website mode.
+         * Some items are only visible for logged in users and are never returned via API. </br>
+         * API may return http response code 429 if we try regardless. <br>
+         * For this reason, some user may prefer website mode.
          */
         if (tagsCount > 3 && account == null) {
-            throw new AccountRequiredException("Account required: Your search query contains too many tags");
+            throw new AccountRequiredException(ERROR_MSG_ACCOUNT_REQUIRED_TOO_MANY_SEARCH_TAGS);
         }
         if (mode == AccessMode.API || (mode == AccessMode.AUTO && hosterplugin.allowUseAPI(account, SankakucomplexCom.API_METHOD.OTHER))) {
             return crawlTagsPostsAPI(account, param, tags, language);
@@ -225,9 +231,13 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         br.getPage("https://chan.sankakucomplex.com/" + langPart + "posts?tags=" + tagsUrlEncoded);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getURL().contains("/premium")) {
-            if (br.containsHTML("Ihre Suchanfrage enthält zu viele Tags")) {
-                throw new AccountRequiredException("Account required: Your search query contains too many tags");
+        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/premium")) {
+            if (StringUtils.containsIgnoreCase(br.getURL(), "state=8")) {
+                /*
+                 * Website error [DE]: Ihre Suchanfrage enthält zu viele Tags. Wenn Sie mehr verwenden möchten, erstellen Sie bitte ein
+                 * Konto.
+                 */
+                throw new AccountRequiredException(ERROR_MSG_ACCOUNT_REQUIRED_TOO_MANY_SEARCH_TAGS);
             }
             /* Account required (most times due to adult content so free account is enough). */
             throw new AccountRequiredException();
@@ -369,7 +379,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             if ("snackbar__anonymous_tags-limit".equals(entries.get("code"))) {
                 throw new AccountRequiredException("Account required: Your search query contains too many tags");
-            } else if (!Boolean.TRUE.equals(entries.get("success"))) {
+            } else if (Boolean.FALSE.equals(entries.get("success"))) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");

@@ -50,12 +50,18 @@ public class DeleteRequest extends PostRequest {
     }
 
     @Override
-    protected PostRequest cloneRequestRaw() {
+    protected DeleteRequest cloneRequestRaw() {
         return new DeleteRequest(this);
     }
 
     @Override
     public RequestMethod getRequestMethod() {
         return RequestMethod.DELETE;
+    }
+
+    @Override
+    public DeleteRequest setXHR(boolean b) {
+        super.setXHR(b);
+        return this;
     }
 }

@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jd.PluginWrapper;
+import jd.http.BearerAuthentication;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
@@ -65,7 +67,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -465,7 +467,7 @@ public class GofileIo extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         final GetRequest request = new GetRequest(getAPIBase() + "/accounts/website");
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + getAccountTokenOrFail(account));
+        br.addAuthentication(new BearerAuthentication(new URL(getAPIBase()).getHost(), getAccountTokenOrFail(account), null));
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + getHost());
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
         br.getPage(request);

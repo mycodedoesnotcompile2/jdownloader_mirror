@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51775 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51797 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNu extends PluginForHost {
     public GigafileNu(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,12 +108,12 @@ public class GigafileNu extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(fid);
-        }
         this.setBrowserExclusive();
         final String filenameFromCrawler = link.getStringProperty(PROPERTY_FILE_NAME_FROM_CRAWLER);
         /* If we are about to download, we want to access URL from "getPluginPatternMatcher" down below. */

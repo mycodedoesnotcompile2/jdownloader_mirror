@@ -27,28 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.download.HashInfo;
-import jd.plugins.hoster.ArchiveOrg;
-import jd.plugins.hoster.DirectHTTP;
-
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -71,7 +49,29 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51793 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.download.HashInfo;
+import jd.plugins.hoster.ArchiveOrg;
+import jd.plugins.hoster.DirectHTTP;
+
+@DecrypterPlugin(revision = "$Revision: 51795 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,8 +118,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Returns identifier from given URL. </br> The definition of how an identifier is supposed to look is vague so in this case we're also
-     * including username strings a la "@<username>" as possible return values.
+     * Returns identifier from given URL. </br>
+     * The definition of how an identifier is supposed to look is vague so in this case we're also including username strings a la
+     * "@<username>" as possible return values.
      */
     public static String getIdentifierFromURL(final String url) {
         /* htmldecode because "@" of "@username" could be url-encoded. */
@@ -171,10 +172,13 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Uses search APIv1 </br> API: Docs: https://archive.org/help/aboutsearch.htm </br> 2024-07-17: This API is limited in functionality
-     * which is why we are moving away from it and use {@link #crawlBetaSearchAPI(String, String)}. </br> Example of things which are NOT
-     * possible via this API: </br> - Find all uploads of a user </br> - New style search queries such as:
-     * query=test&and%5B%5D=lending%3A"is_readable"&and%5B%5D=year%3A%5B1765+TO+1780%5D
+     * Uses search APIv1 </br>
+     * API: Docs: https://archive.org/help/aboutsearch.htm </br>
+     * 2024-07-17: This API is limited in functionality which is why we are moving away from it and use
+     * {@link #crawlBetaSearchAPI(String, String)}. </br>
+     * Example of things which are NOT possible via this API: </br>
+     * - Find all uploads of a user </br>
+     * - New style search queries such as: query=test&and%5B%5D=lending%3A"is_readable"&and%5B%5D=year%3A%5B1765+TO+1780%5D
      */
     @Deprecated
     private ArrayList<DownloadLink> crawlViaScrapeAPI(final String searchTerm, final int maxResultsLimit) throws Exception {
@@ -656,8 +660,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         int internalPageIndex = 0;
         for (final Object imageO : imagesO) {
             /**
-             * Most of all objects will contain an array with 2 items --> Books always have two viewable pages. </br> Exception = First page
-             * --> Cover
+             * Most of all objects will contain an array with 2 items --> Books always have two viewable pages. </br>
+             * Exception = First page --> Cover
              */
             final List<Map<String, Object>> bookpages = (List<Map<String, Object>>) imageO;
             for (final Map<String, Object> bookpage : bookpages) {
@@ -686,8 +690,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     link.setProperty(ArchiveOrg.PROPERTY_IS_BORROWED_UNTIL_TIMESTAMP, System.currentTimeMillis() + loanedSecondsLeft * 1000);
                 }
                 /**
-                 * Mark pages that are not viewable in browser as offline. </br> If we have borrowed this book, this field will not exist at
-                 * all.
+                 * Mark pages that are not viewable in browser as offline. </br>
+                 * If we have borrowed this book, this field will not exist at all.
                  */
                 final Object viewable = bookpage.get("viewable");
                 if (Boolean.FALSE.equals(viewable)) {
@@ -923,37 +927,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 identifierDotMp4Exists = true;
             }
             /* Find path- and filename */
-            /* Relative path to this file including identifier as root folder. */
-            String pathToCurrentFolder;
-            String filename = null;
-            if (pathWithFilename.contains("/")) {
-                /* Separate path and filename. */
-                pathToCurrentFolder = "";
-                final String[] pathSegments = pathWithFilename.split("/");
-                int index = 0;
-                for (final String pathSegment : pathSegments) {
-                    final boolean isLastSegment = index == pathSegments.length - 1;
-                    if (isLastSegment) {
-                        filename = pathSegment;
-                    } else {
-                        if (pathToCurrentFolder == null) {
-                            pathToCurrentFolder = pathSegment;
-                        } else {
-                            if (pathToCurrentFolder.length() > 0) {
-                                pathToCurrentFolder += "/";
-                            }
-                            pathToCurrentFolder += pathSegment;
-                        }
-                    }
-                    index++;
-                }
-                /* Add identifier slash root dir name to path. */
-                pathToCurrentFolder = identifier + "/" + pathToCurrentFolder;
-            } else {
-                /* Current file is in root folder */
-                pathToCurrentFolder = identifier;
-                filename = pathWithFilename;
-            }
+            final String[] pathAndFilename = extractPathAndFilename(pathWithFilename, identifier);
+            final String pathToCurrentFolder = identifier + "/" + pathAndFilename[0];
+            final String filename = pathAndFilename[1];
             String url = "https://" + getHost() + "/download/" + identifier;
             if (pathWithFilename.startsWith("/")) {
                 url += URLEncode.encodeURIComponent(pathWithFilename);
@@ -1082,49 +1058,26 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             }
             logger.info("Failed to find single file/path -> Adding all (selected) results instead");
             /* Add single offline item to list of results */
-            // final DownloadLink offline = this.createDownloadlink(sourceurl);
             /*
              * Add as DirectHTTP link so that URL structure does not matter and link will definitely end up as entry in linkgrabber visible
              * to the user.
              */
             {
+                final String[] pathAndFilename = extractPathAndFilename(desiredSubpathDecoded, identifier);
+                final String pathToCurrentFolder = identifier + "/" + pathAndFilename[0];
                 final DownloadLink offline = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(sourceurl));
                 offline.setAvailable(false);
-                selectedItems.add(offline);
-                if (desiredSubpathDecoded != null) {
-                    String pathToCurrentFolder;
-                    if (desiredSubpathDecoded.contains("/")) {
-                        /* Separate path and filename. */
-                        pathToCurrentFolder = "";
-                        final String[] pathSegments = desiredSubpathDecoded.split("/");
-                        int index = 0;
-                        for (final String pathSegment : pathSegments) {
-                            final boolean isLastSegment = index == pathSegments.length - 1;
-                            if (!isLastSegment) {
-                                if (pathToCurrentFolder == null) {
-                                    pathToCurrentFolder = pathSegment;
-                                } else {
-                                    if (pathToCurrentFolder.length() > 0) {
-                                        pathToCurrentFolder += "/";
-                                    }
-                                    pathToCurrentFolder += pathSegment;
-                                }
-                            }
-                            index++;
-                        }
-                    } else {
-                        /* Current file is in root folder */
-                        pathToCurrentFolder = identifier;
-                    }
-                    FilePackage fp = packagemap.get(pathToCurrentFolder);
-                    if (fp == null) {
-                        fp = FilePackage.getInstance();
-                        fp.setName(pathToCurrentFolder);
-                        fp.setComment(description);
-                        packagemap.put(pathToCurrentFolder, fp);
-                    }
-                    offline._setFilePackage(fp);
+                /* Ensures that this item will go into same package as other items within the same folder structure. */
+                offline.setRelativeDownloadFolderPath(pathToCurrentFolder);
+                FilePackage fp = packagemap.get(pathToCurrentFolder);
+                if (fp == null) {
+                    fp = FilePackage.getInstance();
+                    fp.setName(pathToCurrentFolder);
+                    fp.setComment(description);
+                    packagemap.put(pathToCurrentFolder, fp);
                 }
+                offline._setFilePackage(fp);
+                selectedItems.add(offline);
             }
         }
         /* Log skipped results */
@@ -1356,6 +1309,40 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             logger.info("User wanted specific path/file but that hasn't been found -> Returning all globally allowed items instead");
         }
         return selectedItems;
+    }
+
+    /**
+     * Extracts the directory path and filename from a given input path.
+     *
+     * If the input contains a "/" separator, it splits the path and returns the directory portion (all segments except the last) and the
+     * filename (the last segment). If the input has no separator, the entire input is treated as a filename and the identifier is used as
+     * the path.
+     *
+     * @param input
+     *            the input path string, potentially containing "/" separators
+     * @param identifier
+     *            the identifier to use as the path for files in the root directory
+     * @return a String array with two elements: [0] = the directory path (or identifier if input has no "/" separator) [1] = the filename
+     *         (last segment of path, or entire input if no "/" separator)
+     */
+    private String[] extractPathAndFilename(String input, String identifier) {
+        String pathToCurrentFolder;
+        String filename;
+        if (input.contains("/")) {
+            final String[] pathSegments = input.split("/");
+            pathToCurrentFolder = "";
+            for (int i = 0; i < pathSegments.length - 1; i++) {
+                if (i > 0) {
+                    pathToCurrentFolder += "/";
+                }
+                pathToCurrentFolder += pathSegments[i];
+            }
+            filename = pathSegments[pathSegments.length - 1];
+        } else {
+            pathToCurrentFolder = identifier;
+            filename = input;
+        }
+        return new String[] { pathToCurrentFolder, filename };
     }
 
     private Map<String, Map<String, String>> parseFilterMap(final String url) {

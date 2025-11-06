@@ -23,6 +23,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -45,17 +55,7 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51793 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -94,9 +94,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
-                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
-                 * preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
+                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
+                 * this, http protocol would be used even if user preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -423,12 +423,14 @@ public class FilerNet extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         if (data.get("state").toString().equalsIgnoreCase("premium")) {
             account.setType(AccountType.PREMIUM);
+            account.setMaxSimultanDownloads(10);
             final Long trafficLeft = (Long) ReflectionUtils.cast(data.get("traffic"), Long.class);
             ai.setTrafficLeft(trafficLeft.longValue());
             final Long validUntil = (Long) ReflectionUtils.cast(data.get("until"), Long.class);
             ai.setValidUntil(validUntil.longValue() * 1000, br);
         } else {
             account.setType(AccountType.FREE);
+            account.setMaxSimultanDownloads(10);
             // ai.setUnlimitedTraffic();
             ai.setTrafficLeft(0);
             /* Display traffic left 0 but still allow account to be used for downloading. */

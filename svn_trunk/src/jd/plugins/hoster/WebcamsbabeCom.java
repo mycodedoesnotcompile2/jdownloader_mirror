@@ -15,14 +15,22 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.PluginWrapper;
-import jd.parser.Regex;
-import jd.plugins.HostPlugin;
+import org.appwork.utils.StringUtils;
 
-@HostPlugin(revision = "$Revision: 51790 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
+@HostPlugin(revision = "$Revision: 51795 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebcamsbabeCom extends KernelVideoSharingComV2 {
     public WebcamsbabeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -74,5 +82,21 @@ public class WebcamsbabeCom extends KernelVideoSharingComV2 {
             return null;
         }
         return this.getProtocol() + host + "/videos/" + fuid + "-" + urlSlug + ".html";
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
+        /* Special handling */
+        final String embed = br.getRegex("<iframe[^>]*(https?://(?:www\\.)?sexcams-24\\.com/embed/\\d+)").getMatch(0);
+        if (embed != null && !StringUtils.equals(br._getURL().getPath(), new URL(embed).getPath())) {
+            /* 2025-11-05: e.g. privaterecords.life/embed... -> sexcams-24.com/... */
+            br.getPage(embed);
+            if (isOfflineWebsite(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            return super.getDllink(link, br);
+        } else {
+            return super.getDllink(link, br);
+        }
     }
 }

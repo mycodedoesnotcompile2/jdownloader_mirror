@@ -32,4 +32,9 @@ public class URLUserInfoAuthentication extends AbstractAuthenticationFactory {
             return null;
         }
     }
+
+    @Override
+    protected Authentication buildBearerAuthentication(Browser browser, Request request, String realm) {
+        return null;
+    }
 }

@@ -737,7 +737,7 @@ public class Browser {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     *
+     * 
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -752,7 +752,6 @@ public class Browser {
     private LogInterface                        logger                = null;
     private ProxySelectorInterface              proxy;
     private int                                 readTimeout           = -1;
-    private Request                             request;
     private boolean                             verbose               = false;
     private volatile List<BlockedTypeInterface> blockedTypeInterfaces = null;
 
@@ -880,6 +879,7 @@ public class Browser {
         br.sslSocketStreamOptionsModifier = this.sslSocketStreamOptionsModifier;
         br.readTimeout = this.readTimeout;
         br.request = this.getRequest();
+        br.baseRequest = this.getBaseRequest();
         br.cookies = this.cookies;
         br.browserParentID = this.getBrowserID();
         br.getBrowserID();
@@ -1699,6 +1699,9 @@ public class Browser {
         return new Regex(this, string);
     }
 
+    private Request baseRequest;
+    private Request request;
+
     /**
      * Gets the latest request
      *
@@ -1706,6 +1709,10 @@ public class Browser {
      */
     public Request getRequest() {
         return this.request;
+    }
+
+    public Request getBaseRequest() {
+        return this.baseRequest;
     }
 
     public ProxySelectorInterface getThreadProxy() {
@@ -2038,7 +2045,7 @@ public class Browser {
         case NO_REFERRER_WHEN_DOWNGRADE: {
             // Send the origin, path, and query string in Referer when the protocol security level stays the same or improves (HTTP→HTTP,
             // HTTP→HTTPS, HTTPS→HTTPS). Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
-            Request currentRequest = this.getRequest();
+            Request currentRequest = this.getBaseRequest();
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
@@ -2062,7 +2069,7 @@ public class Browser {
         case ORIGIN_WHEN_CROSS_ORIGIN: {
             // When performing a same-origin request, send the origin, path, and query string. Send only the origin for cross origin
             // requests and requests to less secure destinations (HTTPS→HTTP).
-            Request currentRequest = this.getRequest();
+            Request currentRequest = this.getBaseRequest();
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
@@ -2076,7 +2083,7 @@ public class Browser {
         }
         case SAME_ORIGIN: {
             // Send the origin, path, and query string for same-origin requests. Don't send the Referer header for cross-origin requests.
-            Request currentRequest = this.getRequest();
+            Request currentRequest = this.getBaseRequest();
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
@@ -2091,7 +2098,7 @@ public class Browser {
         case STRICT_ORIGIN: {
             // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS). Don't send the Referer header to less
             // secure destinations (HTTPS→HTTP).
-            Request currentRequest = this.getRequest();
+            Request currentRequest = this.getBaseRequest();
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
@@ -2107,7 +2114,7 @@ public class Browser {
             // Send the origin, path, and query string when performing a same-origin request. For cross-origin requests send the origin
             // (only) when the protocol security level stays same (HTTPS→HTTPS). Don't send the Referer header to less secure destinations
             // (HTTPS→HTTP).
-            Request currentRequest = this.getRequest();
+            Request currentRequest = this.getBaseRequest();
             if (currentRequest == null) {
                 currentRequest = new GetRequest(requestReferrer);
             }
@@ -2137,7 +2144,7 @@ public class Browser {
         if (ret != null) {
             return ret;
         }
-        ret = REFERRER_POLICY.get(this.getRequest());
+        ret = REFERRER_POLICY.get(this.getBaseRequest());
         if (ret != null) {
             return ret;
         }
@@ -2653,7 +2660,8 @@ public class Browser {
             } else if (lCurrentURL != null && lCurrentURL instanceof Request) {
                 return ((Request) lCurrentURL).getUrl();
             } else {
-                return this.getURL();
+                final Request baseRequest = this.getBaseRequest();
+                return baseRequest == null ? null : baseRequest.getUrl(false);
             }
         } else {
             return refererURLHeader;
@@ -2746,11 +2754,14 @@ public class Browser {
     public void setRequest(final Request request) {
         if (request == null) {
             this.currentURL = null;
-        } else {
+        } else if (!request.isXHR()) {
             this.currentURL = request.getUrl();
         }
         this.updateCookies(request);
         this.request = request;
+        if (request == null || !request.isXHR()) {
+            this.baseRequest = request;
+        }
     }
 
     public void setVerbose(final boolean b) {
@@ -3498,8 +3509,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {

@@ -28,17 +28,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.GfycatConfig;
-import org.jdownloader.plugins.components.config.GfycatConfig.PreferredFormat;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -54,7 +43,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51696 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.GfycatConfig;
+import org.jdownloader.plugins.components.config.GfycatConfig.PreferredFormat;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 2, names = {}, urls = {})
 public class GfyCatCom extends PluginForHost {
     public GfyCatCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -621,12 +620,12 @@ public class GfyCatCom extends PluginForHost {
                 link.removeProperty(gfycatFormat);
             }
         }
-        final GfycatConfig cfg = PluginJsonConfig.get(GfycatConfig.class);
+        final GfycatConfig cfg = PluginJsonConfig.get(getConfigInterface());
         return cfg.getPreferredFormat();
     }
 
     @Override
-    public Class<? extends PluginConfigInterface> getConfigInterface() {
+    public Class<? extends GfycatConfig> getConfigInterface() {
         return GfycatConfig.class;
     }
 

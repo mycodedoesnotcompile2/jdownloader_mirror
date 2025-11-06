@@ -294,6 +294,7 @@ public abstract class Request {
             this.setHeaders(this.getDefaultRequestHeader(this.getURL()));
         }
         this.setRedirectOrigin(cloneRequest.getRedirectOrigin());
+        this.setXHR(cloneRequest.isXHR());
     }
 
     public Request(final URL url) throws IOException {
@@ -607,7 +608,7 @@ public abstract class Request {
                 useCS = this.httpConnection.getCharset();
             }
             if (StringUtils.isEmpty(useCS) && contentType != null) {
-                final String contentDispositionHeader = httpConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_DISPOSITION);
+                final String contentDispositionHeader = this.httpConnection.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_DISPOSITION);
                 final String contentDispositionFileName = HTTPConnectionUtils.getFileNameFromDispositionHeader(contentDispositionHeader);
                 if (contentType.matches("(?i)application/json")) {
                     // application/json default is UTF-8 //
@@ -929,6 +930,17 @@ public abstract class Request {
     abstract public long postRequest() throws IOException;
 
     abstract public void preRequest() throws IOException;
+
+    protected boolean xhrFlag = false;
+
+    public Request setXHR(boolean b) {
+        this.xhrFlag = b;
+        return this;
+    }
+
+    public boolean isXHR() {
+        return this.xhrFlag;
+    }
 
     public String printHeaders() {
         final URLConnectionAdapter lhttpConnection = this.getHttpConnection();

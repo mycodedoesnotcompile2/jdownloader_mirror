@@ -22,14 +22,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.BearerAuthentication;
 import jd.http.Request;
 import jd.http.requests.GetRequest;
 import jd.parser.Regex;
@@ -44,7 +39,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51696 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,26 +77,31 @@ public class RedgifsComCrawler extends PluginForDecrypt {
     }
 
     private static final Pattern PATTERN_USERS                 = Pattern.compile("/users/([\\w\\-]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_NICHES                = Pattern.compile("/niches/([\\w\\-]+)(\\?.+)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_GALLERY_OR_SINGLE_GIF = Pattern.compile("/(?!gifs/)(?:(?:watch|ifr)/)?([A-Za-z0-9]+)$", Pattern.CASE_INSENSITIVE);
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.|v3\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_USERS.pattern() + "|" + PATTERN_GALLERY_OR_SINGLE_GIF.pattern() + ")");
+            ret.add("https?://(?:www\\.|v3\\.)?" + buildHostsPatternPart(domains) + "(" + PATTERN_USERS.pattern() + "|" + PATTERN_GALLERY_OR_SINGLE_GIF.pattern() + "|" + PATTERN_NICHES + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final RedGifsCom plg = (RedGifsCom) this.getNewPluginForHostInstance(this.getHost());
         this.br = plg.createNewBrowserInstance();
-        final String token = plg.getTemporaryToken(br, null);
-        final String username = new Regex(param.getCryptedUrl(), PATTERN_USERS).getMatch(0);
-        String contentID = new Regex(param.getCryptedUrl(), PATTERN_GALLERY_OR_SINGLE_GIF).getMatch(0);
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www." + this.getHost());
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www." + this.getHost() + "/");
-        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
+        final String token = plg.getTemporaryToken(br, null);
+        br.addAuthentication(new BearerAuthentication("api.redgifs.com", token, null));
+        final String niche = new Regex(param.getCryptedUrl(), PATTERN_NICHES).getMatch(0);
+        if (niche != null) {
+            return decrypNichesGifs(plg, token, niche, param);
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_USERS).getMatch(0);
+        String contentID = new Regex(param.getCryptedUrl(), PATTERN_GALLERY_OR_SINGLE_GIF).getMatch(0);
         int totalNumberofItems = -1;
         if (username != null) {
             /* Crawl all items of a user */
@@ -232,6 +238,72 @@ public class RedgifsComCrawler extends PluginForDecrypt {
                 ret.add(link);
             }
         }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> decrypNichesGifs(final RedGifsCom plg, final String token, String niche, CryptedLink param) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName("Niches ~ " + niche);
+        final int maxItemsPerPage = 40;
+        int page = 1;
+        int totalNumberofItems = -1;
+        final int pageLimit = 10;// TODO: add a plugin setting
+        final HashSet<String> dupes = new HashSet<String>();
+        UrlQuery urlQuery = UrlQuery.parse(param.getCryptedUrl());
+        pagination: do {
+            int numberofNewItemsThisPage = 0;
+            final UrlQuery requestQuery = new UrlQuery();
+            if (urlQuery.containsKey("order")) {
+                requestQuery.append("order", urlQuery.get("order"), false);
+            } else {
+                requestQuery.appendEncoded("order", "new");
+            }
+            requestQuery.appendEncoded("count", Integer.toString(maxItemsPerPage));
+            if (page > 1) {
+                requestQuery.appendEncoded("page", Integer.toString(page));
+            }
+            final GetRequest req = br.createGetRequest("https://api.redgifs.com/v2/niches/" + niche + "/gifs?" + requestQuery.toString());
+            plg.getPage(br, token, req);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (((Number) entries.get("total")).intValue() == 0) {
+                /* Profile contains zero items/content. */
+                throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
+            }
+            final List<Map<String, Object>> gifs = (List<Map<String, Object>>) entries.get("gifs");
+            for (final Map<String, Object> gif : gifs) {
+                final String mediaID = gif.get("id").toString();
+                if (!dupes.add(mediaID)) {
+                    logger.info("Skipping dupe mediaID: " + mediaID);
+                    continue;
+                }
+                numberofNewItemsThisPage++;
+                final DownloadLink link = this.createDownloadlink(generateSingleItemURL(mediaID, null));
+                RedGifsCom.parseFileInfo(link, gif);
+                link.setAvailable(true);
+                link._setFilePackage(fp);
+                ret.add(link);
+                distribute(link);
+            }
+            final int pageMax = ((Number) entries.get("pages")).intValue();
+            totalNumberofItems = ((Number) entries.get("total")).intValue();
+            logger.info("Crawled page " + page + "/" + pageMax + " | Found items: " + ret.size() + "/" + totalNumberofItems + " | New items this page: " + numberofNewItemsThisPage);
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                throw new InterruptedException();
+            } else if (page == pageLimit) {
+                logger.info("Stopping because: page limit reached :" + pageLimit);
+                break pagination;
+            } else if (numberofNewItemsThisPage == 0) {
+                /* Additional fail safe which should not be needed. */
+                logger.info("Stopping because: Failed to find any new items on current page: " + page);
+                break pagination;
+            } else {
+                /* Continue to next page */
+                page++;
+                continue pagination;
+            }
+        } while (true);
         return ret;
     }
 

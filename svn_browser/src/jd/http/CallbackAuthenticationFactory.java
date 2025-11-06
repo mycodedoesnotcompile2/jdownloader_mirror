@@ -12,4 +12,9 @@ public abstract class CallbackAuthenticationFactory extends AbstractAuthenticati
     protected Authentication buildDigestAuthentication(Browser browser, Request request, String realm) {
         return this.askAuthentication(browser, request, realm);
     }
+
+    @Override
+    protected Authentication buildBearerAuthentication(Browser browser, Request request, String realm) {
+        return null;
+    }
 }

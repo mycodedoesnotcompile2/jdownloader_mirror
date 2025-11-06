@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -33,6 +30,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -40,7 +38,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51514 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.translate._JDT;
+
+@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
 public class WindfilesCom extends PluginForHost {
     public WindfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,7 +81,7 @@ public class WindfilesCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/share/([a-z0-9]{14})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/share/(?:pwd/\\?shareId=)?([a-z0-9]{14})");
         }
         return ret.toArray(new String[0]);
     }
@@ -113,15 +115,16 @@ public class WindfilesCom extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+        final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
-            link.setName(this.getFID(link));
+            link.setName(fid);
         }
         this.setBrowserExclusive();
         if (account != null) {
             this.login(account, false);
         }
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage("https://windfiles.com/share/" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*分享不存在")) {
@@ -155,6 +158,27 @@ public class WindfilesCom extends PluginForHost {
         final String directlinkproperty = "directurl";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
             requestFileInformation(link, account);
+            final String fid = this.getFID(link);
+            Form password = br.getFormbyAction("/share/pwd/?shareId=" + fid);
+            if (password != null) {
+                final String lastTriedPasswordPropert = "lastTriedPassword";
+                String passCode = link.getDownloadPassword();
+                if (StringUtils.equals(passCode, link.getStringProperty(lastTriedPasswordPropert))) {
+                    passCode = null;
+                }
+                if (passCode == null) {
+                    passCode = getUserInput("Password?", link);
+                }
+
+                password.put("pwd", Encoding.urlEncode(passCode));
+                br.submitForm(password);
+                if (br.containsHTML(">\\s*Please get the correct password")) {
+                    link.setProperty(lastTriedPasswordPropert, passCode);
+                    throw new PluginException(LinkStatus.ERROR_FATAL, _JDT.T.plugins_errors_wrongpassword());
+                }
+                link.removeProperty(lastTriedPasswordPropert);
+                link.setDownloadPassword(passCode);
+            }
             final String waitSecondsStr = br.getRegex("const counterTime = (\\d+);").getMatch(0);
             final String nextStep = br.getRegex("\"(/download/slow/[^\"]+)").getMatch(0);
             if (StringUtils.isEmpty(nextStep)) {
@@ -187,6 +211,10 @@ public class WindfilesCom extends PluginForHost {
     protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
+            final String largerThan = br.getRegex("the current file is larger than\\s*<b>(.*?)</b>").getMatch(0);
+            if (largerThan != null && getDownloadLink().getKnownDownloadSize() >= SizeFormatter.getSize(largerThan)) {
+                throw new AccountRequiredException();
+            }
             final String ipLimit = br.getRegex("(You have downloaded.*?)</h5>\\s*</div>").getMatch(0);
             if (ipLimit != null) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, ipLimit);

@@ -26,7 +26,13 @@ public class PutRequest extends PostRequest {
     }
 
     @Override
-    protected PostRequest cloneRequestRaw() {
+    protected PutRequest cloneRequestRaw() {
         return new PutRequest(this);
+    }
+
+    @Override
+    public PutRequest setXHR(boolean b) {
+        super.setXHR(b);
+        return this;
     }
 }

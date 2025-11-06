@@ -73,6 +73,12 @@ public class HeadRequest extends Request {
         return ret;
     }
 
+    @Override
+    public HeadRequest setXHR(boolean b) {
+        super.setXHR(b);
+        return this;
+    }
+
     /** {@inheritDoc} */
     @Override
     public long postRequest() throws IOException {

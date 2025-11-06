@@ -71,6 +71,12 @@ public class PostRequest extends Request {
         }
     }
 
+    @Override
+    public PostRequest setXHR(boolean b) {
+        super.setXHR(b);
+        return this;
+    }
+
     public PostRequest(final String url) throws IOException {
         super(url);
     }
@@ -221,7 +227,7 @@ public class PostRequest extends Request {
                 writer.flush();
                 writer.close();
             }
-            break;
+                break;
             default:
                 throw new IOException("not implemented " + this.sendWHAT.name());
             }

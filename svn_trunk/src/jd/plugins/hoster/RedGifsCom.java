@@ -15,8 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import static jd.plugins.hoster.GfyCatCom.PROPERTY_API_ITEM_ID;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -25,14 +23,6 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.encoding.Base64;
-import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -45,7 +35,16 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51696 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.encoding.Base64;
+import org.jdownloader.plugins.components.config.RedGifsComConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
     public RedGifsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,6 +52,7 @@ public class RedGifsCom extends GfyCatCom {
 
     @Override
     public Browser createNewBrowserInstance() {
+        Browser.setRequestIntervalLimitGlobal("api.redgifs.com", true, 250);
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
         br.setAllowedResponseCodes(new int[] { 410, 500 });
@@ -176,12 +176,18 @@ public class RedGifsCom extends GfyCatCom {
         return invalidTokens.remove(br.getProxy());
     }
 
-    public final Map<String, Object> getPage(final Browser br, final String token, final Request req) throws Exception {
+    public final Map<String, Object> getPage(final Browser br, final String token, Request req) throws Exception {
         req.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.redgifs.com");
         req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.redgifs.com/");
-        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
+        if (token != null) {
+            req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
+        }
         br.getPage(req);
-        if (req.getHttpConnection().getResponseCode() == 401) {
+        if (req.getHttpConnection().getResponseCode() == 429) {
+            // {"error":{"code":"RateLimited","message":"Too many requests, please retry later.","status":429,"delay":1474,"subject":"IP-RANGE|niche-gifs|NUMBER"}}
+            // Turnstile Captcha required to continue
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Too many requests, please retry later");
+        } else if (req.getHttpConnection().getResponseCode() == 401) {
             /*
              * e.g.
              * {"error":{"code":"WrongSender","message":"This token belongs to a different device, please request a new one.","status":401}}
@@ -261,6 +267,11 @@ public class RedGifsCom extends GfyCatCom {
                 link.setComment(description);
             }
         }
+    }
+
+    @Override
+    public Class<RedGifsComConfig> getConfigInterface() {
+        return RedGifsComConfig.class;
     }
 
     @Override

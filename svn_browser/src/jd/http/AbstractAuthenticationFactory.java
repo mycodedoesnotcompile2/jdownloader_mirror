@@ -43,6 +43,8 @@ public abstract class AbstractAuthenticationFactory implements AuthenticationFac
 
     protected abstract Authentication buildDigestAuthentication(Browser browser, Request request, final String realm);
 
+    protected abstract Authentication buildBearerAuthentication(Browser browser, Request request, final String realm);
+
     @Override
     public boolean retry(Authentication authentication, Browser browser, Request request) {
         return authentication != null && this.containsAuthentication(authentication) && authentication.retry(browser, request);
@@ -71,13 +73,26 @@ public abstract class AbstractAuthenticationFactory implements AuthenticationFac
             final List<String> wwwAuthenticateMethods = this.getWWWAuthenticate(request);
             if (wwwAuthenticateMethods != null) {
                 final String realm = this.getRealm(request);
-                for (final String wwwAuthenticateMethod : wwwAuthenticateMethods) {
+                wwwAuthenticateMethods: for (final String wwwAuthenticateMethod : wwwAuthenticateMethods) {
                     if (wwwAuthenticateMethod.matches("(?i)^\\s*Basic.*")) {
                         final Authentication ret = this.buildBasicAuthentication(browser, request, realm);
+                        if (ret == null) {
+                            continue wwwAuthenticateMethods;
+                        }
                         this.addAuthentication(ret);
                         return ret;
                     } else if (wwwAuthenticateMethod.matches("(?i)^\\s*Digest.*")) {
                         final Authentication ret = this.buildDigestAuthentication(browser, request, realm);
+                        if (ret == null) {
+                            continue wwwAuthenticateMethods;
+                        }
+                        this.addAuthentication(ret);
+                        return ret;
+                    } else if (wwwAuthenticateMethod.matches("(?i)^\\s*Bearer.*")) {
+                        final Authentication ret = this.buildBearerAuthentication(browser, request, realm);
+                        if (ret == null) {
+                            continue wwwAuthenticateMethods;
+                        }
                         this.addAuthentication(ret);
                         return ret;
                     }
