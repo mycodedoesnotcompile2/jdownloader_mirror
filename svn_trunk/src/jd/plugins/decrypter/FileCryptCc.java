@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 51747 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51804 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,7 +74,7 @@ public class FileCryptCc extends PluginForDecrypt {
         br.setLoadLimit(br.getLoadLimit() * 2);
         br.getHeaders().put("Accept-Encoding", "gzip, deflate");
         br.setFollowRedirects(true);
-        /* Prefer english language */
+        /* Prefer English language */
         br.setCookie(getHost(), "lang_v2", "en_US");
         br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
         return br;
@@ -406,11 +406,173 @@ public class FileCryptCc extends PluginForDecrypt {
         return false;
     }
 
+    private boolean handlePassword(final CryptedLink param) throws Exception {
+        final List<String> passwords = getPreSetPasswords();
+        final HashSet<String> usedWrongPasswords = new HashSet<String>();
+        int passwordCounter = 0;
+        final int maxPasswordRetries = 3;
+        final String[] possiblePasswordFieldKeys = new String[] { "password", "pssw", "password__" };
+        /* Initialize logo password if available */
+        final String logoPassword = initializeLogoPassword();
+        if (logoPassword != null) {
+            /* Try logoPW first */
+            passwords.add(0, logoPassword);
+        }
+        passwordLoop: while (true) {
+            passwordCounter++;
+            if (passwordCounter > maxPasswordRetries) {
+                logger.info("Stopping because: Too many wrong password attempts");
+                break passwordLoop;
+            }
+            logger.info("Password attempt: " + passwordCounter + " / " + maxPasswordRetries);
+            /* Find the password form */
+            final Form passwordForm = findPasswordForm(possiblePasswordFieldKeys);
+            if (passwordForm == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find password Form");
+            }
+            final String passwordFieldKey = getPasswordFieldKey(passwordForm, possiblePasswordFieldKeys);
+            if (StringUtils.isEmpty(passwordFieldKey)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "passwordFieldKey can't be empty");
+            }
+            /* Get next password that hasn't been tried yet */
+            String passCode = getNextPassword(passwords, usedWrongPasswords);
+            if (passCode == null) {
+                /* Ask user for password */
+                passCode = getUserInput("Password?", param);
+                if (StringUtils.isEmpty(passCode)) {
+                    throw new DecrypterException(DecrypterException.PASSWORD);
+                }
+                if (usedWrongPasswords.contains(passCode)) {
+                    logger.info("Skipping user-entered already tried wrong password: " + passCode);
+                    continue;
+                }
+            }
+            /* Submit password */
+            passwordForm.put(passwordFieldKey, Encoding.urlEncode(passCode));
+            submitForm(passwordForm);
+            /* Check if password was correct */
+            if (!containsPassword(this.cleanHTML)) {
+                logger.info("Password success: " + passCode);
+                successfullyUsedFolderPassword = passCode;
+                /* Save correct password for future usage */
+                if (!StringUtils.equals(this.getPluginConfig().getStringProperty(PROPERTY_PLUGIN_LAST_USED_PASSWORD), successfullyUsedFolderPassword)) {
+                    /* Only log this if the password differs from the old value. */
+                    logger.info("Saving correct password for future usage: " + successfullyUsedFolderPassword);
+                }
+                this.getPluginConfig().setProperty(PROPERTY_PLUGIN_LAST_USED_PASSWORD, successfullyUsedFolderPassword);
+                return true;
+            } else {
+                logger.info("Password failure | Wrong password: " + passCode);
+                usedWrongPasswords.add(passCode);
+                continue passwordLoop;
+            }
+        }
+        if (passwordCounter >= maxPasswordRetries && containsPassword(this.cleanHTML)) {
+            throw new DecrypterException(DecrypterException.PASSWORD);
+        }
+        return false;
+    }
+
+    private static final Map<String, String> LOGO_PASSWORD_MAP = new HashMap<String, String>();
+    static {
+        LOGO_PASSWORD_MAP.put("53d1b", "serienfans.org");
+        LOGO_PASSWORD_MAP.put("80d13", "serienfans.org");
+        LOGO_PASSWORD_MAP.put("fde1d", "serienfans.org");
+        LOGO_PASSWORD_MAP.put("8abe0", "serienfans.org");
+        LOGO_PASSWORD_MAP.put("8f073", "serienfans.org");
+        LOGO_PASSWORD_MAP.put("975e4", "filmfans.org");
+        LOGO_PASSWORD_MAP.put("51967", "kellerratte");
+        LOGO_PASSWORD_MAP.put("aaf75", "cs.rin.ru");
+    }
+
+    private String initializeLogoPassword() {
+        if (logoPW != null) {
+            return logoPW;
+        }
+        /**
+         * Search password based on folder-logo. </br>
+         * Only do this one time in the first run of this loop.
+         */
+        final String customLogoID = br.getRegex("(?:logo|custom)/([a-z0-9]+)\\.png").getMatch(0);
+        if (customLogoID != null) {
+            /**
+             * Magic auto passwords: </br>
+             * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first that
+             * are typically associated with folders published by those sources.
+             */
+            final String password = getLogoPassword(customLogoID);
+            if (password != null) {
+                logger.info("Found possible PW by logoID: " + password);
+                logoPW = password;
+                return password;
+            }
+            logger.info("Found unknown logoID: " + customLogoID);
+            return null;
+        }
+        logger.info("Failed to find logoID via regex, trying fallback method");
+        /* Fallback: Check all known logo IDs by searching for their PNG references in HTML */
+        final java.util.Iterator<String> iterator = LOGO_PASSWORD_MAP.keySet().iterator();
+        while (iterator.hasNext()) {
+            final String logoID = iterator.next();
+            if (br.containsHTML("/" + logoID + "\\.png")) {
+                final String password = LOGO_PASSWORD_MAP.get(logoID);
+                logger.info("Found logoID via fallback search: " + logoID + " | LogoPW: " + password);
+                logoPW = password;
+                return password;
+            }
+        }
+        logger.info("Failed to find logoID via fallback method");
+        return null;
+    }
+
+    private String getLogoPassword(final String customLogoID) {
+        if (customLogoID == null) {
+            return null;
+        }
+        return LOGO_PASSWORD_MAP.get(customLogoID);
+    }
+
+    private Form findPasswordForm(final String[] possiblePasswordFieldKeys) {
+        final Form[] allForms = br.getForms();
+        if (allForms == null || allForms.length == 0) {
+            return null;
+        }
+        for (int i = 0; i < allForms.length; i++) {
+            final Form aForm = allForms[i];
+            for (int j = 0; j < possiblePasswordFieldKeys.length; j++) {
+                if (aForm.hasInputFieldByName(possiblePasswordFieldKeys[j])) {
+                    logger.info("Found password form by hasInputFieldByName(passwordFieldKey) | passwordFieldKey = " + possiblePasswordFieldKeys[j]);
+                    return aForm;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String getPasswordFieldKey(final Form passwordForm, final String[] possiblePasswordFieldKeys) {
+        for (int i = 0; i < possiblePasswordFieldKeys.length; i++) {
+            if (passwordForm.hasInputFieldByName(possiblePasswordFieldKeys[i])) {
+                return possiblePasswordFieldKeys[i];
+            }
+        }
+        return null;
+    }
+
+    private String getNextPassword(final List<String> passwords, final HashSet<String> usedWrongPasswords) {
+        while (passwords.size() > 0) {
+            final String pw = passwords.remove(0);
+            if (!usedWrongPasswords.contains(pw)) {
+                return pw;
+            }
+            logger.info("Skipping already tried wrong password: " + pw);
+        }
+        return null;
+    }
+
     private void handlePasswordAndCaptcha(final CryptedLink param, final String folderID, final String url) throws Exception {
         int cutCaptchaRetryIndex = -1;
         final FileCryptConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         final int cutCaptchaAvoidanceMaxRetries = cfg.getMaxCutCaptchaAvoidanceRetries();
-        final HashSet<String> usedWrongPasswords = new HashSet<String>();
         boolean captchaSuccess = false;
         boolean lastCaptchaIsCutCaptcha = false;
         boolean tryToSolveCutCaptcha = false;
@@ -437,233 +599,104 @@ public class FileCryptCc extends PluginForDecrypt {
                 /* Empty link/folder. */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            if (cutCaptchaRetryIndex == 0 && logoPW == null) {
-                /**
-                 * Search password based on folder-logo. </br>
-                 * Only do this one time in the first run of this loop.
-                 */
-                final String customLogoID = br.getRegex("custom/([a-z0-9]+)\\.png").getMatch(0);
-                if (customLogoID != null) {
-                    /**
-                     * Magic auto passwords: </br>
-                     * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first
-                     * that are typically associated with folders published by those sources.
-                     */
-                    if ("53d1b".equals(customLogoID) || "80d13".equals(customLogoID) || "fde1d".equals(customLogoID) || "8abe0".equals(customLogoID) || "8f073".equals(customLogoID)) {
-                        logoPW = "serienfans.org";
-                    } else if ("975e4".equals(customLogoID)) {
-                        logoPW = "filmfans.org";
-                    } else if ("51967".equals(customLogoID)) {
-                        logoPW = "kellerratte";
-                    } else if ("aaf75".equals(customLogoID)) {
-                        /* 2023-10-23 */
-                        logoPW = "cs.rin.ru";
-                    }
-                    if (logoPW != null) {
-                        logger.info("Found possible PW by logoID: " + logoPW);
-                    } else {
-                        logger.info("Found unknown logoID: " + customLogoID);
-                    }
-                } else {
-                    logger.info("Failed to find logoID");
-                }
-            }
-            /* Separate password and captcha handling. This is easier for several reasons! */
             if (containsPassword(this.cleanHTML)) {
-                int passwordCounter = 0;
-                final int maxPasswordRetries = 3;
-                final List<String> passwords = getPreSetPasswords();
-                final String lastUsedPassword = this.getPluginConfig().getStringProperty(PROPERTY_PLUGIN_LAST_USED_PASSWORD);
-                if (logoPW != null) {
-                    logger.info("Try PW by logo: " + logoPW);
-                    passwords.add(0, logoPW);
-                }
-                if (successfullyUsedFolderPassword != null) {
-                    /**
-                     * This may happen if user first enters correct password but then wrong captcha or retry was done to try to avoid
-                     * cutcaptcha.
-                     */
-                    logger.info("Entering password handling with known correct password: " + successfullyUsedFolderPassword);
-                    passwords.add(0, successfullyUsedFolderPassword);
-                } else if (StringUtils.isNotEmpty(lastUsedPassword)) {
-                    logger.info("Trying last used password first: " + lastUsedPassword);
-                    passwords.add(0, lastUsedPassword);
-                }
-                passwordLoop: while (true) {
-                    passwordCounter++;
-                    if (passwordCounter > maxPasswordRetries) {
-                        logger.info("Stopping because: Too many wrong password attempts");
-                        break passwordLoop;
-                    }
-                    logger.info("Password attempt: " + passwordCounter + " / " + maxPasswordRetries);
-                    Form passwordForm = null;
-                    /* Place current password field value on position [0]! */
-                    final String[] possiblePasswordFieldKeys = new String[] { "password", "pssw", "password__" };
-                    String passwordFieldKey = null;
-                    final Form[] allForms = br.getForms();
-                    if (allForms != null && allForms.length != 0) {
-                        findPwFormLoop: for (final Form aForm : allForms) {
-                            for (final String possiblePasswordFieldKey : possiblePasswordFieldKeys) {
-                                if (aForm.hasInputFieldByName(possiblePasswordFieldKey)) {
-                                    logger.info("Found password form by hasInputFieldByName(passwordFieldKey) | passwordFieldKey = " + possiblePasswordFieldKey);
-                                    passwordFieldKey = possiblePasswordFieldKey;
-                                    passwordForm = aForm;
-                                    break findPwFormLoop;
-                                }
-                            }
-                        }
-                    }
-                    /* If there is captcha + password, password comes first, then captcha! */
-                    if (passwordForm == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find pasword Form");
-                    } else if (StringUtils.isEmpty(passwordFieldKey)) {
-                        /* Developer mistake */
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "passwordFieldKey can't be empty");
-                    }
-                    String passCode = null;
-                    /* Get next password of which we know that it isn't wrong. */
-                    while (passwords.size() > 0) {
-                        /* List of previously used passwords */
-                        final String pw = passwords.remove(0);
-                        if (!usedWrongPasswords.contains(pw)) {
-                            passCode = pw;
-                            break;
-                        } else {
-                            // no need to submit password that has already been tried!
-                            logger.info("Skipping already tried wrong password: " + pw);
-                            continue;
-                        }
-                    }
-                    if (passCode == null) {
-                        /* when previous provided passwords have failed -> Ask user */
-                        passCode = getUserInput("Password?", param);
-                        if (StringUtils.isEmpty(passCode)) {
-                            /* Bad user input */
-                            throw new DecrypterException(DecrypterException.PASSWORD);
-                        }
-                        if (usedWrongPasswords.contains(passCode)) {
-                            // no need to submit password that has already been tried!
-                            logger.info("Skipping user-entered already tried wrong password: " + passCode);
-                            continue;
-                        }
-                    }
-                    passwordForm.put(passwordFieldKey, Encoding.urlEncode(passCode));
-                    submitForm(passwordForm);
-                    if (!containsPassword(this.cleanHTML)) {
-                        /* Success */
-                        logger.info("Password success: " + passCode);
-                        successfullyUsedFolderPassword = passCode;
-                        break passwordLoop;
-                    } else {
-                        logger.info("Password failure | Wrong password: " + passCode);
-                        usedWrongPasswords.add(passCode);
-                        continue passwordLoop;
-                    }
-                }
-                if (passwordCounter >= maxPasswordRetries && containsPassword(this.cleanHTML)) {
-                    throw new DecrypterException(DecrypterException.PASSWORD);
-                }
-                if (!StringUtils.equals(this.getPluginConfig().getStringProperty(PROPERTY_PLUGIN_LAST_USED_PASSWORD), successfullyUsedFolderPassword)) {
-                    /* Avoid log spam thus only log this if the password is new. */
-                    logger.info("Saving correct password for future usage: " + successfullyUsedFolderPassword);
-                }
-                this.getPluginConfig().setProperty(PROPERTY_PLUGIN_LAST_USED_PASSWORD, successfullyUsedFolderPassword);
+                handlePassword(param);
             }
             lastCaptchaIsCutCaptcha = false;
-            if (containsCaptcha(this.cleanHTML)) {
-                /* Process captcha */
-                logger.info("Looks like captcha is required");
-                int captchaCounter = -1;
-                final int maxCaptchaRetries = 10;
-                captchaLoop: while (captchaCounter++ < maxCaptchaRetries && !this.isAbort()) {
-                    logger.info("Captcha loop: " + captchaCounter + "/" + maxCaptchaRetries);
-                    final boolean isLastLoop = captchaCounter >= maxCaptchaRetries;
-                    Form captchaForm = null;
-                    final Form[] forms = br.getForms();
-                    if (forms != null && forms.length != 0) {
-                        for (final Form form : forms) {
-                            if (form.containsHTML("captcha") || AbstractRecaptchaV2.containsRecaptchaV2Class(form)) {
-                                captchaForm = form;
-                                break;
-                            } else if (form.containsHTML("cform")) {
-                                captchaForm = form;
-                                break;
-                            }
-                        }
-                    }
-                    if (captchaForm == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find captchaForm");
-                    }
-                    final String captchaURL = captchaForm.getRegex("((https?://[^<>\"']*?)?/captcha/[^<>\"']*?)\"").getMatch(0);
-                    if (captchaURL != null && this.containsCircleCaptcha(captchaURL)) {
-                        /* Click-captcha */
-                        final ClickedPoint cp = getCaptchaClickedPoint(getHost(), getCaptchaImage(captchaURL), param, "Click on the open circle");
-                        if (cp == null) {
-                            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                        }
-                        final InputField button = captchaForm.getInputFieldByType(InputField.InputType.IMAGE.name());
-                        if (button == null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                        captchaForm.removeInputField(button);
-                        captchaForm.put(button.getKey() + ".x", String.valueOf(cp.getX()));
-                        captchaForm.put(button.getKey() + ".y", String.valueOf(cp.getY()));
-                    } else if (captchaForm != null && captchaForm.containsHTML("=\"g-recaptcha\"")) {
-                        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-                        captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
-                        lastCaptchaIsCutCaptcha = true;
-                        if (cutCaptchaRetryIndex == 0 || tryToSolveCutCaptcha) {
-                            logger.info("Attempting to solve CutCaptcha");
-                            try {
-                                final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
-                                captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
-                                tryToSolveCutCaptcha = true;
-                            } catch (final Exception e) {
-                                if (tryToSolveCutCaptcha) {
-                                    /* Handling worked before and failed now -> Throw exception */
-                                    throw e;
-                                }
-                                logger.log(e);
-                                logger.info("CutCaptcha failed - most likely no CutCaptcha solver is available");
-                                /* Don't try again! */
-                                tryToSolveCutCaptcha = false;
-                            }
-                        }
-                        if (!tryToSolveCutCaptcha) {
-                            logger.info("Trying to avoid cutcaptcha | cutCaptchaRetryIndex = " + cutCaptchaRetryIndex);
-                            /* Clear cookies to increase the chances of getting a different captcha type than cutcaptcha. */
-                            br.clearCookies(null);
-                            /* Only wait if we know that we will try again */
-                            if (!isLastLoop) {
-                                sleep(1000, param);
-                            }
-                            /*
-                             * Continue from the beginning. If a password was required, we already know the correct password and won't have
-                             * to ask the user again.
-                             */
-                            continue cutcaptchaAvoidanceLoop;
-                        }
-                    } else {
-                        /* Normal image captcha */
-                        final String code = getCaptchaCode(captchaURL, param);
-                        captchaForm.put("recaptcha_response_field", Encoding.urlEncode(code));
-                    }
-                    submitForm(captchaForm);
-                    if (this.containsCaptcha(this.cleanHTML)) {
-                        logger.info("User entered wrong captcha");
-                        this.invalidateLastChallengeResponse();
-                        continue captchaLoop;
-                    } else {
-                        logger.info("User entered correct captcha");
-                        this.validateLastChallengeResponse();
-                        captchaSuccess = true;
-                        break captchaLoop;
-                    }
-                }
-            } else {
+            if (!containsCaptcha(this.cleanHTML)) {
                 logger.info("Looks like no captcha is required");
                 captchaSuccess = true;
+                break cutcaptchaAvoidanceLoop;
+            }
+            /* Process captcha */
+            logger.info("Looks like captcha is required");
+            int captchaCounter = -1;
+            final int maxCaptchaRetries = 10;
+            captchaLoop: while (captchaCounter++ < maxCaptchaRetries && !this.isAbort()) {
+                logger.info("Captcha loop: " + captchaCounter + "/" + maxCaptchaRetries);
+                final boolean isLastLoop = captchaCounter >= maxCaptchaRetries;
+                Form captchaForm = null;
+                final Form[] forms = br.getForms();
+                if (forms != null && forms.length != 0) {
+                    for (final Form form : forms) {
+                        if (form.containsHTML("captcha") || AbstractRecaptchaV2.containsRecaptchaV2Class(form)) {
+                            captchaForm = form;
+                            break;
+                        } else if (form.containsHTML("cform")) {
+                            captchaForm = form;
+                            break;
+                        }
+                    }
+                }
+                if (captchaForm == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find captchaForm");
+                }
+                final String captchaURL = captchaForm.getRegex("((https?://[^<>\"']*?)?/captcha/[^<>\"']*?)\"").getMatch(0);
+                if (captchaURL != null && this.containsCircleCaptcha(captchaURL)) {
+                    /* Click-captcha */
+                    final ClickedPoint cp = getCaptchaClickedPoint(getHost(), getCaptchaImage(captchaURL), param, "Click on the open circle");
+                    if (cp == null) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                    }
+                    final InputField button = captchaForm.getInputFieldByType(InputField.InputType.IMAGE.name());
+                    if (button == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    captchaForm.removeInputField(button);
+                    captchaForm.put(button.getKey() + ".x", String.valueOf(cp.getX()));
+                    captchaForm.put(button.getKey() + ".y", String.valueOf(cp.getY()));
+                } else if (captchaForm != null && captchaForm.containsHTML("=\"g-recaptcha\"")) {
+                    final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+                    captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
+                    lastCaptchaIsCutCaptcha = true;
+                    if (cutCaptchaRetryIndex == 0 || tryToSolveCutCaptcha) {
+                        logger.info("Attempting to solve CutCaptcha");
+                        try {
+                            final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
+                            captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
+                            tryToSolveCutCaptcha = true;
+                        } catch (final Exception e) {
+                            if (tryToSolveCutCaptcha) {
+                                /* Handling worked before and failed now -> Throw exception */
+                                throw e;
+                            }
+                            logger.log(e);
+                            logger.info("CutCaptcha failed - most likely no CutCaptcha solver is available");
+                            /* Don't try again! */
+                            tryToSolveCutCaptcha = false;
+                        }
+                    }
+                    if (!tryToSolveCutCaptcha) {
+                        logger.info("Trying to avoid cutcaptcha | cutCaptchaRetryIndex = " + cutCaptchaRetryIndex);
+                        /* Clear cookies to increase the chances of getting a different captcha type than cutcaptcha. */
+                        br.clearCookies(null);
+                        /* Only wait if we know that we will try again */
+                        if (!isLastLoop) {
+                            sleep(1000, param);
+                        }
+                        /*
+                         * Continue from the beginning. If a password was required, we already know the correct password and won't have to
+                         * ask the user again.
+                         */
+                        continue cutcaptchaAvoidanceLoop;
+                    }
+                } else {
+                    /* Normal image captcha */
+                    final String code = getCaptchaCode(captchaURL, param);
+                    captchaForm.put("recaptcha_response_field", Encoding.urlEncode(code));
+                }
+                submitForm(captchaForm);
+                if (this.containsCaptcha(this.cleanHTML)) {
+                    logger.info("User entered wrong captcha");
+                    this.invalidateLastChallengeResponse();
+                    continue captchaLoop;
+                } else {
+                    logger.info("User entered correct captcha");
+                    this.validateLastChallengeResponse();
+                    captchaSuccess = true;
+                    break captchaLoop;
+                }
             }
             /* Dead end: No reason to continue this loop here. */
             logger.info("Stepping out of cutCaptchaAvoidanceLoop");

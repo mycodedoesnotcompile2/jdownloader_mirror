@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.translate._JDT;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -38,11 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.translate._JDT;
-
-@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51803 $", interfaceVersion = 3, names = {}, urls = {})
 public class WindfilesCom extends PluginForHost {
     public WindfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -124,7 +124,7 @@ public class WindfilesCom extends PluginForHost {
         if (account != null) {
             this.login(account, false);
         }
-        br.getPage("https://windfiles.com/share/" + fid);
+        br.getPage("https://" + getHost() + "/share/" + fid);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*分享不存在")) {
@@ -169,7 +169,6 @@ public class WindfilesCom extends PluginForHost {
                 if (passCode == null) {
                     passCode = getUserInput("Password?", link);
                 }
-
                 password.put("pwd", Encoding.urlEncode(passCode));
                 br.submitForm(password);
                 if (br.containsHTML(">\\s*Please get the correct password")) {
@@ -189,7 +188,7 @@ public class WindfilesCom extends PluginForHost {
                 this.sleep(Integer.parseInt(waitSecondsStr), link);
             }
             br.getPage(nextStep);
-            final Regex ipWait = br.getRegex(">(\\d+) Mins? (\\d+) Second");
+            final Regex ipWait = br.getRegex(">\\s*(\\d+) Mins? (\\d+) Second");
             if (ipWait.patternFind()) {
                 final int min = Integer.parseInt(ipWait.getMatch(0));
                 final int sec = Integer.parseInt(ipWait.getMatch(1));
@@ -211,9 +210,9 @@ public class WindfilesCom extends PluginForHost {
     protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
-            final String largerThan = br.getRegex("the current file is larger than\\s*<b>(.*?)</b>").getMatch(0);
-            if (largerThan != null && getDownloadLink().getKnownDownloadSize() >= SizeFormatter.getSize(largerThan)) {
-                throw new AccountRequiredException();
+            final String premiumOnlyBecauseFileSizeLargerThanX = br.getRegex("the current file is larger than\\s*<b>(.*?)</b>").getMatch(0);
+            if (premiumOnlyBecauseFileSizeLargerThanX != null && getDownloadLink().getKnownDownloadSize() >= SizeFormatter.getSize(premiumOnlyBecauseFileSizeLargerThanX)) {
+                throw new AccountRequiredException("Premium account required to download files larger than " + premiumOnlyBecauseFileSizeLargerThanX);
             }
             final String ipLimit = br.getRegex("(You have downloaded.*?)</h5>\\s*</div>").getMatch(0);
             if (ipLimit != null) {
