@@ -123,7 +123,7 @@ public class BuildDecisionData implements Storable {
             imports = null;
         }
         if (imports != null && imports.length != anno.tags().length) {
-            throw new WTFException("Bad annotation. ids and anno.imports");
+            throw new WTFException("Bad annotation. ids and anno.imports class:" + type.getName() + " Anno: " + anno);
         }
         int i = 0;
         String[] dependsOn = anno.dependsOn();

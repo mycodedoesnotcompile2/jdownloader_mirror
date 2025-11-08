@@ -863,7 +863,7 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char                                       DOUBLE_QUOTE         = '"';
+    protected static final char                                     DOUBLE_QUOTE         = '"';
     protected static final char                                     END_OF_TRANSMISSION  = '\u2404';
     // public static final FlexiJSonNode FALSE = new FlexiJSonValue(false);
     /**
@@ -878,7 +878,7 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char                                       SINGLE_QUOTE         = '\'';
+    protected static final char                                     SINGLE_QUOTE         = '\'';
     /**
      *
      */

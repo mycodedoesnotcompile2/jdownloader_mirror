@@ -27,6 +27,7 @@ public class TestWindowsCertificateCode extends AWTest {
         // Create temporary signed test file
         File file = Application.getTempUniqueResource("appworktests");
         file.deleteOnExit();
+        file.getParentFile().mkdirs();
         final FileOutputStream out = new FileOutputStream(file);
         try {
             IO.readStreamToOutputStream(-1, TestWindowsCertificateCode.class.getResource("test.exe").openStream(), out, true);

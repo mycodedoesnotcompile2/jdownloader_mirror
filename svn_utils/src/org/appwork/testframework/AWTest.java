@@ -77,6 +77,7 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.Joiner;
 import org.appwork.utils.UniqueAlltimeID;
 import org.appwork.utils.net.LineParsingOutputStream;
 import org.appwork.utils.net.NoClosingInputStream;
@@ -318,20 +319,20 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         assertEquals(null, b);
     }
 
-    public static void assertEquals(final Object a, final Object b) throws Exception {
+    public static void assertEquals(final Object a, final Object b, String... comments) throws Exception {
         if (a instanceof Number && b instanceof Number) {
             if (!CompareUtils.equalsNumber((Number) a, (Number) b)) {
-                throw new Exception("a does not equal b. \r\n" + a + " != \r\n" + b);
+                throw new Exception("a does not equal b. \r\n" + a + " != \r\n" + b + (comments.length == 0 ? "" : (" " + new Joiner(", ").join(comments))));
             } else {
                 return;
             }
         }
         if (!Objects.equals(a, b)) {
-            throw new Exception("a does not equal b. \r\n" + a + " != \r\n" + b);
+            throw new Exception("a does not equal b. \r\n" + a + " != \r\n" + b + (comments.length == 0 ? "" : (" " + new Joiner(", ").join(comments))));
         } else {
             if (a != null && b != null) {
                 if (a.hashCode() != b.hashCode()) {
-                    throw new Exception("a equals b but hashCode is different");
+                    throw new Exception("a equals b but hashCode is different" + (comments.length == 0 ? "" : (" " + new Joiner(", ").join(comments))));
                 }
             }
         }

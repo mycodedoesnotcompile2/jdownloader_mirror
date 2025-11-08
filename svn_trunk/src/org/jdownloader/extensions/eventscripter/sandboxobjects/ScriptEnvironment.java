@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -99,6 +100,10 @@ import org.jdownloader.extensions.eventscripter.ScriptThread;
 import org.jdownloader.extensions.eventscripter.T;
 import org.jdownloader.extensions.eventscripter.Utils;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.notify.BasicNotify;
+import org.jdownloader.gui.notify.BubbleNotify;
+import org.jdownloader.gui.notify.BubbleNotify.AbstractNotifyWindowFactory;
+import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.gui.views.ArraySet;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
@@ -1178,7 +1183,29 @@ public class ScriptEnvironment {
         }
     }
 
-    @ScriptAPI(description = "Show a Confirm Dialog", parameters = { "message", "okOption", "cancelOption" }, example = "showConfirmDialog(\"Do you like this method?\",\"yes\",\"no\"")
+    @ScriptAPI(description = "Show a Notification", parameters = { "Map: notification settings(title, message, iconKey, timeout)" }, example = "displayNotification({\"title\":\"Ping\",\"message\":\"Nice\",\"iconKey\":\"stop\",\"timeout\":1000})")
+    public static void displayNotification(final Map<String, Object> notification) {
+        if (Application.isHeadless()) {
+            return;
+        }
+        BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
+            @Override
+            public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
+                final String title = StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(notification.get("title")));
+                final String text = StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(notification.get("message")));
+                final String iconKey = StringUtils.valueOfOrNull(notification.get("iconKey"));
+                final BasicNotify ret = new BasicNotify(title, text, iconKey == null ? new AbstractIcon(IconKey.ICON_INFO, 32) : new AbstractIcon(iconKey, 32));
+                final Number timeout = (Number) notification.get("timeout");
+                if (timeout != null) {
+                    ret.setTimeout(timeout.intValue());
+                }
+                return ret;
+
+            }
+        });
+    }
+
+    @ScriptAPI(description = "Show a Confirm Dialog", parameters = { "message", "okOption", "cancelOption" }, example = "showConfirmDialog(\"Do you like this method?\",\"yes\",\"no\")")
     public static int showConfirmDialog(final String message, final String okOption, final String cancelOption) {
         final ScriptThread env = getScriptThread();
         final String id = T.T.showConfirmDialog_title(env.getScript().getName(), env.getScript().getEventTrigger().getLabel());

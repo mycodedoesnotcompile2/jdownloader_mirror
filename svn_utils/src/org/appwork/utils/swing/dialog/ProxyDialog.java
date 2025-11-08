@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -34,6 +34,7 @@
 package org.appwork.utils.swing.dialog;
 
 import java.awt.Component;
+import java.awt.Dialog.ModalExclusionType;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
@@ -130,6 +131,96 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
         super(Dialog.STYLE_HIDE_ICON, _AWU.T.proxydialog_title(), null, _AWU.T.lit_save(), _AWU.T.ABSTRACTDIALOG_BUTTON_CANCEL());
         proxy = usedProxy;
         this.message = message;
+    }
+
+    /**
+     * Checks if a window is currently blocked by a modal dialog.
+     * 
+     * @param window The window to check
+     * @return true if the window is blocked by a modal dialog, false otherwise
+     */
+    private boolean isWindowBlockedByModalDialog(java.awt.Window window) {
+        if (window == null || !window.isVisible()) {
+            return false;
+        }
+        
+        // Check all windows to find modal dialogs that could block the owner
+        for (java.awt.Window w : java.awt.Window.getWindows()) {
+            if (w instanceof java.awt.Dialog && w.isVisible()) {
+                java.awt.Dialog dialog = (java.awt.Dialog) w;
+                java.awt.Dialog.ModalityType modality = dialog.getModalityType();
+                
+                // APPLICATION_MODAL dialogs block all windows in the application
+                if (modality == java.awt.Dialog.ModalityType.APPLICATION_MODAL) {
+                    return true;
+                }
+                
+                // DOCUMENT_MODAL dialogs block the owner and its children
+                if (modality == java.awt.Dialog.ModalityType.DOCUMENT_MODAL) {
+                    java.awt.Window dialogOwner = dialog.getOwner();
+                    if (dialogOwner == window || isDescendantOf(dialogOwner, window)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Checks if a window is a descendant of another window in the owner hierarchy.
+     * 
+     * @param descendant The potential descendant window
+     * @param ancestor The potential ancestor window
+     * @return true if descendant is a descendant of ancestor, false otherwise
+     */
+    private boolean isDescendantOf(java.awt.Window descendant, java.awt.Window ancestor) {
+        if (descendant == null || ancestor == null) {
+            return false;
+        }
+        
+        java.awt.Window current = descendant;
+        while (current != null) {
+            if (current == ancestor) {
+                return true;
+            }
+            current = current.getOwner();
+        }
+        
+        return false;
+    }
+
+    /**
+     * Overrides getOwner() to return null if the owner is blocked by a modal dialog,
+     * otherwise returns the normal owner. This ensures the ProxyDialog can appear
+     * even when the EDT is blocked by a modal dialog.
+     */
+    @Override
+    public java.awt.Window getOwner() {
+        // Get the normal owner first
+        java.awt.Window owner = super.getOwner();
+        
+        // If owner is blocked by a modal dialog, return null to make the dialog independent
+        if (owner != null && isWindowBlockedByModalDialog(owner)) {
+            return null;
+        }
+        
+        return owner;
+    }
+
+    /**
+     * Overrides layoutDialog() to set the ModalExclusionType.
+     * This allows the ProxyDialog to appear even when the EDT is blocked by a modal dialog.
+     */
+    @Override
+    protected void layoutDialog() {
+        super.layoutDialog();
+        // Set ModalExclusionType so the dialog can appear even when EDT is blocked
+        // APPLICATION_EXCLUDE means the dialog won't be blocked by APPLICATION_MODAL dialogs
+        if (this.getDialog() != null) {
+            this.getDialog().setModalExclusionType(ModalExclusionType.APPLICATION_EXCLUDE);
+        }
     }
 
     protected MigPanel createBottomPanel() {

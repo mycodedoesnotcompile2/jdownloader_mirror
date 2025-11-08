@@ -2027,6 +2027,8 @@ public class Browser {
     /**
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy
      *
+     * https://w3c.github.io/webappsec-referrer-policy/
+     *
      * @param referrerPolicy
      * @param nextRequest
      */
@@ -2280,6 +2282,7 @@ public class Browser {
             throw new IllegalStateException("Request is null");
         }
         int redirectLoopPrevention = 0;
+        final boolean hasInitialBaseRequest = this.getBaseRequest() != null;
         final Request originalRequest = request;
         while (true) {
             this.setRequestProperties(request);
@@ -2364,14 +2367,14 @@ public class Browser {
                  */
                 this.loadConnection(request.getHttpConnection());
                 final Request redirectRequest = this.createRedirectFollowingRequest(request);
-                this.setRequest(request);
+                this.setRequest(request, hasInitialBaseRequest);
                 if (redirectRequest == null) {
                     return request.getHttpConnection();
                 } else {
                     request = redirectRequest;
                 }
             } else {
-                this.setRequest(request);
+                this.setRequest(request, true); // last request, always allow update of baseRequest
                 return request.getHttpConnection();
             }
         }
@@ -2752,15 +2755,17 @@ public class Browser {
     }
 
     public void setRequest(final Request request) {
-        if (request == null) {
-            this.currentURL = null;
-        } else if (!request.isXHR()) {
-            this.currentURL = request.getUrl();
-        }
+        this.setRequest(request, true);
+    }
+
+    protected void setRequest(final Request request, final boolean allowBaseUpdate) {
         this.updateCookies(request);
         this.request = request;
-        if (request == null || !request.isXHR()) {
-            this.baseRequest = request;
+        if (request == null || allowBaseUpdate) {
+            this.currentURL = null;// currentURL is meant to serve as initial/first referrer, cleared now as we have set our current request
+            if (request == null || !request.isXHR()) {
+                this.baseRequest = request;
+            }
         }
     }
 
@@ -2782,10 +2787,11 @@ public class Browser {
     }
 
     public void updateCookies(final Request request) {
-        if (request != null && request.hasCookies()) {
-            final Cookies cookies = this.getCookies(Browser.getHost(request.getURL()));
-            cookies.add(request.getCookies());
+        if (request == null || !request.hasCookies()) {
+            return;
         }
+        final Cookies cookies = this.getCookies(Browser.getHost(request.getURL()));
+        cookies.add(request.getCookies());
     }
 
     /**

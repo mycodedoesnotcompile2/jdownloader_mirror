@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Locale;
 
 import org.appwork.JNAHelper;
-import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -59,7 +58,6 @@ import com.sun.jna.platform.win32.WinReg;
  * @date 04.04.2022
  *
  */
-@BuildDecisionRequired(tags = { JNAHelper.JNA_HELPER_USE_JNA }, imports = { JNAHelper.CLASS_COM_SUN_JNA_NATIVE + ";" + JNAHelper.CLASS_COM_SUN_JNA_PLATFORM_FILE_UTILS, "" })
 public class JNAWindowsProxyUtils {
     private static final String INTERNET_SETTINGS_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
 

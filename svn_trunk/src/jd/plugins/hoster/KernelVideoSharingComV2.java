@@ -79,7 +79,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51806 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -860,9 +860,13 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         this.dllink = this.getDllinkViaAPI(br.cloneBrowser(), link, videoID);
         if (!isDownload && !link.isSizeSet()) {
             /* Only check directurl during availablecheck, not if user has started downloading. */
+            /* Absoluten Link erhalten */
+            this.dllink = br.getURL(this.dllink).toExternalForm();
+            /* Neue Browserinstanz erstellen */
+            final Browser br = this.createNewBrowserInstance();
             URLConnectionAdapter con = null;
             try {
-                con = br.openRequestConnection(br.createHeadRequest(dllink).setXHR(true));
+                con = br.openRequestConnection(br.createHeadRequest(dllink));
                 this.handleConnectionErrors(br, con);
                 if (con.isContentDecoded()) {
                     link.setDownloadSize(con.getCompleteContentLength());

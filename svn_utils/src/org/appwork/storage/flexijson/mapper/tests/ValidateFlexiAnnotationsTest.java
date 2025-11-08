@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -50,8 +50,8 @@ import org.appwork.storage.flexijson.FlexiJSONParser;
 import org.appwork.storage.flexijson.FlexiParserException;
 import org.appwork.storage.flexijson.FlexiUtils;
 import org.appwork.storage.flexijson.ParsingError;
-import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiEnumFallback;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.testframework.AWTest;
@@ -187,10 +187,9 @@ public class ValidateFlexiAnnotationsTest extends AWTest {
 
     /**
      * @param storableExample
-     * @throws FlexiMapperException
-     * @throws FlexiParserException
+     * @throws Exception
      */
-    private void validateAnnotation(StorableExample a) throws FlexiParserException, FlexiMapperException {
+    private void validateAnnotation(StorableExample a) throws Exception {
         final FlexiJSONParser parser = new FlexiJSONParser(a.value()) {
             @Override
             public boolean isParseInlineCommentEnabled() {
@@ -206,7 +205,11 @@ public class ValidateFlexiAnnotationsTest extends AWTest {
         final HashSet<ParsingError> ignore = new HashSet<ParsingError>(FlexiJSONParser.IGNORE_LIST_ENSURE_CORRECT_VALUES);
         // ignore.add(ParsingError.ERROR_STRING_VALUE_WITHOUT_QUOTES);
         parser.setIgnoreIssues(ignore);
-        Object example = new FlexiJSonMapper().jsonToObject(parser.parse(), TypeRef.OBJECT);
+        try {
+            Object example = new FlexiJSonMapper().jsonToObject(parser.parse(), TypeRef.OBJECT);
+        } catch (Exception e) {
+            throw Exceptions.addSuppressed(e, new Exception("Annotation: " + a));
+        }
     }
 
     public static void main(String[] args) {
