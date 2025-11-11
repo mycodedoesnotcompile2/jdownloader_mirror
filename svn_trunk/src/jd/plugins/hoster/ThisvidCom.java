@@ -33,11 +33,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51313 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51811 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThisvidCom extends KernelVideoSharingComV2 {
     public ThisvidCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.thisvid.com/");
+        this.enablePremium("https://" + getHost() + "/signup.php");
     }
 
     @Override
@@ -78,48 +78,36 @@ public class ThisvidCom extends KernelVideoSharingComV2 {
         synchronized (account) {
             br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
-            final Cookies cookies;
+            final Cookies cookies = account.loadCookies("");
             final Cookies userCookies;
-            if ((userCookies = account.loadUserCookies()) != null) {
-                this.br.setCookies(userCookies);
-                if (!validateCookies) {
-                    return;
+            if ((userCookies = account.loadUserCookies()) != null || cookies != null) {
+                if (userCookies != null) {
+                    br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
                 }
                 if (!validateCookies) {
-                    logger.info("Trust cookies without check");
                     return;
                 }
                 br.getPage("https://" + this.getHost() + "/");
                 if (isLoggedIN(br)) {
                     logger.info("Cookie login successful");
-                    account.saveCookies(this.br.getCookies(this.getHost()), "");
+                    if (userCookies == null) {
+                        account.saveCookies(br.getCookies(br.getHost()), "");
+                    }
                     return;
-                } else {
-                    logger.info("User Cookie login failed");
+                }
+                logger.info("Cookie login failed");
+                if (userCookies != null) {
+                    /* Dead end */
                     if (account.hasEverBeenValid()) {
                         throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                     } else {
                         throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                     }
                 }
-            } else if ((cookies = account.loadCookies("")) != null) {
-                br.setCookies(cookies);
-                if (!validateCookies) {
-                    logger.info("Trust cookies without check");
-                    return;
-                }
-                br.getPage("https://" + this.getHost() + "/");
-                if (isLoggedIN(br)) {
-                    logger.info("Cookie login successful");
-                    account.saveCookies(this.br.getCookies(this.getHost()), "");
-                    return;
-                } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(null);
-                    account.clearCookies("");
-                }
             }
-            br.clearCookies(this.getHost());
+            br.clearCookies(getHost());
             br.getPage("https://" + this.getHost() + "/login.php");
             final Form loginform = br.getFormbyProperty("id", "logon_form");
             if (loginform == null) {

@@ -8,9 +8,6 @@ import javax.swing.JLabel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Cookies;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
@@ -20,6 +17,9 @@ import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Cookies;
 
 public class DefaultEditAccountPanelCookieLogin extends MigPanel implements AccountBuilderInterface {
     /**
@@ -155,22 +155,28 @@ public class DefaultEditAccountPanelCookieLogin extends MigPanel implements Acco
             /* Normal username & password login */
             pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
         }
+        handleClipboardAutoFill();
+    }
+
+    private void handleClipboardAutoFill() {
         final ExtTextField dummy = new ExtTextField();
         dummy.paste();
         final String clipboard = dummy.getText();
-        if (StringUtils.isNotEmpty(clipboard)) {
-            /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
-            final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
-            if ((cookieLoginOnly || cookieLoginOptional) && userCookies != null) {
-                /*
-                 * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
-                 * them.
-                 */
-                pass.setPassword(clipboard.toCharArray());
-            } else if (userCookies == null && clipboard.trim().length() > 0) {
-                /* Auto fill username field with clipboard content. */
-                name.setText(clipboard);
-            }
+        if (StringUtils.isEmpty(clipboard)) {
+            return;
+        }
+        /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
+        final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
+        if ((cookieLoginOnly || cookieLoginOptional) && userCookies != null) {
+            /*
+             * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
+             * them.
+             */
+            pass.setPassword(clipboard.toCharArray());
+            pass.setText(clipboard);
+        } else if (userCookies == null && clipboard.trim().length() > 0) {
+            /* Auto fill username field with clipboard content. */
+            name.setText(clipboard);
         }
     }
 
@@ -178,9 +184,19 @@ public class DefaultEditAccountPanelCookieLogin extends MigPanel implements Acco
         return callback;
     }
 
+    @Override
     public void setAccount(final Account defaultAccount) {
-        if (defaultAccount != null) {
+        if (defaultAccount == null) {
+            return;
+        }
+        /**
+         * Set account data so it will be displayed in GUI accordingly. <br>
+         * Do not set empty fields as we do not want to overwrite data that was auto set from clipboard.
+         */
+        if (!StringUtils.isEmpty(defaultAccount.getUser())) {
             name.setText(defaultAccount.getUser());
+        }
+        if (!StringUtils.isEmpty(defaultAccount.getPass())) {
             pass.setText(defaultAccount.getPass());
         }
     }

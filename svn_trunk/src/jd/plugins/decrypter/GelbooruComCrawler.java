@@ -35,7 +35,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.GelbooruCom;
 
-@DecrypterPlugin(revision = "$Revision: 51051 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
+@DecrypterPlugin(revision = "$Revision: 51811 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=list\\&tags=.+" })
 public class GelbooruComCrawler extends PluginForDecrypt {
     public GelbooruComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,6 +46,12 @@ public class GelbooruComCrawler extends PluginForDecrypt {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* Avoid hitting rate limit too early */
+        return 2;
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {

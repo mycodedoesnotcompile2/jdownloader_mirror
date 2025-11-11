@@ -44,11 +44,16 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.controlling.FileStateManager;
 import org.jdownloader.controlling.FileStateManager.FILESTATE;
 import org.jdownloader.gui.translate._GUI;
@@ -76,7 +81,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51791 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 51811 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -535,35 +540,48 @@ public class WeTransferCom extends PluginForHost {
             br.setCookiesExclusive(true);
             logger.info("Attempting cookie/token login");
             String access_token = account.getStringProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
-            final boolean allowOnlyLocalStorageStringAsPassword = true;
+            String refresh_token = null;
+            final boolean allowOnlyJsonStringAsPassword = true;
             Number access_token_expire_timestamp = this.getTokenExpireTimestamp(account);
-            final String error_invalid_local_storage_login_input = "Invalid password syntax: Enter exported LocalStorage token string in password field";
             final String error_login_token_expired = "Login token expired";
             Map<String, Object> parsedJson = null;
             try {
                 parsedJson = restoreFromString(account.getPass(), TypeRef.MAP);
             } catch (final JSonMapperException jme) {
-                if (allowOnlyLocalStorageStringAsPassword) {
-                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
+                if (allowOnlyJsonStringAsPassword) {
+                    errorInvalidSpecialLoginString();
+                    /* Unreachable code */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
             if (parsedJson != null) {
                 final Map<String, Object> data = (Map<String, Object>) parsedJson.get("data");
-                if (data == null) {
-                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
+                if (data != null) {
+                    access_token = (String) data.get("access_token");
+                    refresh_token = (String) data.get("refresh_token");
+                    access_token_expire_timestamp = (Number) data.get("expiresAt");
+                    if (access_token_expire_timestamp == null) {
+                        errorInvalidSpecialLoginString();
+                        /* Unreachable code */
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                } else {
+                    /* Maybe json from "https://auth.wetransfer.com/oauth/token" */
+                    access_token = (String) parsedJson.get("access_token");
+                    refresh_token = (String) parsedJson.get("refresh_token");
+                    // final Number expires_in = (Number) parsedJson.get("expires_in");
+                    // access_token_expire_timestamp = System.currentTimeMillis() + expires_in.longValue() * 1000;
                 }
-                access_token = (String) data.get("access_token");
-                access_token_expire_timestamp = (Number) data.get("expiresAt");
                 if (StringUtils.isEmpty(access_token)) {
-                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
-                } else if (access_token_expire_timestamp == null) {
-                    throw new AccountInvalidException(error_invalid_local_storage_login_input);
+                    errorInvalidSpecialLoginString();
+                    /* Unreachable code */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN, access_token);
                 account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN_EXPIRE_TIMESTAMP, access_token_expire_timestamp);
             }
             if (access_token != null) {
-                if (access_token_expire_timestamp.longValue() <= System.currentTimeMillis()) {
+                if (access_token_expire_timestamp != null && access_token_expire_timestamp.longValue() <= System.currentTimeMillis()) {
                     /*
                      * 2025-11-04: Looks like the "expiresAt" timestamp from LocalStorage token string does not represent the expire date of
                      * that login token.
@@ -594,8 +612,10 @@ public class WeTransferCom extends PluginForHost {
                 // }
                 throw new AccountInvalidException(error_login_token_expired);
             }
-            if (allowOnlyLocalStorageStringAsPassword || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                throw new AccountInvalidException(error_invalid_local_storage_login_input);
+            if (allowOnlyJsonStringAsPassword || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                errorInvalidSpecialLoginString();
+                /* Unreachable code */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final Cookies userCookies = account.loadCookies("");
             if (userCookies == null) {
@@ -618,6 +638,11 @@ public class WeTransferCom extends PluginForHost {
             br.getPage(API_BASE_LOGIN + "/v1/users/me");
             return (Map<String, Object>) this.checkErrorsAPI(br);
         }
+    }
+
+    private void errorInvalidSpecialLoginString() throws AccountInvalidException {
+        showSpecialLoginInfo();
+        throw new AccountInvalidException("Invalid password syntax: Enter exported token string in password field!\r\nMore info: support.jdownloader.org/knowledgebase/article/wetransfer-com-account-login-instructions");
     }
 
     @Override
@@ -693,6 +718,44 @@ public class WeTransferCom extends PluginForHost {
         // TODO: Add better errorhandling
         final int statusCode = ((Number) map.get("statusCode")).intValue();
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "ErrorCode " + statusCode);
+    }
+
+    protected Thread showSpecialLoginInfo() {
+        final String host = this.getHost();
+        final Thread thread = new Thread() {
+            public void run() {
+                // TODO: Add more translations
+                try {
+                    final String help_article_url = "https://support.jdownloader.org/knowledgebase/article/wetransfer-com-account-login-instructions";
+                    String message = "";
+                    final String title;
+                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                        title = host + " - Login";
+                        message += "Hallo liebe(r) " + host + " NutzerIn\r\n";
+                        message += "Um deinen " + host + " Account in JDownloader verwenden zu können, musst du folgende Schritte beachten:\r\n";
+                        message += "Folge der Anleitung im Hilfe-Artikel:\r\n";
+                        message += help_article_url;
+                    } else {
+                        title = host + " - Login";
+                        message += "Hello dear " + host + " user\r\n";
+                        message += "In order to use an account of this service in JDownloader, please follow these instructions:\r\n";
+                        message += help_article_url;
+                    }
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    dialog.setTimeout(3 * 60 * 1000);
+                    if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
+                        CrossSystem.openURL(help_article_url);
+                    }
+                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+                    ret.throwCloseExceptions();
+                } catch (final Throwable e) {
+                    getLogger().log(e);
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
     }
 
     @Override

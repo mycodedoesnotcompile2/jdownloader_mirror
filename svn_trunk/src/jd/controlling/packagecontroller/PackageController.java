@@ -655,6 +655,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
 
     public void merge(final PackageType dest, final List<ChildType> srcLinks, final List<PackageType> srcPkgs, final PackageSettings mergesettings) {
         if (mergesettings == null) {
+            /* Developer mistake */
             throw new IllegalArgumentException();
         }
         if (mergesettings.getMergeSameNamedPackages()) {

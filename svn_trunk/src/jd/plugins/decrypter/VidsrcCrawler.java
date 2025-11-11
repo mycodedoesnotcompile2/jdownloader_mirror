@@ -17,9 +17,12 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -38,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51676 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51811 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidsrcCrawler extends PluginForDecrypt {
     public VidsrcCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,11 +104,24 @@ public class VidsrcCrawler extends PluginForDecrypt {
         }
         if (episode != null || new Regex(contenturl, TYPE_MOVIE).patternFind() || new Regex(contenturl, TYPE_MOVIE_2).patternFind()) {
             /* We expect a single video stream -> Crawl it */
+            /* Typical url format: "//cloudnestra.com/rcp/..." */
             final String next_url = br.getRegex("id=\"player_iframe\" src=\"([^\"]+)").getMatch(0);
             if (next_url == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             br.getPage(next_url);
+            final String tsKey = br.getRegex("class=\"cf-turnstile\" data-sitekey=\"([^\"]+)\"").getMatch(0);
+            if (tsKey != null) {
+                /* 2025-11-10: Handle captcha challenge */
+                if (!br.containsHTML("/rcp_verify")) {
+                    logger.warning("Unespected html -> Cloudflare challenge may fail!");
+                }
+                final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, tsKey).getToken();
+                /* TODO: Finish captcha implementation */
+                final Browser brc = br.cloneBrowser();
+                brc.postPageRaw("/rcp_verify", "{\"token\":\"" + cfTurnstileResponse + "\"}");
+                final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            }
             final String next_url_2 = br.getRegex("src:\\s*'(/prorcp/[^']+)").getMatch(0);
             if (next_url_2 == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

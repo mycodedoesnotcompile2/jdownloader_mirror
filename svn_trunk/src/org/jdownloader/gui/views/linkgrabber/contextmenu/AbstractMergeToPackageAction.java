@@ -178,19 +178,23 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         if (!isEnabled()) {
             return;
         }
-        int numberofExpandedPackages = 0;
+        int numberofContainedExpandedPackages = 0;
+        int numberofSelectedExpandedPackages = 0;
         int numberofSelectedPackages = 0;
         String singleFileName = null;
         final List<PackageView<PackageType, ChildrenType>> pvlist = sel.getPackageViews();
         final List<PackageType> selectedPackages = new ArrayList<PackageType>();
         for (final PackageView<PackageType, ChildrenType> pv : pvlist) {
             final PackageType _package_ = pv.getPackage();
-            selectedPackages.add(_package_);
-            if (_package_.isEnabled()) {
-                numberofExpandedPackages++;
+            if (pv.isExpanded()) {
+                numberofContainedExpandedPackages++;
             }
             if (pv.isPackageSelected()) {
                 numberofSelectedPackages++;
+                selectedPackages.add(_package_);
+                if (pv.isExpanded()) {
+                    numberofSelectedExpandedPackages++;
+                }
             }
             final List<ChildrenType> children = pv.getSelectedChildren();
             if (children.size() == 1) {
@@ -220,9 +224,13 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         if (packageExpandMode == PackageExpandMode.AUTO) {
             final boolean autoPackageExpandedResult;
             if (selectedpackage != null) {
+                /* Single selected package */
                 autoPackageExpandedResult = selectedpackage.isExpanded();
-            } else if (numberofSelectedPackages > 0 && numberofExpandedPackages >= numberofSelectedPackages / 2) {
-                /* Most selected packages are expanded -> Expand target package too */
+            } else if (selectedPackages.size() == 0 && numberofContainedExpandedPackages > 0) {
+                /* No package selected but only links -> Expand new package if selection contains any items from expanded package. */
+                autoPackageExpandedResult = true;
+            } else if (numberofSelectedPackages > 0 && numberofSelectedExpandedPackages >= numberofSelectedPackages / 2) {
+                /* Multiple packages are selected -> Most selected packages are expanded -> Expand target package too */
                 autoPackageExpandedResult = true;
             } else {
                 autoPackageExpandedResult = false;
@@ -231,6 +239,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         } else if (packageExpandMode == PackageExpandMode.EXPANDED) {
             expandPackagePreSetState = true;
         } else {
+            /* PackageExpandMode.COLLAPSED */
             expandPackagePreSetState = false;
         }
         if (this.isDisplayNewPackageDialog()) {
@@ -271,10 +280,10 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
             @Override
             protected Void run() throws RuntimeException {
                 final PackageType newPackage = createNewPackage(final_newPackageName, final_downloadFolder);
-                final List<PackageType> packages = new ArrayList<PackageType>();
-                for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
-                    packages.add(pv.getPackage());
-                }
+                // final List<PackageType> packages = new ArrayList<PackageType>();
+                // for (PackageView<PackageType, ChildrenType> pv : sel.getPackageViews()) {
+                // packages.add(pv.getPackage());
+                // }
                 int index = -1;
                 switch (getLocation()) {
                 case AFTER_SELECTION:

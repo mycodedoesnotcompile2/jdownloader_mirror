@@ -45,7 +45,6 @@ import org.appwork.storage.flexijson.FlexiJSonObject;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.KeyValueElement;
 import org.appwork.storage.flexijson.NodeFilter;
-import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
 
 /**
  * @author thomas
@@ -140,9 +139,6 @@ public class FlexiJSonPrettyPrinterForConfig extends FlexiJSonPrettyStringify {
             if (filter.skipCommentNode(comment)) {
                 return;
             }
-        }
-        if (comment.getTags().contains(FlexiMapperTags.SEE)) {
-            System.out.println(132);
         }
         super.appendComment(comment, out, layer, path);
     }
