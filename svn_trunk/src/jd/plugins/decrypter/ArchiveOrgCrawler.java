@@ -71,7 +71,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 51795 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 51812 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +134,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         }
         final boolean useBetaAPI = true;
         if (useBetaAPI) {
-            return crawlBetaSearchAPI(sourceurl, collectionIdentifier, "collection");
+            return crawlBetaSearchAPI(sourceurl, collectionIdentifier, "collection", false);
         } else {
             return crawlViaScrapeAPI("collection:" + collectionIdentifier, -1);
         }
@@ -143,7 +143,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlSearchQueryURL(final CryptedLink param) throws Exception {
         final boolean useBetaAPI = true;
         if (useBetaAPI) {
-            return this.crawlBetaSearchAPI(param.getCryptedUrl(), null, null);
+            return this.crawlBetaSearchAPI(param.getCryptedUrl(), null, null, true);
         } else {
             /* Old handling */
             return crawlOldSearch(param);
@@ -277,12 +277,22 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
      * Crawls items using the archive.org "BETA Search API" which, funnily enough, they are also using in production on their website. </br>
      * Successor of {@link #crawlViaScrapeAPI(String, int)}
      */
-    private ArrayList<DownloadLink> crawlBetaSearchAPI(final String sourceurl, String identifier, final String type) throws Exception {
+    private ArrayList<DownloadLink> crawlBetaSearchAPI(final String sourceurl, String identifier, final String type, final boolean allowApplySearchLimit) throws Exception {
         if (StringUtils.isEmpty(sourceurl)) {
             throw new IllegalArgumentException();
         }
-        final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
-        final int maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
+        if (identifier == null) {
+            identifier = getIdentifierFromURL(sourceurl);
+        }
+        final boolean isUserProfile = identifier != null && identifier.startsWith("@");
+        final boolean isCollection = StringUtils.equalsIgnoreCase(type, "collection");
+        final int maxResults;
+        if (allowApplySearchLimit) {
+            final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
+            maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
+        } else {
+            maxResults = -1;
+        }
         if (maxResults == 0) {
             logger.info("User disabled search term crawler -> Returning empty array");
             return new ArrayList<DownloadLink>();
@@ -290,15 +300,12 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final int defaultMaxNumberofItemsPerPage = 100;
         final int maxNumberofItemsPerPageForThisRun;
         if (maxResults == -1) {
-            /* -1 means unlimited -> Use internal hardcoded limit. */
+            /* -1 means unlimited -> Use internal hardcoded limit for pagination. */
             maxNumberofItemsPerPageForThisRun = defaultMaxNumberofItemsPerPage;
         } else if (maxResults < defaultMaxNumberofItemsPerPage) {
             maxNumberofItemsPerPageForThisRun = maxResults;
         } else {
             maxNumberofItemsPerPageForThisRun = defaultMaxNumberofItemsPerPage;
-        }
-        if (identifier == null) {
-            identifier = getIdentifierFromURL(sourceurl);
         }
         final UrlQuery sourceurlquery = UrlQuery.parse(sourceurl);
         String userSearchQuery = sourceurlquery.get("query");
@@ -306,8 +313,6 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             userSearchQuery = "";
         }
         final String titleHumanReadable;
-        final boolean isUserProfile = identifier != null && identifier.startsWith("@");
-        final boolean isCollection = StringUtils.equalsIgnoreCase(type, "collection");
         if (isUserProfile) {
             titleHumanReadable = "Profile " + identifier;
         } else if (isCollection) {
@@ -1426,7 +1431,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             /* Curate given parameter. */
             username += "@";
         }
-        return crawlBetaSearchAPI(sourceurl, username, null);
+        return crawlBetaSearchAPI(sourceurl, username, null, true);
     }
 
     /** Crawls desired book. Given browser instance needs to access URL to book in beforehand! */

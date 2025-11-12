@@ -47,7 +47,6 @@ import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -81,13 +80,11 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51811 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 51813 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://auth." + getHost() + "/signup");
-        }
+        this.enablePremium("https://auth." + getHost() + "/signup");
     }
     // @Override
     // public LazyPlugin.FEATURE[] getFeatures() {
@@ -140,6 +137,7 @@ public class WeTransferCom extends PluginForHost {
     public static final String   PROPERTY_ACCOUNT_ACCESS_TOKEN                  = "access_token";
     public static final String   PROPERTY_ACCOUNT_ACCESS_TOKEN_EXPIRE_TIMESTAMP = "access_token_expire_timestamp";
     public static final String   PROPERTY_ACCOUNT_REFRESH_TOKEN                 = "refresh_token";
+    private static final String  LOGIN_HELP_URL                                 = "https://support.jdownloader.org/knowledgebase/article/wetransfer-account-login-instructions";
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -557,6 +555,7 @@ public class WeTransferCom extends PluginForHost {
             if (parsedJson != null) {
                 final Map<String, Object> data = (Map<String, Object>) parsedJson.get("data");
                 if (data != null) {
+                    /* LocalStorage json string */
                     access_token = (String) data.get("access_token");
                     refresh_token = (String) data.get("refresh_token");
                     access_token_expire_timestamp = (Number) data.get("expiresAt");
@@ -566,7 +565,7 @@ public class WeTransferCom extends PluginForHost {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                 } else {
-                    /* Maybe json from "https://auth.wetransfer.com/oauth/token" */
+                    /* Hopefully json from "https://auth.wetransfer.com/oauth/token" */
                     access_token = (String) parsedJson.get("access_token");
                     refresh_token = (String) parsedJson.get("refresh_token");
                     // final Number expires_in = (Number) parsedJson.get("expires_in");
@@ -581,7 +580,7 @@ public class WeTransferCom extends PluginForHost {
                 account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN_EXPIRE_TIMESTAMP, access_token_expire_timestamp);
             }
             if (access_token != null) {
-                if (access_token_expire_timestamp != null && access_token_expire_timestamp.longValue() <= System.currentTimeMillis()) {
+                if (access_token_expire_timestamp != null && access_token_expire_timestamp.longValue() != -1 && access_token_expire_timestamp.longValue() <= System.currentTimeMillis()) {
                     /*
                      * 2025-11-04: Looks like the "expiresAt" timestamp from LocalStorage token string does not represent the expire date of
                      * that login token.
@@ -612,7 +611,7 @@ public class WeTransferCom extends PluginForHost {
                 // }
                 throw new AccountInvalidException(error_login_token_expired);
             }
-            if (allowOnlyJsonStringAsPassword || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            if (allowOnlyJsonStringAsPassword) {
                 errorInvalidSpecialLoginString();
                 /* Unreachable code */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -642,7 +641,8 @@ public class WeTransferCom extends PluginForHost {
 
     private void errorInvalidSpecialLoginString() throws AccountInvalidException {
         showSpecialLoginInfo();
-        throw new AccountInvalidException("Invalid password syntax: Enter exported token string in password field!\r\nMore info: support.jdownloader.org/knowledgebase/article/wetransfer-com-account-login-instructions");
+        final String login_help_url_without_protocol = LOGIN_HELP_URL.replaceFirst("https://", "");
+        throw new AccountInvalidException("Invalid password syntax: Enter exported token string in password field!\r\nMore info: " + login_help_url_without_protocol);
     }
 
     @Override
@@ -658,7 +658,7 @@ public class WeTransferCom extends PluginForHost {
          * to have an unique username.
          */
         final String email = (String) user.get("email");
-        if (!StringUtils.isEmpty(email)) {
+        if (!StringUtils.isEmpty(email) && !StringUtils.equalsIgnoreCase(account.getUser(), email)) {
             account.setUser(email);
         }
         final String date_created_at = user.get("created_at").toString();
@@ -715,7 +715,7 @@ public class WeTransferCom extends PluginForHost {
             /* No error */
             return map;
         }
-        // TODO: Add better errorhandling
+        // TODO: Add better error handling
         final int statusCode = ((Number) map.get("statusCode")).intValue();
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "ErrorCode " + statusCode);
     }
@@ -724,22 +724,69 @@ public class WeTransferCom extends PluginForHost {
         final String host = this.getHost();
         final Thread thread = new Thread() {
             public void run() {
-                // TODO: Add more translations
                 try {
-                    final String help_article_url = "https://support.jdownloader.org/knowledgebase/article/wetransfer-com-account-login-instructions";
+                    final String help_article_url = LOGIN_HELP_URL;
+                    final String lang = System.getProperty("user.language", "en").toLowerCase();
                     String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = host + " - Login";
-                        message += "Hallo liebe(r) " + host + " NutzerIn\r\n";
-                        message += "Um deinen " + host + " Account in JDownloader verwenden zu können, musst du folgende Schritte beachten:\r\n";
-                        message += "Folge der Anleitung im Hilfe-Artikel:\r\n";
+                    String title = host + " - Login";
+                    switch (lang) {
+                    case "de":
+                        message += "Hallo liebe(r) " + host + "-Nutzer/in\r\n";
+                        message += "Um deinen Account dieses Dienstes in JDownloader verwenden zu können, befolge bitte diese Anleitung:\r\n";
                         message += help_article_url;
-                    } else {
-                        title = host + " - Login";
+                        break;
+                    case "fr":
+                        message += "Bonjour cher/chère utilisateur(trice) de " + host + "\r\n";
+                        message += "Pour utiliser un compte de ce service dans JDownloader, veuillez suivre les instructions suivantes :\r\n";
+                        message += help_article_url;
+                        break;
+                    case "es":
+                        message += "Hola estimado/a usuario/a de " + host + "\r\n";
+                        message += "Para utilizar una cuenta de este servicio en JDownloader, por favor sigue las siguientes instrucciones:\r\n";
+                        message += help_article_url;
+                        break;
+                    case "it":
+                        message += "Ciao caro/a utente di " + host + "\r\n";
+                        message += "Per utilizzare un account di questo servizio in JDownloader, segui queste istruzioni:\r\n";
+                        message += help_article_url;
+                        break;
+                    case "pt":
+                    case "pt_br":
+                        message += "Olá caro(a) usuário(a) do " + host + "\r\n";
+                        message += "Para usar uma conta deste serviço no JDownloader, siga as instruções:\r\n";
+                        message += help_article_url;
+                        break;
+                    case "ru":
+                        message += "Здравствуйте, уважаемый пользователь " + host + "\r\n";
+                        message += "Чтобы использовать аккаунт этого сервиса в JDownloader, пожалуйста, следуйте следующим инструкциям:\r\n";
+                        message += help_article_url;
+                        break;
+                    case "tr":
+                        message += "Merhaba değerli " + host + " kullanıcısı\r\n";
+                        message += "Bu servisin hesabını JDownloader üzerinde kullanmak için lütfen aşağıdaki talimatları izleyin:\r\n";
+                        message += help_article_url;
+                        break;
+                    case "zh":
+                        message += "亲爱的 " + host + " 用户您好\r\n";
+                        message += "要在 JDownloader 中使用此服务的账户，请按照以下说明进行操作：\r\n";
+                        message += help_article_url;
+                        break;
+                    case "ja":
+                        message += host + " のご利用者様へ\r\n";
+                        message += "JDownloader でこのサービスのアカウントを使用するには、以下の手順に従ってください：\r\n";
+                        message += help_article_url;
+                        break;
+                    case "ko":
+                        message += "안녕하세요, " + host + " 사용자님\r\n";
+                        message += "JDownloader에서 이 서비스 계정을 사용하려면 다음 안내를 따라주세요:\r\n";
+                        message += help_article_url;
+                        break;
+                    default:
+                        // English fallback
                         message += "Hello dear " + host + " user\r\n";
                         message += "In order to use an account of this service in JDownloader, please follow these instructions:\r\n";
                         message += help_article_url;
+                        break;
                     }
                     final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
                     dialog.setTimeout(3 * 60 * 1000);
