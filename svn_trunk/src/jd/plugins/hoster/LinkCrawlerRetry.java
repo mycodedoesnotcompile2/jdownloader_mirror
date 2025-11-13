@@ -40,7 +40,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
-@HostPlugin(revision = "$Revision: 51793 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51816 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
 public class LinkCrawlerRetry extends PluginForHost {
     private final static String ON_LINKCHECK = "onlinkcheck";
 
@@ -94,30 +94,37 @@ public class LinkCrawlerRetry extends PluginForHost {
         if ("FILE_NOT_FOUND".equals(reason)) {
             return AvailableStatus.FALSE;
         } else {
-            if (Boolean.TRUE.equals(getPluginConfig().getBooleanProperty(ON_LINKCHECK)) && parameter.getTempProperties().removeProperty("checked")) {
-                final AbstractNodeNotifier nodeChangeListener = parameter.getNodeChangeListener();
-                final PluginView<AbstractPackageChildrenNode> pv = new PluginView<AbstractPackageChildrenNode>(this);
+            return AvailableStatus.UNCHECKED;
+        }
+    }
+
+    private PluginView<AbstractPackageChildrenNode> toPluginView(final DownloadLink... downloadLinks) {
+        final PluginView<AbstractPackageChildrenNode> pv = new PluginView<AbstractPackageChildrenNode>(this);
+        for (DownloadLink downloadLink : downloadLinks) {
+            if (downloadLink.getTempProperties().removeProperty("checked")) {
+                final AbstractNodeNotifier nodeChangeListener = downloadLink.getNodeChangeListener();
                 if (nodeChangeListener instanceof CrawledLink) {
                     pv.add((CrawledLink) nodeChangeListener);
                 } else {
-                    pv.add(parameter);
+                    pv.add(downloadLink);
                 }
-                retry(pv);
-                return AvailableStatus.UNCHECKED;
             } else {
-                parameter.getTempProperties().setProperty("checked", Boolean.TRUE);
-                return AvailableStatus.UNCHECKED;
+                downloadLink.getTempProperties().setProperty("checked", Boolean.TRUE);
             }
         }
+        return pv;
     }
 
     @Override
     public boolean checkLinks(DownloadLink[] urls) {
-        if (urls == null) {
+        if (urls == null || urls.length == 0) {
             return true;
         }
         for (final DownloadLink link : urls) {
             link.setAvailableStatus(requestFileInformation(link));
+        }
+        if (Boolean.TRUE.equals(getPluginConfig().getBooleanProperty(ON_LINKCHECK))) {
+            retry(toPluginView(urls));
         }
         return true;
     }

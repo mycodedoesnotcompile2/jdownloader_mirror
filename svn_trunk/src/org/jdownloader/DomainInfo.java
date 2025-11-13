@@ -190,7 +190,10 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
     }
 
     // Protected methods
-    protected Icon getFavIcon(final FavIconRequestor requestor, int width, int height, final boolean updatePermission) {
+    protected Icon getFavIcon(final FavIconRequestor requestor, int width, int height, boolean updatePermission) {
+        if (!updatePermission && "linkcrawlerretry".equals(getDomain())) {
+            updatePermission = true;
+        }
         Icon ret = getHosterIcon();
         final boolean hasHosterIcon = ret != null;
         if (ret == null || (!hosterIconUpdatePermission && updatePermission)) {

@@ -1,12 +1,13 @@
 package org.jdownloader.extensions.shutdown;
 
+import jd.plugins.ExtensionConfigInterface;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-
-import jd.plugins.ExtensionConfigInterface;
+import org.appwork.storage.config.annotations.SpinnerValidator;
 
 public interface ShutdownConfig extends ExtensionConfigInterface {
     @DefaultBooleanValue(false)
@@ -38,6 +39,7 @@ public interface ShutdownConfig extends ExtensionConfigInterface {
     @DefaultIntValue(60)
     @AboutConfig
     @DescriptionForConfigEntry("Seconds after shutdown request until JDownloader closes.")
+    @SpinnerValidator(max = 600, min = 5, step = 10)
     int getCountdownTime();
 
     void setCountdownTime(int seconds);

@@ -155,12 +155,9 @@ public class FavIcons {
         return getFavIcon(host, requestor, true);
     }
 
-    public static Icon getFavIcon(String host, FavIconRequestor requestor, boolean updatePermission) {
+    public static Icon getFavIcon(String host, FavIconRequestor requestor, final boolean updatePermission) {
         if (host == null) {
             return null;
-        }
-        if ("linkcrawlerretry".equals(host)) {
-            updatePermission = true;
         }
         Icon image = null;
         synchronized (LOCK) {

@@ -54,7 +54,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@HostPlugin(revision = "$Revision: 49011 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDriveDirectoryIndex extends PluginForHost {
     public GoogleDriveDirectoryIndex(PluginWrapper wrapper) {
         super(wrapper);
@@ -324,10 +324,8 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
         }
 
         public void setAccount(final Account defaultAccount) {
-            if (defaultAccount != null) {
-                name.setText(defaultAccount.getUser());
-                pass.setText(defaultAccount.getPass());
-            }
+            name.setText(defaultAccount.getUser());
+            pass.setText(defaultAccount.getPass());
         }
 
         @Override
@@ -362,6 +360,11 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
         @Override
         public JComponent getComponent() {
             return this;
+        }
+
+        @Override
+        public boolean handleClipboardAutoFill() {
+            return false;
         }
     }
 

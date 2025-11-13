@@ -37,6 +37,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -52,7 +53,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 
-@HostPlugin(revision = "$Revision: 51066 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 2, names = {}, urls = {})
 public class EmuParadiseMe extends PluginForHost {
     public EmuParadiseMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,7 +114,7 @@ public class EmuParadiseMe extends PluginForHost {
 
     @Override
     public AccountBuilderInterface getAccountFactory(InputChangedCallbackInterface callback) {
-        return new EmuParadiseMeAccountFactory(callback);
+        return new EmuParadiseMeAccountFactory(callback, this);
     }
 
     @Override
@@ -502,14 +503,16 @@ public class EmuParadiseMe extends PluginForHost {
             if (txnIdHelp.equals(this.txnId.getText())) {
                 return null;
             }
-            return this.txnId.getText();
+            return StringUtils.trim(this.txnId.getText());
         }
 
-        private final ExtTextField txnId;
-        private final JLabel       jlTxnId;
+        private final ExtTextField  txnId;
+        private final JLabel        jlTxnId;
+        private final EmuParadiseMe plg;
 
-        public EmuParadiseMeAccountFactory(final InputChangedCallbackInterface callback) {
+        public EmuParadiseMeAccountFactory(final InputChangedCallbackInterface callback, final EmuParadiseMe plg) {
             super("ins 0, wrap 2", "[][grow,fill]", "");
+            this.plg = plg;
             // txnid
             add(jlTxnId = new JLabel("TxnId: (must be at least 8 digits)"));
             add(this.txnId = new ExtTextField() {
@@ -527,17 +530,20 @@ public class EmuParadiseMe extends PluginForHost {
         }
 
         @Override
+        public boolean handleClipboardAutoFill() {
+            return DefaultEditAccountPanelAPIKeyLogin.handleClipboardAutoFill(txnId, null, this.plg);
+        }
+
+        @Override
         public void setAccount(Account defaultAccount) {
-            if (defaultAccount != null) {
-                txnId.setText(defaultAccount.getStringProperty("txnId", null));
-            }
+            txnId.setText(defaultAccount.getStringProperty("txnId", null));
         }
 
         @Override
         public boolean validateInputs() {
             final String txnId = getTxnId();
             /* Either username & password or txnId only. */
-            if (!validatetxnId(txnId)) {
+            if (!plg.looksLikeValidAPIKey(txnId)) {
                 jlTxnId.setForeground(Color.RED);
                 return false;
             } else {
@@ -546,18 +552,14 @@ public class EmuParadiseMe extends PluginForHost {
             }
         }
 
-        private boolean validatetxnId(final String txnId) {
-            return txnId != null && txnId.matches("^\\d{8,}$");
-        }
-
         @Override
         public Account getAccount() {
             final String txnId = getTxnId();
             final Account account = new Account(txnId, "");
-            if (this.validatetxnId(txnId)) {
+            if (plg.looksLikeValidAPIKey(txnId)) {
                 account.setProperty("txnid", txnId);
             } else {
-                account.setProperty("txnid", Property.NULL);
+                account.removeProperty("txnid");
             }
             return account;
         }
@@ -573,6 +575,11 @@ public class EmuParadiseMe extends PluginForHost {
                 return false;
             }
         }
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(String txnId) {
+        return txnId != null && txnId.matches("^\\d{8,}$");
     }
 
     @Override

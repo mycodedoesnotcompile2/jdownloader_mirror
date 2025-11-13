@@ -36,22 +36,6 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
@@ -71,7 +55,23 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -214,8 +214,8 @@ public class SendCm extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (allowAPIDownloadIfApikeyIsAvailable(link, account)) {
             /**
-             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br>
-             * Looks like this is supposed to help with Cloudflare problems.
+             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br> Looks like this is supposed to help with
+             * Cloudflare problems.
              */
             final String directurl = this.getDllinkAPI(link, account);
             handleDownload(link, account, null, directurl);
@@ -966,36 +966,39 @@ public class SendCm extends XFileSharingProBasic {
                 pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
             }
             freeAccountPanel.add(pass);
-            // Handle clipboard auto-fill
-            handleClipboardAutoFill();
             // Set initial visibility
             updateVisibleComponents();
         }
 
-        private void handleClipboardAutoFill() {
+        @Override
+        public boolean handleClipboardAutoFill() {
             final ExtTextField dummy = new ExtTextField();
             dummy.paste();
-            final String clipboard = dummy.getText();
-            if (StringUtils.isEmpty(clipboard)) {
-                return;
+            final String clipboardContent = StringUtils.trim(dummy.getText());
+            if (StringUtils.isEmpty(clipboardContent)) {
+                return false;
             }
             /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
-            final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboard, null);
+            final Cookies userCookies = Cookies.parseCookiesFromJsonString(clipboardContent, plg.getLogger());
             if ((websiteLoginCookieLoginOnly || websiteLoginCookieLoginOptional) && userCookies != null && !userCookies.isEmpty()) {
                 /*
                  * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
                  * them.
                  */
-                pass.setPassword(clipboard.toCharArray());
+                pass.setPassword(clipboardContent.toCharArray());
                 /* User has copied exported cookies in beforehand, auto switch to website login. */
                 accountTypeComboBox.setSelectedIndex(1);
-            } else if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
-                this.apikey.setText(clipboard);
-            } else if (userCookies == null && clipboard.trim().length() > 0) {
+                updateVisibleComponents();
+                return true;
+            } else if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboardContent)) {
+                this.apikey.setText(clipboardContent);
+                return true;
+            } else if (userCookies == null && clipboardContent.trim().length() > 0 && (!usernameIsEmail || plg.looksLikeValidEmailAddress(null, clipboardContent))) {
                 /* Auto fill username field with clipboard content. */
-                name.setText(clipboard);
+                name.setText(clipboardContent);
+                return true;
             }
-            updateVisibleComponents();
+            return false;
         }
 
         private void updateVisibleComponents() {
@@ -1026,9 +1029,6 @@ public class SendCm extends XFileSharingProBasic {
         }
 
         public void setAccount(final Account defaultAccount) {
-            if (defaultAccount == null) {
-                return;
-            }
             /* If user edits existing account ensure that GUI matches users' account type. */
             if (defaultAccount.hasProperty(PROPERTY_ACCOUNT_FORCE_API_LOGIN)) {
                 /* Premium account / API key login */

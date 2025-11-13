@@ -177,7 +177,7 @@ public class CrossSystem {
         KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
-         * 
+         *
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -194,7 +194,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         * 
+         *
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -207,9 +207,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         * 
+         *
          * https://wiki.ubuntu.com/Releases
-         * 
+         *
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -304,7 +304,8 @@ public class CrossSystem {
         WINDOWS_11_22H2(OSFamily.WINDOWS),
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
-        WINDOWS_11_25H2(OSFamily.WINDOWS);
+        WINDOWS_11_25H2(OSFamily.WINDOWS),
+        WINDOWS_11_26H1(OSFamily.WINDOWS);
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -564,7 +565,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         * 
+         *
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -840,7 +841,10 @@ public class CrossSystem {
                     // https://en.wikipedia.org/wiki/Windows_11_version_history
                     // https://betawiki.net/wiki/Windows_as_a_service
                     // https://ss64.com/nt/ver.html
-                    if (buildNumber >= 26200) {
+                    if (buildNumber >= 28000) {
+                        // https://blogs.windows.com/windows-insider/2025/11/07/announcing-windows-11-insider-preview-build-28000-canary-channel/
+                        this.set(OperatingSystem.WINDOWS_11_26H1);
+                    } else if (buildNumber >= 26200) {
                         this.set(OperatingSystem.WINDOWS_11_25H2);
                     } else if (buildNumber >= 26052 || buildNumber >= 26080 || buildNumber >= 26100) {
                         // https://blogs.windows.com/windows-insider/2024/02/08/announcing-windows-11-insider-preview-build-26052-canary-and-dev-channels/
@@ -1460,19 +1464,19 @@ public class CrossSystem {
             final String arch = archString.toLowerCase(Locale.ENGLISH);
             if (arch.contains("i386") || arch.contains("i486") || arch.contains("i586") || arch.contains("i686") || arch.contains("x86") || arch.contains("amd64")) {
                 return ARCHFamily.X86;
-            } else if (arch.contains("ppc") || arch.contains("powerpc")) {
+            } else if (arch.contains("ppc") || arch.contains("powerpc") || arch.contains("ppc64") || arch.contains("ppc64le")) {
                 return ARCHFamily.PPC;
             } else if (arch.contains("mips")) {
                 return ARCHFamily.MIPS;
             } else if (arch.contains("sparc")) {
                 return ARCHFamily.SPARC;
-            } else if (arch.contains("arm") || arch.contains("aarch")) {
+            } else if (arch.contains("arm") || arch.contains("aarch") || arch.contains("aarch64")) {
                 return ARCHFamily.ARM;
             } else if (arch.contains("ia64")) {
                 return ARCHFamily.IA64;
-            } else if (arch.contains("riscv")) {
+            } else if (arch.contains("riscv") || arch.contains("riscv64")) {
                 return ARCHFamily.RISCV;
-            } else if ((arch.contains("loongarch") || arch.contains("loong"))) {
+            } else if (arch.contains("loongarch") || arch.contains("loong") || arch.contains("loongarch64")) {
                 // loongarch64 and loong64
                 return ARCHFamily.LOONGARCH;
             }

@@ -19,14 +19,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -36,7 +32,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49390 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51816 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonymfileCom extends PluginForHost {
     public AnonymfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,9 @@ public class AnonymfileCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "anonymfile.com" });
+        ret.add(new String[] { "anonymfile.com" });// redirects to filefa.st
+        ret.add(new String[] { "anonfilesnew.com" });
+        ret.add(new String[] { "filefa.st" });
         return ret;
     }
 
@@ -72,7 +74,7 @@ public class AnonymfileCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]+)(/([^/#\\?]+))?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9\\-_]+)(/([^/#\\?]+))?");
         }
         return ret.toArray(new String[0]);
     }
@@ -95,59 +97,12 @@ public class AnonymfileCom extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    private final String API_BASE = "https://anonymfile.com/api/v1";
-
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (true) {
-            return requestFileInformationWebsite(link);
-        } else {
-            // 2024-07-02: api returns 404/html
-            return requestFileInformationAPI(link);
-        }
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformationWebsite(link);
     }
 
-    public AvailableStatus requestFileInformationAPI(final DownloadLink link) throws IOException, PluginException {
-        final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            /* Fallback */
-            final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
-            if (filenameFromURL != null) {
-                link.setName(Encoding.htmlDecode(filenameFromURL).trim());
-            } else {
-                link.setName(fid);
-            }
-        }
-        this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getPage(API_BASE + "/file/" + this.getFID(link) + "/info");
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            if (true) {
-                // 2024-07-02: api returns 404/html
-                return requestFileInformationWebsite(link);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-        }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (Boolean.FALSE.equals(entries.get("status"))) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-        final Map<String, Object> file = (Map<String, Object>) data.get("file");
-        final Map<String, Object> metadata = (Map<String, Object>) file.get("metadata");
-        final Map<String, Object> sizemap = (Map<String, Object>) metadata.get("size");
-        link.setFinalFileName(metadata.get("name").toString());
-        final Object bytes = sizemap.get("bytes");
-        if (bytes instanceof Number) {
-            link.setVerifiedFileSize(((Number) bytes).longValue());
-        } else {
-            link.setVerifiedFileSize(Long.parseLong(bytes.toString()));
-        }
-        return AvailableStatus.TRUE;
-    }
-
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws Exception {
         final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
@@ -170,12 +125,30 @@ public class AnonymfileCom extends PluginForHost {
         } else if (br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fileName = br.getRegex("download\\s*=\\s*\"(.*?)\"").getMatch(0);
-        final String fileSize = br.getRegex(">\\s*Download\\s*\\((.*?)\\)").getMatch(0);
+        boolean safeFilename = false;
+        String fileName = br.getRegex("download\\s*=\\s*\"(.*?)\"").getMatch(0);
+        if (fileName == null) {
+            fileName = br.getRegex("fileName.\"\\s*:\\s*.\"(.*?).\"\\s*,").getMatch(0);
+            fileName = fileName == null ? null : (String) JavaScriptEngineFactory.jsonToJavaObject("\"" + fileName + "\"");
+            safeFilename = fileName != null;
+        }
         if (fileName != null) {
-            link.setName(fileName);
-            if (fileSize != null) {
-                link.setDownloadSize(SizeFormatter.getSize(fileSize));
+            if (safeFilename) {
+                link.setFinalFileName(fileName);
+            } else {
+                link.setName(fileName);
+            }
+            String fileSizeBytes = br.getRegex("bytes.\"\\s*:\\s*(\\d+)").getMatch(0);
+            if (fileSizeBytes != null) {
+                link.setVerifiedFileSize(Long.parseLong(fileSizeBytes));
+            } else {
+                String fileSize = br.getRegex(">\\s*Download\\s*\\((.*?)\\)").getMatch(0);
+                if (fileSize == null) {
+                    fileSize = br.getRegex("readable.\"\\s*:\\s*.\"(.*?).\"\\s*").getMatch(0);
+                }
+                if (fileSize != null) {
+                    link.setDownloadSize(SizeFormatter.getSize(fileSize));
+                }
             }
             return AvailableStatus.TRUE;
         }
@@ -198,24 +171,25 @@ public class AnonymfileCom extends PluginForHost {
             String dllink = br.getRegex("\"(https[^\"]+)\"\\s*download\\s*=\\s*").getMatch(0);
             if (dllink == null) {
                 dllink = br.getRegex("(/f/[a-f0-9\\-]+)").getMatch(0);
+                if (dllink == null) {
+                    dllink = br.getRegex("fileUrl.\"\\s*:\\s*.\"(.*?).\"\\s*,").getMatch(0);
+                    dllink = dllink == null ? null : (String) JavaScriptEngineFactory.jsonToJavaObject("\"" + dllink + "\"");
+                }
             }
             if (StringUtils.isEmpty(dllink)) {
                 logger.warning("Failed to find final downloadurl");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                br.followConnection(true);
-                if (dl.getConnection().getResponseCode() == 403) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
-                } else if (dl.getConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
-                }
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
+    }
+
+    @Override
+    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     @Override

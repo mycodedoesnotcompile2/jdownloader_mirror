@@ -24,14 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -47,7 +39,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 51227 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
+import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51816 $", interfaceVersion = 3, names = {}, urls = {})
 public class CyberdropMeAlbum extends PluginForDecrypt {
     public CyberdropMeAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,17 +71,17 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
         return br;
     }
 
-    public final static String MAIN_CYBERDROP_DOMAIN = "cyberdrop.me";
+    public final static String MAIN_CYBERDROP_DOMAIN = "cyberdrop.cr";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { MAIN_CYBERDROP_DOMAIN, "cyberdrop.to", "cyberdrop.cc", "cyberdrop.ch" });
+        ret.add(new String[] { MAIN_CYBERDROP_DOMAIN, "cyberdrop.me", "cyberdrop.to", "cyberdrop.cc", "cyberdrop.ch" });
         return ret;
     }
 
     public static List<String> getDeadDomains() {
-        return Arrays.asList(new String[] { "cyberdrop.to" });
+        return Arrays.asList(new String[] { "cyberdrop.to", "cyberdrop.me" });
     }
 
     public static String[] getAnnotationNames() {
@@ -109,13 +109,19 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
-        final String singleFileURL = isSingleMediaURL(contenturl);
-        String path = new URL(contenturl).getPath();
+        String contentURL = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        final String hostFromAddedURLWithoutSubdomain = new URL(contentURL).getHost();
+        final List<String> deadDomains = getDeadDomains();
+        if (deadDomains != null && deadDomains.contains(hostFromAddedURLWithoutSubdomain)) {
+            contentURL = param.getCryptedUrl().replaceFirst(Pattern.quote(hostFromAddedURLWithoutSubdomain) + "/", getHost() + "/");
+            logger.info("Corrected domain in added URL: " + hostFromAddedURLWithoutSubdomain + " --> " + getHost());
+        }
+        final String singleFileURL = isSingleMediaURL(contentURL);
+        String path = new URL(contentURL).getPath();
         if (new Regex(path, CyberdropMeAlbum.PATTERN_SINGLE_FILE).patternFind()) {
             /* Single file -> Handle via hosterplugin */
             this.ensureInitHosterplugin();
-            final DownloadLink singlefile = this.createDownloadlink(contenturl);
+            final DownloadLink singlefile = this.createDownloadlink(contentURL);
             singlefile.setDefaultPlugin(plugin);
             ret.add(singlefile);
         } else if (singleFileURL != null) {
@@ -123,13 +129,7 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
             add(ret, null, param.getCryptedUrl(), null, null, null, null);
         } else if (new Regex(path, PATTERN_ALBUM).patternFind()) {
             /* Most likely we have an album or similar: One URL which leads to more URLs. */
-            String contentURL = param.getCryptedUrl();
-            final String hostFromAddedURLWithoutSubdomain = new URL(contentURL).getHost();
-            final List<String> deadDomains = getDeadDomains();
-            if (deadDomains != null && deadDomains.contains(hostFromAddedURLWithoutSubdomain)) {
-                contentURL = param.getCryptedUrl().replaceFirst(Pattern.quote(hostFromAddedURLWithoutSubdomain) + "/", getHost() + "/");
-                logger.info("Corrected domain in added URL: " + hostFromAddedURLWithoutSubdomain + " --> " + getHost());
-            }
+
             final HashSet<String> dups = new HashSet<String>();
             br.getPage(contentURL);
             if (br.getHttpConnection().getResponseCode() == 404) {
@@ -223,7 +223,7 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
             fp.addLinks(ret);
         } else if (new Regex(path, CyberdropMeAlbum.PATTERN_SINGLE_FILE_SHORT_LINK).patternFind()) {
             br.setFollowRedirects(false);
-            br.getPage(contenturl);
+            br.getPage(contentURL);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -293,8 +293,8 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
     }
 
     /**
-     * Returns URL if given URL looks like it is pointing to a single file. </br>
-     * Returns null if given URL-structure is unknown or does not seem to point to a single file.
+     * Returns URL if given URL looks like it is pointing to a single file. </br> Returns null if given URL-structure is unknown or does not
+     * seem to point to a single file.
      */
     private String isSingleMediaURL(final String url) {
         if (url == null) {

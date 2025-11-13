@@ -8,6 +8,8 @@ import javax.swing.JLabel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import jd.http.Cookies;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
@@ -16,8 +18,6 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-
-import jd.http.Cookies;
 
 public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderInterface {
     /**
@@ -54,6 +54,7 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
     private JLabel                              usernameLabel               = null;
     private JLabel                              passwordLabel               = null;
     private boolean                             allowCookiesInPasswordField = false;
+    private final PluginForHost                 plg;
 
     public boolean updateAccount(Account input, Account output) {
         boolean changed = false;
@@ -68,13 +69,10 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
         return changed;
     }
 
-    public DefaultEditAccountPanel(final InputChangedCallbackInterface callback) {
-        this(callback, true);
-    }
-
-    public DefaultEditAccountPanel(final InputChangedCallbackInterface callback, final boolean allowCookieLogin) {
+    public DefaultEditAccountPanel(final InputChangedCallbackInterface callback, PluginForHost plg, final boolean allowCookieLogin) {
         super("ins 0, wrap 2", "[][grow,fill]", "");
         this.callback = callback;
+        this.plg = plg;
         add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name()));
         add(this.name = new ExtTextField() {
             @Override
@@ -109,22 +107,6 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
         } else {
             pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
         }
-        final ExtTextField dummy = new ExtTextField();
-        dummy.paste();
-        final String clipboard = dummy.getText();
-        if (StringUtils.isNotEmpty(clipboard)) {
-            /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
-            if (allowCookieLogin && Cookies.parseCookiesFromJsonString(clipboard, null) != null) {
-                /*
-                 * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
-                 * them.
-                 */
-                pass.setPassword(clipboard.toCharArray());
-            } else if (name != null) {
-                /* Auto fill username field with clipboard content if username is needed. */
-                name.setText(clipboard);
-            }
-        }
         allowCookiesInPasswordField = allowCookieLogin;
     }
 
@@ -133,12 +115,10 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
     }
 
     public void setAccount(final Account defaultAccount) {
-        if (defaultAccount != null) {
-            if (name != null) {
-                name.setText(defaultAccount.getUser());
-            }
-            pass.setText(defaultAccount.getPass());
+        if (name != null) {
+            name.setText(defaultAccount.getUser());
         }
+        pass.setText(defaultAccount.getPass());
     }
 
     @Override
@@ -187,5 +167,29 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
     @Override
     public JComponent getComponent() {
         return this;
+    }
+
+    @Override
+    public boolean handleClipboardAutoFill() {
+        final ExtTextField dummy = new ExtTextField();
+        dummy.paste();
+        final String clipboardContent = dummy.getText();
+        if (StringUtils.isEmpty(clipboardContent)) {
+            return false;
+        }
+        /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
+        if (allowCookiesInPasswordField && Cookies.parseCookiesFromJsonString(clipboardContent, plg.getLogger()) != null) {
+            /*
+             * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
+             * them.
+             */
+            pass.setPassword(clipboardContent.toCharArray());
+            return true;
+        } else if (name != null) {
+            /* Auto fill username field with clipboard content if username is needed. */
+            name.setText(StringUtils.trim(clipboardContent));
+            return true;
+        }
+        return false;
     }
 }

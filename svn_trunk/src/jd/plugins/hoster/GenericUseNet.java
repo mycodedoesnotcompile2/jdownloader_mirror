@@ -5,6 +5,18 @@ import java.util.Arrays;
 import javax.swing.JLabel;
 import javax.swing.SpinnerNumberModel;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.DefaultEditAccountPanel;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+
 import org.appwork.swing.components.ExtCheckBox;
 import org.appwork.swing.components.ExtSpinner;
 import org.appwork.swing.components.ExtTextField;
@@ -19,19 +31,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.DefaultEditAccountPanel;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-
-@HostPlugin(revision = "$Revision: 50228 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
 public class GenericUseNet extends UseNet {
     public GenericUseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +106,7 @@ public class GenericUseNet extends UseNet {
 
     @Override
     public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
-        return new DefaultEditAccountPanel(callback, false) {
+        return new DefaultEditAccountPanel(callback, this, false) {
             private final ExtTextField host;
             private final ExtCheckBox  ssl;
             private final ExtSpinner   port;
@@ -129,19 +129,22 @@ public class GenericUseNet extends UseNet {
             }
 
             @Override
+            public boolean handleClipboardAutoFill() {
+                return false;
+            }
+
+            @Override
             public void setAccount(Account defaultAccount) {
                 super.setAccount(defaultAccount);
-                if (defaultAccount != null) {
-                    GenericUsenetAccountConfig cfg = getAccountJsonConfig(defaultAccount);
-                    ssl.setSelected(cfg.isSSLEnabled());
-                    host.setText(cfg.getHost());
-                    int p = cfg.getPort();
-                    if (p <= 0) {
-                        p = ssl.isSelected() ? 563 : 119;
-                    }
-                    port.setValue(p);
-                    connections.setValue(Math.max(1, defaultAccount.getMaxSimultanDownloads()));
+                final GenericUsenetAccountConfig cfg = getAccountJsonConfig(defaultAccount);
+                ssl.setSelected(cfg.isSSLEnabled());
+                host.setText(cfg.getHost());
+                int p = cfg.getPort();
+                if (p <= 0) {
+                    p = ssl.isSelected() ? 563 : 119;
                 }
+                port.setValue(p);
+                connections.setValue(Math.max(1, defaultAccount.getMaxSimultanDownloads()));
             }
 
             @Override

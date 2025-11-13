@@ -40,6 +40,7 @@ import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -59,7 +60,7 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPlugin
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 
-@HostPlugin(revision = "$Revision: 50510 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = {}, urls = {})
 public class NexusmodsCom extends PluginForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -491,7 +492,7 @@ public class NexusmodsCom extends PluginForHost {
         if (isAPIOnlyMode()) {
             account.setPass(account.getPass());
         }
-        if (!isAPIKey(getApikey(account))) {
+        if (!looksLikeValidAPIKey(getApikey(account))) {
             throw new AccountInvalidException("Invalid API key format");
         }
         prepBrAPI(br, account);
@@ -672,7 +673,8 @@ public class NexusmodsCom extends PluginForHost {
         account.setProperty("apikey", apikey);
     }
 
-    private static boolean isAPIKey(final String str) {
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
         } else if (str.matches("[A-Za-z0-9\\-=/\\+_]{64,}")) {
@@ -686,7 +688,7 @@ public class NexusmodsCom extends PluginForHost {
     public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
         if (isAPIOnlyMode()) {
             /* API login */
-            return new NexusmodsAccountFactory(callback);
+            return new NexusmodsAccountFactory(callback, this);
         } else {
             /* Website login */
             return super.getAccountFactory(callback);
@@ -704,7 +706,7 @@ public class NexusmodsCom extends PluginForHost {
             if (this.pass == null) {
                 return null;
             } else {
-                return new String(this.pass.getPassword());
+                return StringUtils.trim(new String(this.pass.getPassword()));
             }
         }
 
@@ -721,9 +723,11 @@ public class NexusmodsCom extends PluginForHost {
         }
 
         private final ExtPasswordField pass;
+        private final NexusmodsCom     plg;
 
-        public NexusmodsAccountFactory(final InputChangedCallbackInterface callback) {
+        public NexusmodsAccountFactory(final InputChangedCallbackInterface callback, final NexusmodsCom plg) {
             super("ins 0, wrap 2", "[][grow,fill]", "");
+            this.plg = plg;
             add(new JLabel("Where can I find my API key?"));
             add(new JLink("Click here", "https://www.nexusmods.com/users/myaccount?tab=api%20access"));
             add(apikeyLabel = new JLabel("<html><u><b>Personal</b></u> API Key [premium accounts only]:</html>"));
@@ -742,17 +746,19 @@ public class NexusmodsCom extends PluginForHost {
         }
 
         @Override
+        public boolean handleClipboardAutoFill() {
+            return DefaultEditAccountPanelAPIKeyLogin.handleClipboardAutoFill(pass, null, this.plg);
+        }
+
+        @Override
         public void setAccount(Account defaultAccount) {
-            if (defaultAccount != null) {
-                // name.setText(defaultAccount.getUser());
-                pass.setText(defaultAccount.getPass());
-            }
+            pass.setText(defaultAccount.getPass());
         }
 
         @Override
         public boolean validateInputs() {
             final String pw = getPassword();
-            if (NexusmodsCom.isAPIKey(pw)) {
+            if (plg.looksLikeValidAPIKey(pw)) {
                 apikeyLabel.setForeground(Color.BLACK);
                 return true;
             } else {
@@ -777,17 +783,6 @@ public class NexusmodsCom extends PluginForHost {
     @Override
     protected String getAPILoginHelpURL() {
         return "https://www.nexusmods.com/users/myaccount?tab=api%20access";
-    }
-
-    @Override
-    protected boolean looksLikeValidAPIKey(final String str) {
-        if (str == null) {
-            return false;
-        } else if (str.matches("[A-Za-z0-9\\-=/\\+_]{64,}")) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     @Override

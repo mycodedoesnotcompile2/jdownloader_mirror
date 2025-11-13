@@ -15,7 +15,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.awt.Color;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -29,6 +28,35 @@ import java.util.WeakHashMap;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.HashInfo;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -58,35 +86,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginProgress;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.HashInfo;
-
-@HostPlugin(revision = "$Revision: 51773 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -679,8 +679,7 @@ public class AllDebridCom extends PluginForHost {
         String dllink = (String) data.get("link");
         if (StringUtils.isEmpty(dllink)) {
             /**
-             * Assume that this is a stream download e.g. for eporner.com </br>
-             * https://docs.alldebrid.com/#streaming-links
+             * Assume that this is a stream download e.g. for eporner.com </br> https://docs.alldebrid.com/#streaming-links
              */
             final String linkID = data.get("id").toString();
             Map<String, Object> best = null;
@@ -958,12 +957,11 @@ public class AllDebridCom extends PluginForHost {
             if (this.pass == null) {
                 return null;
             } else {
-                return new String(this.pass.getPassword());
+                return StringUtils.trim(new String(this.pass.getPassword()));
             }
         }
 
         private final ExtPasswordField pass;
-        private final JLabel           idLabel;
         private final AllDebridCom     plg;
 
         public boolean updateAccount(Account input, Account output) {
@@ -981,7 +979,7 @@ public class AllDebridCom extends PluginForHost {
             add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions()));
             final String helplink = this.plg.getAPILoginHelpURL();
             add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), helplink));
-            this.add(this.idLabel = new JLink("<HTML><U>Enter your API key or click on 'Save' to initiate browser login.</U></HTML>", helplink));
+            this.add(new JLink("<HTML><U>Enter your API key or click on 'Save' to initiate browser login.</U></HTML>", helplink));
             add(this.pass = new ExtPasswordField() {
                 @Override
                 public void onChanged() {
@@ -991,26 +989,18 @@ public class AllDebridCom extends PluginForHost {
             pass.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_api_key_help());
         }
 
+        @Override
+        public boolean handleClipboardAutoFill() {
+            return DefaultEditAccountPanelAPIKeyLogin.handleClipboardAutoFill(pass, null, this.plg);
+        }
+
         public void setAccount(final Account defaultAccount) {
-            if (defaultAccount != null) {
-                pass.setText(defaultAccount.getPass());
-            }
+            pass.setText(defaultAccount.getPass());
         }
 
         @Override
         public boolean validateInputs() {
-            final boolean allowAnyInput = true;
-            if (allowAnyInput) {
-                return true;
-            }
-            final String password = getPassword();
-            if (plg.looksLikeValidAPIKey(password)) {
-                idLabel.setForeground(Color.BLACK);
-                return true;
-            } else {
-                idLabel.setForeground(Color.RED);
-                return false;
-            }
+            return true;
         }
 
         @Override

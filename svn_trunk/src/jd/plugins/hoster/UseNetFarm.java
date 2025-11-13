@@ -8,6 +8,15 @@ import java.util.Map;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 
+import jd.PluginWrapper;
+import jd.http.Cookies;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextField;
@@ -18,16 +27,7 @@ import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
 
-import jd.PluginWrapper;
-import jd.http.Cookies;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
-@HostPlugin(revision = "$Revision: 50770 $", interfaceVersion = 3, names = { "usenet.farm" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = { "usenet.farm" }, urls = { "" })
 public class UseNetFarm extends UseNet {
     public UseNetFarm(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,10 +118,13 @@ public class UseNetFarm extends UseNet {
         }
 
         @Override
+        public boolean handleClipboardAutoFill() {
+            return false;
+        }
+
+        @Override
         public void setAccount(Account defaultAccount) {
-            if (defaultAccount != null) {
-                url.setText(defaultAccount.getUser());
-            }
+            url.setText(defaultAccount.getUser());
         }
 
         @Override

@@ -75,7 +75,9 @@ public class EditAccountDialog extends AbstractDialog<Integer> implements InputC
         final AccountBuilderInterface accountFactory = acc.getPlugin().getAccountFactory(this);
         accountBuilderUI = accountFactory;
         content.add(accountBuilderUI.getComponent(), "gapleft 32,spanx,wmin 450");
-        accountBuilderUI.setAccount(acc);
+        if (acc != null) {
+            accountBuilderUI.setAccount(acc);
+        }
         onChangedInput(null);
         getDialog().pack();
         return content;

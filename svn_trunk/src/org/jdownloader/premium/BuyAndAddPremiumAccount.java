@@ -110,7 +110,7 @@ public class BuyAndAddPremiumAccount extends AbstractDialog<Boolean> implements 
         ExtButton bt = new ExtButton(openURLAction);
         ret.add(bt, "gapleft 27");
         ret.add(header(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_enter()), "gapleft 15,pushx,growx");
-        PluginForHost plg;
+        final PluginForHost plg;
         try {
             plg = HostPluginController.getInstance().get(info.getTld()).newInstance(cl);
         } catch (UpdateRequiredClassNotFoundException e) {
@@ -118,6 +118,9 @@ public class BuyAndAddPremiumAccount extends AbstractDialog<Boolean> implements 
         }
         accountBuilderUI = plg.getAccountFactory(this);
         ret.add(accountBuilderUI.getComponent(), "gapleft 27");
+        if (accountBuilderUI.handleClipboardAutoFill()) {
+            accountBuilderUI.validateInputs();
+        }
         onChangedInput(null);
         return ret;
     }

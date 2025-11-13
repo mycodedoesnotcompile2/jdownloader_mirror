@@ -5,13 +5,13 @@ import java.util.List;
 
 import javax.swing.AbstractAction;
 
+import jd.plugins.Account;
+
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
-
-import jd.plugins.Account;
 
 public class EditAction extends AbstractAction {
     /**
@@ -31,11 +31,10 @@ public class EditAction extends AbstractAction {
             return;
         }
         final Account acc = selection.get(0).getAccount();
-        EditAccountDialog editDialog = new EditAccountDialog(acc);
+        final EditAccountDialog editDialog = new EditAccountDialog(acc);
         try {
             Dialog.getInstance().showDialog(editDialog);
         } catch (DialogNoAnswerException e1) {
-            e1.printStackTrace();
         }
     }
 

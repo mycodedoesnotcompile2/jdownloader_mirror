@@ -58,6 +58,7 @@ import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -96,7 +97,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -2057,26 +2058,13 @@ public class OneFichierCom extends PluginForHost {
             freeAccountPanel.add(pass);
             /* Normal username & password login */
             pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
-            // Handle clipboard auto-fill
-            handleClipboardAutoFill();
             // Set initial visibility
             updateVisibleComponents();
         }
 
-        private void handleClipboardAutoFill() {
-            final ExtTextField dummy = new ExtTextField();
-            dummy.paste();
-            final String clipboard = dummy.getText();
-            if (StringUtils.isEmpty(clipboard)) {
-                return;
-            }
-            if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboard)) {
-                this.apikey.setText(clipboard);
-            } else if (clipboard.trim().length() > 0) {
-                /* Auto fill username field with clipboard content. */
-                name.setText(clipboard);
-            }
-            updateVisibleComponents();
+        @Override
+        public boolean handleClipboardAutoFill() {
+            return DefaultEditAccountPanelAPIKeyLogin.handleClipboardAutoFill(apikey, name, plg);
         }
 
         /** Returns true if API login will be used baeed on the selected account type. */

@@ -928,7 +928,19 @@ public class CompiledFiletypeFilter {
 
     public static enum ArchiveExtensions implements CompiledFiletypeExtension {
         REV,
-        RAR,
+        RAR {
+            private final Pattern pattern = Pattern.compile("(?i)application/x-rar-compressed");
+
+            @Override
+            public int matchesMimeType(String mimeType) {
+                return CompiledFiletypeFilter.matchesMimeType(pattern, mimeType);
+            }
+
+            @Override
+            public String getExtensionFromMimeType(String mimeType) {
+                return matchesMimeType(mimeType) > 0 ? "rar" : null;
+            }
+        },
         ZIP {
             private final Pattern pattern = Pattern.compile("(?i)application/zip");
 

@@ -8,15 +8,16 @@ import javax.swing.JLabel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import jd.gui.swing.components.linkbutton.JLink;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.ExtTextHighlighter;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-
-import jd.gui.swing.components.linkbutton.JLink;
 
 /** Use this for plugins which need API key login instead of username/password. */
 public class DefaultEditAccountPanelAPIKeyLogin extends MigPanel implements AccountBuilderInterface {
@@ -71,10 +72,44 @@ public class DefaultEditAccountPanelAPIKeyLogin extends MigPanel implements Acco
         pass.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_api_key_help());
     }
 
-    public void setAccount(final Account defaultAccount) {
-        if (defaultAccount == null) {
-            return;
+    public static boolean handleClipboardAutoFill(final Object passwordField, final ExtTextField usernameField, PluginForHost plugin) {
+        final ExtTextField dummy = new ExtTextField();
+        dummy.paste();
+        final String clipboardContent = dummy.getText();
+        if (StringUtils.isEmpty(clipboardContent)) {
+            return false;
         }
+        if (plugin != null && plugin.looksLikeValidAPIKey(clipboardContent)) {
+            if (passwordField instanceof ExtPasswordField) {
+                ((ExtPasswordField) passwordField).setPassword(clipboardContent.toCharArray());
+                return true;
+            }
+            if (passwordField instanceof ExtTextField) {
+                ((ExtTextField) passwordField).setText(clipboardContent);
+                return true;
+            }
+        }
+        if (usernameField != null) {
+            usernameField.setText(clipboardContent);
+            return true;
+        }
+        if (plugin == null && passwordField instanceof ExtPasswordField) {
+            ((ExtPasswordField) passwordField).setPassword(clipboardContent.toCharArray());
+            return true;
+        }
+        if (plugin == null && passwordField instanceof ExtTextField) {
+            ((ExtTextField) passwordField).setText(clipboardContent);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean handleClipboardAutoFill() {
+        return handleClipboardAutoFill(pass, null, this.plg);
+    }
+
+    public void setAccount(final Account defaultAccount) {
         pass.setText(defaultAccount.getPass());
     }
 
