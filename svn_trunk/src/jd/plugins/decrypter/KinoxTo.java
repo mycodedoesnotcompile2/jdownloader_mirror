@@ -21,9 +21,8 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
-
-import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -41,7 +40,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 50967 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 51820 $", interfaceVersion = 3, names = {}, urls = {})
 public class KinoxTo extends PluginForDecrypt {
     public KinoxTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -232,7 +233,7 @@ public class KinoxTo extends PluginForDecrypt {
             finallink = new Regex(finallink, "(?:href|src)\\s*=\\s*('|\"|)(.*?)\\1").getMatch(1);
             final DownloadLink dl = createDownloadlink(Request.getLocation(finallink, br.getRequest()));
             if (season_number != null && episode != null) {
-                dl.setProperty("fallback_filename", format("%sE%02d.mp4", fpName, Integer.parseInt(episode)));
+                dl.setProperty("fallback_filename", format(Locale.ROOT, "%sE%02d.mp4", fpName, Integer.parseInt(episode)));
             } else {
                 dl.setProperty("fallback_filename", fpName + ".mp4");
             }

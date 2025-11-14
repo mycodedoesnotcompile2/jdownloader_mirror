@@ -61,7 +61,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51753 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -520,7 +520,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            // postFilePackage.setName(String.format("[@DEV: %d Expected kemono results] ", kemonoResults.size()) +
+            // postFilePackage.setName(String.format(Locale.ROOT,"[@DEV: %d Expected kemono results] ", kemonoResults.size()) +
             // postFilePackage.getName());
         }
         postFilePackage.addLinks(ret);
@@ -570,10 +570,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
-                                                          protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                                                              return size() > 100;
-                                                          };
-                                                      };
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > 100;
+        };
+    };
 
     /**
      * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.

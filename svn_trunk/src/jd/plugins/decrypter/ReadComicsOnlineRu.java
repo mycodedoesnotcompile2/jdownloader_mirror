@@ -18,10 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Locale;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -30,7 +26,11 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
-@DecrypterPlugin(revision = "$Revision: 45729 $", interfaceVersion = 2, names = { "readcomicsonline.ru" }, urls = { "https?://(?:www\\.)?readcomicsonline\\.ru/comic/.+" })
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "readcomicsonline.ru" }, urls = { "https?://(?:www\\.)?readcomicsonline\\.ru/comic/.+" })
 public class ReadComicsOnlineRu extends antiDDoSForDecrypt {
     public ReadComicsOnlineRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,10 +68,10 @@ public class ReadComicsOnlineRu extends antiDDoSForDecrypt {
                 int chapterNumber = Integer.parseInt(chapterID);
                 int pageNumber = 1;
                 final int pagePadlength = StringUtils.getPadLength(pageCount);
-                String chapter_formatted = String.format(Locale.US, "%0" + StringUtils.getPadLength(chapterCount) + "d", chapterNumber);
+                String chapter_formatted = String.format(Locale.ROOT, "%0" + StringUtils.getPadLength(chapterCount) + "d", chapterNumber);
                 for (String page : pages) {
                     final DownloadLink dl = createDownloadlink(Encoding.htmlOnlyDecode(page));
-                    String page_formatted = String.format(Locale.US, "%0" + pagePadlength + "d", pageNumber++);
+                    String page_formatted = String.format(Locale.ROOT, "%0" + pagePadlength + "d", pageNumber++);
                     String ext = getFileNameExtensionFromURL(page, ".jpg");
                     dl.setFinalFileName(title + "_" + chapter_formatted + "_" + page_formatted + ext);
                     if (StringUtils.isNotEmpty(title)) {

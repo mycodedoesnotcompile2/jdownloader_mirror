@@ -25,10 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -41,8 +37,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.YoukuCom.YoukuComConfigInterface;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 /** See also youtube-dl: https://github.com/rg3/youtube-dl/blob/master/youtube_dl/extractor/youku.py */
-@DecrypterPlugin(revision = "$Revision: 45729 $", interfaceVersion = 3, names = { "youku.com", "video.tudou.com", "tudou.com" }, urls = { "https?://v\\.youku\\.com/v_show/id_[A-Za-z0-9=]+", "https?://video\\.tudou\\.com/v/[A-Za-z0-9=]+", "https?://(?:www\\.)?tudou\\.com/programs/view/[A-Za-z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "youku.com", "video.tudou.com", "tudou.com" }, urls = { "https?://v\\.youku\\.com/v_show/id_[A-Za-z0-9=]+", "https?://video\\.tudou\\.com/v/[A-Za-z0-9=]+", "https?://(?:www\\.)?tudou\\.com/programs/view/[A-Za-z0-9\\-_]+" })
 public class YoukuCom extends PluginForDecrypt {
     public YoukuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,7 +150,7 @@ public class YoukuCom extends PluginForDecrypt {
             final int padLength = StringUtils.getPadLength(segment_list.size());
             /* Add HLS URL */
             DownloadLink dl = this.createDownloadlink(url_hls);
-            String segment_counter_formatted = String.format(Locale.US, "%0" + padLength + "d", segment_counter);
+            String segment_counter_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", segment_counter);
             String quality_key = String.format(quality_key_format, protocol, height);
             dl.setFinalFileName(String.format(filename_format, title, protocol, resolution, segment_counter_formatted));
             if (filesize > 0) {
@@ -174,7 +174,7 @@ public class YoukuCom extends PluginForDecrypt {
                 if (StringUtils.isEmpty(url_http)) {
                     continue;
                 }
-                segment_counter_formatted = String.format(Locale.US, "%0" + padLength + "d", segment_counter);
+                segment_counter_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", segment_counter);
                 /* Re-use that variable */
                 dl = this.createDownloadlink(url_http);
                 dl.setFinalFileName(String.format(filename_format, title, protocol, resolution, segment_counter_formatted));

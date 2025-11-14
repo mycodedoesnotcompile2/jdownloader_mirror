@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.jdownloader.plugins.components.config.YoutvDeConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -39,7 +35,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.YoutvDe;
 
-@DecrypterPlugin(revision = "$Revision: 47304 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.jdownloader.plugins.components.config.YoutvDeConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class YoutvDeCrawler extends PluginForDecrypt {
     public YoutvDeCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,7 +125,7 @@ public class YoutvDeCrawler extends PluginForDecrypt {
             link.setAvailable(true);
             ret.add(link);
         }
-        logger.info(String.format("Returning %d/%d items | Skipped items: %d", ret.size(), recordings.size(), numberofSkippedItems));
+        logger.info(String.format(Locale.ROOT, "Returning %d/%d items | Skipped items: %d", ret.size(), recordings.size(), numberofSkippedItems));
         if (numberofSkippedItems > 0) {
             logger.info("Number of skipped items due to user settings: " + numberofSkippedItems);
         }

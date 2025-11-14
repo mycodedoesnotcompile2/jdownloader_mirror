@@ -25,19 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.NitroflareConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -61,7 +48,20 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50897 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.NitroflareConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class NitroFlareCom extends PluginForHost {
     private final String         staticBaseURL             = "https://nitroflare.com";
     /* Documentation | docs: https://nitroflare.com/member?s=api */
@@ -147,8 +147,7 @@ public class NitroFlareCom extends PluginForHost {
     /**
      * Use website or API: https://nitroflare.com/member?s=api </br>
      *
-     * @return true: Use API for account login and downloading </br>
-     *         false: Use website for everything (except linkcheck)
+     * @return true: Use API for account login and downloading </br> false: Use website for everything (except linkcheck)
      */
     private boolean useAPIMode(final Account account, final DownloadLink downloadLink) {
         if (API_AUTO_DISABLED.get()) {
@@ -167,8 +166,7 @@ public class NitroFlareCom extends PluginForHost {
     private static AtomicReference<String> BASE_DOMAIN = new AtomicReference<String>(null);
 
     /**
-     * Finds valid base domain. </br>
-     * In some countries some nitroflare domains may be blocked by some ISPs.
+     * Finds valid base domain. </br> In some countries some nitroflare domains may be blocked by some ISPs.
      */
     public static String getBaseDomain(final Plugin plugin, final Browser br) throws PluginException {
         synchronized (BASE_DOMAIN) {
@@ -679,15 +677,14 @@ public class NitroFlareCom extends PluginForHost {
     }
 
     /**
-     * @param isLastResort:
-     *            Set this to true to gurantee that a PluginException will happen no matter what.
+     * @param isLastResort
+     *            : Set this to true to gurantee that a PluginException will happen no matter what.
      */
     private void handleErrors(final Account account, final Browser br, final boolean postCaptcha, final boolean isLastResort) throws PluginException {
         if (postCaptcha) {
             if (br.containsHTML("You don't have an entry ticket\\. Please refresh the page to get a new one")) {
                 /**
-                 * This should be a rare error. </br>
-                 * 2024-02-21: This may still happen sometimes for unknown reasons
+                 * This should be a rare error. </br> 2024-02-21: This may still happen sometimes for unknown reasons
                  */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "You don't have an entry ticket. Please refresh the page to get a new one.", 2 * 60 * 1000l);
             } else if (br.containsHTML("File doesn't exist")) {
@@ -765,11 +762,11 @@ public class NitroFlareCom extends PluginForHost {
             } else if (StringUtils.isEmpty(user) || !user.matches(".+@.+")) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nYou haven't provided a valid username (must be email address)!", PluginException.VALUE_ID_PREMIUM_DISABLE);
             } else
-            // check to see if the user added the email username with caps.. this can make login incorrect
-            if (!user.equals(account.getUser())) {
-                logger.info("Corrected username: Old: " + account.getUser() + " | New: " + user);
-                account.setUser(user);
-            }
+                // check to see if the user added the email username with caps.. this can make login incorrect
+                if (!user.equals(account.getUser())) {
+                    logger.info("Corrected username: Old: " + account.getUser() + " | New: " + user);
+                    account.setUser(user);
+                }
             // urlencode required!
             return "user=" + Encoding.urlEncode(user) + "&premiumKey=" + Encoding.urlEncode(pass);
         }
@@ -1097,7 +1094,7 @@ public class NitroFlareCom extends PluginForHost {
                 final int maxtries = 2;
                 boolean askedForCaptcha = false;
                 do {
-                    logger.info(String.format("Premium downloadloop %d / %d", counter + 1, maxtries));
+                    logger.info(String.format(Locale.ROOT, "Premium downloadloop %d / %d", counter + 1, maxtries));
                     this.dl = new jd.plugins.BrowserAdapter().openDownload(br, link, getCorrectedDownloadURL(link), this.isResumeable(link, account), this.getMaxChunks(account));
                     if (looksLikeDownloadableContent(dl.getConnection())) {
                         /* Directurl */

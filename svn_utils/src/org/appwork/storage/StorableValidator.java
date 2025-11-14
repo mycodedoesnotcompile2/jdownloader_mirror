@@ -139,7 +139,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -147,7 +147,7 @@ public class StorableValidator<T> {
             if (getMessage() != null) {
                 return getMessage();
             }
-            return "Property deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM).format(new Date(deprecatedSinceTimestamp));
+            return "Property deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(deprecatedSinceTimestamp));
         }
 
         /**
@@ -197,7 +197,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#onClassFieldMissing(java.lang.Object, java.lang.String,
          * org.appwork.storage.flexijson.FlexiJSonNode)
          */
@@ -214,7 +214,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#returnFallbackOrThrowException(org.appwork.storage.flexijson.mapper.
          * FlexiMapperException)
          */
@@ -244,7 +244,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#nodeToEnum(org.appwork.storage.flexijson.FlexiJSonNode,
          * java.lang.reflect.Type)
          */
@@ -316,7 +316,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#convert(java.lang.Object, org.appwork.storage.TypeRef)
          */
         @Override
@@ -337,7 +337,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#convertStringToBoolean(org.appwork.storage.flexijson.FlexiJSonValue,
          * java.lang.String, java.lang.Class)
          */
@@ -451,7 +451,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -488,7 +488,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -670,7 +670,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -678,7 +678,7 @@ public class StorableValidator<T> {
             if (getMessage() != null) {
                 return getMessage();
             }
-            return "Property available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM).format(new Date(availableSinceTimestamp)) + "(" + availableSinceTimestamp + ")";
+            return "Property available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(availableSinceTimestamp)) + "(" + availableSinceTimestamp + ")";
         }
 
         /**
@@ -806,7 +806,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -814,7 +814,7 @@ public class StorableValidator<T> {
             if (getMessage() != null) {
                 return getMessage();
             }
-            return "Property deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM).format(new Date(deprecatedSinceTimestamp));
+            return "Property deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(deprecatedSinceTimestamp));
         }
 
         /**
@@ -843,7 +843,7 @@ public class StorableValidator<T> {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.storage.StorableValidator.ValidatorException#getErrorMessage()
          */
         @Override
@@ -979,6 +979,7 @@ public class StorableValidator<T> {
         private List<Annotation> annotations = new ArrayList<Annotation>();
         private JSPath           path;
         private Property         context;
+
         //
         // /**
         // * @param node
@@ -1006,7 +1007,6 @@ public class StorableValidator<T> {
         // add(cc.getAnnotations(key, StorableValidateTimestampRelative.class));
         // add(cc.getAnnotations(key, StorableValidateTimeSpan.class));
         // }
-
         public Property getContext() {
             return context;
         }
@@ -1019,10 +1019,10 @@ public class StorableValidator<T> {
                 annotations.addAll(a);
             }
         }
+
         // public ValidatetoDoss(FlexiJSonNode node, Object value, CompiledType type, ClassCache cc, String key) {
         // this(node, value, type, cc, key, fromFlexiNode(node));
         // }
-
         /**
          * @param node2
          * @param object
@@ -1373,9 +1373,9 @@ public class StorableValidator<T> {
                     long ts = ((Date) new DateMapper().json2Obj(null, new FlexiJSonValue(condition.value()), CompiledType.create(Date.class), null)).getTime();
                     BuildsInfo buildInfo = getTargetBuildsinfo(toDo.node);
                     if (StringUtils.isEmpty(desc)) {
-                        desc = "[Deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM).format(ts) + "]";
+                        desc = "[Deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(ts) + "]";
                     } else {
-                        desc = "[Deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM).format(ts) + "] " + desc;
+                        desc = "[Deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(ts) + "] " + desc;
                     }
                     DeprecatedException ex = new DeprecatedException(StorableValidator.this, ts, toDo.path, toDo.node, toDo.type, desc, condition.level());
                     if (buildInfo != null && ex.handle(buildInfo) == TargetBuildIssue.NO_TARGET_BUILDS_AFFECTED) {
@@ -1395,9 +1395,9 @@ public class StorableValidator<T> {
                     String desc = condition.message();
                     long ts = ((Date) new DateMapper().json2Obj(null, new FlexiJSonValue(condition.value()), CompiledType.create(Date.class), null)).getTime();
                     if (StringUtils.isEmpty(desc)) {
-                        desc = "[Available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM).format(new Date(ts)) + "]";
+                        desc = "[Available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(ts)) + "]";
                     } else {
-                        desc = "[Available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM).format(new Date(ts)) + "] " + desc;
+                        desc = "[Available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(ts)) + "] " + desc;
                     }
                     BuildsInfo buildInfo = getTargetBuildsinfo(toDo.node);
                     AvailableSinceException ex = new AvailableSinceException(StorableValidator.this, ts, toDo.path, toDo.node, toDo.type, desc, condition.level());

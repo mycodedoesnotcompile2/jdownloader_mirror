@@ -35,6 +35,7 @@ package org.appwork.utils.logging2;
 
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.logging.LogRecord;
 import java.util.logging.SimpleFormatter;
 
@@ -42,12 +43,9 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringBuilderQueue;
 
 public class LogSourceFormatter extends SimpleFormatter {
-
     private final Date       dat                    = new Date();
-    private final DateFormat longTimestamp          = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM);
-
+    private final DateFormat longTimestamp          = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM, Locale.ROOT);
     private int              lastThreadID;
-
     protected StringBuilder  formatterStringBuilder = null;
 
     @Override

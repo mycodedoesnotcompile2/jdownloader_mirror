@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils;
 
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -73,7 +75,15 @@ public class StringUtils {
      * Returns formatted number as String according to given padLength. </br> E.g. number 1 with padLength 3 will return "001".
      */
     public static String formatByPadLength(final int padLength, final int num) {
-        return String.format(Locale.US, "%0" + padLength + "d", num);
+        return formatByPadLength(Locale.ROOT, padLength, num);
+    }
+
+    public static String formatByPadLength(Locale locale, final int padLength, final int num) {
+        if (locale == null) {
+            return String.format(Locale.ROOT, "%0" + padLength + "d", num);
+        } else {
+            return String.format(locale, "%0" + padLength + "d", num);
+        }
     }
 
     /**
@@ -315,6 +325,20 @@ public class StringUtils {
     @Deprecated
     public static String getCommonalities(final String a, final String b) {
         return getCommonPrefix(a, b);
+    }
+
+    public static String toString(final NumberFormat c, final long number) {
+        if (c instanceof DecimalFormat && ((DecimalFormat) c).getDecimalFormatSymbols().getZeroDigit() != '0') {
+            return c.format(number);
+        }
+        return Long.toString(number);
+    }
+
+    public static String toString(final NumberFormat c, final double number) {
+        if (c instanceof DecimalFormat && ((DecimalFormat) c).getDecimalFormatSymbols().getZeroDigit() != '0') {
+            return c.format(number);
+        }
+        return Double.toString(number);
     }
 
     /**

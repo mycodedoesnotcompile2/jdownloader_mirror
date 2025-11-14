@@ -17,17 +17,9 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.parser.UrlQuery;
-import org.bouncycastle.crypto.digests.SHA1Digest;
-import org.bouncycastle.crypto.macs.HMac;
-import org.bouncycastle.crypto.params.KeyParameter;
-import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -41,7 +33,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.parser.UrlQuery;
+import org.bouncycastle.crypto.digests.SHA1Digest;
+import org.bouncycastle.crypto.macs.HMac;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = {}, urls = {})
 public class AudioMackComHoster extends PluginForHost {
     public AudioMackComHoster(PluginWrapper wrapper) {
         super(wrapper);
@@ -163,7 +164,7 @@ public class AudioMackComHoster extends PluginForHost {
         String filename;
         final boolean titleStartsWithPositionNumber = title.matches("^\\d+\\..+");
         if (playlistPosition != -1 && !titleStartsWithPositionNumber) {
-            filename = String.format("%d %s - %s", playlistPosition, artist, title);
+            filename = String.format(Locale.ROOT, "%d %s - %s", playlistPosition, artist, title);
             filename = playlistPosition + ". " + artist + " - " + title;
         } else if (titleStartsWithPositionNumber) {
             filename = title;

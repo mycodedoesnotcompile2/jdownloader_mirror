@@ -50,6 +50,7 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.swing.Box;
@@ -394,7 +395,7 @@ public class IconDebugger extends JFrame {
                 int red = (pixel >> 16) & 0xFF;
                 int green = (pixel >> 8) & 0xFF;
                 int blue = pixel & 0xFF;
-                return String.format("#%02X%02X%02X%02X", alpha, red, green, blue);
+                return String.format(Locale.ROOT, "#%02X%02X%02X%02X", alpha, red, green, blue);
             }
             return "Outside image bounds";
         }

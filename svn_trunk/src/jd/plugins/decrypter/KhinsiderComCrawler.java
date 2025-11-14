@@ -18,10 +18,8 @@ package jd.plugins.decrypter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -44,7 +42,10 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KhinsiderCom;
 
-@DecrypterPlugin(revision = "$Revision: 49355 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@DecrypterPlugin(revision = "$Revision: 51820 $", interfaceVersion = 3, names = {}, urls = {})
 public class KhinsiderComCrawler extends PluginForDecrypt {
     public KhinsiderComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +79,7 @@ public class KhinsiderComCrawler extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             final String hostsPattern = buildHostsPatternPart(domains);
-            ret.add(String.format(PATTERN_ALBUM_DOWNLOAD, hostsPattern) + "|" + String.format(PATTERN_ALBUM_STREAM, hostsPattern) + "|" + String.format(PATTERN_ALBUM_SINGLE_TRACK_STREAM, hostsPattern));
+            ret.add(String.format(Locale.ROOT, PATTERN_ALBUM_DOWNLOAD, hostsPattern) + "|" + String.format(PATTERN_ALBUM_STREAM, hostsPattern) + "|" + String.format(PATTERN_ALBUM_SINGLE_TRACK_STREAM, hostsPattern));
         }
         return ret.toArray(new String[0]);
     }

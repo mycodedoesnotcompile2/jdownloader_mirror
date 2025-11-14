@@ -75,7 +75,7 @@ public enum SplitType {
 
         @Override
         protected String buildMissingPart(String[] matches, int partIndex, int partStringLength) {
-            return matches[0] + "." + String.format(Locale.US, "%0" + partStringLength + "d", partIndex) + ".xtm";
+            return matches[0] + "." + String.format(Locale.ROOT, "%0" + partStringLength + "d", partIndex) + ".xtm";
         }
 
         @Override
@@ -253,7 +253,7 @@ public enum SplitType {
 
         @Override
         protected String buildMissingPart(String[] matches, int partIndex, int partStringLength) {
-            return matches[0] + "." + String.format(Locale.US, "%0" + partStringLength + "d", partIndex);
+            return matches[0] + "." + String.format(Locale.ROOT, "%0" + partStringLength + "d", partIndex);
         }
 
         @Override

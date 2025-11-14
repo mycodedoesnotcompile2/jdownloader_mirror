@@ -1,10 +1,13 @@
 package org.jdownloader.gui.views.downloads.overviewpanel;
 
+import java.text.NumberFormat;
+
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 
 import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.swing.MigPanel;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.SwingUtils;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
@@ -25,10 +28,11 @@ public abstract class DataEntry<T> {
         return selected;
     }
 
-    private JLabel       filtered;
-    private JLabel       selected;
-    final private String label;
-    protected String     id;
+    private JLabel               filtered;
+    private JLabel               selected;
+    final private String         label;
+    protected String             id;
+    protected final NumberFormat numberFormat;
 
     public String getId() {
 
@@ -55,6 +59,11 @@ public abstract class DataEntry<T> {
         filtered.setToolTipText(_GUI.T.DownloadOverview_DownloadOverview_tooltip2());
         selected.setToolTipText(_GUI.T.DownloadOverview_DownloadOverview_tooltip3());
         updateVisibility(false);
+        this.numberFormat = getNumberFormat();
+    }
+
+    protected NumberFormat getNumberFormat() {
+        return NumberFormat.getInstance();
     }
 
     public String getPopupLabel() {
@@ -79,16 +88,26 @@ public abstract class DataEntry<T> {
         info.add(selected, "hidemode 3");
     }
 
-    public void setTotal(Object string) {
-        total.setText(string.toString());
+    public void setTotal(Object value) {
+        total.setText(toString(value));
     }
 
-    public void setSelected(Object string) {
-        selected.setText(string.toString());
+    private String toString(Object value) {
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value instanceof Number) {
+            return StringUtils.toString(numberFormat, ((Number) value).longValue());
+        }
+        return value.toString();
     }
 
-    public void setFiltered(Object string) {
-        filtered.setText(string.toString());
+    public void setSelected(Object value) {
+        selected.setText(toString(value));
+    }
+
+    public void setFiltered(Object value) {
+        filtered.setText(toString(value));
     }
 
     public void updateVisibility(final boolean hasSelectedObjects) {

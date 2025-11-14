@@ -12,6 +12,7 @@ import org.jdownloader.translate._JDT;
 public enum FinalLinkState {
     FINISHED(_GUI.T.TaskColumn_getStringValue_finished_(), IconKey.ICON_TRUE),
     FINISHED_MIRROR(_GUI.T.TaskColumn_getStringValue_finished_mirror(), IconKey.ICON_TRUE_ORANGE),
+    FINISHED_CRC32C(_JDT.T.system_download_doCRC2_success("CRC32C"), IconKey.ICON_OK),
     FINISHED_CRC32(_JDT.T.system_download_doCRC2_success("CRC32"), IconKey.ICON_OK),
     FINISHED_MD5(_JDT.T.system_download_doCRC2_success("MD5"), IconKey.ICON_OK),
     FINISHED_SHA1(_JDT.T.system_download_doCRC2_success("SHA1"), IconKey.ICON_OK),
@@ -22,6 +23,7 @@ public enum FinalLinkState {
     FINISHED_WHIRLPOOL(_JDT.T.system_download_doCRC2_success("WHIRLPOOL"), IconKey.ICON_OK),
     FAILED(_JDT.T.downloadlink_status_error_downloadfailed(), IconKey.ICON_FALSE),
     FAILED_CRC32(_JDT.T.system_download_doCRC2_failed("CRC32"), IconKey.ICON_FALSE),
+    FAILED_CRC32C(_JDT.T.system_download_doCRC2_failed("CRC32C"), IconKey.ICON_FALSE),
     FAILED_MD5(_JDT.T.system_download_doCRC2_failed("MD5"), IconKey.ICON_FALSE),
     FAILED_SHA1(_JDT.T.system_download_doCRC2_failed("SHA1"), IconKey.ICON_FALSE),
     FAILED_SHA224(_JDT.T.system_download_doCRC2_failed("SHA224"), IconKey.ICON_FALSE),
@@ -72,6 +74,7 @@ public enum FinalLinkState {
         case FINISHED:
         case FINISHED_MIRROR:
         case FINISHED_CRC32:
+        case FINISHED_CRC32C:
         case FINISHED_MD5:
         case FINISHED_SHA1:
         case FINISHED_SHA224:
@@ -92,6 +95,7 @@ public enum FinalLinkState {
     public final boolean isFailedHash() {
         switch (this) {
         case FAILED_CRC32:
+        case FAILED_CRC32C:
         case FAILED_MD5:
         case FAILED_SHA1:
         case FAILED_SHA224:

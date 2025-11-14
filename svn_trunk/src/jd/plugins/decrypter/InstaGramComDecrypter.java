@@ -78,7 +78,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 51390 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -276,7 +276,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 }
             }
             if (retry > 1) {
-                logger.info(String.format("Trying to get around rate limit %d / %d", retry, maxtries));
+                logger.info(String.format(Locale.ROOT, "Trying to get around rate limit %d / %d", retry, maxtries));
                 /* 2020-01-21: Changing User-Agent or Cookies will not help us to get around this limit earlier! */
                 // br.clearCookies(br.getHost());
                 // br.getHeaders().put("User-Agent", "iPad");
@@ -286,7 +286,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             if (responsecode == 502) {
                 final int waittime = 20000 + 15000 * retry;
                 totalWaittime += waittime;
-                logger.info(String.format("Waiting %d seconds on error 502 until retry", waittime / 1000));
+                logger.info(String.format(Locale.ROOT, "Waiting %d seconds on error 502 until retry", waittime / 1000));
                 sleep(waittime, link);
             } else if (responsecode == 403 || responsecode == 429) {
                 if (PluginJsonConfig.get(InstagramConfig.class).getActionOnRateLimitReached() == ActionOnRateLimitReached.ABORT) {
@@ -295,7 +295,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 } else {
                     final int waittime = 20000 + 15000 * retry;
                     totalWaittime += waittime;
-                    logger.info(String.format("Waiting %d seconds on error 403/429 until retry", waittime / 1000));
+                    logger.info(String.format(Locale.ROOT, "Waiting %d seconds on error 403/429 until retry", waittime / 1000));
                     sleep(waittime, link);
                 }
             } else {
@@ -1634,7 +1634,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 dl.setComment(description);
                 dl.setProperty(InstaGramCom.PROPERTY_description, description);
             }
-            dl.setProperty(InstaGramCom.PROPERTY_orderid, String.format(Locale.US, "%0" + padLength + "d", orderID));
+            dl.setProperty(InstaGramCom.PROPERTY_orderid, String.format(Locale.ROOT, "%0" + padLength + "d", orderID));
             dl.setProperty(InstaGramCom.PROPERTY_orderid_raw, orderID);
             dl.setProperty(InstaGramCom.PROPERTY_orderid_max_raw, mediaItems.size());
             dl.setProperty(InstaGramCom.PROPERTY_internal_media_id, internalMediaID);
@@ -1804,7 +1804,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                     dl.setProperty(InstaGramCom.PROPERTY_DIRECTURL, directurl);
                     dl.setProperty(InstaGramCom.PROPERTY_has_tried_to_crawl_original_url, true);
                 }
-                dl.setProperty(InstaGramCom.PROPERTY_orderid, String.format(Locale.US, "%0" + padLength + "d", orderID));
+                dl.setProperty(InstaGramCom.PROPERTY_orderid, String.format(Locale.ROOT, "%0" + padLength + "d", orderID));
                 dl.setProperty(InstaGramCom.PROPERTY_orderid_raw, orderID);
                 dl.setProperty(InstaGramCom.PROPERTY_orderid_max_raw, mediaItems.size());
                 dl.setProperty(InstaGramCom.PROPERTY_internal_media_id, internalMediaID);
@@ -1855,7 +1855,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                     dl.setProperty(InstaGramCom.PROPERTY_DIRECTURL, dllink);
                     dl.setProperty(InstaGramCom.PROPERTY_has_tried_to_crawl_original_url, true);
                 }
-                dl.setProperty(InstaGramCom.PROPERTY_orderid, String.format(Locale.US, "%0" + padLength + "d", orderID));
+                dl.setProperty(InstaGramCom.PROPERTY_orderid, String.format(Locale.ROOT, "%0" + padLength + "d", orderID));
                 dl.setProperty(InstaGramCom.PROPERTY_orderid_raw, orderID);
                 dl.setProperty(InstaGramCom.PROPERTY_orderid_max_raw, mediaItems.size());
                 dl.setProperty(InstaGramCom.PROPERTY_internal_media_id, media.get("id").toString());

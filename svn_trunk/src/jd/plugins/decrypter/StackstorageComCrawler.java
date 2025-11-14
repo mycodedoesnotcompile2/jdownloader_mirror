@@ -17,12 +17,8 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -37,7 +33,12 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.StackstorageCom;
 
-@DecrypterPlugin(revision = "$Revision: 50140 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([a-z0-9]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([a-z0-9]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
 public class StackstorageComCrawler extends PluginForDecrypt {
     public StackstorageComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,7 +122,7 @@ public class StackstorageComCrawler extends PluginForDecrypt {
             br.getHeaders().put("Omit-Authentication-Header", "true");
             boolean isSingleFile = false;
             do {
-                br.getPage(String.format("https://%s.stackstorage.com/public-share/%s/list?public=true&token=%s&type=folder&offset=%d&limit=%d&sortBy=default&order=asc&query=&dir=%s&_=%s", subdomain, folderID, folderID, offset, maxItemsPerRequest, subdir, System.currentTimeMillis()));
+                br.getPage(String.format(Locale.ROOT, "https://%s.stackstorage.com/public-share/%s/list?public=true&token=%s&type=folder&offset=%d&limit=%d&sortBy=default&order=asc&query=&dir=%s&_=%s", subdomain, folderID, folderID, offset, maxItemsPerRequest, subdir, System.currentTimeMillis()));
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }

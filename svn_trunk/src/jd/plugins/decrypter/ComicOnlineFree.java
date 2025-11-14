@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -39,7 +35,11 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49534 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = {}, urls = {})
 public class ComicOnlineFree extends antiDDoSForDecrypt {
     public ComicOnlineFree(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,7 +136,7 @@ public class ComicOnlineFree extends antiDDoSForDecrypt {
                     /* Skip dupes */
                     continue;
                 }
-                String page_formatted = String.format(Locale.US, "%0" + padlength + "d", page++);
+                String page_formatted = String.format(Locale.ROOT, "%0" + padlength + "d", page++);
                 imageURL = Encoding.htmlDecode(imageURL);
                 final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageURL));
                 String ext = Plugin.getFileNameExtensionFromURL(imageURL, ".jpg");

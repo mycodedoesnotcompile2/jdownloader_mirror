@@ -17,8 +17,7 @@ package jd.plugins.decrypter;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-
-import org.jdownloader.plugins.controller.LazyPlugin;
+import java.util.Locale;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -31,7 +30,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48359 $", interfaceVersion = 3, names = { "mangatown.com" }, urls = { "https?://(?:www\\.)?mangatown\\.com/manga/[^/]+/c\\d+/(?:\\d+\\.html)?" })
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "mangatown.com" }, urls = { "https?://(?:www\\.)?mangatown\\.com/manga/[^/]+/c\\d+/(?:\\d+\\.html)?" })
 public class MangatownComCrawler extends PluginForDecrypt {
     public MangatownComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +81,7 @@ public class MangatownComCrawler extends PluginForDecrypt {
         for (short page = 1; page <= page_max; page++) {
             final String chapter_formatted = df_chapter.format(chapter);
             final String page_formatted = df_page.format(page);
-            final String content_url = String.format("https://www.mangatown.com/manga/%s/c%s/%d.html", url_name, chapter_str, page);
+            final String content_url = String.format(Locale.ROOT, "https://www.mangatown.com/manga/%s/c%s/%d.html", url_name, chapter_str, page);
             final DownloadLink dl = this.createDownloadlink(content_url);
             dl.setFinalFileName(url_name + "_" + chapter_formatted + "_" + page_formatted + ext);
             dl.setAvailable(true);

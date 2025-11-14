@@ -7,10 +7,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -25,6 +21,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 /**
  * A plugin for downloading JPG galleries from plain HTML of configured sites. Single galleries are supported, but also all galleries for a
  * specific model. Each gallery will be put into an own folder with name like the "title" tag of the single gallery, with a best-effort
@@ -32,7 +32,7 @@ import jd.plugins.PluginForDecrypt;
  *
  * Please note: right now, if a model has multiple pages worth of galleries, paging must be done manually.
  */
-@DecrypterPlugin(revision = "$Revision: 50085 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = {}, urls = {})
 @Deprecated
 public class SimpleHtmlBasedGalleryPlugin extends PluginForDecrypt {
     @Override
@@ -354,7 +354,7 @@ public class SimpleHtmlBasedGalleryPlugin extends PluginForDecrypt {
     }
 
     protected String buildImageFileName(int padLength, int index) {
-        return "image_" + String.format(Locale.US, "%0" + padLength + "d", index) + ".jpg";
+        return "image_" + String.format(Locale.ROOT, "%0" + padLength + "d", index) + ".jpg";
     }
 
     protected String getFilePackageName(String url, Browser brc) {

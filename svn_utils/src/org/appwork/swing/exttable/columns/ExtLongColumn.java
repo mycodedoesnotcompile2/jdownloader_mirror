@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.exttable.columns;
 
+import java.text.NumberFormat;
+
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.SwingConstants;
@@ -41,12 +43,14 @@ import javax.swing.border.Border;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableModel;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.renderer.RenderLabel;
 
 public abstract class ExtLongColumn<E> extends ExtColumn<E> {
     private static final long   serialVersionUID = -6917352290094392921L;
     protected final RenderLabel renderer;
     private final Border        defaultBorder    = BorderFactory.createEmptyBorder(0, 5, 0, 5);
+    protected NumberFormat      formatter        = null;
 
     public ExtLongColumn(final String name) {
         this(name, null);
@@ -54,6 +58,7 @@ public abstract class ExtLongColumn<E> extends ExtColumn<E> {
 
     public ExtLongColumn(final String name, final ExtTableModel<E> table) {
         super(name, table);
+        formatter = updateNumberFormat();
         this.renderer = new RenderLabel();
         this.renderer.setHorizontalAlignment(SwingConstants.RIGHT);
         this.setRowSorter(new ExtDefaultRowSorter<E>() {
@@ -71,6 +76,11 @@ public abstract class ExtLongColumn<E> extends ExtColumn<E> {
                 }
             }
         });
+    }
+
+    @Override
+    protected NumberFormat updateNumberFormat() {
+        return formatter = super.updateNumberFormat();
     }
 
     @Override
@@ -97,7 +107,7 @@ public abstract class ExtLongColumn<E> extends ExtColumn<E> {
     }
 
     protected String getLongFormatted(E value) {
-        return Long.toString(getLong(value));
+        return StringUtils.toString(formatter, getLong(value));
     }
 
     protected abstract long getLong(E value);

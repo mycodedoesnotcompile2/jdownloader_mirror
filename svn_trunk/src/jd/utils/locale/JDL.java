@@ -15,10 +15,12 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.utils.locale;
 
-import org.jdownloader.logging.LogController;
+import java.util.Locale;
 
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+
+import org.jdownloader.logging.LogController;
 
 public final class JDL {
     /**
@@ -50,7 +52,7 @@ public final class JDL {
             LogController.CL().severe("FIXME: " + key);
         }
         try {
-            return String.format(JDL.L(key, def), args);
+            return String.format(Locale.ROOT, JDL.L(key, def), args);
         } catch (Exception e) {
             LogController.CL().severe("FIXME: " + key);
             return "FIXME: " + key;

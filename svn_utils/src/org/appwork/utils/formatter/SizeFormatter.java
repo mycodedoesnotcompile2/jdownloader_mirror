@@ -39,6 +39,7 @@ import java.text.NumberFormat;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.locale._AWU;
 
 /**
@@ -68,7 +69,7 @@ public class SizeFormatter {
         } else if (abs >= Unit.KB.getBytes1024()) {
             return _AWU.T.literally_kibibyte(c.format(fileSize / (double) Unit.KB.getBytes1024()));
         } else {
-            return _AWU.T.literally_byte(fileSize);
+            return _AWU.T.literally_byte_string(StringUtils.toString(c, fileSize));
         }
     }
 

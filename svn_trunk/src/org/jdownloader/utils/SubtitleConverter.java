@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.Locale;
 import java.util.Scanner;
 
 import jd.parser.Regex;
@@ -59,7 +60,7 @@ public class SubtitleConverter {
 
         assert numberDigits <= digits : "The number is bigger then expected!";
 
-        String stringNumber = String.format("%0" + digits + "d", number);
+        String stringNumber = String.format(Locale.ROOT, "%0" + digits + "d", number);
 
         return stringNumber;
     }

@@ -1745,7 +1745,7 @@ public interface GuiTranslation extends TranslateInterface {
     String FilterRule_toString_autocaptcha_not();
 
     @Default(lngs = { "en" }, values = { "%s1/%s2 online" })
-    String AvailabilityColumn_getStringValue_object_(int i, int size);
+    String AvailabilityColumn_getStringValue_object_(String i, String size);
 
     @Default(lngs = { "en" }, values = { "Set Priority" })
     String PriorityAction_PriorityAction_();

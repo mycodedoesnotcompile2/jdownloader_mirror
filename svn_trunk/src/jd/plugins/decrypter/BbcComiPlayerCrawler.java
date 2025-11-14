@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -47,7 +48,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 50768 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcComiPlayerCrawler extends PluginForDecrypt {
     public BbcComiPlayerCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -265,7 +266,7 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
                 logger.info("1080p trick failed");
             }
         }
-        qualityString = String.format("hls_%s@%d", hlscontainer_chosen.getResolution(), hlscontainer_chosen.getFramerate(25));
+        qualityString = String.format(Locale.ROOT, "hls_%s@%d", hlscontainer_chosen.getResolution(), hlscontainer_chosen.getFramerate(25));
         final DownloadLink link = new DownloadLink(hosterPlugin, hosterPlugin.getHost(), hlscontainer_chosen.getDownloadurl(), true);
         if (param.getDownloadLink() != null) {
             /* Set properties from previous crawler on new DownloadLink instance e.g. date, title */

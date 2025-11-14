@@ -1456,7 +1456,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.moncompare.Operator#isFilterRoot()
          */
         @Override
@@ -2978,7 +2978,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
         if (this.logger != null) {
             if (args != null && args.length > 0) {
-                string = String.format(string, args);
+                string = String.format(Locale.ROOT, string, args);
             }
             String pathString = path.toPathString(false);
             logPathLength = Math.max(logPathLength, pathString.length());
@@ -2994,7 +2994,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         final LogInterface log = THREAD_LOGGER.get();
         if (log != null) {
             if (args != null && args.length > 0) {
-                string = String.format(string, args);
+                string = String.format(Locale.ROOT, string, args);
             }
             String pathString = path.toPathString(false);
             logPathLength = Math.max(logPathLength, pathString.length());
@@ -3063,7 +3063,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.util.HashMap#put(java.lang.Object, java.lang.Object)
      */
     @Override
@@ -3083,7 +3083,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.util.HashMap#putAll(java.util.Map)
      */
     @Override
@@ -3095,7 +3095,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.util.HashMap#remove(java.lang.Object)
      */
     @Override
@@ -3105,7 +3105,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.util.HashMap#replace(java.lang.Object, java.lang.Object, java.lang.Object)
      */
     @Override
@@ -3123,7 +3123,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.util.HashMap#replaceAll(java.util.function.BiFunction)
      */
     @Override
@@ -3175,7 +3175,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.util.AbstractMap#toString()
      */
     @Override

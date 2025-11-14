@@ -23,11 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -48,8 +43,13 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImgurComHoster;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 /*Only accept single-imag URLs with an LID-length or either 5 OR 7 - everything else are invalid links or thumbnails*/
-@DecrypterPlugin(revision = "$Revision: 51595 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgurComGallery extends PluginForDecrypt {
     public ImgurComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -256,7 +256,7 @@ public class ImgurComGallery extends PluginForDecrypt {
         for (final Map<String, Object> item : items) {
             itemNumber++;
             final DownloadLink dl = apiCrawlJsonSingleItem(item);
-            final String itemnumber_formatted = String.format(Locale.US, "%0" + padLength + "d", itemNumber);
+            final String itemnumber_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", itemNumber);
             dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_ORDERID, itemnumber_formatted);
             if (galleryID != null) {
                 dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_GALLERY_ID, galleryID);
@@ -455,7 +455,7 @@ public class ImgurComGallery extends PluginForDecrypt {
                 dupes.add(id);
                 foundNewItems = true;
                 final DownloadLink dl = apiCrawlJsonSingleItem(item);
-                final String itemnumber_formatted = String.format(Locale.US, "%0" + padLength + "d", index);
+                final String itemnumber_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", index);
                 dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_ORDERID, itemnumber_formatted);
                 final String filename = ImgurComHoster.getFormattedFilename(dl);
                 dl.setFinalFileName(filename);
@@ -562,8 +562,8 @@ public class ImgurComGallery extends PluginForDecrypt {
         final Object dataO = entries.get("data");
         if (!(dataO instanceof Map)) {
             /**
-             * 2020-10-06: Offline content or single item e.g.: {"data":[],"success":true,"status":200} </br>
-             * We've checked for offline already so let's just add it as a single item.
+             * 2020-10-06: Offline content or single item e.g.: {"data":[],"success":true,"status":200} </br> We've checked for offline
+             * already so let's just add it as a single item.
              */
             final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
             plg.setBrowser(brc);
@@ -689,7 +689,7 @@ public class ImgurComGallery extends PluginForDecrypt {
         for (final Object imageO : imagesO) {
             itemNumber++;
             entries = (Map<String, Object>) imageO;
-            final String itemnumber_formatted = String.format(Locale.US, "%0" + padLength + "d", itemNumber);
+            final String itemnumber_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", itemNumber);
             final DownloadLink dl = this.websiteCrawlJsonSingleItem(entries);
             dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_ORDERID, itemnumber_formatted);
             if (galleryID != null) {

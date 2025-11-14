@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,6 +43,18 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
+import jd.controlling.packagecontroller.PackageController;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLinkProperty;
+import jd.plugins.DownloadLinkStorable;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageProperty;
+import jd.plugins.PluginForHost;
+import jd.utils.JDUtilities;
 
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
@@ -86,18 +99,6 @@ import org.jdownloader.settings.CleanAfterDownloadAction;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.GeneralSettings.CreateFolderTrigger;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
-
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
-import jd.controlling.packagecontroller.PackageController;
-import jd.parser.Regex;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLinkProperty;
-import jd.plugins.DownloadLinkStorable;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageProperty;
-import jd.plugins.PluginForHost;
-import jd.utils.JDUtilities;
 
 public class DownloadController extends PackageController<FilePackage, DownloadLink> {
     private final transient DownloadControllerEventSender eventSender         = new DownloadControllerEventSender();
@@ -1061,7 +1062,7 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
             /* prepare formatter(001,0001...) for package filenames in zipfiles */
             final String packageFormat;
             if (packages.size() >= 10) {
-                packageFormat = String.format("%%0%dd", (int) Math.log10(packages.size()) + 1);
+                packageFormat = String.format(Locale.ROOT, "%%0%dd", (int) Math.log10(packages.size()) + 1);
             } else {
                 packageFormat = "%02d";
             }
@@ -1130,7 +1131,7 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                     try {
                         final int childrenSize = pkg.getChildren().size();
                         if (childrenSize > 0) {
-                            final String packageEntryID = String.format(packageFormat, packageIndex++);
+                            final String packageEntryID = String.format(Locale.ROOT, packageFormat, packageIndex++);
                             {
                                 /* convert FilePackage to JSon */
                                 final FilePackageStorable packageStorable = new FilePackageStorable(pkg, false);
@@ -1142,14 +1143,14 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                             }
                             final String childFormat;
                             if (childrenSize >= 10) {
-                                childFormat = String.format("%%0%dd", (int) Math.log10(childrenSize) + 1);
+                                childFormat = String.format(Locale.ROOT, "%%0%dd", (int) Math.log10(childrenSize) + 1);
                             } else {
                                 childFormat = "%02d";
                             }
                             int childIndex = 0;
                             for (final DownloadLink link : pkg.getChildren()) {
                                 final DownloadLinkStorable linkStorable = new DownloadLinkStorable(link);
-                                final String childEntryID = String.format(childFormat, childIndex++);
+                                final String childEntryID = String.format(Locale.ROOT, childFormat, childIndex++);
                                 final ZipEntry linkEntry = new ZipEntry(packageEntryID + "_" + childEntryID);
                                 linkEntry.setMethod(ZipEntry.DEFLATED);
                                 zos.putNextEntry(linkEntry);

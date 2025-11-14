@@ -18,8 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -37,7 +35,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SuicidegirlsCom;
 
-@DecrypterPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/(?:girls|members)/[A-Za-z0-9\\-_]+/(?:album/\\d+/[A-Za-z0-9\\-_]+/)?" })
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/(?:girls|members)/[A-Za-z0-9\\-_]+/(?:album/\\d+/[A-Za-z0-9\\-_]+/)?" })
 public class SuicidegirlsComCrawler extends PluginForDecrypt {
     public SuicidegirlsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +106,7 @@ public class SuicidegirlsComCrawler extends PluginForDecrypt {
                 dl.setHost(plugin.getHost());
                 final String extension = getFileNameExtensionFromURL(directlink, ".jpg");
                 final int padLength = StringUtils.getPadLength(links.length);
-                final String imageName = String.format(Locale.US, "%0" + padLength + "d", imageIndex + 1) + "_" + title + extension;
+                final String imageName = String.format(Locale.ROOT, "%0" + padLength + "d", imageIndex + 1) + "_" + title + extension;
                 dl.setFinalFileName(imageName);
                 dl.setAvailable(true);
                 dl.setContentUrl(directlink);

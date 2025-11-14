@@ -33,6 +33,27 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.requests.PostRequest;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.WeTransferComFolder;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.HashInfo;
+
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
@@ -59,33 +80,13 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.requests.PostRequest;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.decrypter.WeTransferComFolder;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.HashInfo;
-
-@HostPlugin(revision = "$Revision: 51813 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 51834 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://auth." + getHost() + "/signup");
     }
+
     // @Override
     // public LazyPlugin.FEATURE[] getFeatures() {
     // return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
@@ -338,8 +339,7 @@ public class WeTransferCom extends PluginForHost {
         dl.startDownload();
         /**
          * 2024-02-27: This website delivers single files as .zip files without .zip file-extension while all of them contain exactly one
-         * file. </br>
-         * The special handling down below corrects this by extracting such files.
+         * file. </br> The special handling down below corrects this by extracting such files.
          */
         if (!isSingleZip && link.getLinkStatus().hasStatus(LinkStatus.FINISHED) && link.getDownloadCurrent() > 0) {
             extract(link);
@@ -476,7 +476,7 @@ public class WeTransferCom extends PluginForHost {
                         final FileOutputStream fos = new FileOutputStream(extractedFile);
                         try {
                             dis = new DigestInputStream(zis, MessageDigest.getInstance("SHA-256"));
-                            final byte[] buffer = new byte[2048 * 1024];
+                            final byte[] buffer = new byte[1024 * 1024];
                             while (true) {
                                 final int read = dis.read(buffer);
                                 if (read == -1) {
@@ -515,6 +515,7 @@ public class WeTransferCom extends PluginForHost {
         } finally {
             if (zipFile != null) {
                 zipFile.close();
+                zipFile = null;
             }
         }
     }
@@ -729,64 +730,51 @@ public class WeTransferCom extends PluginForHost {
                     final String lang = System.getProperty("user.language", "en").toLowerCase();
                     String message = "";
                     String title = host + " - Login";
-                    switch (lang) {
-                    case "de":
+                    if ("de".equals(lang)) {
                         message += "Hallo liebe(r) " + host + "-Nutzer/in\r\n";
                         message += "Um deinen Account dieses Dienstes in JDownloader verwenden zu können, befolge bitte diese Anleitung:\r\n";
                         message += help_article_url;
-                        break;
-                    case "fr":
+                    } else if ("fr".equals(lang)) {
                         message += "Bonjour cher/chère utilisateur(trice) de " + host + "\r\n";
                         message += "Pour utiliser un compte de ce service dans JDownloader, veuillez suivre les instructions suivantes :\r\n";
                         message += help_article_url;
-                        break;
-                    case "es":
+                    } else if ("es".equals(lang)) {
                         message += "Hola estimado/a usuario/a de " + host + "\r\n";
                         message += "Para utilizar una cuenta de este servicio en JDownloader, por favor sigue las siguientes instrucciones:\r\n";
                         message += help_article_url;
-                        break;
-                    case "it":
+                    } else if ("it".equals(lang)) {
                         message += "Ciao caro/a utente di " + host + "\r\n";
                         message += "Per utilizzare un account di questo servizio in JDownloader, segui queste istruzioni:\r\n";
                         message += help_article_url;
-                        break;
-                    case "pt":
-                    case "pt_br":
+                    } else if ("pt".equals(lang) || "pt_br".equals(lang)) {
                         message += "Olá caro(a) usuário(a) do " + host + "\r\n";
                         message += "Para usar uma conta deste serviço no JDownloader, siga as instruções:\r\n";
                         message += help_article_url;
-                        break;
-                    case "ru":
+                    } else if ("ru".equals(lang)) {
                         message += "Здравствуйте, уважаемый пользователь " + host + "\r\n";
                         message += "Чтобы использовать аккаунт этого сервиса в JDownloader, пожалуйста, следуйте следующим инструкциям:\r\n";
                         message += help_article_url;
-                        break;
-                    case "tr":
+                    } else if ("tr".equals(lang)) {
                         message += "Merhaba değerli " + host + " kullanıcısı\r\n";
                         message += "Bu servisin hesabını JDownloader üzerinde kullanmak için lütfen aşağıdaki talimatları izleyin:\r\n";
                         message += help_article_url;
-                        break;
-                    case "zh":
+                    } else if ("zh".equals(lang)) {
                         message += "亲爱的 " + host + " 用户您好\r\n";
                         message += "要在 JDownloader 中使用此服务的账户，请按照以下说明进行操作：\r\n";
                         message += help_article_url;
-                        break;
-                    case "ja":
+                    } else if ("ja".equals(lang)) {
                         message += host + " のご利用者様へ\r\n";
                         message += "JDownloader でこのサービスのアカウントを使用するには、以下の手順に従ってください：\r\n";
                         message += help_article_url;
-                        break;
-                    case "ko":
+                    } else if ("ko".equals(lang)) {
                         message += "안녕하세요, " + host + " 사용자님\r\n";
                         message += "JDownloader에서 이 서비스 계정을 사용하려면 다음 안내를 따라주세요:\r\n";
                         message += help_article_url;
-                        break;
-                    default:
+                    } else {
                         // English fallback
                         message += "Hello dear " + host + " user\r\n";
                         message += "In order to use an account of this service in JDownloader, please follow these instructions:\r\n";
                         message += help_article_url;
-                        break;
                     }
                     final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
                     dialog.setTimeout(3 * 60 * 1000);
@@ -798,7 +786,7 @@ public class WeTransferCom extends PluginForHost {
                 } catch (final Throwable e) {
                     getLogger().log(e);
                 }
-            };
+            }
         };
         thread.setDaemon(true);
         thread.start();

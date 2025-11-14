@@ -6,12 +6,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
@@ -22,7 +16,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48359 $", interfaceVersion = 2, names = { "mangadex.org" }, urls = { "https?://(?:www\\.)?mangadex\\.(?:org|cc)/(chapter/[a-f0-9\\-]+|title/[a-f0-9\\-]+)(/[^/]*\\?tab=(art|chapters))?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "mangadex.org" }, urls = { "https?://(?:www\\.)?mangadex\\.(?:org|cc)/(chapter/[a-f0-9\\-]+|title/[a-f0-9\\-]+)(/[^/]*\\?tab=(art|chapters))?" })
 public class MangadexOrg extends antiDDoSForDecrypt {
     public MangadexOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,9 +96,9 @@ public class MangadexOrg extends antiDDoSForDecrypt {
                                 link.setAvailable(true);
                                 final String volumeString;
                                 if (volume == null) {
-                                    volumeString = String.format(Locale.US, "-V%0" + StringUtils.getPadLength(data.size()) + "d", count);
+                                    volumeString = String.format(Locale.ROOT, "-V%0" + StringUtils.getPadLength(data.size()) + "d", count);
                                 } else if (volume.matches("\\d+")) {
-                                    volumeString = String.format(Locale.US, "-V%0" + StringUtils.getPadLength(data.size()) + "d", Integer.parseInt(volume));
+                                    volumeString = String.format(Locale.ROOT, "-V%0" + StringUtils.getPadLength(data.size()) + "d", Integer.parseInt(volume));
                                 } else {
                                     volumeString = volume;
                                 }

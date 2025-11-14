@@ -18,18 +18,8 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.views.downloads.columns.ETAColumn;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.PluginTaskID;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -50,7 +40,18 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.views.downloads.columns.ETAColumn;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
 public class RapidsPl extends PluginForHost {
     /* API documentation: https://new.rapids.pl/api */
     private static final String  API_BASE            = "https://api.rapids.pl/api";
@@ -159,7 +160,7 @@ public class RapidsPl extends PluginForHost {
             Integer currentProgress = 0;
             String finalDownloadurl = null;
             do {
-                logger.info(String.format("Waiting for file to get loaded onto server - seconds left %d / %d", waitSecondsLeft, maxWaitSeconds));
+                logger.info(String.format(Locale.ROOT, "Waiting for file to get loaded onto server - seconds left %d / %d", waitSecondsLeft, maxWaitSeconds));
                 link.addPluginProgress(waitProgress);
                 waitProgress.updateValues(currentProgress.intValue(), 100);
                 this.sleep(waitSecondsPerLoop, link);
@@ -201,7 +202,7 @@ public class RapidsPl extends PluginForHost {
                 if (delayedStatus == 4) {
                     logger.info("Error happened during serverside download");
                 } else if (waitSecondsLeft <= 0) {
-                    logger.info(String.format("Timeout happened during serverside download - exceeded %d seconds", maxWaitSeconds));
+                    logger.info(String.format(Locale.ROOT, "Timeout happened during serverside download - exceeded %d seconds", maxWaitSeconds));
                 } else {
                     logger.info("Unknown error happened during serverside download");
                 }
@@ -311,7 +312,7 @@ public class RapidsPl extends PluginForHost {
         final boolean needs_token_refresh = System.currentTimeMillis() - account.getCookiesTimeStamp("") >= token_refresh_minutes * 60 * 1000l;
         Map<String, Object> entries = null;
         if (token != null && needs_token_refresh) {
-            logger.info(String.format("Token needs to be refreshed as it is older than %d minutes", token_refresh_minutes));
+            logger.info(String.format(Locale.ROOT, "Token needs to be refreshed as it is older than %d minutes", token_refresh_minutes));
         } else if (token != null) {
             logger.info("Attempting token login");
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);

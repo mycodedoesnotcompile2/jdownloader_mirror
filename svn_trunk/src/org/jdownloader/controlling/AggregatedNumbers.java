@@ -6,7 +6,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.download.DownloadInterface;
+
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.gui.translate._GUI;
@@ -20,12 +27,6 @@ import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.download.DownloadInterface;
-
 public class AggregatedNumbers {
     protected static final boolean FORCED_MIRROR_CASE_INSENSITIVE = CrossSystem.isWindows() || JsonConfig.create(GeneralSettings.class).isForceMirrorDetectionCaseInsensitive();
     private final long             totalBytes;
@@ -34,25 +35,25 @@ public class AggregatedNumbers {
 
     public final String getFinishedString(final boolean inclDisabled) {
         if (inclDisabled) {
-            return String.valueOf(downloadsFinished + disabledDownloadsFinished);
+            return StringUtils.toString(formatter, downloadsFinished + disabledDownloadsFinished);
         } else {
-            return String.valueOf(downloadsFinished);
+            return StringUtils.toString(formatter, downloadsFinished);
         }
     }
 
     public String getSkippedString(boolean inclDisabled) {
         if (inclDisabled) {
-            return String.valueOf(downloadsSkipped + disabledDownloadsSkipped);
+            return StringUtils.toString(formatter, downloadsSkipped + disabledDownloadsSkipped);
         } else {
-            return String.valueOf(downloadsSkipped);
+            return StringUtils.toString(formatter, downloadsSkipped);
         }
     }
 
     public String getFailedString(boolean inclDisabled) {
         if (inclDisabled) {
-            return String.valueOf(downloadsFailed + disabledDownloadsFailed);
+            return StringUtils.toString(formatter, downloadsFailed + disabledDownloadsFailed);
         } else {
-            return String.valueOf(downloadsFailed);
+            return StringUtils.toString(formatter, downloadsFailed);
         }
     }
 

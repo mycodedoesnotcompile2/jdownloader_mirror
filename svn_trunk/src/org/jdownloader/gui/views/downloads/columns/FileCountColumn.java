@@ -1,20 +1,24 @@
 package org.jdownloader.gui.views.downloads.columns;
 
+import java.text.NumberFormat;
+
 import javax.swing.JComponent;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingConstants;
-
-import org.appwork.swing.exttable.ExtColumn;
-import org.appwork.swing.exttable.ExtDefaultRowSorter;
-import org.appwork.utils.swing.renderer.RenderLabel;
-import org.jdownloader.gui.translate._GUI;
 
 import jd.controlling.linkcrawler.CrawledPackage;
 import jd.controlling.packagecontroller.AbstractNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 
+import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.swing.exttable.ExtDefaultRowSorter;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.renderer.RenderLabel;
+import org.jdownloader.gui.translate._GUI;
+
 public class FileCountColumn extends ExtColumn<AbstractNode> {
     private final RenderLabel countRenderer;
+    private NumberFormat      formatter;
 
     public JPopupMenu createHeaderPopup() {
         return FileColumn.createColumnPopup(this, getMinWidth() == getMaxWidth() && getMaxWidth() > 0);
@@ -38,6 +42,12 @@ public class FileCountColumn extends ExtColumn<AbstractNode> {
                 }
             }
         });
+        formatter = updateNumberFormat();
+    }
+
+    @Override
+    protected NumberFormat updateNumberFormat() {
+        return formatter = super.updateNumberFormat();
     }
 
     @Override
@@ -46,7 +56,7 @@ public class FileCountColumn extends ExtColumn<AbstractNode> {
 
     @Override
     public void configureRendererComponent(final AbstractNode value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-        this.countRenderer.setText(String.valueOf(getNumberOfItems(value)));
+        this.countRenderer.setText(StringUtils.toString(formatter, getNumberOfItems(value)));
     }
 
     @Override
@@ -72,7 +82,7 @@ public class FileCountColumn extends ExtColumn<AbstractNode> {
 
     @Override
     protected String getTooltipText(final AbstractNode value) {
-        return String.valueOf(getNumberOfItems(value));
+        return StringUtils.toString(formatter, getNumberOfItems(value));
     }
 
     @Override

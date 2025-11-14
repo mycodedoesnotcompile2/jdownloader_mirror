@@ -91,7 +91,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 51794 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1073,27 +1073,27 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return false;
         }
-    try {
-        /* Check if response is plaintext and contains any known error messages. */
-        final byte[] probe = urlConnection.peek(32);
-        if (probe.length > 0) {
-            final String probeContext = new String(probe, "UTF-8");
-            final Request clone = urlConnection.getRequest().cloneRequest();
-            clone.setHtmlCode(probeContext);
-            final Browser br = createNewBrowserInstance();
-            br.setRequest(clone);
-            try {
-                // TODO: extract the html checks into own method to avoid Browser instance
-                checkServerErrors(br, getDownloadLink(), null);
-            } catch (PluginException e) {
-                logger.log(e);
-                return false;
+        try {
+            /* Check if response is plaintext and contains any known error messages. */
+            final byte[] probe = urlConnection.peek(32);
+            if (probe.length > 0) {
+                final String probeContext = new String(probe, "UTF-8");
+                final Request clone = urlConnection.getRequest().cloneRequest();
+                clone.setHtmlCode(probeContext);
+                final Browser br = createNewBrowserInstance();
+                br.setRequest(clone);
+                try {
+                    // TODO: extract the html checks into own method to avoid Browser instance
+                    checkServerErrors(br, getDownloadLink(), null);
+                } catch (PluginException e) {
+                    logger.log(e);
+                    return false;
+                }
             }
+        } catch (IOException e) {
+            logger.log(e);
         }
-    } catch (IOException e) {
-        logger.log(e);
-    }
-    return true;
+        return true;
     }
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
@@ -2238,7 +2238,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             int download1counter = 0;
             final int download1max = 1;
             download1: do {
-                logger.info(String.format("Handling download1 loop %d / %d", download1counter + 1, download1max + 1));
+                logger.info(String.format(Locale.ROOT, "Handling download1 loop %d / %d", download1counter + 1, download1max + 1));
                 dllink = getDllink(link, account, br, getCorrectBR(br));
                 if (!StringUtils.isEmpty(dllink) && !preferOfficialVideoDownload) {
                     logger.info("Stepping out of download1 loop because: Found directurl");
@@ -2258,7 +2258,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         final int countermax = 3;
                         do {
                             counter++;
-                            logger.info(String.format("imghost_next_form loop %d / %d", counter + 1, countermax));
+                            logger.info(String.format(Locale.ROOT, "imghost_next_form loop %d / %d", counter + 1, countermax));
                             // this.handleCaptcha(link, imghost_next_form);
                             submitForm(imghost_next_form);
                             checkErrors(br, getCorrectBR(br), link, account);
@@ -2330,7 +2330,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 final int download2start = 0;
                 final int download2max = 2;
                 for (int download2counter = download2start; download2counter <= download2max; download2counter++) {
-                    logger.info(String.format("Download2 loop %d / %d", download2counter + 1, download2max + 1));
+                    logger.info(String.format(Locale.ROOT, "Download2 loop %d / %d", download2counter + 1, download2max + 1));
                     final long timeBefore = Time.systemIndependentCurrentJVMTimeMillis();
                     handlePassword(download2, link);
                     handleCaptcha(link, br, download2);
@@ -2524,7 +2524,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         if (targetHTML == null || chosenVideoQualityStr == null || videoHash == null) {
             /* This should never happen */
-            logger.info(String.format("Failed to find officially downloadable video quality although there are %d qualities available", videoQualityHTMLs.length));
+            logger.info(String.format(Locale.ROOT, "Failed to find officially downloadable video quality although there are %d qualities available", videoQualityHTMLs.length));
             return null;
         }
         if (filesizeStr == null) {

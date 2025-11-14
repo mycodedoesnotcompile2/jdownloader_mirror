@@ -18,9 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -33,7 +30,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 45806 $", interfaceVersion = 2, names = { "comic-walker.com" }, urls = { "https?://(www\\.)?comic-walker\\.com/(viewer|contents/detail)/.+" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "comic-walker.com" }, urls = { "https?://(www\\.)?comic-walker\\.com/(viewer|contents/detail)/.+" })
 public class ComicWalkerCom extends antiDDoSForDecrypt {
     public ComicWalkerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,7 +81,7 @@ public class ComicWalkerCom extends antiDDoSForDecrypt {
             int page = 1;
             for (String image : images) {
                 String imageURL = "directhttp://" + image.replace("\\", "");
-                String page_formatted = String.format(Locale.US, "%0" + padlength + "d", page);
+                String page_formatted = String.format(Locale.ROOT, "%0" + padlength + "d", page);
                 if (ext == null) {
                     /* No general extension given? Get it from inside the URL. */
                     ext = getFileNameExtensionFromURL(imageURL, ".jpg");

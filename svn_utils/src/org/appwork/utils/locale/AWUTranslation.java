@@ -169,6 +169,10 @@ public interface AWUTranslation extends TranslateInterface {
     String literally_byte(@Name("amount") @Example("1,56") long fileSize);
 
     @Warning("Do not auto-translate - might result in errors")
+    @Default(lngs = { "en", "de" }, values = { "%s1 B", "%s1 B" })
+    String literally_byte_string(@Name("amount") @Example("1,56") String format);
+
+    @Warning("Do not auto-translate - might result in errors")
     @Default(lngs = { "en", "de" }, values = { "%s1 GB", "%s1 GB" })
     String literally_gibibyte(@Name("amount") @Example("1,56") String format);
 

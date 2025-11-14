@@ -30,6 +30,7 @@ import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.storage.config.validators.DefaultSimpleDateValidator;
 import org.appwork.utils.Application;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.View;
@@ -516,13 +517,12 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
                     return formatter.format(fileSize / (double) KB.getDivider()).concat(" KB");
                 }
             default:
-                if (fileSize == 0) {
-                    return _AWU.T.literally_byte(0);
+                if (fileSize > 0) {
+                    return _AWU.T.literally_byte_string(StringUtils.toString(formatter, fileSize));
                 } else if (fileSize < 0) {
                     return "~";
                 } else {
-                    // TODO: _AWU.T.literally_byte(formatter.format(fileSize)
-                    return _AWU.T.literally_byte(fileSize);
+                    return _AWU.T.literally_byte_string(StringUtils.toString(formatter, 0));
                 }
             }
         }

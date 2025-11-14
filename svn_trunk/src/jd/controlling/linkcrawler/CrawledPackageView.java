@@ -1,5 +1,6 @@
 package jd.controlling.linkcrawler;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -40,6 +41,7 @@ public class CrawledPackageView extends ChildrenView<CrawledPackage, CrawledLink
     private volatile ChildrenAvailablility availability                   = ChildrenAvailablility.UNKNOWN;
     private final CrawledPackage           pkg;
     protected static final boolean         FORCED_MIRROR_CASE_INSENSITIVE = CrossSystem.isWindows() || JsonConfig.create(GeneralSettings.class).isForceMirrorDetectionCaseInsensitive();
+    protected final NumberFormat           numberFormat                   = NumberFormat.getInstance();
 
     public CrawledPackageView(final CrawledPackage pkg) {
         this.pkg = pkg;
@@ -116,7 +118,7 @@ public class CrawledPackageView extends ChildrenView<CrawledPackage, CrawledLink
         count = tmp.count;
         updatesDone = tmp.lupdatesRequired;
         availability = updateAvailability(tmp);
-        this.availabilityColumnString = _GUI.T.AvailabilityColumn_getStringValue_object_(tmp.newOnline, tmp.count);
+        this.availabilityColumnString = _GUI.T.AvailabilityColumn_getStringValue_object_(StringUtils.toString(numberFormat, tmp.newOnline), StringUtils.toString(numberFormat, tmp.count));
     }
 
     protected void addLinkToTemp(Temp tmp, CrawledLink link) {

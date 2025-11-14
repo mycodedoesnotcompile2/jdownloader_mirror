@@ -42,6 +42,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 
@@ -163,7 +164,8 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
                 fractionalPart = fractionalPart.substring(0, tzIndex); // Isolate the microseconds
             }
             // Trim to the first 3 digits (milliseconds) or pad with 0s if fewer digits
-            fractionalPart = fractionalPart.length() < 3 ? String.format("%-3s", fractionalPart).replace(' ', '0') // Pad to 3 digits
+            fractionalPart = fractionalPart.length() < 3 ? String.format(Locale.ROOT, "%-3s", fractionalPart).replace(' ', '0') // Pad to 3
+                                                                                                                                // digits
                     : fractionalPart.substring(0, 3); // Trim to 3 digits
             return Integer.parseInt(fractionalPart); // Convert to an integer
         }
@@ -201,7 +203,6 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
     @Override
     public List<ProcessInfo> listByPids(int... pids) throws IOException, InterruptedException {
         try {
-
             final ArrayList<ProcessInfo> ret = new ArrayList<ProcessInfo>();
             if (pids.length == 0) {
                 return ret;

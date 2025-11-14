@@ -33,7 +33,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49736 $", interfaceVersion = 2, names = { "readallcomics.com" }, urls = { "https?://(?:www\\.)?readallcomics\\.com/(?:category/)?[^/]+/?" })
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "readallcomics.com" }, urls = { "https?://(?:www\\.)?readallcomics\\.com/(?:category/)?[^/]+/?" })
 public class ReadAllComics extends antiDDoSForDecrypt {
     public ReadAllComics(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +88,7 @@ public class ReadAllComics extends antiDDoSForDecrypt {
             final int padlength = StringUtils.getPadLength(images.length);
             int page = 1;
             for (String image : images) {
-                String page_formatted = String.format(Locale.US, "%0" + padlength + "d", page++);
+                String page_formatted = String.format(Locale.ROOT, "%0" + padlength + "d", page++);
                 image = Encoding.htmlOnlyDecode(image);
                 final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(image));
                 String ext = getFileNameExtensionFromURL(image, ".jpg");

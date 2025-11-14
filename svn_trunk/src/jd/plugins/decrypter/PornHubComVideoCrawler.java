@@ -27,15 +27,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -60,7 +51,16 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 51146 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -280,7 +280,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             int numberofAddedItemsCurrentPage = 0;
             int numberOfDupeItems = 0;
             page++;
-            logger.info(String.format("Crawling page %s| %d / %d", br.getURL(), page, maxPage));
+            logger.info(String.format(Locale.ROOT, "Crawling page %s| %d / %d", br.getURL(), page, maxPage));
             final Set<String> viewKeys = new HashSet<String>();
             if (account != null && page == 1) {
                 // layout has changed, we only want to deep dive into other pages on first page
@@ -350,7 +350,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             } else {
                 logger.info("found NEW content: page=" + page + "|max_page=" + maxPage + "|all_added=" + addedItems + "|page_found:" + (viewKeys != null ? viewKeys.size() : -1) + "|page_added=" + numberofAddedItemsCurrentPage + "|page_dupes=" + numberOfDupeItems);
             }
-            logger.info(String.format("Found %d new items", numberofAddedItemsCurrentPage));
+            logger.info(String.format(Locale.ROOT, "Found %d new items", numberofAddedItemsCurrentPage));
             final String next = br.getRegex("page_next[^\"]*\"[^>]*>\\s*<a href=\"([^\"]*?page=\\d+)\"").getMatch(0);
             final String nextAjax = br.getRegex("onclick=\"[^\"]*loadMoreDataStream\\(([^\\)]+)\\)").getMatch(0);
             if (nextAjax != null) {
@@ -457,8 +457,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String seeAllURL = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
         if (seeAllURL != null) {
             /**
-             * E.g. users/bla/videos --> /users/bla/videos/favorites </br>
-             * Without this we might only see some of all items and no pagination which is needed to be able to find all items.
+             * E.g. users/bla/videos --> /users/bla/videos/favorites </br> Without this we might only see some of all items and no
+             * pagination which is needed to be able to find all items.
              */
             logger.info("Found seeAllURL: " + seeAllURL);
             PornHubCom.getPage(br, seeAllURL);
@@ -1048,7 +1048,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
                 /*
                  * 2023-02-17: The following line of code contains a typo. This typo now needs to be there forever otherwise it would break
                  * the ability to find duplicates for thumbnails added in order versions :D
-                 *
+                 * 
                  * 2023-03-17: Nope, you can just fix PluginForHost.getLinkID and add support for old/new one ;)
                  */
                 dl.setLinkID("pornhub://" + viewkey + "_thumnail");

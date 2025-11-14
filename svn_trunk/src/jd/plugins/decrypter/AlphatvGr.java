@@ -16,8 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
-
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import java.util.Locale;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -28,7 +27,9 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48921 $", interfaceVersion = 3, names = { "alphatv.gr" }, urls = { "https?://(?:www\\.)?alphatv\\.gr/shows?/.+" })
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "alphatv.gr" }, urls = { "https?://(?:www\\.)?alphatv\\.gr/shows?/.+" })
 public class AlphatvGr extends PluginForDecrypt {
     public AlphatvGr(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,7 +102,7 @@ public class AlphatvGr extends PluginForDecrypt {
                 int page = 1;
                 String[] videoItems = null;
                 do {
-                    logger.info(String.format("Crawling urls from page %d", page));
+                    logger.info(String.format(Locale.ROOT, "Crawling urls from page %d", page));
                     br.getPage("https://www.alphatv.gr/ajax/Isobar.AlphaTv.Components.Shows.Show.episodeslist?Key=" + year + "&Page=" + page + "&PageSize=" + maxItemsPerPage + "&ShowId=" + showID);
                     videoItems = br.getRegex("<div class=\"episodeItem flexClm4\">(.*?)</div>\\s*?</div>").getColumn(0);
                     for (final String videoItem : videoItems) {

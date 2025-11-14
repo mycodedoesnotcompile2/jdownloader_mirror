@@ -8,6 +8,18 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollectorCrawler;
+import jd.controlling.linkcollector.LinkCollectorEvent;
+import jd.controlling.linkcollector.LinkCollectorListener;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.JDGui.Panels;
+import jd.gui.swing.jdgui.interfaces.View;
+
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -21,18 +33,6 @@ import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollectorCrawler;
-import jd.controlling.linkcollector.LinkCollectorEvent;
-import jd.controlling.linkcollector.LinkCollectorListener;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.JDGui.Panels;
-import jd.gui.swing.jdgui.interfaces.View;
-
 public class LinkgrabberOverview extends AbstractOverviewPanel<AggregatedCrawlerNumbers, CrawledPackage, CrawledLink> implements GenericConfigEventListener<Boolean>, LinkCollectorListener, GUIListener {
     private final class UnknownCountEntry extends DataEntry<AggregatedCrawlerNumbers> {
         private UnknownCountEntry(String label) {
@@ -42,13 +42,13 @@ public class LinkgrabberOverview extends AbstractOverviewPanel<AggregatedCrawler
         @Override
         public void setData(AggregatedCrawlerNumbers total, AggregatedCrawlerNumbers filtered, AggregatedCrawlerNumbers selected) {
             if (total != null) {
-                setTotal(Long.toString(total.getStatusUnknown()));
+                setTotal(total.getStatusUnknown());
             }
             if (filtered != null) {
-                setFiltered(Long.toString(filtered.getStatusUnknown()));
+                setFiltered(filtered.getStatusUnknown());
             }
             if (selected != null) {
-                setSelected(Long.toString(selected.getStatusUnknown()));
+                setSelected(selected.getStatusUnknown());
             }
         }
 
@@ -66,13 +66,13 @@ public class LinkgrabberOverview extends AbstractOverviewPanel<AggregatedCrawler
         @Override
         public void setData(AggregatedCrawlerNumbers total, AggregatedCrawlerNumbers filtered, AggregatedCrawlerNumbers selected) {
             if (total != null) {
-                setTotal(Long.toString(total.getStatusOffline()));
+                setTotal(total.getStatusOffline());
             }
             if (filtered != null) {
-                setFiltered(Long.toString(filtered.getStatusOffline()));
+                setFiltered(filtered.getStatusOffline());
             }
             if (selected != null) {
-                setSelected(Long.toString(selected.getStatusOffline()));
+                setSelected(selected.getStatusOffline());
             }
         }
 
@@ -90,13 +90,13 @@ public class LinkgrabberOverview extends AbstractOverviewPanel<AggregatedCrawler
         @Override
         public void setData(AggregatedCrawlerNumbers total, AggregatedCrawlerNumbers filtered, AggregatedCrawlerNumbers selected) {
             if (total != null) {
-                setTotal(Long.toString(total.getStatusOnline()));
+                setTotal(total.getStatusOnline());
             }
             if (filtered != null) {
-                setFiltered(Long.toString(filtered.getStatusOnline()));
+                setFiltered(filtered.getStatusOnline());
             }
             if (selected != null) {
-                setSelected(Long.toString(selected.getStatusOnline()));
+                setSelected(selected.getStatusOnline());
             }
         }
 
@@ -114,13 +114,13 @@ public class LinkgrabberOverview extends AbstractOverviewPanel<AggregatedCrawler
         @Override
         public void setData(AggregatedCrawlerNumbers total, AggregatedCrawlerNumbers filtered, AggregatedCrawlerNumbers selected) {
             if (total != null) {
-                setTotal(Integer.toString(total.getHoster().size()));
+                setTotal(total.getHoster().size());
             }
             if (filtered != null) {
-                setFiltered(Integer.toString(filtered.getHoster().size()));
+                setFiltered(filtered.getHoster().size());
             }
             if (selected != null) {
-                setSelected(Integer.toString(selected.getHoster().size()));
+                setSelected(selected.getHoster().size());
             }
         }
 
@@ -138,13 +138,13 @@ public class LinkgrabberOverview extends AbstractOverviewPanel<AggregatedCrawler
         @Override
         public void setData(AggregatedCrawlerNumbers total, AggregatedCrawlerNumbers filtered, AggregatedCrawlerNumbers selected) {
             if (total != null) {
-                setTotal(Integer.toString(total.getLinkCount()));
+                setTotal(total.getLinkCount());
             }
             if (filtered != null) {
-                setFiltered(Integer.toString(filtered.getLinkCount()));
+                setFiltered(filtered.getLinkCount());
             }
             if (selected != null) {
-                setSelected(Integer.toString(selected.getLinkCount()));
+                setSelected(selected.getLinkCount());
             }
         }
 
@@ -187,13 +187,13 @@ public class LinkgrabberOverview extends AbstractOverviewPanel<AggregatedCrawler
         @Override
         public void setData(AggregatedCrawlerNumbers total, AggregatedCrawlerNumbers filtered, AggregatedCrawlerNumbers selected) {
             if (total != null) {
-                setTotal(Integer.toString(total.getPackageCount()));
+                setTotal(total.getPackageCount());
             }
             if (filtered != null) {
-                setFiltered(Integer.toString(filtered.getPackageCount()));
+                setFiltered(filtered.getPackageCount());
             }
             if (selected != null) {
-                setSelected(Integer.toString(selected.getPackageCount()));
+                setSelected(selected.getPackageCount());
             }
         }
 

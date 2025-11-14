@@ -9,6 +9,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.ButtonGroup;
@@ -90,16 +91,16 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
     }
 
     ItemListener userSelectionListener = new ItemListener() {
-        @Override
-        public void itemStateChanged(ItemEvent e) {
-            if (e.getStateChange() != ItemEvent.SELECTED) {
-                return;
-            }
-            userChangedSelection.set(true);
-            updateNewFilenameCharactersLeftTextAndColor();
-            stopTimer();
-        }
-    };
+                                           @Override
+                                           public void itemStateChanged(ItemEvent e) {
+                                               if (e.getStateChange() != ItemEvent.SELECTED) {
+                                                   return;
+                                               }
+                                               userChangedSelection.set(true);
+                                               updateNewFilenameCharactersLeftTextAndColor();
+                                               stopTimer();
+                                           }
+                                       };
 
     @Override
     public ModalityType getModalityType() {
@@ -321,7 +322,7 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongAct
         } else {
             newFilenameCharactersLeft.setForeground(Color.BLACK);
         }
-        newFilenameCharactersLeft.setText(String.format("Characters left: %d", charactersLeft));
+        newFilenameCharactersLeft.setText(String.format(Locale.ROOT, "Characters left: %d", charactersLeft));
     }
 
     /** Returns true if user defined filename differs from the initially suggested auto shortened filename. */

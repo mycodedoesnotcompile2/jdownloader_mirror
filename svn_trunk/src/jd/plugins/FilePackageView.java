@@ -1,5 +1,6 @@
 package jd.plugins;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -64,6 +65,7 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
     private volatile int                   count                          = 0;
     protected static final long            GUIUPDATETIMEOUT               = JsonConfig.create(GraphicalUserInterfaceSettings.class).getDownloadViewRefresh();
     protected static final boolean         FORCED_MIRROR_CASE_INSENSITIVE = CrossSystem.isWindows() || JsonConfig.create(GeneralSettings.class).isForceMirrorDetectionCaseInsensitive();
+    protected final NumberFormat           numberFormat                   = NumberFormat.getInstance();
 
     public boolean isEnabled() {
         return enabledCount > 0;
@@ -321,7 +323,7 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
         this.offline = tmp.newOffline;
         this.online = tmp.newOnline;
         this.availability = updateAvailability(tmp);
-        this.availabilityColumnString = _GUI.T.AvailabilityColumn_getStringValue_object_(tmp.newOnline, tmp.count);
+        this.availabilityColumnString = _GUI.T.AvailabilityColumn_getStringValue_object_(StringUtils.toString(numberFormat, tmp.newOnline), StringUtils.toString(numberFormat, tmp.count));
     }
 
     public final ChildrenAvailablility updateAvailability(Temp tmp) {
@@ -517,11 +519,16 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
             switch (finalLinkState) {
             case FAILED:
             case FAILED_CRC32:
-            case FAILED_EXISTS:
-            case FAILED_FATAL:
+            case FAILED_CRC32C:
             case FAILED_MD5:
             case FAILED_SHA1:
+            case FAILED_SHA224:
+            case FAILED_SHA384:
             case FAILED_SHA256:
+            case FAILED_SHA512:
+            case FAILED_WHIRLPOOL:
+            case FAILED_EXISTS:
+            case FAILED_FATAL:
             case OFFLINE:
             case PLUGIN_DEFECT:
                 id = "error".concat(link.getHost());
@@ -559,6 +566,7 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
             case FINISHED:
             case FINISHED_MIRROR:
             case FINISHED_CRC32:
+            case FINISHED_CRC32C:
             case FINISHED_MD5:
             case FINISHED_SHA1:
             case FINISHED_SHA224:

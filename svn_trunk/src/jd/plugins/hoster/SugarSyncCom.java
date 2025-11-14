@@ -16,10 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
+import java.util.Locale;
 
 import jd.PluginWrapper;
 import jd.http.URLConnectionAdapter;
@@ -33,7 +30,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50706 $", interfaceVersion = 2, names = { "sugarsync.com" }, urls = { "https?://(?:www\\.)?sugarsync\\.com/pf/(D[\\d\\_]+)" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+
+@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "sugarsync.com" }, urls = { "https?://(?:www\\.)?sugarsync\\.com/pf/(D[\\d\\_]+)" })
 public class SugarSyncCom extends PluginForHost {
     public SugarSyncCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -160,7 +161,7 @@ public class SugarSyncCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final String fid = getFID(link);
-            dllink = String.format("https://www.sugarsync.com/pf/%s?_=0.%d&token=%s&customData=%s", fid, System.currentTimeMillis(), token, token);
+            dllink = String.format(Locale.ROOT, "https://www.sugarsync.com/pf/%s?_=0.%d&token=%s&customData=%s", fid, System.currentTimeMillis(), token, token);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {

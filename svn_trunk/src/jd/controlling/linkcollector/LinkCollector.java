@@ -2468,7 +2468,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                         /* prepare formatter for package filenames in zipfiles */
                         final String packageFormat;
                         if (packages.size() >= 10) {
-                            packageFormat = String.format("%%0%dd", (int) Math.log10(packages.size()) + 1);
+                            packageFormat = String.format(Locale.ROOT, "%%0%dd", (int) Math.log10(packages.size()) + 1);
                         } else {
                             packageFormat = "%02d";
                         }
@@ -2513,7 +2513,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                             try {
                                 final int childrenSize = pkg.getChildren().size();
                                 if (childrenSize > 0) {
-                                    final String packageEntryID = String.format(packageFormat, packageIndex++);
+                                    final String packageEntryID = String.format(Locale.ROOT, packageFormat, packageIndex++);
                                     {
                                         /* convert FilePackage to JSon */
                                         final CrawledPackageStorable packageStorable = new CrawledPackageStorable(pkg, false);
@@ -2532,7 +2532,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                                     }
                                     final String childFormat;
                                     if (childrenSize >= 10) {
-                                        childFormat = String.format("%%0%dd", (int) Math.log10(childrenSize) + 1);
+                                        childFormat = String.format(Locale.ROOT, "%%0%dd", (int) Math.log10(childrenSize) + 1);
                                     } else {
                                         childFormat = "%02d";
                                     }
@@ -2559,7 +2559,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                                         if (id != null) {
                                             linkStorable.setID(id.getMappingID());
                                         }
-                                        final String childEntryID = String.format(childFormat, childIndex++);
+                                        final String childEntryID = String.format(Locale.ROOT, childFormat, childIndex++);
                                         final ZipEntry linkEntry = new ZipEntry(packageEntryID + "_" + childEntryID);
                                         linkEntry.setMethod(ZipEntry.DEFLATED);
                                         final byte[] entryBytes = mapper.objectToByteArray(linkStorable);

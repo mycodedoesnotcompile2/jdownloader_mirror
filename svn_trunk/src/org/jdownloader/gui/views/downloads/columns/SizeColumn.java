@@ -6,21 +6,22 @@ import javax.swing.JComponent;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingConstants;
 
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.swing.exttable.ExtColumn;
-import org.appwork.swing.exttable.ExtDefaultRowSorter;
-import org.appwork.utils.swing.renderer.RenderLabel;
-import org.appwork.utils.swing.renderer.RendererMigPanel;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 import jd.controlling.packagecontroller.AbstractNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.swing.exttable.ExtDefaultRowSorter;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.renderer.RenderLabel;
+import org.appwork.utils.swing.renderer.RendererMigPanel;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 
 public class SizeColumn extends ExtColumn<AbstractNode> {
     /**
@@ -97,7 +98,7 @@ public class SizeColumn extends ExtColumn<AbstractNode> {
         this.sizeRenderer.setText(getSizeString(getBytes(value)));
         if (fileCountVisible) {
             if (value instanceof AbstractPackageNode) {
-                countRenderer.setText("[" + ((AbstractPackageNode) value).getView().size() + "]");
+                countRenderer.setText("[" + StringUtils.toString(formatter, ((AbstractPackageNode) value).getView().size()) + "]");
             } else {
                 countRenderer.setText("");
             }

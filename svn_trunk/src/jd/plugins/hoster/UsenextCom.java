@@ -1,6 +1,5 @@
 package jd.plugins.hoster;
 
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -10,10 +9,8 @@ import java.util.Map;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -24,9 +21,8 @@ import jd.PluginWrapper;
 import jd.controlling.proxy.AbstractProxySelectorImpl;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
@@ -34,8 +30,9 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51772 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51835 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -112,21 +109,21 @@ public class UsenextCom extends UseNet {
     private Map<String, Object> queryAPI(final Account account, final Browser br) throws Exception {
         /* At this point login was successful and all that's left to do is to obtain account information. */
         final String api_url = "https://janus.usenext.com";
-        final PostRequest postRequest = br.createJSonPostRequest(URLHelper.parseLocation(new URL(api_url), "/graphql"),
-                "{\"operationName\":\"DashboardInformation\",\"variables\":{},\"query\":\"query DashboardInformation {\\n  radiusData {\\n    volume {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n    extraBoost {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  cancellationInformation {\\n    isContractLocked\\n    hasWithdrawableCancellation\\n    isServiceDenied\\n    isInCancellationPeriod\\n    cancellationProcess {\\n      createDate\\n    }\\n  }\\n  currentServiceRoundUpgradeData {\\n    hasPendingUpgrade\\n    isLastUpgrade\\n    accountingPeriod {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  serviceInformation {\\n    currentServiceRound {\\n      currEndDate\\n      startDate\\n      article {\\n        id\\n        name\\n        articleTypeId\\n        priceNet\\n        priceGross\\n        volumeGb\\n        runtime\\n        runtimeUnit\\n      }\\n      invoice {\\n        id\\n        createDate\\n        uuid\\n        invoiceStatePaths {\\n          invoiceStateId\\n          isCurrent\\n        }\\n      }\\n    }\\n    nextServiceRoundBeginDate\\n    nextArticle {\\n      id\\n      name\\n      articleTypeId\\n      priceNet\\n      priceGross\\n      volumeGb\\n      runtime\\n      runtimeUnit\\n    }\\n  }\\n}\\n\"}");
+        final PostRequest postRequest = br.createJSonPostRequest(api_url + "/graphql",
+                "{\"query\":\"query Subscription {\\n  radiusData {\\n    volume {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n    extraBoost {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  currentServiceRoundUpgradeData {\\n    hasPendingUpgrade\\n    isLastUpgrade\\n    totalServiceRoundUpgradeNumbers\\n    currentServiceRoundUpgradeNumber\\n    accountingPeriod {\\n      remaining\\n      total\\n      unitResourceStringKey\\n    }\\n  }\\n  serviceInformation {\\n    contractCreateDate\\n    hasServiceRoundRenewOrder\\n    currentServiceRound {\\n      startDate\\n      currEndDate\\n      roundNr\\n      article {\\n        id\\n        name\\n        runtimeUnit\\n        runtime\\n        volumeGb\\n        priceNet\\n        priceGross\\n        articleTypeId\\n      }\\n      invoice {\\n        id\\n        uuid\\n        sumGrossPrice\\n        createDate\\n        invoiceStatePaths {\\n          invoiceStateId\\n          isCurrent\\n        }\\n      }\\n    }\\n    currentServiceRoundCalculatedEndDate\\n    nextServiceRoundBeginDate\\n    nextArticle {\\n      id\\n      name\\n      runtime\\n      runtimeUnit\\n      volumeGb\\n      priceNet\\n      priceGross\\n      articleTypeId\\n    }\\n  }\\n  cancellationInformation {\\n    cancellationProcess {\\n      cancellationTypeId\\n      createDate\\n    }\\n    isContractLocked\\n    hasWithdrawableCancellation\\n    isInCancellationPeriod\\n  }\\n}\",\"variables\":{}}");
         postRequest.getHeaders().put("x-ui-language", "en-US");
         postRequest.getHeaders().put("Origin", "https://www." + br.getHost());
+        // postRequest.getHeaders().put("Referer", "https://www." + getHost() + "/");
         br.setCurrentURL("https://www." + br.getHost() + "/");
         br.getPage(postRequest);
         if (br.containsHTML("\"AUTH_NOT_AUTHENTICATED\"")) {
             throw new AccountInvalidException();
-        } else {
-            synchronized (account) {
-                account.saveCookies(br.getCookies(br.getHost()), "");
-            }
-            final Map<String, Object> json = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            return json;
         }
+        synchronized (account) {
+            account.saveCookies(br.getCookies(br.getHost()), "");
+        }
+        final Map<String, Object> json = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        return json;
     }
 
     @Override
@@ -134,24 +131,45 @@ public class UsenextCom extends UseNet {
         setBrowserExclusive();
         synchronized (account) {
             if (account.getUser() == null || !account.getUser().matches("^avi-\\d+-[a-z0-9]+$")) {
-                if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nDer Nutzername muss folgendes Format haben: avi-123456-xxxx...!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                final String allowed_format_human_readable = "avi-123456-xxxx...";
+                final String userLanguage = System.getProperty("user.language");
+                String errorMessage;
+                if ("de".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nDer Nutzername muss folgendes Format haben: " + allowed_format_human_readable + "!";
+                } else if ("fr".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nLe nom d'utilisateur doit être au format suivant: " + allowed_format_human_readable + "!";
+                } else if ("es".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nEl nombre de usuario debe tener el siguiente formato: " + allowed_format_human_readable + "!";
+                } else if ("it".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nIl nome utente deve avere il seguente formato: " + allowed_format_human_readable + "!";
+                } else if ("nl".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nDe gebruikersnaam moet het volgende formaat hebben: " + allowed_format_human_readable + "!";
+                } else if ("pt".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nO nome de usuário deve estar no seguinte formato: " + allowed_format_human_readable + "!";
+                } else if ("ru".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nИмя пользователя должно быть в следующем формате: " + allowed_format_human_readable + "!";
+                } else if ("ja".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\nユーザー名は次の形式である必要があります: " + allowed_format_human_readable + "!";
+                } else if ("zh".equalsIgnoreCase(userLanguage)) {
+                    errorMessage = "\r\n用户名必须为以下格式: " + allowed_format_human_readable + "!";
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUsername must be in the following format: avi-123456-xxxx...!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    errorMessage = "\r\nUsername must be in the following format: " + allowed_format_human_readable + "!";
                 }
+                throw new AccountInvalidException(errorMessage);
             }
             final AccountInfo ai = new AccountInfo();
             br.setFollowRedirects(true);
             final Cookies cookies = account.loadCookies("");
             Map<String, Object> json = null;
-            final String dashboardUrlRelative = "/ma";
+            final String dashboardUrlRelative = "/ma/dashboard";
             if (cookies != null) {
+                logger.info("Attempting cookie login");
                 br.setCookies(cookies);
                 br.getPage("https://www." + getHost() + dashboardUrlRelative);
                 try {
                     json = queryAPI(account, br);
                     logger.info("Cookie login successful");
-                } catch (PluginException e) {
+                } catch (final PluginException e) {
                     logger.info("Cookie login failed");
                     br.clearCookies(null);
                     account.clearCookies("");
@@ -159,32 +177,17 @@ public class UsenextCom extends UseNet {
             }
             if (json == null) {
                 logger.info("Performing full login");
-                br.getPage("https://www." + getHost() + "/signin");
-                String clientID = null;
-                final String buildManifest = br.getRegex("(/_next/static/[^\"]*?buildManifest.js)\"").getMatch(0);
-                if (buildManifest != null) {
-                    Browser brc = br.cloneBrowser();
-                    brc.getPage(buildManifest);
-                    final String signin = brc.getRegex("\"([^\"]*pages/signin[^\"]*\\.js)\"").getMatch(0);
-                    if (signin != null) {
-                        brc = br.cloneBrowser();
-                        brc.getPage("/_next/" + signin);
-                        clientID = brc.getRegex("\\w+\\s*=\\s*\"([a-f0-9]{32})\"").getMatch(0);
-                    }
+                br.getPage("https://www." + getHost() + "/signin?returnTo=%2Fma%2Fdashboard");
+                final Request req = br.createJSonPostRequest(br.getURL(), "[{\"password\":\"" + PluginJSonUtils.escape(account.getPass()) + "\",\"username\":\"" + PluginJSonUtils.escape(account.getUser()) + "\"},\"/ma/dashboard\"]");
+                /* 2025-11-13: Mandatory static value */
+                req.getHeaders().put("next-action", "5c76fc0dd6c3af6c32ede62d92596a9adb1b943b");
+                br.getPage(req);
+                /* Returns http response code 303 on success */
+                if (br.getHttpConnection().getResponseCode() == 500) {
+                    /* Wrong credentials -> http response code 500 */
+                    throw new AccountInvalidException();
                 }
-                if (clientID == null) {
-                    logger.warning("Fallback to static clientID value");
-                    clientID = "852f41f8997141c5b9b59e6d15e03f33"; // 2023-01-04
-                }
-                br.getPage("https://auth." + getHost() + "/login?culture=de-DE&client_id=" + URLEncode.encodeURIComponent(clientID) + "&CustomCSS=https%3A%2F%2Fwww.usenext.com%2Fauth-css%2Fauth.override.css&returnUrl=https%3A%2F%2Fwww.usenext.com%2F%3Fclient_id%3D" + URLEncode.encodeURIComponent(clientID));
-                final Form login = br.getFormbyKey("username");
-                if (login == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                login.put("username", Encoding.urlEncode(account.getUser()));
-                login.put("password", Encoding.urlEncode(account.getPass()));
-                br.submitForm(login);
-                br.getPage("https://www." + getHost() + dashboardUrlRelative);
+                logger.info("Login looks to be successful");
                 json = queryAPI(account, br);
             }
             final Map<String, Object> volume = (Map<String, Object>) JavaScriptEngineFactory.walkJson(json, "data/radiusData/volume");
@@ -228,14 +231,19 @@ public class UsenextCom extends UseNet {
 
     @Override
     public List<UsenetServer> getAvailableUsenetServer() {
-        /* Current list of servers can be found here: https://www.usenext.com/en-US/support -> See "How do I set up my newsreader" */
+        /*
+         * Current list of servers can be found here: https://www.usenext.com/en-US/support/faq -> See
+         * "I have a Mac or Linux computer – is there special software available?"
+         */
         final List<UsenetServer> ret = new ArrayList<UsenetServer>();
         ret.addAll(UsenetServer.createServerList("flat.usenext.de", false, 119, 443));// speed limited to 2Mbyte/s
         ret.addAll(UsenetServer.createServerList("flat.usenext.de", true, 563));// speed limited to 2Mbyte/s
         ret.addAll(UsenetServer.createServerList("high.usenext.de", false, 119, 443));// max speed
         ret.addAll(UsenetServer.createServerList("high.usenext.de", true, 563));// max speed
-        /*
+        /**
          * 2023-01-04: Moved entries for news.usenext.de to bottom as their FAQ does not list this entry anymore but it still seems to work.
+         * <br>
+         * 2025-11-13: Still working.
          */
         ret.addAll(UsenetServer.createServerList("news.usenext.de", false, 119, 443));
         ret.addAll(UsenetServer.createServerList("news.usenext.de", true, 563));

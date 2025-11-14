@@ -21,9 +21,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -42,7 +39,10 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51082 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighpornNetCrawler extends PluginForDecrypt {
     public HighpornNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -138,7 +138,7 @@ public class HighpornNetCrawler extends PluginForDecrypt {
                 continue;
             }
             counter++;
-            final String orderid_formatted = String.format(Locale.US, "%0" + padLength + "d", counter);
+            final String orderid_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", counter);
             final String filename = title + "_" + orderid_formatted + ".mp4";
             final DownloadLink dl = createDownloadlink("highporndecrypted://" + videoID);
             dl.setName(filename);

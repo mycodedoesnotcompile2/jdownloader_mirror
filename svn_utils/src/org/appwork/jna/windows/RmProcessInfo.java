@@ -34,6 +34,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.jna.windows;
 
+import java.util.Locale;
+
 import com.sun.jna.Native;
 import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.WinBase;
@@ -67,6 +69,6 @@ public class RmProcessInfo extends Structure {
     public String toString() {
         String appName = Native.toString(strAppName);
         String serviceName = Native.toString(strServiceShortName);
-        return String.format("PID: %d%n" + "AppName: %s%n" + "ServiceName: %s%n" + "AppType: %d%n" + "AppStatus: %d%n" + "SessionId: %d%n" + "Restartable: %b%n", Process, appName, serviceName, ApplicationType, AppStatus, TSSessionId, bRestartable);
+        return String.format(Locale.ROOT, "PID: %d%n" + "AppName: %s%n" + "ServiceName: %s%n" + "AppType: %d%n" + "AppStatus: %d%n" + "SessionId: %d%n" + "Restartable: %b%n", Process, appName, serviceName, ApplicationType, AppStatus, TSSessionId, bRestartable);
     }
 }

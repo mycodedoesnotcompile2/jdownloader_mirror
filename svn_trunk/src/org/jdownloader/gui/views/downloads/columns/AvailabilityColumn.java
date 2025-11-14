@@ -42,9 +42,7 @@ public class AvailabilityColumn extends ExtTextColumn<AbstractNode> implements G
     private boolean           textVisible;
 
     public JPopupMenu createHeaderPopup() {
-
         return FileColumn.createColumnPopup(this, getMinWidth() == getMaxWidth() && getMaxWidth() > 0);
-
     }
 
     public AvailabilityColumn() {

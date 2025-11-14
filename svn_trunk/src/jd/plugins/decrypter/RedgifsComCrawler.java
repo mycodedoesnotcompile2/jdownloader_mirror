@@ -45,7 +45,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51801 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComCrawler extends PluginForDecrypt {
     public RedgifsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -185,7 +185,7 @@ public class RedgifsComCrawler extends PluginForDecrypt {
             } while (true);
             final int numberofMissingItems = totalNumberofItems - ret.size();
             if (numberofMissingItems > 0) {
-                String message = String.format("Found only %d/%d items!\r\nThis may happen if items get deleted but the server side total number of items is not updated by redgifs.\r\nThis is not a JDownloader bug!", ret.size(), totalNumberofItems);
+                String message = String.format(Locale.ROOT, "Found only %d/%d items!\r\nThis may happen if items get deleted but the server side total number of items is not updated by redgifs.\r\nThis is not a JDownloader bug!", ret.size(), totalNumberofItems);
                 if (!pagesWithMissingItems.isEmpty()) {
                     StringBuilder sb = new StringBuilder();
                     for (int i = 0; i < pagesWithMissingItems.size(); i++) {

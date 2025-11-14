@@ -20,11 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -38,7 +33,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = {}, urls = {})
 public class RappersIn extends PluginForDecrypt {
     public RappersIn(PluginWrapper wrapper) {
         super(wrapper);
@@ -177,7 +176,7 @@ public class RappersIn extends PluginForDecrypt {
             for (final DownloadLink track : tracks) {
                 if (tracks.size() == 1) {
                     /* Add position to track-filename */
-                    final String newFilename = String.format(Locale.US, "%0" + padLength + "d.", progress) + track.getFinalFileName();
+                    final String newFilename = String.format(Locale.ROOT, "%0" + padLength + "d.", progress) + track.getFinalFileName();
                     track.setFinalFileName(newFilename);
                     track.setProperty(DirectHTTP.FIXNAME, newFilename);
                 }

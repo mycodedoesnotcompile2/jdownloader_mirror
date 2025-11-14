@@ -5,6 +5,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.Rectangle;
+import java.util.Locale;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -124,7 +125,7 @@ public class DefaultEmptyLookAndFeelExtension extends LookAndFeelExtension {
             DebugMode.debugger();
             color = Color.LIGHT_GRAY;
         }
-        return String.format("#%02X%02X%02X%02X", color.getAlpha(), color.getRed(), color.getGreen(), color.getBlue());
+        return String.format(Locale.ROOT, "#%02X%02X%02X%02X", color.getAlpha(), color.getRed(), color.getGreen(), color.getBlue());
     }
 
     @Override

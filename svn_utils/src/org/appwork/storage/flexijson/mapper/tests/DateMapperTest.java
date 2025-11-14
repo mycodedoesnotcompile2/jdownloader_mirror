@@ -61,7 +61,7 @@ public class DateMapperTest extends AWTest {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
@@ -76,7 +76,7 @@ public class DateMapperTest extends AWTest {
         int offsetInMillis = timeZone.getOffset(calendar.getTimeInMillis());
         int offsetHours = offsetInMillis / (1000 * 60 * 60);
         int offsetMinutes = Math.abs((offsetInMillis / (1000 * 60)) % 60);
-        final String currentTimezoneOffset = String.format("%+03d:%02d", offsetHours, offsetMinutes);
+        final String currentTimezoneOffset = String.format(Locale.ROOT, "%+03d:%02d", offsetHours, offsetMinutes);
         try {
             Map<String, String> testDates = new LinkedHashMap<String, String>() {
                 {

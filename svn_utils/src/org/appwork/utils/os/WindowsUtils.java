@@ -58,6 +58,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -187,7 +188,6 @@ public class WindowsUtils {
         SYNCHRONIZE(WinNT.SYNCHRONIZE),
         @StorableDoc("Access system security.")
         ACCESS_SYSTEM_SECURITY(WinNT.ACCESS_SYSTEM_SECURITY);
-
         public final int mask;
 
         private AccessPermission(int mask) {
@@ -278,7 +278,6 @@ public class WindowsUtils {
         SID_KEY_TRUST_IDENTITY("S-1-18-4"),
         SID_KEY_PROPERTY_MFA("S-1-18-5"),
         SID_KEY_PROPERTY_ATTESTATION("S-1-18-6");
-
         public final String sid;
 
         private SID(String sid) {
@@ -1436,7 +1435,6 @@ public class WindowsUtils {
              * Application is critical to system operation
              */
             RmCritical(6);
-
             private final int value;
 
             ApplicationType(int value) {
@@ -1548,7 +1546,7 @@ public class WindowsUtils {
 
         @Override
         public String toString() {
-            return String.format("LockInfo{pid=%d, appName='%s', serviceName='%s', type=%s, sessionId=%d}", pid, appName, serviceName, applicationType, tsSessionId);
+            return String.format(Locale.ROOT, "LockInfo{pid=%d, appName='%s', serviceName='%s', type=%s, sessionId=%d}", pid, appName, serviceName, applicationType, tsSessionId);
         }
     }
 
@@ -1942,5 +1940,4 @@ public class WindowsUtils {
         }
         return false;
     }
-
 }

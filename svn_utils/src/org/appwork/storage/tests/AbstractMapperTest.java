@@ -48,42 +48,53 @@ import org.appwork.testframework.AWTest;
  */
 public abstract class AbstractMapperTest extends AWTest {
     public void runWith(JSONMapper mapper) throws Exception {
-        floatNumberFormatTests(mapper);
-        fixedNumberFormatTests(mapper);
-        undefinedTests(mapper);
-        assertEquals("10", mapper.stringToObject("10", String.class));
-        assertEquals("1.0", mapper.stringToObject("1.0", String.class));
-        assertEquals("false", mapper.stringToObject("false", String.class));
-        assertEquals(0.0d, mapper.stringToObject("null", double.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Double>(Double.class)));
-        assertEquals(0.0f, mapper.stringToObject("null", float.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Float>(Float.class)));
-        assertEquals((long) 0, mapper.stringToObject("null", long.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Long>(Long.class)));
-        assertEquals(0, mapper.stringToObject("null", int.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Integer>(Integer.class)));
-        assertEquals((char) 0, mapper.stringToObject("0", char.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Character>(Character.class)));
-        assertEquals((short) 0, mapper.stringToObject("null", short.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Short>(Short.class)));
-        assertEquals((byte) 0, mapper.stringToObject("null", byte.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Byte>(Byte.class)));
-        assertEquals(false, mapper.stringToObject("null", boolean.class));
-        assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Boolean>(Boolean.class)));
-        SimpleStorable obj = new SimpleStorable();
-        obj.setB(true);
-        obj.setBa(new boolean[] { true, false, true });
-        obj.setI(12367);
-        obj.setL(System.currentTimeMillis());
-        obj.setLa(new long[] { System.currentTimeMillis(), 0, System.currentTimeMillis() });
-        obj.setIa(new int[] { 1, 2, 3, 4, 5 });
-        obj.setString("Hello again");
-        obj.setStringa(new String[] { "a", "b", "C" });
-        String json = mapper.objectToString(obj);
-        // HashMap<String, Object> map = mapper.stringToObject(json, TypeRef.HASHMAP);
-        SimpleStorable restored = mapper.stringToObject(json, new SimpleTypeRef<SimpleStorable>(SimpleStorable.class));
-        assertEqualsDeep(restored, obj);
-        new CharJSONTest().runTest(mapper);
+        final Locale def = Locale.getDefault();
+        try {
+            String[] systems = { "arab", "arabext", "bali", "beng", "deva", "fullwide", "gujr", "guru", "hanidec", "khmr", "knda", "latn", "mlym", "mymr", "orya", "tamldec", "telu", "thai", "tibt" };
+            for (final String system : systems) {
+                final Locale loc = Locale.forLanguageTag("en-US-u-nu-" + system);
+                Locale.setDefault(loc);
+                floatNumberFormatTests(mapper);
+                fixedNumberFormatTests(mapper);
+                undefinedTests(mapper);
+                assertEquals("10", mapper.stringToObject("10", String.class));
+                assertEquals(10, mapper.stringToObject("10", int.class));
+                assertEquals("1.0", mapper.stringToObject("1.0", String.class));
+                assertEquals("false", mapper.stringToObject("false", String.class));
+                assertEquals(0.0d, mapper.stringToObject("null", double.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Double>(Double.class)));
+                assertEquals(0.0f, mapper.stringToObject("null", float.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Float>(Float.class)));
+                assertEquals((long) 0, mapper.stringToObject("null", long.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Long>(Long.class)));
+                assertEquals(0, mapper.stringToObject("null", int.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Integer>(Integer.class)));
+                assertEquals((char) 0, mapper.stringToObject("0", char.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Character>(Character.class)));
+                assertEquals((short) 0, mapper.stringToObject("null", short.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Short>(Short.class)));
+                assertEquals((byte) 0, mapper.stringToObject("null", byte.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Byte>(Byte.class)));
+                assertEquals(false, mapper.stringToObject("null", boolean.class));
+                assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Boolean>(Boolean.class)));
+                SimpleStorable obj = new SimpleStorable();
+                obj.setB(true);
+                obj.setBa(new boolean[] { true, false, true });
+                obj.setI(12367);
+                obj.setL(System.currentTimeMillis());
+                obj.setLa(new long[] { System.currentTimeMillis(), 0, System.currentTimeMillis() });
+                obj.setIa(new int[] { 1, 2, 3, 4, 5 });
+                obj.setString("Hello again");
+                obj.setStringa(new String[] { "a", "b", "C" });
+                String json = mapper.objectToString(obj);
+                // HashMap<String, Object> map = mapper.stringToObject(json, TypeRef.HASHMAP);
+                SimpleStorable restored = mapper.stringToObject(json, new SimpleTypeRef<SimpleStorable>(SimpleStorable.class));
+                assertEqualsDeep(restored, obj);
+                new CharJSONTest().runTest(mapper);
+            }
+        } finally {
+            Locale.setDefault(def);
+        }
     }
 
     public void undefinedTests(final JSONMapper mapper) throws Exception {
@@ -210,7 +221,7 @@ public abstract class AbstractMapperTest extends AWTest {
         setBigIntegerSupported(false);
         if (!isBigIntegerSupported()) {
             final Class<? extends Number> numClass = Number.class;
-            final BigInteger num = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE);
+            final BigInteger num = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(System.currentTimeMillis()));
             new AssertAnException<NumberFormatException>(AssertAnException.MODE.CONTAINS) {
                 @Override
                 protected void run() throws Exception {
@@ -275,7 +286,7 @@ public abstract class AbstractMapperTest extends AWTest {
         }
         for (float num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 0.33f) {
             final boolean isNegativ = num < 0;
-            for (String numberString : new String[] { Float.toString(Math.abs(num)), String.format(Locale.ENGLISH, "%e", Math.abs(num)), String.format(Locale.ENGLISH, "%E", Math.abs(num)) }) {
+            for (String numberString : new String[] { Float.toString(Math.abs(num)), String.format(Locale.ROOT, "%e", Math.abs(num)), String.format(Locale.ROOT, "%E", Math.abs(num)) }) {
                 Float diff = num - mapper.stringToObject((isNegativ ? "-" : "") + numberString, Float.class).floatValue();
                 assertTrue(diff < 0.01f);
                 if (!isNegativ) {
@@ -286,7 +297,7 @@ public abstract class AbstractMapperTest extends AWTest {
         }
         for (double num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 0.33d) {
             final boolean isNegativ = num < 0;
-            for (String numberString : new String[] { Double.toString(Math.abs(num)), String.format(Locale.ENGLISH, "%e", Math.abs(num)), String.format(Locale.ENGLISH, "%E", Math.abs(num)) }) {
+            for (String numberString : new String[] { Double.toString(Math.abs(num)), String.format(Locale.ROOT, "%e", Math.abs(num)), String.format(Locale.ROOT, "%E", Math.abs(num)) }) {
                 Double diff = num - mapper.stringToObject((isNegativ ? "-" : "") + numberString, Double.class).doubleValue();
                 assertTrue(diff < 0.01d);
                 if (!isNegativ) {

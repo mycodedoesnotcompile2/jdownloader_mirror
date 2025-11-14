@@ -7,13 +7,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.flexijson.FlexiJSONParser;
-import org.appwork.storage.flexijson.ParsingError;
-import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
@@ -26,7 +19,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "genshin.hoyoverse.com" }, urls = { "https?://genshin.hoyoverse.com/(?:[a-z]{2}/)?manga/detail/\\d+" })
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.flexijson.FlexiJSONParser;
+import org.appwork.storage.flexijson.ParsingError;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "genshin.hoyoverse.com" }, urls = { "https?://genshin.hoyoverse.com/(?:[a-z]{2}/)?manga/detail/\\d+" })
 public class GenshinManga extends PluginForDecrypt {
     public GenshinManga(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,7 +86,7 @@ public class GenshinManga extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "invalid imageURL:" + imageURL);
             }
             final DownloadLink downloadLink = createDownloadlink("directhttp://" + imageURL, false);
-            final String name = String.format(Locale.US, "%0" + numLength + "d", pageIndex++) + getFileNameExtensionFromURL(imageURL, ".jpg");
+            final String name = String.format(Locale.ROOT, "%0" + numLength + "d", pageIndex++) + getFileNameExtensionFromURL(imageURL, ".jpg");
             downloadLink.setAvailable(true);
             downloadLink.setFinalFileName(name);
             downloadLink.setProperty(DirectHTTP.FIXNAME, name);

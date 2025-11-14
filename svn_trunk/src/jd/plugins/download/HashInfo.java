@@ -178,7 +178,7 @@ public class HashInfo {
             if (StringUtils.isEmpty(hexHash)) {
                 throw new IllegalArgumentException("hash is empty:" + type + "-" + hash);
             } else if (hexHash.length() < type.getSize()) {
-                this.hash = String.format("%0" + (type.getSize() - hexHash.length()) + "d%s", 0, hexHash);
+                this.hash = String.format(Locale.ROOT, "%0" + (type.getSize() - hexHash.length()) + "d%s", 0, hexHash);
             } else if (hexHash.length() > type.getSize()) {
                 throw new IllegalArgumentException("invalid hash size:" + type + "-" + hash);
             } else {

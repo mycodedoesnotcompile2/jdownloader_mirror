@@ -2,6 +2,7 @@ package org.jdownloader.plugins.components.usenet;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.appwork.storage.Storable;
 import org.appwork.utils.StringUtils;
@@ -85,7 +86,7 @@ public class UsenetServer implements Storable {
 
     @Override
     public String toString() {
-        return String.format("Host:%s|Port:%d|Connections:%d|SSL:%b", getHost(), getPort(), getConnections(), isSSL());
+        return String.format(Locale.ROOT, "Host:%s|Port:%d|Connections:%d|SSL:%b", getHost(), getPort(), getConnections(), isSSL());
     }
 
     // Static Factory Methods

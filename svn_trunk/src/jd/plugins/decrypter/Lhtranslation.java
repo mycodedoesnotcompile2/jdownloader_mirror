@@ -18,9 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
@@ -32,7 +29,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48351 $", interfaceVersion = 3, names = { "lhtranslation.net" }, urls = { "https?://(?:www\\.)?lhtranslation\\.(?:com|net)/manga/([a-z0-9\\-]+)/(chapter-([0-9\\-]+)/?)?" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "lhtranslation.net" }, urls = { "https?://(?:www\\.)?lhtranslation\\.(?:com|net)/manga/([a-z0-9\\-]+)/(chapter-([0-9\\-]+)/?)?" })
 public class Lhtranslation extends PluginForDecrypt {
     public Lhtranslation(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,7 +89,7 @@ public class Lhtranslation extends PluginForDecrypt {
             int page = 0;
             for (final String finallink : images) {
                 page++;
-                final String page_formatted = String.format(Locale.US, "%0" + padLength + "d", page);
+                final String page_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", page);
                 if (finallink == null) {
                     return null;
                 }

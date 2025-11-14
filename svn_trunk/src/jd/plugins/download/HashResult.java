@@ -33,6 +33,8 @@ public class HashResult {
                 return FinalLinkState.FINISHED_SHA1;
             case MD5:
                 return FinalLinkState.FINISHED_MD5;
+            case CRC32C:
+                return FinalLinkState.FINISHED_CRC32C;
             case CRC32:
                 return FinalLinkState.FINISHED_CRC32;
             default:
@@ -54,6 +56,8 @@ public class HashResult {
                 return FinalLinkState.FAILED_SHA1;
             case MD5:
                 return FinalLinkState.FAILED_MD5;
+            case CRC32C:
+                return FinalLinkState.FAILED_CRC32C;
             case CRC32:
                 return FinalLinkState.FAILED_CRC32;
             default:

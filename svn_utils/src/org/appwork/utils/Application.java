@@ -703,7 +703,7 @@ public class Application {
                 if (jarName != null) {
                     final File jarFile = Application.getResource(jarName);
                     if (jarFile.isFile()) {
-                        logger.info(jarFile + "- lastModified: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(new Date(jarFile.lastModified())));
+                        logger.info(jarFile + "- lastModified: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM, Locale.ROOT).format(new Date(jarFile.lastModified())));
                     }
                 }
             } catch (final Exception ignore) {
@@ -716,7 +716,7 @@ public class Application {
                     exe4jFile = Application.getResource(moduleName);
                 }
                 if (exe4jFile.isFile()) {
-                    logger.info(exe4jFile + "- lastModified: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(new Date(exe4jFile.lastModified())));
+                    logger.info(exe4jFile + "- lastModified: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM, Locale.ROOT).format(new Date(exe4jFile.lastModified())));
                 }
             }
         } catch (final Throwable e1) {
@@ -737,7 +737,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(int)
          */
         @Override
@@ -760,7 +760,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(byte[])
          */
         @Override
@@ -783,7 +783,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(byte[], int, int)
          */
         @Override
@@ -806,7 +806,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#flush()
          */
         @Override
@@ -827,7 +827,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#close()
          */
         @Override

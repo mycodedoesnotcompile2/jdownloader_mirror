@@ -11,6 +11,19 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.gui.swing.jdgui.interfaces.View;
+import jd.gui.swing.jdgui.menu.ChunksEditor;
+import jd.gui.swing.jdgui.menu.ParalellDownloadsEditor;
+import jd.gui.swing.jdgui.menu.ParallelDownloadsPerHostEditor;
+import jd.gui.swing.jdgui.menu.SpeedlimitEditor;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLinkProperty;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageProperty;
+
 import org.appwork.controlling.StateEvent;
 import org.appwork.controlling.StateEventListener;
 import org.appwork.storage.config.ValidationException;
@@ -27,19 +40,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.DownloadsView;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.interfaces.View;
-import jd.gui.swing.jdgui.menu.ChunksEditor;
-import jd.gui.swing.jdgui.menu.ParalellDownloadsEditor;
-import jd.gui.swing.jdgui.menu.ParallelDownloadsPerHostEditor;
-import jd.gui.swing.jdgui.menu.SpeedlimitEditor;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLinkProperty;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageProperty;
 
 public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, FilePackage, DownloadLink> implements DownloadControllerListener, HierarchyListener, GenericConfigEventListener<Boolean>, GUIListener {
     private final class FailedEntry extends DataEntry<AggregatedNumbers> {
@@ -129,13 +129,13 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
         @Override
         public void setData(AggregatedNumbers total, AggregatedNumbers filtered, AggregatedNumbers selected) {
             if (total != null) {
-                setTotal(Long.toString(total.getConnections()));
+                setTotal(total.getConnections());
             }
             if (filtered != null) {
-                setFiltered(Long.toString(filtered.getConnections()));
+                setFiltered(filtered.getConnections());
             }
             if (selected != null) {
-                setSelected(Long.toString(selected.getConnections()));
+                setSelected(selected.getConnections());
             }
         }
 
@@ -201,13 +201,13 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
         @Override
         public void setData(AggregatedNumbers total, AggregatedNumbers filtered, AggregatedNumbers selected) {
             if (total != null) {
-                setTotal(Integer.toString(total.getLinkCount()));
+                setTotal(total.getLinkCount());
             }
             if (filtered != null) {
-                setFiltered(Integer.toString(filtered.getLinkCount()));
+                setFiltered(filtered.getLinkCount());
             }
             if (selected != null) {
-                setSelected(Integer.toString(selected.getLinkCount()));
+                setSelected(selected.getLinkCount());
             }
         }
 
@@ -225,13 +225,13 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
         @Override
         public void setData(AggregatedNumbers total, AggregatedNumbers filtered, AggregatedNumbers selected) {
             if (total != null) {
-                setTotal(Long.toString(total.getRunning()));
+                setTotal(total.getRunning());
             }
             if (filtered != null) {
-                setFiltered(Long.toString(filtered.getRunning()));
+                setFiltered(filtered.getRunning());
             }
             if (selected != null) {
-                setSelected(Long.toString(selected.getRunning()));
+                setSelected(selected.getRunning());
             }
         }
 
@@ -324,13 +324,13 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
         @Override
         public void setData(AggregatedNumbers total, AggregatedNumbers filtered, AggregatedNumbers selected) {
             if (total != null) {
-                setTotal(Integer.toString(total.getPackageCount()));
+                setTotal(total.getPackageCount());
             }
             if (filtered != null) {
-                setFiltered(Integer.toString(filtered.getPackageCount()));
+                setFiltered(filtered.getPackageCount());
             }
             if (selected != null) {
-                setSelected(Integer.toString(selected.getPackageCount()));
+                setSelected(selected.getPackageCount());
             }
         }
 

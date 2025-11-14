@@ -37,6 +37,7 @@ import java.io.PrintStream;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.Method;
 import java.util.IllegalFormatException;
+import java.util.Locale;
 
 import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.LogVetoListener;
@@ -351,7 +352,7 @@ public class LogV3 {
             String logMessage = formatString;
             if (formatParams != null && formatParams.length > 0) {
                 try {
-                    logMessage = String.format(logMessage, formatParams);
+                    logMessage = String.format(Locale.ROOT, logMessage, formatParams);
                 } catch (final IllegalFormatException e) {
                     e.printStackTrace();
                 }
@@ -370,7 +371,7 @@ public class LogV3 {
             String logMessage = formatString;
             if (formatParams != null && formatParams.length > 0) {
                 try {
-                    logMessage = String.format(logMessage, formatParams);
+                    logMessage = String.format(Locale.ROOT, logMessage, formatParams);
                 } catch (final IllegalFormatException e1) {
                     e1.printStackTrace();
                 }

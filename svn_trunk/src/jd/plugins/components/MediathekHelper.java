@@ -4,10 +4,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.MediathekProperties;
-
-import jd.plugins.DownloadLink;
 
 public class MediathekHelper {
     /** TODO: Ensure mp3 (audioonly) compatibility, put less info in filename if not required e.g. leave out protocol if we only have one */
@@ -44,7 +44,7 @@ public class MediathekHelper {
         /* TODO: value zero is not possible at the moment! */
         if (seasonNumber > 0 && episodeNumber > 0) {
             /* TODO: Check if we can have the case that only episode- or seasonnumber is given! */
-            filename += " - " + String.format(Locale.US, "S%0" + StringUtils.getPadLength(seasonNumber) + "d" + "E%0" + StringUtils.getPadLength(episodeNumber) + "d", seasonNumber, episodeNumber);
+            filename += " - " + String.format(Locale.ROOT, "S%0" + StringUtils.getPadLength(seasonNumber) + "d" + "E%0" + StringUtils.getPadLength(episodeNumber) + "d", seasonNumber, episodeNumber);
         }
         if (title != null) {
             filename += " - " + title;

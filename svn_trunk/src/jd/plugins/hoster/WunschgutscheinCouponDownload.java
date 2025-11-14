@@ -19,9 +19,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.jdownloader.downloader.text.TextDownloader;
+import java.util.Locale;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -34,7 +32,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50867 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.jdownloader.downloader.text.TextDownloader;
+
+@HostPlugin(revision = "$Revision: 51820 $", interfaceVersion = 3, names = {}, urls = {})
 public class WunschgutscheinCouponDownload extends PluginForHost {
     public WunschgutscheinCouponDownload(PluginWrapper wrapper) {
         super(wrapper);
@@ -206,7 +207,7 @@ public class WunschgutscheinCouponDownload extends PluginForHost {
         }
         sb.append("\nRedeemID: " + link.getStringProperty(PROPERTY_REDEEM_ID));
         sb.append("\nShopID: " + link.getStringProperty(PROPERTY_SHOP_ID));
-        sb.append("\nWert: " + String.format("%.2f", link.getIntegerProperty(PROPERTY_VALUE_IN_CENT) / 100.0));
+        sb.append("\nWert: " + String.format(Locale.ROOT, "%.2f", link.getIntegerProperty(PROPERTY_VALUE_IN_CENT) / 100.0));
         final String code = link.getStringProperty(PROPERTY_CODE);
         if (code != null) {
             sb.append("\nCode: " + code);

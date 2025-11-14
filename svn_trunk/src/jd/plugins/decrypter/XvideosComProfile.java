@@ -20,6 +20,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -53,7 +54,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 51473 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosComProfile extends PluginForDecrypt {
     public XvideosComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -511,7 +512,7 @@ public class XvideosComProfile extends PluginForDecrypt {
         short pageNum = 0;
         int decryptedLinksNum;
         do {
-            logger.info(String.format("Crawling page %d", pageNum));
+            logger.info(String.format(Locale.ROOT, "Crawling page %d", pageNum));
             decryptedLinksNum = 0;
             br.getPage("/" + type + "/" + username + "/videos-premium/best/" + pageNum);
             // users don't always have profile... as Guardao finds links from google... false positive.

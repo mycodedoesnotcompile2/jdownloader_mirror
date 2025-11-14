@@ -31,10 +31,12 @@ import java.lang.management.MemoryUsage;
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.swing.JButton;
@@ -43,6 +45,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.LookAndFeel;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 import jd.SecondLevelLaunch;
@@ -260,7 +263,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                 final long max = memory.getMax();
                 final long minimumWarningLevel = max / 100 * 20;// less than 20% free, warning
                 if (max - used < minimumWarningLevel) {
-                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(used) + " - Allocated: " + SizeFormatter.formatBytes(committed) + " - Max: " + SizeFormatter.formatBytes(max), "https://support.jdownloader.org/Knowledgebase/Article/View/troubleshooting-jdownloader-is-slow"));
+                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), used) + " - Allocated: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), committed) + " - Max: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), max), "https://support.jdownloader.org/Knowledgebase/Article/View/troubleshooting-jdownloader-is-slow"));
                     final long minimumRedWarning = max / 100 * 10;// less than 10% free, warning
                     if (max - used < minimumRedWarning) {
                         comp.setForeground(Color.RED);
@@ -268,7 +271,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                         comp.setForeground(Color.ORANGE.darker());
                     }
                 } else {
-                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(used) + " - Allocated: " + SizeFormatter.formatBytes(committed) + " - Max: " + SizeFormatter.formatBytes(max), "https://support.jdownloader.org/Knowledgebase/Article/View/vmoptions-file"));
+                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), used) + " - Allocated: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), committed) + " - Max: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), max), "https://support.jdownloader.org/Knowledgebase/Article/View/vmoptions-file"));
                 }
                 try {
                     final List<MemoryPoolMXBean> memoryPoolMXBeans = java.lang.management.ManagementFactory.getMemoryPoolMXBeans();
@@ -282,7 +285,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                         sb.append("Managed by:").append(Arrays.toString(memoryPoolMXBean.getMemoryManagerNames())).append("\r\n");
                         final MemoryUsage collectionUsage = memoryPoolMXBean.getCollectionUsage();
                         if (collectionUsage != null) {
-                            sb.append("Usage: " + SizeFormatter.formatBytes(collectionUsage.getUsed()) + " - Allocated: " + SizeFormatter.formatBytes(collectionUsage.getCommitted()) + " - Max: " + SizeFormatter.formatBytes(collectionUsage.getMax()));
+                            sb.append("Usage: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), collectionUsage.getUsed()) + " - Allocated: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), collectionUsage.getCommitted()) + " - Max: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), collectionUsage.getMax()));
                         }
                         sb.append("\r\n");
                     }
@@ -445,11 +448,10 @@ public class AboutDialog extends AbstractDialog<Integer> {
         extraction.add(createLink("7ZipJBindings (" + get7ZipJBindingDetails() + ")", "https://github.com/borisbrodski/sevenzipjbinding"));
         extraction.add(createLink("Zip4J 1.3.3", "https://github.com/srikanth-lingala/zip4j"));
         stats.add(extraction);
-        final String ffmpegVersion = getFFmpegDetails();
-        if (ffmpegVersion != null) {
-            stats.add(new JLabel("FFmpeg:"), "");
-            stats.add(createLink(ffmpegVersion, "https://ffmpeg.org/"));
-        }
+        final ExtButton ffmpegLink = createLink("Loading.....please wait", "https://ffmpeg.org/");
+        stats.add(new JLabel("FFmpeg:"), "");
+        stats.add(ffmpegLink);
+        loadFFmpegDetailsAsync(ffmpegLink);
         final LookAndFeel laf = UIManager.getLookAndFeel();
         if (laf != null) {
             stats.add(new JLabel(_GUI.T.jd_gui_swing_components_AboutDialog_laf()), "");
@@ -516,6 +518,39 @@ public class AboutDialog extends AbstractDialog<Integer> {
         }
     }
 
+    private void loadFFmpegDetailsAsync(final ExtButton ffmpegLink) {
+        Thread thread = new Thread("FFmpegVersionLoader") {
+            public void run() {
+                String version = "not available";
+                try {
+                    final FFmpeg ffmpeg = new FFmpeg(null) {
+                        public LogInterface getLogger() {
+                            return LogController.getFastPluginLogger("ffmpeg");
+                        }
+                    };
+                    if (ffmpeg.isAvailable()) {
+                        String v = ffmpeg.getVersionString();
+                        if (v != null) {
+                            version = v;
+                        } else {
+                            version = "unknown version";
+                        }
+                    }
+                } catch (final Throwable ignore) {
+                }
+                final String finalVersion = version;
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        ffmpegLink.setText("<html><u>" + finalVersion + "</u></html>");
+                        AboutDialog.this.pack();
+                    }
+                });
+            }
+        };
+        thread.setDaemon(true);
+        thread.start();
+    }
+
     private int getCopyrightYear() {
         final GregorianCalendar calendar = new GregorianCalendar();
         calendar.setTimeInMillis(System.currentTimeMillis());
@@ -534,26 +569,6 @@ public class AboutDialog extends AbstractDialog<Integer> {
         } catch (final Throwable ignore1) {
         }
         return version;
-    }
-
-    private String getFFmpegDetails() {
-        try {
-            final FFmpeg ffmpeg = new FFmpeg(null) {
-                @Override
-                public LogInterface getLogger() {
-                    return LogController.getFastPluginLogger("ffmpeg");
-                }
-            };
-            if (!ffmpeg.isAvailable()) {
-                return null;
-            }
-            final String version = ffmpeg.getVersionString();
-            if (version != null) {
-                return version;
-            }
-        } catch (final Throwable ignore1) {
-        }
-        return "unknown version";
     }
 
     private ExtButton createLink(final Object object, final String url) {

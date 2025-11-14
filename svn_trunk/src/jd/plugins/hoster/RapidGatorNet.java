@@ -69,7 +69,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
-@HostPlugin(revision = "$Revision: 51606 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1170,7 +1170,7 @@ public class RapidGatorNet extends PluginForHost {
      */
     private boolean sessionReUseAllowed(final Account account, final String session_create_property, final int session_refresh_timeoutMinutes) {
         if (session_refresh_timeoutMinutes > 0) {
-            logger.info(String.format("Currently sessions are re-freshed every %d minutes", session_refresh_timeoutMinutes));
+            logger.info(String.format(Locale.ROOT, "Currently sessions are re-freshed every %d minutes", session_refresh_timeoutMinutes));
         }
         final long timestamp_session_validity = account.getLongProperty(session_create_property, 0) + session_refresh_timeoutMinutes * 60 * 1000l;
         if (session_refresh_timeoutMinutes > 0 && System.currentTimeMillis() > timestamp_session_validity) {
@@ -1178,7 +1178,7 @@ public class RapidGatorNet extends PluginForHost {
              * 2019-12-23: We could avoid checking sessions as we know their age before already but I currently want all session_ids to get
              * checked to get better log results/find serverside issues.
              */
-            logger.info(String.format("session seems to be valid but we'll get a new one as current session is older than %d minutes", session_refresh_timeoutMinutes));
+            logger.info(String.format(Locale.ROOT, "session seems to be valid but we'll get a new one as current session is older than %d minutes", session_refresh_timeoutMinutes));
             return false;
         } else {
             if (session_refresh_timeoutMinutes > 0) {

@@ -14,7 +14,7 @@ import jd.plugins.PluginForDecrypt;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 
-@DecrypterPlugin(revision = "$Revision: 36558 $", interfaceVersion = 2, names = { "ub.uni-koeln.de" }, urls = { "https?://(www.)?ub\\.uni-koeln\\.de/cdm/[a-zA-Z0-9]+/collection/[a-zA-Z0-9\\-_]+/id/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "ub.uni-koeln.de" }, urls = { "https?://(www.)?ub\\.uni-koeln\\.de/cdm/[a-zA-Z0-9]+/collection/[a-zA-Z0-9\\-_]+/id/\\d+" })
 public class UbUniKoelnDe extends PluginForDecrypt {
 
     public UbUniKoelnDe(PluginWrapper wrapper) {
@@ -59,7 +59,7 @@ public class UbUniKoelnDe extends PluginForDecrypt {
             for (int index = 0; index < pages.length; index++) {
                 if (!isAbort()) {
                     final String page[] = pages[index];
-                    final String fileName = "Seite_" + String.format(Locale.US, "%0" + padLength + "d", index + 1) + ".jpg";
+                    final String fileName = "Seite_" + String.format(Locale.ROOT, "%0" + padLength + "d", index + 1) + ".jpg";
                     final String url = "http://www.ub.uni-koeln.de/utils/getdownloaditem/collection/" + collection + "/type/compoundobject/show/" + page[0] + "/cpdtype/monograph/filename/" + page[1];
                     final DownloadLink link = createDownloadlink("directhttp://" + url);
                     link.setProperty("requestType", "GET");
