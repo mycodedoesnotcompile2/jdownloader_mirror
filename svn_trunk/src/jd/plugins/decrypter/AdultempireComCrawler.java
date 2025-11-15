@@ -21,6 +21,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -41,14 +48,7 @@ import jd.plugins.hoster.AdultempireCom;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 49997 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51837 $", interfaceVersion = 3, names = {}, urls = {})
 public class AdultempireComCrawler extends PluginForDecrypt {
     public AdultempireComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,7 +135,7 @@ public class AdultempireComCrawler extends PluginForDecrypt {
         /* Website will include more parameters but really only "item_id" is required! */
         br.getPage("https://www." + this.getHost() + "/gw/player/?type=trailer&item_id=" + internalIDStr);
         final String thumbnailUrl = PluginJSonUtils.getJson(br, "thumbnailUrl");
-        final String httpStreamingURL = PluginJSonUtils.getJson(br, "contentUrl");
+        final String trailer_httpStreamingURL = PluginJSonUtils.getJson(br, "contentUrl");
         if (!StringUtils.isEmpty(thumbnailUrl)) {
             final DownloadLink thumbnail = this.createDownloadlink(thumbnailUrl);
             thumbnail.setAvailable(true);
@@ -144,9 +144,9 @@ public class AdultempireComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> trailerResults = this.crawlVideo(br.cloneBrowser(), internalIDStr, null, "trailer", "trailer");
         ret.addAll(trailerResults);
         final String title = trailerResults.get(0).getStringProperty(PROPERTY_TITLE);
-        if (!StringUtils.isEmpty(httpStreamingURL)) {
-            final DownloadLink httpStream = this.createDownloadlink(httpStreamingURL);
-            httpStream.setFinalFileName(title + "_http.mp4");
+        if (!StringUtils.isEmpty(trailer_httpStreamingURL)) {
+            final DownloadLink httpStream = this.createDownloadlink(trailer_httpStreamingURL);
+            httpStream.setFinalFileName(title + " - trailer_http.mp4");
             httpStream.setAvailable(true);
             ret.add(httpStream);
         }
@@ -217,7 +217,7 @@ public class AdultempireComCrawler extends PluginForDecrypt {
         fp.addLinks(ret);
         if (isPremiumUser) {
             /* Display information message to user */
-            this.displayBubbleNotification("Premium items cannot be crawled", title + "\r\nPremium items cannot be crawled/downloaded because they are DRM protected.");
+            this.displayBubbleNotification("Premium items cannot be crawled", title + "\r\nPremium items cannot be crawled/downloaded because they are DRM protected!");
         }
         return ret;
     }

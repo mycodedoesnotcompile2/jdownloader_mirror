@@ -1,6 +1,7 @@
 package jd.gui.swing.jdgui.views.settings.panels.packagizer;
 
 import java.awt.event.ActionEvent;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 
 import javax.swing.JComponent;
@@ -8,6 +9,7 @@ import javax.swing.JComponent;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.exttable.columns.ExtComponentColumn;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.renderer.RenderLabel;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.packagizer.PackagizerRule;
@@ -27,6 +29,7 @@ public class OrderColumn extends ExtComponentColumn<PackagizerRule> {
     private ExtButton         editorDown;
     private PackagizerRule    editing;
     private int               editingRow;
+    private NumberFormat      formatter;
 
     public OrderColumn() {
         super(_GUI.T.settings_rules_columns_exeorder());
@@ -82,6 +85,12 @@ public class OrderColumn extends ExtComponentColumn<PackagizerRule> {
         renderer.add(rendererLbl);
         renderer.add(rendererUp, "height 20!,width 20!");
         renderer.add(rendererDown, "height 20!,width 20!");
+        formatter = updateNumberFormat();
+    }
+
+    @Override
+    protected NumberFormat updateNumberFormat() {
+        return formatter = super.updateNumberFormat();
     }
 
     @Override
@@ -95,10 +104,10 @@ public class OrderColumn extends ExtComponentColumn<PackagizerRule> {
     }
 
     @Override
-    public void configureEditorComponent(PackagizerRule value, boolean isSelected, int row, int column) {
+    public void configureEditorComponent(PackagizerRule value, boolean isSelected, final int row, int column) {
         editing = value;
         editingRow = row;
-        editorLbl.setText(row + "");
+        editorLbl.setText(StringUtils.toString(formatter, row + 1));
         editorDown.setEnabled(row != getModel().getRowCount() - 1);
         editorUp.setEnabled(row != 0);
     }
@@ -106,7 +115,7 @@ public class OrderColumn extends ExtComponentColumn<PackagizerRule> {
     @Override
     public void configureRendererComponent(PackagizerRule value, boolean isSelected, boolean hasFocus, int row, int column) {
         /* Row is an index value. Add 1 so that it starts from 1 and not 0 since this is what the user will see. */
-        rendererLbl.setText(row + 1 + "");
+        rendererLbl.setText(StringUtils.toString(formatter, row + 1));
         rendererDown.setEnabled(row != getModel().getRowCount() - 1);
         rendererUp.setEnabled(row != 0);
     }

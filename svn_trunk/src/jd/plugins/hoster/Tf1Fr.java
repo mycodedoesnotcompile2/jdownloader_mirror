@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49416 $", interfaceVersion = 2, names = { "tf1.fr" }, urls = { "https?://(?:www\\.)?(wat\\.tv/video/.*?|tf1\\.fr/.+/videos/[A-Za-z0-9\\-_]+)\\.html" })
+@HostPlugin(revision = "$Revision: 51838 $", interfaceVersion = 2, names = { "tf1.fr" }, urls = { "https?://(?:www\\.)?tf1\\.fr/.+/videos/[A-Za-z0-9\\-_]+\\.html" })
 public class Tf1Fr extends PluginForHost {
     public Tf1Fr(final PluginWrapper wrapper) {
         super(wrapper);
@@ -44,17 +44,7 @@ public class Tf1Fr extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.wat.tv/cgu";
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        if ("wat.tv".equals(getHost())) {
-            if (host == null || "tf1.fr".equals(host)) {
-                return "tf1.fr";
-            }
-        }
-        return super.rewriteHost(host);
+        return "https://www." + getHost() + "/";
     }
 
     /* 2016-04-22: Changed domain from wat.tv to tf1.fr - everything else mostly stays the same */
@@ -114,7 +104,7 @@ public class Tf1Fr extends PluginForHost {
             video_id = br2.getRegex("\"streamId\"\\s*:\\s*\"(\\d{6,8})").getMatch(0);
         }
         final Browser br2 = br.cloneBrowser();
-        br2.getPage("http://www.wat.tv/get/webhtml/" + video_id);
+        br2.getPage("http://www.tf1.fr/get/webhtml/" + video_id);
         String finallink = null;
         try {
             final Map<String, Object> response = restoreFromString(br2.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -122,13 +112,15 @@ public class Tf1Fr extends PluginForHost {
         } catch (final Throwable ignore) {
         }
         if (finallink == null) {
+            /* Dead end */
             /**
              * 2022-01-11: Usage of other endpoint required but this will only return MPD with split video/audio, see also:
              * https://svn.jdownloader.org/issues/89353 </br>
              * New endpoint: https://mediainfo.tf1.fr/mediainfocombo/<video_id>
              */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported streaming type MPD with split video audio");
-        } else if (finallink.contains(".f4m?")) {
+        }
+        if (finallink.matches("(?i).+\\.f4m?$")) {
             // HDS
             br.getPage(finallink);
             final List<HDSContainer> all = HDSContainer.getHDSQualities(br);

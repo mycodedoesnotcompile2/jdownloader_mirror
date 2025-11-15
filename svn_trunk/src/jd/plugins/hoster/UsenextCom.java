@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 51835 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 51837 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,15 +50,14 @@ public class UsenextCom extends UseNet {
     };
 
     @Override
-    public void update(final DownloadLink downloadLink, final Account account, long bytesTransfered) {
+    public void update(final DownloadLink link, final Account account, long bytesTransfered) {
         final UsenetServer server = getLastUsedUsenetServer();
-        /**
-         * If the "flatrate domain" is in use, do not substract traffic from users' account. </br>
-         * Only substract traffic if no domain is given or a non-flatrate domain is given.
-         */
-        if (server == null || !StringUtils.equalsIgnoreCase(FLATRATE_DOMAIN, server.getHost())) {
-            super.update(downloadLink, account, bytesTransfered);
+        // If flatrate domain is in use, do not substract traffic from account
+        if (FLATRATE_DOMAIN.equals(server.getHost())) {
+            return;
         }
+        // Substract traffic for non-flatrate domains or when no domain is given
+        super.update(link, account, bytesTransfered);
     }
 
     @Override
@@ -101,7 +100,7 @@ public class UsenextCom extends UseNet {
         } else if (StringUtils.equals(unit, "UNX_UNIT_BYTES") || StringUtils.equals(unit, "UNIT_BYTES")) {
             unit = "B";
         } else {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "unsupported:" + unit);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported unit:" + unit);
         }
         return SizeFormatter.getSize(value + unit);
     }
@@ -180,6 +179,10 @@ public class UsenextCom extends UseNet {
                 br.getPage("https://www." + getHost() + "/signin?returnTo=%2Fma%2Fdashboard");
                 final Request req = br.createJSonPostRequest(br.getURL(), "[{\"password\":\"" + PluginJSonUtils.escape(account.getPass()) + "\",\"username\":\"" + PluginJSonUtils.escape(account.getUser()) + "\"},\"/ma/dashboard\"]");
                 /* 2025-11-13: Mandatory static value */
+                /**
+                 * 6742: function (e, t, n) {...var r = (0, n(9976).$) ('5c76fc0dd6c3af6c32ede62d92596a9adb1b943b')
+                 *
+                 */
                 req.getHeaders().put("next-action", "5c76fc0dd6c3af6c32ede62d92596a9adb1b943b");
                 br.getPage(req);
                 /* Returns http response code 303 on success */

@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -45,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.AdultempireComCrawler;
 
-@HostPlugin(revision = "$Revision: 51789 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51837 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { AdultempireComCrawler.class })
 public class AdultempireCom extends PluginForHost {
     public AdultempireCom(PluginWrapper wrapper) {
@@ -126,6 +127,9 @@ public class AdultempireCom extends PluginForHost {
 
     public boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
+            if (account.getPass().length() < 6) {
+                throw new AccountInvalidException("Password needs to be 6 chars or more");
+            }
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             final String urlPathAccountInfo = "/unlimited/account";
@@ -150,6 +154,7 @@ public class AdultempireCom extends PluginForHost {
             logger.info("Performing full login");
             br.getPage("https://www." + this.getHost() + "/unlimited/account/signin");
             if (br.containsHTML(">\\s*Confirm You Are Over 18\\s*<") || br.containsHTML("id\\s*=\\s*\"ageConfirmationButton\"")) {
+                logger.info("Handling age confirmation");
                 br.getPage("/Account/AgeConfirmation?ageConfirmationClicked=true&_=" + System.currentTimeMillis());
                 br.getPage("/unlimited/account/signin");
             }
@@ -159,6 +164,11 @@ public class AdultempireCom extends PluginForHost {
             loginform.setMethod(MethodType.POST);
             loginform.put("username", Encoding.urlEncode(account.getUser()));
             loginform.put("password", Encoding.urlEncode(account.getPass()));
+            final String sitekey = br.getRegex("var SITEKEY = '([^']+)';").getMatch(0);
+            if (sitekey != null) {
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, sitekey).getToken();
+                loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            }
             brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
             brc.submitForm(loginform);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -231,7 +241,7 @@ public class AdultempireCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
