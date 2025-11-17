@@ -53,6 +53,7 @@ import java.util.jar.JarInputStream;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Files;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
 
 public class TranslationFactory {
@@ -350,9 +351,20 @@ public class TranslationFactory {
                 }
                 break;
             }
+            // LOCALE_CACHE.put(localeWithLatinNumbers(ret), lng);
             LOCALE_CACHE.put(ret, lng);
             return ret;
         }
+    }
+
+    public static Locale localeWithLatinNumbers(final Locale locale) {
+        if (!"1234567890".equals(String.format(locale, "%d", 1234567890)) && JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
+            try {
+                return new Locale.Builder().setLocale(locale).setUnicodeLocaleKeyword("nu", "latn").build();
+            } catch (RuntimeException/* IllformedLocaleException */ ignore) {
+            }
+        }
+        return locale;
     }
 
     public static List<String> getVariantsOf(String lng) {

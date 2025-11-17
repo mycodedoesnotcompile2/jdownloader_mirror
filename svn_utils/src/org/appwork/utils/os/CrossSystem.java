@@ -50,6 +50,7 @@ import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -306,6 +307,7 @@ public class CrossSystem {
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H2(OSFamily.WINDOWS),
         WINDOWS_11_26H1(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -372,6 +374,7 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -408,7 +411,7 @@ public class CrossSystem {
     }
 
     private static volatile String[]                     BROWSER_COMMANDLINE = null;
-    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>(); ;
+    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>();
     private static String[]                              FILE_COMMANDLINE    = null;
     private static String                                JAVAINT             = null;
     /**
@@ -826,7 +829,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);
@@ -1315,7 +1318,13 @@ public class CrossSystem {
     public static OperatingSystem getLinuxRelease(final String osName) {
         OperatingSystem ret = null;
         if (osName != null && osName.toLowerCase(Locale.ENGLISH).contains("linux")) {
-            final String[] sources = new String[] { "/etc/os-release", "/etc/issue", "/usr/lib/os-release" };
+            final List<String> sources = new ArrayList<String>(Arrays.asList("/etc/os-release", "/etc/issue", "/usr/lib/os-release"));
+            if (Flatpak.isInsideFlatpak()) {
+                // https://docs.flatpak.org/en/latest/flatpak-command-reference.html
+                // Flatpak also bind-mounts as read-only the host's /etc/os-release (if available, or /usr/lib/os-release as a fallback) to
+                // /run/host/os-release
+                sources.add(0, "/run/host/os-release");
+            }
             for (final String source : sources) {
                 final File issue = new File(source);
                 if (issue.isFile()) {
@@ -1434,19 +1443,19 @@ public class CrossSystem {
             }
             if (ret == null) {
                 ret = getLinuxRelease(os);
-            }
-            if (ret == null || ret == OperatingSystem.LINUX) {
-                final OperatingSystem byOsVersion = parseReleaseByKernelString(System.getProperty("os.version"));
-                final OperatingSystem byProcVersion = getLinuxReleaseByProcVersion();
-                if (byOsVersion != null && byProcVersion != null) {
-                    if (byOsVersion.name().length() > byProcVersion.name().length()) {
+                if (ret == null || ret == OperatingSystem.LINUX) {
+                    final OperatingSystem byOsVersion = parseReleaseByKernelString(System.getProperty("os.version"));
+                    final OperatingSystem byProcVersion = getLinuxReleaseByProcVersion();
+                    if (byOsVersion != null && byProcVersion != null) {
+                        if (byOsVersion.name().length() > byProcVersion.name().length()) {
+                            return byOsVersion;
+                        }
+                        return byProcVersion;
+                    } else if (byOsVersion != null) {
                         return byOsVersion;
+                    } else if (byProcVersion != null) {
+                        return byProcVersion;
                     }
-                    return byProcVersion;
-                } else if (byOsVersion != null) {
-                    return byOsVersion;
-                } else if (byProcVersion != null) {
-                    return byProcVersion;
                 }
             }
             if (ret != null) {
@@ -1823,11 +1832,19 @@ public class CrossSystem {
     }
 
     public static boolean isLinux() {
-        return OSFamily.LINUX.equals(CrossSystem.OS.getFamily());
+        final OperatingSystem os = CrossSystem.OS;
+        if (os != null) {
+            return OSFamily.LINUX.equals(os.getFamily());
+        }
+        return OS_STRING != null && OS_STRING.toLowerCase(Locale.ROOT).contains("linux");
     }
 
     public static boolean isBSD() {
-        return OSFamily.BSD.equals(CrossSystem.OS.getFamily());
+        final OperatingSystem os = CrossSystem.OS;
+        if (os != null) {
+            return OSFamily.BSD.equals(os.getFamily());
+        }
+        return OS_STRING != null && OS_STRING.toLowerCase(Locale.ROOT).contains("bsd");
     }
 
     /**
@@ -1836,7 +1853,11 @@ public class CrossSystem {
      * @return
      */
     public static boolean isMac() {
-        return OSFamily.MAC.equals(CrossSystem.OS.getFamily());
+        final OperatingSystem os = CrossSystem.OS;
+        if (os != null) {
+            return OSFamily.MAC.equals(os.getFamily());
+        }
+        return OS_STRING != null && (OS_STRING.toLowerCase(Locale.ROOT).contains("mac") || OS_STRING.toLowerCase(Locale.ROOT).contains("darwin"));
     }
 
     /**
@@ -1858,7 +1879,11 @@ public class CrossSystem {
     }
 
     public static boolean isOS2() {
-        return OSFamily.OS2.equals(CrossSystem.OS.getFamily());
+        final OperatingSystem os = CrossSystem.OS;
+        if (os != null) {
+            return OSFamily.OS2.equals(os.getFamily());
+        }
+        return OS_STRING != null && OS_STRING.toLowerCase(Locale.ROOT).contains("os/2");
     }
 
     public static boolean isCopySelectionTrigger(final KeyStroke ks) {
@@ -1923,7 +1948,11 @@ public class CrossSystem {
      * @return
      */
     public static boolean isWindows() {
-        return OSFamily.WINDOWS.equals(CrossSystem.OS.getFamily());
+        final OperatingSystem os = CrossSystem.OS;
+        if (os != null) {
+            return OSFamily.WINDOWS.equals(os.getFamily());
+        }
+        return OS_STRING != null && (OS_STRING.toLowerCase(Locale.ROOT).contains("windows") || OS_STRING.toLowerCase(Locale.ROOT).contains("nt"));
     }
 
     protected static boolean openCustom(String[] commandLine, final String url) throws IOException {
