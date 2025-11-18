@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PinterestComDecrypter;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 51759 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51841 $", interfaceVersion = 3, names = {}, urls = {})
 public class PinterestCom extends PluginForHost {
     public PinterestCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,17 +139,18 @@ public class PinterestCom extends PluginForHost {
         this.setBrowserExclusive();
         /* 2021-03-02: PINs may redirect to other PINs in very rare cases -> Handle that */
         br.getPage(link.getPluginPatternMatcher());
-        PinterestComDecrypter.checkSinglePINOffline(br);
         String redirect = br.getRegex("window\\.location\\s*=\\s*\"([^\"]+)").getMatch(0);
         if (redirect != null) {
             /* We want the full URL. */
             redirect = br.getURL(redirect).toExternalForm();
+            if (new Regex(redirect, PinterestComDecrypter.PATTERN_PIN).patternFind() && !redirect.contains(pinID)) {
+                final String newPinID = getPinID(redirect);
+                logger.info("Old pinID: " + pinID + " | New pinID: " + newPinID + " | New URL: " + redirect);
+                // link.setPluginPatternMatcher(redirect);
+                br.getPage(redirect);
+            }
         }
-        if (redirect != null && new Regex(redirect, PinterestComDecrypter.PATTERN_PIN).patternFind() && !redirect.contains(pinID)) {
-            final String newPinID = getPinID(redirect);
-            logger.info("Old pinID: " + pinID + " | New pinID: " + newPinID + " | New URL: " + redirect);
-            // link.setPluginPatternMatcher(redirect);
-        }
+        PinterestComDecrypter.checkSinglePINOffline(br);
         parse_single_pin_info_from_html: {
             final String[] directurls = br.getRegex("fetchpriority=\"high\" href=\"(https://[^\"]+)").getColumn(0);
             if (directurls != null && directurls.length > 0) {

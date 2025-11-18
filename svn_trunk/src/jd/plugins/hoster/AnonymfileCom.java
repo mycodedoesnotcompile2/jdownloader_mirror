@@ -19,12 +19,19 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -32,34 +39,38 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51816 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51841 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonymfileCom extends PluginForHost {
     public AnonymfileCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    private final int FREE_MAXCHUNKS = 1;
+
     @Override
-    public String getAGBLink() {
-        return "https://www.test.com/help/privacy";
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.getHeaders().put("User-Agent", "JDownloader");
+        return br;
     }
 
     @Override
-    public void setBrowser(final Browser br) {
-        this.br = br;
-        this.br.getHeaders().put("User-Agent", "JDownloader");
+    public String getAGBLink() {
+        return "https://www." + getHost() + "/help/privacy";
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "anonymfile.com" });// redirects to filefa.st
         ret.add(new String[] { "anonfilesnew.com" });
-        ret.add(new String[] { "filefa.st" });
+        ret.add(new String[] { "filefa.st", "anonymfile.com", "anonfiles.me" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -79,9 +90,10 @@ public class AnonymfileCom extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    /* Connection stuff */
-    private final boolean FREE_RESUME    = true;
-    private final int     FREE_MAXCHUNKS = 1;
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -98,31 +110,52 @@ public class AnonymfileCom extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformationWebsite(link);
+    protected String getDefaultFileName(DownloadLink link) {
+        final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
+        if (filenameFromURL != null) {
+            return Encoding.htmlDecode(filenameFromURL).trim();
+        } else {
+            return this.getFID(link);
+        }
     }
 
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws Exception {
-        final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            /* Fallback */
-            final String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
-            if (filenameFromURL != null) {
-                link.setName(Encoding.htmlDecode(filenameFromURL).trim());
-            } else {
-                link.setName(fid);
-            }
+    private boolean useLinkcheckAPI() {
+        return true;
+    }
+
+    private String getAPIBase() {
+        if (this.getHost().equals("anonfilesnew.com")) {
+            return "https://api.anonfilesnew.com/v3";
+        } else {
+            /* e.g. filefa.st */
+            return "https://" + getHost() + "/api/v1";
         }
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        if (this.useLinkcheckAPI()) {
+            return requestFileInformationAPI(link);
+        } else {
+            return requestFileInformationWebsite(link);
+        }
+    }
+
+    private AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws Exception {
+        final String fid = this.getFID(link);
         if (fid.toLowerCase(Locale.ENGLISH).equals(fid)) {
             /* Example: https://anonymfile.com/about */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invlid fileID");
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 410) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<title>\\s*File Not Found") || br.containsHTML(">\\s*Sorry, File does not exist on this server")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Requested file might be deleted")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         boolean safeFilename = false;
@@ -132,42 +165,66 @@ public class AnonymfileCom extends PluginForHost {
             fileName = fileName == null ? null : (String) JavaScriptEngineFactory.jsonToJavaObject("\"" + fileName + "\"");
             safeFilename = fileName != null;
         }
-        if (fileName != null) {
-            if (safeFilename) {
-                link.setFinalFileName(fileName);
-            } else {
-                link.setName(fileName);
-            }
-            String fileSizeBytes = br.getRegex("bytes.\"\\s*:\\s*(\\d+)").getMatch(0);
-            if (fileSizeBytes != null) {
-                link.setVerifiedFileSize(Long.parseLong(fileSizeBytes));
-            } else {
-                String fileSize = br.getRegex(">\\s*Download\\s*\\((.*?)\\)").getMatch(0);
-                if (fileSize == null) {
-                    fileSize = br.getRegex("readable.\"\\s*:\\s*.\"(.*?).\"\\s*").getMatch(0);
-                }
-                if (fileSize != null) {
-                    link.setDownloadSize(SizeFormatter.getSize(fileSize));
-                }
-            }
-            return AvailableStatus.TRUE;
+        if (fileName == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (safeFilename) {
+            link.setFinalFileName(fileName);
+        } else {
+            link.setName(fileName);
+        }
+        String fileSizeBytes = br.getRegex("bytes.\"\\s*:\\s*(\\d+)").getMatch(0);
+        if (fileSizeBytes != null) {
+            link.setVerifiedFileSize(Long.parseLong(fileSizeBytes));
+        } else {
+            String fileSize = br.getRegex(">\\s*Download\\s*\\((.*?)\\)").getMatch(0);
+            if (fileSize == null) {
+                fileSize = br.getRegex("readable.\"\\s*:\\s*.\"(.*?).\"\\s*").getMatch(0);
+            }
+            if (fileSize != null) {
+                link.setDownloadSize(SizeFormatter.getSize(fileSize));
+            }
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    /**
+     * Docs: https://filefa.st/docs/api </br>
+     * Docs2: https://anonfilesnew.com/docs/api </br>
+     * Old API that also existed back in 2024: </br>
+     * https://svn.jdownloader.org/projects/jd/repository/revisions/48795/entry/trunk/src/jd/plugins/hoster/AnonfilesMe.java
+     */
+    private AvailableStatus requestFileInformationAPI(final DownloadLink link) throws Exception {
+        final String fid = this.getFID(link);
+        if (fid.toLowerCase(Locale.ENGLISH).equals(fid)) {
+            /* Example: https://anonymfile.com/about */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invlid fileID");
+        }
+        this.setBrowserExclusive();
+        br.getPage(getAPIBase() + "/file/" + fid + "/info");
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            /* Plaintext response "Not found -> anonfilesnew.com */
+            /* json response: {"status":false,"errors":{"file":"The file you are looking for does not exist."}} -> filefa.st */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> metadata = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/file/metadata");
+        final Map<String, Object> sizemap = (Map<String, Object>) metadata.get("size");
+        link.setFinalFileName(metadata.get("name").toString());
+        /* Can be either a number or a string. Number: anonfilesnew.com String: filefa.st */
+        final String filesizeBytesStr = sizemap.get("bytes").toString();
+        link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+        return AvailableStatus.TRUE;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        handleDownload(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
+        handleDownload(link, "free_directlink");
     }
 
-    private void handleDownload(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
+    private void handleDownload(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
-            requestFileInformation(link);
-            br.getPage(link.getPluginPatternMatcher());
-            /* Double-check for offline file-status. */
-            if (br.containsHTML("(?i)>\\s*Requested file might be deleted")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
+            requestFileInformationWebsite(link);
             String dllink = br.getRegex("\"(https[^\"]+)\"\\s*download\\s*=\\s*").getMatch(0);
             if (dllink == null) {
                 dllink = br.getRegex("(/f/[a-f0-9\\-]+)").getMatch(0);
@@ -180,7 +237,7 @@ public class AnonymfileCom extends PluginForHost {
                 logger.warning("Failed to find final downloadurl");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), FREE_MAXCHUNKS);
             handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
@@ -204,7 +261,7 @@ public class AnonymfileCom extends PluginForHost {
         }
         try {
             final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, FREE_RESUME, FREE_MAXCHUNKS);
+            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, null), FREE_MAXCHUNKS);
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
                 return true;
             } else {
@@ -224,13 +281,5 @@ public class AnonymfileCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

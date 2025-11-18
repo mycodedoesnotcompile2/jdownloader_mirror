@@ -145,6 +145,17 @@ public class JVMTest extends AWTest {
                 assertTrue(!check.is(next));
             }
         }
+        int classID = -1;
+        for (JavaVersion version : versions) {
+            if (classID == -1) {
+                classID = version.getClassID();
+            } else if (classID + 1 != version.getClassID()) {
+                if (!JavaVersion.JVM_1_0.equals(version) && !JavaVersion.JVM_1_1.equals(version)) {
+                    throw new Exception();
+                }
+            }
+            classID = version.getClassID();
+        }
         final JavaVersionInterface farFarAway = JVMVersion.toJavaVersion("100");
         assertTrue(JavaVersion.UNKNOWN.equals(farFarAway.getBase()));
         assertTrue(farFarAway.is(farFarAway));
