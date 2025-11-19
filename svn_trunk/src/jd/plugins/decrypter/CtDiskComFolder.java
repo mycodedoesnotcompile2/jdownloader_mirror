@@ -15,17 +15,16 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -35,28 +34,32 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.hoster.CtDiskCom;
 
-@DecrypterPlugin(revision = "$Revision: 48644 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51844 $", interfaceVersion = 2, names = {}, urls = {})
 public class CtDiskComFolder extends PluginForDecrypt {
-    @Deprecated
-    private String             uuid                = null;
-    // folder unique id
-    @Deprecated
-    private String             fuid                = null;
-    private static Object      LOCK                = new Object();
-    public static final String PROPERTY_PARENT_DIR = "parent_dir";
+    public static final String   PROPERTY_PARENT_DIR = "parent_dir";
+    private static final Pattern PATTERN_FOLDER      = Pattern.compile("/(dir|d)/(\\d+)-(\\d+)(-([a-f0-9]+))?.*", Pattern.CASE_INSENSITIVE);
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "ctfile.com", "ctdisk.com", "400gb.com", "pipipan.com", "t00y.com", "bego.cc", "72k.us", "tc5.us", "545c.com", "sn9.us", "089u.com", "u062.com", "474b.com", "590m.com", "n802.com" });
         return ret;
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static String[] getAnnotationNames() {
@@ -72,7 +75,7 @@ public class CtDiskComFolder extends PluginForDecrypt {
         final List<String[]> pluginDomains = getPluginDomains();
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://([A-Za-z0-9]+\\.)?" + buildHostsPatternPart(domains) + "/(?:dir/[a-f0-9\\-]+(?:\\?\\d+)?|u/\\d+/\\d+|d/[a-f0-9\\-]+(?:\\?\\d+)?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FOLDER.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -81,208 +84,172 @@ public class CtDiskComFolder extends PluginForDecrypt {
         super(wrapper);
     }
 
-    private Browser prepBrowser(final Browser prepBr) {
-        Browser.setRequestIntervalLimitGlobal(this.getHost(), 1000);
-        prepBr.setCookiesExclusive(true);
-        prepBr.setConnectTimeout(3 * 60 * 1000);
-        prepBr.setReadTimeout(3 * 60 * 1000);
-        return prepBr;
-    }
-
-    @Deprecated
-    protected String correctHost(final String oldhostOld) {
-        final List<String[]> pluginDomains = getPluginDomains();
-        for (final String[] domains : pluginDomains) {
-            for (String domain : domains) {
-                if (StringUtils.equalsIgnoreCase(oldhostOld, domain)) {
-                    return domains[0];
-                }
-            }
-        }
-        return oldhostOld;
+    public static String getPath(final String url) {
+        String path = new Regex(url, PATTERN_FOLDER).getMatch(0);
+        return path;
     }
 
     public static String getUserID(final String url) {
-        String userid = new Regex(url, "https?://u(\\d+)").getMatch(0);
-        if (userid == null) {
-            userid = new Regex(url, "/fs/(\\d+)").getMatch(0);
-        }
-        if (userid == null) {
-            userid = new Regex(url, "file/(\\d+)-\\d+$").getMatch(0);
-        }
+        String userid = new Regex(url, PATTERN_FOLDER).getMatch(1);
         return userid;
     }
 
-    public static String getFileID(final String url) {
-        String fileid = new Regex(url, "/fs/(?:\\d+\\-|file/)(\\d+)$").getMatch(0);
-        if (fileid == null) {
-            fileid = new Regex(url, "/file/\\d+-(\\d+)$").getMatch(0);
-        }
+    public static String getFolderID(final String url) {
+        String folder_id = new Regex(url, PATTERN_FOLDER).getMatch(2);
+        return folder_id;
+    }
+
+    public static String getFolderHash(final String url) {
+        String fileid = new Regex(url, PATTERN_FOLDER).getMatch(4);
         return fileid;
     }
 
-    private static final String TYPE_NEW_1    = "https?://[^/]+/(d)/([a-f0-9\\-]+)(?:\\?(\\d+))?";
-    private static final String TYPE_NEW_2    = "https?://[^/]+/(dir)/([a-f0-9\\-]+)(?:\\?(\\d+))?";
-    private static final String TYPE_NEW_BOTH = "https?://[^/]+/(d|dir)/([a-f0-9\\-]+)(?:\\?(\\d+))?";
-    private static final String WEBAPI_BASE   = "https://webapi.ctfile.com";
-
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        br.setFollowRedirects(true);
-        if (param.getCryptedUrl().matches(TYPE_NEW_1) || param.getCryptedUrl().matches(TYPE_NEW_2)) {
-            return crawlFolderNew(param);
-        } else {
-            return crawlFolderOld(param);
-        }
-    }
-
-    /** 2021-08-10: New */
-    public ArrayList<DownloadLink> crawlFolderNew(final CryptedLink param) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_NEW_BOTH);
+        final String contenturl = param.getCryptedUrl();
+        final String folder_base_url = URLHelper.getUrlWithoutParams(contenturl);
+        final String folder_path = getPath(contenturl);
+        final String folder_user_id = getUserID(contenturl);
+        final String folder_id = getFolderID(contenturl);
+        final String folder_hash = getFolderHash(contenturl);
+        final UrlQuery addedlink_query = UrlQuery.parse(contenturl);
+        String folder_id_from_url = addedlink_query.get("d");
+        if (folder_id_from_url == null) {
+            folder_id_from_url = "undefined";
+        }
+        String d_str = folder_user_id + "-" + folder_id;
+        if (folder_hash != null) {
+            d_str += "-" + folder_hash;
+        }
+        String fk = addedlink_query.get("fk");
+        if (fk == null) {
+            fk = "";
+        }
         /* Root-ID of a folder */
-        final String folderBaseID = urlinfo.getMatch(1);
-        /* ID that goes to specific subfolder */
-        final String folderID = urlinfo.getMatch(2);
-        final String folderIDForQuery = folderID != null ? folderID : "";
         prepAjax(this.br);
         final UrlQuery query = new UrlQuery();
-        query.add("path", urlinfo.getMatch(0));
-        query.add("d", folderBaseID);
-        query.add("folder_id", folderIDForQuery);
+        query.add("path", folder_path);
+        query.add("d", d_str);
+        query.add("folder_id", folder_id_from_url);
+        query.appendEncoded("fk", fk);
         query.add("token", "0");
         query.add("ref", "");
-        br.getHeaders().put("Origin", "https://" + Browser.getHost(param.getCryptedUrl()));
-        br.getHeaders().put("Referer", param.getCryptedUrl());
+        query.appendEncoded("url", contenturl);
+        br.getHeaders().put("Origin", "https://" + Browser.getHost(contenturl));
+        br.getHeaders().put("Referer", contenturl);
         String passCode = param.getDecrypterPassword();
-        Map<String, Object> folderinfo = null;
+        Map<String, Object> entries = null;
         int passwordCounter = 0;
+        int code = -1;
         do {
             passwordCounter += 1;
             query.addAndReplace("passcode", passCode != null ? Encoding.urlEncode(passCode) : "");
             query.addAndReplace("r", "0." + System.currentTimeMillis());
-            br.getPage(WEBAPI_BASE + "/getdir.php?" + query.toString());
-            folderinfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            if (((Number) folderinfo.get("code")).intValue() == 401) {
-                if (passwordCounter > 3) {
-                    throw new DecrypterException(DecrypterException.PASSWORD);
-                } else {
-                    logger.info("Wrong password or password required");
-                    passCode = getUserInput("Password?", param);
-                    continue;
-                }
-            } else {
+            br.getPage(CtDiskCom.WEBAPI_BASE + "/getdir.php?" + query.toString());
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            code = ((Number) entries.get("code")).intValue();
+            if (code != 401 && code != 423) {
+                /* No password required or correct password has been entered */
                 break;
             }
+            if (passwordCounter > 3) {
+                throw new DecrypterException(DecrypterException.PASSWORD);
+            }
+            logger.info("Wrong password or password required");
+            passCode = getUserInput("Password?", param);
+            continue;
         } while (true);
-        final Map<String, Object> folderinfo2 = (Map<String, Object>) folderinfo.get("file");
-        if (folderinfo2 != null) {
-            /* 2024-02-05 */
-            br.getPage(folderinfo2.get("url").toString());
-        } else {
-            br.getPage(folderinfo.get("url").toString());
+        // TODO: Add better offline errorhandling
+        if (code == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (code == 504) {
+            /* The share does not exist or has expired. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String subfolderpath = this.getAdoptedCloudFolderStructure();
-        if (subfolderpath == null) {
-            subfolderpath = (String) folderinfo.get("folder_name");
-        }
-        final FilePackage fp = FilePackage.getInstance();
-        fp.setName(subfolderpath);
-        final Map<String, Object> folderoverview = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (((Number) folderoverview.get("iTotalRecords")).intValue() == 0) {
-            ret.add(this.createOfflinelink(param.getCryptedUrl(), "EMPTY_FOLDER " + subfolderpath, "EMPTY_FOLDER " + subfolderpath));
-            return ret;
-        }
-        /* This is where the crappy part starts: json containing string-arrays with HTML code... */
-        final List<List<Object>> items = (List<List<Object>>) folderoverview.get("aaData");
-        final String folderBaseURL;
-        if (param.getCryptedUrl().contains("?")) {
-            /* User added subfolder --> We need to build the root folder URL on our own. */
-            folderBaseURL = param.getCryptedUrl().substring(0, param.getCryptedUrl().lastIndexOf("?"));
-        } else {
-            /* User added root folder */
-            folderBaseURL = param.getCryptedUrl();
-        }
-        for (final List<Object> item : items) {
-            // final String info0 = item.get(0).toString();
-            final String info1 = item.get(1).toString();
-            final Regex folderRegex = new Regex(info1, "onclick=\"load_subdir\\((\\d+)\\)\">([^<]+)</a>");
-            if (folderRegex.patternFind()) {
-                final String subfolderID = folderRegex.getMatch(0);
-                final String subfolderName = folderRegex.getMatch(1);
-                /* Subfolder */
-                final DownloadLink folder = this.createDownloadlink(folderBaseURL + "?" + subfolderID);
-                if (passCode != null) {
+        final Map<String, Object> filemap = (Map<String, Object>) entries.get("file");
+        final String folder_api_url = filemap.get("url").toString();
+        int page = 1;
+        int index = 0;
+        pagination: do {
+            // TODO: Implement pagination
+            br.getPage(folder_api_url);
+            String subfolderpath = this.getAdoptedCloudFolderStructure();
+            if (subfolderpath == null) {
+                subfolderpath = (String) filemap.get("folder_name");
+            }
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(subfolderpath);
+            final Map<String, Object> folderoverview = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (((Number) folderoverview.get("iTotalRecords")).intValue() == 0) {
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            }
+            /* This is where the crappy part starts: json containing string-arrays with HTML code... */
+            final List<List<Object>> items = (List<List<Object>>) folderoverview.get("aaData");
+            for (final List<Object> item : items) {
+                // final String info0 = item.get(0).toString();
+                final String html0 = item.get(0).toString();
+                final String html1 = item.get(1).toString();
+                final Regex folderRegex1 = new Regex(html1, "onclick=\"load_subdir\\((\\d+)\\)\">([^<]+)</a>");
+                String subfolderID = new Regex(html0, "value=\"d(\\d+)\"").getMatch(0);
+                String subfolderHash = null;
+                String subfolderTitle = null;
+                if (folderRegex1.patternFind()) {
+                    subfolderID = folderRegex1.getMatch(0);
+                    subfolderTitle = folderRegex1.getMatch(1);
+                } else {
+                    final Regex folderRegex2 = new Regex(html1, "load_subdir\\((\\d+), '([a-f0-9]+)'\\)\">([^<]+)</a>");
+                    subfolderID = folderRegex2.getMatch(0);
+                    subfolderHash = folderRegex2.getMatch(1);
+                    subfolderTitle = folderRegex2.getMatch(2);
+                }
+                if (subfolderID != null) {
+                    /* Subfolder */
+                    String url = folder_base_url + "?d=" + subfolderID;
+                    if (subfolderHash != null) {
+                        url += "&fk=" + subfolderHash;
+                    }
+                    final DownloadLink folder = this.createDownloadlink(url);
                     folder.setDownloadPassword(passCode);
+                    if (subfolderTitle != null) {
+                        subfolderTitle = Encoding.htmlDecode(subfolderTitle).trim();
+                        folder.setRelativeDownloadFolderPath(subfolderpath + "/" + subfolderTitle);
+                    } else {
+                        logger.warning("Failed to find subfolder title for subfolder with folder_id " + subfolderID);
+                        folder.setRelativeDownloadFolderPath(subfolderpath + "/" + subfolderID);
+                    }
+                    ret.add(folder);
+                } else {
+                    /* Single file */
+                    final String filesize = item.get(2).toString();
+                    final String file_id = new Regex(html0, "value=\"f(\\d+)\"").getMatch(0);
+                    if (file_id == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    } else if (StringUtils.isEmpty(filesize)) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    /* Build url */
+                    final String url = "https://" + br.getHost(true) + "/fs/" + folder_user_id + "-" + file_id;
+                    final String filename = new Regex(html1, ">([^<]+)</a>").getMatch(0);
+                    final DownloadLink link = this.createDownloadlink(url);
+                    /* Set info only for fileURLs which then go into the hosterplugin! */
+                    if (filename != null) {
+                        link.setName(Encoding.htmlDecode(filename).trim());
+                    } else {
+                        logger.warning("Failed to find filename for item with file_id " + file_id);
+                    }
+                    link.setDownloadSize(SizeFormatter.getSize(filesize));
+                    link.setAvailable(true);
+                    link.setRelativeDownloadFolderPath(subfolderpath);
+                    link.setProperty(PROPERTY_PARENT_DIR, param.getCryptedUrl());
+                    link._setFilePackage(fp);
+                    ret.add(link);
                 }
-                folder.setRelativeDownloadFolderPath(subfolderpath + "/" + subfolderName);
-                ret.add(folder);
-            } else {
-                final Regex fileinfo = new Regex(info1, "href=\"(/f/tempdir-[A-Za-z0-9_\\-]+)\">([^<>\"]+)<");
-                final String url = fileinfo.getMatch(0);
-                final String filename = fileinfo.getMatch(1);
-                final String filesize = item.get(2).toString();
-                if (url == null || filename == null || StringUtils.isEmpty(filesize)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final DownloadLink file = this.createDownloadlink(URLHelper.createURL(URLHelper.parseLocation(new URL(param.getCryptedUrl()), url)).toString());
-                file.setName(filename);
-                file.setDownloadSize(SizeFormatter.getSize(filesize));
-                file.setAvailable(true);
-                if (passCode != null) {
-                    file.setDownloadPassword(passCode);
-                }
-                file.setRelativeDownloadFolderPath(subfolderpath);
-                file.setProperty(PROPERTY_PARENT_DIR, param.getCryptedUrl());
-                file._setFilePackage(fp);
-                ret.add(file);
             }
-        }
-        return ret;
-    }
-
-    @Deprecated
-    public ArrayList<DownloadLink> crawlFolderOld(final CryptedLink param) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String host_current = Browser.getHost(param.getCryptedUrl());
-        final String host_new = correctHost(host_current);
-        String parameter = param.toString().replace(host_current + "/", host_new + "/");
-        prepBrowser(br);
-        // lock to one thread!
-        synchronized (LOCK) {
-            br.getPage(parameter);
-            final boolean accessDenied = br.containsHTML("主页分享功能已经关闭，请直接分享文件或文件夹");
-            if (br.getHttpConnection().getResponseCode() == 404 || accessDenied || br.containsHTML("(Due to the limitaion of local laws, this url has been disabled!<|该用户还未打开完全共享\\。|您目前无法访问他的资源列表\\。)")) {
-                ret.add(this.createOfflinelink(parameter));
-                return ret;
-            }
-            uuid = getUserID(parameter);
-            if (uuid == null) {
-                logger.warning("Failed to find userid");
-                return null;
-            }
-            if (fuid == null) {
-                fuid = "0";
-            }
-            String fpName = uuid;
-            if (!"0".equals(fuid)) {
-                // covers sub directories. /u/uuid/fuid/
-                fpName = br.getRegex("href=\"/u/" + uuid + "/" + fuid + "\">(.*?)</a>").getMatch(0);
-                if (fpName == null && uuid != null) {
-                    /* Fallback */
-                    fpName = "User " + uuid + " - Sub Directory " + fuid;
-                }
-            } else {
-                fpName = uuid;
-            }
-            // covers base /u/\d+ directories,
-            // no fpName for these as results of base directory returns subdirectories.
-            parsePage(ret, parameter);
-            if (fpName != null) {
-                FilePackage fp = FilePackage.getInstance();
-                fp.setName(fpName.trim());
-                fp.addLinks(ret);
-            }
-        }
+            logger.info("Crawled page " + page + " | Index: " + index + " | Found items: " + ret.size());
+            index += items.size();
+            // TODO: Implement pagination
+            break pagination;
+        } while (true);
         return ret;
     }
 
@@ -293,68 +260,7 @@ public class CtDiskComFolder extends PluginForDecrypt {
         return prepBr;
     }
 
-    private void parsePage(ArrayList<DownloadLink> ret, String parameter) throws Exception {
-        // "/iajax_guest.php?item=file_act&action=file_list&folder_id=0&uid=1942919&task=file_list&t=1420817115&k=40d90e63574e9dce0af62dfb94aafdf7"
-        String ajaxSource = PluginJSonUtils.getJson(br, "sAjaxSource");
-        if (StringUtils.isEmpty(ajaxSource)) {
-            logger.warning("Can not find 'ajax source' : " + parameter);
-            return;
-        }
-        Browser ajax = br.cloneBrowser();
-        prepAjax(ajax);
-        ajax.getPage(ajaxSource);
-        // ajax.getHttpConnection().getRequest().setHtmlCode(ajax.toString().replaceAll("\\\\/", "/").replaceAll("\\\\\"", "\""));
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(ajax.toString());
-        /*
-         * 2019-07-08: 'iTotalRecords' only counts for images. If we only have folders, it will return 0 although 'aaData' is present and
-         * contains objects!
-         */
-        // final long totalCount = JavaScriptEngineFactory.toLong(entries.get("iTotalRecords"), 0);
-        // if (totalCount == 0) {
-        // ret.add(this.createOfflinelink(parameter));
-        // return;
-        // }
-        final List<Object> ressourcelist = (List<Object>) entries.get("aaData");
-        List<Object> fileinfo = (List<Object>) entries.get("aaData");
-        if (fileinfo.isEmpty()) {
-            ret.add(this.createOfflinelink(parameter));
-            return;
-        }
-        for (final Object fileO : ressourcelist) {
-            fileinfo = (List<Object>) fileO;
-            final String objectIDhtml = (String) fileinfo.get(0);
-            final String filehtml = (String) fileinfo.get(1);
-            final String filesize = (String) fileinfo.get(2);
-            final boolean isFolder = objectIDhtml.contains("folder_ids[]");
-            final String objectID = new Regex(objectIDhtml, "value=\"(\\d+)\"").getMatch(0);
-            // String url = new Regex(filehtml, "href=\"(/[^<>\"]+)").getMatch(0);
-            if (StringUtils.isEmpty(objectID)) {
-                /* Skip invalid items */
-                continue;
-            }
-            /* Build url */
-            String url;
-            if (isFolder) {
-                url = "https://" + br.getHost(true) + "/u/" + this.uuid + "/" + objectID;
-            } else {
-                url = "https://" + br.getHost(true) + "/fs/" + this.uuid + "-" + objectID;
-            }
-            final String filename = new Regex(filehtml, ">([^<>\"]+)</a>").getMatch(0);
-            final DownloadLink dl = this.createDownloadlink(url);
-            if (!isFolder) {
-                /* Set info only for fileURLs which then go into the hosterplugin! */
-                if (filename != null) {
-                    dl.setName(filename);
-                }
-                if (filesize != null) {
-                    dl.setDownloadSize(SizeFormatter.getSize(filesize));
-                }
-                dl.setAvailable(true);
-            }
-            ret.add(dl);
-        }
-    }
-
+    @Override
     public boolean hasCaptcha(final CryptedLink link, final jd.plugins.Account acc) {
         return false;
     }
