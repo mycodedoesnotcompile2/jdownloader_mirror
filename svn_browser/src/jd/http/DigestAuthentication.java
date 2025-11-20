@@ -1,5 +1,6 @@
 package jd.http;
 
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.exceptions.WTFException;
@@ -56,7 +57,7 @@ public class DigestAuthentication extends Authentication {
     protected String getNextNc() {
         final String ret = Long.toHexString(this.nc.incrementAndGet());
         if (ret.length() < 8) {
-            return String.format("%0" + (8 - ret.length()) + "d", 0) + ret;
+            return String.format(Locale.ROOT, "%0" + (8 - ret.length()) + "d", 0) + ret;
         } else {
             return ret;
         }

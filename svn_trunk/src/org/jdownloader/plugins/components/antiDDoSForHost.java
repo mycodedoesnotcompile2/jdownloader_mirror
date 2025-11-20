@@ -62,7 +62,7 @@ import jd.plugins.components.UserAgents.BrowserName;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@HostPlugin(revision = "$Revision: 50778 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51848 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForHost extends PluginForHost {
     public antiDDoSForHost(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,18 +92,17 @@ public abstract class antiDDoSForHost extends PluginForHost {
             String html = request.getHtmlCode();
             while (true) {
                 final String emailProtection = new Regex(html, "(<a\\s*href\\s*=\\s*\"/cdn-cgi/l/email-protection\".*?</a>)").getMatch(0);
-                if (emailProtection != null) {
-                    final String data_cfemail = new Regex(emailProtection, "data-cfemail\\s*=\\s*\"([a-fA-F0-9]+)\"").getMatch(0);
-                    final int r = Integer.parseInt(data_cfemail.substring(0, 2), 16);
-                    String result = "";
-                    for (int n = 2; n < data_cfemail.length() - 1; n = n + 2) {
-                        final int i = Integer.parseInt(String.valueOf(new char[] { data_cfemail.charAt(n), data_cfemail.charAt(n + 1) }), 16) ^ r;
-                        result += Character.toString((char) i);
-                    }
-                    html = html.replace(emailProtection, result);
-                } else {
+                if (emailProtection == null) {
                     break;
                 }
+                final String data_cfemail = new Regex(emailProtection, "data-cfemail\\s*=\\s*\"([a-fA-F0-9]+)\"").getMatch(0);
+                final int r = Integer.parseInt(data_cfemail.substring(0, 2), 16);
+                String result = "";
+                for (int n = 2; n < data_cfemail.length() - 1; n = n + 2) {
+                    final int i = Integer.parseInt(String.valueOf(new char[] { data_cfemail.charAt(n), data_cfemail.charAt(n + 1) }), 16) ^ r;
+                    result += Character.toString((char) i);
+                }
+                html = html.replace(emailProtection, result);
             }
             if (!StringUtils.equals(html, request.toString())) {
                 request.setHtmlCode(html);
@@ -143,15 +142,16 @@ public abstract class antiDDoSForHost extends PluginForHost {
 
     protected void loadAntiDDoSCookies(Browser prepBr, final String host) {
         synchronized (antiDDoSCookies) {
-            if (!antiDDoSCookies.isEmpty()) {
-                for (final Map.Entry<String, Cookies> cookieEntry : antiDDoSCookies.entrySet()) {
-                    final String cookiesHost = cookieEntry.getKey();
-                    if (cookiesHost != null && cookiesHost.equals(host)) {
-                        try {
-                            prepBr.setCookies(cookiesHost, cookieEntry.getValue(), false);
-                        } catch (final Throwable e) {
-                            logger.log(e);
-                        }
+            if (antiDDoSCookies.isEmpty()) {
+                return;
+            }
+            for (final Map.Entry<String, Cookies> cookieEntry : antiDDoSCookies.entrySet()) {
+                final String cookiesHost = cookieEntry.getKey();
+                if (cookiesHost != null && cookiesHost.equals(host)) {
+                    try {
+                        prepBr.setCookies(cookiesHost, cookieEntry.getValue(), false);
+                    } catch (final Throwable e) {
+                        logger.log(e);
                     }
                 }
             }

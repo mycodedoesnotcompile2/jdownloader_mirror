@@ -58,7 +58,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.CtDiskComFolder;
 
-@HostPlugin(revision = "$Revision: 51844 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51847 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CtDiskComFolder.class })
 public class CtDiskCom extends PluginForHost {
     public static final String                WEBAPI_BASE       = "https://webapi.ctfile.com";
@@ -203,7 +203,7 @@ public class CtDiskCom extends PluginForHost {
         Map<String, Object> entries = null;
         filemap = null;
         int code = 0;
-        String errormessage = null;
+        String message = null;
         final String file_hash = getFileHash(link.getPluginPatternMatcher());
         do {
             final UrlQuery query = new UrlQuery();
@@ -245,7 +245,12 @@ public class CtDiskCom extends PluginForHost {
             br.getPage(CtDiskCom.WEBAPI_BASE + "/getfile.php?" + query.toString());
             entries = this.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             filemap = (Map<String, Object>) entries.get("file");
-            errormessage = filemap != null ? (String) filemap.get("message") : null;
+            message = filemap != null ? (String) filemap.get("message") : null;
+            if (filemap != null) {
+                message = (String) filemap.get("message");
+            } else {
+                message = (String) entries.get("message");
+            }
             code = ((Number) entries.get("code")).intValue();
             if (code != 401 && code != 423) {
                 /* No password required or correct password has been entered. */
@@ -290,16 +295,19 @@ public class CtDiskCom extends PluginForHost {
         }
         if (code == 403) {
             /* {"code":403,"file":{"code":403,"message":"The share link is not fully opened."} */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
         } else if (code == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
         } else if (code == 503) {
             /* {"code":503,"message":"\u8be5\u5171\u4eab\u4e0d\u5b58\u5728\u6216\u5df2\u5931\u6548\u3002"} */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
+        } else if (code == 504) {
+            /* {"code":504,"file":{"code":504,"message":"User sharing is blocked."} */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
         } else if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
         } else if (code != 200) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Error code " + code + " | " + errormessage);
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Error code " + code + " | " + message);
         }
         final String filename = (String) filemap.get("file_name");
         final String filesizeStr = (String) filemap.get("file_size");

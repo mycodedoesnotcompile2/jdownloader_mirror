@@ -173,19 +173,20 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
     public boolean handleClipboardAutoFill() {
         final ExtTextField dummy = new ExtTextField();
         dummy.paste();
-        final String clipboardContent = dummy.getText();
+        final String clipboardContent = StringUtils.trim(dummy.getText());
         if (StringUtils.isEmpty(clipboardContent)) {
             return false;
         }
+        final boolean isCookies = Cookies.parseCookiesFromJsonString(clipboardContent, plg.getLogger()) != null;
         /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
-        if (allowCookiesInPasswordField && Cookies.parseCookiesFromJsonString(clipboardContent, plg.getLogger()) != null) {
+        if (allowCookiesInPasswordField && isCookies) {
             /*
              * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
              * them.
              */
             pass.setPassword(clipboardContent.toCharArray());
             return true;
-        } else if (name != null) {
+        } else if (name != null && !isCookies) {
             /* Auto fill username field with clipboard content if username is needed. */
             name.setText(StringUtils.trim(clipboardContent));
             return true;

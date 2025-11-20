@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -50,6 +51,8 @@ import javax.swing.event.ChangeListener;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
@@ -57,6 +60,8 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.Flatpak;
+import org.appwork.utils.os.Snap;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -392,6 +397,15 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 }
             };
             getSettings().setChannelLanguage(newChannel);
+        }
+        if (newChannel.equalsIgnoreCase("#jdownloader")) {
+            // if we join the default channel, we print out some info, saves the bot from doing it every time
+            // this will always print when the user joins a channel named #jdownloader - even when a different
+            // irc server has been configured... but that's a rare edge case...
+            this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> This is the JDownloader support chat!  ");
+            this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> Please ask your question in ENGLISH or GERMAN! Be patient, give us time to respond!  ");
+            this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> You can also search the forums at <a href=\"https://board.jdownloader.org\">https://board.jdownloader.org</a>  ");
+            this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> Before reporting a problem, please check that you have the latest version installed!  ");
         }
     }
 
@@ -846,7 +860,41 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION " + this.prepareToSend(rest.trim()) + new String(new byte[] { 1 }));
                 this.addToText(null, ChatExtension.STYLE_ACTION, this.conn.getNick() + " " + Utils.prepareMsg(rest.trim()));
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_VERSION)) {
-                final String msg = " is using " + JDUtilities.getJDTitle(0) + " with Java " + System.getProperty("java.runtime.name") + "/" + System.getProperty("java.version") + (Application.is64BitJvm() ? "64bit" : "32bit") + CrossSystem.getARCHFamily() + " on a " + CrossSystem.getOSString() + " system, runtime " + TimeFormatter.formatMilliSeconds(Time.systemIndependentCurrentJVMTimeMillis() - SecondLevelLaunch.startup, 0);
+                // shamelessly copied from the about screen
+                Map<String, Object> map = null;
+                try {
+                    final File buildJson = Application.getResource("build.json");
+                    if (buildJson.isFile()) {
+                        map = JSonStorage.restoreFromString(IO.readFileToString(buildJson), TypeRef.HASHMAP);
+                    }
+                } catch (Exception e) {
+                    org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
+                }
+                List<String> infobits = new ArrayList<String>();
+                infobits.add("is using " + JDUtilities.getJDTitle(0));
+                infobits.add("Java " + System.getProperty("java.runtime.name") + "/" + System.getProperty("java.version"));
+                infobits.add(CrossSystem.getOSFamily() + "/" + CrossSystem.getOS());
+                infobits.add((Application.is64BitJvm() ? "64bit" : "32bit") + "-" + CrossSystem.getARCHFamily());
+                if (map.containsKey("JDownloaderRevision")) {
+                    infobits.add("JD CoreRev #" + map.get("JDownloaderRevision"));
+                }
+                try {
+                    if (Flatpak.isInsideFlatpak()) {
+                        infobits.add("Flatpak:" + Flatpak.getInstanceName());
+                    }
+                } catch (Throwable ignore) {
+                }
+                try {
+                    if (Snap.isInsideSnap()) {
+                        infobits.add("Snap:" + Snap.getSnapInstanceName());
+                    }
+                } catch (Throwable ignore) {
+                }
+                if (map.containsKey("buildDate")) {
+                    infobits.add("Build " + map.get("buildDate"));
+                }
+                infobits.add("runtime " + TimeFormatter.formatMilliSeconds(Time.systemIndependentCurrentJVMTimeMillis() - SecondLevelLaunch.startup, 0));
+                final String msg = String.join(", ", infobits);
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION " + this.prepareToSend(msg) + new String(new byte[] { 1 }));
                 this.addToText(null, ChatExtension.STYLE_ACTION, this.conn.getNick() + " " + Utils.prepareMsg(msg));
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_MODE)) {

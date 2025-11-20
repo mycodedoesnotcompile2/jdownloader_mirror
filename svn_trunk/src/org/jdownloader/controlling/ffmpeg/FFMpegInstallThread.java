@@ -88,6 +88,13 @@ public class FFMpegInstallThread extends Thread {
             protected File getBundledBinaryPath(BINARY binary) {
                 final String binaryName = binary.name().toLowerCase(Locale.ENGLISH);
                 switch (CrossSystem.getARCHFamily()) {
+                case ARM:
+                    if (CrossSystem.is64BitOperatingSystem()) {
+                        final File arm64Path = Application.getResource("tools/Windows/ffmpeg/arm64/" + binaryName + ".exe");
+                        if (arm64Path.isFile()) {
+                            return arm64Path;
+                        }
+                    }
                 case X86:
                     if (CrossSystem.is64BitOperatingSystem()) {
                         final File x64Path = Application.getResource("tools/Windows/ffmpeg/x64/" + binaryName + ".exe");

@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51814 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51847 $", interfaceVersion = 3, names = {}, urls = {})
 public class GxplayerXyz extends PluginForHost {
     public GxplayerXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -148,6 +148,9 @@ public class GxplayerXyz extends PluginForHost {
         checkFFmpeg(link, "Download a HLS Stream");
         final String hls_master = "/m3u8/" + video_uid + "/" + video_hash + "/master.txt?s=1&id=" + video_id + "&cache=1";
         br.getPage(hls_master);
+        if (br.containsHTML("security error")) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Security error");
+        }
         dl = new HLSDownloader(link, br, HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br)).getDownloadurl());
         dl.startDownload();
     }

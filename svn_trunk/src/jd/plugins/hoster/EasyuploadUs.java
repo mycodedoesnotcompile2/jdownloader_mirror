@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51699 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51849 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasyuploadUs extends PluginForHost {
     public EasyuploadUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +55,7 @@ public class EasyuploadUs extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "easyupload.us" });
+        /* Similar but different: bestfile.io */
         return ret;
     }
 
@@ -105,13 +106,13 @@ public class EasyuploadUs extends PluginForHost {
             link.setName(this.getFID(link));
         }
         this.setBrowserExclusive();
-        final String contenturl = link.getPluginPatternMatcher().replaceFirst("/preview$", "/file");
+        final String contenturl = link.getPluginPatternMatcher().replaceFirst("(?i)/preview$", "/file");
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("class=\"filebox-title mb-1\">([^<]+)</p>").getMatch(0);
-        String filesize = br.getRegex("File size\\s*:\\s*</strong>([^<]+)</p>").getMatch(0);
+        String filesize = br.getRegex("File size(?:\\s*:)?\\s*</strong>([^<]+)</p>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
@@ -132,47 +133,19 @@ public class EasyuploadUs extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link) throws Exception, PluginException {
-        final String directlinkproperty = "directurl";
-        if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
-            requestFileInformation(link);
-            String dllink = br.getRegex("class=\"download-link\"[^>]*href=\"(https?://[^\"]+)\"").getMatch(0);
-            if (StringUtils.isEmpty(dllink)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
-            }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-            this.handleConnectionErrors(br, dl.getConnection());
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+        requestFileInformation(link);
+        String dllink = br.getRegex("class=\"download-link\"[^>]*href=\"(https?://[^\"]+)\"").getMatch(0);
+        if (StringUtils.isEmpty(dllink)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
         }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
+        this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
         return false;
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty) throws Exception {
-        final String url = link.getStringProperty(directlinkproperty);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, null), this.getMaxChunks(link, null));
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
-        }
     }
 
     @Override

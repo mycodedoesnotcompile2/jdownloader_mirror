@@ -26,6 +26,7 @@ import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -39,7 +40,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51848 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -377,16 +378,17 @@ public class HotlinkCc extends XFileSharingProBasic {
     }
 
     private boolean modifyFreeDownloadForm(Browser br, Form form) {
-        if (form != null) {
-            /* TODO: add handling to support premium mode here? */
-            /* method_premium exists as input field AND button */
-            /* free download button is done via javascript */
-            /* premium download button does send method_premium twice to signal premium download */
-            final List<InputField> methodPremiumFields = form.getInputFields("method_premium", null);
-            if (methodPremiumFields.size() > 1) {
-                form.remove("method_premium");
-                return true;
-            }
+        if (form == null) {
+            return false;
+        }
+        /* TODO: add handling to support premium mode here? */
+        /* method_premium exists as input field AND button */
+        /* free download button is done via javascript */
+        /* premium download button does send method_premium twice to signal premium download */
+        final List<InputField> methodPremiumFields = form.getInputFields("method_premium", null);
+        if (methodPremiumFields.size() > 1) {
+            form.remove("method_premium");
+            return true;
         }
         return false;
     }
@@ -403,6 +405,77 @@ public class HotlinkCc extends XFileSharingProBasic {
         final Form ret = super.findFormDownload2Free(br);
         modifyFreeDownloadForm(br, ret);
         return ret;
+    }
+
+    private static Object LOCK = new Object();
+
+    @Override
+    protected void runPostRequestTask(final Browser ibr) throws Exception {
+        synchronized (LOCK) {
+            if (!requiresAntiBotChallenge(br)) {
+                return;
+            }
+            /* Anti bot stuff */
+            final String existing_cookie___js_p_ = br.getCookie(br.getHost(), "__js_p_");
+            if (existing_cookie___js_p_ == null) {
+                /* There is nothing we can do */
+                logger.warning("Anti bot handling is possibly outdated");
+                return;
+            }
+            int code = 0;
+            int commaIndex = existing_cookie___js_p_.indexOf(',');
+            if (commaIndex > 0) {
+                code = Integer.parseInt(existing_cookie___js_p_.substring(0, commaIndex));
+            } else {
+                code = Integer.parseInt(existing_cookie___js_p_);
+            }
+            int jhash = getJHash(code);
+            final Request request = br.getRequest();
+            String userAgent = request.getHeaders().get("User-Agent");
+            br.setCookie(br.getHost(), "__jhash_", String.valueOf(jhash));
+            br.setCookie(br.getHost(), "__jua_", Encoding.urlEncode(userAgent));
+            final String waitMillisStr = br.getRegex(", 1 \\* (\\d{4})\\);").getMatch(0);
+            final long waitMillis;
+            if (waitMillisStr != null) {
+                waitMillis = Long.parseLong(waitMillisStr);
+            } else {
+                /* Fallback to default value */
+                logger.warning("Failed to find refresh page sleep value");
+                waitMillis = 1000;
+            }
+            final DownloadLink link = this.getDownloadLink();
+            if (link != null) {
+                this.sleep(waitMillis, link);
+            } else {
+                Thread.sleep(waitMillis);
+            }
+            br.getPage(br.getURL());
+            /* Update corrected html code -> Required due to ugly XFS codebase */
+            if (wasCorrectBrowserFlagSet(br)) {
+                correctBR(br);
+            }
+            /* Check if challenge has been completed successfully */
+            if (requiresAntiBotChallenge(br)) {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Anti bot challenge failed", 5 * 60 * 1000);
+            }
+        }
+    }
+
+    private boolean requiresAntiBotChallenge(final Browser br) {
+        return br.containsHTML("window\\.location\\.reload");
+    }
+
+    private int getJHash(int code) {
+        int x = 123456789;
+        int k = 0;
+        for (int i = 0; i < 1677696; i++) {
+            x = ((x + code) ^ (x + (x % 3) + (x % 17) + code) ^ i) % 16776960;
+            if (x % 117 == 0) {
+                k = (k + 1) % 1111;
+            }
+        }
+        return k;
     }
 
     @Override

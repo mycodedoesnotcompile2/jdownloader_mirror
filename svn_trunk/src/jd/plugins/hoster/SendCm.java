@@ -71,7 +71,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51852 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -993,7 +993,7 @@ public class SendCm extends XFileSharingProBasic {
             } else if (this.apikey != null && this.plg.looksLikeValidAPIKey(clipboardContent)) {
                 this.apikey.setText(clipboardContent);
                 return true;
-            } else if (userCookies == null && clipboardContent.trim().length() > 0 && (!usernameIsEmail || plg.looksLikeValidEmailAddress(null, clipboardContent))) {
+            } else if (userCookies == null && (!usernameIsEmail || plg.looksLikeValidEmailAddress(null, clipboardContent))) {
                 /* Auto fill username field with clipboard content. */
                 name.setText(clipboardContent);
                 return true;

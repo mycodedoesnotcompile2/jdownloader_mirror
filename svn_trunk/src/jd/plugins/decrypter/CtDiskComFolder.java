@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -43,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CtDiskCom;
 
-@DecrypterPlugin(revision = "$Revision: 51844 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51848 $", interfaceVersion = 2, names = {}, urls = {})
 public class CtDiskComFolder extends PluginForDecrypt {
     public static final String   PROPERTY_PARENT_DIR = "parent_dir";
     private static final Pattern PATTERN_FOLDER      = Pattern.compile("/(dir|d)/(\\d+)-(\\d+)(-([a-f0-9]+))?.*", Pattern.CASE_INSENSITIVE);
@@ -141,7 +142,7 @@ public class CtDiskComFolder extends PluginForDecrypt {
         Map<String, Object> entries = null;
         int passwordCounter = 0;
         int code = -1;
-        do {
+        password_loop: do {
             passwordCounter += 1;
             query.addAndReplace("passcode", passCode != null ? Encoding.urlEncode(passCode) : "");
             query.addAndReplace("r", "0." + System.currentTimeMillis());
@@ -150,39 +151,61 @@ public class CtDiskComFolder extends PluginForDecrypt {
             code = ((Number) entries.get("code")).intValue();
             if (code != 401 && code != 423) {
                 /* No password required or correct password has been entered */
-                break;
+                break password_loop;
             }
             if (passwordCounter > 3) {
                 throw new DecrypterException(DecrypterException.PASSWORD);
             }
+            /* Try again */
             logger.info("Wrong password or password required");
             passCode = getUserInput("Password?", param);
-            continue;
+            continue password_loop;
         } while (true);
-        // TODO: Add better offline errorhandling
+        final String message = (String) entries.get("message");
         if (code == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
         } else if (code == 504) {
             /* The share does not exist or has expired. */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
+        } else if (code != 200) {
+            /* Assume that folder is offline */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
         }
+        final int maxItemsPerPageDefault = 100;
         final Map<String, Object> filemap = (Map<String, Object>) entries.get("file");
-        final String folder_api_url = filemap.get("url").toString();
+        final String folder_api_url = br.getURL(filemap.get("url").toString()).toExternalForm();
+        final String folder_api_url_without_params = URLHelper.getUrlWithoutParams(folder_api_url);
+        final UrlQuery folder_api_query = UrlQuery.parse(folder_api_url);
+        if (!folder_api_query.containsKey("iDisplayLength") || !folder_api_query.containsKey("iDisplayStart")) {
+            folder_api_query.add("iDisplayLength", Integer.toString(maxItemsPerPageDefault));
+            folder_api_query.add("iDisplayStart", "0");
+        }
+        /**
+         * 2025-11-19: By default, folder_api_url does not contain any limiting parameters thus we would get all items with one request.
+         * <br>
+         * Website is limiting results to max 10 items per page -> We use 100.
+         */
+        int maxItemsPerPage = -1;
+        final String maxItemsPerPageStr = folder_api_query.get("iDisplayLength");
+        if (maxItemsPerPageStr != null) {
+            maxItemsPerPage = Integer.parseInt(maxItemsPerPageStr);
+        }
         int page = 1;
         int index = 0;
+        String subfolderpath = this.getAdoptedCloudFolderStructure();
+        if (subfolderpath == null) {
+            subfolderpath = (String) filemap.get("folder_name");
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(subfolderpath);
+        final HashSet<String> dupes = new HashSet<String>();
         pagination: do {
-            // TODO: Implement pagination
-            br.getPage(folder_api_url);
-            String subfolderpath = this.getAdoptedCloudFolderStructure();
-            if (subfolderpath == null) {
-                subfolderpath = (String) filemap.get("folder_name");
-            }
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(subfolderpath);
+            br.getPage(folder_api_url_without_params + "?" + folder_api_query.toString());
             final Map<String, Object> folderoverview = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             if (((Number) folderoverview.get("iTotalRecords")).intValue() == 0) {
-                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, d_str + "_" + subfolderpath);
             }
+            int numberofNewItemsThisPage = 0;
             /* This is where the crappy part starts: json containing string-arrays with HTML code... */
             final List<List<Object>> items = (List<List<Object>>) folderoverview.get("aaData");
             for (final List<Object> item : items) {
@@ -204,6 +227,10 @@ public class CtDiskComFolder extends PluginForDecrypt {
                 }
                 if (subfolderID != null) {
                     /* Subfolder */
+                    if (!dupes.add(subfolderID)) {
+                        /* Skip dupes */
+                        continue;
+                    }
                     String url = folder_base_url + "?d=" + subfolderID;
                     if (subfolderHash != null) {
                         url += "&fk=" + subfolderHash;
@@ -227,6 +254,10 @@ public class CtDiskComFolder extends PluginForDecrypt {
                     } else if (StringUtils.isEmpty(filesize)) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
+                    if (!dupes.add(file_id)) {
+                        /* Skip dupes */
+                        continue;
+                    }
                     /* Build url */
                     final String url = "https://" + br.getHost(true) + "/fs/" + folder_user_id + "-" + file_id;
                     final String filename = new Regex(html1, ">([^<]+)</a>").getMatch(0);
@@ -244,11 +275,24 @@ public class CtDiskComFolder extends PluginForDecrypt {
                     link._setFilePackage(fp);
                     ret.add(link);
                 }
+                numberofNewItemsThisPage++;
             }
-            logger.info("Crawled page " + page + " | Index: " + index + " | Found items: " + ret.size());
+            logger.info("Crawled page " + page + " | Index: " + index + " | New items this page: " + numberofNewItemsThisPage + " | Found items: " + ret.size());
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                throw new InterruptedException();
+            } else if (maxItemsPerPage == -1 || items.size() < maxItemsPerPage) {
+                logger.info("Stopping because: Reached end");
+                break pagination;
+            } else if (numberofNewItemsThisPage == 0) {
+                /* Fail-safe */
+                logger.info("Stopping because: Found no new items on current page");
+                break pagination;
+            }
+            /* Continue to next page */
             index += items.size();
-            // TODO: Implement pagination
-            break pagination;
+            page++;
+            folder_api_query.addAndReplace("iDisplayStart", Integer.toString(index));
         } while (true);
         return ret;
     }

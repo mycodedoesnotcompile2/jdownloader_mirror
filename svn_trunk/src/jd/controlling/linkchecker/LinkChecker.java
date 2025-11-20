@@ -14,14 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.controlling.UniqueAlltimeID;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.plugins.FinalLinkState;
-import org.jdownloader.plugins.controller.PluginClassLoader;
-import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
-
 import jd.controlling.linkcrawler.CheckableLink;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
@@ -34,6 +26,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.FinalLinkState;
+import org.jdownloader.plugins.controller.PluginClassLoader;
+import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 
 public class LinkChecker<E extends CheckableLink> {
     protected static class InternCheckableLink {
@@ -393,7 +393,8 @@ public class LinkChecker<E extends CheckableLink> {
                                                         if (link.linkCheckAllowed()) {
                                                             final DownloadLink dlLink = link.getCheckableLink().getDownloadLink();
                                                             if (dlLink.getAvailableStatus() != AvailableStatus.UNCHECKED) {
-                                                                logger.info("Link " + dlLink.getPluginPatternMatcher() + " is(already) " + dlLink.getAvailableStatus());
+                                                                // logger.info("Link " + dlLink.getPluginPatternMatcher() + " is(already) "
+                                                                // + dlLink.getAvailableStatus());
                                                             } else {
                                                                 downloadLinks.add(dlLink);
                                                             }
@@ -557,7 +558,7 @@ public class LinkChecker<E extends CheckableLink> {
 
     private static void updateAvailableStatus(PluginForHost plgToUse, DownloadLink link, LogSource logger) {
         if (link.getAvailableStatus() != AvailableStatus.UNCHECKED) {
-            logger.info("Link " + link.getPluginPatternMatcher() + " is(already) " + link.getAvailableStatus());
+            // logger.info("Link " + link.getPluginPatternMatcher() + " is(already) " + link.getAvailableStatus());
             logger.clear();
             return;
         }

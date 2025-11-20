@@ -15,13 +15,22 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51504 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 51852 $", interfaceVersion = 3, names = {}, urls = {})
 public class WatchMdhTo extends KernelVideoSharingComV2 {
     public WatchMdhTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -30,7 +39,9 @@ public class WatchMdhTo extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "watchdirty.org", "watchdirty.is", "watchdirty.to", "watchmdh.to" });
+        ret.add(new String[] { "fyxxr.to", "watchdirty.org", "watchdirty.is", "watchdirty.to", "watchmdh.to" });
+        ret.add(new String[] { "mdhstream.cc", "fyxstream.cc" });
+        ret.add(new String[] { "mdhporn.co", "fyxporn.co" });
         return ret;
     }
 
@@ -40,6 +51,37 @@ public class WatchMdhTo extends KernelVideoSharingComV2 {
         deadDomains.add("watchdirty.to");
         deadDomains.add("watchmdh.to");
         return deadDomains;
+    }
+
+    private boolean isSupportedDomain(final URL url) throws IOException {
+        final String host = url.getHost();
+        for (final String[] pluginDomains : getPluginDomains()) {
+            for (final String pluginDomain : pluginDomains) {
+                if (StringUtils.containsIgnoreCase(host, pluginDomain)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
+        /* Special handling */
+        final String embed = br.getRegex("(https?://[^/]*/embed/\\d+)").getMatch(0);
+        if (embed != null && !StringUtils.equals(br._getURL().getPath(), new URL(embed).getPath()) && isSupportedDomain(new URL(embed))) {
+            br.setFollowRedirects(true);
+            br.getPage(embed);
+            final String msg = this.getPrivateVideoWebsiteMessage(br);
+            if (msg != null) {
+                throw new AccountRequiredException(msg);
+            } else if (isOfflineWebsite(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            return getDllink(link, br);
+        } else {
+            return super.getDllink(link, br);
+        }
     }
 
     @Override

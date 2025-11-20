@@ -45,18 +45,6 @@ import javax.swing.KeyStroke;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.gui.UserIO;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.RefreshAction;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountError;
-import jd.plugins.AccountInfo;
-import jd.plugins.PluginForHost;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.StringUtils;
@@ -84,6 +72,18 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.gui.UserIO;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.RefreshAction;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
+import jd.plugins.AccountInfo;
+import jd.plugins.PluginForHost;
+import net.miginfocom.swing.MigLayout;
 
 public class AddAccountDialog extends AbstractDialog<Integer> implements InputChangedCallbackInterface {
     public static void showDialog(PluginForHost preSelectedPlugin, Account preFillAccount) {
@@ -206,7 +206,6 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
     }
 
     private HosterChooserTable           hosterTable;
-
     private JPanel                       content;
     private final PluginClassLoaderChild cl;
     protected MouseAdapter               mouseAdapter;
@@ -451,10 +450,10 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
 
     private Account getAccount() {
         final AccountBuilderInterface accountBuilder = currentAccountBuilder;
-        if (accountBuilder != null) {
-            return accountBuilder.getAccount();
+        if (accountBuilder == null) {
+            return null;
         }
-        return null;
+        return accountBuilder.getAccount();
     }
 
     private PluginForHost updatePanel(PluginForHost selectedPlugin) {
