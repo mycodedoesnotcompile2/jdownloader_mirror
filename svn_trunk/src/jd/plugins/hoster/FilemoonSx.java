@@ -21,10 +21,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
 import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
 
 import jd.PluginWrapper;
@@ -42,12 +40,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.decrypter.FilemoonSxCrawler;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51856 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSx extends XFileSharingProBasic {
     public FilemoonSx(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
+
+    public static final String TIMESTAMP_OFFICIAL_VIDEO_DOWNLOAD_IMPOSSIBLE = "timestamp_official_video_download_impossible";
 
     @Override
     protected List<String> getDeadDomains() {
@@ -184,19 +184,37 @@ public class FilemoonSx extends XFileSharingProBasic {
     @Override
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         /* First bring up saved final links */
-        String dllink = checkDirectLink(link, account);
+        if (this.attemptStoredDownloadurlDownload(link, account)) {
+            return;
+        }
+        String dllink = null;
         String streamDownloadurl = null;
-        grabOfficialVideoDownloadDirecturl: if (StringUtils.isEmpty(dllink)) {
+        grabOfficialVideoDownloadDirecturl: {
             requestFileInformationWebsite(link, account);
-            final DownloadMode mode = this.getPreferredDownloadModeFromConfig();
-            streamDownloadurl = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
-            if (!StringUtils.isEmpty(streamDownloadurl) && (mode == DownloadMode.STREAM || mode == DownloadMode.AUTO)) {
-                /* User prefers to download stream -> We can skip the captcha required to find official video downloadurl. */
-                break grabOfficialVideoDownloadDirecturl;
+            /* 2025-11-20: All streams are encrypted thus we will not even lok for stream downloads here. */
+            // final DownloadMode mode = this.getPreferredDownloadModeFromConfig();
+            // streamDownloadurl = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
+            // if (!StringUtils.isEmpty(streamDownloadurl) && (mode == DownloadMode.STREAM || mode == DownloadMode.AUTO)) {
+            // /* User prefers to download stream -> We can skip the captcha required to find official video downloadurl. */
+            // break grabOfficialVideoDownloadDirecturl;
+            // }
+            final String error_download_impossible = "Uploader has disabled downloads for this file and stream is DRM protected";
+            /*
+             * Check cached status so that we can avoid asking user to solve a captcha as we can be quite sure already that download will
+             * not work.
+             */
+            if (System.currentTimeMillis() - link.getLongProperty(TIMESTAMP_OFFICIAL_VIDEO_DOWNLOAD_IMPOSSIBLE, 0) < 24 * 60 * 60 * 1000) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_download_impossible);
             }
             this.checkErrors(br, this.getCorrectBR(br), link, account);
-            if (!br.getURL().matches(".*/download/.*")) {
-                this.getPage("/download/" + this.getFUIDFromURL(link));
+            /* Access download page if this hasn't already been done. */
+            final String file_id = this.getFUIDFromURL(link);
+            if (!br.getURL().matches(".*/download/" + file_id + ".*")) {
+                final String step_continue_to_official_download = br.getRegex("/download/" + file_id).getMatch(-1);
+                if (step_continue_to_official_download == null) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, error_download_impossible);
+                }
+                this.getPage(step_continue_to_official_download);
             }
             final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LdiBGAgAAAAAIQm_arJfGYrzjUNP_TCwkvPlv8k").getToken();
             final Form dlform = new Form();
@@ -205,19 +223,10 @@ public class FilemoonSx extends XFileSharingProBasic {
             dlform.put("file_code", this.getFUIDFromURL(link));
             dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
             this.submitForm(dlform);
-            if (br.containsHTML("class=\"error e404\"|>\\s*Page not found")) {
-                /* 2023-05-04 */
-                if (streamDownloadurl != null) {
-                    logger.info("Official download is not possible -> Fallback to stream download");
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 404 download impossible at this moment");
-                }
-            }
             dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
-            if (StringUtils.isEmpty(dllink) && !StringUtils.isEmpty(streamDownloadurl)) {
-                logger.info("Failed to find official downloadurl -> Fallback to stream download");
-                // dllink = streamDownloadurl;
-                /* Fallback happens in upper code */
+            if (dllink == null && br.containsHTML("class=\"error e404\"|>\\s*Page not found")) {
+                link.setProperty(TIMESTAMP_OFFICIAL_VIDEO_DOWNLOAD_IMPOSSIBLE, System.currentTimeMillis());
+                throw new PluginException(LinkStatus.ERROR_FATAL, error_download_impossible);
             }
         }
         handleDownload(link, account, dllink, streamDownloadurl);

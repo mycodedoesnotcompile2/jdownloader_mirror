@@ -41,7 +41,9 @@ public class Flatpak {
     private final static String FLATPAK_SANDBOX_DIR = System.getenv("FLATPAK_SANDBOX_DIR");
 
     public static boolean isInsideFlatpak() {
-        if (!CrossSystem.isUnix()) {
+        // https://flatpak.org/setup/
+        // https://docs.flatpak.org/en/latest/conventions.html
+        if (!CrossSystem.isLinux()) {
             return false;
         }
         return "flatpak".equalsIgnoreCase(CONTAINER) || StringUtils.isAllNotEmpty(FLATPAK_ID, FLATPAK_SANDBOX_DIR);

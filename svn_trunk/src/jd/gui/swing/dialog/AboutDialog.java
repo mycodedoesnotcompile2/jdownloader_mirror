@@ -332,8 +332,9 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     CrossSystem.openFile(directory);
                 }
             });
-            JLabel envLabel = new JLabel(_GUI.T.jd_gui_swing_components_AboutDialog_environment());
-            try {
+            {
+                // environment (snap,flatpak, container, hardware)
+                JLabel envLabel = new JLabel(_GUI.T.jd_gui_swing_components_AboutDialog_environment());
                 if (HardwareType.getHardware() != null) {
                     if (envLabel != null) {
                         stats.add(envLabel, "spanx");
@@ -342,9 +343,6 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     stats.add(new JLabel(_GUI.T.jd_gui_swing_components_AboutDialog_hardware()), "gapleft 10");
                     stats.add(createLink(HardwareType.getHardware().toString()));
                 }
-            } catch (Throwable ignore) {
-            }
-            try {
                 if (Snap.isInsideSnap()) {
                     if (envLabel != null) {
                         stats.add(envLabel, "spanx");
@@ -353,9 +351,6 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     stats.add(new JLabel("Snap:"), "gapleft 10");
                     stats.add(createLink(Snap.getSnapInstanceName()));
                 }
-            } catch (Throwable ignore) {
-            }
-            try {
                 if (Flatpak.isInsideFlatpak()) {
                     if (envLabel != null) {
                         stats.add(envLabel, "spanx");
@@ -364,9 +359,6 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     stats.add(new JLabel("Flatpak:"), "gapleft 10");
                     stats.add(createLink(Flatpak.getInstanceName()));
                 }
-            } catch (Throwable ignore) {
-            }
-            try {
                 if (ContainerRuntime.isInsideContainer()) {
                     if (envLabel != null) {
                         stats.add(envLabel, "spanx");
@@ -375,7 +367,6 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     stats.add(new JLabel(ContainerRuntime.getType() + ":"), "gapleft 10");
                     stats.add(createLink(ContainerRuntime.getID()));
                 }
-            } catch (Throwable ignore) {
             }
             if (map != null) {
                 stats.add(new JLabel(_GUI.T.jd_gui_swing_components_AboutDialog_sourcerevisions()), "spanx");

@@ -41,7 +41,6 @@ import org.appwork.utils.StringUtils;
  *
  */
 public class Snap {
-
     private final static String SNAPINSTANCE = findSnapInstanceID();
 
     public static boolean isInsideSnap() {
@@ -53,15 +52,16 @@ public class Snap {
     }
 
     private static String findSnapInstanceID() {
-        if (CrossSystem.isUnix() && (System.getenv("SNAP_COOKIE") != null)) {
-            final String snapInstanceName = System.getenv("SNAP_INSTANCE_NAME");
-            if (StringUtils.isNotEmpty(snapInstanceName)) {
-                return snapInstanceName;
-            }
-            final String snapName = System.getenv("SNAP_NAME");
-            if (StringUtils.isNotEmpty(snapName)) {
-                return snapName;
-            }
+        if (!CrossSystem.isUnix() || System.getenv("SNAP_COOKIE") == null) {
+            return null;
+        }
+        final String snapInstanceName = System.getenv("SNAP_INSTANCE_NAME");
+        if (StringUtils.isNotEmpty(snapInstanceName)) {
+            return snapInstanceName;
+        }
+        final String snapName = System.getenv("SNAP_NAME");
+        if (StringUtils.isNotEmpty(snapName)) {
+            return snapName;
         }
         return null;
     }

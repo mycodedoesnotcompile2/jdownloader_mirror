@@ -19,12 +19,30 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+
+import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.controlling.packagecontroller.PackageControllerModifyVetoListener;
+import jd.plugins.AddonPanel;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
@@ -32,6 +50,7 @@ import org.appwork.shutdown.ShutdownVetoException;
 import org.appwork.shutdown.ShutdownVetoListener;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.ModifyLock;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
@@ -50,6 +69,7 @@ import org.jdownloader.extensions.ExtensionConfigPanel;
 import org.jdownloader.extensions.StartException;
 import org.jdownloader.extensions.StopException;
 import org.jdownloader.extensions.extraction.actions.ExtractAction;
+import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkArchiveFile;
 import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkFactory;
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFactory;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFactory;
@@ -89,16 +109,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.packagecontroller.PackageControllerModifyVetoListener;
-import jd.plugins.AddonPanel;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
 
 public class ExtractionExtension extends AbstractExtension<ExtractionConfig, ExtractionTranslation> implements FileCreationListener, MenuExtenderHandler, PackageControllerModifyVetoListener<FilePackage, DownloadLink> {
     private ExtractionQueue       extractionQueue = new ExtractionQueue();
@@ -722,63 +732,159 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         }
     }
 
-    public List<Archive> getArchivesFromPackageChildren(List<? extends Object> nodes, Set<String> ignoreArchiveIDs, int maxArchives) {
-        final ArrayList<Archive> archives = new ArrayList<Archive>();
-        HashSet<String> archiveIDs = null;
-        if (ignoreArchiveIDs != null) {
-            archiveIDs = new HashSet<String>();
-            archiveIDs.addAll(ignoreArchiveIDs);
+    public static final ThreadLocal<Map<AbstractPackageNode, List<AbstractPackageChildrenNode>>> ARCHIVE_FACTORY_OPTIMIZATION = new ThreadLocal<Map<AbstractPackageNode, List<AbstractPackageChildrenNode>>>();
+
+    public List<Archive> getArchivesFromPackageChildren(final List<? extends Object> nodes, Set<String> ignoreArchiveIDs, final int maxArchives) {
+        final Map<AbstractPackageNode, List<AbstractPackageChildrenNode>> optimize = new HashMap<AbstractPackageNode, List<AbstractPackageChildrenNode>>();
+        final HashSet<String> skipArchiveIDSet = new HashSet<String>();
+        ARCHIVE_FACTORY_OPTIMIZATION.set(optimize);
+        try {
+            final ArrayList<Archive> archives = new ArrayList<Archive>();
+            final ArrayList<Archive> optimizeArchives = new ArrayList<Archive>();
+            if (ignoreArchiveIDs != null) {
+                skipArchiveIDSet.addAll(ignoreArchiveIDs);
+            }
+            final AtomicBoolean abortFlag = new AtomicBoolean(false);
+            final LinkedList<Object> linkedNodes = new LinkedList<Object>(nodes);
+            final List<Thread> helperThreads = new ArrayList<Thread>();
+            for (int threadIndex = 0; threadIndex < 8; threadIndex++) {
+                final Thread helperThread = new Thread("getArchivesFromPackageChildren:thread=" + threadIndex + "|nodesIdentityHashCode=" + System.identityHashCode(nodes) + "|size=" + nodes.size()) {
+
+                    private List<AbstractPackageChildrenNode> optimizePackageChildren(AbstractPackageChildrenNode childNode) {
+                        final AbstractPackageNode parent = (AbstractPackageNode) childNode.getParentNode();
+                        if (parent == null) {
+                            return null;
+                        }
+                        synchronized (optimize) {
+                            List<AbstractPackageChildrenNode> packageChildren = optimize.get(parent);
+                            if (packageChildren != null) {
+                                if (packageChildren.indexOf(childNode) == -1) {
+                                    return null;
+                                }
+                                return packageChildren;
+                            }
+                            final ModifyLock modifyLock = parent.getModifyLock();
+                            boolean readL = modifyLock.readLock();
+                            try {
+                                optimize.put(parent, packageChildren = new CopyOnWriteArrayList<AbstractPackageChildrenNode>(parent.getChildren()));
+                            } finally {
+                                modifyLock.readUnlock(readL);
+                            }
+                            return packageChildren;
+                        }
+                    }
+
+                    private int optimizePackageChildren(final Archive archive) {
+                        int removed = 0;
+                        final List<ArchiveFile> archiveFiles = archive.getArchiveFiles();
+                        for (final ArchiveFile archiveFile : archiveFiles) {
+                            if (archiveFile instanceof CrawledLinkArchiveFile) {
+                                final CrawledLinkArchiveFile cla = (CrawledLinkArchiveFile) archiveFile;
+                                for (CrawledLink cl : cla.getLinks()) {
+                                    final CrawledPackage parent = cl.getParentNode();
+                                    if (parent == null) {
+                                        continue;
+                                    }
+                                    final List<AbstractPackageChildrenNode> children;
+                                    synchronized (optimize) {
+                                        children = optimize.get(parent);
+                                    }
+                                    if (children != null && children.remove(cl)) {
+                                        removed++;
+                                    }
+                                }
+                            } else if (archiveFile instanceof DownloadLinkArchiveFactory) {
+                                final DownloadLinkArchiveFactory dla = (DownloadLinkArchiveFactory) archiveFile;
+                                for (DownloadLink dl : dla.getDownloadLinks()) {
+                                    final FilePackage parent = dl.getParentNode();
+                                    if (parent == null) {
+                                        continue;
+                                    }
+                                    final List<AbstractPackageChildrenNode> children;
+                                    synchronized (optimize) {
+                                        children = optimize.get(parent);
+                                    }
+                                    if (children != null && children.remove(dl)) {
+                                        removed++;
+                                    }
+                                }
+                            }
+                        }
+                        return removed;
+                    }
+
+                    @Override
+                    public void run() {
+                        ARCHIVE_FACTORY_OPTIMIZATION.set(optimize);
+                        archiveBuildLoop: while (!abortFlag.get()) {
+                            final Object child;
+                            synchronized (linkedNodes) {
+                                child = linkedNodes.poll();
+                                if (child == null && linkedNodes.size() == 0) {
+                                    break;
+                                }
+                            }
+                            final ArchiveFactory af;
+                            List<AbstractPackageChildrenNode> packageChildren = null;
+                            if (child instanceof CrawledLink) {
+                                final CrawledLink cl = ((CrawledLink) child);
+                                packageChildren = optimizePackageChildren(cl);
+                                if (packageChildren == null || packageChildren.size() == 0 || packageChildren.indexOf(child) == -1) {
+                                    continue archiveBuildLoop;
+                                }
+                                af = new CrawledLinkFactory(cl);
+                            } else if (child instanceof DownloadLink) {
+                                final DownloadLink dl = ((DownloadLink) child);
+                                packageChildren = optimizePackageChildren(dl);
+                                if (packageChildren == null || packageChildren.size() == 0 || packageChildren.indexOf(child) == -1) {
+                                    continue archiveBuildLoop;
+                                }
+                                af = new DownloadLinkArchiveFactory(dl);
+                            } else if (child instanceof File) {
+                                af = new FileArchiveFactory(((File) child));
+                            } else if (child instanceof ArchiveFactory) {
+                                af = (ArchiveFactory) child;
+                            } else {
+                                continue archiveBuildLoop;
+                            }
+                            final Archive archive = getArchiveByFactory(af);
+                            if (archive == null) {
+                                if (packageChildren != null) {
+                                    packageChildren.remove(child);
+                                }
+                                continue archiveBuildLoop;
+                            }
+                            synchronized (archives) {
+                                if (!abortFlag.get() && skipArchiveIDSet.add(archive.getArchiveID())) {
+                                    archives.add(archive);
+                                    optimizePackageChildren(archive);
+                                    System.out.println("count:" + archives.size());
+                                    if (maxArchives > 0 && archives.size() >= maxArchives) {
+                                        abortFlag.set(true);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+                helperThreads.add(helperThread);
+                helperThread.setDaemon(true);
+                helperThread.start();
+            }
+            for (final Thread helperThread : helperThreads) {
+                try {
+                    helperThread.join();
+                } catch (InterruptedException e) {
+                    abortFlag.set(true);
+                }
+            }
+            synchronized (archives) {
+                return new ArrayList<Archive>(archives);
+            }
+        } finally {
+            ARCHIVE_FACTORY_OPTIMIZATION.set(null);
         }
-        buildLoop: for (final Object child : nodes) {
-            if (child instanceof CrawledLink) {
-                final DownloadLink dlLink = ((CrawledLink) child).getDownloadLink();
-                if (dlLink != null && (Boolean.FALSE.equals(dlLink.isPartOfAnArchive()) || (archiveIDs != null && archiveIDs.contains(dlLink.getArchiveID())))) {
-                    //
-                    continue buildLoop;
-                }
-            } else if (child instanceof DownloadLink) {
-                final DownloadLink dlLink = (DownloadLink) child;
-                if (Boolean.FALSE.equals(dlLink.isPartOfAnArchive()) || (archiveIDs != null && archiveIDs.contains(dlLink.getArchiveID()))) {
-                    //
-                    continue buildLoop;
-                }
-            } else if (child instanceof ArchiveFactory) {
-                final ArchiveFactory af = ((ArchiveFactory) child);
-                if (Boolean.FALSE.equals(af.isPartOfAnArchive()) || (archiveIDs != null && archiveIDs.contains(af.getArchiveID()))) {
-                    //
-                    continue buildLoop;
-                }
-            }
-            for (final Archive archive : archives) {
-                if (archive.contains(child)) {
-                    continue buildLoop;
-                }
-            }
-            final ArchiveFactory af;
-            if (child instanceof CrawledLink) {
-                af = new CrawledLinkFactory(((CrawledLink) child));
-            } else if (child instanceof DownloadLink) {
-                af = new DownloadLinkArchiveFactory(((DownloadLink) child));
-            } else if (child instanceof File) {
-                af = new FileArchiveFactory(((File) child));
-            } else if (child instanceof ArchiveFactory) {
-                af = (ArchiveFactory) child;
-            } else {
-                continue buildLoop;
-            }
-            final Archive archive = getArchiveByFactory(af);
-            if (archive != null) {
-                archives.add(archive);
-                if (archiveIDs == null) {
-                    archiveIDs = new HashSet<String>();
-                }
-                archiveIDs.add(archive.getArchiveID());
-                if (maxArchives > 0 && archives.size() >= maxArchives) {
-                    return archives;
-                }
-            }
-        }
-        return archives;
     }
 
     public IfFileExistsAction getIfFileExistsAction(Archive archive) {

@@ -10,6 +10,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -17,12 +19,11 @@ import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFactory;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.BooleanStatus;
+import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
 import org.jdownloader.settings.GeneralSettings;
-
-import jd.plugins.DownloadLink;
 
 public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactory {
     private final Archive origin;
@@ -67,7 +68,7 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
         return ret;
     }
 
-    public java.util.List<ArchiveFile> createPartFileList(String file, String patternString) {
+    public java.util.List<ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String file, String patternString) {
         final Pattern pattern = Pattern.compile(patternString, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
         final List<ArchiveFile> ret = new ArrayList<ArchiveFile>();
         for (final File foundFile : findFiles(pattern, getFile().getParentFile())) {

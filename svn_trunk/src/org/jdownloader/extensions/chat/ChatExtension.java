@@ -59,9 +59,11 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.os.ContainerRuntime;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.Flatpak;
 import org.appwork.utils.os.Snap;
+import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -878,22 +880,22 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 if (map.containsKey("JDownloaderRevision")) {
                     infobits.add("JD CoreRev #" + map.get("JDownloaderRevision"));
                 }
-                try {
-                    if (Flatpak.isInsideFlatpak()) {
-                        infobits.add("Flatpak:" + Flatpak.getInstanceName());
-                    }
-                } catch (Throwable ignore) {
+                if (Flatpak.isInsideFlatpak()) {
+                    infobits.add("Flatpak:" + Flatpak.getInstanceName());
                 }
-                try {
-                    if (Snap.isInsideSnap()) {
-                        infobits.add("Snap:" + Snap.getSnapInstanceName());
-                    }
-                } catch (Throwable ignore) {
+                if (Snap.isInsideSnap()) {
+                    infobits.add("Snap:" + Snap.getSnapInstanceName());
+                }
+                if (HardwareType.getHardware() != null) {
+                    infobits.add(HardwareType.getHardware().toString());
+                }
+                if (ContainerRuntime.isInsideContainer()) {
+                    infobits.add(ContainerRuntime.getType() + ":" + ContainerRuntime.getID());
                 }
                 if (map.containsKey("buildDate")) {
                     infobits.add("Build " + map.get("buildDate"));
                 }
-                infobits.add("runtime " + TimeFormatter.formatMilliSeconds(Time.systemIndependentCurrentJVMTimeMillis() - SecondLevelLaunch.startup, 0));
+                infobits.add("Runtime " + TimeFormatter.formatMilliSeconds(Time.systemIndependentCurrentJVMTimeMillis() - SecondLevelLaunch.startup, 0));
                 final String msg = String.join(", ", infobits);
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION " + this.prepareToSend(msg) + new String(new byte[] { 1 }));
                 this.addToText(null, ChatExtension.STYLE_ACTION, this.conn.getNick() + " " + Utils.prepareMsg(msg));

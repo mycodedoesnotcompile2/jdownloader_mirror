@@ -43,7 +43,7 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHos
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 
-@HostPlugin(revision = "$Revision: 51506 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51861 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -313,15 +313,10 @@ public class MixdropCo extends antiDDoSForHost {
         return new CaptchaHelperHostPluginRecaptchaV2(this, br, this.getReCaptchaKey()) {
 
             @Override
-            protected Map<String, Object> getV3Action() {
+            protected Map<String, Object> getV3Action(String source) {
                 final Map<String, Object> ret = new HashMap<String, Object>();
                 ret.put("action", "download");
                 return ret;
-            }
-
-            @Override
-            public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.VERSION getVersion() {
-                return super.getVersion();
             }
 
             @Override

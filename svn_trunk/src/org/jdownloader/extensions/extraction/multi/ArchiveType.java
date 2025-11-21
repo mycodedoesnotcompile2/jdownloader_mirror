@@ -23,9 +23,10 @@ import org.jdownloader.extensions.extraction.ArchiveFactory;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.FileSignatures;
 import org.jdownloader.extensions.extraction.MissingArchiveFile;
+import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.logging.LogController;
 
-public enum ArchiveType {
+public enum ArchiveType implements UnitType {
     /**
      * DO NOT CHANGE ORDER: some archiveTypes share same extension!
      */
@@ -109,7 +110,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return true;
         }
     },
@@ -175,7 +176,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return true;
         }
 
@@ -223,7 +224,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return true;
         }
 
@@ -343,7 +344,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -479,15 +480,15 @@ public enum ArchiveType {
                     } else if (isRAR5x && signatureString.length() >= 17 * 2) {
                         // RAR 5.x 0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00 (MARK_HEAD)
                         /*
-                         * 
+                         *
                          * 0x0001   Volume. Archive is a part of multivolume set.
-                         * 
+                         *
                          * 0x0002   Volume number field is present. This flag is present in all volumes except first.
-                         * 
+                         *
                          * 0x0004   Solid archive.
-                         * 
+                         *
                          * 0x0008   Recovery record is present.
-                         * 
+                         *
                          * 0x0010   Locked archive.
                          */
                         try {
@@ -578,7 +579,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return true;
         }
 
@@ -640,7 +641,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return true;
         }
 
@@ -735,7 +736,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return true;
         }
 
@@ -811,7 +812,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -886,7 +887,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -961,7 +962,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -1036,7 +1037,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -1111,7 +1112,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -1186,7 +1187,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -1261,7 +1262,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -1336,7 +1337,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -1411,7 +1412,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return false;
         }
 
@@ -1486,7 +1487,7 @@ public enum ArchiveType {
         }
 
         @Override
-        protected boolean isMultiPartType() {
+        public boolean isMultiPartType() {
             return true;
         }
 
@@ -1616,7 +1617,7 @@ public enum ArchiveType {
 
     protected abstract int getMinimumNeededPartIndex();
 
-    protected abstract boolean isMultiPartType();
+    public abstract boolean isMultiPartType();
 
     protected abstract String buildMissingPart(String[] matches, int partIndex, int partStringLength);
 
@@ -1731,7 +1732,7 @@ public enum ArchiveType {
                 } else if (isMultiPart != null && archiveType.isMultiPartType() != isMultiPart.booleanValue()) {
                     continue archiveTypeLoop;
                 }
-                final List<ArchiveFile> foundArchiveFiles = link.createPartFileList(linkPath, pattern.pattern());
+                final List<ArchiveFile> foundArchiveFiles = link.createPartFileList(archiveType, filePathParts, linkPath, pattern.pattern());
                 if (foundArchiveFiles == null || foundArchiveFiles.size() == 0) {
                     throw new ArchiveException("Broken archive support!ArchiveType:" + archiveType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Path:" + linkPath + "|Pattern:" + pattern.pattern() + "|MultiPart:" + isMultiPart + "|DeepInspection:" + allowDeepInspection);
                 }

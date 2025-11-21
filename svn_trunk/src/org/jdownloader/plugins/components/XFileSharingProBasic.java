@@ -91,7 +91,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51838 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51856 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3373,11 +3373,17 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
         String dllink = null;
+        final String current_url = br.getURL();
         for (final Pattern pattern : getDownloadurlRegexes()) {
-            dllink = new Regex(src, pattern).getMatch(0);
-            if (dllink != null) {
-                break;
+            String this_dllink = new Regex(src, pattern).getMatch(0);
+            if (this_dllink == null) {
+                continue;
+            } else if (this_dllink.equals(current_url)) {
+                /* Direct-url equals current browser-url -> Doesn't make any sense -> Skip this result */
+                continue;
             }
+            dllink = this_dllink;
+            break;
         }
         if (StringUtils.isEmpty(dllink)) {
             final String cryptedScripts[] = new Regex(src, "p\\}\\((.*?)\\.split\\('\\|'\\)").getColumn(0);
@@ -4191,6 +4197,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             throw new PluginException(LinkStatus.ERROR_FATAL, "Downloads are disabled for your country", 60 * 60 * 1000l);
         } else if (br.containsHTML(">\\s*File was locked by administrator")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "File was locked by administrator");
+        } else if (new Regex(html, ">\\s*Couldn't generate direct link").patternFind()) {
+            /* 2025-11-20: Should be XFS default error e.g. subyshare.com, worldbytez.com */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Couldn't generate direct link");
         }
         /*
          * Errorhandling for accounts that are valid but cannot be used yet because the user has to add his mail to the account via website.

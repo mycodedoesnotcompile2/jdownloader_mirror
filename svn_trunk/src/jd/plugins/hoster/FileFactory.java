@@ -26,21 +26,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -65,7 +50,22 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51754 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 51860 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     public FileFactory(final PluginWrapper wrapper) {
         super(wrapper);
@@ -100,7 +100,7 @@ public class FileFactory extends PluginForHost {
 
     /** Returns true if this link shall be used with the older filefactory.com website accessible via classic.filefactory.com. */
     private boolean isClassicFile(final DownloadLink link) throws PluginException {
-        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */ && link.getPluginPatternMatcher().contains("classic.filefactory.com"));
+        return link.hasProperty(PROPERTY_CLASSIC) || (false/* disabled because old classic links do redirect to www again */&& link.getPluginPatternMatcher().contains("classic.filefactory.com"));
     }
 
     private String getContentURL(final DownloadLink link) throws PluginException {
@@ -758,8 +758,7 @@ public class FileFactory extends PluginForHost {
                     accountType = AccountType.PREMIUM;
                 }
                 /**
-                 * Other possible values: </br>
-                 * "expired" -> Free Account
+                 * Other possible values: </br> "expired" -> Free Account
                  */
             }
             if (accountType == null) {
@@ -908,11 +907,12 @@ public class FileFactory extends PluginForHost {
                         }
 
                         @Override
-                        protected Map<String, Object> getV3Action() {
+                        protected Map<String, Object> getV3Action(String source) {
                             final Map<String, Object> ret = new HashMap<String, Object>();
                             ret.put("action", "SIGNIN");
                             return ret;
                         }
+
                     };
                     final String recaptchaV2Response = rc.getToken();
                     final Map<String, Object> postdata1 = new HashMap<String, Object>();

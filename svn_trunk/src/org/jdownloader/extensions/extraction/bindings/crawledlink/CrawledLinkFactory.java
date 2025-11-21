@@ -8,10 +8,15 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.plugins.DownloadLink;
 import jd.plugins.PluginForHost;
 
 import org.appwork.exceptions.WTFException;
@@ -24,6 +29,8 @@ import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFactory;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.BooleanStatus;
+import org.jdownloader.extensions.extraction.ExtractionExtension;
+import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
@@ -83,9 +90,10 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
         }
     }
 
-    public List<ArchiveFile> createPartFileList(final String file, final String archivePartFilePattern) {
+    public List<ArchiveFile> createPartFileList(final UnitType unitType, final String[] filePathParts, final String file, String archivePartFilePattern) {
         final String pattern = modifyPartFilePattern(archivePartFilePattern);
-        final Pattern pat = Pattern.compile(pattern, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
+        final boolean caseSensitive = !CrossSystem.isWindows();
+        final Pattern pat = Pattern.compile(pattern, caseSensitive ? Pattern.CASE_INSENSITIVE : 0);
         final CrawledPackage parentNode = getFirstPart().getParentNode();
         if (parentNode == null) {
             final List<ArchiveFile> ret = new ArrayList<ArchiveFile>();
@@ -94,27 +102,47 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
             return ret;
         } else {
             final HashMap<String, ArchiveFile> map = new HashMap<String, ArchiveFile>();
-            final ModifyLock modifyLock = parentNode.getModifyLock();
-            boolean readL = modifyLock.readLock();
-            try {
-                for (CrawledLink link : parentNode.getChildren()) {
-                    final String linkName = link.getName();
-                    if (pat.matcher(linkName).matches()) {
-                        CrawledLinkArchiveFile af = (CrawledLinkArchiveFile) map.get(linkName);
-                        if (af == null) {
-                            af = new CrawledLinkArchiveFile(link);
-                            map.put(linkName, af);
-                        } else {
-                            af.addMirror(link);
-                        }
+            final Map<AbstractPackageNode, List<AbstractPackageChildrenNode>> packageChildrenMap = ExtractionExtension.ARCHIVE_FACTORY_OPTIMIZATION.get();
+            final List<AbstractPackageChildrenNode> children;
+            if (packageChildrenMap != null) {
+                synchronized (packageChildrenMap) {
+                    children = packageChildrenMap.get(parentNode);
+                }
+            } else {
+                final ModifyLock modifyLock = parentNode.getModifyLock();
+                boolean readL = modifyLock.readLock();
+                try {
+                    children = new ArrayList<AbstractPackageChildrenNode>(parentNode.getChildren());
+                } finally {
+                    modifyLock.readUnlock(readL);
+                }
+            }
+            System.out.println(children.size());
+            final String fileNameCheck = filePathParts[0] + ".";
+            loop: for (AbstractPackageChildrenNode child : children) {
+                final CrawledLink link = (CrawledLink) child;
+                final String linkName = link.getName();
+                final DownloadLink dlLink = link.getDownloadLink();
+                if (dlLink != null && Boolean.FALSE.equals(dlLink.isPartOfAnArchive())) {
+                    continue loop;
+                } else if (linkName.length() < fileNameCheck.length()) {
+                    continue;
+                } else if ((!caseSensitive && !StringUtils.startsWithCaseInsensitive(linkName, fileNameCheck)) || (caseSensitive && !linkName.startsWith(fileNameCheck))) {
+                    continue loop;
+                }
+                if (pat.matcher(linkName).matches()) {
+                    CrawledLinkArchiveFile af = (CrawledLinkArchiveFile) map.get(caseSensitive ? linkName : linkName.toLowerCase(Locale.ROOT));
+                    if (af == null) {
+                        af = new CrawledLinkArchiveFile(link);
+                        map.put(caseSensitive ? linkName : linkName.toLowerCase(Locale.ROOT), af);
+                    } else {
+                        af.addMirror(link);
                     }
                 }
-            } finally {
-                modifyLock.readUnlock(readL);
             }
             final File directory = LinkTreeUtils.getDownloadDirectory(parentNode);
             if (directory != null) {
-                final List<ArchiveFile> localFiles = new FileArchiveFactory(directory).createPartFileList(file, pattern);
+                final List<ArchiveFile> localFiles = new FileArchiveFactory(directory).createPartFileList(unitType, filePathParts, file, pattern);
                 for (ArchiveFile localFile : localFiles) {
                     final ArchiveFile archiveFile = map.get(localFile.getName());
                     if (archiveFile == null) {

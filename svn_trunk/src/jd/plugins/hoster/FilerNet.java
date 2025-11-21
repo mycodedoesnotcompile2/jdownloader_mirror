@@ -23,16 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -55,7 +45,17 @@ import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51801 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 51859 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int     STATUSCODE_APIDISABLED                             = 400;
     private static final String  ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -94,9 +94,9 @@ public class FilerNet extends PluginForHost {
             @Override
             public URLConnectionAdapter openRequestConnection(Request request, final boolean followRedirects) throws IOException {
                 /**
-                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br>
-                 * This can also be seen as a workaround since filer.net redirects from https to http on final download-attempt so without
-                 * this, http protocol would be used even if user preferred https. <br>
+                 * 2024-02-20: Ensure to enforce user-preferred protocol. </br> This can also be seen as a workaround since filer.net
+                 * redirects from https to http on final download-attempt so without this, http protocol would be used even if user
+                 * preferred https. <br>
                  * Atm we don't know if this is a filer.net server side bug or if this is intentional. <br>
                  * Asked support about this, waiting for feedback
                  */
@@ -111,6 +111,7 @@ public class FilerNet extends PluginForHost {
         };
         br.setFollowRedirects(true);
         br.getHeaders().put("User-Agent", "JDownloader");
+        br.setAllowedResponseCodes(400, 502);
         return br;
     }
 
@@ -315,11 +316,20 @@ public class FilerNet extends PluginForHost {
             if (Boolean.TRUE.equals(data.get("premiumOnly")) && (account == null || !AccountType.PREMIUM.equals(account.getType()))) {
                 throw new AccountRequiredException("File is only downloadable by premium users");
             }
-            final String reCaptchaKey = "6LdvqRAqAAAAAE2OriJIn9DX6QR59hHZuuj7keeo";
+            /* 2025-11-20: key was changed and type is now reCaptcha Enterprise. */
+            final String reCaptchaKey = "6LfUvREsAAAAAHd79QK9HOfIAEVGqK4G4JxovEEn";
             final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey) {
+
                 @Override
-                public TYPE getType() {
-                    return TYPE.INVISIBLE;
+                protected Map<String, Object> getV3Action(String source) {
+                    final Map<String, Object> ret = new HashMap<String, Object>();
+                    ret.put("action", "download");
+                    return ret;
+                }
+
+                @Override
+                protected boolean isEnterprise() {
+                    return true;
                 }
             };
             String recaptchaV2Response = null;
@@ -335,6 +345,7 @@ public class FilerNet extends PluginForHost {
                     recaptchaV2Response = null;
                     logger.warning("Wait loop is executed multiple times -> Nullify captcha response");
                 }
+                /* The following API call starts the server side pre download wait time. */
                 data = (Map<String, Object>) callAPI(null, "/api/file/request/" + fid);
                 token = data.get("t").toString();
                 final int waitSeconds = ((Number) data.get("wt")).intValue();
@@ -566,8 +577,21 @@ public class FilerNet extends PluginForHost {
             } else if (statusCode == STATUSCODE_UNKNOWNERROR) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMESSAGE_UNKNOWNERRORTEXT);
             } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error");
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + statusCode);
             }
+        }
+        final Object errorO = entries.get("error");
+        final String message = (String) entries.get("message");
+        if (errorO instanceof Number) {
+            final int error = ((Number) errorO).intValue();
+            if (error == 502) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, message, 5 * 60 * 1000);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + error);
+            }
+        } else if (errorO instanceof String) {
+            /* e.g. {"error":"Action mismatch: expected 'download', got ''"} */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error " + errorO);
         }
         return entries;
     }

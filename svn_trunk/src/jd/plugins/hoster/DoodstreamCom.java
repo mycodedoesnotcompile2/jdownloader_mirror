@@ -56,7 +56,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51856 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -510,58 +510,59 @@ public class DoodstreamCom extends XFileSharingProBasic {
     @Override
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         /* First bring up saved final links */
-        String dllink = checkDirectLink(link, account);
-        if (StringUtils.isEmpty(dllink)) {
-            requestFileInformationWebsite(link, account);
-            if (this.getContentURL(link).matches(TYPE_DOWNLOAD)) {
-                /* Basically the same as the other type but hides that via iFrame. */
-                String embedURL = br.getRegex("<iframe[^>]*src=\"(/e/[a-z0-9]+)\"").getMatch(0);
-                if (embedURL == null && br.containsHTML("#poopiframe")) {
-                    /* 2024-03-26: poop.com.co special handling */
-                    embedURL = "/playr.php?id=" + this.getFUIDFromURL(link);
-                }
-                if (embedURL == null) {
-                    checkSSLInspection(br, link, account);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    this.getPage(embedURL);
-                }
+        if (this.attemptStoredDownloadurlDownload(link, account)) {
+            return;
+        }
+        String dllink = null;
+        requestFileInformationWebsite(link, account);
+        if (this.getContentURL(link).matches(TYPE_DOWNLOAD)) {
+            /* Basically the same as the other type but hides that via iFrame. */
+            String embedURL = br.getRegex("<iframe[^>]*src=\"(/e/[a-z0-9]+)\"").getMatch(0);
+            if (embedURL == null && br.containsHTML("#poopiframe")) {
+                /* 2024-03-26: poop.com.co special handling */
+                embedURL = "/playr.php?id=" + this.getFUIDFromURL(link);
             }
-            dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
-            if (dllink == null) {
-                String captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
-                if (captchaContainer != null) {
-                    if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
-                        // TODO: Implement cf turnstile handling
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
-                    } else {
-                        final Browser brc = br.cloneBrowser();
-                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, brc).getToken();
-                        this.getPage(brc, captchaContainer + Encoding.urlEncode(recaptchaV2Response), true);
-                        sleep(1000, link);
-                        getPage(br.getURL());// location.reload();
-                        captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
-                        if (captchaContainer != null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
+            if (embedURL == null) {
+                checkSSLInspection(br, link, account);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else {
+                this.getPage(embedURL);
+            }
+        }
+        dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
+        if (dllink == null) {
+            String captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
+            if (captchaContainer != null) {
+                if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
+                    // TODO: Implement cf turnstile handling
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
+                } else {
+                    final Browser brc = br.cloneBrowser();
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, brc).getToken();
+                    this.getPage(brc, captchaContainer + Encoding.urlEncode(recaptchaV2Response), true);
+                    sleep(1000, link);
+                    getPage(br.getURL());// location.reload();
+                    captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
+                    if (captchaContainer != null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                 }
-                br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                final String continue_url = br.getRegex("'(/pass_md5/[^<>\"\\']+)'").getMatch(0);
-                if (continue_url == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                final String token = br.getRegex("\\&token=([a-z0-9]+)").getMatch(0);
-                if (token == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                this.getPage(continue_url);
-                /* Make sure we got a valid URL before continuing! */
-                final URL dlurl = new URL(br.getRequest().getHtmlCode());
-                // final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                dllink = dlurl.toExternalForm();
-                dllink += "?token=" + token + "&expiry=" + System.currentTimeMillis();
             }
+            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            final String continue_url = br.getRegex("'(/pass_md5/[^<>\"\\']+)'").getMatch(0);
+            if (continue_url == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String token = br.getRegex("\\&token=([a-z0-9]+)").getMatch(0);
+            if (token == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            this.getPage(continue_url);
+            /* Make sure we got a valid URL before continuing! */
+            final URL dlurl = new URL(br.getRequest().getHtmlCode());
+            // final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+            dllink = dlurl.toExternalForm();
+            dllink += "?token=" + token + "&expiry=" + System.currentTimeMillis();
         }
         handleDownload(link, account, dllink, null);
     }

@@ -42,7 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51856 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public NovaFileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -257,40 +257,34 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     /* *************************** SPECIAL RECONNECT STUFF STARTS HERE *************************** */
     @Override
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
-        final String dllink = checkDirectLink(link, account);
-        if (dllink != null) {
-            /*
-             * Found directurl? Start download! This is there to prevent our experimental reconnect handling from triggering when the user
-             * starts downloads which have been started before and thus have a working saved directurl stored!
-             */
-            super.handleDownload(link, account, dllink, null);
-        } else {
-            /* No directurl? Check for saved reconnect-limit and if there is none, continue via template-handling! */
-            currentIP.set(new BalancedWebIPCheck(null).getExternalIP().getIP());
-            synchronized (CTRLLOCK) {
-                /* Load list of saved IPs + timestamp of last download */
-                final Object lastdownloadmap = this.getPluginConfig().getProperty(PROPERTY_LASTDOWNLOAD);
-                if (lastdownloadmap != null && lastdownloadmap instanceof Map && blockedIPsMap.isEmpty()) {
-                    blockedIPsMap = (Map<String, Long>) lastdownloadmap;
-                }
-            }
-            /**
-             * Experimental reconnect handling to prevent having to enter a captcha just to see that a limit has been reached!
-             */
-            if (this.getPluginConfig().getBooleanProperty(EXPERIMENTALHANDLING, default_eh)) {
-                /*
-                 * If the user starts a download in free or free-acount mode the waittime is on his IP. This also affects free accounts if
-                 * he tries to start more downloads via free accounts afterwards BUT nontheless the limit is only on his IP so he CAN
-                 * download using the same free accounts after performing a reconnect!
-                 */
-                long lastdownload = getPluginSavedLastDownloadTimestamp();
-                long passedTimeSinceLastDl = System.currentTimeMillis() - lastdownload;
-                if (passedTimeSinceLastDl < FREE_RECONNECTWAIT_DEFAULT) {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, FREE_RECONNECTWAIT_DEFAULT - passedTimeSinceLastDl);
-                }
-            }
-            super.doFree(link, account);
+        if (this.attemptStoredDownloadurlDownload(link, account)) {
+            return;
         }
+        /* No directurl? Check for saved reconnect-limit and if there is none, continue via template-handling! */
+        currentIP.set(new BalancedWebIPCheck(null).getExternalIP().getIP());
+        synchronized (CTRLLOCK) {
+            /* Load list of saved IPs + timestamp of last download */
+            final Object lastdownloadmap = this.getPluginConfig().getProperty(PROPERTY_LASTDOWNLOAD);
+            if (lastdownloadmap != null && lastdownloadmap instanceof Map && blockedIPsMap.isEmpty()) {
+                blockedIPsMap = (Map<String, Long>) lastdownloadmap;
+            }
+        }
+        /**
+         * Experimental reconnect handling to prevent having to enter a captcha just to see that a limit has been reached!
+         */
+        if (this.getPluginConfig().getBooleanProperty(EXPERIMENTALHANDLING, default_eh)) {
+            /*
+             * If the user starts a download in free or free-acount mode the waittime is on his IP. This also affects free accounts if he
+             * tries to start more downloads via free accounts afterwards BUT nontheless the limit is only on his IP so he CAN download
+             * using the same free accounts after performing a reconnect!
+             */
+            long lastdownload = getPluginSavedLastDownloadTimestamp();
+            long passedTimeSinceLastDl = System.currentTimeMillis() - lastdownload;
+            if (passedTimeSinceLastDl < FREE_RECONNECTWAIT_DEFAULT) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, FREE_RECONNECTWAIT_DEFAULT - passedTimeSinceLastDl);
+            }
+        }
+        super.doFree(link, account);
     }
 
     private static final long              FREE_RECONNECTWAIT_DEFAULT = 45 * 60 * 1000L;

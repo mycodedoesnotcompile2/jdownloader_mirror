@@ -20,6 +20,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.AccountRequiredException;
@@ -28,9 +30,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 51852 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51859 $", interfaceVersion = 3, names = {}, urls = {})
 public class WatchMdhTo extends KernelVideoSharingComV2 {
     public WatchMdhTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -69,19 +69,29 @@ public class WatchMdhTo extends KernelVideoSharingComV2 {
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
         /* Special handling */
         final String embed = br.getRegex("(https?://[^/]*/embed/\\d+)").getMatch(0);
-        if (embed != null && !StringUtils.equals(br._getURL().getPath(), new URL(embed).getPath()) && isSupportedDomain(new URL(embed))) {
-            br.setFollowRedirects(true);
-            br.getPage(embed);
-            final String msg = this.getPrivateVideoWebsiteMessage(br);
-            if (msg != null) {
-                throw new AccountRequiredException(msg);
-            } else if (isOfflineWebsite(br)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            return getDllink(link, br);
-        } else {
+        if (embed == null) {
+            /* No embed link found -> No special handling needed */
             return super.getDllink(link, br);
         }
+        if (StringUtils.equals(br._getURL().getPath(), new URL(embed).getPath())) {
+            /* We are already on the URL we just regexed -> No special handling needed */
+            return super.getDllink(link, br);
+        }
+        if (!isSupportedDomain(new URL(embed))) {
+            /* URL inside embed link is not supported -> No special handling allowed */
+            logger.info("Found embed link with unsupported domain -> " + embed);
+            return super.getDllink(link, br);
+        }
+        br.setFollowRedirects(true);
+        br.getPage(embed);
+        final String msg = this.getPrivateVideoWebsiteMessage(br);
+        if (msg != null) {
+            throw new AccountRequiredException(msg);
+        }
+        if (isOfflineWebsite(br)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        return getDllink(link, br);
     }
 
     @Override
@@ -99,7 +109,11 @@ public class WatchMdhTo extends KernelVideoSharingComV2 {
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutFileID(getPluginDomains());
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/((videos?/)?[^/\\?#]+/?|embed/\\d+/?)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override

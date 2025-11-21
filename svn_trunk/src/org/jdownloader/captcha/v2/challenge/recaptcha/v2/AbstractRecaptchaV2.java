@@ -106,11 +106,11 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
         return 1 * 60 * 1000;
     }
 
-    protected Map<String, Object> getV3Action() {
+    protected final Map<String, Object> getV3Action() {
         return getV3Action(br != null ? br.toString() : null);
     }
 
-    public VERSION getVersion() {
+    public final VERSION getVersion() {
         return getVersion(br != null ? br.toString() : null);
     }
 

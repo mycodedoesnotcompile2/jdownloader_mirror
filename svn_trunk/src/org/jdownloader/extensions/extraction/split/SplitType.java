@@ -21,10 +21,11 @@ import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.FileSignatures;
 import org.jdownloader.extensions.extraction.MissingArchiveFile;
 import org.jdownloader.extensions.extraction.Signature;
+import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.multi.ArchiveException;
 import org.jdownloader.logging.LogController;
 
-public enum SplitType {
+public enum SplitType implements UnitType {
     /**
      * Multipart XtremSplit Archive (.001.xtm, .002.xtm ...), 000-999 -> max 1000 parts
      */
@@ -114,7 +115,12 @@ public enum SplitType {
 
         @Override
         public boolean matches(String filePathOrName) {
-            return filePathOrName != null && pattern.matcher(filePathOrName).matches();
+            return !ignore(filePathOrName) && pattern.matcher(filePathOrName).matches();
+        }
+
+        private boolean ignore(String filePathOrName) {
+            // avoid false positives
+            return filePathOrName == null || filePathOrName.endsWith("zip") || filePathOrName.endsWith("rar");
         }
 
         @Override
@@ -478,6 +484,10 @@ public enum SplitType {
 
     protected abstract int getMinimumNeededPartIndex();
 
+    public boolean isMultiPartType() {
+        return true;
+    }
+
     protected abstract String buildMissingPart(String[] matches, int partIndex, int partStringLength);
 
     protected boolean looksLikeAnArchive(BitSet bitset, ArchiveFile archiveFiles[]) {
@@ -565,7 +575,7 @@ public enum SplitType {
         final String[] filePathParts = splitType.getMatches(linkPath);
         if (filePathParts != null && splitType.isValidPart(-1, link)) {
             final Pattern pattern = splitType.buildArchivePattern(filePathParts);
-            final List<ArchiveFile> foundArchiveFiles = link.createPartFileList(linkPath, pattern.pattern());
+            final List<ArchiveFile> foundArchiveFiles = link.createPartFileList(splitType, filePathParts, linkPath, pattern.pattern());
             if (foundArchiveFiles == null || foundArchiveFiles.size() == 0) {
                 throw new ArchiveException("Broken archive support!SplitType:" + splitType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Path:" + linkPath + "|Pattern:" + pattern.pattern() + "|DeepInspection:" + allowDeepInspection);
             }

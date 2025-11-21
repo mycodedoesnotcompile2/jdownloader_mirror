@@ -11,6 +11,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.packagecontroller.AbstractNodeVisitor;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.PluginForHost;
+
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -18,16 +24,11 @@ import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFactory;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.BooleanStatus;
+import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
 import org.jdownloader.settings.GeneralSettings;
-
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.packagecontroller.AbstractNodeVisitor;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.PluginForHost;
 
 public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implements ArchiveFactory {
     public static final String DOWNLOADLINK_KEY_EXTRACTEDPATH = "EXTRACTEDPATH";
@@ -129,7 +130,7 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
      * optimize this, eg check for single part and try to avoid file system stuff and maybe skip links with different archive type/extension
      * and that are already belong to different archive
      */
-    public List<ArchiveFile> createPartFileList(final String file, final String archivePartFilePattern) {
+    public List<ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, final String file, final String archivePartFilePattern) {
         final String pattern = modifyPartFilePattern(archivePartFilePattern);
         final Pattern pat = Pattern.compile(pattern, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
         final String fileParent = new File(file).getParent();
@@ -170,7 +171,7 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                 return true;
             }
         }, true);
-        final List<ArchiveFile> localFiles = new FileArchiveFactory(new File(getFilePath())).createPartFileList(file, pattern);
+        final List<ArchiveFile> localFiles = new FileArchiveFactory(new File(getFilePath())).createPartFileList(unitType, filePathParts, file, pattern);
         for (ArchiveFile localFile : localFiles) {
             final ArchiveFile archiveFile = map.get(localFile.getName());
             if (archiveFile == null) {
