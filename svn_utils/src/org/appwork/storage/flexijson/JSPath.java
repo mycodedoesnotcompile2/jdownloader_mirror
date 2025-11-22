@@ -575,9 +575,10 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
 
     /**
      * @param i
+     * @return
      */
-    public void remove(int i) {
-        elements.remove(0);
+    public Object remove(int i) {
+        return elements.remove(i);
     }
 
     @Deprecated
@@ -592,5 +593,14 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
      */
     public JSPath subPath(int from, int to) {
         return fromPathElements(elements.subList(from, to));
+    }
+
+    /**
+     * @return
+     *
+     */
+    public Object removeLast() {
+        return elements.removeLast();
+
     }
 }

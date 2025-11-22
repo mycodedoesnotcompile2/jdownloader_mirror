@@ -108,7 +108,7 @@ import org.appwork.utils.reflection.Clazz;
 // * {$or:[{a:true},{b:true}]} matches {a:true} and {b:true}
 // * HOWEVER:
 // * {$or:[{§§THIS:{a:true}},{b:true}]} matches only {b:true}, because for {§§THIS:{a:true}} a:true is not a direct children
-@StorableDoc(wiki = "connect:Condition", value = "A Condition Object. This may be a dynamic expression that resolves at runtime, a query on a database or a filter expression that resolves to true or false. See the WIKI for more details.", generator = org.appwork.moncompare.ConditionDocsGenerator.class)
+@StorableDoc(wiki = "connect:Condition", value = "A Condition Object. This may be a dynamic expression that resolves at runtime, a query on a database or a filter expression that resolves to true or false. For each Condition there is a Matcher against which the Condition is checked. For more detailed documentation, see [[Condition_Framework]].", generator = org.appwork.moncompare.ConditionDocsGenerator.class)
 @StorableExample("{\"$eq\":\"MyValue\"}")
 public class Condition<MatcherType> extends LinkedHashMap<String, Object> implements Storable {
     /**
@@ -1673,7 +1673,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     /**
      *
      */
-    @ApiDoc("Path traversal identifier. Used to access parent fields in the matcher object - relative to the current scope. Usage is like ../../ in directory pathes")
+    @ApiDoc("Path traversal identifier. Used to access parent fields in the matcher object - relative to the current scope. Usage is like ../../ in directory paths")
     public static final String                              $PARENT                  = "§PARENT";
     public static final String                              $REGEX                   = "§regex";
     @ApiDoc("Aggregation OP: find a match in a string via regex\r\nParam 1:string\r\nParam 2:regex\r\nParam 3: matching group index(optional)")

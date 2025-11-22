@@ -26,17 +26,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Request;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -53,7 +48,14 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 
-@DecrypterPlugin(revision = "$Revision: 51780 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 51864 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -126,8 +128,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     private String currentBoardPath = null;
 
     /**
-     * One function which can handle _any_ type of supported pinterest link (except for single PIN links). </br>
-     * WORK IN PROGRESS
+     * One function which can handle _any_ type of supported pinterest link (except for single PIN links). </br> WORK IN PROGRESS
      */
     private ArrayList<DownloadLink> crawlAllOtherItems(final String contenturl) throws Exception {
         /* Login whenever possible to be able to crawl private pinterest boards. */
@@ -405,8 +406,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         final Map<String, Object> postDataOptions = (Map<String, Object>) postData.get("options");
         final String boardID = (String) postDataOptions.get("board_id");
         /**
-         * A page size is not always given. It is controlled serverside via the "bookmark" parameter. </br>
-         * Any page can have any number of items.
+         * A page size is not always given. It is controlled serverside via the "bookmark" parameter. </br> Any page can have any number of
+         * items.
          */
         final Number page_sizeO = (Number) postDataOptions.get("page_size");
         final int maxItemsPerPage = page_sizeO != null ? page_sizeO.intValue() : -1;
@@ -419,8 +420,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 if (nextbookmark != null) {
                     postDataOptions.put("bookmarks", new String[] { nextbookmark });
                 }
-                this.prepWebapiBrowser(br);
-                br.getPage("/resource/" + resourceType + "/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis());
+                final GetRequest request = prepWebapiRequest(br.createGetRequest("/resource/" + resourceType + "/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis()), "www/[username]/[slug].js");
+                br.getPage(request);
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final Map<String, Object> resource_response = (Map<String, Object>) entries.get("resource_response");
                 nextbookmark = (String) resource_response.get("bookmark");
@@ -478,8 +479,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         if (enable_crawl_alternative_URL) {
             /* The more complicated way (if wished by user). */
             /**
-             * 2021-03-02: PINs may redirect to other PINs in very rare cases -> Handle that </br>
-             * If that wasn't the case, we could rely on API-only!
+             * 2021-03-02: PINs may redirect to other PINs in very rare cases -> Handle that </br> If that wasn't the case, we could rely on
+             * API-only!
              */
             br.getPage(contenturl);
             checkSinglePINOffline(br);
@@ -555,8 +556,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             }
         }
         List<Object> resource_data_cache = null;
-        final String pin_json_url = "https://www.pinterest.com/resource/PinResource/get/?source_url=%2Fpin%2F" + pinID + "%2F&data=%7B%22options%22%3A%7B%22field_set_key%22%3A%22detailed%22%2C%22ptrf%22%3Anull%2C%22fetch_visual_search_objects%22%3Atrue%2C%22id%22%3A%22" + pinID + "%22%7D%2C%22context%22%3A%7B%7D%7D&module_path=Pin(show_pinner%3Dtrue%2C+show_board%3Dtrue%2C+is_original_pin_in_related_pins_grid%3Dtrue)&_=" + System.currentTimeMillis();
-        br.getPage(pin_json_url);
+        final GetRequest request = prepWebapiRequest(br.createGetRequest("https://www.pinterest.com/resource/PinResource/get/?source_url=%2Fpin%2F" + pinID + "%2F&data=%7B%22options%22%3A%7B%22field_set_key%22%3A%22detailed%22%2C%22ptrf%22%3Anull%2C%22fetch_visual_search_objects%22%3Atrue%2C%22id%22%3A%22" + pinID + "%22%7D%2C%22context%22%3A%7B%7D%7D&module_path=Pin(show_pinner%3Dtrue%2C+show_board%3Dtrue%2C+is_original_pin_in_related_pins_grid%3Dtrue)&_=" + System.currentTimeMillis()), "www/pin/[id].js");
+        br.getPage(request);
         final Map<String, Object> root = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
         if (root.containsKey("resource_data_cache")) {
             resource_data_cache = (List) root.get("resource_data_cache");
@@ -710,7 +711,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 /* First request */
                 url = "https://" + getHost() + url;
             }
-            br.getPage(url);
+            final GetRequest request = prepWebapiRequest(br.createGetRequest(url), "www/[username]/[slug].js");
+            br.getPage(request);
             final Map<String, Object> sectionPaginationInfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Object bookmarksO = JavaScriptEngineFactory.walkJson(sectionPaginationInfo, "resource/options/bookmarks");
             final String bookmarks = (String) JavaScriptEngineFactory.walkJson(sectionPaginationInfo, "resource/options/bookmarks/{0}");
@@ -835,8 +837,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
 
     /**
      * @return: true: target section was found and only this will be crawler false: failed to find target section - in this case we should
-     *          crawl everything we find </br>
-     *          This can return a lot of results e.g. a board contains 1000 sections, each section contains 1000 PINs...
+     *          crawl everything we find </br> This can return a lot of results e.g. a board contains 1000 sections, each section contains
+     *          1000 PINs...
      */
     private ArrayList<DownloadLink> crawlSections(final String username, final String boardID, final String boardName, final Browser ajax, final String contenturl) throws Exception {
         if (username == null || boardID == null || boardName == null) {
@@ -853,8 +855,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         postData.put("options", postDataOptions);
         postData.put("context", new HashMap<String, Object>());
         int sectionPage = -1;
-        this.prepWebapiBrowser(ajax);
-        ajax.getPage("/resource/BoardSectionsResource/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis());
+        GetRequest request = prepWebapiRequest(ajax.createRequest("/resource/BoardSectionsResource/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis()), "www/[username]/[slug].js");
+        ajax.getPage(request);
         final int maxSectionsPerPage = 25;
         sectionPagination: do {
             sectionPage += 1;
@@ -887,7 +889,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 break sectionPagination;
             } else {
                 postDataOptions.put("bookmarks", new String[] { sectionsNextBookmark });
-                ajax.getPage("/resource/BoardSectionsResource/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis());
+                request = prepWebapiRequest(ajax.createRequest("/resource/BoardSectionsResource/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis()), "www/[username]/[slug].js");
+                ajax.getPage(request);
             }
         } while (!this.isAbort());
         logger.info("Section crawler done");
@@ -901,13 +904,14 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         return fp;
     }
 
-    private void prepWebapiBrowser(final Browser br) {
-        br.getHeaders().put("Accept", "application/json, text/javascript, */*, q=0.01");
-        br.getHeaders().put("Referer", "https://www.pinterest.com/");
+    protected static <T extends Request> T prepWebapiRequest(final T request, String pwsHandler) {
+        request.getHeaders().put("Accept", "application/json, text/javascript, */*, q=0.01");
+        request.getHeaders().put("Referer", "https://www.pinterest.com/");
         // br.getHeaders().put("x-app-version", "d406622");
         // br.getHeaders().put("x-pinterest-appstate", "background");
-        br.getHeaders().put("x-pinterest-pws-handler", "www/[username]/[slug].js");
+        request.getHeaders().put("x-pinterest-pws-handler", pwsHandler);
         // br.getHeaders().put("x-pinterest-source-url", "/username/boardname/");
-        br.getHeaders().put("x-requested-with", "XMLHttpRequest");
+        request.getHeaders().put("x-requested-with", "XMLHttpRequest");
+        return request;
     }
 }

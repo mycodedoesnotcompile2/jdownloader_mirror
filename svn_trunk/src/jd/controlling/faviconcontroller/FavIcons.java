@@ -853,7 +853,17 @@ public class FavIcons {
                 }
                 try {
                     List<BufferedImage> ret = null;
-                    if (bytes.length > 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff) {
+                    if (bytes.length > 4 && bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x01 && bytes[3] == 0x00 || StringUtils.containsIgnoreCase(con.getContentType(), "image/x-icon")) {
+                        // ICO magic
+                        ret = ICODecoder.read(new ByteArrayInputStream(bytes));
+                    } else if (bytes.length > 4 && bytes[0] == 0x3c && bytes[1] == 0x73 && bytes[2] == 0x76 && bytes[3] == 0x67 || StringUtils.containsIgnoreCase(con.getContentType(), "image/svg+xml")) {
+                        // SVG magic
+                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                        if (img != null) {
+                            ret = new ArrayList<BufferedImage>();
+                            ret.add(img);
+                        }
+                    } else if (bytes.length > 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff) {
                         // JPG magic
                         final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
                         if (img != null) {

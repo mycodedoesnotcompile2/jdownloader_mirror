@@ -427,7 +427,7 @@ public class FlexiJSonMapper {
                         if (this.isIgnoreProperty(obj, cType, context, g)) {
                             continue;
                         }
-                        final Object value = getValue(obj, g);
+                        final Object value = getValue(obj, g, context);
                         if (this.isIgnoreDefaultValuesEnabled(obj, cType, g)) {
                             if (empty == null) {
                                 empty = this.createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
@@ -454,7 +454,7 @@ public class FlexiJSonMapper {
                                         // seems to be a Anonymous method only available in the impl.no way to get a default value
                                     }
                                 } else {
-                                    if (CompareUtils.equalsDeep(getValue(empty, g), value)) {
+                                    if (CompareUtils.equalsDeep(getValue(empty, g, context), value)) {
                                         continue;
                                     }
                                 }
@@ -477,7 +477,7 @@ public class FlexiJSonMapper {
                                     } catch (final NoSuchMethodException e) {
                                         // seems to be a Anonymous method only available in the impl.no way to get a default value
                                     }
-                                } else if (CompareUtils.equalsDeep(getValue(empty, g), value)) {
+                                } else if (CompareUtils.equalsDeep(getValue(empty, g, context), value)) {
                                     subNode.tag(FlexiMapperTags.DEFAULT_VALUE);
                                 }
                             }
@@ -490,7 +490,7 @@ public class FlexiJSonMapper {
                             if (empty == null) {
                                 element = (this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), null, false));
                             } else {
-                                element = (this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), getValue(empty, g), true));
+                                element = (this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), getValue(empty, g, context), true));
                             }
                         } else {
                             element = (this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), null, false));
@@ -586,11 +586,12 @@ public class FlexiJSonMapper {
     /**
      * @param obj
      * @param g
+     * @param context TODO
      * @return
      * @throws IllegalAccessException
      * @throws InvocationTargetException
      */
-    protected Object getValue(final Object obj, final Getter g) throws IllegalAccessException, InvocationTargetException {
+    protected Object getValue(final Object obj, final Getter g, DefaultObjectToJsonContext context) throws IllegalAccessException, InvocationTargetException {
         return g.getValue(obj);
     }
 
@@ -686,13 +687,13 @@ public class FlexiJSonMapper {
                     if (cType.getClassCache().getAnnotations(g.key, StorableHidden.class).size() > 0) {
                         continue;
                     }
-                    final Object value = getValue(obj, g);
+                    final Object value = getValue(obj, g, context);
                     if (this.isIgnoreDefaultValuesEnabled(obj, cType, g)) {
                         if (empty == null) {
                             empty = this.createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                         }
                         if (empty != null) {
-                            if (CompareUtils.equalsDeep(getValue(empty, g), value)) {
+                            if (CompareUtils.equalsDeep(getValue(empty, g, context), value)) {
                                 continue;
                             }
                         }
@@ -703,7 +704,7 @@ public class FlexiJSonMapper {
                             empty = this.createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                         }
                         if (empty != null) {
-                            if (CompareUtils.equalsDeep(getValue(empty, g), value)) {
+                            if (CompareUtils.equalsDeep(getValue(empty, g, context), value)) {
                                 subNode.tag(FlexiMapperTags.DEFAULT_VALUE);
                             }
                         }
@@ -715,7 +716,7 @@ public class FlexiJSonMapper {
                         if (empty == null) {
                             ret.add(this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), null, false));
                         } else {
-                            ret.add(this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), getValue(empty, g), true));
+                            ret.add(this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), getValue(empty, g, context), true));
                         }
                     } else {
                         ret.add(this.methodOrFieldAnnotationsToComments(g, context, this.createKeyValueElement(ret, g.getKey(), subNode), null, false));

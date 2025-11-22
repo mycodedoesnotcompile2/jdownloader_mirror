@@ -63,6 +63,7 @@ import javax.swing.KeyStroke;
 import org.appwork.JNAHelper;
 import org.appwork.builddecision.BuildDecisions;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.storage.StorableDoc;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
@@ -78,133 +79,198 @@ import org.appwork.utils.processes.ProcessBuilderFactory;
  * @author $Author: unknown$
  */
 public class CrossSystem {
+    @StorableDoc("Enumeration of supported operating systems and their specific versions. Used for OS detection and platform-specific functionality.")
     public static enum OperatingSystem {
+        @StorableDoc("NetBSD operating system")
         NETBSD(OSFamily.BSD),
+        @StorableDoc("OpenBSD operating system")
         OPENBSD(OSFamily.BSD),
+        @StorableDoc("kFreeBSD (Debian GNU/kFreeBSD)")
         KFREEBSD(OSFamily.BSD),
+        @StorableDoc("FreeBSD operating system")
         FREEBSD(OSFamily.BSD),
+        @StorableDoc("DragonFlyBSD operating system")
         DRAGONFLYBSD(OSFamily.BSD),
+        @StorableDoc("Generic BSD operating system")
         BSD(OSFamily.BSD),
+        @StorableDoc("Generic Linux operating system")
         LINUX(OSFamily.LINUX),
         /*
          * Fedora: List must be sorted by release Date!!
          */
+        @StorableDoc("Fedora Linux distribution")
         FEDORA(OSFamily.LINUX),
+        @StorableDoc("Bazzite Linux distribution (Steam Deck optimized)")
         BAZZITE(OSFamily.LINUX),
         /*
          * CentOS: List must be sorted by release Date!!
          */
+        @StorableDoc("CentOS Linux distribution")
         CENTOS(OSFamily.LINUX),
+        @StorableDoc("CentOS Stream Linux distribution")
         CENTOS_STREAM(OSFamily.LINUX),
         /*
          * openSUSE: List must be sorted by release Date!!
          */
+        @StorableDoc("openSUSE Linux distribution")
         OPENSUSE(OSFamily.LINUX),
+        @StorableDoc("openSUSE Leap Linux distribution")
         OPENSUSE_LEAP(OSFamily.LINUX, "opensuse-leap"),
+        @StorableDoc("openSUSE Tumbleweed Linux distribution (rolling release)")
         OPENSUSE_TUMBLEWEED(OSFamily.LINUX, "opensuse-tumbleweed"),
         /*
          * Slackware: List must be sorted by release Date!!
          */
+        @StorableDoc("Slackware Linux distribution")
         SLACKWARE(OSFamily.LINUX),
         /*
          * Arch: List must be sorted by release Date!!
          */
+        @StorableDoc("Arch Linux distribution")
         ARCH(OSFamily.LINUX),
         /*
          * Gentoo: List must be sorted by release Date!!
          */
+        @StorableDoc("Gentoo Linux distribution")
         GENTOO(OSFamily.LINUX),
         /*
          * Red Hat: List must be sorted by release Date!!
          */
+        @StorableDoc("Red Hat Enterprise Linux (RHEL)")
         REDHAT(OSFamily.LINUX),
         /*
          * SUSE Linux Enterprise Server: List must be sorted by release Date!!
          */
+        @StorableDoc("SUSE Linux Enterprise Server (SLES)")
         SLES(OSFamily.LINUX),
         /*
          * Alpine Linux
          */
+        @StorableDoc("Alpine Linux distribution")
         ALPINE(OSFamily.LINUX),
         /*
          * Manjaro
          */
+        @StorableDoc("Manjaro Linux distribution (Arch-based)")
         MANJARO(OSFamily.LINUX),
         /*
          * EndeavourOS(Arch Linux)
          */
+        @StorableDoc("EndeavourOS Linux distribution (Arch-based)")
         ENDEAVOUROS(OSFamily.LINUX),
         /*
          * Elementary OS
          */
+        @StorableDoc("Elementary OS Linux distribution")
         ELEMENTARYOS(OSFamily.LINUX),
         /*
          * NixOS
          */
+        @StorableDoc("NixOS Linux distribution")
         NIXOS(OSFamily.LINUX),
         /**
          * Mageia
          */
+        @StorableDoc("Mageia Linux distribution")
         MAGEIA(OSFamily.LINUX),
         /**
          * AlmaLinux
          */
+        @StorableDoc("AlmaLinux Linux distribution (RHEL-compatible)")
         ALMALINUX(OSFamily.LINUX),
         /**
          * Rocky Linux
          */
+        @StorableDoc("Rocky Linux distribution (RHEL-compatible)")
         ROCKYLINUX(OSFamily.LINUX),
         /**
          * https://www.kali.org/releases/
          *
          * Kali Linux: List must be sorted by release Date!!
          */
+        @StorableDoc("Kali Linux distribution (penetration testing)")
         KALILINUX(OSFamily.LINUX),
+        @StorableDoc("Kali Linux 2022.1 release")
         KALILINUX_2022_1(OSFamily.LINUX, "2022\\.1"),
+        @StorableDoc("Kali Linux 2022.2 release")
         KALILINUX_2022_2(OSFamily.LINUX, "2022\\.2"),
+        @StorableDoc("Kali Linux 2022.3 release")
         KALILINUX_2022_3(OSFamily.LINUX, "2022\\.3"),
+        @StorableDoc("Kali Linux 2022.4 release")
         KALILINUX_2022_4(OSFamily.LINUX, "2022\\.4"),
+        @StorableDoc("Kali Linux 2023.1 release")
         KALILINUX_2023_1(OSFamily.LINUX, "2023\\.1"),
+        @StorableDoc("Kali Linux 2023.2 release")
         KALILINUX_2023_2(OSFamily.LINUX, "2023\\.2"),
+        @StorableDoc("Kali Linux 2023.3 release")
         KALILINUX_2023_3(OSFamily.LINUX, "2023\\.3"),
+        @StorableDoc("Kali Linux 2023.4 release")
         KALILINUX_2023_4(OSFamily.LINUX, "2023\\.4"),
+        @StorableDoc("Kali Linux 2024.1 release")
         KALILINUX_2024_1(OSFamily.LINUX, "2024\\.1"),
+        @StorableDoc("Kali Linux 2024.2 release")
         KALILINUX_2024_2(OSFamily.LINUX, "2024\\.2"),
+        @StorableDoc("Kali Linux 2024.3 release")
         KALILINUX_2024_3(OSFamily.LINUX, "2024\\.3"),
+        @StorableDoc("Kali Linux 2024.4 release")
         KALILINUX_2024_4(OSFamily.LINUX, "2024\\.4"),
+        @StorableDoc("Kali Linux 2025.1 release")
         KALILINUX_2025_1(OSFamily.LINUX, "2025\\.1"),
+        @StorableDoc("Kali Linux 2025.2 release")
         KALILINUX_2025_2(OSFamily.LINUX, "2025\\.2"),
+        @StorableDoc("Kali Linux 2025.3 release")
         KALILINUX_2025_3(OSFamily.LINUX, "2025\\.3"),
+        @StorableDoc("Kali Linux 2025.4 release")
         KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
          *
          * Debian: List must be sorted by release Date!!
          */
+        @StorableDoc("Debian Linux distribution")
         DEBIAN(OSFamily.LINUX),
+        @StorableDoc("Debian 5.0 (Lenny)")
         DEBIAN_LENNY(OSFamily.LINUX, "lenny"),
+        @StorableDoc("Debian 6.0 (Squeeze)")
         DEBIAN_SQUEEZE(OSFamily.LINUX, "squeeze"), // 6
+        @StorableDoc("Debian 7.0 (Wheezy)")
         DEBIAN_WHEEZY(OSFamily.LINUX, "wheezy"), // 7
+        @StorableDoc("Debian 8.0 (Jessie)")
         DEBIAN_JESSIE(OSFamily.LINUX, "jessie"), // 8
+        @StorableDoc("Debian 9.0 (Stretch)")
         DEBIAN_STRETCH(OSFamily.LINUX, "stretch"), // 9
+        @StorableDoc("Debian 10.0 (Buster)")
         DEBIAN_BUSTER(OSFamily.LINUX, "buster"), // 10
+        @StorableDoc("Debian 11.0 (Bullseye)")
         DEBIAN_BULLSEYE(OSFamily.LINUX, "bull"), // 11
+        @StorableDoc("Debian 12.0 (Bookworm)")
         DEBIAN_BOOKWORM(OSFamily.LINUX, "bookworm"), // 12
+        @StorableDoc("Debian 13.0 (Trixie)")
         DEBIAN_TRIXIE(OSFamily.LINUX, "trixie"), // 13
+        @StorableDoc("Debian 14.0 (Forky)")
         DEBIAN_FORKY(OSFamily.LINUX, "forky"), // 14
+        @StorableDoc("Debian Unstable (Sid)")
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
          *
          * RASPBIAN: List must be sorted by release Date!!
          */
+        @StorableDoc("Raspbian Linux distribution (Raspberry Pi OS)")
         RASPBIAN(OSFamily.LINUX),
+        @StorableDoc("Raspbian based on Debian Wheezy")
         RASPBIAN_WHEEZY(OSFamily.LINUX, "wheezy"),
+        @StorableDoc("Raspbian based on Debian Jessie")
         RASPBIAN_JESSIE(OSFamily.LINUX, "jessie"),
+        @StorableDoc("Raspbian based on Debian Stretch")
         RASPBIAN_STRETCH(OSFamily.LINUX, "stretch"),
+        @StorableDoc("Raspbian based on Debian Buster")
         RASPBIAN_BUSTER(OSFamily.LINUX, "buster"),
+        @StorableDoc("Raspbian based on Debian Bullseye")
         RASPBIAN_BULLSEYE(OSFamily.LINUX, "bull"),
+        @StorableDoc("Raspbian based on Debian Bookworm")
         RASPBIAN_BOOKWORM(OSFamily.LINUX, "bookworm"),
+        @StorableDoc("Raspbian based on Debian Trixie")
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
@@ -213,99 +279,184 @@ public class CrossSystem {
          *
          * Ubuntu: List must be sorted by release Date!!
          */
+        @StorableDoc("Ubuntu Linux distribution")
         UBUNTU(OSFamily.LINUX),
+        @StorableDoc("Ubuntu 12.04 LTS (Precise Pangolin)")
         UBUNTU_PRECISE(OSFamily.LINUX, "12\\.04"), // 12.04
+        @StorableDoc("Ubuntu 12.10 (Quantal Quetzal)")
         UBUNTU_QUANTAL(OSFamily.LINUX, "12\\.10"), // 12.10
+        @StorableDoc("Ubuntu 13.04 (Raring Ringtail)")
         UBUNTU_RARING(OSFamily.LINUX, "13\\.04"), // 13.04
+        @StorableDoc("Ubuntu 13.10 (Saucy Salamander)")
         UBUNTU_SAUCY(OSFamily.LINUX, "13\\.10"), // 13.10
+        @StorableDoc("Ubuntu 14.04 LTS (Trusty Tahr)")
         UBUNTU_TRUSTY(OSFamily.LINUX, "14\\.04"), // 14.04
+        @StorableDoc("Ubuntu 14.10 (Utopic Unicorn)")
         UBUNTU_UTOPIC(OSFamily.LINUX, "14\\.10"), // 14.10
+        @StorableDoc("Ubuntu 15.04 (Vivid Vervet)")
         UBUNTU_VIVID(OSFamily.LINUX, "15\\.04"), // 15.04
+        @StorableDoc("Ubuntu 15.10 (Wily Werewolf)")
         UBUNTU_WILY(OSFamily.LINUX, "15\\.10"), // 15.10
+        @StorableDoc("Ubuntu 16.04 LTS (Xenial Xerus)")
         UBUNTU_XENIAL(OSFamily.LINUX, "16\\.04"), // 16.04
+        @StorableDoc("Ubuntu 16.10 (Yakkety Yak)")
         UBUNTU_YAKKETY(OSFamily.LINUX, "16\\.10"), // 16.10
+        @StorableDoc("Ubuntu 17.04 (Zesty Zapus)")
         UBUNTU_ZESTY(OSFamily.LINUX, "17\\.04"), // 17.04
+        @StorableDoc("Ubuntu 17.10 (Artful Aardvark)")
         UBUNTU_ARTFUL(OSFamily.LINUX, "17\\.10"), // 17.10
+        @StorableDoc("Ubuntu 18.04 LTS (Bionic Beaver)")
         UBUNTU_BIONIC(OSFamily.LINUX, "18\\.04"), // 18.04
+        @StorableDoc("Ubuntu 18.10 (Cosmic Cuttlefish)")
         UBUNTU_COSMIC(OSFamily.LINUX, "18\\.10"), // 18.10
+        @StorableDoc("Ubuntu 19.04 (Disco Dingo)")
         UBUNTU_DISCO(OSFamily.LINUX, "19\\.04"), // 19.04
+        @StorableDoc("Ubuntu 19.10 (Eoan Ermine)")
         UBUNTU_EOAN(OSFamily.LINUX, "19\\.10"), // 19.10
+        @StorableDoc("Ubuntu 20.04 LTS (Focal Fossa)")
         UBUNTU_FOCAL(OSFamily.LINUX, "20\\.04"), // 20.04
+        @StorableDoc("Ubuntu 20.10 (Groovy Gorilla)")
         UBUNTU_GROOVY(OSFamily.LINUX, "20\\.10"), // 20.10
+        @StorableDoc("Ubuntu 21.04 (Hirsute Hippo)")
         UBUNTU_HIRSUTE(OSFamily.LINUX, "21\\.04"), // 21.04
+        @StorableDoc("Ubuntu 21.10 (Impish Indri)")
         UBUNTU_IMPISH(OSFamily.LINUX, "21\\.10"), // 21.10
+        @StorableDoc("Ubuntu 22.04 LTS (Jammy Jellyfish)")
         UBUNTU_JAMMY(OSFamily.LINUX, "22\\.04"), // 22.04
+        @StorableDoc("Ubuntu 22.10 (Kinetic Kudu)")
         UBUNTU_KINETIC(OSFamily.LINUX, "22\\.10"), // 22.10
+        @StorableDoc("Ubuntu 23.04 (Lunar Lobster)")
         UBUNTU_LUNAR(OSFamily.LINUX, "23\\.04"), // 23.04
+        @StorableDoc("Ubuntu 23.10 (Mantic Minotaur)")
         UBUNTU_MANTIC(OSFamily.LINUX, "23\\.10"), // 23.10
+        @StorableDoc("Ubuntu 24.04 LTS (Noble Numbat)")
         UBUNTU_NOBLE(OSFamily.LINUX, "24\\.04"), // 24.04
+        @StorableDoc("Ubuntu 24.10 (Oracular Oriole)")
         UBUNTU_ORACULAR(OSFamily.LINUX, "24\\.10"), // 24.10
+        @StorableDoc("Ubuntu 25.04 (Plucky Pangolin)")
         UBUNTU_PLUCKY(OSFamily.LINUX, "25\\.04"), // 25.04
+        @StorableDoc("Ubuntu 25.10 (Questing Quail)")
         UBUNTU_QUESTING(OSFamily.LINUX, "25\\.10"), // 25.10
+        @StorableDoc("Ubuntu 26.04 LTS (Resolute Rhino)")
         UBUNTU_RESOLUTE(OSFamily.LINUX, "26\\.04"), // 26.04
         /*
          * MAC: List must be sorted by release Date!!
          */
+        @StorableDoc("Generic macOS operating system")
         MAC(OSFamily.MAC),
+        @StorableDoc("macOS 10.0 (Cheetah)")
         MAC_CHEETAH(OSFamily.MAC), // 10.0
+        @StorableDoc("macOS 10.1 (Puma)")
         MAC_PUMA(OSFamily.MAC), // 10.1
+        @StorableDoc("macOS 10.2 (Jaguar)")
         MAC_JAGUAR(OSFamily.MAC), // 10.2
+        @StorableDoc("macOS 10.3 (Panther)")
         MAC_PANTHER(OSFamily.MAC), // 10.3
+        @StorableDoc("macOS 10.4 (Tiger)")
         MAC_TIGER(OSFamily.MAC), // 10.4
+        @StorableDoc("macOS 10.5 (Leopard)")
         MAC_LEOPOARD(OSFamily.MAC), // 10.5
+        @StorableDoc("macOS 10.6 (Snow Leopard)")
         MAC_SNOW_LEOPOARD(OSFamily.MAC), // 10.6
+        @StorableDoc("macOS 10.7 (Lion)")
         MAC_LION(OSFamily.MAC), // 10.7
+        @StorableDoc("macOS 10.8 (Mountain Lion)")
         MAC_MOUNTAIN_LION(OSFamily.MAC), // 10.8
+        @StorableDoc("macOS 10.9 (Mavericks)")
         MAC_MAVERICKS(OSFamily.MAC), // 10.9
+        @StorableDoc("macOS 10.10 (Yosemite)")
         MAC_YOSEMITE(OSFamily.MAC), // 10.10
+        @StorableDoc("macOS 10.11 (El Capitan)")
         MAC_EL_CAPITAN(OSFamily.MAC), // 10.11
+        @StorableDoc("macOS 10.12 (Sierra)")
         MAC_SIERRA(OSFamily.MAC), // 10.12
+        @StorableDoc("macOS 10.13 (High Sierra)")
         MAC_HIGH_SIERRA(OSFamily.MAC), // 10.13
+        @StorableDoc("macOS 10.14 (Mojave)")
         MAC_MOJAVE(OSFamily.MAC), // 10.14
+        @StorableDoc("macOS 10.15 (Catalina)")
         MAC_CATALINA(OSFamily.MAC), // 10.15
+        @StorableDoc("macOS 11.0 (Big Sur)")
         MAC_BIG_SUR(OSFamily.MAC), // 10.16/11.00
+        @StorableDoc("macOS 12.0 (Monterey)")
         MAC_MONTEREY(OSFamily.MAC), // 10.17/12.00
+        @StorableDoc("macOS 13.0 (Ventura)")
         MAC_VENTURA(OSFamily.MAC), // 10.18/13.00
+        @StorableDoc("macOS 14.0 (Sonoma)")
         MAC_SONOMA(OSFamily.MAC), // 10.19/14.00
+        @StorableDoc("macOS 15.0 (Sequoia)")
         MAC_SEQUOIA(OSFamily.MAC), // 10.20/15.00
+        @StorableDoc("macOS 26.0 (Tahoe)")
         MAC_TAHOE(OSFamily.MAC), // 10.xx/26.00
         /*
          * OS2
          */
+        @StorableDoc("OS/2 operating system")
         OS2(OSFamily.OS2),
         /*
          * Windows: List must be sorted by release Date!!
          */
+        @StorableDoc("Other or unknown Windows version")
         WINDOWS_OTHERS(OSFamily.WINDOWS),
+        @StorableDoc("Windows NT")
         WINDOWS_NT(OSFamily.WINDOWS),
+        @StorableDoc("Windows 2000")
         WINDOWS_2000(OSFamily.WINDOWS),
+        @StorableDoc("Windows XP")
         WINDOWS_XP(OSFamily.WINDOWS),
+        @StorableDoc("Windows 2003")
         WINDOWS_2003(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2003")
         WINDOWS_SERVER_2003(OSFamily.WINDOWS),
+        @StorableDoc("Windows Vista")
         WINDOWS_VISTA(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2008")
         WINDOWS_SERVER_2008(OSFamily.WINDOWS),
+        @StorableDoc("Windows 7")
         WINDOWS_7(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2008 R2")
         WINDOWS_SERVER_2008_R2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 8")
         WINDOWS_8(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2012")
         WINDOWS_SERVER_2012(OSFamily.WINDOWS),
+        @StorableDoc("Windows 8.1")
         WINDOWS_8_1(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2012 R2")
         WINDOWS_SERVER_2012_R2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 10")
         WINDOWS_10(OSFamily.WINDOWS),
+        @StorableDoc("Windows 10 version 20H2 (October 2020 Update)")
         WINDOWS_10_20H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 10 version 21H1 (May 2021 Update)")
         WINDOWS_10_21H1(OSFamily.WINDOWS),
+        @StorableDoc("Windows 10 version 21H2 (November 2021 Update)")
         WINDOWS_10_21H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 10 version 22H2 (October 2022 Update)")
         WINDOWS_10_22H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2016")
         WINDOWS_SERVER_2016(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2019")
         WINDOWS_SERVER_2019(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2020")
         WINDOWS_SERVER_2020(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2022")
         WINDOWS_SERVER_2022(OSFamily.WINDOWS),
+        @StorableDoc("Windows Server 2025")
         WINDOWS_SERVER_2025(OSFamily.WINDOWS),
+        @StorableDoc("Windows 11")
         WINDOWS_11(OSFamily.WINDOWS), // WINDOWS_11_21H2
+        @StorableDoc("Windows 11 version 21H2 (original release)")
         WINDOWS_11_21H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 11 version 22H2 (2022 Update)")
         WINDOWS_11_22H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 11 version 23H2 (2023 Update)")
         WINDOWS_11_23H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 11 version 24H2 (2024 Update)")
         WINDOWS_11_24H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 11 version 25H2 (2025 Update)")
         WINDOWS_11_25H2(OSFamily.WINDOWS),
+        @StorableDoc("Windows 11 version 26H1 (2026 Update)")
         WINDOWS_11_26H1(OSFamily.WINDOWS);
 
         private final OSFamily family;
@@ -367,12 +518,19 @@ public class CrossSystem {
 
     private final static EnumSet<OperatingSystem> OperatingSystems = EnumSet.allOf(OperatingSystem.class);
 
+    @StorableDoc("Enumeration of operating system families. Groups operating systems by their base platform (BSD, Linux, Mac, Windows, etc.).")
     public static enum OSFamily {
+        @StorableDoc("BSD family of operating systems (FreeBSD, OpenBSD, NetBSD, etc.)")
         BSD,
+        @StorableDoc("Linux family of operating systems (Ubuntu, Debian, Fedora, etc.)")
         LINUX,
+        @StorableDoc("macOS family (Apple Macintosh operating systems)")
         MAC,
+        @StorableDoc("OS/2 operating system")
         OS2,
+        @StorableDoc("Other or unknown operating system families")
         OTHERS,
+        @StorableDoc("Windows family of operating systems (Windows 7, 10, 11, Server editions, etc.)")
         WINDOWS;
 
         public static OSFamily get(final OperatingSystem os) {
@@ -394,15 +552,25 @@ public class CrossSystem {
         }
     }
 
+    @StorableDoc("Enumeration of processor architecture families. Used to identify the CPU architecture of the system.")
     public static enum ARCHFamily {
+        @StorableDoc("Not available or unknown architecture")
         NA,
+        @StorableDoc("x86 architecture family (Intel/AMD 32-bit and 64-bit processors: i386, i486, i586, i686, x86, amd64, x86_64)")
         X86,
+        @StorableDoc("ARM architecture family (ARM processors: arm, aarch64, arm64)")
         ARM,
+        @StorableDoc("PowerPC architecture family (PPC processors: ppc, powerpc, ppc64)")
         PPC,
+        @StorableDoc("MIPS architecture family (MIPS processors: mips, mipsel)")
         MIPS,
+        @StorableDoc("SPARC architecture family (SPARC processors: sparc, sparcv9)")
         SPARC,
+        @StorableDoc("Intel Itanium 64-bit architecture (IA-64 processors)")
         IA64,
+        @StorableDoc("RISC-V architecture family (RISC-V processors: riscv32, riscv64)")
         RISCV,
+        @StorableDoc("LoongArch architecture family (LoongArch processors: loongarch64, loong64)")
         LOONGARCH
     }
 

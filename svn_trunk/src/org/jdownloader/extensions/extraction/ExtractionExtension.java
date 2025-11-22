@@ -36,7 +36,6 @@ import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.controlling.packagecontroller.PackageControllerModifyVetoListener;
@@ -735,9 +734,9 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
     public static final ThreadLocal<Map<AbstractPackageNode, List<AbstractPackageChildrenNode>>> ARCHIVE_FACTORY_OPTIMIZATION = new ThreadLocal<Map<AbstractPackageNode, List<AbstractPackageChildrenNode>>>();
 
     public List<Archive> getArchivesFromPackageChildren(final List<? extends Object> nodes, Set<String> ignoreArchiveIDs, final int maxArchives) {
-        final Map<AbstractPackageNode, List<AbstractPackageChildrenNode>> optimize = new HashMap<AbstractPackageNode, List<AbstractPackageChildrenNode>>();
+        final Map<AbstractPackageNode, List<AbstractPackageChildrenNode>> packageChildrenCache = new HashMap<AbstractPackageNode, List<AbstractPackageChildrenNode>>();
         final HashSet<String> skipArchiveIDSet = new HashSet<String>();
-        ARCHIVE_FACTORY_OPTIMIZATION.set(optimize);
+        ARCHIVE_FACTORY_OPTIMIZATION.set(packageChildrenCache);
         try {
             final ArrayList<Archive> archives = new ArrayList<Archive>();
             final ArrayList<Archive> optimizeArchives = new ArrayList<Archive>();
@@ -750,61 +749,62 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
             for (int threadIndex = 0; threadIndex < 8; threadIndex++) {
                 final Thread helperThread = new Thread("getArchivesFromPackageChildren:thread=" + threadIndex + "|nodesIdentityHashCode=" + System.identityHashCode(nodes) + "|size=" + nodes.size()) {
 
-                    private List<AbstractPackageChildrenNode> optimizePackageChildren(AbstractPackageChildrenNode childNode) {
+                    private final List<AbstractPackageChildrenNode> getCachedPackageChildren(AbstractPackageChildrenNode childNode) {
                         final AbstractPackageNode parent = (AbstractPackageNode) childNode.getParentNode();
                         if (parent == null) {
                             return null;
                         }
-                        synchronized (optimize) {
-                            List<AbstractPackageChildrenNode> packageChildren = optimize.get(parent);
+                        List<AbstractPackageChildrenNode> packageChildren = null;
+                        getPackageChildren: synchronized (packageChildrenCache) {
+                            packageChildren = packageChildrenCache.get(parent);
                             if (packageChildren != null) {
-                                if (packageChildren.indexOf(childNode) == -1) {
-                                    return null;
-                                }
-                                return packageChildren;
+                                break getPackageChildren;
                             }
                             final ModifyLock modifyLock = parent.getModifyLock();
                             boolean readL = modifyLock.readLock();
                             try {
-                                optimize.put(parent, packageChildren = new CopyOnWriteArrayList<AbstractPackageChildrenNode>(parent.getChildren()));
+                                packageChildrenCache.put(parent, packageChildren = new CopyOnWriteArrayList<AbstractPackageChildrenNode>(parent.getChildren()));
                             } finally {
                                 modifyLock.readUnlock(readL);
                             }
                             return packageChildren;
                         }
+                        if (packageChildren.indexOf(childNode) != -1) {
+                            return packageChildren;
+                        }
+                        return null;
                     }
 
-                    private int optimizePackageChildren(final Archive archive) {
+                    private final boolean optimizeCachedPackageChildren(AbstractPackageChildrenNode childNode) {
+                        final AbstractPackageNode parent = (AbstractPackageNode) childNode.getParentNode();
+                        if (parent == null) {
+                            return false;
+                        }
+                        final List<AbstractPackageChildrenNode> packageChildren;
+                        synchronized (packageChildrenCache) {
+                            packageChildren = packageChildrenCache.get(parent);
+                        }
+                        if (packageChildren != null && packageChildren.remove(childNode)) {
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    private int optimizeCachedPackageChildren(final Archive archive) {
                         int removed = 0;
                         final List<ArchiveFile> archiveFiles = archive.getArchiveFiles();
                         for (final ArchiveFile archiveFile : archiveFiles) {
                             if (archiveFile instanceof CrawledLinkArchiveFile) {
                                 final CrawledLinkArchiveFile cla = (CrawledLinkArchiveFile) archiveFile;
                                 for (CrawledLink cl : cla.getLinks()) {
-                                    final CrawledPackage parent = cl.getParentNode();
-                                    if (parent == null) {
-                                        continue;
-                                    }
-                                    final List<AbstractPackageChildrenNode> children;
-                                    synchronized (optimize) {
-                                        children = optimize.get(parent);
-                                    }
-                                    if (children != null && children.remove(cl)) {
+                                    if (optimizeCachedPackageChildren(cl)) {
                                         removed++;
                                     }
                                 }
                             } else if (archiveFile instanceof DownloadLinkArchiveFactory) {
                                 final DownloadLinkArchiveFactory dla = (DownloadLinkArchiveFactory) archiveFile;
                                 for (DownloadLink dl : dla.getDownloadLinks()) {
-                                    final FilePackage parent = dl.getParentNode();
-                                    if (parent == null) {
-                                        continue;
-                                    }
-                                    final List<AbstractPackageChildrenNode> children;
-                                    synchronized (optimize) {
-                                        children = optimize.get(parent);
-                                    }
-                                    if (children != null && children.remove(dl)) {
+                                    if (optimizeCachedPackageChildren(dl)) {
                                         removed++;
                                     }
                                 }
@@ -815,7 +815,7 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
 
                     @Override
                     public void run() {
-                        ARCHIVE_FACTORY_OPTIMIZATION.set(optimize);
+                        ARCHIVE_FACTORY_OPTIMIZATION.set(packageChildrenCache);
                         archiveBuildLoop: while (!abortFlag.get()) {
                             final Object child;
                             synchronized (linkedNodes) {
@@ -828,15 +828,15 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                             List<AbstractPackageChildrenNode> packageChildren = null;
                             if (child instanceof CrawledLink) {
                                 final CrawledLink cl = ((CrawledLink) child);
-                                packageChildren = optimizePackageChildren(cl);
-                                if (packageChildren == null || packageChildren.size() == 0 || packageChildren.indexOf(child) == -1) {
+                                packageChildren = getCachedPackageChildren(cl);
+                                if (packageChildren == null) {
                                     continue archiveBuildLoop;
                                 }
                                 af = new CrawledLinkFactory(cl);
                             } else if (child instanceof DownloadLink) {
                                 final DownloadLink dl = ((DownloadLink) child);
-                                packageChildren = optimizePackageChildren(dl);
-                                if (packageChildren == null || packageChildren.size() == 0 || packageChildren.indexOf(child) == -1) {
+                                packageChildren = getCachedPackageChildren(dl);
+                                if (packageChildren == null) {
                                     continue archiveBuildLoop;
                                 }
                                 af = new DownloadLinkArchiveFactory(dl);
@@ -857,7 +857,7 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                             synchronized (archives) {
                                 if (!abortFlag.get() && skipArchiveIDSet.add(archive.getArchiveID())) {
                                     archives.add(archive);
-                                    optimizePackageChildren(archive);
+                                    optimizeCachedPackageChildren(archive);
                                     System.out.println("count:" + archives.size());
                                     if (maxArchives > 0 && archives.size() >= maxArchives) {
                                         abortFlag.set(true);

@@ -73,7 +73,9 @@ public class ConditionDocsGenerator extends DocsGenerator {
 
                 ArrayList<String> keys = new ArrayList<String>(list.getKeys());
                 Collections.sort(keys);
-
+                if (matcherType.isObject()) {
+                    return null;
+                }
                 return "Matcher/Context: " + matcherType.toString() + " (" + new Joiner(", ").join(keys) + ") -[[" + matcherType.toString() + "]]";
             } catch (SecurityException e) {
                 LogV3.log(e);
