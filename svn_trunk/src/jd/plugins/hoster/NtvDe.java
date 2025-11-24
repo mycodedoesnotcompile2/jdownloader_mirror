@@ -19,6 +19,11 @@ import java.io.IOException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.downloader.hls.HLSDownloader;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -30,11 +35,8 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
-import org.jdownloader.downloader.hls.HLSDownloader;
-
-@HostPlugin(revision = "$Revision: 50459 $", interfaceVersion = 2, names = { "n-tv.de" }, urls = { "https?://(?:www\\.)?n\\-tv\\.de/mediathek/(?:videos|sendungen|magazine)/([^/]+/[^/]+)\\.html" })
+@HostPlugin(revision = "$Revision: 51865 $", interfaceVersion = 2, names = { "n-tv.de" }, urls = { "https?://(?:www\\.)?n\\-tv\\.de/mediathek/(?:videos|sendungen|magazine)/([^/]+/[^/]+)\\.html" })
 public class NtvDe extends PluginForHost {
     public NtvDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,15 +83,29 @@ public class NtvDe extends PluginForHost {
          * https://www.n-tv.de/mediathek/sendungen/RTLplus/Queen-Elizabeth-Eine-Familiengeschichte-article20787496.html
          */
         final boolean looksLikeDRMProtected = br.containsHTML("sec-mediathek_sendungen_tvnow") && getStreamURL(br) == null;
-        final String date = br.getRegex("publishedDateAsUnixTimeStamp:\\s*?\"(\\d+)\"").getMatch(0);
+        String dateString = br.getRegex("publishedDateAsUnixTimeStamp:\\s*?\"(\\d+)\"").getMatch(0);
+        if (dateString == null) {
+            // publishedAt":"2025-10-31T16:43"
+            final long date = TimeFormatter.getMilliSeconds(br.getRegex("\"publishedAt\"\\s*:\\s*\"([0-9T:-]+)").getMatch(0), "yyyy-MM-dd", Locale.GERMANY);
+            if (date != -1) {
+                dateString = Long.toString(date / 1000);
+            }
+        }
         String title = br.getRegex("headline:\\s*\"(.*?)\",\\s").getMatch(0);
         if (title != null) {
             title = Encoding.unicodeDecode(title);
-            title = PluginJSonUtils.unescape(title);
+        } else {
+            // new json
+            title = br.getRegex("\"headline\"\\s*:\\s*\"(.*?)\"\\s*,\\s*\"").getMatch(0);
+            if (title != null) {
+                title = restoreFromString("\"" + title + "\"", TypeRef.STRING);
+            }
+        }
+        if (title != null) {
             title = title.trim();
             String filename = "";
-            if (date != null) {
-                filename = formatDate(date) + "_";
+            if (dateString != null) {
+                filename = formatDate(dateString) + "_";
             }
             filename += "_n-tv_" + title + ".mp4";
             if (looksLikeDRMProtected) {
@@ -156,11 +172,25 @@ public class NtvDe extends PluginForHost {
     }
 
     private String getStreamURL(final Browser br) {
-        final String progressive = br.getRegex("progressive\\s*?:\\s*?\"(https?[^\"]+)\"").getMatch(0);
+        String progressive = br.getRegex("progressive\\s*?:\\s*?\"(https?[^\"]+)\"").getMatch(0);
+        if (progressive == null) {
+            // new json
+            progressive = br.getRegex("\"web-prog\"\\s*:\\s*\"(https?.*?)\"\\s*,\\s*\"").getMatch(0);
+            if (progressive != null) {
+                progressive = restoreFromString("\"" + progressive + "\"", TypeRef.STRING);
+            }
+        }
         if (progressive != null) {
             return progressive;
         }
-        final String m3u8 = br.getRegex("videoM3u8\\s*:\\s*\"(/apple/[^<>\"/]+\\.m3u8)\"").getMatch(0);
+        String m3u8 = br.getRegex("videoM3u8\\s*:\\s*\"(/apple/[^<>\"/]+\\.m3u8)\"").getMatch(0);
+        if (m3u8 == null) {
+            // new json, has split video/audio
+            m3u8 = br.getRegex("\"web-hls\"\\s*:\\s*\"(https?.*?)\"\\s*,\\s*\"").getMatch(0);
+            if (m3u8 != null) {
+                m3u8 = restoreFromString("\"" + m3u8 + "\"", TypeRef.STRING);
+            }
+        }
         return m3u8;
     }
 

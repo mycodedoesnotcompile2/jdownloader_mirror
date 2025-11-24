@@ -16,13 +16,16 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -46,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PinterestComDecrypter;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 51841 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51866 $", interfaceVersion = 3, names = {}, urls = {})
 public class PinterestCom extends PluginForHost {
     public PinterestCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -152,16 +155,40 @@ public class PinterestCom extends PluginForHost {
         }
         PinterestComDecrypter.checkSinglePINOffline(br);
         parse_single_pin_info_from_html: {
-            final String[] directurls = br.getRegex("fetchpriority=\"high\" href=\"(https://[^\"]+)").getColumn(0);
-            if (directurls != null && directurls.length > 0) {
-                final List<String> directurls_without_dupes = new ArrayList<String>();
-                for (final String directurl : directurls) {
-                    if (directurls_without_dupes.contains(directurl)) {
-                        continue;
+            String[] directurls = null;
+            find_directurl_list: {
+                String videoMP4 = null;
+                String videos = br.getRegex("\"videos\"\\s*:\\s*(\\{.*?\\}\\s*\\}\\s*\\})").getMatch(0);
+                if (videos != null) {
+                    Map<String, Object> map = null;
+                    try {
+                        map = restoreFromString(videos, TypeRef.MAP);
+                    } catch (Exception e) {
+                        // TODO: optimize json regex
+                        map = restoreFromString(videos + "}", TypeRef.MAP);
                     }
-                    directurls_without_dupes.add(directurl);
+                    videoMP4 = (String) JavaScriptEngineFactory.walkJson(map, "videoList/v720P/url");
+                } else {
+                    videos = br.getRegex("\"videoDataV2\"\\s*:\\s*(\\{.*?\\}\\s*\\}\\s*\\})").getMatch(0);
+                    final Map<String, Object> map = restoreFromString(videos, TypeRef.MAP);
+                    videoMP4 = (String) JavaScriptEngineFactory.walkJson(map, "videoList720P/v720P/url");
                 }
-                link.setProperty(PinterestCom.PROPERTY_DIRECTURL_LIST, directurls_without_dupes);
+                if (videoMP4 != null) {
+                    directurls = new String[] { videoMP4 };
+                    link.setProperty(PinterestCom.PROPERTY_DIRECTURL_LIST, new ArrayList<String>(Arrays.asList(directurls)));
+                    break find_directurl_list;
+                }
+                directurls = br.getRegex("fetchpriority=\"high\" href=\"(https://[^\"]+)").getColumn(0);
+                if (directurls != null && directurls.length > 0) {
+                    final List<String> directurls_without_dupes = new ArrayList<String>();
+                    for (final String directurl : directurls) {
+                        if (directurls_without_dupes.contains(directurl)) {
+                            continue;
+                        }
+                        directurls_without_dupes.add(directurl);
+                    }
+                    link.setProperty(PinterestCom.PROPERTY_DIRECTURL_LIST, directurls_without_dupes);
+                }
             }
             String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
             if (title != null) {
@@ -211,8 +238,11 @@ public class PinterestCom extends PluginForHost {
         }
         final String ext;
         if (!StringUtils.isEmpty(directlink)) {
-            if (directlink.contains(".m3u8")) {
-                /* HLS stream */
+            if (directlink.contains(".mp4")) {
+                /* progressive mp4 stream */
+                ext = ".mp4";
+            } else if (directlink.contains(".m3u8")) {
+                /* HLS stream, currently unsupported by handleDownload method */
                 ext = ".mp4";
             } else {
                 ext = getFileNameExtensionFromString(directlink, ".jpg");
