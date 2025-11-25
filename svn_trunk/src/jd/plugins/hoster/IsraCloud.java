@@ -15,14 +15,18 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -31,7 +35,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51867 $", interfaceVersion = 3, names = {}, urls = {})
 public class IsraCloud extends XFileSharingProBasic {
     public IsraCloud(final PluginWrapper wrapper) {
         super(wrapper);
@@ -140,5 +144,34 @@ public class IsraCloud extends XFileSharingProBasic {
         if (br.containsHTML("This file is available.{1,8}for Premium Users only")) {
             throw new AccountRequiredException();
         }
+    }
+
+    @Override
+    protected void sendRequest(final Browser ibr, final Request request) throws Exception {
+        prepReq(ibr, request);
+        super.sendRequest(ibr, request);
+    }
+
+    @Override
+    protected URLConnectionAdapter openAntiDDoSRequestConnection(final Browser ibr, Request request) throws Exception {
+        prepReq(ibr, request);
+        return super.openAntiDDoSRequestConnection(ibr, request);
+    }
+
+    private void prepReq(final Browser ibr, final Request request) throws MalformedURLException {
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            return;
+        }
+        final String fid = this.getFUIDFromURL(getDownloadLink());
+        if (fid == null) {
+            return;
+        }
+        /* Set special headers to allow users to download special "temporary file ids". */
+        ibr.getHeaders().put("Referer", "https://www.isrbx.me/");
+        final String host = Browser.getHost(request.getUrl());
+        // request.setURL(new URL("https://" + host + "/download"));
+        ibr.setCookie(host, "file_id", fid);
+        ibr.setCookie(host, "ref_url", "https%3A%2F%2Fwww.isrbx.me%2F");
+        // ibr.setCookie(host, "forceSplash", "1");
     }
 }

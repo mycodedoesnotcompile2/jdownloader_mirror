@@ -29,6 +29,8 @@ import java.awt.event.MouseMotionListener;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -97,13 +99,16 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     private static final long                   AWAY_TIMEOUT   = 15 * 60 * 1000;
     private static final Pattern                CMD_ACTION     = Pattern.compile("(me)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_CONNECT    = Pattern.compile("(connect|verbinden)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern                CMD_CLOSE      = Pattern.compile("(close)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_DISCONNECT = Pattern.compile("(disconnect|trennen)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_EXIT       = Pattern.compile("(exit|quit)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern                CMD_HELP       = Pattern.compile("(help|info)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_MODE       = Pattern.compile("(mode|modus)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_JOIN       = Pattern.compile("join", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_NICK       = Pattern.compile("(nick|name)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_PM         = Pattern.compile("(msg|query)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_SLAP       = Pattern.compile("(slap)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern                CMD_SAVE       = Pattern.compile("(save)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_TOPIC      = Pattern.compile("(topic|title)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_VERSION    = Pattern.compile("(version|jdversion)", Pattern.CASE_INSENSITIVE);
     private static final java.util.List<String> COMMANDS       = new ArrayList<String>();
@@ -118,6 +123,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     }
     public static final String STYLE_ACTION         = "action";
     public static final String STYLE_ERROR          = "error";
+    public static final String STYLE_HELP           = "help";
     public static final String STYLE_HIGHLIGHT      = "highlight";
     public static final String STYLE_NOTICE         = "notice";
     public static final String STYLE_PM             = "pm";
@@ -125,6 +131,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     public static final String STYLE_SYSTEM_MESSAGE = "system";
     public static final String STYLE_OP_NOTICE      = "opnotice";
     public static final String STYLE_TOPIC          = "topic";
+    public static final String SERVER_MESSAGE_TAB   = "server-messages";
     public static String       USERLIST_STYLE;
     static {
         try {
@@ -150,11 +157,11 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     private JTextPane                        textArea;
     private JTextField                       textField;
     private JDChatView                       view;
-    private JTabbedPane                      tabbedPane;
     private ChatConfigPanel                  configPanel;
     private String                           currentChannel;
     private Thread                           awayChecker;
     private String                           banText   = null;
+    JTabbedPane                              tabbedPane;
 
     public ExtensionConfigPanel<ChatExtension> getConfigPanel() {
         return configPanel;
@@ -172,6 +179,24 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     public ChatExtension() throws StartException {
         super();
         setTitle(T.jd_plugins_optional_jdchat_jdchat());
+    }
+
+    public void switchToPMS(final String user) {
+        if (ChatExtension.this.tabbedPane.getTitleAt(ChatExtension.this.tabbedPane.getSelectedIndex()).toLowerCase().equals(user.toLowerCase())) {
+            return;
+        }
+        new EDTHelper<Object>() {
+            @Override
+            public Object edtRun() {
+                for (int x = 0; x < ChatExtension.this.tabbedPane.getTabCount(); x++) {
+                    if (ChatExtension.this.tabbedPane.getTitleAt(x).toLowerCase().equals(user.toLowerCase())) {
+                        ChatExtension.this.tabbedPane.setSelectedIndex(x);
+                        break;
+                    }
+                }
+                return null;
+            }
+        }.start(true);
     }
 
     public void addPMS(final String user2) {
@@ -294,19 +319,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
             if (!this.pms.containsKey(usr.name.toLowerCase())) {
                 this.addPMS(usr.name);
             }
-            for (int x = 0; x < this.tabbedPane.getTabCount(); x++) {
-                if (this.tabbedPane.getTitleAt(x).equals(usr.name)) {
-                    final int t = x;
-                    new EDTHelper<Object>() {
-                        @Override
-                        public Object edtRun() {
-                            ChatExtension.this.tabbedPane.setSelectedIndex(t);
-                            return null;
-                        }
-                    }.start(true);
-                    break;
-                }
-            }
+            this.switchToPMS(usr.name.toLowerCase());
         } else {
             new EDTHelper<Object>() {
                 @Override
@@ -383,7 +396,8 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
         }
         this.NAMES.clear();
         if (this.conn != null && this.conn.isConnected()) {
-            this.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Change channel to: " + newChannel);
+            this.addToText(null, ChatExtension.STYLE_HELP, "You are now in channel: " + newChannel);
+            this.addToText(null, ChatExtension.STYLE_HELP, "Your username is: " + this.getNickname());
         }
         // only leave if actually in a channel - fixes "No such channel" on connect
         if (this.conn != null && this.conn.isConnected() && currentChannel != null) {
@@ -408,6 +422,8 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
             this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> Please ask your question in ENGLISH or GERMAN! Be patient, give us time to respond!  ");
             this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> You can also search the forums at <a href=\"https://board.jdownloader.org\">https://board.jdownloader.org</a>  ");
             this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> Before reporting a problem, please check that you have the latest version installed!  ");
+            this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> For a list of available commands, type \"/help\"  ");
+            this.addToText(null, ChatExtension.STYLE_HIGHLIGHT, "==> This is a <u>public</u> chat, do not post usernames or passwords here!  ");
         }
     }
 
@@ -465,8 +481,6 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
         // this.textField.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, Collections.EMPTY_SET);
         this.textField.addFocusListener(new FocusListener() {
             public void focusGained(final FocusEvent e) {
-                if (e.getOppositeComponent() == null) {
-                }
                 ChatExtension.this.tabbedPane.setForegroundAt(ChatExtension.this.tabbedPane.getSelectedIndex(), Color.black);
             }
 
@@ -633,11 +647,9 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
             final int port = getSettings().getIrcPort();
             final String pass = null;
             final String nick = this.getNickname();
+            final String name = "jdchat";
             // Making user name based on startup time, user would have to restart to get around channel ban based on name
-            final long instance_id = SecondLevelLaunch.startup;
-            String name = "jdchat" + instance_id;
-            // Username can only be 9 characters long anyway
-            String user = "jdchat";
+            String user = "jd" + String.valueOf(SecondLevelLaunch.startup).substring(3, 10);
             this.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Connecting to JDChat...");
             this.conn = new IRCConnection(host, new int[] { port }, pass, nick, user, name);
             this.conn.setTimeout(1000 * 60 * 60);
@@ -674,11 +686,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 for (int x = 0; x < ChatExtension.this.tabbedPane.getTabCount(); x++) {
                     if (ChatExtension.this.tabbedPane.getTitleAt(x).equals(user)) {
                         final int t = x;
-                        String text = text2;
                         ChatExtension.this.tabbedPane.setForegroundAt(t, Color.RED);
-                        if (text.length() > 40) {
-                            text = text.substring(0, 40).concat("...");
-                        }
                         return null;
                     }
                 }
@@ -843,20 +851,70 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                         return null;
                     }
                 }.start(true);
+                if (ChatExtension.this.tabbedPane.getTitleAt(ChatExtension.this.tabbedPane.getSelectedIndex()).equals(ChatExtension.SERVER_MESSAGE_TAB)) {
+                    this.addToText(null, ChatExtension.STYLE_ERROR, "You can't send messages to this tab", pms.get(ChatExtension.SERVER_MESSAGE_TAB.toLowerCase()).getTextArea(), pms.get(ChatExtension.SERVER_MESSAGE_TAB.toLowerCase()).getSb());
+                    return;
+                }
                 end = rest.indexOf(" ");
                 if (end < 0) {
                     end = rest.length();
                 }
-                if (!this.pms.containsKey(rest.substring(0, end).trim().toLowerCase())) {
-                    this.addPMS(rest.substring(0, end).trim());
+                final String targetUser = rest.substring(0, end).trim();
+                if (!this.pms.containsKey(targetUser.toLowerCase())) {
+                    this.addPMS(targetUser);
                 }
-                this.conn.doPrivmsg(rest.substring(0, end).trim(), this.prepareToSend(rest.substring(end).trim()));
-                this.lastCommand = "/msg " + rest.substring(0, end).trim() + " ";
-                this.addToText(this.getUser(this.conn.getNick()), ChatExtension.STYLE_SELF, Utils.prepareMsg(rest.substring(end).trim()), this.pms.get(rest.substring(0, end).trim().toLowerCase()).getTextArea(), this.pms.get(rest.substring(0, end).trim().toLowerCase()).getSb());
+                this.conn.doPrivmsg(targetUser, this.prepareToSend(rest.substring(end).trim()));
+                this.lastCommand = "/msg " + targetUser.trim() + " ";
+                this.addToText(this.getUser(this.conn.getNick()), ChatExtension.STYLE_SELF, Utils.prepareMsg(rest.substring(end).trim()), this.pms.get(targetUser.toLowerCase()).getTextArea(), this.pms.get(targetUser.toLowerCase()).getSb());
+                this.switchToPMS(targetUser);
+            } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_HELP)) {
+                String[] infoLines = { "Available commands in this chat:", "/me <action>  -->  lets people know you do <action>", "/nick <name>  -->  changes your nick to <name>", "/msg <user> <message> -->  opens a private message with <user>", "/close  -->  closes the current chat tab", "/quit  -->  closes the support chat", "/topic  -->  lets you read the channel topic again", "/version  -->  shows info about your JDownloader program", "/connect  -->  connect/reconnects to the chat server if the connection got lost", "/disconnect  -->  disconnect from the chat server" };
+                final String chatName = ChatExtension.this.tabbedPane.getTitleAt(ChatExtension.this.tabbedPane.getSelectedIndex());
+                if (this.pms.containsKey(chatName.toLowerCase())) {
+                    for (String infoLine : infoLines) {
+                        this.addToText(null, ChatExtension.STYLE_HELP, Utils.prepareMsg(infoLine), pms.get(chatName.toLowerCase()).getTextArea(), pms.get(chatName.toLowerCase()).getSb());
+                    }
+                } else {
+                    for (String infoLine : infoLines) {
+                        this.addToText(null, ChatExtension.STYLE_HELP, Utils.prepareMsg(infoLine));
+                    }
+                }
+                this.lastCommand = "/help";
+            } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_SAVE)) {
+                final String chatName = ChatExtension.this.tabbedPane.getTitleAt(ChatExtension.this.tabbedPane.getSelectedIndex());
+                final String chatTime = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME).toString();
+                final String logFilename = "ChatLog " + chatName.replace("#", "") + " " + chatTime + ".txt";
+                final String userInfo = "This chat has been saved to the file \"" + logFilename + "\" in your JDownloader folder (" + Application.getHome() + ")";
+                String chatBox;
+                if (this.pms.containsKey(chatName.toLowerCase())) {
+                    // save a pm
+                    chatBox = this.pms.get(chatName.toLowerCase()).getTextArea().getText();
+                    this.addToText(null, ChatExtension.STYLE_HELP, userInfo, pms.get(chatName.toLowerCase()).getTextArea(), pms.get(chatName.toLowerCase()).getSb());
+                } else {
+                    // not a pm, it's the main chat
+                    chatBox = ChatExtension.this.textArea.getText();
+                    this.addToText(null, ChatExtension.STYLE_HELP, userInfo);
+                }
+                // There's surely a better way to covert to plain text...
+                final String chatLog = "JDownloader support chat log \"" + chatName + "\" at " + chatTime + "\r\n" + chatBox.replaceAll("<!-{4}>", "FORCE-NL").replaceAll("\\<[^>]*>", "").replaceAll("\\r\\n\\s*\\r\\n", "\r\n").replaceAll("[\\s]{2,}", " ").replaceAll("FORCE-NL", "\r\n") + "\r\n";
+                logger.info("CHAT: Writing chatlog to file " + logFilename + " folder " + Application.getHome());
+                try {
+                    IO.writeStringToFile(new File(Application.getHome(), logFilename), chatLog);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                this.lastCommand = "/save";
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_SLAP)) {
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION  slaps " + rest + " with the whole Javadocs" + new String(new byte[] { 1 }));
                 this.addToText(null, ChatExtension.STYLE_ACTION, this.conn.getNick() + " slaps " + rest + " with the whole Javadocs");
                 this.lastCommand = "/slap ";
+            } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_CLOSE)) {
+                if (ChatExtension.this.tabbedPane.getSelectedIndex() > 0) {
+                    ChatExtension.this.delPMS(ChatExtension.this.tabbedPane.getTitleAt(ChatExtension.this.tabbedPane.getSelectedIndex()));
+                } else if (ChatExtension.this.tabbedPane.getSelectedIndex() == 0) {
+                    ChatExtension.this.addToText(null, ChatExtension.STYLE_ERROR, "You can't close the main Chat!");
+                }
+                this.lastCommand = "/close";
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_ACTION)) {
                 this.lastCommand = "/me ";
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION " + this.prepareToSend(rest.trim()) + new String(new byte[] { 1 }));
@@ -899,6 +957,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 final String msg = String.join(", ", infobits);
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION " + this.prepareToSend(msg) + new String(new byte[] { 1 }));
                 this.addToText(null, ChatExtension.STYLE_ACTION, this.conn.getNick() + " " + Utils.prepareMsg(msg));
+                this.lastCommand = "/version";
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_MODE)) {
                 end = rest.indexOf(" ");
                 if (end < 0) {
@@ -938,6 +997,10 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                     this.conn.close();
                 }
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_EXIT)) {
+                // close all tabs except for the main tab
+                for (int x = 1; x < ChatExtension.this.tabbedPane.getTabCount(); x++) {
+                    ChatExtension.this.tabbedPane.remove(x);
+                }
                 getGUI().setActive(false);
             } else {
                 this.addToText(null, ChatExtension.STYLE_ERROR, "Command /" + cmd + " is not available");

@@ -8,17 +8,19 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import jd.plugins.DownloadLink;
 
-import org.appwork.utils.Application;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFactory;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.BooleanStatus;
+import org.jdownloader.extensions.extraction.ExtractionExtension;
 import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
@@ -42,30 +44,51 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
     }
 
     protected List<File> findFiles(Pattern pattern, File directory) {
-        if (Application.getJavaVersion() >= Application.JAVA17) {
+        final Map<? extends Object, ? extends Object> directoryCachedFiles = ExtractionExtension.ARCHIVE_FACTORY_OPTIMIZATION.get();
+        cached_fileList: if (directoryCachedFiles != null) {
+            final List<File> directoryFiles;
+            synchronized (directoryCachedFiles) {
+                directoryFiles = (List<File>) directoryCachedFiles.get(directory);
+            }
+            if (directoryFiles == null) {
+                break cached_fileList;
+            }
+            final ArrayList<File> ret = new ArrayList<File>();
+            for (final File directoryFile : directoryFiles) {
+                if (pattern.matcher(directoryFile.getPath()).matches()) {
+                    if (directoryFile.isFile()) {
+                        ret.add(directoryFile);
+                    }
+                }
+            }
+            return ret;
+        }
+        nio: if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
             try {
                 return FileArchiveFactoryNIO.findFiles(pattern, directory);
             } catch (IOException e) {
                 org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
             }
         }
-        final ArrayList<File> ret = new ArrayList<File>();
-        if (pattern != null && directory != null && directory.isDirectory()) {
-            final String[] directoryFiles = directory.list();
-            if (directoryFiles != null) {
-                final String absoluteDirectoryPath = directory.getAbsolutePath();
-                for (final String directoryFile : directoryFiles) {
-                    final String directoryFilePath = absoluteDirectoryPath + File.separator + directoryFile;
-                    if (pattern.matcher(directoryFilePath).matches()) {
-                        final File dFile = new File(directory, directoryFile);
-                        if (dFile.isFile()) {
-                            ret.add(dFile);
+        fileList: {
+            final ArrayList<File> ret = new ArrayList<File>();
+            if (pattern != null && directory != null && directory.isDirectory()) {
+                final String[] directoryFiles = directory.list();
+                if (directoryFiles != null) {
+                    final String absoluteDirectoryPath = directory.getAbsolutePath();
+                    for (final String directoryFile : directoryFiles) {
+                        final String directoryFilePath = absoluteDirectoryPath + File.separator + directoryFile;
+                        if (pattern.matcher(directoryFilePath).matches()) {
+                            final File dFile = new File(directory, directoryFile);
+                            if (dFile.isFile()) {
+                                ret.add(dFile);
+                            }
                         }
                     }
                 }
             }
+            return ret;
         }
-        return ret;
     }
 
     public java.util.List<ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String file, String patternString) {

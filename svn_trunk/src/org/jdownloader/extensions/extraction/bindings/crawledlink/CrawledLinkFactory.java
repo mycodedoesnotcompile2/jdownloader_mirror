@@ -15,7 +15,6 @@ import java.util.regex.Pattern;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.plugins.DownloadLink;
 import jd.plugins.PluginForHost;
 
@@ -102,11 +101,11 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
             return ret;
         } else {
             final HashMap<String, ArchiveFile> map = new HashMap<String, ArchiveFile>();
-            final Map<AbstractPackageNode, List<AbstractPackageChildrenNode>> packageChildrenMap = ExtractionExtension.ARCHIVE_FACTORY_OPTIMIZATION.get();
+            final Map<? extends Object, ? extends Object> packageChildrenMap = ExtractionExtension.ARCHIVE_FACTORY_OPTIMIZATION.get();
             final List<AbstractPackageChildrenNode> children;
             if (packageChildrenMap != null) {
                 synchronized (packageChildrenMap) {
-                    children = packageChildrenMap.get(parentNode);
+                    children = (List<AbstractPackageChildrenNode>) packageChildrenMap.get(parentNode);
                 }
             } else {
                 final ModifyLock modifyLock = parentNode.getModifyLock();

@@ -45,6 +45,10 @@ class IRCListener implements IRCEventListener {
         logger.info("Disconnected");
         this.owner.setLoggedIn(false);
         this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Connection lost. type /connect if jd does not connect by itself");
+        // close all tabs except for the main tab
+        while (this.owner.tabbedPane.getTabCount() > 1) {
+            this.owner.tabbedPane.remove(1);
+        }
     }
 
     public void onError(final int num, final String msg) {
@@ -71,7 +75,7 @@ class IRCListener implements IRCEventListener {
 
     public void onJoin(final String chan, final IRCUser u) {
         logger.info(chan + "> " + u.getNick() + " joins");
-        this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, u.getNick() + " joins");
+        this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, u.getNick() + " joins " + chan);
         this.owner.addUser(u.getNick());
         // owner.requestNameList();
     }
@@ -88,7 +92,8 @@ class IRCListener implements IRCEventListener {
 
     public void onMode(final IRCUser u, final String nickPass, final String mode) {
         logger.info("Mode: " + u.getNick() + " sets modes " + mode + " " + nickPass);
-        this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, u.getNick() + " sets modes " + mode + " " + nickPass);
+        // this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, u.getNick() + " sets modes " + mode + " " + nickPass);
+        serverMessage(u.getNick() + " sets modes " + mode + " " + nickPass);
     }
 
     public void onMode(final String chan, final IRCUser u, final IRCModeParser mp) {
@@ -115,7 +120,9 @@ class IRCListener implements IRCEventListener {
             if (user != null && user.getRank().equals("@")) { // Notice from operator/channel-bot
                 this.owner.addToText(null, ChatExtension.STYLE_OP_NOTICE, "NOTICE: " + Utils.prepareMsg(msg));
             } else {
-                this.owner.addToText(null, ChatExtension.STYLE_NOTICE, u.getNick() + " (notice): " + Utils.prepareMsg(msg));
+                // No user means it's a server message / notification, lets put these into a separate tab
+                // Server-errors will still be displayed in the current tab
+                serverMessage(msg);
             }
         }
         if (msg.endsWith("has been ghosted.")) {
@@ -203,7 +210,7 @@ class IRCListener implements IRCEventListener {
 
     public void onRegistered() {
         logger.info("Connected");
-        this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Connection estabilished");
+        this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Connection established");
         this.owner.onConnected();
     }
 
@@ -225,6 +232,15 @@ class IRCListener implements IRCEventListener {
     public void onTopic(final String chan, final IRCUser u, final String topic) {
         logger.info(chan + "> " + u.getNick() + " changes topic into: " + topic);
         this.owner.setTopic(topic);
+    }
+
+    public void serverMessage(final String msg) {
+        if (!this.owner.getPms().containsKey(ChatExtension.SERVER_MESSAGE_TAB)) {
+            this.owner.addPMS(ChatExtension.SERVER_MESSAGE_TAB);
+            // info message at the top
+            this.owner.addToText(null, ChatExtension.STYLE_HELP, "This is the chat connection log - if you're having problems connecting to the support chat, please check for problems here!", this.owner.getPms().get(ChatExtension.SERVER_MESSAGE_TAB).getTextArea(), this.owner.getPms().get(ChatExtension.SERVER_MESSAGE_TAB).getSb());
+        }
+        this.owner.addToText(null, ChatExtension.STYLE_HELP, Utils.prepareMsg(msg), this.owner.getPms().get(ChatExtension.SERVER_MESSAGE_TAB).getTextArea(), this.owner.getPms().get(ChatExtension.SERVER_MESSAGE_TAB).getSb());
     }
 
     public void unknown(final String a, final String b, final String c, final String d) {

@@ -50,11 +50,20 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 51623 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 51869 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        /* Prefer English */
+        br.setCookie(getHost(), "USER_SELECTED_LANG", "en");
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -78,14 +87,13 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             /* 2025-07-28: Negative-lookahead regex which excludes image-directlinks */
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!(img|images?|video)/).+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!(img|images?|video|search)/).+");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
         /* Modify URL so we will always start crawling from first page */
         final UrlQuery firstQuery = UrlQuery.parse(param.getCryptedUrl());
         final String pageParamInAddedURL = firstQuery.get("page");
@@ -108,10 +116,17 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         final String domainInURL = Browser.getHost(contentURLCleaned, true);
         contentURLCleaned = contentURLCleaned.replace(domainInURL, this.getHost());
         br.getPage(contentURLCleaned);
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() == 400) {
+            /* invalid URLs such as: https://putmega.com/%MEDIUM_URL% */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getURL().matches("(?i)^https?://[^/]+/?$")) {
-            /* Redirect to main page */
+            /* Redirect to main page -> Content offline */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("data-params-hidden=\"list=images\">\\s*<div class=\"content-empty\">")) {
+            /* <h2>There's nothing to show here.</h2> */
+            /* Example: https://putmega.com/search/images/?q={q} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String passCode = null;
@@ -149,8 +164,6 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         if (seek != null) {
             seek = Encoding.htmlDecode(seek);
         }
-        br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
-        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         final String token = br.getRegex("PF\\.obj\\.config\\.auth_token\\s*=\\s*\"([a-f0-9]+)\"").getMatch(0);
         final String apiurl = br.getRegex("PF\\.obj\\.config\\.json_api\\s*=\\s*\"((https?://|/)[^\"]+)\"").getMatch(0);
         final String dataparamshidden = br.getRegex("data-params-hidden=\"([^\"]+)").getMatch(0);
@@ -159,7 +172,6 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         if (numberofImagesStr != null) {
             numberofImages = Integer.parseInt(numberofImagesStr);
         }
-        int page = 1;
         final UrlQuery query = dataparamshidden != null ? UrlQuery.parse(dataparamshidden) : new UrlQuery();
         query.appendEncoded("action", "list");
         query.appendEncoded("list", "images"); // contained in dataparamshidden
@@ -200,9 +212,14 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             seekEnds.add(seek);
         }
         final Set<String> dupes = new HashSet<String>();
+        int page = 1;
         int imagePosition = 1;
-        do {
+        pagination: do {
             final String[] htmls = br.getRegex("<div class=\"list-item [^\"]+\"(.*?)class=\"btn-lock fas fa-eye-slash\"[^>]*></div>").getColumn(0);
+            if (page == 1 && (htmls == null || htmls.length == 0) && seek == null && dataparamshidden == null && numberofImagesStr == null) {
+                /* Link is valid but does not lead to any crawlable content e.g. https://putmega.com/?lang=fi */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Link does not lead to any crawlable content");
+            }
             int numberofNewItems = 0;
             int numberofNewAlbums = 0;
             for (final String html : htmls) {
@@ -274,39 +291,41 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                 break;
             } else if (ret.size() == numberofImages) {
                 logger.info("Stopping because: Found all items");
-                break;
+                break pagination;
             } else if (numberofNewItems == 0 && numberofNewAlbums == 0) {
                 logger.info("Stopping because: Current page contains no new items");
-                break;
+                break pagination;
             } else if (apiurl == null || token == null || seek == null) {
                 /* This should never happen */
                 logger.info("Stopping because: At least one mandatory pagination param is missing | apiurl=" + apiurl + " | token=" + token + " | seek=" + seek);
-                break;
+                break pagination;
+            }
+            /* Continue to next page */
+            page++;
+            br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
+            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            if (isProfileAlbumsOverview) {
+                // album overview has different pagination, use same as in browser
+                br.getPage("?page=" + Integer.toString(page) + "&seek=" + URLEncode.encodeURIComponent(seek));
+                seek = br.getRegex("page=" + Integer.toString(page + 1) + "&seek=([^\\&\"]+)").getMatch(0);
+                if (seek != null) {
+                    seek = Encoding.htmlDecode(seek);
+                }
+                if (seek != null && !seekEnds.add(seek)) {
+                    seek = null;
+                }
             } else {
-                page++;
-                if (isProfileAlbumsOverview) {
-                    // album overview has different pagination, use same as in browser
-                    br.getPage("?page=" + Integer.toString(page) + "&seek=" + URLEncode.encodeURIComponent(seek));
-                    seek = br.getRegex("page=" + Integer.toString(page + 1) + "&seek=([^\\&\"]+)").getMatch(0);
-                    if (seek != null) {
-                        seek = Encoding.htmlDecode(seek);
-                    }
-                    if (seek != null && !seekEnds.add(seek)) {
-                        seek = null;
-                    }
-                } else {
-                    query.addAndReplace("page", Integer.toString(page));
-                    query.addAndReplace("seek", URLEncode.encodeURIComponent(seek));
-                    br.postPage(apiurl, query);
-                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                    final String html = (String) entries.get("html");
-                    if (html != null) {
-                        br.getRequest().setHtmlCode(html);
-                    }
-                    seek = (String) entries.get("seekEnd");
-                    if (seek != null && !seekEnds.add(seek)) {
-                        seek = null;
-                    }
+                query.addAndReplace("page", Integer.toString(page));
+                query.addAndReplace("seek", URLEncode.encodeURIComponent(seek));
+                br.postPage(apiurl, query);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String html = (String) entries.get("html");
+                if (html != null) {
+                    br.getRequest().setHtmlCode(html);
+                }
+                seek = (String) entries.get("seekEnd");
+                if (seek != null && !seekEnds.add(seek)) {
+                    seek = null;
                 }
             }
         } while (true);

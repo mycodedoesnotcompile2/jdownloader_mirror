@@ -15,25 +15,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -57,7 +38,26 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 51474 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 51870 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class TurbobitCore extends PluginForHost {
     /* Settings */
     public static final String             SETTING_FREE_PARALLEL_DOWNLOADSTARTS          = "SETTING_FREE_PARALLEL_DOWNLOADSTARTS";
@@ -67,6 +67,7 @@ public abstract class TurbobitCore extends PluginForHost {
     private static final boolean           prefer_single_linkcheck_via_mass_linkchecker  = true;
     private static final String            TYPE_premiumRedirectLinks                     = "(?i)(?:https?://[^/]+/)?/?download/redirect/[A-Za-z0-9]+/([a-z0-9]+)";
     private static Map<String, AtomicLong> hostLastPremiumCaptchaProcessedTimestampMap   = new HashMap<String, AtomicLong>();
+
     /* Properties */
 
     /**
@@ -151,9 +152,9 @@ public abstract class TurbobitCore extends PluginForHost {
         }
         /**
          * Enabled = Do not check for filesize via single-linkcheck on first time linkcheck - only on the 2nd linkcheck and when the
-         * filesize is not known already. This will speedup the linkcheck! </br>
-         * Disabled = Check for filesize via single-linkcheck even first time links get added as long as no filesize is given. This will
-         * slow down the linkcheck and cause more http requests in a short amount of time!
+         * filesize is not known already. This will speedup the linkcheck! </br> Disabled = Check for filesize via single-linkcheck even
+         * first time links get added as long as no filesize is given. This will slow down the linkcheck and cause more http requests in a
+         * short amount of time!
          */
         final boolean fastLinkcheck = isFastLinkcheckEnabled();
         final List<DownloadLink> linksForDeepCheck = new ArrayList<DownloadLink>();
@@ -646,8 +647,7 @@ public abstract class TurbobitCore extends PluginForHost {
     }
 
     /**
-     * Fills in captchaForm. </br>
-     * DOES NOT SEND CAPTCHA-FORM!!
+     * Fills in captchaForm. </br> DOES NOT SEND CAPTCHA-FORM!!
      */
     protected boolean processCaptchaFormWebsiteV1(final DownloadLink link, final Account account, final Form captchaform, final Browser br, final boolean optionalCaptcha) throws PluginException, InterruptedException {
         if (AbstractHCaptcha.containsHCaptcha(br)) {
@@ -1190,9 +1190,18 @@ public abstract class TurbobitCore extends PluginForHost {
     private Map<String, Object> checkErrorsWebsiteV2(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         /* Wait milliseconds for unknown/generic errors */
         final long waitmillis = 60 * 1000;
-        Map<String, Object> entries = null;
+        final Map<String, Object> entries = new HashMap<String, Object>();
         try {
-            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Object obj = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (obj instanceof Map) {
+                entries.putAll((Map<String, Object>) obj);
+            } else if (obj instanceof List) {
+                if (((List) obj).size() > 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            } else if (obj != null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         } catch (final JSonMapperException ignore) {
             /* This should never happen. */
             final String errortext = "Invalid API response";
@@ -1384,6 +1393,7 @@ public abstract class TurbobitCore extends PluginForHost {
                 postdata.put("captcha", true);
                 postdata.put("g-recaptcha-response", "");
                 postdata.put("g-captcha-index", 4);
+                br.addAllowedResponseCodes(422);
                 br.postPageRaw(getWebsiteV2Base() + "/api/auth/login", JSonStorage.serializeToJson(postdata));
                 final Map<String, Object> entries = this.checkErrorsWebsiteV2(br, null, account);
                 return entries;

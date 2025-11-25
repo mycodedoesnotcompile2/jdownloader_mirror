@@ -9,10 +9,11 @@ ul         { padding: 0px; margin:0px; }
 .self      { color:#222222; }
 .time      { }
 .highlight { color:#000000; background-color:#FFFF99; margin-bottom:15px; margin-top:15px; }
-.error     { color:#ff0000; }
+.error     { color:#ff0000; font-weight:bold; }
 .action    { font-style:italic; color:#009900; }
 .notice    { color:#00B5B8; }
 .topic     { color:#204A87; font-weight:bold; font-size:10px; margin-bottom:15px; margin-top:15px; }
+.help      { color:#0000FF; font-weight:bold; }
 .opnotice  { background-color:#FF0000; color:#FFFFFF; font-size:10px; font-weight:bold; 
              margin-bottom:20px; margin-top:20px; }
 </style>

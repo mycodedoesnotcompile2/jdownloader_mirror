@@ -731,7 +731,7 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         }
     }
 
-    public static final ThreadLocal<Map<AbstractPackageNode, List<AbstractPackageChildrenNode>>> ARCHIVE_FACTORY_OPTIMIZATION = new ThreadLocal<Map<AbstractPackageNode, List<AbstractPackageChildrenNode>>>();
+    public static final ThreadLocal<Map<? extends Object, ? extends Object>> ARCHIVE_FACTORY_OPTIMIZATION = new ThreadLocal<Map<? extends Object, ? extends Object>>();
 
     public List<Archive> getArchivesFromPackageChildren(final List<? extends Object> nodes, Set<String> ignoreArchiveIDs, final int maxArchives) {
         final Map<AbstractPackageNode, List<AbstractPackageChildrenNode>> packageChildrenCache = new HashMap<AbstractPackageNode, List<AbstractPackageChildrenNode>>();
