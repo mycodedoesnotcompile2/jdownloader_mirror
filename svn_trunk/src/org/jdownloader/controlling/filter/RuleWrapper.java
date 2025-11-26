@@ -4,17 +4,18 @@ import java.io.File;
 import java.net.URL;
 import java.util.regex.Pattern;
 
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkOriginDetails;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkInfo;
-
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.RegexFilter.MatchType;
 import org.jdownloader.controlling.packagizer.PackagizerController;
 import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
+
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkOriginDetails;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.PackageInfo;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkInfo;
 
 public class RuleWrapper<T extends FilterRule> {
     private final CompiledRegexFilter        fileNameRule;
@@ -300,7 +301,7 @@ public class RuleWrapper<T extends FilterRule> {
         }
     }
 
-    protected String getPackageName(CrawledLink link) {
+    public String getPackageName(CrawledLink link) {
         if (link == null) {
             return null;
         }
@@ -308,8 +309,9 @@ public class RuleWrapper<T extends FilterRule> {
         if (link.getParentNode() != null) {
             ret = link.getParentNode().getName();
         }
-        if (StringUtils.isEmpty(ret) && link.getDesiredPackageInfo() != null) {
-            ret = link.getDesiredPackageInfo().getName();
+        final PackageInfo dpi;
+        if (StringUtils.isEmpty(ret) && (dpi = link.getDesiredPackageInfo()) != null) {
+            ret = dpi.getName();
         }
         return ret;
     }
@@ -519,5 +521,4 @@ public class RuleWrapper<T extends FilterRule> {
     public boolean isEnabled() {
         return rule.isEnabled();
     }
-
 }

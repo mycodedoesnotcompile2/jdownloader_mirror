@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51874 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosharingCom extends XFileSharingProBasic {
     public XvideosharingCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -72,8 +72,16 @@ public class XvideosharingCom extends XFileSharingProBasic {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "xvideosharing.com" });
-        ret.add(new String[] { "vidspeeds.com", "vidspeed.net" });
+        /* 2025-11-25: Main domain has changed from vidspeeds.com to vidspeed.org and domain vidspeed.net is down */
+        ret.add(new String[] { "vidspeed.org", "vidspeeds.com", "vidspeed.net" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("vidspeed.net");
+        return deadDomains;
     }
 
     @Override

@@ -149,4 +149,9 @@ public class MissingArchiveFile implements ArchiveFile {
     public String getArchiveID() {
         return archiveID;
     }
+
+    @Override
+    public boolean isFileArchiveFileExists() {
+        return false;
+    }
 }

@@ -16,8 +16,10 @@
 package jd.plugins.hoster;
 
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -27,6 +29,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -35,12 +38,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51867 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51872 $", interfaceVersion = 3, names = {}, urls = {})
 public class IsraCloud extends XFileSharingProBasic {
     public IsraCloud(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
+
+    private static final Pattern PATTERN_SUPPORTED = Pattern.compile("/([a-z0-9]{12})(/([^/]+)(?:\\.html)?)?", Pattern.CASE_INSENSITIVE);
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
@@ -68,7 +73,15 @@ public class IsraCloud extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_SUPPORTED.pattern());
+        }
+        return ret.toArray(new String[0]);
     }
 
     public static List<String[]> getPluginDomains() {
@@ -141,8 +154,8 @@ public class IsraCloud extends XFileSharingProBasic {
     @Override
     protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account) throws NumberFormatException, PluginException {
         super.checkErrors(br, html, link, account);
-        if (br.containsHTML("This file is available.{1,8}for Premium Users only")) {
-            throw new AccountRequiredException();
+        if (br.containsHTML(">\\s*This file is available.{1,8}for Premium Users only")) {
+            throw new AccountRequiredException("This file is available for Premium Users only");
         }
     }
 
@@ -159,19 +172,30 @@ public class IsraCloud extends XFileSharingProBasic {
     }
 
     private void prepReq(final Browser ibr, final Request request) throws MalformedURLException {
+        /* Set special headers to allow users to download special "temporary file ids". */
+        final boolean enableSpecialHandling = false;
         if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             return;
         }
-        final String fid = this.getFUIDFromURL(getDownloadLink());
-        if (fid == null) {
+        if (!enableSpecialHandling) {
             return;
         }
-        /* Set special headers to allow users to download special "temporary file ids". */
-        ibr.getHeaders().put("Referer", "https://www.isrbx.me/");
+        final String fid = new Regex(request.getURL().getPath(), PATTERN_SUPPORTED).getMatch(0);
+        if (fid == null) {
+            /* Not the expected URL -> Do not modify request */
+            return;
+        }
+        final boolean accessDownloadPageDirectly = true;
+        final String specialReferer = Encoding.Base64Decode("aHR0cHM6Ly93d3cuaXNyYngubWUv");
         final String host = Browser.getHost(request.getUrl());
-        // request.setURL(new URL("https://" + host + "/download"));
-        ibr.setCookie(host, "file_id", fid);
-        ibr.setCookie(host, "ref_url", "https%3A%2F%2Fwww.isrbx.me%2F");
+        if (accessDownloadPageDirectly) {
+            ibr.getHeaders().put("Referer", "https://isra.cloud/" + fid);
+            request.setURL(new URL("https://" + host + "/download"));
+        } else {
+            ibr.getHeaders().put("Referer", specialReferer);
+        }
+        ibr.setCookie(host, "file_code", fid);
+        ibr.setCookie(host, "ref_url", Encoding.urlEncode(specialReferer));
         // ibr.setCookie(host, "forceSplash", "1");
     }
 }

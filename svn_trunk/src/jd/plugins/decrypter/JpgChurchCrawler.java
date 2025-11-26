@@ -22,12 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -50,7 +44,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 51869 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 51875 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -87,7 +87,7 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             /* 2025-07-28: Negative-lookahead regex which excludes image-directlinks */
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!(img|images?|video|search)/).+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?!(img|images?|video|search|explore)/).+");
         }
         return ret.toArray(new String[0]);
     }

@@ -455,15 +455,15 @@ public enum ArchiveType implements UnitType {
                         // RAR 4.x 0x52 0x61 0x72 0x21 0x1A 0x07 0x00 (MARK_HEAD)
                         /*
                          * 0x0001 Volume/Archive, bit 0
-                         *
+                         * 
                          * 0x0002 Comment
-                         *
+                         * 
                          * 0x0004 Lock Archive
-                         *
+                         * 
                          * 0x0008 Solid Archive
-                         *
+                         * 
                          * 0x0010 New Volume naming scheme (.partN.rar), bit 4
-                         *
+                         * 
                          * 0x0100 First Volume (only in RAR 3.0 and later), bit 8
                          */
                         final boolean archiveHeader = "73".equals(signatureString.substring(18, 20));
@@ -480,15 +480,15 @@ public enum ArchiveType implements UnitType {
                     } else if (isRAR5x && signatureString.length() >= 17 * 2) {
                         // RAR 5.x 0x52 0x61 0x72 0x21 0x1A 0x07 0x01 0x00 (MARK_HEAD)
                         /*
-                         *
+                         * 
                          * 0x0001   Volume. Archive is a part of multivolume set.
-                         *
+                         * 
                          * 0x0002   Volume number field is present. This flag is present in all volumes except first.
-                         *
+                         * 
                          * 0x0004   Solid archive.
-                         *
+                         * 
                          * 0x0008   Recovery record is present.
-                         *
+                         * 
                          * 0x0010   Locked archive.
                          */
                         try {
@@ -538,12 +538,12 @@ public enum ArchiveType implements UnitType {
                 } else {
                     final long value = read & 0x7f;
                     final int msb = (read & 0xff) >> 7;
-                                ret |= (value << shift);
-                                if (msb == 0) {
-                                    return ret;
-                                } else {
-                                    shift += 7;
-                                }
+                    ret |= (value << shift);
+                    if (msb == 0) {
+                        return ret;
+                    } else {
+                        shift += 7;
+                    }
                 }
             }
         }
@@ -1732,7 +1732,7 @@ public enum ArchiveType implements UnitType {
                 } else if (isMultiPart != null && archiveType.isMultiPartType() != isMultiPart.booleanValue()) {
                     continue archiveTypeLoop;
                 }
-                final List<ArchiveFile> foundArchiveFiles = link.createPartFileList(archiveType, filePathParts, linkPath, pattern.pattern());
+                final List<? extends ArchiveFile> foundArchiveFiles = link.createPartFileList(archiveType, filePathParts, linkPath, pattern.pattern());
                 if (foundArchiveFiles == null || foundArchiveFiles.size() == 0) {
                     throw new ArchiveException("Broken archive support!ArchiveType:" + archiveType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Path:" + linkPath + "|Pattern:" + pattern.pattern() + "|MultiPart:" + isMultiPart + "|DeepInspection:" + allowDeepInspection);
                 }
@@ -1763,33 +1763,61 @@ public enum ArchiveType implements UnitType {
                         }
                     }
                 }
-                if (archiveType.looksLikeAnArchive(availableParts, archiveFiles)) {
-                    final String[] fileNameParts = archiveType.getMatches(link.getName());
-                    final Archive archive = link.createArchive(archiveType);
-                    archive.setName(fileNameParts[0]);
-                    final String rawID = archiveType.name() + " |" + fileNameParts[0] + archiveType.buildIDPattern(fileNameParts, isMultiPart);
-                    final String ID = Hash.getSHA256(rawID);
-                    final String archiveID = Archive.getBestArchiveID(foundArchiveFiles, ID);
-                    archive.setArchiveID(archiveID);
-                    final ArrayList<ArchiveFile> sortedArchiveFiles = new ArrayList<ArchiveFile>();
-                    final int minimumParts = Math.max(archiveType.getMinimumNeededPartIndex(), highestPartNumber);
-                    for (int partIndex = archiveType.getFirstPartIndex(); partIndex <= minimumParts; partIndex++) {
-                        if (availableParts.get(partIndex) == false) {
-                            final File missingFile = new File(archiveType.buildMissingPart(filePathParts, partIndex, partStringLength));
-                            sortedArchiveFiles.add(new MissingArchiveFile(missingFile.getName(), missingFile.getAbsolutePath()));
-                        } else {
-                            if (allowDeepInspection && Boolean.FALSE.equals(archiveType.isValidPart(partIndex, archiveFiles[partIndex], false))) {
-                                continue archiveTypeLoop;
-                            }
-                            sortedArchiveFiles.add(archiveFiles[partIndex]);
-                        }
-                    }
-                    archive.setArchiveFiles(sortedArchiveFiles);
-                    return archive;
+                Archive ret = finalizeArchive(archiveType, link, availableParts, archiveFiles, foundArchiveFiles, allowDeepInspection, filePathParts, isMultiPart, partStringLength, highestPartNumber);
+                if (ret != null) {
+                    return ret;
+                }
+                final ArchiveType maybeArchiveType;
+                if (ArchiveType.ZIP_MULTI2.equals(archiveType) && availableParts.get(0) && availableParts.length() == 1) {
+                    /* short cut from ZIP_MULTI2 to ZIP_SINGLE */
+                    maybeArchiveType = ArchiveType.ZIP_SINGLE;
+                } else if (ArchiveType.RAR_MULTI3.equals(archiveType) && availableParts.get(0) && availableParts.length() == 1) {
+                    /* short cut from RAR_MULTI3 to RAR_SINGLE */
+                    maybeArchiveType = ArchiveType.RAR_SINGLE;
                 } else {
                     continue archiveTypeLoop;
                 }
+                final String[] filePathParts2 = maybeArchiveType.getMatches(linkPath);
+                final Boolean isMultiPart2;
+                if (allowDeepInspection) {
+                    isMultiPart2 = maybeArchiveType.isMultiPart(link, false);
+                } else {
+                    isMultiPart2 = null;
+                }
+                ret = finalizeArchive(maybeArchiveType, link, availableParts, archiveFiles, foundArchiveFiles, allowDeepInspection, filePathParts2, isMultiPart2, partStringLength, highestPartNumber);
+                if (ret != null) {
+                    return ret;
+                }
+                continue archiveTypeLoop;
             }
+        }
+        return null;
+    }
+
+    private static Archive finalizeArchive(ArchiveType archiveType, ArchiveFactory link, BitSet availableParts, ArchiveFile[] archiveFiles, List<? extends ArchiveFile> foundArchiveFiles, final boolean allowDeepInspection, String[] filePathParts, final Boolean isMultiPart, int partStringLength, int highestPartNumber) {
+        if (archiveType.looksLikeAnArchive(availableParts, archiveFiles)) {
+            final String[] fileNameParts = archiveType.getMatches(link.getName());
+            final Archive archive = link.createArchive(archiveType);
+            archive.setName(fileNameParts[0]);
+            final String rawID = archiveType.name() + " |" + fileNameParts[0] + archiveType.buildIDPattern(fileNameParts, isMultiPart);
+            final String ID = Hash.getSHA256(rawID);
+            final String archiveID = Archive.getBestArchiveID(foundArchiveFiles, ID);
+            archive.setArchiveID(archiveID);
+            final ArrayList<ArchiveFile> sortedArchiveFiles = new ArrayList<ArchiveFile>();
+            final int minimumParts = Math.max(archiveType.getMinimumNeededPartIndex(), highestPartNumber);
+            for (int partIndex = archiveType.getFirstPartIndex(); partIndex <= minimumParts; partIndex++) {
+                if (availableParts.get(partIndex) == false) {
+                    final File missingFile = new File(archiveType.buildMissingPart(filePathParts, partIndex, partStringLength));
+                    sortedArchiveFiles.add(new MissingArchiveFile(missingFile.getName(), missingFile.getAbsolutePath()));
+                } else {
+                    if (allowDeepInspection && Boolean.FALSE.equals(archiveType.isValidPart(partIndex, archiveFiles[partIndex], false))) {
+                        return null;
+                    }
+                    sortedArchiveFiles.add(archiveFiles[partIndex]);
+                }
+            }
+            archive.setArchiveFiles(sortedArchiveFiles);
+            return archive;
         }
         return null;
     }

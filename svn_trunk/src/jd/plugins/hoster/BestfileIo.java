@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51849 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51874 $", interfaceVersion = 3, names = {}, urls = {})
 public class BestfileIo extends PluginForHost {
     public BestfileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,6 +59,7 @@ public class BestfileIo extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "bestfile.io" });
         ret.add(new String[] { "zippyshare.day" });
+        /* 2025-11-25: Also similar: zapupload.top */
         /* Similar but different: easyupload.us */
         return ret;
     }

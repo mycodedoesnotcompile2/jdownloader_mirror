@@ -27,31 +27,24 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
 @HostPlugin(revision = "$Revision: 51874 $", interfaceVersion = 3, names = {}, urls = {})
-public class VidrobaCom extends XFileSharingProBasic {
-    public VidrobaCom(final PluginWrapper wrapper) {
+public class CdnplusOrg extends XFileSharingProBasic {
+    public CdnplusOrg(final PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium(super.getPurchasePremiumURL());
+        this.enablePremium(super.getPurchasePremiumURL());
     }
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2019-03-08: null<br />
+     * captchatype-info: null 4dignum, reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidoba.org", "vidroba.com", "vidoba.net" });
+        ret.add(new String[] { "cdnplus.org" });
         return ret;
-    }
-
-    @Override
-    public String rewriteHost(final String host) {
-        /* 2021-09-23: Main domain changed from vidoba.net to vidroba.com */
-        /* 2025-11-25: Main domain changed from vidroba.com to vidoba.org */
-        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -64,28 +57,16 @@ public class VidrobaCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return buildAnnotationUrls(getPluginDomains());
-    }
-
-    public static final String getDefaultAnnotationPatternPartVidroba() {
-        /* Special: Allow port in URLs */
-        return "(?::\\d+)?/(?:d/[A-Za-z0-9]+|(?:embed-)?[a-z0-9]{12}(?:/[^/]+(?:\\.html)?)?)";
-    }
-
-    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + getDefaultAnnotationPatternPartVidroba());
-        }
-        return ret.toArray(new String[0]);
+        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
             return true;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
@@ -96,50 +77,31 @@ public class VidrobaCom extends XFileSharingProBasic {
 
     @Override
     public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return -2;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return 0;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return -2;
+            return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return -2;
+            return 0;
         }
     }
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return 1;
+        return -1;
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return 1;
+        return -1;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return 1;
-    }
-
-    @Override
-    public boolean isVideohosterEmbed() {
-        return true;
-    }
-
-    @Override
-    public boolean isVideohoster_enforce_video_filename() {
-        return true;
-    }
-
-    @Override
-    protected boolean supports_availablecheck_filesize_html() {
-        return false;
-    }
-
-    @Override
-    public boolean supports_availablecheck_filesize_via_embedded_video() {
-        return false;
+        return -1;
     }
 }

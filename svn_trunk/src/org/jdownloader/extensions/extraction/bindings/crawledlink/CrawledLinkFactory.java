@@ -31,6 +31,7 @@ import org.jdownloader.extensions.extraction.BooleanStatus;
 import org.jdownloader.extensions.extraction.ExtractionExtension;
 import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFactory;
+import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
@@ -90,9 +91,9 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
     }
 
     public List<ArchiveFile> createPartFileList(final UnitType unitType, final String[] filePathParts, final String file, String archivePartFilePattern) {
-        final String pattern = modifyPartFilePattern(archivePartFilePattern);
+        final String patternString = modifyPartFilePattern(archivePartFilePattern);
         final boolean caseSensitive = !CrossSystem.isWindows();
-        final Pattern pat = Pattern.compile(pattern, caseSensitive ? Pattern.CASE_INSENSITIVE : 0);
+        final Pattern patternPattern = Pattern.compile(patternString, caseSensitive ? Pattern.CASE_INSENSITIVE : 0);
         final CrawledPackage parentNode = getFirstPart().getParentNode();
         if (parentNode == null) {
             final List<ArchiveFile> ret = new ArrayList<ArchiveFile>();
@@ -116,7 +117,6 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
                     modifyLock.readUnlock(readL);
                 }
             }
-            System.out.println(children.size());
             final String fileNameCheck = filePathParts[0] + ".";
             loop: for (AbstractPackageChildrenNode child : children) {
                 final CrawledLink link = (CrawledLink) child;
@@ -129,7 +129,7 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
                 } else if ((!caseSensitive && !StringUtils.startsWithCaseInsensitive(linkName, fileNameCheck)) || (caseSensitive && !linkName.startsWith(fileNameCheck))) {
                     continue loop;
                 }
-                if (pat.matcher(linkName).matches()) {
+                if (patternPattern.matcher(linkName).matches()) {
                     CrawledLinkArchiveFile af = (CrawledLinkArchiveFile) map.get(caseSensitive ? linkName : linkName.toLowerCase(Locale.ROOT));
                     if (af == null) {
                         af = new CrawledLinkArchiveFile(link);
@@ -141,17 +141,16 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
             }
             final File directory = LinkTreeUtils.getDownloadDirectory(parentNode);
             if (directory != null) {
-                final List<ArchiveFile> localFiles = new FileArchiveFactory(directory).createPartFileList(unitType, filePathParts, file, pattern);
-                for (ArchiveFile localFile : localFiles) {
+                final List<FileArchiveFile> localFiles = new FileArchiveFactory(directory).createPartFileList(unitType, filePathParts, file, patternString);
+                for (FileArchiveFile localFile : localFiles) {
                     final ArchiveFile archiveFile = map.get(localFile.getName());
                     if (archiveFile == null) {
                         // There is a matching local file, without a downloadlink link. this can happen if the user removes finished
-                        // downloads
-                        // immediatelly
+                        // downloads immediatelly
                         map.put(localFile.getName(), localFile);
                     } else if (archiveFile instanceof CrawledLinkArchiveFile) {
                         final CrawledLinkArchiveFile af = (CrawledLinkArchiveFile) archiveFile;
-                        af.setFileArchiveFileExists(true);
+                        af.setExists(localFile);
                     }
                 }
             }

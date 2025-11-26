@@ -15,6 +15,7 @@ import jd.plugins.DownloadLink;
 
 import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.io.J7FileList;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFactory;
@@ -43,7 +44,7 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
         return origin != null;
     }
 
-    protected List<File> findFiles(Pattern pattern, File directory) {
+    protected List<File> findFiles(String[] filePathParts, Pattern pattern, File directory) {
         final Map<? extends Object, ? extends Object> directoryCachedFiles = ExtractionExtension.ARCHIVE_FACTORY_OPTIMIZATION.get();
         cached_fileList: if (directoryCachedFiles != null) {
             final List<File> directoryFiles;
@@ -53,9 +54,16 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
             if (directoryFiles == null) {
                 break cached_fileList;
             }
+            final String fileNameCheck = filePathParts[0] + ".";
+            final boolean caseSensitive = !CrossSystem.isWindows();
             final ArrayList<File> ret = new ArrayList<File>();
             for (final File directoryFile : directoryFiles) {
-                if (pattern.matcher(directoryFile.getPath()).matches()) {
+                final String fileName = directoryFile.getName();
+                if (fileName.length() < fileNameCheck.length()) {
+                    continue;
+                } else if ((!caseSensitive && !StringUtils.startsWithCaseInsensitive(fileName, fileNameCheck)) || (caseSensitive && !fileName.startsWith(fileNameCheck))) {
+                    continue;
+                } else if (pattern.matcher(fileName).matches()) {
                     if (directoryFile.isFile()) {
                         ret.add(directoryFile);
                     }
@@ -65,7 +73,8 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
         }
         nio: if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_7)) {
             try {
-                return FileArchiveFactoryNIO.findFiles(pattern, directory);
+                final List<File> ret = J7FileList.findFiles(pattern, directory, true, true);
+                return ret;
             } catch (IOException e) {
                 org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
             }
@@ -77,8 +86,7 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
                 if (directoryFiles != null) {
                     final String absoluteDirectoryPath = directory.getAbsolutePath();
                     for (final String directoryFile : directoryFiles) {
-                        final String directoryFilePath = absoluteDirectoryPath + File.separator + directoryFile;
-                        if (pattern.matcher(directoryFilePath).matches()) {
+                        if (pattern.matcher(directoryFile).matches()) {
                             final File dFile = new File(directory, directoryFile);
                             if (dFile.isFile()) {
                                 ret.add(dFile);
@@ -91,10 +99,14 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
         }
     }
 
-    public java.util.List<ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String file, String patternString) {
+    public List<FileArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String file, String patternString) {
         final Pattern pattern = Pattern.compile(patternString, CrossSystem.isWindows() ? Pattern.CASE_INSENSITIVE : 0);
-        final List<ArchiveFile> ret = new ArrayList<ArchiveFile>();
-        for (final File foundFile : findFiles(pattern, getFile().getParentFile())) {
+        final List<FileArchiveFile> ret = new ArrayList<FileArchiveFile>();
+        File directory = getFile();
+        if (!directory.isDirectory()) {
+            directory = directory.getParentFile();
+        }
+        for (final File foundFile : findFiles(filePathParts, pattern, directory)) {
             ret.add(new FileArchiveFile(foundFile));
         }
         return ret;

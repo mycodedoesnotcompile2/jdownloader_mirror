@@ -72,4 +72,6 @@ public interface ArchiveFile {
 
     public String getArchiveID();
 
+    public boolean isFileArchiveFileExists();
+
 }

@@ -575,7 +575,10 @@ public enum SplitType implements UnitType {
         final String[] filePathParts = splitType.getMatches(linkPath);
         if (filePathParts != null && splitType.isValidPart(-1, link)) {
             final Pattern pattern = splitType.buildArchivePattern(filePathParts);
-            final List<ArchiveFile> foundArchiveFiles = link.createPartFileList(splitType, filePathParts, linkPath, pattern.pattern());
+            if (pattern == null) {
+                return null;
+            }
+            final List<? extends ArchiveFile> foundArchiveFiles = link.createPartFileList(splitType, filePathParts, linkPath, pattern.pattern());
             if (foundArchiveFiles == null || foundArchiveFiles.size() == 0) {
                 throw new ArchiveException("Broken archive support!SplitType:" + splitType.name() + "|ArchiveFactory:" + link.getClass().getName() + "|Exists:" + link.exists(allowDeepInspection) + "|Path:" + linkPath + "|Pattern:" + pattern.pattern() + "|DeepInspection:" + allowDeepInspection);
             }

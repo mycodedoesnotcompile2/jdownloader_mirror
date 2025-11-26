@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51127 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 51874 $", interfaceVersion = 3, names = {}, urls = {})
 public class Up4loadCom extends XFileSharingProBasic {
     public Up4loadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,7 @@ public class Up4loadCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "up4load.com" });
+        ret.add(new String[] { "up4load.to", "up4load.com" });
         return ret;
     }
 

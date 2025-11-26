@@ -126,12 +126,13 @@ public class FileArchiveFile implements ArchiveFile {
 
     @Override
     public boolean exists(boolean ignoreCache) {
-        if (FileStateManager.getInstance().hasFileState(getFile(), FILESTATE.WRITE_EXCLUSIVE)) {
+        final File file = getFile();
+        if (FileStateManager.getInstance().hasFileState(file, FILESTATE.WRITE_EXCLUSIVE)) {
             return false;
         }
         Boolean ret = ignoreCache ? null : exists.get();
         if (ret == null) {
-            ret = getFile().isFile();
+            ret = file.isFile();
             exists.compareAndSet(null, ret);
         }
         return ret;
@@ -161,5 +162,10 @@ public class FileArchiveFile implements ArchiveFile {
     @Override
     public String getArchiveID() {
         return archiveID;
+    }
+
+    @Override
+    public boolean isFileArchiveFileExists() {
+        return exists();
     };
 }

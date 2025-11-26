@@ -2,6 +2,7 @@ package org.jdownloader.extensions.extraction;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.List;
 
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
@@ -12,7 +13,7 @@ public interface ArchiveFactory extends ArchiveFile {
     public static final String HOSTER      = "%HOSTER%";
     public static final String PACKAGENAME = "%PACKAGENAME%";
 
-    java.util.List<ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String file, String pattern);
+    List<? extends ArchiveFile> createPartFileList(UnitType unitType, String[] filePathParts, String file, String pattern);
 
     // for (DownloadLink link1 : archive.getDownloadLinks()) {
     // link1.setProperty(ExtractionExtension.DOWNLOADLINK_KEY_EXTRACTEDPATH,

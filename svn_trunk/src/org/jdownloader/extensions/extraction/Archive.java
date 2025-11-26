@@ -22,12 +22,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import net.sf.sevenzipjbinding.ArchiveFormat;
+
 import org.jdownloader.extensions.extraction.ArchiveFile.ArchiveID;
 import org.jdownloader.extensions.extraction.content.ContentView;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
-
-import net.sf.sevenzipjbinding.ArchiveFormat;
 
 /**
  * Contains information about the archivefile.
@@ -36,7 +36,7 @@ import net.sf.sevenzipjbinding.ArchiveFormat;
  *
  */
 public class Archive {
-    public static String getBestArchiveID(List<ArchiveFile> archiveFiles, final String suggestedArchiveID) {
+    public static String getBestArchiveID(List<? extends ArchiveFile> archiveFiles, final String suggestedArchiveID) {
         final HashMap<String, ArchiveID> scores = new HashMap<String, ArchiveID>();
         for (final ArchiveFile archiveFile : archiveFiles) {
             if (archiveFile == null) {

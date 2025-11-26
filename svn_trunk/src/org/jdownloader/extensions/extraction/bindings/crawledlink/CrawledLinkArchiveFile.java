@@ -20,28 +20,15 @@ import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.ExtractionController;
 import org.jdownloader.extensions.extraction.ExtractionStatus;
+import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 
 public class CrawledLinkArchiveFile implements ArchiveFile {
-    private final List<CrawledLink>        links;
-    private final String                   name;
-    private volatile long                  size;
-    private final AtomicReference<Boolean> exists                = new AtomicReference<Boolean>(null);
-    private final int                      hashCode;
-    private boolean                        fileArchiveFileExists = false;
-
-    public boolean isFileArchiveFileExists() {
-        return fileArchiveFileExists;
-    }
-
-    public void setFileArchiveFileExists(boolean fileArchiveFileExists) {
-        if (fileArchiveFileExists) {
-            setExists(true);
-        } else {
-            invalidateExists();
-        }
-        this.fileArchiveFileExists = fileArchiveFileExists;
-    }
+    private final List<CrawledLink>       links;
+    private final String                  name;
+    private volatile long                 size;
+    private final AtomicReference<Object> exists = new AtomicReference<Object>(null);
+    private final int                     hashCode;
 
     @Override
     public LinkInfo getLinkInfo() {
@@ -90,7 +77,7 @@ public class CrawledLinkArchiveFile implements ArchiveFile {
     }
 
     public Boolean isComplete() {
-        if (isFileArchiveFileExists() && exists()) {
+        if (isFileArchiveFileExists()) {
             return Boolean.TRUE;
         }
         for (final CrawledLink crawledLink : getLinks()) {
@@ -116,10 +103,6 @@ public class CrawledLinkArchiveFile implements ArchiveFile {
 
     public String getFilePath() {
         return name;
-    }
-
-    public void deleteFile(DeleteOption option) {
-        setFileArchiveFileExists(false);
     }
 
     public String getName() {
@@ -285,14 +268,41 @@ public class CrawledLinkArchiveFile implements ArchiveFile {
         return exists(false);
     };
 
+    public FileArchiveFile getFileArchiveFile() {
+        final Object ret = exists.get();
+        if (ret instanceof FileArchiveFile) {
+            return (FileArchiveFile) ret;
+        }
+        return null;
+    }
+
+    public boolean isFileArchiveFileExists() {
+        final Object ret = exists.get();
+        if (ret instanceof FileArchiveFile) {
+            return ((FileArchiveFile) ret).exists();
+        }
+        return false;
+    }
+
+    public void deleteFile(DeleteOption option) {
+        invalidateExists();
+    }
+
     @Override
     public boolean exists(boolean ignoreCache) {
-        Boolean ret = ignoreCache ? null : exists.get();
-        if (ret == null) {
-            ret = new File(LinkTreeUtils.getDownloadDirectory(getLinks().get(0)), getName()).exists();
-            exists.compareAndSet(null, ret);
+        final Object ret = ignoreCache ? null : exists.get();
+        if (ret instanceof FileArchiveFile) {
+            return ((FileArchiveFile) ret).exists(ignoreCache);
+        } else if (ret instanceof Boolean) {
+            return ((Boolean) ret).booleanValue();
         }
-        return ret;
+        final Boolean fileExists = new File(LinkTreeUtils.getDownloadDirectory(getLinks().get(0)), getName()).exists();
+        exists.compareAndSet(null, fileExists);
+        return fileExists.booleanValue();
+    }
+
+    protected void setExists(FileArchiveFile archiveFile) {
+        exists.set(archiveFile);
     }
 
     protected void setExists(boolean b) {
